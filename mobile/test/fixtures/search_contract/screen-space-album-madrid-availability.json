@@ -1,0 +1,42 @@
+{
+  "actor": "me",
+  "description": "Space album screen search mode, Places: Madrid (the archived photo stays in): availability only",
+  "ids": {
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec"
+      ],
+      "city": "Madrid",
+      "country": "Spain",
+      "dimensions": [
+        "availability"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": false,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

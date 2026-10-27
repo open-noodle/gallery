@@ -2,10 +2,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/common/polaroid_hero.widget.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
@@ -13,13 +14,12 @@ import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 /// Shown on the main Photos timeline when it resolves to zero assets.
 ///
 /// Four states, in priority order:
-///  1. a photos filter is active and its search request is still in flight -> a
-///     loading indicator. The search-backed timeline service starts at zero
-///     assets, so without this the "no results" state would be rendered for the
-///     whole duration of every search request (#901);
-///  2. a photos filter is active and the search has answered with nothing -> a
-///     compact "no results" state that lets the user clear the filter (never
-///     tells an existing user to enable backup);
+///  1. search mode has a filter and its results request is still in flight -> a
+///     loading indicator, so the "no results" state never flashes while a search
+///     is still answering (#901);
+///  2. search mode has a filter and the search has answered with nothing -> a
+///     compact "no results" state that clears the filters (never tells an
+///     existing user to enable backup);
 ///  3. the initial remote sync is still running -> a loading indicator, so the
 ///     brief empty bucket emission during sync (the upstream "blank timeline"
 ///     race) never flashes the onboarding state for accounts that have photos;
@@ -30,11 +30,11 @@ class TimelineEmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasActiveFilter = ref.watch(photosFilterProvider.select((f) => !f.isEmpty));
+    final hasActiveFilter =
+        ref.watch(searchModeProvider) && !ref.watch(searchStateProvider.select((state) => state.isEmpty));
     if (hasActiveFilter) {
-      // Read from inside the TimelineRouteScope, same as the load-more footer, so
-      // this is the scoped notifier actually feeding the timeline.
-      final isSearching = ref.watch(photosFilterSearchProvider.select((s) => s.isLoading));
+      // Read from inside the TimelineRouteScope, so this is the screen's own search.
+      final isSearching = ref.watch(searchResultsProvider.select((results) => results.loading));
       if (isSearching) {
         return const Center(child: ImmichLoadingIndicator());
       }
@@ -132,7 +132,8 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
   }
 }
 
-/// Compact "no results" state for when a filter is active but matched nothing.
+/// Compact "no results" state for when a filter is active but matched nothing. Its action clears every filter and the
+/// query, and search mode stays open (like Clear all).
 class _FilteredEmpty extends ConsumerWidget {
   const _FilteredEmpty();
 
@@ -164,7 +165,11 @@ class _FilteredEmpty extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             TextButton(
-              onPressed: () => ref.read(photosFilterProvider.notifier).reset(),
+              key: const Key('timeline-empty-clear-filters'),
+              onPressed: () {
+                ref.read(searchStateProvider.notifier).reset();
+                ref.read(searchFieldControllerProvider).clear();
+              },
               child: Text(context.t.timeline_empty_clear_filters),
             ),
           ],

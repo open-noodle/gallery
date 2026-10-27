@@ -1,0 +1,60 @@
+{
+  "actor": "me",
+  "description": "Photos, Kyoto rated at least 3, two filters: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "dimensions": [
+        "places"
+      ],
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Paris",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "France"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

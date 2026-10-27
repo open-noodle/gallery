@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Stock Immich server: upstream's feature keys only",
+  "ids": {},
+  "request": {
+    "headers": {},
+    "method": "GET",
+    "path": "/api/server/features"
+  },
+  "response": {
+    "body": {
+      "configFile": false,
+      "duplicateDetection": false,
+      "email": false,
+      "facialRecognition": false,
+      "importFaces": false,
+      "map": true,
+      "oauth": false,
+      "oauthAutoLaunch": false,
+      "ocr": false,
+      "passwordLogin": true,
+      "realtimeTranscoding": false,
+      "reverseGeocoding": true,
+      "search": true,
+      "sidecar": true,
+      "smartSearch": false,
+      "trash": true
+    },
+    "status": 200
+  },
+  "responseView": "stock-immich"
+}

@@ -1,11 +1,11 @@
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/search/search_timeline.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
@@ -23,7 +23,7 @@ final timelineServiceProvider = Provider<TimelineService>(
   },
   // Route-local timeline scopes may override this provider with an
   // implementation that watches the route's temporal scope.
-  dependencies: [photosTimelineFilterProvider, timelineTemporalScopeProvider],
+  dependencies: [searchTimelineFeedProvider, timelineTemporalScopeProvider],
 );
 
 final timelineFactoryProvider = Provider<TimelineFactory>(
