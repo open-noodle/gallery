@@ -1,0 +1,418 @@
+/* web/src/lib/gallery/motion/motion.css
+ * Gallery motion language, CSS half. Imported by src/styles/gallery-theme.css.
+ * Design: specs/2026-10-23-web-motion-language-design.md. The values mirror tokens.ts
+ * (tokens.spec.ts fails when they drift).
+ *
+ * Rules here are unlayered so they beat Tailwind utilities (duration-100 etc.) on the
+ * upstream and @immich/ui components they retime. They only touch timing, opacity and
+ * the individual `scale` property, never layout.
+ */
+
+:root {
+  --motion-instant: 90ms;
+  --motion-quick: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 400ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  --spring-gentle: linear(
+    0,
+    0.07,
+    0.23,
+    0.424,
+    0.614,
+    0.776,
+    0.901,
+    0.989,
+    1.042,
+    1.069,
+    1.076,
+    1.07,
+    1.058,
+    1.043,
+    1.029,
+    1.017,
+    1.007,
+    1.001,
+    0.997,
+    0.995,
+    0.994,
+    0.995,
+    0.996,
+    0.997,
+    1
+  );
+  --spring-gentle-duration: 560ms;
+  --spring-snappy: linear(
+    0,
+    0.081,
+    0.26,
+    0.465,
+    0.653,
+    0.806,
+    0.916,
+    0.988,
+    1.028,
+    1.045,
+    1.048,
+    1.042,
+    1.033,
+    1.023,
+    1.015,
+    1.008,
+    1.003,
+    1,
+    0.998,
+    0.998,
+    1
+  );
+  --spring-snappy-duration: 360ms;
+  --spring-bouncy: linear(
+    0,
+    0.124,
+    0.405,
+    0.723,
+    0.991,
+    1.165,
+    1.238,
+    1.23,
+    1.172,
+    1.095,
+    1.024,
+    0.973,
+    0.946,
+    0.941,
+    0.952,
+    0.97,
+    0.988,
+    1.003,
+    1.011,
+    1.014,
+    1.013,
+    1.009,
+    1.004,
+    1,
+    0.998,
+    0.997,
+    0.997,
+    0.997,
+    1
+  );
+  --spring-bouncy-duration: 780ms;
+}
+
+@keyframes gallery-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes gallery-scale-in {
+  from {
+    scale: 0.82;
+    translate: 0 32px;
+  }
+}
+
+@keyframes gallery-scale-in-small {
+  from {
+    scale: 0.85;
+    translate: 0 -8px;
+  }
+}
+
+@keyframes gallery-pop {
+  from {
+    scale: 0.4;
+  }
+}
+
+/* ── Keyframes: entrances ─────────────────────────────────────────────── */
+
+/* Modals: the backdrop fades, the card springs up from slightly small. */
+[data-dialog-overlay][data-state='open'] {
+  animation: gallery-fade-in var(--motion-base) var(--ease-standard);
+}
+
+[data-dialog-content][data-state='open'] {
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-scale-in var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+/* Menus, popovers and selects grow out of the control that opened them. */
+[data-menu-content][data-state='open'],
+[data-popover-content][data-state='open'],
+[data-select-content][data-state='open'] {
+  transform-origin: var(--bits-floating-transform-origin, top);
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-scale-in-small var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+[data-tooltip-content] {
+  animation: gallery-fade-in var(--motion-quick) var(--ease-standard);
+}
+
+/* ── Springs: toggles and selection ───────────────────────────────────── */
+
+/* @immich/ui Switch: the thumb slides and grows (scale-150) on a spring instead of 100ms linear. */
+[data-switch-thumb] {
+  transition-duration: var(--spring-snappy-duration);
+  transition-timing-function: var(--spring-snappy);
+}
+
+/* Timeline thumbnail selection: the photo shrinks into its frame with a little give. */
+[data-thumbnail-focus-container] .transition-transform {
+  transition-duration: var(--spring-bouncy-duration);
+  transition-timing-function: var(--spring-bouncy);
+}
+
+/* Hovering a timeline photo draws it a little closer inside its frame (the frame clips it). Selected
+ * photos already sit shrunk in their frame, so they stay still. */
+[data-thumbnail-focus-container] img {
+  transition: scale 600ms var(--ease-settle);
+}
+
+[data-thumbnail-focus-container]:not([data-selected]):hover img {
+  scale: 1.1;
+}
+
+/* The check pops when a press selects something. `data-just-pressed` is set by press.ts for a
+ * moment after a press, so checks that are already on when a page renders stay still. */
+[role='checkbox'][aria-checked='true'][data-just-pressed] [data-icon-select],
+[role='checkbox'][data-state='checked'][data-just-pressed] svg {
+  animation: gallery-pop var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+/* ── Hover: cards lift, chrome eases ──────────────────────────────────
+ * Hovering a card lifts its picture a few pixels with a softer shadow; leaving lets it settle.
+ * Fork components opt in with `data-motion-lift` (and `data-motion-lift-group` on the hover area);
+ * upstream's album card is matched by its test id, so its file stays untouched. */
+
+[data-testid='album-card'],
+[data-testid='space-card'] {
+  transition:
+    background-color var(--motion-quick) var(--ease-standard),
+    border-color var(--motion-quick) var(--ease-standard);
+}
+
+[data-motion-lift],
+[data-testid='album-card'] img.aspect-square {
+  transition:
+    translate var(--spring-gentle-duration) var(--spring-gentle),
+    scale var(--spring-gentle-duration) var(--spring-gentle),
+    transform var(--motion-slow) var(--ease-settle),
+    box-shadow var(--motion-base) var(--ease-settle);
+}
+
+:is([data-motion-lift-group], [data-testid='album-card']):hover {
+  /* The lift is a stacking context: raise the whole card so its own menus stay above the next card. */
+  z-index: 1;
+}
+
+:is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
+  translate: 0 -8px;
+  scale: 1.04;
+  /* tilt.ts sets the angles from the mouse position. Only while hovered: a transform at rest would make
+   * every card a stacking context (rule 6 in the design doc). */
+  transform: perspective(700px) rotateX(var(--gallery-tilt-x, 0deg)) rotateY(var(--gallery-tilt-y, 0deg));
+  box-shadow: 0 20px 36px -12px rgb(0 0 0 / 0.45);
+}
+
+/* Round pictures (people) would show a square shadow: they lift and grow a hair instead. */
+[data-motion-lift-group]:hover [data-motion-lift='flat'][data-motion-lift] {
+  box-shadow: none;
+  scale: 1.07;
+}
+
+[data-motion-lift='flat'] {
+  transition:
+    translate var(--motion-base) var(--ease-settle),
+    scale var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+/* Sidebar items: the pill fades in rather than snapping, and the icon leans in a touch. */
+#sidebar a[class~='rounded-e-full'] {
+  transition:
+    background-color var(--motion-quick) var(--ease-standard),
+    color var(--motion-quick) var(--ease-standard),
+    padding 100ms 100ms;
+}
+
+#sidebar a[class~='rounded-e-full'] svg {
+  transition:
+    scale var(--spring-bouncy-duration) var(--spring-bouncy),
+    rotate var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+#sidebar a[class~='rounded-e-full']:hover svg {
+  scale: 1.25;
+  rotate: -8deg;
+}
+
+/* Explore: place photos drift closer inside their frames and brighten; people grow a hair. Matched
+ * by link target because the page is upstream's. Person tiles have their own lift (excluded). */
+a[href*='city='] .overflow-hidden > img.object-cover {
+  transition: scale var(--motion-slow) var(--ease-settle);
+}
+
+a[href*='city='] .brightness-75 {
+  transition: filter var(--motion-base) var(--ease-standard);
+}
+
+a[href*='city=']:hover .overflow-hidden > img.object-cover {
+  scale: 1.12;
+}
+
+a[href*='city=']:hover .brightness-75 {
+  filter: brightness(0.9);
+}
+
+a[href*='/people/']:not(:has([data-motion-lift])) img.rounded-full {
+  transition: scale var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
+  scale: 1.08;
+}
+
+/* Sidebar groups (Spaces, Albums): children slide down into place and the chevron turns, instead of
+ * both snapping. @immich/ui renders the children as the sibling right after the item's row, so
+ * `:has(+ div)` tells an expanded row from a collapsed one. */
+#sidebar div.relative.flex:has(> button.absolute) + div {
+  animation:
+    gallery-fade-in var(--motion-base) var(--ease-standard),
+    gallery-drop-in var(--motion-base) var(--ease-settle);
+}
+
+#sidebar div.relative.flex:has(+ div) > button.absolute svg {
+  animation: gallery-turn-down var(--spring-snappy-duration) var(--spring-snappy);
+}
+
+#sidebar div.relative.flex:not(:has(+ div)) > button.absolute svg {
+  animation: gallery-turn-right var(--spring-snappy-duration) var(--spring-snappy);
+}
+
+@keyframes gallery-drop-in {
+  from {
+    translate: 0 -16px;
+  }
+}
+
+@keyframes gallery-turn-down {
+  from {
+    rotate: -90deg;
+  }
+}
+
+@keyframes gallery-turn-right {
+  from {
+    rotate: 90deg;
+  }
+}
+
+/* Fork content that appears inline (a suggestion banner): fades and drops into place. Opt in with
+ * `data-motion-reveal`; CSS rather than a Svelte transition, so nothing waits on it to unmount. */
+[data-motion-reveal] {
+  animation:
+    gallery-fade-in var(--motion-base) var(--ease-standard),
+    gallery-drop-in var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+/* The selection bar slides down over the top bar when photos are selected. */
+#control-bar {
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-drop-in var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+/* ── Layout transitions: pages crossfade (page-transition.ts) ────────── */
+
+/* Only while a crossfade runs (page-transition.ts adds the class): a view-transition-name makes its
+ * element a stacking context, which would trap the top bar's dropdowns under the page content. */
+:root.gallery-page-transition #sidebar {
+  view-transition-name: gallery-sidebar;
+}
+
+:root.gallery-page-transition #dashboard-navbar {
+  view-transition-name: gallery-navbar;
+}
+
+::view-transition-old(root) {
+  animation:
+    var(--motion-quick) var(--ease-exit) both gallery-fade-out,
+    var(--motion-base) var(--ease-exit) both gallery-sink-out;
+}
+
+::view-transition-new(root) {
+  animation:
+    var(--motion-slow) var(--ease-standard) both gallery-fade-in,
+    var(--spring-gentle-duration) var(--spring-gentle) both gallery-rise-in;
+}
+
+@keyframes gallery-sink-out {
+  to {
+    scale: 0.98;
+  }
+}
+
+@keyframes gallery-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gallery-rise-in {
+  from {
+    translate: 0 28px;
+  }
+}
+
+/* ── Reduced motion: keep fades (they carry meaning), drop movement ──── */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-dialog-content][data-state='open'],
+  [data-menu-content][data-state='open'],
+  [data-popover-content][data-state='open'],
+  [data-select-content][data-state='open'] {
+    animation: gallery-fade-in var(--motion-quick) linear;
+  }
+
+  [data-switch-thumb],
+  [data-thumbnail-focus-container] .transition-transform,
+  #sidebar a[class~='rounded-e-full'] svg {
+    transition-duration: 0ms;
+  }
+
+  :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square),
+  #sidebar a[class~='rounded-e-full']:hover svg {
+    translate: none;
+    scale: none;
+  }
+
+  #sidebar div.relative.flex + div,
+  #sidebar div.relative.flex > button.absolute svg,
+  #control-bar,
+  [data-motion-reveal] {
+    animation: none;
+  }
+
+  [data-thumbnail-focus-container]:not([data-selected]):hover img,
+  a[href*='city=']:hover .overflow-hidden > img.object-cover,
+  a[href*='/people/']:hover img.rounded-full {
+    scale: none;
+  }
+
+  :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
+    transform: none;
+  }
+
+  [role='checkbox'][data-just-pressed] [data-icon-select],
+  [role='checkbox'][data-just-pressed] svg {
+    animation: none;
+  }
+}
