@@ -12,6 +12,9 @@
   "added_to_collections_count": "Toegevoegd aan {count, plural, one {# collectie} other {# collecties}}",
   "added_to_space_count": "{count, plural, one {# item} other {# items}} aan Space toegevoegd",
   "admin": {
+    "backup_s3_credentials_hint": "Back-ups worden met de S3-inloggegevens die de server al heeft onder backups/ naar dezelfde bucket als je media geschreven. Zolang dit aan staat, wordt elke nieuwe back-up geüpload en daarna van de lokale schijf verwijderd.",
+    "backup_s3_enabled": "Back-ups naar S3 uploaden",
+    "backup_s3_enabled_description": "Geplande databaseback-ups in objectopslag bewaren in plaats van op de schijf van de server",
     "birthday_memories_setting": "Verjaardagsherinneringen",
     "birthday_memories_setting_description": "Gegenereerde herinneringen aanmaken voor mensen op hun verjaardag",
     "classification_action_tag": "Alleen taggen",
