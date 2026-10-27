@@ -341,14 +341,16 @@ void main() {
       // older-favorites-* is a newer server than older-* (it has searchOptions): its features would answer first.
       include: (name) =>
           (name.startsWith('older-') && !name.startsWith('older-favorites-')) ||
-          name.startsWith('scope-photos-filtered-timeline'),
+          name.startsWith('scope-photos-filtered-timeline') ||
+          // The When sheet's months: an older server's suggestion lists have none.
+          name == 'timeline-buckets-photos',
     );
     addTearDown(server.close);
     final container = containerFor(server, const PhotosSearchScope());
 
     container.listen(searchOptionsProvider, (_, _) {});
-    // version, features, the filter suggestions, then five countries' cities.
-    await server.waitForServed(2 + 1 + 5);
+    // version, features, the filter suggestions, then the month buckets and five countries' cities.
+    await server.waitForServed(2 + 1 + 1 + 5);
     var options = container.read(searchOptionsProvider);
     expect(options.hasCounts, isFalse);
     expect(options.error, isNull);
@@ -363,17 +365,21 @@ void main() {
       for (final p in suggestions['people'] as List) 'person:${(p['primaryProfile'] as Map)['id']}',
     ]);
     expect(options.people!.every((p) => p.count == null), isTrue);
+    expect(options.months!.map((m) => '${m.year}-${m.month.toString().padLeft(2, '0')}-01').toList(), [
+      for (final b in contractResponseBody('timeline-buckets-photos')! as List)
+        (b['timeBucket'] as String).substring(0, 10),
+    ], reason: 'the When sheet has its months');
 
     container.read(searchStateProvider.notifier)
       ..setPlace(const SearchPlace(country: 'Japan', city: 'Kyoto'))
       ..setMinRating(3);
-    await server.waitForServed(8 + 1 + 3);
+    await server.waitForServed(9 + 1 + 1 + 3);
     options = container.read(searchOptionsProvider);
     expect(options.countries!.map((c) => c.country).toList(), body('older-filters-photos-kyoto')['countries']);
     expect(options.countries!.firstWhere((c) => c.country == 'Japan').cities!.map((c) => c.city), ['Kyoto']);
 
     container.listen(searchResultsProvider, (_, _) {});
-    await server.waitForServed(12 + 1);
+    await server.waitForServed(14 + 1);
     expect(container.read(searchResultsProvider).total, body('scope-photos-filtered-total')['total']);
     expect(server.requests.where((r) => r.endsWith('/search/options')), isEmpty);
     expect(server.unmatched, isEmpty);

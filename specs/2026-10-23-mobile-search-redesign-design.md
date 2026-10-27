@@ -367,7 +367,7 @@ Also:
 
 The mobile app and server release independently.
 
-- **New app, older Gallery server** (no new endpoint): detect it through `/server/features`, the way `localTakenRange` is detected today. Fall back to `/search/suggestions/filters` for options, with no counts, and countries then cities fetched without blocking the sheet. Never error.
+- **New app, older Gallery server** (no new endpoint): detect it through `/server/features`, the way `localTakenRange` is detected today, read again each time search mode opens (an app that moves from an older server to a newer one, or whose server is upgraded, must not keep the older answer). Fall back to `/search/suggestions/filters` for options, with no counts, and countries then cities fetched without blocking the sheet. The suggestion lists have no months, so When's months come from `/timeline/buckets` with the same filters. Never error.
 - **New app, stock Immich server:** keep today's `serverSupportsSpacesProvider` behaviour (`filter_suggestions.provider.dart:18-22`), which hides the facet sections, and today's `localTakenRange` date encoding (`search_filter.model.dart:34-48`).
 - **Stock Immich clients** are unaffected: the server addition is a new fork-only endpoint.
 
@@ -543,7 +543,7 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
 - **Warm-up.** Given the server reports `searchOptions`, when the Photos tab first shows, the app requests the unfiltered availability and every dimension for the Photos scope once, in the background. This fills the server's unfiltered cache, whose cold cost at 500k photos is about 5.8 s (`specs/research/2026-10-23-search-options-500k-benchmark.md`), before search opens. No warm-up is sent to an older or stock server, and a failed warm-up is silent.
 - **Loading order.** When search mode opens, availability is requested first. Every dimension is then requested in parallel, and a response marked `stale: true` is shown as-is, then asked again for as long as answers stay stale (after 2 s, then each wait doubled up to 30 s), so a change since the last search (a new favourite, an upload) appears without leaving search. The remembered "empty for the whole screen" answer (#910's hide) is refreshed the same way when it was stale, even after a filter has been picked.
 - **Race.** Given an options request for filter A is still in flight when filter B is applied, when A's response arrives after B's, then A's response is dropped.
-- **Older Gallery server** (no flag): options come from `/search/suggestions/filters` with no counts, and cities from `/search/suggestions?type=city` per country. Nothing throws.
+- **Older Gallery server** (no flag): options come from `/search/suggestions/filters` with no counts, cities from `/search/suggestions?type=city` per country, and When's months from `/timeline/buckets`. Nothing throws.
 - **Stock Immich server:** facet options are unavailable (as `serverSupportsSpacesProvider` decides today). Results still work, and dates use the `localTakenRange` encoding when the server lacks it.
 
 **End-to-end test:** `mobile/test/gallery/search/search_core_contract_test.dart`:

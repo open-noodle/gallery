@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search.repository.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
@@ -305,7 +306,19 @@ void main() {
       expect(options.hasCounts, isFalse);
       expect(options.people!.single.count, isNull);
       expect(options.countries!.map((c) => c.cities), [null, null], reason: 'countries show before their cities');
-      expect(repository.log.skip(1), ['cities:Japan', 'cities:Portugal']);
+      expect(options.months, isNull, reason: 'the When sheet waits for the month buckets');
+      expect(repository.log.skip(1), ['buckets:-', 'cities:Japan', 'cities:Portugal']);
+
+      // The suggestion lists have no months: they come from /timeline/buckets, with their counts.
+      repository.answer('buckets:-', [
+        TimeBucketsResponseDto(timeBucket: '2024-06-01', count: 3),
+        TimeBucketsResponseDto(timeBucket: '2023-09-01', count: 2),
+      ]);
+      await settle();
+      expect(container.read(searchOptionsProvider).months!.map((m) => (m.year, m.month, m.count)), [
+        (2024, 6, 3),
+        (2023, 9, 2),
+      ]);
 
       repository.answer('cities:Portugal', const [SearchCityOption(city: 'Lisbon')]);
       repository.fail('cities:Japan', Exception('timeout'));
@@ -316,6 +329,41 @@ void main() {
       expect(options.error, isNull);
       expect(repository.log.where((call) => call.startsWith('options:')), isEmpty);
     });
+  });
+
+  group('older Gallery server, failed months', () {
+    test('a failed month request shows the When error, not an endless placeholder', () async {
+      final repository = FakeSearchRepository(olderGallery);
+      final container = containerFor(repository);
+      addTearDown(container.dispose);
+      container.listen(searchOptionsProvider, (_, _) {});
+      await settle();
+      repository.answer('fallback:-', const SearchOptionsPart(countries: []));
+      await settle();
+      repository.fail('buckets:-', Exception('timeout'));
+      await settle();
+      expect(container.read(searchOptionsProvider).hasFailed(SearchDimension.time), isTrue);
+    });
+  });
+
+  test('opening search mode asks the server for its capabilities again', () async {
+    // An older server first (the app was on the demo), then a newer one after logging in there.
+    final repository = FakeSearchRepository(olderGallery);
+    final container = containerFor(repository);
+    addTearDown(container.dispose);
+    container.read(searchModeProvider.notifier).enter();
+    expect((await container.read(searchCapabilitiesProvider.future)).searchOptions, isFalse);
+
+    repository.onCapabilities = () async =>
+        const SearchServerCapabilities(isGallery: true, searchOptions: true, localTakenRange: true);
+    container.read(searchModeProvider.notifier).leave();
+    expect(
+      (await container.read(searchCapabilitiesProvider.future)).searchOptions,
+      isFalse,
+      reason: 'kept while search is closed',
+    );
+    container.read(searchModeProvider.notifier).enter();
+    expect((await container.read(searchCapabilitiesProvider.future)).searchOptions, isTrue);
   });
 
   group('stock Immich server', () {

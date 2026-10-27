@@ -206,16 +206,13 @@ class GallerySearchRepository {
     );
   }
 
-  static SearchMonthCount _month(TimeBucketsResponseDto bucket) {
-    final date = DateTime.parse(bucket.timeBucket);
-    return SearchMonthCount(year: date.year, month: date.month, count: bucket.count);
-  }
+  static SearchMonthCount _month(TimeBucketsResponseDto bucket) => searchMonthOf(bucket);
 
   // ---------------------------------------------------------------------------------------------------------------
   // Older Gallery server: GET /search/suggestions/filters, then GET /search/suggestions?type=city per country
   // ---------------------------------------------------------------------------------------------------------------
 
-  /// No counts, no cities (see [fallbackCities]), no months. The suggestion endpoints take `albumId` and, in a space,
+  /// No counts, no cities (see [fallbackCities]), no months (the options notifier reads those from [timeBuckets]). The suggestion endpoints take `albumId` and, in a space,
   /// space people as `personIds` with `spaceId`; they take no visibility, text filters or `withPartners`.
   Future<SearchOptionsPart> fallbackOptions(SearchParams p) async {
     final r = await _search.getFilterSuggestions(
@@ -575,3 +572,9 @@ SearchParams upstreamOnlyParams(SearchParams p) => SearchParams(
   query: p.query,
   queryAssetId: p.queryAssetId,
 );
+
+/// A month of the When sheet from a /timeline/buckets (or search options) bucket.
+SearchMonthCount searchMonthOf(TimeBucketsResponseDto bucket) {
+  final date = DateTime.parse(bucket.timeBucket);
+  return SearchMonthCount(year: date.year, month: date.month, count: bucket.count);
+}

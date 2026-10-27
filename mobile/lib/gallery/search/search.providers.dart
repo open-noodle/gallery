@@ -25,6 +25,9 @@ final gallerySearchRepositoryProvider = Provider<GallerySearchRepository>((ref) 
 });
 
 /// Read once per session: which search calls the server answers.
+/// Asked again every time search mode opens (SearchModeNotifier.enter): kept for the whole app session, an older
+/// server's answer outlived logging in to a newer one (or the server's upgrade), and search waited on dimensions the
+/// app thought the server could not answer.
 final searchCapabilitiesProvider = FutureProvider<SearchServerCapabilities>(
   (ref) => ref.watch(gallerySearchRepositoryProvider).capabilities(),
 );
@@ -288,6 +291,19 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
     }
     state = const SearchOptions(hasCounts: false).merge(part);
     await Future.wait([
+      // The When sheet's months: the suggestion lists have none, /timeline/buckets has them (with counts).
+      repository
+          .timeBuckets(params, sort: SearchSort.newest)
+          .then((buckets) {
+            if (_current(generation)) {
+              state = state.merge(SearchOptionsPart(months: buckets.map(searchMonthOf).toList()));
+            }
+          })
+          .catchError((Object error) {
+            if (_current(generation)) {
+              state = state.withError(error, dimensions: {SearchDimension.time});
+            }
+          }),
       for (final country in part.countries ?? const <SearchCountryOption>[])
         repository
             .fallbackCities(params, country.country)

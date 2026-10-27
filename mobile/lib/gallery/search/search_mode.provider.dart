@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart' show searchCapabilitiesProvider;
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 
 // Search mode on a timeline screen (specs/2026-10-23-mobile-search-redesign-design.md, "Entering and leaving search
@@ -39,6 +40,8 @@ class SearchModeNotifier extends Notifier<bool> {
     scopeAvailability = null;
     scopeAvailabilityStale = false;
     _entrancePending = true;
+    // What the server can do is read again for each opening: it may be another server, or upgraded, since last time.
+    ref.invalidate(searchCapabilitiesProvider);
     state = true;
   }
 
