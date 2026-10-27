@@ -27,6 +27,7 @@ import { GalleryPeopleService } from 'src/gallery/services/gallery-people.servic
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
+import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -93,6 +94,8 @@ export const galleryRepositories = [
 
 export const galleryServices = [
   AppMetricsService,
+  // not a service of its own: a provider DatabaseBackupService injects to learn where a backup goes
+  BackupStoreResolver,
   AssetVisibilityTransitionService,
   ClassificationService,
   FaceIdentityMaintenanceService,

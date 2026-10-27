@@ -12,6 +12,9 @@
   "added_to_collections_count": "已加入到 {count, plural, one {# 個收藏集} other {# 個收藏集}}",
   "added_to_space_count": "已將 {count, plural, one {# 個項目} other {# 個項目}} 加入到 Space",
   "admin": {
+    "backup_s3_credentials_hint": "備份會使用伺服器已設定的 S3 憑證，寫入與媒體檔案相同的儲存桶，位於 backups/ 下。啟用後，每個新備份都會上傳，隨後從本機磁碟刪除。",
+    "backup_s3_enabled": "將備份上傳至 S3",
+    "backup_s3_enabled_description": "將排程的資料庫備份保存在物件儲存中，而非伺服器磁碟上",
     "birthday_memories_setting": "生日回憶",
     "birthday_memories_setting_description": "在人物生日當天為其產生回憶",
     "classification_action_tag": "僅加上標籤",

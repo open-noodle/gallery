@@ -25,7 +25,10 @@ The default configuration looks like this:
     "database": {
       "cronExpression": "0 02 * * *",
       "enabled": true,
-      "keepLastAmount": 14
+      "keepLastAmount": 14,
+      "s3": {
+        "enabled": false
+      }
     }
   },
   "classification": {

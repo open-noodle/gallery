@@ -1,17 +1,17 @@
 <script lang="ts">
-  import SettingInputField from '#lib/components/shared-components/settings/SettingInputField.svelte';
-  import SettingSwitch from '#lib/components/shared-components/settings/SettingSwitch.svelte';
+  import { createPreloadedQuery } from '#lib/queries/client.ts';
+  import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
+  import { cloneDeep } from 'lodash-es';
   import SettingButtonsRow from '#lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
+  import SettingInputField from '#lib/components/shared-components/settings/SettingInputField.svelte';
+  import SettingSelect from './SettingSelect.svelte';
+  import SettingSwitch from '#lib/components/shared-components/settings/SettingSwitch.svelte';
   import { SettingInputFieldType } from '#lib/constants.ts';
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import { createPreloadedQuery } from '#lib/queries/client.ts';
-  import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
-  import { Link } from '@immich/ui';
-  import { cloneDeep } from 'lodash-es';
+  import { Link, Text } from '@immich/ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
-  import SettingSelect from './SettingSelect.svelte';
 
   const query = createPreloadedQuery(getAdminConfigQuery);
   const config = $derived(query.data);
@@ -75,6 +75,23 @@
           bind:value={configToEdit.backup.database.keepLastAmount}
           isEdited={configToEdit.backup.database.keepLastAmount !== config.backup.database.keepLastAmount}
         />
+
+        <!-- Gallery-fork: offered only on the S3 storage backend, which is where the bucket, credentials,
+             region and endpoint these objects are written with come from; the key prefix is fixed at
+             `backups/`. There is nothing to configure beyond the switch, and the group is absent rather
+             than disabled when it cannot apply. -->
+        {#if featureFlagsManager.value.s3Storage}
+          <hr />
+
+          <SettingSwitch
+            title={$t('admin.backup_s3_enabled')}
+            subtitle={$t('admin.backup_s3_enabled_description')}
+            {disabled}
+            bind:checked={configToEdit.backup.database.s3.enabled}
+          />
+
+          <Text size="small" color="muted">{$t('admin.backup_s3_credentials_hint')}</Text>
+        {/if}
 
         <SettingButtonsRow {disabled} bind:configToEdit keys={['backup']} />
       </div>

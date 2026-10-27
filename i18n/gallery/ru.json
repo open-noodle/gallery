@@ -12,6 +12,9 @@
   "added_to_collections_count": "Добавлено в {count, plural, one {# коллекцию} few {# коллекции} many {# коллекций} other {# коллекции}}",
   "added_to_space_count": "В Space добавлено {count, plural, one {# объект} few {# объекта} many {# объектов} other {# объекта}}",
   "admin": {
+    "backup_s3_credentials_hint": "Резервные копии записываются в тот же бакет, что и медиафайлы, в папку backups/, с использованием уже настроенных на сервере учётных данных S3. Пока эта настройка включена, каждая новая копия загружается, а затем удаляется с локального диска.",
+    "backup_s3_enabled": "Загружать резервные копии в S3",
+    "backup_s3_enabled_description": "Хранить плановые резервные копии базы данных в объектном хранилище, а не на диске сервера",
     "birthday_memories_setting": "Воспоминания о днях рождения",
     "birthday_memories_setting_description": "Создавать воспоминания для людей в их дни рождения",
     "classification_action_tag": "Только тег",

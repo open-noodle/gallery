@@ -693,6 +693,74 @@ describe('S3StorageBackend', () => {
     });
   });
 
+  describe('list', () => {
+    it('should return an empty array when the prefix matches nothing', async () => {
+      mockSend.mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+
+      await expect(backend.list('backups/')).resolves.toEqual([]);
+    });
+
+    it('should return each object key with its size', async () => {
+      mockSend.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'db/immich-db-backup-1.sql.gz', Size: 1024 },
+          { Key: 'db/immich-db-backup-2.sql.gz', Size: 2048 },
+        ],
+        IsTruncated: false,
+      });
+
+      await expect(backend.list('db/')).resolves.toEqual([
+        { key: 'db/immich-db-backup-1.sql.gz', size: 1024 },
+        { key: 'db/immich-db-backup-2.sql.gz', size: 2048 },
+      ]);
+      const listInputs = mockSend.mock.calls
+        .filter(([cmd]) => cmd._type === 'ListObjectsV2Command')
+        .map(([cmd]) => cmd.input);
+      // `Delimiter` is what keeps this to the direct children the interface promises. Without it a
+      // nested key comes back whose filename no longer reconstructs the key, so a caller round-tripping
+      // a listing into `delete` — which is what backup retention does — silently deletes nothing.
+      expect(listInputs).toEqual([expect.objectContaining({ Bucket: 'test-bucket', Prefix: 'db/', Delimiter: '/' })]);
+    });
+
+    it('should paginate via ContinuationToken across multiple pages', async () => {
+      mockSend
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'db/a.sql.gz', Size: 1 }],
+          IsTruncated: true,
+          NextContinuationToken: 'token-page-2',
+        })
+        .mockResolvedValueOnce({ Contents: [{ Key: 'db/b.sql.gz', Size: 2 }], IsTruncated: false });
+
+      await expect(backend.list('db/')).resolves.toEqual([
+        { key: 'db/a.sql.gz', size: 1 },
+        { key: 'db/b.sql.gz', size: 2 },
+      ]);
+      const listInputs = mockSend.mock.calls
+        .filter(([cmd]) => cmd._type === 'ListObjectsV2Command')
+        .map(([cmd]) => cmd.input);
+      expect(listInputs).toHaveLength(2);
+      expect(listInputs[1].ContinuationToken).toBe('token-page-2');
+    });
+
+    it('should skip the zero-byte folder marker a console-created prefix leaves behind', async () => {
+      mockSend.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'db/', Size: 0 },
+          { Key: 'db/a.sql.gz', Size: 7 },
+        ],
+        IsTruncated: false,
+      });
+
+      await expect(backend.list('db/')).resolves.toEqual([{ key: 'db/a.sql.gz', size: 7 }]);
+    });
+
+    it('should default a missing Size to zero', async () => {
+      mockSend.mockResolvedValueOnce({ Contents: [{ Key: 'db/a.sql.gz' }], IsTruncated: false });
+
+      await expect(backend.list('db/')).resolves.toEqual([{ key: 'db/a.sql.gz', size: 0 }]);
+    });
+  });
+
   describe('deletePrefix', () => {
     it('should not send DeleteObjectsCommand when the prefix matches nothing', async () => {
       mockSend.mockResolvedValueOnce({ Contents: [], IsTruncated: false });

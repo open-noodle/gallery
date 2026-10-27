@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import z from 'zod';
 import { AdminConfigDto, defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto.js';
 import {
+  GalleryBackupS3Schema,
   GalleryClassificationSchema,
   GalleryFaceSuggestionSchema,
   GalleryMemoriesSchema,
@@ -66,6 +67,18 @@ describe('gallery config fragments', () => {
   it('does not inherit a user-visible enabled leaf on pet detection', () => {
     expect(z.globalRegistry.get(GalleryPetDetectionSchema.shape.enabled)?.visibility).toBeUndefined();
   });
+
+  it('coerces the backup S3 enabled flag from an IMMICH_CONFIG_FILE string boolean', () => {
+    const parsed = GalleryBackupS3Schema.parse({ enabled: 'true' });
+    expect(parsed.enabled).toBe(true);
+  });
+
+  // Nothing about the destination is configurable: the bucket, credentials, region and endpoint come from
+  // the media backend the gate requires, and the key prefix is fixed at `backups/`. That is what keeps
+  // secrets out of the database and out of GET /admin/config, which redacts nothing.
+  it('carries nothing but the on/off flag', () => {
+    expect(Object.keys(GalleryBackupS3Schema.shape)).toEqual(['enabled']);
+  });
 });
 
 describe('fork config survives schema composition', () => {
@@ -91,6 +104,10 @@ describe('fork config survives schema composition', () => {
     expect(parsed.machineLearning.clip.maxDistance).toBe(0);
     expect(parsed.machineLearning.facialRecognition.suggestions).toEqual({ enabled: true, maxDistance: 0.7 });
     expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 });
+  });
+
+  it('keeps the fork database-backup S3 block', () => {
+    expect(parsed.backup.database.s3).toEqual({ enabled: false });
   });
 
   it('keeps the fork server flag and job concurrencies', () => {
@@ -125,6 +142,8 @@ describe('fork config is admin-only', () => {
     'suggestions',
     'mergePeopleAcrossOwners',
     'maxDistance',
+    // the backup bucket and prefix are admin-only infrastructure detail, like the rest of `backup`
+    's3',
   ];
 
   it.each([

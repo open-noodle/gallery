@@ -17,6 +17,19 @@ export const galleryConfigBool = z
   }, z.boolean())
   .meta({ type: 'boolean' });
 
+// Gallery-fork: scheduled database backups to S3. Deliberately a single on/off flag. Bucket, credentials,
+// region and endpoint are not here because the feature is only offered when the server's storage backend is
+// already S3 (IMMICH_STORAGE_BACKEND=s3), so the only S3 configuration that could apply is the one the media
+// backend is already using; and the key prefix is fixed at `backups/` (see BACKUP_PREFIX in
+// src/gallery/utils/backup-store.ts), which is what guarantees the dumps stay out of the media key space.
+// The result is that nothing about the destination is stored in the database, so there is no S3 secret for
+// GET /admin/config to hand back in the clear, and nothing an admin can misconfigure.
+export const GalleryBackupS3Schema = z
+  .object({
+    enabled: galleryConfigBool.describe('Upload scheduled database backups to S3'),
+  })
+  .meta({ id: 'AdminConfigDatabaseBackupS3Dto' });
+
 const GalleryClassificationFaceExclusionSchema = z
   .enum(['off', 'any_assigned_face', 'named_people', 'named_visible_people'])
   .default('off')
@@ -160,6 +173,11 @@ export const galleryMachineLearningDefaults = {
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+};
+
+export const galleryBackupDatabaseDefaults = {
+  // off out of the box, so a fresh install behaves exactly like upstream Immich
+  s3: { enabled: false },
 };
 
 export const galleryServerDefaults = { mergePeopleAcrossOwners: false };
