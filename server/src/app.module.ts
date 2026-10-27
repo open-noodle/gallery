@@ -3,7 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Inject, Module, OnModuleDestroy, OnModuleInit, applyDecorators, forwardRef } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
-import { ApiExcludeController } from '@nestjs/swagger';
+import { ApiExtension, ApiTags } from '@nestjs/swagger';
 import { ClsModule } from 'nestjs-cls';
 import { KyselyModule } from 'nestjs-kysely';
 import { OpenTelemetryModule } from 'nestjs-otel';
@@ -13,7 +13,9 @@ import { join } from 'node:path';
 import { commandsAndQuestions } from 'src/commands/index.js';
 import { IWorker } from 'src/constants.js';
 import { controllers } from 'src/controllers/index.js';
-import { ImmichEnvironment, ImmichWorker } from 'src/enum.js';
+import { HistoryBuilder } from 'src/decorators.js';
+import { ApiTag, ImmichEnvironment, ImmichWorker } from 'src/enum.js';
+import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { MaintenanceAuthGuard } from 'src/maintenance/maintenance-auth.guard.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
@@ -64,8 +66,14 @@ const isFutoBackupsDevelopmentMode = environment !== ImmichEnvironment.Productio
 const futoBackupsStatePath = getBackupsStatePath(storage.mediaLocation);
 const futoBackupsCachePath = join(detectMediaLocation(storage.mediaLocation, existsSync), 'restic-cache');
 
+const futoBackupsHistory = new HistoryBuilder().added('v3.4.0').internal('v3.4.0').getExtensions();
+
 for (const controller of futoBackupsControllers) {
-  applyDecorators(Authenticated({ admin: true }), ApiExcludeController())(controller);
+  applyDecorators(
+    Authenticated({ admin: true }),
+    ApiTags(ApiTag.Backups),
+    ...Object.entries(futoBackupsHistory).map(([key, value]) => ApiExtension(key, value)),
+  )(controller);
 }
 
 const commonImports = [
@@ -176,6 +184,10 @@ export class ApiModule extends BaseModule {}
     AppRepository,
     MaintenanceHealthRepository,
     MaintenanceWebsocketRepository,
+    // gallery-fork: DatabaseBackupService resolves its storage backends through this. The other
+    // workers get it from `galleryServices`; this module's provider list is explicit, so it is
+    // named here too, or the maintenance worker cannot construct the backup service.
+    BackupStoreResolver,
     DatabaseBackupService,
     MaintenanceWorkerService,
     ...commonMiddleware,
