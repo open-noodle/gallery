@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Photos with a city: mediaTypes only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 5,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

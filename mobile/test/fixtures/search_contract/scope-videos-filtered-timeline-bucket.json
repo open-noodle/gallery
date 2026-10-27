@@ -1,0 +1,81 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024, two filters: the first month of the browse results",
+  "ids": {
+    "91fff3b3-188f-40be-868c-9e45d58a634a": "asset:berlin-video",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "country": "Germany",
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "timeBucket": "2024-02-01",
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Berlin"
+      ],
+      "country": [
+        "Germany"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-02-14T10:00:00"
+      ],
+      "id": [
+        "91fff3b3-188f-40be-868c-9e45d58a634a"
+      ],
+      "isFavorite": [
+        false
+      ],
+      "isImage": [
+        false
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

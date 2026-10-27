@@ -1,0 +1,185 @@
+{
+  "actor": "me",
+  "description": "Photos in June 2024: months ignore the date range",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "takenAfter": "2024-06-01T00:00:00.000Z",
+      "takenBefore": "2024-07-01T00:00:00.000Z",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": false
+      },
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        },
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 5
+            }
+          ],
+          "count": 5,
+          "country": "Japan"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 5,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [
+        {
+          "count": 2,
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        }
+      ],
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 3
+        },
+        {
+          "count": 1,
+          "rating": 5
+        }
+      ],
+      "tags": [
+        {
+          "count": 2,
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "isSelected": false,
+          "value": "beach"
+        },
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ],
+      "timeBuckets": [
+        {
+          "count": 5,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 2,
+          "timeBucket": "2024-05-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2024-02-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2024-01-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2023-08-01"
+        },
+        {
+          "count": 2,
+          "timeBucket": "2023-07-01"
+        }
+      ],
+      "total": 5
+    },
+    "status": 200
+  }
+}

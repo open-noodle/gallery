@@ -1,0 +1,78 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: the month 2024-05-01 of the browse results",
+  "ids": {
+    "b6e1b361-f6d9-45f3-89c8-2d1b0dcffef9": "user:partner",
+    "fe297055-5253-43cc-85b9-f265b63f4555": "asset:partner-paris-1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "isFavorite": "true",
+      "timeBucket": "2024-05-01",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Paris"
+      ],
+      "country": [
+        "France"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-05-01T10:00:00"
+      ],
+      "id": [
+        "fe297055-5253-43cc-85b9-f265b63f4555"
+      ],
+      "isFavorite": [
+        true
+      ],
+      "isImage": [
+        true
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "b6e1b361-f6d9-45f3-89c8-2d1b0dcffef9"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

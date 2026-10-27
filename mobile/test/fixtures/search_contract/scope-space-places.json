@@ -1,0 +1,57 @@
+{
+  "actor": "me",
+  "description": "Space screen, Pia in Kyoto: places only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Madrid",
+              "count": 3
+            }
+          ],
+          "count": 3,
+          "country": "Spain"
+        },
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Porto",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

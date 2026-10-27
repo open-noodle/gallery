@@ -1,0 +1,34 @@
+{
+  "actor": "me",
+  "description": "Archive screen search mode, Places: Osaka (never the partner's archived photo): time only",
+  "ids": {
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "time"
+      ],
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "visibility": "archive"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 2,
+          "timeBucket": "2022-12-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

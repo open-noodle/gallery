@@ -1,0 +1,24 @@
+{
+  "actor": "me",
+  "description": "Gallery server before searchFavoritesAcrossSpaces, Favorites screen: my own favourites, archived ones too: total only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "total"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 2
+    },
+    "status": 200
+  }
+}

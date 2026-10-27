@@ -1,0 +1,81 @@
+{
+  "actor": "me",
+  "description": "Videos screen: type VIDEO within the Photos scope",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": false,
+        "hasFavorites": false,
+        "hasImages": true,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": true
+      },
+      "cameraMakes": [],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Berlin",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Germany"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 12,
+          "type": "IMAGE"
+        },
+        {
+          "count": 1,
+          "type": "VIDEO"
+        }
+      ],
+      "people": [],
+      "ratings": [],
+      "tags": [],
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-02-01"
+        }
+      ],
+      "total": 1
+    },
+    "status": 200
+  }
+}

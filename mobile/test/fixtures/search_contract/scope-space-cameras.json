@@ -1,0 +1,37 @@
+{
+  "actor": "me",
+  "description": "Space screen, Pia in Kyoto: cameras only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "actor": "me",
+  "description": "Album screen, Japan photos, two filters: time only",
+  "ids": {
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "country": "Japan",
+      "dimensions": [
+        "time"
+      ],
+      "type": "IMAGE"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

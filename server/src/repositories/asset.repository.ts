@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
+import { withOwnArchiveOnly } from 'src/gallery/utils/favorites-scope.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { stackHasSeveralLiveAssets } from 'src/gallery/utils/stack-badge.js';
 import { DB } from 'src/schema/index.js';
@@ -383,6 +384,7 @@ export function withTimeBucketAssetFilters<O>(
       })
       .$if(options.visibility === undefined, withDefaultVisibility)
       .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
+      .$call((qb) => withOwnArchiveOnly(qb, options))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
       .$if(!!options.albumId, (qb) =>
         qb

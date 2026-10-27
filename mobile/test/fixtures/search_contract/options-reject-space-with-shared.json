@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Rejected: spaceId + withSharedSpaces",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "message": "Cannot use both spaceId and withSharedSpaces"
+    },
+    "status": 400
+  }
+}
