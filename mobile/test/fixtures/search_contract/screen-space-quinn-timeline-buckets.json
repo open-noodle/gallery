@@ -1,0 +1,30 @@
+{
+  "actor": "me",
+  "description": "Space screen search mode, People: Quinn (a bare space-person id): browse results",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "896d137b-eeec-45b7-8af0-75610855e1ea": "space-person:quinn"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "896d137b-eeec-45b7-8af0-75610855e1ea"
+      ]
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2023-08-01"
+      }
+    ],
+    "status": 200
+  }
+}

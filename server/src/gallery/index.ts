@@ -9,6 +9,7 @@ import { UserGroupController } from 'src/controllers/user-group.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
+import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -25,6 +26,7 @@ import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
+import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
@@ -62,6 +64,7 @@ export const galleryControllers = [
   GalleryAssetController,
   GalleryMapController,
   GalleryPeopleController,
+  GallerySearchController,
   LibraryManifestController,
   SharedSpaceController,
   StorageMigrationController,
@@ -105,6 +108,7 @@ export const galleryServices = [
   GalleryAssetService,
   GalleryPeopleService,
   GalleryPluginService,
+  GallerySearchService,
   GalleryStackService,
   LibraryManifestService,
   PetDetectionService,

@@ -1,0 +1,53 @@
+{
+  "actor": "me",
+  "description": "Place screen (Lisbon) search mode, People: Anna: places only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "body": {
+      "city": "Lisbon",
+      "dimensions": [
+        "places"
+      ],
+      "personIds": [
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

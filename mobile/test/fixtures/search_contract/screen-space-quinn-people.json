@@ -1,0 +1,45 @@
+{
+  "actor": "me",
+  "description": "Space screen search mode, People: Quinn (a bare space-person id): people only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "896d137b-eeec-45b7-8af0-75610855e1ea": "space-person:quinn"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "people"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "896d137b-eeec-45b7-8af0-75610855e1ea"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 1,
+          "filterId": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "isPet": false,
+          "isSelected": true,
+          "name": "Quinn",
+          "primaryProfile": {
+            "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+            "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+            "type": "space-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}

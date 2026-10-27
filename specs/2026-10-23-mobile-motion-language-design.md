@@ -110,4 +110,6 @@ Web's rules apply. On mobile in particular:
 - Restoring from the trash could throw the photos back out of the restore button, and adding to an
   album or space could reuse the throw once the picker shows its destination.
 - Other loading screens (Spaces list, albums) still show a spinner; a card skeleton would match.
-- Search is out of scope here: it is getting a redesign.
+- Search's motion (entrance, chip row, results wipe, folds) is described in
+  `specs/2026-10-23-mobile-search-redesign-design.md`, "Motion"; its generic pieces (`entrance.dart`,
+  `animated_row.dart`, `swap.dart`, `pop.dart`, `fold.dart`) live here in `lib/gallery/motion/`.

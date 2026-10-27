@@ -1,0 +1,82 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites rated at least 3 from an iPhone 15 with \"receipt\" in the photo: the month 2023-09-01 of the browse results",
+  "ids": {
+    "a7a026e9-9ca1-4960-8197-fb1adc269894": "asset:lisbon-1",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "isFavorite": "true",
+      "make": "Apple",
+      "model": "iPhone 15",
+      "ocr": "receipt",
+      "rating": "3",
+      "timeBucket": "2023-09-01",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Lisbon"
+      ],
+      "country": [
+        "Portugal"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2023-09-10T10:00:00"
+      ],
+      "id": [
+        "a7a026e9-9ca1-4960-8197-fb1adc269894"
+      ],
+      "isFavorite": [
+        true
+      ],
+      "isImage": [
+        true
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

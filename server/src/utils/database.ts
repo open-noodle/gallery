@@ -44,6 +44,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
+import { isExpectedSearchOptionsProbeTimeout } from 'src/gallery/utils/search-options-probe.js';
 import {
   AssetSearchBuilderOptions,
   AssetSearchBuilderV3Options,
@@ -80,7 +81,11 @@ export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyCon
         return;
       }
 
-      if (isAssetChecksumConstraint(event.error) || isStaleAssetForeignKeyConstraint(event.error)) {
+      if (
+        isAssetChecksumConstraint(event.error) ||
+        isStaleAssetForeignKeyConstraint(event.error) ||
+        isExpectedSearchOptionsProbeTimeout(event.error, event.query.sql)
+      ) {
         return;
       }
 
