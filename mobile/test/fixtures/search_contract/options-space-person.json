@@ -1,0 +1,105 @@
+{
+  "actor": "me",
+  "description": "Space person screen: spaceId + spacePersonIds",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "6438d955-2a1c-4bd0-8150-4f3503d02fbe"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": false,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": false
+      },
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [
+        {
+          "count": 2,
+          "filterId": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "isPet": false,
+          "isSelected": true,
+          "name": "Pia",
+          "primaryProfile": {
+            "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+            "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+            "type": "space-person"
+          }
+        }
+      ],
+      "ratings": [],
+      "tags": [],
+      "timeBuckets": [
+        {
+          "count": 2,
+          "timeBucket": "2024-06-01"
+        }
+      ],
+      "total": 2
+    },
+    "status": 200
+  }
+}

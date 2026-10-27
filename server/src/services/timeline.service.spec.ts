@@ -298,6 +298,35 @@ describe(TimelineService.name, () => {
         ).rejects.toThrow(BadRequestException);
       });
 
+      it('should throw with visibility unset unless the request is for favourites', async () => {
+        for (const dto of [
+          { withSharedSpaces: true },
+          { withPartners: true },
+          { withSharedSpaces: true, isFavorite: false },
+        ]) {
+          await expect(sut.getTimeBuckets(authStub.admin, dto)).rejects.toThrow(BadRequestException);
+        }
+        expect(mocks.asset.getTimeBuckets).not.toHaveBeenCalled();
+      });
+
+      it('should accept the Favorites screen: favourites with partners and shared spaces, visibility unset', async () => {
+        mocks.asset.getTimeBuckets.mockResolvedValue([]);
+        mocks.partner.getAll.mockResolvedValue([]);
+
+        await sut.getTimeBuckets(authStub.admin, { isFavorite: true, withSharedSpaces: true, withPartners: true });
+
+        expect(mocks.asset.getTimeBuckets.mock.calls[0][0].visibility).toBeUndefined();
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isFavorite: true,
+            withSharedSpaces: true,
+            withPartners: true,
+            authUserId: authStub.admin.user.id,
+          }),
+          authStub.admin,
+        );
+      });
+
       it('should throw when combined with undefined visibility', async () => {
         await expect(
           sut.getTimeBuckets(authStub.admin, {

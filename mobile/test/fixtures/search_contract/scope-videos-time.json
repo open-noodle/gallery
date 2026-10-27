@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024: time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "time"
+      ],
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-02-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Rejected as on /timeline/buckets: withSharedSpaces, no visibility",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "message": "withSharedSpaces is only supported for non-archived, non-trashed assets"
+    },
+    "status": 400
+  }
+}

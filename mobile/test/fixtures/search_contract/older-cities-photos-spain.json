@@ -1,0 +1,23 @@
+{
+  "actor": "me",
+  "description": "Older Gallery server: the cities of Spain, fetched after the countries",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/search/suggestions",
+    "query": {
+      "country": "Spain",
+      "type": "city",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      "Madrid"
+    ],
+    "status": 200
+  }
+}

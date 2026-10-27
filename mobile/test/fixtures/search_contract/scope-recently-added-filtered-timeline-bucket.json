@@ -1,0 +1,81 @@
+{
+  "actor": "me",
+  "description": "Recently added screen, beach rated 5, two filters: the first month of the browse results",
+  "ids": {
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "b041dd6b-85ba-4171-8260-52366fcc95af": "asset:kyoto-1",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "orderBy": "createdAt",
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "rating": "5",
+      "tagIds": [
+        "7ef1e1f8-ec65-4488-8815-9f1e36421437"
+      ],
+      "timeBucket": "2024-06-01"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Kyoto"
+      ],
+      "country": [
+        "Japan"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-06-03T10:00:00"
+      ],
+      "id": [
+        "b041dd6b-85ba-4171-8260-52366fcc95af"
+      ],
+      "isFavorite": [
+        false
+      ],
+      "isImage": [
+        true
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

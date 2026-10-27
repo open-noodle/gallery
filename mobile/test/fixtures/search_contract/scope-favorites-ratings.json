@@ -1,0 +1,31 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal: ratings only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "ratings"
+      ],
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 4
+        }
+      ]
+    },
+    "status": 200
+  }
+}

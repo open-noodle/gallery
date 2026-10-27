@@ -1,0 +1,101 @@
+{
+  "actor": "me",
+  "description": "Photos search mode, Anna in 2024: the month 2024-06-01 of the browse results",
+  "ids": {
+    "5ec2c666-2090-4b1d-8ade-27503d58745c": "asset:kyoto-2",
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "b041dd6b-85ba-4171-8260-52366fcc95af": "asset:kyoto-1",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "personIds": [
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "timeBucket": "2024-06-01",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Kyoto",
+        "Kyoto"
+      ],
+      "country": [
+        "Japan",
+        "Japan"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null,
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-06-03T10:00:00",
+        "2024-06-02T10:00:00"
+      ],
+      "id": [
+        "b041dd6b-85ba-4171-8260-52366fcc95af",
+        "5ec2c666-2090-4b1d-8ade-27503d58745c"
+      ],
+      "isFavorite": [
+        false,
+        false
+      ],
+      "isImage": [
+        true,
+        true
+      ],
+      "isTrashed": [
+        false,
+        false
+      ],
+      "livePhotoVideoId": [
+        null,
+        null
+      ],
+      "localOffsetHours": [
+        0,
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null,
+        null
+      ],
+      "ratio": [
+        1,
+        1
+      ],
+      "status": [
+        "active",
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash",
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline",
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

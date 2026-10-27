@@ -1,0 +1,88 @@
+{
+  "actor": "me",
+  "description": "Text filters together: OCR, description and file name",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food"
+  },
+  "request": {
+    "body": {
+      "description": "dinner",
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "ocr": "menu",
+      "originalFileName": "menu",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": false,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": false,
+        "hasFavorites": false,
+        "hasImages": true,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": true,
+        "hasVideos": false
+      },
+      "cameraMakes": [],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 1,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [],
+      "ratings": [],
+      "tags": [
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ],
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-01-01"
+        }
+      ],
+      "total": 1
+    },
+    "status": 200
+  }
+}

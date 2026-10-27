@@ -1,0 +1,114 @@
+{
+  "actor": "me",
+  "description": "Recently taken screen search mode, Places: Kyoto: the month 2024-06-01 of the browse results",
+  "ids": {
+    "5ec2c666-2090-4b1d-8ade-27503d58745c": "asset:kyoto-2",
+    "b041dd6b-85ba-4171-8260-52366fcc95af": "asset:kyoto-1",
+    "d2a45c4a-c8ae-4fa7-8df6-8994f69819a0": "asset:kyoto-3",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "timeBucket": "2024-06-01",
+      "visibility": "timeline"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Kyoto",
+        "Kyoto",
+        "Kyoto"
+      ],
+      "country": [
+        "Japan",
+        "Japan",
+        "Japan"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null,
+        null,
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-06-03T10:00:00",
+        "2024-06-02T10:00:00",
+        "2024-06-01T10:00:00"
+      ],
+      "id": [
+        "b041dd6b-85ba-4171-8260-52366fcc95af",
+        "5ec2c666-2090-4b1d-8ade-27503d58745c",
+        "d2a45c4a-c8ae-4fa7-8df6-8994f69819a0"
+      ],
+      "isFavorite": [
+        false,
+        false,
+        false
+      ],
+      "isImage": [
+        true,
+        true,
+        true
+      ],
+      "isTrashed": [
+        false,
+        false,
+        false
+      ],
+      "livePhotoVideoId": [
+        null,
+        null,
+        null
+      ],
+      "localOffsetHours": [
+        0,
+        0,
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null,
+        null,
+        null
+      ],
+      "ratio": [
+        1,
+        1,
+        1
+      ],
+      "status": [
+        "active",
+        "active",
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash",
+        "thumbhash",
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline",
+        "timeline",
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

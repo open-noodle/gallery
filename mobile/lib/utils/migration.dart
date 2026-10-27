@@ -20,6 +20,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/feature_message.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
+import 'package:immich_mobile/gallery/utils/retired_store_keys.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
@@ -50,6 +51,7 @@ Future<void> migrateDatabaseIfNeeded(Drift drift, NativeSyncApi nativeSyncApi, P
   if (version < 28) {
     await _migrateTo28(drift);
   }
+  await migrateForkStoreValues(drift);
 
   if (storedVersion == null) {
     await FeatureMessageService(SettingsRepository.instance).markSeen();

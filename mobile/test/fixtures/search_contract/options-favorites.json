@@ -1,0 +1,132 @@
+{
+  "actor": "me",
+  "description": "Favorites screen on an older server: my own favourites, timeline + archive",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": false,
+        "hasVideos": false
+      },
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [
+        {
+          "count": 1,
+          "filterId": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isPet": true,
+          "isSelected": false,
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ],
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 4
+        }
+      ],
+      "tags": [],
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
+        }
+      ],
+      "total": 2
+    },
+    "status": 200
+  }
+}

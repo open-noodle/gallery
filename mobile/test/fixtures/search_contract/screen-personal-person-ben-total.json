@@ -1,0 +1,30 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna) search mode, People: Ben added: total only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "total"
+      ],
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+        "c360094e-5899-4aea-88e0-01a3aafd727b"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 1
+    },
+    "status": 200
+  }
+}

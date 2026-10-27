@@ -1,0 +1,34 @@
+{
+  "actor": "me",
+  "description": "Album timeline buckets",
+  "ids": {
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "albumId": "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-02-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2022-12-01"
+      }
+    ],
+    "status": 200
+  }
+}

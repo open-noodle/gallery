@@ -12,9 +12,10 @@ import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
 import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
 import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
@@ -47,7 +48,7 @@ void main() {
   test(
     'years activation zooms to months, stores a year anchor, and preserves filters without changing scope',
     () async {
-      container.read(photosFilterProvider.notifier).setText('paris');
+      container.read(searchStateProvider.notifier).submitText('paris');
       container.read(timelineTemporalScopeProvider.notifier).setYear(2024);
       var scrollEvents = 0;
       final subscription = EventStream.shared.listen<ScrollToTopEvent>((_) => scrollEvents++);
@@ -63,7 +64,7 @@ void main() {
       expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
       // Drilldown is view state: the "Group by" setting must not move with it.
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
-      expect(container.read(photosFilterProvider).context, 'paris');
+      expect(container.read(searchStateProvider).query, const SearchQuery.text('paris'));
       await Future<void>.delayed(Duration.zero);
       expect(scrollEvents, 0);
     },

@@ -1,0 +1,21 @@
+{
+  "actor": "me",
+  "description": "Server version, as the Gallery app sees it",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/server/version"
+  },
+  "response": {
+    "body": {
+      "major": 3,
+      "minor": 0,
+      "patch": 0,
+      "prerelease": null
+    },
+    "status": 200
+  }
+}

@@ -1,32 +1,44 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/search_result.model.dart';
-import 'package:immich_mobile/domain/services/search.service.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_state.model.dart';
+import 'package:immich_mobile/gallery/search/search_state.notifier.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_empty_state.widget.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
-import 'package:mocktail/mocktail.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-/// Notifier override that always yields a fixed [SearchFilter] from build(),
-/// while keeping the real reset() behaviour.
-class _FixedFilter extends PhotosFilterNotifier {
-  _FixedFilter(this._initial);
+/// Search state override that starts from a fixed state, while keeping the real reset() behaviour.
+class _FixedState extends SearchStateNotifier {
+  _FixedState(this._initial);
 
-  final SearchFilter _initial;
+  final SearchState _initial;
 
   @override
-  SearchFilter build() => _initial;
+  SearchState build() => _initial;
+}
+
+class _Searching extends SearchModeNotifier {
+  @override
+  bool build() => true;
+}
+
+/// Results that never load anything: [loading] is whether a request is still in flight.
+class _FixedResults extends SearchResultsNotifier {
+  _FixedResults({required this.loading});
+
+  final bool loading;
+
+  @override
+  SearchResults build() => SearchResults(loading: loading);
 }
 
 class _FixedSync extends SyncStatusNotifier {
@@ -37,10 +49,6 @@ class _FixedSync extends SyncStatusNotifier {
   @override
   SyncStatusState build() => _initial;
 }
-
-class _MockSearchService extends Mock implements SearchService {}
-
-class _FakeSearchFilter extends Fake implements SearchFilter {}
 
 /// 1×1 transparent PNG so Image.asset resolves without the real asset bundle.
 final _transparentPng = base64Decode(
@@ -65,29 +73,21 @@ class _FakeAssetBundle extends CachingAssetBundle {
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(_FakeSearchFilter()));
-
   Widget withFakeAssets(Widget child) => DefaultAssetBundle(bundle: _FakeAssetBundle(), child: child);
 
-  SearchFilter activeFilter() => SearchFilter.empty().copyWith(context: 'beach');
+  const beach = SearchState(query: SearchQuery.text('beach'), sort: SearchSort.relevance);
 
-  /// Overrides the filter-driven search with one whose page-1 request answers
-  /// with [page1]. Pass a never-completing future to hold it in flight.
-  Override searchOverride(Future<SearchResult?> page1) {
-    final service = _MockSearchService();
-    when(() => service.search(any(), any())).thenAnswer((_) => page1);
-    return photosFilterSearchProvider.overrideWith(
-      (ref) => PhotosFilterSearchNotifier(search: service, filter: activeFilter()),
-    );
-  }
+  /// Search mode with [state], and results that are [loading] or settled.
+  List<Override> searching(SearchState state, {required bool loading}) => [
+    searchModeProvider.overrideWith(_Searching.new),
+    searchStateProvider.overrideWith(() => _FixedState(state)),
+    searchResultsProvider.overrideWith(() => _FixedResults(loading: loading)),
+  ];
 
   testWidgets('first-run state shows the onboarding title and an Enable Backup action', (tester) async {
     await tester.pumpConsumerWidget(
       withFakeAssets(const TimelineEmptyState()),
-      overrides: [
-        photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty())),
-        syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState())),
-      ],
+      overrides: [syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState()))],
     );
     await tester.pumpAndSettle();
 
@@ -100,7 +100,6 @@ void main() {
     await tester.pumpConsumerWidgetRaw(
       const TimelineEmptyState(),
       overrides: [
-        photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty())),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
       ],
     );
@@ -110,18 +109,16 @@ void main() {
     expect(find.text('timeline_empty_title'), findsNothing);
   });
 
-  // #901: the search-backed timeline starts at zero assets, so the empty state is
-  // built while the page-1 request is still in flight. It must not claim there is
-  // nothing to find before the server has answered.
+  // #901: the empty state can be built while the results request is still in flight.
+  // It must not claim there is nothing to find before the server has answered.
   testWidgets('while the filtered search is still in flight it shows a loader, not the no-results state', (
     tester,
   ) async {
     await tester.pumpConsumerWidgetRaw(
       const TimelineEmptyState(),
       overrides: [
-        photosFilterProvider.overrideWith(() => _FixedFilter(activeFilter())),
+        ...searching(beach, loading: true),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState())),
-        searchOverride(Completer<SearchResult?>().future),
       ],
     );
     await tester.pump();
@@ -131,19 +128,20 @@ void main() {
     expect(find.text('timeline_empty_clear_filters'), findsNothing);
   });
 
-  testWidgets('an active filter shows the no-results state and clearing it resets the filter', (tester) async {
+  testWidgets('a search with no matches shows the no-results state, and its action clears every filter and the query '
+      'while search mode stays open (Slice 5 "Empty state")', (tester) async {
     await tester.pumpConsumerWidget(
       const TimelineEmptyState(),
       overrides: [
-        photosFilterProvider.overrideWith(() => _FixedFilter(activeFilter())),
+        ...searching(beach.copyWith(filters: const SearchFilters(favoritesOnly: true, minRating: 4)), loading: false),
         // syncing so that after the reset we deterministically land on the loader
         // (no asset/router needed) rather than the first-run state.
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
-        // Search settled with nothing: only now is "no matching photos" the truth.
-        searchOverride(Future<SearchResult?>.value()),
       ],
     );
     await tester.pump();
+    final container = ProviderScope.containerOf(tester.element(find.byType(TimelineEmptyState)));
+    container.read(searchFieldControllerProvider).text = 'bea';
 
     expect(find.text(StaticTranslations.instance.timeline_empty_filtered_title), findsOneWidget);
     expect(find.text(StaticTranslations.instance.timeline_empty_clear_filters), findsOneWidget);
@@ -152,6 +150,23 @@ void main() {
     await tester.pump();
 
     expect(find.text(StaticTranslations.instance.timeline_empty_filtered_title), findsNothing);
+    expect(find.byType(ImmichLoadingIndicator), findsOneWidget);
+    expect(container.read(searchStateProvider).isEmpty, isTrue, reason: 'filters and query cleared');
+    expect(container.read(searchFieldControllerProvider).text, isEmpty);
+    expect(container.read(searchModeProvider), isTrue, reason: 'search mode stays open, as with Clear all');
+  });
+
+  testWidgets('search mode with no filter yet is not a filtered search', (tester) async {
+    await tester.pumpConsumerWidgetRaw(
+      const TimelineEmptyState(),
+      overrides: [
+        ...searching(const SearchState(), loading: false),
+        syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.text('timeline_empty_filtered_title'), findsNothing);
     expect(find.byType(ImmichLoadingIndicator), findsOneWidget);
   });
 }

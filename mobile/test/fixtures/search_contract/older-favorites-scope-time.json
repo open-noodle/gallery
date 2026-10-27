@@ -1,0 +1,33 @@
+{
+  "actor": "me",
+  "description": "Gallery server before searchFavoritesAcrossSpaces, Favorites screen: my own favourites, archived ones too: time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "time"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

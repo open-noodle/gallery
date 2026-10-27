@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: mediaTypes only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "isFavorite": true,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 3,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

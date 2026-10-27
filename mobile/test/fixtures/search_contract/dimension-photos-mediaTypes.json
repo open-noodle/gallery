@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: mediaTypes only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 12,
+          "type": "IMAGE"
+        },
+        {
+          "count": 1,
+          "type": "VIDEO"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

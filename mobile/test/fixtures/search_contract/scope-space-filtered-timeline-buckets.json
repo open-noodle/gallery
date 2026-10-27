@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Space screen, Pia in Kyoto, two filters: browse results",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "6438d955-2a1c-4bd0-8150-4f3503d02fbe"
+      ]
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 2,
+        "timeBucket": "2024-06-01"
+      }
+    ],
+    "status": 200
+  }
+}

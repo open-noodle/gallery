@@ -36,7 +36,7 @@ A filter section only appears when it can change what you are looking at.
 
 A section holding an active filter is never hidden or greyed, so you can always undo a selection.
 
-The greyed `(0)` state is web only. The mobile filter sheet has no in-between: a section is either hidden, when it has nothing to offer in this scope at all, or shown normally. A section that your current filters merely emptied still renders on mobile instead of dimming.
+The mobile app follows the same rules in its search mode, which opens from the search button: a filter chip or Filters section that could never filter anything is hidden, and one that your current filters have emptied is greyed out and cannot be tapped.
 
 ## Orphaned selections
 

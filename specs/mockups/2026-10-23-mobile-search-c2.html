@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search C, deeper</title>
+<style>
+  :root { --bg:#eceef2; --ink:#16181d; --muted:#6b7280; --line:#e5e7eb; --accent:#4250af; --accent-soft:#e3e6fb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header.page { max-width:1100px; margin:0 auto; padding:24px 16px 4px; }
+  header.page h1 { font-size:22px; margin:0 0 6px; }
+  header.page p { margin:0 0 6px; color:var(--muted); }
+  header.page b { color:var(--ink); }
+  .row { display:flex; gap:40px; justify-content:center; flex-wrap:wrap; padding:16px 16px 40px; }
+  .col { width:360px; display:flex; flex-direction:column; gap:10px; }
+  .col h2 { font-size:16px; margin:0; }
+  .col .why { color:var(--muted); font-size:13px; min-height:72px; margin:0; }
+  .pick { border:1px solid var(--line); background:#fff; border-radius:10px; padding:10px; cursor:pointer; font-weight:600; }
+  .pick.selected { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  .phone { width:360px; height:740px; background:#fff; border-radius:38px; border:10px solid #111; position:relative; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 40px rgba(0,0,0,.18); }
+  .sbar { height:28px; flex:none; font-size:12px; font-weight:600; display:flex; justify-content:space-between; padding:6px 22px 0; }
+  .kbd { flex:none; height:236px; background:#d1d4da; display:none; flex-direction:column; gap:8px; padding:10px 4px 30px; position:relative; z-index:20; }
+  .phone.typing .kbd { display:flex; }
+  .kbd .kr { display:flex; gap:5px; justify-content:center; }
+  .kbd .k { background:#fff; border-radius:5px; height:40px; width:29px; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 1px 0 #999; }
+  .kbd .k.w { width:180px; } .kbd .k.m { width:44px; background:#adb2bb; }
+
+  /* normal timeline chrome */
+  .appbar { flex:none; height:52px; display:flex; align-items:center; padding:0 10px 0 16px; gap:14px; transition:margin .2s; }
+  .appbar .logo { font-weight:800; font-size:19px; letter-spacing:-.02em; flex:1; display:flex; align-items:center; gap:6px; }
+  .appbar .logo i { width:22px; height:22px; border-radius:6px; background:conic-gradient(#f6a 0 25%, #fc4 0 50%, #4c8 0 75%, #49f 0); display:inline-block; }
+  .appbar .ic { font-size:17px; color:#444; }
+  .appbar .me { width:28px; height:28px; border-radius:50%; background:#c78; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+  .bnav { position:absolute; left:0; right:0; bottom:14px; display:flex; justify-content:center; gap:10px; align-items:center; z-index:4; }
+  .pill { background:rgba(255,255,255,.95); border-radius:999px; box-shadow:0 4px 16px rgba(0,0,0,.18); display:flex; padding:5px; gap:2px; }
+  .pill span { padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; color:#555; }
+  .pill span.on { background:var(--accent-soft); color:var(--accent); }
+  .blob { width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,.95); box-shadow:0 4px 16px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; }
+  .blob:hover { background:var(--accent-soft); }
+
+  /* search chrome */
+  .stop { flex:none; display:flex; align-items:center; gap:6px; padding:6px 10px 6px 4px; position:relative; }
+  .back { width:38px; height:38px; display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; border-radius:50%; flex:none; }
+  .back:hover { background:#f1f2f5; }
+  .field { display:flex; flex-wrap:nowrap; overflow-x:auto; align-items:center; gap:4px; background:#f1f2f5; border-radius:14px; padding:5px 8px; min-height:40px; flex:1; scrollbar-width:none; }
+  .field::-webkit-scrollbar { display:none; }
+  .field input { flex:1; min-width:120px; border:0; background:transparent; font-size:15px; outline:none; padding:4px; }
+  .tok { display:inline-flex; align-items:center; gap:4px; background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:3px 8px; font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; flex:none; }
+  .tok .x { opacity:.6; }
+  .dd { position:absolute; left:10px; right:10px; top:50px; background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.2); z-index:8; max-height:360px; overflow:auto; display:none; }
+  .rail { flex:none; display:flex; gap:8px; overflow-x:auto; padding:2px 12px 8px; scrollbar-width:none; }
+  .rail::-webkit-scrollbar { display:none; }
+  .chip { flex:none; border:1px solid #d9dce2; background:#fff; border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; white-space:nowrap; user-select:none; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .chip.filled { background:var(--accent-soft); color:var(--accent); border-color:transparent; font-weight:600; }
+  .chip.off { opacity:.35; pointer-events:none; }
+  .chip small { opacity:.65; margin-left:3px; }
+  .chip .badge { background:var(--accent); color:#fff; border-radius:999px; padding:0 6px; font-size:11px; margin-left:4px; }
+
+  .scroll { flex:1; overflow-y:auto; scrollbar-width:none; }
+  .scroll::-webkit-scrollbar { display:none; }
+  .count { font-size:12px; color:var(--muted); padding:6px 14px; display:flex; justify-content:space-between; align-items:center; }
+  .count b { color:var(--ink); }
+  .mh { font-size:13px; font-weight:700; padding:12px 12px 6px; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; }
+  .grid div { aspect-ratio:1; position:relative; }
+  .grid div.v::after { content:'▶'; position:absolute; right:4px; top:3px; font-size:9px; color:#fff; }
+  .grid div.f::before { content:'♥'; position:absolute; left:4px; bottom:2px; font-size:10px; color:#fff; }
+  .none { padding:40px 20px; text-align:center; color:var(--muted); }
+
+  /* sheets */
+  .sheet-bg { position:absolute; inset:0; background:rgba(0,0,0,.3); display:none; z-index:10; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; height:64%; background:#fff; border-radius:20px 20px 0 0; display:none; flex-direction:column; z-index:11; box-shadow:0 -6px 24px rgba(0,0,0,.12); }
+  .sheet.tall { height:88%; }
+  .phone.sheeted .sheet-bg { display:block; } .phone.sheeted .sheet { display:flex; }
+  .phone.typing .sheet { bottom:236px; height:calc(100% - 236px - 40px); }
+  .grab { width:40px; height:5px; border-radius:3px; background:#d4d7dd; margin:8px auto 2px; flex:none; }
+  .sh { flex:none; padding:4px 14px 8px; display:flex; align-items:center; justify-content:space-between; }
+  .sh b { font-size:17px; }
+  .sh a { color:var(--accent); font-weight:600; cursor:pointer; font-size:13px; }
+  .sfield { margin:0 14px 6px; display:flex; background:#f1f2f5; border-radius:12px; padding:4px 8px; flex:none; }
+  .sfield input { flex:1; border:0; background:transparent; outline:none; font-size:15px; padding:6px 4px; }
+  .sfoot { flex:none; padding:10px 14px 18px; border-top:1px solid var(--line); }
+  .btn { width:100%; border:0; border-radius:12px; padding:12px; font-size:15px; font-weight:600; background:var(--accent); color:#fff; cursor:pointer; }
+  .hint { font-size:11px; color:var(--muted); padding:4px 14px 6px; }
+  .pgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px 4px; padding:6px 10px; }
+  .person { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; text-align:center; cursor:pointer; }
+  .person small { color:var(--muted); font-size:10px; }
+  .person.on .av { outline:3px solid var(--accent); outline-offset:2px; }
+  .av { width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:17px; }
+  .av.sm { width:30px; height:30px; font-size:11px; }
+  .wrap { display:flex; flex-wrap:wrap; gap:8px; padding:6px 14px; }
+  .list .it { display:flex; align-items:center; gap:12px; padding:9px 14px; cursor:pointer; }
+  .list .it:hover { background:#f5f6f8; }
+  .list .it .ico { width:30px; height:30px; border-radius:50%; background:#eef0f4; display:flex; align-items:center; justify-content:center; flex:none; font-size:14px; }
+  .list .it .t { flex:1; } .list .it .t small { display:block; color:var(--muted); font-size:12px; }
+  .list .it .n { color:var(--muted); font-size:12px; }
+  .list .it.on { background:var(--accent-soft); }
+  .list .grp { padding:10px 14px 2px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .months { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; padding:6px 0 4px; }
+  .months .chip { text-align:center; padding:6px 0; }
+  .yr { padding:6px 14px; }
+  .sec { padding:10px 14px; border-bottom:1px solid #f0f1f4; }
+  .sec h4 { margin:0 0 8px; font-size:13px; display:flex; justify-content:space-between; }
+  .sec h4 small { color:var(--muted); font-weight:400; }
+  .seg { display:flex; background:#f1f2f5; border-radius:10px; padding:3px; }
+  .seg span { flex:1; text-align:center; padding:6px 0; border-radius:8px; font-size:13px; cursor:pointer; }
+  .seg span.on { background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.12); font-weight:600; }
+  .seg span.off { opacity:.35; pointer-events:none; }
+  .switch { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+  .switch i { width:42px; height:24px; border-radius:12px; background:#d4d7dd; position:relative; flex:none; }
+  .switch i::after { content:''; position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:2px; left:2px; transition:left .15s; }
+  .switch.on i { background:var(--accent); } .switch.on i::after { left:20px; }
+  .stars span { font-size:24px; cursor:pointer; color:#d4d7dd; } .stars span.on { color:#f5b301; }
+  .tf { display:flex; gap:6px; margin-top:8px; }
+  .tf input { flex:1; border:1px solid #d9dce2; border-radius:10px; padding:8px 10px; font-size:14px; outline:none; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Search C, deeper: filters that react to each other</h1>
+  <p>Both phones start on today's Photos screen. Tap the round <b>🔍</b> button, bottom right. The top bar and bottom nav step aside; ← brings them back.</p>
+  <p>The fake library has about 3,500 photos from 120 trips and events, so the filters really narrow each other. Pick <b>Places → Kyoto</b> and watch People, When and Camera shrink to what exists in Kyoto, each with a count. Options with nothing left disappear. In the top field, <b>@</b>, <b>#</b> and city names work too.</p>
+  <p>The two phones differ only in how you reach the filters beyond People, When, Places and Tags.</p>
+</header>
+<div class="row">
+  <div class="col">
+    <h2>C1 · Every filter in the chip row</h2>
+    <p class="why">One scrolling row holds all ten filters. A filter with nothing left to offer greys out. Everything is one tap away, but the row is long: Camera, Albums and Text sit off-screen to the right.</p>
+    <div class="phone" id="C1"></div>
+    <button class="pick" data-choice="c1" onclick="toggleSelect(this)">I like C1</button>
+  </div>
+  <div class="col">
+    <h2>C2 · Main four, plus a Filters sheet</h2>
+    <p class="why">The row shows People, When, Places and Tags, then a <b>Filters</b> chip with a badge. That chip opens one tall sheet with everything else (favorites, photo or video, rating, camera, albums, text) and live counts. An active extra filter also shows as its own chip in the row, so you can see it and remove it.</p>
+    <div class="phone" id="C2"></div>
+    <button class="pick" data-choice="c2" onclick="toggleSelect(this)">I like C2</button>
+  </div>
+</div>
+<script>
+// ---------------- fake library: events -> assets, so filters correlate ----------------
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const pick = a => a[Math.floor(rnd() * a.length)];
+const PEOPLE = ['Anna Weber','Ben Okafor','Grandma Rose','Chloé Martin','Rex (dog)','David Kim','Emma Schulz','Felix Braun','Hugo Laurent','Lena Fischer','Max Hoffmann','Mia Rossi','Noah Becker','Olivia Brown','Paul Wagner','Sofia Costa','Annika Lindt','Andreas Vogel'];
+const CORE = ['Anna Weber','Ben Okafor','Rex (dog)'];
+const PLACES = [['Berlin','Germany',9],['Hamburg','Germany',3],['Munich','Germany',2],['Lisbon','Portugal',2],['Porto','Portugal',1],['Paris','France',2],['Lyon','France',1],['Kyoto','Japan',1],['Tokyo','Japan',1],['Barcelona','Spain',2],['Madrid','Spain',1],['Rome','Italy',1],['Amsterdam','Netherlands',1],['New York','United States',1]];
+const PLACE_BAG = PLACES.flatMap(p => Array(p[2]).fill(p));
+const KINDS = [['birthday',['birthday','party']],['holiday',['holiday','beach']],['hike',['hiking','nature']],['christmas',['christmas','family']],['wedding',['wedding','party']],['dinner',['food','friends']],['concert',['concert','music']],['garden',['garden','family']],['road trip',['road trip','holiday']],['snow',['snow','holiday']],['everyday',[]]];
+const CAMERAS = { Apple:['iPhone 13','iPhone 15 Pro','iPhone 17'], Sony:['A7 IV','RX100 VII'], Fujifilm:['X100V','X-T5'], Google:['Pixel 8'] };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const ASSETS = []; const EVENT_HUES = [];
+for (let e = 0; e < 120; e++) {
+  const year = 2016 + Math.min(10, Math.floor(Math.sqrt(rnd()) * 11)); const month = Math.floor(rnd() * 12);
+  const kind = pick(KINDS); const home = rnd() < .55; const place = home ? PLACES[0] : pick(PLACE_BAG);
+  const ppl = new Set(); CORE.forEach(p => rnd() < .55 && ppl.add(p)); const extra = Math.floor(rnd() * 4); for (let i=0;i<extra;i++) ppl.add(pick(PEOPLE));
+  if (kind[0]==='christmas' || kind[0]==='garden') ppl.add('Grandma Rose');
+  const make = year < 2020 && rnd() < .5 ? pick(['Sony','Fujifilm']) : pick(['Apple','Apple','Google','Fujifilm']);
+  const model = pick(CAMERAS[make]); const n = 8 + Math.floor(rnd() * 50); EVENT_HUES.push(Math.floor(rnd()*360));
+  for (let i = 0; i < n; i++) {
+    const people = [...ppl].filter(() => rnd() < .6);
+    ASSETS.push({ ev:e, year, month, day: 1+Math.floor(rnd()*28), city:place[0], country:place[1], people, tags: kind[1].filter(() => rnd() < .8), make, model,
+      video: rnd() < .12, fav: rnd() < .07, rating: rnd() < .15 ? 1 + Math.floor(rnd()*5) : 0, inAlbum: rnd() < (kind[0]==='everyday' ? .1 : .6),
+      ocr: kind[0]==='dinner' && rnd() < .3 ? 'menu' : rnd() < .02 ? 'receipt' : '', name:`IMG_${String(1000+ASSETS.length).padStart(4,'0')}.${rnd()<.12?'MOV':'HEIC'}`, kind:kind[0] });
+  }
+}
+ASSETS.sort((a,b) => (b.year-a.year) || (b.month-a.month) || (b.day-a.day));
+
+const hueOf = s => { let h=0; for (const c of s) h=(h*31+c.charCodeAt(0))%360; return h; };
+const avatar = (name, cls='') => `<div class="av ${cls}" style="background:hsl(${hueOf(name)},45%,52%)">${name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n.toLocaleString('en-US');
+const kbdHtml = `<div class="kbd">${['qwertyuiop','asdfghjkl','⇧zxcvbnm⌫'].map(r=>`<div class="kr">${[...r].map(k=>`<div class="k ${'⇧⌫'.includes(k)?'m':''}">${k}</div>`).join('')}</div>`).join('')}<div class="kr"><div class="k m">123</div><div class="k m">@</div><div class="k w">space</div><div class="k m">#</div><div class="k m">go</div></div></div>`;
+
+// ---------------- filtering + facets ----------------
+function fresh() { return { people:[], tags:[], when:null, place:null, fav:false, type:null, rating:0, make:null, model:null, album:null, text:null, query:null }; }
+function passes(a, f, skip) {
+  if (skip!=='people' && f.people.some(p => !a.people.includes(p))) return false;
+  if (skip!=='tags' && f.tags.some(t => !a.tags.includes(t))) return false;
+  if (skip!=='when' && f.when) { if (a.year !== f.when.y) return false; if (f.when.m != null && a.month !== f.when.m) return false; }
+  if (skip!=='place' && f.place) { if (f.place.city ? a.city !== f.place.city : a.country !== f.place.country) return false; }
+  if (skip!=='fav' && f.fav && !a.fav) return false;
+  if (skip!=='type' && f.type && (f.type==='video') !== a.video) return false;
+  if (skip!=='rating' && f.rating && a.rating < f.rating) return false;
+  if (skip!=='camera' && f.make && (a.make !== f.make || (f.model && a.model !== f.model))) return false;
+  if (skip!=='album' && f.album && (f.album==='in') !== a.inAlbum) return false;
+  if (skip!=='text' && f.text) { const q = f.text.q.toLowerCase(); const hay = f.text.field==='ocr' ? a.ocr : f.text.field==='name' ? a.name.toLowerCase() : `${a.kind} at ${a.city}`.toLowerCase(); if (!hay.includes(q)) return false; }
+  if (skip!=='query' && f.query) { const q = f.query.toLowerCase(); const hay = `${a.kind} ${a.tags.join(' ')} ${a.city} ${a.country}`.toLowerCase(); if (!hay.includes(q) && (a.ev*7 + a.day) % 23 !== 0) return false; }
+  return true;
+}
+const results = f => ASSETS.filter(a => passes(a, f));
+function tally(list, key) { const m = new Map(); list.forEach(a => [].concat(key(a)).forEach(k => k!=null && k!=='' && m.set(k, (m.get(k)||0)+1))); return [...m].sort((a,b)=>b[1]-a[1]); }
+function facets(f) {
+  const all = results(f), sk = d => ASSETS.filter(a => passes(a, f, d));
+  const whenL = sk('when'), placeL = sk('place'), camL = sk('camera');
+  return {
+    total: all.length,
+    people: tally(all, a => a.people).filter(([p]) => !f.people.includes(p)),
+    tags: tally(all, a => a.tags).filter(([t]) => !f.tags.includes(t)),
+    years: tally(whenL, a => a.year).sort((a,b)=>b[0]-a[0]),
+    months: y => tally(whenL.filter(a => a.year===y), a => a.month),
+    countries: tally(placeL, a => a.country),
+    cities: tally(placeL, a => a.city),
+    cityCountry: c => PLACES.find(p => p[0]===c)[1],
+    types: tally(sk('type'), a => a.video ? 'video' : 'photo'),
+    favs: sk('fav').filter(a => a.fav).length,
+    ratings: [1,2,3,4,5].map(r => [r, sk('rating').filter(a => a.rating >= r).length]),
+    makes: tally(camL, a => a.make),
+    models: mk => tally(camL.filter(a => a.make===mk), a => a.model),
+    album: tally(sk('album'), a => a.inAlbum ? 'in' : 'none'),
+  };
+}
+
+// ---------------- one prototype instance ----------------
+function Proto(id, variant) {
+  const root = document.getElementById(id); let f = fresh(); let mode = 'normal'; let sheet = null; let sheetQ = ''; let openYear = null; let openMake = null; let textField = 'ocr';
+  root.innerHTML = `<div class="sbar"><span>9:41</span><span>●●● 5G</span></div>
+    <div class="appbar"><div class="logo"><i></i>Gallery</div><span class="ic">▭</span><span class="ic">☁︎</span><div class="me">P</div></div>
+    <div class="stop" style="display:none"><div class="back">←</div><div class="field"><span class="toks"></span><input class="main" placeholder="Search, @person, #tag, place"></div><div class="dd"></div></div>
+    <div class="rail" style="display:none"></div>
+    <div class="scroll body"></div>
+    <div class="bnav"><div class="pill"><span class="on">Photos</span><span>Spaces</span><span>Library</span></div><div class="blob">🔍</div></div>
+    <div class="sheet-bg"></div>
+    <div class="sheet"><div class="grab"></div><div class="sh"><b></b><a class="clear">Clear</a></div><div class="sfield"><input class="sq"></div><div class="scroll sbody"></div><div class="sfoot"><button class="btn"></button></div></div>
+    ${kbdHtml}`;
+  const $ = s => root.querySelector(s);
+  const body = $('.body'), rail = $('.rail'), toks = $('.toks'), input = $('input.main'), dd = $('.dd'), sq = $('.sq');
+
+  // keep the field focused when tapping UI
+  root.addEventListener('mousedown', e => { if (e.target.closest('[data-do]') && !e.target.closest('input')) e.preventDefault(); });
+
+  $('.blob').onclick = () => { mode = 'search'; render(); };
+  $('.back').onclick = () => { mode = 'normal'; f = fresh(); input.value=''; closeSheet(); render(); };
+  $('.sheet-bg').onclick = closeSheet; $('.btn').onclick = closeSheet;
+  $('.clear').onclick = () => { clearDim(sheet); render(); };
+  input.onfocus = () => { root.classList.add('typing'); render(); };
+  input.onblur = () => { root.classList.remove('typing'); render(); };
+  input.oninput = render;
+  input.onkeydown = e => {
+    if (e.key==='Enter' && input.value.trim() && !/^[@#]/.test(input.value)) { f.query = input.value.trim(); input.value=''; input.blur(); render(); }
+    if (e.key==='Backspace' && !input.value) { const t = toks.querySelectorAll('.tok'); if (t.length) { act(t[t.length-1].dataset.do, t[t.length-1].dataset.v); } }
+  };
+  sq.oninput = () => { sheetQ = sq.value; renderSheet(); };
+  sq.onfocus = () => root.classList.add('typing'); sq.onblur = () => root.classList.remove('typing');
+
+  root.addEventListener('click', e => { const el = e.target.closest('[data-do]'); if (!el) return; act(el.dataset.do, el.dataset.v); });
+
+  function openSheet(k) { sheet = k; sheetQ = ''; sq.value = ''; openYear = null; openMake = f.make; root.classList.add('sheeted'); render(); }
+  function closeSheet() { sheet = null; root.classList.remove('sheeted'); root.classList.remove('typing'); render(); }
+  function clearDim(k) {
+    if (k==='people') f.people=[]; if (k==='tags') f.tags=[]; if (k==='when') f.when=null; if (k==='place') f.place=null;
+    if (k==='more') Object.assign(f, { fav:false, type:null, rating:0, make:null, model:null, album:null, text:null });
+    if (k==='camera') { f.make=null; f.model=null; } if (k==='fav') f.fav=false; if (k==='type') f.type=null; if (k==='rating') f.rating=0; if (k==='album') f.album=null; if (k==='text') f.text=null; if (k==='query') f.query=null;
+  }
+  function act(what, v) {
+    const [k, op] = what.split(':');
+    if (k==='sheet') { if (v==='fav') { f.fav = !f.fav; render(); } else openSheet(v); return; }
+    if (op==='rm') { if (k==='person') f.people = f.people.filter(p=>p!==v); else if (k==='tag') f.tags = f.tags.filter(t=>t!==v); else clearDim(k); render(); return; }
+    if (k==='person') f.people.includes(v) ? f.people = f.people.filter(p=>p!==v) : f.people.push(v);
+    if (k==='tag') f.tags.includes(v) ? f.tags = f.tags.filter(t=>t!==v) : f.tags.push(v);
+    if (k==='year') { openYear = openYear===+v ? null : +v; }
+    if (k==='when') { const [y,m] = v.split('-'); const w = { y:+y, m: m==null ? null : +m }; f.when = f.when && f.when.y===w.y && f.when.m===w.m ? null : w; }
+    if (k==='city') f.place = f.place && f.place.city===v ? null : { city:v };
+    if (k==='country') f.place = f.place && f.place.country===v && !f.place.city ? null : { country:v };
+    if (k==='fav') f.fav = !f.fav;
+    if (k==='type') f.type = !v || f.type===v ? null : v;
+    if (k==='rating') f.rating = f.rating===+v ? 0 : +v;
+    if (k==='make') { openMake = openMake===v ? null : v; }
+    if (k==='makeAll') { f.make = f.make===v && !f.model ? null : v; f.model = null; }
+    if (k==='model') { const [mk, md] = v.split('|'); if (f.model===md) { f.model=null; } else { f.make=mk; f.model=md; } }
+    if (k==='album') f.album = !v || f.album===v ? null : v;
+    if (k==='textfield') { textField = v; if (f.text) f.text.field = v; }
+    if (k==='query') { f.query = v; }
+    if (k==='dd') { input.value = ''; }
+    render();
+  }
+  // suggestions from the top field come from the same facets, so they are already narrowed
+  function ddHtml(F) {
+    const raw = input.value; if (!raw) return '';
+    const m = raw[0]==='@' ? 'people' : raw[0]==='#' ? 'tags' : null; const q = (m ? raw.slice(1) : raw).trim().toLowerCase();
+    const hit = s => !q || s.toLowerCase().split(/[\s()]+/).some(w => w.startsWith(q)) || s.toLowerCase().startsWith(q);
+    const rows = [];
+    const ppl = (!m || m==='people') ? F.people.filter(([p]) => hit(p)).slice(0, m ? 8 : 3) : [];
+    const tgs = (!m || m==='tags') ? F.tags.filter(([t]) => hit(t)).slice(0, m ? 8 : 3) : [];
+    const cts = !m ? F.cities.filter(([c]) => hit(c) || hit(F.cityCountry(c))).slice(0, 3) : [];
+    const yrs = !m && /^\d+$/.test(q) ? F.years.filter(([y]) => String(y).includes(q)).slice(0,3) : [];
+    const mi = !m && q.length >= 2 ? MONTH_LONG.findIndex(x => x.toLowerCase().startsWith(q)) : -1;
+    if (ppl.length) { rows.push('<div class="grp">People</div>'); ppl.forEach(([p,n]) => rows.push(`<div class="it" data-do="person,dd" data-v="${esc(p)}">${avatar(p,'sm')}<div class="t">${esc(p)}</div><span class="n">${fmt(n)}</span></div>`)); }
+    if (tgs.length) { rows.push('<div class="grp">Tags</div>'); tgs.forEach(([t,n]) => rows.push(`<div class="it" data-do="tag,dd" data-v="${esc(t)}"><div class="ico">#</div><div class="t">${esc(t)}</div><span class="n">${fmt(n)}</span></div>`)); }
+    if (cts.length) { rows.push('<div class="grp">Places</div>'); cts.forEach(([c,n]) => rows.push(`<div class="it" data-do="city,dd" data-v="${esc(c)}"><div class="ico">📍</div><div class="t">${esc(c)}<small>${esc(F.cityCountry(c))}</small></div><span class="n">${fmt(n)}</span></div>`)); }
+    if (yrs.length) { rows.push('<div class="grp">When</div>'); yrs.forEach(([y,n]) => rows.push(`<div class="it" data-do="when,dd" data-v="${y}"><div class="ico">📅</div><div class="t">${y}</div><span class="n">${fmt(n)}</span></div>`)); }
+    if (mi >= 0) { if (!yrs.length) rows.push('<div class="grp">When</div>'); F.years.slice(0,3).forEach(([y]) => { const n = F.months(y).find(([m]) => m===mi); if (n) rows.push(`<div class="it" data-do="when,dd" data-v="${y}-${mi}"><div class="ico">📅</div><div class="t">${MONTH_LONG[mi]} ${y}</div><span class="n">${fmt(n[1])}</span></div>`); }); }
+    if (!m) rows.push(`<div class="grp">Photos</div><div class="it" data-do="query,dd" data-v="${esc(raw)}"><div class="ico">🔍</div><div class="t">Photos that look like “${esc(raw)}”<small>Smart search</small></div></div>`);
+    if (!rows.length) rows.push('<div class="hint" style="padding:14px">Nothing left that matches</div>');
+    return `<div class="list">${rows.join('')}</div>`;
+  }
+  // multi-action support: "person,dd" means apply person then clear the field
+  root.addEventListener('click', e => { const el = e.target.closest('[data-do*=","]'); if (!el) return; e.stopImmediatePropagation(); const [a] = el.dataset.do.split(','); input.value=''; act(a, el.dataset.v); }, true);
+
+  function whenLabel(w) { return w.m==null ? String(w.y) : `${MON[w.m]} ${w.y}`; }
+  function railChips(F) {
+    const short = p => p.split(' ')[0];
+    const c = [];
+    const chip = (k, label, active, possible, extra='') => c.push(`<div class="chip ${active?'filled':''} ${!active&&!possible?'off':''}" data-do="sheet" data-v="${k}">${label}${extra}</div>`);
+    chip('people', f.people.length ? f.people.map(short).join(', ') + ' ▾' : 'People ▾', f.people.length, F.people.length);
+    chip('when', f.when ? whenLabel(f.when) + ' ▾' : 'When ▾', f.when, F.years.length > 1);
+    chip('place', f.place ? (f.place.city || f.place.country) + ' ▾' : 'Places ▾', f.place, F.cities.length > 1);
+    chip('tags', f.tags.length ? f.tags.map(t=>'#'+t).join(' ') + ' ▾' : 'Tags ▾', f.tags.length, F.tags.length);
+    if (variant==='C1') {
+      chip('fav', f.fav ? '♥ Favorites ✕' : '♥ Favorites', f.fav, F.favs);
+      chip('type', f.type ? (f.type==='video'?'Videos':'Photos only') + ' ▾' : 'Photo / Video ▾', f.type, F.types.length > 1);
+      chip('rating', f.rating ? '★'.repeat(f.rating) + '+ ▾' : 'Rating ▾', f.rating, F.ratings[0][1]);
+      chip('camera', f.make ? (f.model || f.make) + ' ▾' : 'Camera ▾', f.make, F.makes.length > 1);
+      chip('album', f.album ? (f.album==='in'?'In an album':'Not in an album') + ' ▾' : 'Albums ▾', f.album, F.album.length > 1);
+      chip('text', f.text ? `“${esc(f.text.q)}” ▾` : 'Text ▾', f.text, true);
+    } else {
+      const extras = [];
+      if (f.fav) extras.push(['fav','♥ Favorites']);
+      if (f.type) extras.push(['type', f.type==='video'?'Videos':'Photos only']);
+      if (f.rating) extras.push(['rating','★'.repeat(f.rating)+'+']);
+      if (f.make) extras.push(['camera', f.model || f.make]);
+      if (f.album) extras.push(['album', f.album==='in'?'In an album':'Not in an album']);
+      if (f.text) extras.push(['text', `“${f.text.q}”`]);
+      extras.forEach(([k,l]) => c.push(`<div class="chip filled" data-do="${k}:rm" data-v="">${esc(l)} ✕</div>`));
+      c.push(`<div class="chip" data-do="sheet" data-v="more">⚙ Filters${extras.length?`<span class="badge">${extras.length}</span>`:''}</div>`);
+    }
+    return c.join('');
+  }
+  function grid(list) {
+    if (!list.length) return '<div class="none">No photos match all of these.<br>Remove a filter to see more.</div>';
+    let out = '', cur = '', n = 0;
+    for (const a of list) { if (n++ > 90) break; const k = `${MONTH_LONG[a.month]} ${a.year}`; if (k !== cur) { if (cur) out += '</div>'; out += `<div class="mh">${k}${mode==='search'&&a.city!=='Berlin'?` <span style="font-weight:400;color:var(--muted)">· ${a.city}</span>`:''}</div><div class="grid">`; cur = k; }
+      out += `<div class="${a.video?'v':''} ${a.fav?'f':''}" style="background:hsl(${EVENT_HUES[a.ev]},${35+(a.day%4)*6}%,${52+(a.day*7)%22}%)"></div>`; }
+    return out + '</div>';
+  }
+  function render() {
+    const s = mode === 'search';
+    $('.appbar').style.display = s ? 'none' : 'flex'; $('.stop').style.display = s ? 'flex' : 'none'; rail.style.display = s ? 'flex' : 'none'; $('.bnav').style.display = s ? 'none' : 'flex';
+    const F = facets(f);
+    if (!s) { body.innerHTML = grid(ASSETS); return; }
+    const t = [];
+    if (f.query) t.push(`<span class="tok" data-do="query:rm" data-v="">🔍 ${esc(f.query)} <span class="x">✕</span></span>`);
+    toks.innerHTML = t.join('');
+    rail.innerHTML = railChips(F);
+    body.innerHTML = `<div class="count"><span><b>${fmt(F.total)}</b> ${F.total===ASSETS.length?'photos and videos':'match'}</span><span>Newest ▾</span></div>` + grid(results(f));
+    const showDd = document.activeElement === input && input.value; dd.style.display = showDd ? 'block' : 'none'; if (showDd) dd.innerHTML = ddHtml(F);
+    renderSheet(F);
+  }
+  function renderSheet(F = facets(f)) {
+    if (!sheet) return;
+    const titles = { people:'People', when:'When', place:'Places', tags:'Tags', type:'Photo or video', rating:'Rating', camera:'Camera', album:'Albums', text:'Text', more:'Filters' };
+    $('.sh b').textContent = titles[sheet];
+    const searchable = ['people','place','tags'].includes(sheet);
+    $('.sfield').style.display = searchable ? 'flex' : 'none'; sq.placeholder = sheet==='place' ? 'Any city or country…' : `Find ${titles[sheet].toLowerCase()}…`;
+    $('.sheet').classList.toggle('tall', sheet==='more' || sheet==='when');
+    const q = sheetQ.trim().toLowerCase(); const hit = s => !q || s.toLowerCase().split(/[\s()]+/).some(w => w.startsWith(q));
+    let h = '';
+    if (sheet==='people') {
+      const sel = f.people.map(p => [p, null]);
+      const list = F.people.filter(([p]) => hit(p));
+      h = (sel.length ? `<div class="hint">Selected · photos with all of them</div><div class="pgrid">${sel.map(([p]) => `<div class="person on" data-do="person" data-v="${esc(p)}">${avatar(p)}${esc(p.split(' ')[0])}</div>`).join('')}</div>` : '')
+        + `<div class="hint">${q ? 'Matches' : sel.length ? 'Also in these photos' : 'Most photographed'}</div><div class="pgrid">${list.slice(0, q?40:16).map(([p,n]) => `<div class="person" data-do="person" data-v="${esc(p)}">${avatar(p)}${esc(p.split(' ')[0])}<small>${fmt(n)}</small></div>`).join('') || '<div class="hint">No one else in these photos</div>'}</div>`;
+    }
+    if (sheet==='tags') {
+      const list = F.tags.filter(([t]) => hit(t));
+      h = (f.tags.length ? `<div class="wrap">${f.tags.map(t => `<div class="chip on" data-do="tag" data-v="${esc(t)}">#${esc(t)} ✕</div>`).join('')}</div>` : '')
+        + `<div class="wrap">${list.map(([t,n]) => `<div class="chip" data-do="tag" data-v="${esc(t)}">#${esc(t)}<small>${fmt(n)}</small></div>`).join('') || '<div class="hint">No other tags in these photos</div>'}</div>`;
+    }
+    if (sheet==='place') {
+      const cs = F.countries.filter(([c]) => !q || hit(c) || F.cities.some(([ci,]) => F.cityCountry(ci)===c && hit(ci)));
+      h = `<div class="list">${cs.map(([c,n]) => { const cities = F.cities.filter(([ci]) => F.cityCountry(ci)===c && (!q || hit(ci) || hit(c)));
+        return `<div class="it ${f.place&&f.place.country===c&&!f.place.city?'on':''}" data-do="country" data-v="${esc(c)}"><div class="ico">🌍</div><div class="t"><b>${esc(c)}</b><small>All of ${esc(c)}</small></div><span class="n">${fmt(n)}</span></div>`
+          + cities.map(([ci,cn]) => `<div class="it ${f.place&&f.place.city===ci?'on':''}" data-do="city" data-v="${esc(ci)}" style="padding-left:30px"><div class="ico">📍</div><div class="t">${esc(ci)}</div><span class="n">${fmt(cn)}</span></div>`).join(''); }).join('') || '<div class="hint">No places match</div>'}</div>`;
+    }
+    if (sheet==='when') {
+      h = `<div class="hint">Years with matching photos. Tap a year for its months.</div>` + F.years.map(([y,n]) => {
+        const on = f.when && f.when.y===y; const open = openYear===y || (on && openYear==null);
+        return `<div class="yr"><div style="display:flex;gap:8px;align-items:center"><div class="chip ${on&&f.when.m==null?'on':on?'filled':''}" data-do="when" data-v="${y}">${y}<small>${fmt(n)}</small></div><span class="hint" style="padding:0;cursor:pointer" data-do="year" data-v="${y}">${open?'▴ months':'▾ months'}</span></div>`
+          + (open ? `<div class="months">${MON.map((m,i) => { const c = F.months(y).find(([mm]) => mm===i); return `<div class="chip ${on&&f.when.m===i?'on':''} ${c?'':'off'}" data-do="when" data-v="${y}-${i}">${m}</div>`; }).join('')}</div>` : '') + '</div>';
+      }).join('');
+    }
+    const secFav = () => `<div class="sec"><div class="switch ${f.fav?'on':''}" data-do="fav" data-v=""><span>♥ Favorites only <small style="color:var(--muted)">${fmt(F.favs)}</small></span><i></i></div></div>`;
+    const secType = () => { const c = Object.fromEntries(F.types); return `<div class="sec"><h4>Photo or video</h4><div class="seg">${[['','All'],['photo','Photos'],['video','Videos']].map(([k,l]) => `<span class="${(f.type||'')===k?'on':''} ${k&&!c[k]?'off':''}" data-do="type" data-v="${k}">${l}${k&&c[k]!=null?` <small style="color:var(--muted)">${fmt(c[k])}</small>`:''}</span>`).join('')}</div></div>`; };
+    const secRating = () => `<div class="sec"><h4>Rating <small>${f.rating?`${fmt(F.ratings[f.rating-1][1])} at ${f.rating}★ or more`:'any'}</small></h4><div class="stars">${[1,2,3,4,5].map(r => `<span class="${r<=f.rating?'on':''}" data-do="rating" data-v="${r}">★</span>`).join('')}</div></div>`;
+    const secCamera = () => `<div class="sec" style="padding:10px 0"><h4 style="padding:0 14px">Camera</h4><div class="list">${F.makes.map(([mk,n]) => `<div class="it ${f.make===mk&&!f.model?'on':''}" data-do="make" data-v="${esc(mk)}"><div class="ico">📷</div><div class="t">${esc(mk)}</div><span class="n">${fmt(n)} ${openMake===mk?'▴':'▾'}</span></div>`
+      + (openMake===mk ? `<div class="wrap" style="padding-left:56px"><div class="chip ${f.make===mk&&!f.model?'on':''}" data-do="makeAll" data-v="${esc(mk)}">Any ${esc(mk)}</div>${F.models(mk).map(([md,c]) => `<div class="chip ${f.model===md?'on':''}" data-do="model" data-v="${esc(mk)}|${esc(md)}">${esc(md)}<small>${fmt(c)}</small></div>`).join('')}</div>` : '')).join('')}</div></div>`;
+    const secAlbum = () => { const c = Object.fromEntries(F.album); return `<div class="sec"><h4>Albums</h4><div class="seg">${[['','Any'],['in','In an album'],['none','Not in one']].map(([k,l]) => `<span class="${(f.album||'')===k?'on':''} ${k&&!c[k]?'off':''}" data-do="album" data-v="${k}">${l}</span>`).join('')}</div></div>`; };
+    const secText = () => `<div class="sec"><h4>Text</h4><div class="seg">${[['ocr','In the photo'],['name','File name'],['desc','Description']].map(([k,l]) => `<span class="${textField===k?'on':''}" data-do="textfield" data-v="${k}">${l}</span>`).join('')}</div><div class="tf"><input class="ti" placeholder="${textField==='ocr'?'e.g. menu, receipt':textField==='name'?'e.g. IMG_12':'e.g. birthday'}" value="${f.text?esc(f.text.q):''}"></div></div>`;
+    if (sheet==='type') h = secType(); if (sheet==='rating') h = secRating(); if (sheet==='camera') h = secCamera(); if (sheet==='album') h = secAlbum(); if (sheet==='text') h = secText();
+    if (sheet==='more') h = secFav() + secType() + secRating() + secCamera() + secAlbum() + secText();
+    const sb = $('.sbody'); const st = sb.scrollTop; sb.innerHTML = h; sb.scrollTop = st;
+    const ti = sb.querySelector('.ti'); if (ti) { ti.onfocus = () => root.classList.add('typing'); ti.onblur = () => root.classList.remove('typing'); ti.onchange = () => { f.text = ti.value.trim() ? { field:textField, q:ti.value.trim() } : null; render(); }; ti.onkeydown = e => { if (e.key==='Enter') ti.blur(); }; }
+    $('.btn').textContent = F.total ? `Show ${fmt(F.total)} ${F.total===1?'photo':'photos'}` : 'No matches';
+  }
+  render();
+}
+Proto('C1', 'C1'); Proto('C2', 'C2');
+</script>
+</body>
+</html>

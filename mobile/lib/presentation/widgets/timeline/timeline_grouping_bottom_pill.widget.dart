@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search_timeline_hooks.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 
@@ -32,6 +33,8 @@ class TimelineGroupingBottomPill extends ConsumerWidget {
     final hiddenForMultiSelect = ref.watch(multiSelectProvider.select((s) => s.isEnabled || s.forceEnable));
     final keyboardUp = mq.viewInsets.bottom > _keyboardThreshold;
     final hiding = hiddenForMultiSelect || keyboardUp;
+    // The search entry on screens with a search (lib/gallery/search).
+    final searchable = TimelinePillSearchButton.visible(ref);
     final duration = mq.disableAnimations ? Duration.zero : _hideAnimation;
     final bottomInset = mq.padding.bottom > bottomFloat ? mq.padding.bottom : bottomFloat;
 
@@ -58,7 +61,9 @@ class TimelineGroupingBottomPill extends ConsumerWidget {
                   child: Container(
                     key: const Key('timeline-grouping-bottom-pill'),
                     height: pillHeight,
-                    constraints: const BoxConstraints(maxWidth: _pillMaxWidth),
+                    constraints: BoxConstraints(
+                      maxWidth: _pillMaxWidth + (searchable ? TimelinePillSearchButton.width : 0),
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
                       // Mirrors GalleryNavPill's surface treatment (dark: translucent elevated
@@ -82,7 +87,17 @@ class TimelineGroupingBottomPill extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    child: const Center(child: TimelineGroupingSelector(bare: true)),
+                    child: Center(
+                      child: searchable
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(child: TimelineGroupingSelector(bare: true)),
+                                TimelinePillSearchButton(),
+                              ],
+                            )
+                          : const TimelineGroupingSelector(bare: true),
+                    ),
                   ),
                 ),
               ),

@@ -1,13 +1,12 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 
 // Coupled to AutoTabsRouter transition — see tab_shell.page.dart (upstream's
 // 600 ms FadeTransition). 20 ms buffer lets MainTimelinePage finish its first-
-// build pass so FilterSheetSearchBar can accept focus.
+// build pass before search mode replaces its app bar.
 const Duration kGalleryTabTransitionDelay = Duration(milliseconds: 620);
 
 /// Reader is the common shape across WidgetRef, Ref, and ProviderContainer's
@@ -24,6 +23,6 @@ Future<void> openGallerySearch(TabsRouter tabsRouter, ProviderReader read) async
     await Future<void>.delayed(kGalleryTabTransitionDelay);
   }
 
-  read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
-  read(photosFilterSearchFocusRequestProvider.notifier).state++;
+  // Search mode in place on Photos, keyboard closed (specs/2026-10-23-mobile-search-redesign-design.md).
+  read(searchModeProvider.notifier).enter();
 }

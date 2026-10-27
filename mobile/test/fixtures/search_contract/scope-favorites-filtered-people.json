@@ -1,0 +1,59 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal, two filters: people only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"
+  },
+  "request": {
+    "body": {
+      "country": "Portugal",
+      "dimensions": [
+        "people"
+      ],
+      "isFavorite": true,
+      "personIds": [
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 1,
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": true,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isPet": true,
+          "isSelected": false,
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}

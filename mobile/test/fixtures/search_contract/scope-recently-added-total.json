@@ -1,0 +1,26 @@
+{
+  "actor": "me",
+  "description": "Recently added screen, beach rated 5: total only",
+  "ids": {
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "total"
+      ],
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 8
+    },
+    "status": 200
+  }
+}

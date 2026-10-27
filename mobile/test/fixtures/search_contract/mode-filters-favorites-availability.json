@@ -1,0 +1,39 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: availability only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability"
+      ],
+      "isFavorite": true,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": false,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": false,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

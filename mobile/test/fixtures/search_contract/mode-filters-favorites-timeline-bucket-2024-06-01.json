@@ -1,0 +1,78 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: the month 2024-06-01 of the browse results",
+  "ids": {
+    "6111e1c0-b929-459a-89b7-fd4c0fd72087": "asset:space-kyoto-1",
+    "ded86da4-c2dc-4fa2-8868-4242e72fd3c7": "user:member"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "isFavorite": "true",
+      "timeBucket": "2024-06-01",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Kyoto"
+      ],
+      "country": [
+        "Japan"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2024-06-04T10:00:00"
+      ],
+      "id": [
+        "6111e1c0-b929-459a-89b7-fd4c0fd72087"
+      ],
+      "isFavorite": [
+        true
+      ],
+      "isImage": [
+        true
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

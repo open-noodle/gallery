@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_empty_state.widget.dart';
@@ -183,6 +184,8 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       timelineServiceBuilder: (ref, scope, groupBy) => ref
           .watch(timelineFactoryProvider)
           .spaceAlbum(spaceId: widget.spaceId, albumId: widget.albumId, groupBy: groupBy, temporalScope: scope),
+      // The album only, never the space too; archived photos linked into it stay in, as the page shows them.
+      search: SpaceAlbumSearchScope(widget.albumId, name: album?.name),
       child: Timeline(
         withGroupingPill: true,
         // Without this an empty album opens on a blank screen, which reads as a failed load.

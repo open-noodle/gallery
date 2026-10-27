@@ -1,0 +1,36 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites rated at least 3 from an iPhone 15 with \"receipt\" in the photo: time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "time"
+      ],
+      "isFavorite": true,
+      "make": "Apple",
+      "model": "iPhone 15",
+      "ocr": "receipt",
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna), with Ben, in Japan: cameras only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

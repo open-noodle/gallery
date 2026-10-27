@@ -1,0 +1,45 @@
+{
+  "actor": "me",
+  "description": "Gallery server before searchFavoritesAcrossSpaces, Favorites screen: my own favourites, archived ones too: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

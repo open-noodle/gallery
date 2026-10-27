@@ -1,0 +1,33 @@
+{
+  "actor": "me",
+  "description": "Rejected as on /timeline/buckets: withPartners with archive",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "visibility": "archive",
+      "withPartners": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "message": "withPartners is only supported for non-archived, non-trashed, non-locked assets"
+    },
+    "status": 400
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "actor": "me",
+  "description": "Place screen (Lisbon), Anna with an Apple camera: tags only",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food"
+  },
+  "request": {
+    "body": {
+      "city": "Lisbon",
+      "dimensions": [
+        "tags"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "tags": [
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

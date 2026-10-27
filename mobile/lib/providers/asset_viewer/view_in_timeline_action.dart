@@ -1,8 +1,7 @@
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Jumps from a scoped timeline (search results, a person, a place, an album, a
 /// memory, the backup detail list) to [asset]'s place in the global Photos
@@ -17,15 +16,16 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// the main one, which stays mounted and listening, so an unscoped request would be
 /// taken by whichever is laid out first (#1047).
 ///
-/// Clearing the Photos filter is what makes this work from search results (#898).
+/// Leaving Photos search mode is what makes this work from search results (#898).
 /// Unlike web, mobile has no separate search route: `MainTimelinePage` renders the
 /// results itself, swapping its `timelineServiceProvider` for a search-backed one
-/// while the filter is non-empty. The timeline route is therefore already on screen
-/// behind the viewer, so popping and navigating to it lands right back in the same
-/// results. The filter — not the route — is what has to change.
+/// while search mode has a filter (lib/gallery/search/search_timeline.dart). The
+/// timeline route is therefore already on screen behind the viewer, so popping and
+/// navigating to it lands right back in the same results. Search mode — not the
+/// route — is what has to change.
 ///
 /// The order is load-bearing:
-/// * pop first, because clearing the filter disposes the search `TimelineService`
+/// * pop first, because leaving search mode disposes the search `TimelineService`
 ///   the viewer was handed by value;
 /// * latch the scroll target last, so the drain resolves against the global
 ///   timeline instead of the results it is replacing — except for a Space jump,
@@ -38,8 +38,7 @@ Future<void> viewAssetInTimeline({
   String? spaceId,
 }) async {
   await popViewer();
-  read(photosFilterProvider.notifier).reset();
-  read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
+  read(closeSearchModeProvider)();
   if (spaceId != null) {
     // A Space timeline is PUSHED over the main one, and auto_route's push future
     // completes when the route is POPPED, not when it is pushed (`_addNewPage` returns

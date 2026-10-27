@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_action.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Records the order of the navigation steps so the sequencing the timeline jump
 /// depends on can be asserted without a router.
@@ -19,6 +20,8 @@ class _Steps {
 }
 
 void main() {
+  // Leaving search mode drops its options and results on the next frame.
+  TestWidgetsFlutterBinding.ensureInitialized();
   late ProviderContainer container;
   late _Steps steps;
 
@@ -41,53 +44,56 @@ void main() {
     goToTimeline: steps.goToTimeline,
   );
 
-  test('clears an active Photos filter so the jump leaves the search results', () async {
-    // #898: mobile renders search results as the main Photos timeline with a filter
-    // applied, so the timeline route is ALREADY on screen behind the viewer. Popping
-    // and navigating to it changes nothing — only clearing the filter turns those
-    // results back into the global timeline.
-    container.read(photosFilterProvider.notifier).setText('beach');
-    expect(container.read(photosFilterProvider).isEmpty, isFalse, reason: 'precondition: a search is active');
+  /// Photos search mode with a query: the state "View in timeline" is used from.
+  void search() {
+    container.read(searchModeProvider.notifier).enter();
+    container.read(searchFieldControllerProvider).text = 'bea';
+    container.read(searchStateProvider.notifier).submitText('beach');
+  }
+
+  bool searching() => container.read(searchModeProvider) || !container.read(searchStateProvider).isEmpty;
+
+  test('leaves search mode so the jump lands on the normal Photos timeline (Slice 5 "View in timeline")', () async {
+    // #898: mobile renders search results as the main Photos timeline in search mode, so
+    // the timeline route is ALREADY on screen behind the viewer. Popping and navigating to
+    // it changes nothing; only leaving search mode turns the results back into the
+    // normal Photos timeline.
+    search();
+    expect(searching(), isTrue, reason: 'precondition: a search is active');
 
     await run();
 
-    expect(container.read(photosFilterProvider).isEmpty, isTrue);
+    expect(container.read(searchModeProvider), isFalse);
+    expect(container.read(searchStateProvider).isEmpty, isTrue);
+    expect(container.read(searchFieldControllerProvider).text, isEmpty);
   });
 
-  test('hides the filter sheet so it cannot cover the photo it lands on', () async {
-    container.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
-
-    await run();
-
-    expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
-  });
-
-  test('closes the viewer before the filter clears out of under it', () async {
-    // The viewer holds the search TimelineService by value; clearing the filter
+  test('closes the viewer before search mode closes under it', () async {
+    // The viewer holds the search TimelineService by value; leaving search mode
     // disposes it. Pop first so nothing is torn out from under a live viewer.
-    container.read(photosFilterProvider.notifier).setText('beach');
-    String? filterClearedAfter;
-    container.listen(photosFilterProvider, (_, next) {
-      filterClearedAfter ??= next.isEmpty ? steps.calls.join(',') : null;
+    search();
+    String? closedAfter;
+    container.listen(searchModeProvider, (_, next) {
+      closedAfter ??= next ? null : steps.calls.join(',');
     });
 
     await run();
 
-    expect(filterClearedAfter, 'pop');
+    expect(closedAfter, 'pop');
   });
 
-  test('latches the scroll target only once the filter is already cleared', () async {
+  test('latches the scroll target only once search mode is closed', () async {
     // Latching while the search timeline is still the active one lets the drain
     // resolve against the results being left behind and burn the request.
-    container.read(photosFilterProvider.notifier).setText('beach');
-    bool? filterWasEmptyAtLatch;
-    void listener() => filterWasEmptyAtLatch ??= container.read(photosFilterProvider).isEmpty;
+    search();
+    bool? closedAtLatch;
+    void listener() => closedAtLatch ??= !searching();
     scrollToAssetNotifierProvider.addListener(listener);
     addTearDown(() => scrollToAssetNotifierProvider.removeListener(listener));
 
     await run();
 
-    expect(filterWasEmptyAtLatch, isTrue);
+    expect(closedAtLatch, isTrue);
     expect(scrollToAssetNotifierProvider.value?.asset.heroTag, _asset('a1').heroTag);
   });
 

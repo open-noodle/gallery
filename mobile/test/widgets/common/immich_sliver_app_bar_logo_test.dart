@@ -12,6 +12,7 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/cast/cast_manager_state.dart';
@@ -19,7 +20,6 @@ import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
 import 'package:immich_mobile/providers/cast.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/services/background_upload.service.dart';
@@ -167,7 +167,7 @@ void main() {
 
     if (busy) {
       final container = ProviderScope.containerOf(tester.element(find.byType(ImmichSliverAppBar)));
-      container.read(photosFilterProvider.notifier).setText('beach');
+      container.read(searchStateProvider.notifier).submitText('beach');
       container.read(syncStatusProvider.notifier).startRemoteSync();
       // The sync line animates for as long as it is visible, so the tree never settles once
       // syncing starts; pump fixed frames instead of waiting for quiescence.
