@@ -2,6 +2,7 @@
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import type { OnRestore } from '#lib/utils/actions.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
+  import { animateRemoval } from '#lib/gallery/motion/index.ts';
   import { restoreAssets } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { mdiHistory } from '@mdi/js';
@@ -21,6 +22,7 @@
     try {
       const ids = assetMultiSelectManager.assets.map((a) => a.id);
       await restoreAssets({ bulkIdsDto: { ids } });
+      animateRemoval(ids, 'restore');
       onRestore?.(ids);
       toastManager.primary($t('assets_restored_count', { values: { count: ids.length } }));
       assetMultiSelectManager.clear();
