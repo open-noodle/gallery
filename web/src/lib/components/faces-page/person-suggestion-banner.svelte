@@ -49,6 +49,7 @@
        narrow viewport (where the title's `min-w-0` + `truncate` then engage), and `sm:max-w-2xl` stops a very
        long name from dragging the card across a wide desktop screen. -->
   <div
+    data-motion-reveal
     data-testid="person-suggestion-banner"
     class="mx-4 my-3 flex w-fit max-w-full flex-col gap-3 rounded-2xl border border-gray-200 bg-light p-4 sm:mx-6 sm:max-w-2xl dark:border-gray-700"
   >

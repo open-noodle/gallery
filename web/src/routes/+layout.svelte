@@ -4,6 +4,7 @@
   import { shortcut, shortcuts } from '#lib/actions/shortcut.ts';
   import { getMyImmichLink } from '#lib/commands.ts';
   import GlobalSearch from '#lib/components/global-search/global-search.svelte';
+  import { setupMotion } from '#lib/gallery/motion/index.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import OpenInAppBanner from '#lib/components/shared-components/open-in-app-banner.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -175,6 +176,8 @@
     element?.remove();
     // if the browser theme changes, changes the Immich theme too
   });
+
+  setupMotion();
 
   eventManager.emit('AppInit');
 

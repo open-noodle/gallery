@@ -1,3 +1,4 @@
+import { animateRemoval } from '#lib/gallery/motion/index.ts';
 import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, type StackResponseDto } from '@immich/sdk';
@@ -25,6 +26,7 @@ export const deleteAssets = async (
   try {
     const ids = assets.map((a) => a.id);
     await deleteBulk({ assetBulkDeleteDto: { ids, force } });
+    animateRemoval(ids, force ? 'delete' : 'trash');
     onAssetDelete(ids);
 
     toastManager.primary(

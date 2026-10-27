@@ -1,3 +1,4 @@
+import { animateRemoval } from '#lib/gallery/motion/index.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { emptyTrash, restoreTrash } from '@immich/sdk';
@@ -33,6 +34,7 @@ const handleEmptyTrash = async () => {
 
   try {
     const { count } = await emptyTrash();
+    animateRemoval('visible', 'delete');
     toastManager.primary($t('assets_permanently_deleted_count', { values: { count } }));
   } catch (error) {
     handleError(error, $t('errors.unable_to_empty_trash'));
@@ -49,6 +51,7 @@ const handleRestoreTrash = async () => {
 
   try {
     const { count } = await restoreTrash();
+    animateRemoval('visible', 'restore');
     toastManager.primary($t('assets_restored_count', { values: { count } }));
   } catch (error) {
     handleError(error, $t('errors.unable_to_restore_trash'));

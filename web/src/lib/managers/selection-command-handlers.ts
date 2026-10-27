@@ -9,6 +9,7 @@ import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
+import { animateRemoval } from '$lib/gallery/motion';
 import type { CommandContext, SelectionCommandContext } from '$lib/managers/command-context-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
@@ -126,6 +127,7 @@ export async function handleArchiveSelected(ctx?: CommandContext) {
   const $t = get(t);
   try {
     await updateAssets({ assetBulkUpdateDto: { ids, visibility } });
+    animateRemoval(ids, 'archive');
     selection.onArchive(ids, visibility);
     toastManager.primary($t('archived_count', { values: { count: ids.length } }));
     selection.clearSelection();
@@ -158,6 +160,7 @@ export async function handleDeleteSelected(ctx?: CommandContext) {
   const $t = get(t);
   try {
     await deleteBulk({ assetBulkDeleteDto: { ids, force } });
+    animateRemoval(ids, force ? 'delete' : 'trash');
     selection.onDelete(ids);
     toastManager.primary(
       {
