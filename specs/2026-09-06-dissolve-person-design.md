@@ -1,8 +1,209 @@
 # Dissolve a person — design
 
-Status: implemented (see "What shipped, and what did not" below)
-Date: 2026-09-06
+Status: revision 1 implemented (see "What shipped, and what did not" below); **revision 2 approved for build**
+(see "Revision 2" below, which overrides any earlier section it contradicts)
+Date: 2026-09-06, revised 2026-10-28
 Surface: admin face cleanup console (`/admin/face-cleanup`)
+
+## Revision 2 (2026-10-28): make a dissolve stick
+
+### Why
+
+Issue #1228 is the case this feature was asked for, and revision 1 does not fix it. The reporter has
+"junk persons": hundreds to thousands of tiny, blurry or non-face **machine-learning** detections (patterns,
+plush toys, backs of heads), every one with an embedding. Recognition chains them together: a face joins a
+person because it is close to _one_ member, so the cluster has no coherent centre (average pairwise distance
+0.84, the range of two unrelated people) and grows with every run. Their largest is 1,244 faces; about
+11,000 faces sit in clusters like it. The cluster is also copied into the Space people of every Space holding
+those photos (4 Spaces in their case).
+
+Revision 1 cannot remove such a person for good:
+
+- **`unassign` boomerangs.** The non-forced recognition pass streams every `personGroupId IS NULL`
+  machine-learning face back through `FacialRecognition` (`getAllFaces({ personGroupId: null, ... })` in
+  `PersonService.handleQueueRecognizeFaces`), with the same rules that built the cluster. The codebase already
+  says so for single faces: "A bare unassign would therefore boomerang" (`face-repair.service.ts`, the
+  "Unknown person" comment). For this reporter it is worse than a rebuild: 63% of the junk faces' five
+  nearest neighbours belong to _other_ people (320 of them), so with Cluster A gone the faces are filed under
+  whichever person is nearest, real people included.
+- **`delete-faces` boomerangs.** It always re-detects. The same detector on the same preview finds the same
+  boxes, which become new face rows, are queued for recognition and cluster again.
+- **Spaces keep the junk after `unassign`.** `shared_space_person_face` rows are left in place, so the orphan
+  check finds every Space person still linked and removes none.
+
+### Decisions (owner, 2026-10-28)
+
+1. **Detected faces are hidden, not unassigned or deleted.** "Hidden" is the existing "Not a face" tombstone:
+   `asset_face.deletedAt` set, `personGroupId` cleared, `face_identity_face` rows removed. Every path that
+   could bring the face back already skips it: `getAllFaces` and `searchFaces` filter
+   `asset_face.deletedAt IS NULL`, so recognition never picks it up and it never serves as a neighbour that
+   bridges other junk; and `handleDetectFaces` keeps it, because `getForDetectFacesJob` returns soft-deleted
+   faces, so a fresh detection at IoU > 0.5 matches the tombstone and adds no new row. `deletedAt` is
+   upstream's own soft-delete column, so stock Immich hides these faces too (layering rules 1, 2 and 4).
+2. **Accept losing the occasional real face inside a junk person.** Reviewing 11,000 faces one by one is not
+   a workflow anyone will follow, and a real face inside Cluster A is not under its person's name today
+   anyway. The dialog says this and points at the console's existing per-face move as the way to rescue a
+   face _before_ dissolving.
+3. **Hiding is undoable.** The dissolve records which faces it hid. Restoring a dissolve brings every one of
+   them back as an unnamed face, and recognition sorts them again. Restore is per dissolve, all or nothing.
+   It does not recreate the dissolved person.
+4. **The outcome picker goes.** The admin picks only _which_ faces (the existing `scope`). Each kind of face
+   gets the one treatment that works for it (table below). `unassign` disappears as a choice.
+5. **Spaces are cleaned up too,** but only for the faces this dissolve touched (detail below).
+6. **No new discovery.** No cohesion or face-size signal and no junk-cluster detector: the owner's call is
+   that people find these clusters on their own People page. The cheap signal (face size) is noisy on its
+   own, and the reliable one (spread around the centroid) is expensive at 35k people. The existing Health
+   tab stays exactly as revision 1 shipped it. **Finding a person in the console is by name:** the admin names
+   the junk person on the People page ("junk 1"), then searches for it in Face Cleanup. The user docs
+   (`docs/docs/administration/face-cleanup.md`) say so. No link from the People page into the console.
+
+### Treatment per face
+
+Within the chosen scope, each face of the person gets exactly one treatment:
+
+| Face                                                                         | Treatment                                       | Undoable | Re-detect its photo |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- | -------- | ------------------- |
+| Hand-drawn (`asset_face_creator` row) or `sourceType = 'manual'`             | Unassigned, left on the photo                   | n/a      | no                  |
+| `sourceType = 'machine-learning'` (with or without an embedding), not pet    | **Hidden** (tombstone) and recorded for restore | yes      | no                  |
+| `sourceType = 'exif'`                                                        | Deleted, photo re-scanned (revision 1 behaviour) | no       | yes                 |
+
+- **Why imported faces are still deleted:** a hidden EXIF face would block the repair. `handleDetectFaces`
+  matches any non-pet existing face at IoU > 0.5, soft-deleted ones included (L12), and writes the new
+  embedding onto it instead of adding a face. So a hidden EXIF box would swallow the real face the re-scan
+  is meant to find. Deleting it lets the detector add a fresh, visible face, which recognition then files
+  normally.
+- **Why manual faces are unassigned, not deleted (builder's note: this widens revision 1).** Revision 1
+  kept only `asset_face_creator` boxes and deleted owner-drawn `manual` faces. Recognition never re-clusters
+  a non-ML face, so unassigning a manual face cannot boomerang, and no re-scan can recreate a box a person
+  drew. Unassigning is the safe treatment for both.
+- **Detected faces are not re-scanned.** Re-scanning would find the same boxes; the tombstone already does
+  the job. Only the photos of deleted EXIF faces get their `facesRecognizedAt` cleared, which also shrinks
+  L3 (re-detection removing another person's face on a shared photo) to the EXIF part of a dissolve.
+- **Pets** stay excluded from every scope, and pet persons are still refused (L6).
+- Already soft-deleted faces of the person in scope: EXIF ones are hard-deleted as before (L12); ML ones
+  are already hidden and get their `personGroupId` cleared; they are not recorded for restore, since this
+  dissolve did not hide them.
+- Faces with `isVisible = false` (hidden by an edit crop) are treated like visible ones by source. A
+  detected one is hidden like the rest, so it cannot reappear on the person if the crop is undone.
+
+### The person
+
+After the treatments, if the person has no face left that still carries its `personGroupId`, the dissolve
+deletes that one `person` row and queues `FileDelete` for its thumbnail (revision 1's
+`delete-faces-and-person` path; never `PersonCleanup`, L2). If faces remain (a partial scope), the person
+survives and its representative face is repointed the way the "Not a face" detach does it
+(`faceRepairRepository.reconcileRepresentativeFaces`), with `PersonGenerateThumbnail` queued when it changed.
+A surviving person must never show a hidden face as its thumbnail.
+
+### Spaces
+
+- For every face this dissolve **hides**, delete its `shared_space_person_face` rows inside the
+  transaction. Deleted EXIF faces lose theirs by cascade, as today. Unassigned hand-drawn and manual faces
+  keep theirs (revision 1 behaviour).
+- Then remove only the Space persons left with no faces by this dissolve (existing L1 logic, still never
+  `deleteAllOrphanedPersons()`).
+- A Space person that survives because it still has faces from other photos stays. The preview reports how
+  many Space persons will survive and in how many Spaces, so the admin is not surprised to still see them.
+- A surviving Space person must not keep a hidden face as its `representativeFaceId`. Hiding does not null
+  that FK (the row still exists), and `repairInvalidRepresentativeFaces` does not check
+  `asset_face.deletedAt`. The builder repoints it inline or extends the repair; either is fine as long as a
+  test proves it.
+- Space face matching must not re-link a hidden face. It reads faces through queries that already filter
+  `asset_face.deletedAt IS NULL`; the regression tests below pin it.
+
+### Restore
+
+- **Storage:** two fork tables, created by a new fork migration in `server/src/schema/migrations-gallery/`
+  numbered above `1799000000000` (builder's choice of round number):
+  - `face_dissolve`: `id` (uuid v7), `ownerId` (FK `user`, CASCADE), `personGroupId` (plain uuid, no FK: the
+    person may be gone), `personName` (snapshot for the list), `scope`, `actorId` (FK `user`, SET NULL),
+    `createdAt`, `restoredAt` (nullable), counts for the list (hidden, deleted, unassigned).
+  - `face_dissolve_face`: (`dissolveId` FK CASCADE, `assetFaceId` FK `asset_face` CASCADE), primary key on
+    both. Only hidden faces are recorded.
+  - Every FK onto an upstream key (`user.id`, `asset_face.id`) is listed in
+    `server/src/schema/gallery-upstream-fks.json`. `scripts/revert-to-immich.sql` drops both tables. The
+    migration's `down()` drops them: the data has no upstream home, and the tombstones themselves stay in
+    upstream's own column, so nothing is lost that stock Immich could use. Say so in the migration.
+- **Restore** sets `deletedAt = NULL` on the recorded faces that still exist and are still hidden
+  (`deletedAt IS NOT NULL AND personGroupId IS NULL`), stamps `restoredAt`, then queues
+  `FacialRecognitionQueueAll { force: false }`. Faces return unnamed; the dissolved person is not recreated;
+  Space links come back only if Space matching re-links them. Restoring an already-restored dissolve is a
+  409. It refuses while recognition or detection is active, like the dissolve.
+- **What breaks a restore, accepted:** a forced "Detect faces (all)" hard-deletes every ML face, hidden ones
+  included, and the cascade empties the record. A photo deleted later takes its faces with it. A re-scan
+  that no longer detects a hidden face (for example after raising the detection score) hard-deletes it. The
+  list shows how many recorded faces still exist.
+- **Expected:** restored junk will most likely re-cluster. The restore confirmation says so.
+- **Web:** a "Dissolved" page under Face Cleanup (`/admin/face-cleanup/dissolved`, next to `declined` and
+  `resolutions`), listing dissolves newest first with person name, owner, date, counts, faces still
+  restorable, and a Restore button. Linked from the dashboard the same way the other two are.
+- **Retention:** none. Records live until restored or until their faces are gone.
+
+### API changes
+
+- Preview and apply body becomes `{ scope, expectedFaceCount }`. `outcome` and `redetect` are removed
+  (the PR is unmerged, so no compatibility shim). The named `DissolveOutcome` schema goes with them.
+- Preview counts gain what the dialog must state: faces to hide, faces to delete, faces to unassign, whether
+  the person will be removed (and how many faces it keeps otherwise), Space persons removed vs surviving
+  and the number of Spaces, plus the existing `shared-assets`, `not-redetectable` and `metadata-import-on`
+  inputs (now computed over the EXIF part only, since only those photos are re-scanned).
+- Warnings that described `unassign` (`strands-faces`, `recluster-similar`, `person-will-be-cleaned-up`) are
+  removed. `hand-drawn-kept` stays and now also covers manual faces.
+- New: `GET /admin/face-repair/dissolves` (paged) and `POST /admin/face-repair/dissolves/:id/restore`.
+  Admin-only, like the rest of the console.
+- The active-job refusal (L13) covers both the FacialRecognition and FaceDetection queues.
+
+### Web dialog
+
+- One choice: which faces, the four scope buttons revision 1 shipped (all, imported, detected, without
+  embedding). The outcome radio and the re-detect checkbox are removed. (Revision 1's planned quick-select
+  chips never shipped; there is nothing to convert.)
+- The preview states, in plain words, what happens to each kind of face, whether the person goes, what
+  remains in Spaces, and that hidden faces can be restored from the Dissolved page.
+- A line before the confirm: real faces caught in this person will be hidden too; move them to the right
+  person first if you want to keep them.
+- The typed-name confirmation stays.
+- New strings go in `i18n/gallery/en.json` plus the nine overlay locales; strings removed with `unassign` are
+  deleted from all ten.
+
+### Regression tests: the dissolve must stick
+
+Medium tests against a real database. Each must fail against revision 1's `unassign` and `delete-faces`.
+
+| Test                       | Asserts                                                                                                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-recluster`             | A chained junk person (embeddings A≈B≈C, A far from C) next to a real person P2 whose faces sit within `maxDistance` of some junk faces. Dissolve, then run the non-forced recognition queue and every queued `FacialRecognition` job, including the deferred pass. No dissolved face gets a `personGroupId`, no new person is created, P2's face count is unchanged. |
+| `nightly-skips`            | The nightly `FacialRecognitionQueueAll` does not queue any hidden face.                                                                                                                                                                                 |
+| `redetect-keeps-tombstone` | `handleDetectFaces` on a dissolved photo with the ML stub returning the same boxes: no new `asset_face` row, the hidden face stays hidden.                                                                                                               |
+| `not-a-neighbour`          | A new face that is close only to hidden faces does not join anyone through them.                                                                                                                                                                        |
+| `space-cleanup`            | The Space persons holding only dissolved faces are removed; one also holding another photo's face survives with the hidden face removed from it and a representative that is not hidden; Space face matching on the photo does not re-link a hidden face. |
+| `restore`                  | Restore un-hides exactly the recorded faces, leaves faces hidden by the console's own "Not a face" alone, queues recognition once; a second restore is a 409; a recorded face hard-deleted in between is skipped and reported.                          |
+| `exif-repair`              | Unchanged from revision 1: imported faces are deleted, their photos re-scanned, and a fresh visible face appears where the detector finds one.                                                                                                         |
+
+Revision 1's isolation fixture and its blast-radius tests (L1 to L13) still apply and are updated to the new
+treatments, not dropped. The e2e run dissolves an ML junk person and checks the faces are hidden and the
+person is gone, then restores it.
+
+### Out of scope, separately tracked
+
+- **Stopping new junk from forming.** New uploads can still chain into a fresh junk person. The reporter's
+  prevention ideas (a minimum face size for clustering, checking a face against the person as a whole rather
+  than one nearest member) belong in recognition, behind fork hooks that default to upstream behaviour. A
+  follow-up PR, linked from #1228.
+- Recording the console's existing single-face "Not a face" action for restore.
+- Any discovery of junk clusters (decision 6).
+
+### Left to the builder
+
+- Where the new code lives. New fork files go under `server/src/gallery/` (layering rule 5); moving revision
+  1's `face-dissolve.*` files there in the same PR is the builder's call, as long as the PR reports whether
+  upstream-file diffs grew or shrank.
+- Whether the hide step reuses `faceRepairRepository.detachFaces` (it filters `isVisible = true` and
+  `deletedAt IS NULL`, so it covers most but not all of the table above) or a dissolve-specific statement.
+- Pending face suggestions for hidden faces are drained the way the "Not a face" detach drains them
+  (`facePersonVerdictRepository.drainPendingForFaces`), in the same transaction.
+- Confirm that stock mobile apps treat a soft-deleted face the same way they already do for the console's
+  "Not a face" action; this revision adds no new sync behaviour.
 
 ## What shipped, and what did not
 
@@ -74,6 +275,10 @@ Decided:
 Non-goals, recorded so they are not rediscovered as omissions: space people; undo; blocking re-import;
 an owner-facing surface; fixing the EXIF import bug; pet people (see L6).
 
+**[revision 2]** Three of these are reversed: detected faces are hidden (a tombstone), hiding is undoable, and
+the Space persons holding dissolved faces are cleaned up. "No tombstone table" and "no undo page" no longer
+hold. See "Revision 2" at the top.
+
 ## Design
 
 ### 1. Discovery
@@ -128,6 +333,10 @@ Four warnings are load-bearing honesty rather than decoration:
   changed. Otherwise expect a similar grouping.
 
 ### 3. Operations
+
+**[revision 2]** The `outcome` and `redetect` fields below are removed; each face's treatment now follows
+from its source ("Treatment per face" at the top). §2's `unassign` warnings and §5's chip table are replaced
+in the same way. The text below records revision 1.
 
 `POST /admin/face-repair/person/:personId/dissolve`
 
@@ -218,7 +427,8 @@ DELETE FROM asset_face WHERE "personId" = $1 AND <scope>;
 Then queue, outside the transaction: `PersonGenerateThumbnail` for surviving people whose `faceAssetId` was
 nulled, and `AssetDetectFacesQueueAll { force: false }` when `redetect`.
 
-**No migration.** All six referencing FKs already cascade; nothing new is stored.
+**No migration.** All six referencing FKs already cascade; nothing new is stored. **[revision 2]** No longer
+true: the restore record adds two fork tables and one fork migration.
 
 ### 5. Web
 
@@ -395,9 +605,12 @@ Playwright run dissolving an EXIF-contaminated person.
 2. **L3 is a real, accepted data-loss path.** Re-detecting a shared asset can remove another person's ML face
    if the detector no longer finds it. Accepted because the alternative is skipping repair on exactly the
    photos that need it; mitigated by surfacing the shared-asset count.
-3. **`redetect` on an ML-scope dissolve discards good embeddings** to re-derive them. Correct but expensive.
+3. ~~**`redetect` on an ML-scope dissolve discards good embeddings** to re-derive them.~~ **[revision 2]**
+   Detected faces are no longer re-scanned.
 4. **The discovery aggregate is library-wide.** The people page has been bitten by PG JIT before; measure on
    the personal clone rather than assume.
+5. **[revision 2] Hiding real faces.** A junk person can hold a few real faces; they are hidden with it. Mitigated
+   by restore and by the dialog pointing at per-face moves first.
 
 ## Rollout
 
