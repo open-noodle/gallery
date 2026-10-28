@@ -89,6 +89,8 @@
   bind:this={container}
   class="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-6 lg:grid-cols-12"
   data-testid="cleanup-calendar"
+  role="group"
+  aria-label={$t('cleanup_your_year')}
   onpointerleave={() => onLeave()}
   onfocusout={onFocusOut}
 >
