@@ -1,0 +1,37 @@
+{
+  "actor": "me",
+  "description": "Since immich-32565: withPartners without a visibility (not favourites) means the timeline",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "isFavorite": "false",
+      "withPartners": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 3,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-05-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-02-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-01-01"
+      }
+    ],
+    "status": 200
+  }
+}
