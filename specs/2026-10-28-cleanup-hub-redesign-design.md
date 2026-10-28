@@ -273,6 +273,26 @@ One modal, used by the Blurry, Screenshots and Bursts queues.
 - **Motion:** the window grows out of the tile that opened it and shrinks back into it on close (reduced
   motion: fade). Stepping slides the photo in from the direction of travel.
 
+### Blurry and Screenshots: bigger tiles
+
+The owner finds the grid tiles too small to judge, on Screenshots most of all.
+
+- **Screenshots keep their shape.** A phone screenshot is tall and narrow, and the square tile crops it to a
+  sliver of its middle. Screenshot tiles use the asset's own aspect ratio (`width` / `height` from
+  `CleanupAssetDto`, with a 9:19.5 portrait fallback when missing), shown whole (`object-fit: contain` on a
+  neutral background), in a masonry-style or row-aligned layout (builder's call) so tall and wide shots both
+  fit without gaps dominating.
+- **Larger by default.** The minimum tile width goes from 150px to about 220px on Screenshots and about 200px
+  on Blurry (builder's call on exact values), so roughly half as many tiles fit per row on a laptop.
+- **Tile size control.** Both pages get a three-step size control (small, medium, large) in the queue header,
+  next to the existing filters, remembered per queue in browser storage (try/catch, like
+  `cleanup.rewind.mode`). Medium is the new default above. Large makes a screenshot's text readable without
+  opening it. `Ctrl`/`Cmd` + `+` / `-` is not hijacked; the control is the only way to change it.
+- **Same interactions.** Selection, keys, the expand button and the photo window work at every size; the grid
+  keeps `animate:flip` and the trash animation.
+- **Motion:** changing size animates the tiles to their new positions (`flipMotion`); under reduced motion it
+  snaps.
+
 ### Bursts: big frame and filmstrip
 
 Each series card (`BurstGroupCard`) becomes:
@@ -303,6 +323,8 @@ Each series card (`BurstGroupCard`) becomes:
 
 - The expand button opens the photo window for its own photo and changes no selection or mark; Space opens it;
   double-click still opens the viewer.
+- Screenshot tiles render at the asset's aspect ratio, uncropped; the size control changes the tile size and
+  is remembered per queue.
 - In Blurry and Screenshots, ← / → step through the loaded photos, Keep and Trash call the queue's paths and
   advance, Select toggles the grid's selection.
 - In Bursts, hovering or ← / → changes the big frame, clicking the big frame or K toggles its mark, the window
