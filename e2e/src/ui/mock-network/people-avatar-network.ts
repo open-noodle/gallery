@@ -12,13 +12,13 @@ export const AVATAR_PEOPLE: MockAvatarPerson[] = [
 ];
 
 /**
- * Mocks for the asset-viewer Info panel's People grid.
- *
- * `GET /api/faces?id=<assetId>` is what `faceManager.getAssetFaces` calls, and nothing else under
- * `src/ui/mock-network/` intercepts it — `face-editor-network.ts` only handles the **POST** to the
- * same path and falls back on every other method. Without this route the People section renders
- * empty and any assertion about avatars is vacuous.
- */
+Mocks for the asset-viewer Info panel's People grid.
+
+`GET /api/faces?id=<assetId>` is what `faceManager.getAssetFaces` calls, and nothing else under
+`src/ui/mock-network/` intercepts it — `face-editor-network.ts` only handles the **POST** to the
+same path and falls back on every other method. Without this route the People section renders
+empty and any assertion about avatars is vacuous.
+*/
 export const setupPeopleAvatarMockApiRoutes = async (context: BrowserContext) => {
   await context.route('**/api/faces?*', async (route, request) => {
     if (request.method() !== 'GET') {

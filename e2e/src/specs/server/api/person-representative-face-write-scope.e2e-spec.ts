@@ -1,22 +1,22 @@
 /**
- * Slice 3 — M2: `PUT /people/:id/representative-face` (`updateRepresentativeFace`) is reachable by
- * anyone with `PersonRead` — which, per `GalleryPersonAccess.checkSharedSpaceAccess`, admits ANY shared-space
- * role (Owner, Editor, and Viewer). Before this fix, that meant a space Viewer could mutate the
- * owner's GLOBAL representative face (the People-page cover) for everyone, not just their own view.
- *
- * The fix requires the caller be the person's owner OR an Editor/Owner of a space the person is
- * shared through (checked via `GalleryPersonAccess.checkSharedSpaceEditAccess`); a Viewer is denied with a
- * 403. Owner ∪ Editor — never Viewer-only.
- *
- * `personId` here (owned by `spaceOwner`) has two faces on the space-shared asset
- * (`ctx.spaceAssetId`): the first becomes the representative face automatically (Person.faceAssetId
- * is set on first `createFace`), the second is the target the disputed actor tries to switch to — so
- * the "left unchanged" assertion is meaningful (a no-op same-value write would pass trivially).
- *
- * `PersonResponseDto` does not expose `faceAssetId` in the JSON body (only `thumbnailPath`, populated
- * asynchronously by the PersonGenerateThumbnail job), so change/no-change is asserted directly via
- * `utils.getPersonFaceAssetId` (reads the column over SQL) rather than the PUT/GET response body.
- */
+Slice 3 — M2: `PUT /people/:id/representative-face` (`updateRepresentativeFace`) is reachable by
+anyone with `PersonRead` — which, per `GalleryPersonAccess.checkSharedSpaceAccess`, admits ANY shared-space
+role (Owner, Editor, and Viewer). Before this fix, that meant a space Viewer could mutate the
+owner's GLOBAL representative face (the People-page cover) for everyone, not just their own view.
+
+The fix requires the caller be the person's owner OR an Editor/Owner of a space the person is
+shared through (checked via `GalleryPersonAccess.checkSharedSpaceEditAccess`); a Viewer is denied with a
+403. Owner ∪ Editor — never Viewer-only.
+
+`personId` here (owned by `spaceOwner`) has two faces on the space-shared asset
+(`ctx.spaceAssetId`): the first becomes the representative face automatically (Person.faceAssetId
+is set on first `createFace`), the second is the target the disputed actor tries to switch to — so
+the "left unchanged" assertion is meaningful (a no-op same-value write would pass trivially).
+
+`PersonResponseDto` does not expose `faceAssetId` in the JSON body (only `thumbnailPath`, populated
+asynchronously by the PersonGenerateThumbnail job), so change/no-change is asserted directly via
+`utils.getPersonFaceAssetId` (reads the column over SQL) rather than the PUT/GET response body.
+*/
 
 import { type SpaceContext, buildSpaceContext } from 'src/actors.js';
 import { app, asBearerAuth, utils } from 'src/utils.js';
