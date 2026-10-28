@@ -37,7 +37,8 @@ a row of queues showing what is quick to win; the year is still there but no lon
 
 - No new endpoints or changes to what the queues, calendar or rewind contain. (One exception may be needed
   for the banner collage; see "Today banner".)
-- The queue pages (space hogs, bursts, screenshots, blurry) keep their current design.
+- The queue pages keep their current design, apart from the photo preview added to Blurry and Screenshots
+  (see that section).
 - One-at-a-time rewind mode keeps its layout; it only picks up the shared styling (tile radius, floating
   bottom bar, header).
 - Mobile app: unchanged.
@@ -228,6 +229,62 @@ under `prefers-reduced-motion` movement drops to plain fades or nothing. New hel
 - Before handing over, check the motion in a real browser (dev stack on `:3000`): no layout shift, no
   scrollbars appearing during animations, no smearing on the calendar, and nothing stuck after fast
   hovering.
+
+## Blurry and Screenshots queues: photo preview
+
+The owner's request: on the Blurry & botched page the tiles are too small to tell what a photo shows, and there
+is no way to see it bigger or learn anything about it. Double-click opens the full asset viewer today, but
+nothing on the page says so, and the viewer gives no queue context. The fix follows the face suggestions
+review (`specs/2026-09-03-face-cleanup-photo-context-design.md`, #1079), which solved the same problem there.
+
+Scope: both queues that use `QueueSelectGrid` (Blurry and Screenshots), since they share the grid. My call;
+the owner asked for Blurry. Space hogs and Bursts are unchanged.
+
+### Expand button on each tile
+
+- Each tile gets a small round expand button (a magnify or plus icon) in its bottom-right corner, on a dark
+  translucent chip so it reads on any photo. On pointer devices it appears on hover and on keyboard focus;
+  on touch it is always visible.
+- Pressing it opens the preview modal for that photo. It does not toggle the tile's selection.
+- Double-click keeps opening the full viewer. Space on a focused tile now opens the preview modal instead of
+  the viewer (my call: a quick look fits the queue better; the modal links on to the full viewer).
+
+### Preview modal
+
+- **Photo:** the preview size (`AssetMediaSize.Preview`), as large as the viewport allows, never cropped. The
+  thumbhash shows while it loads. Videos show their poster with a ▶ badge; they are not played in the modal.
+- **Why it's here:** for Blurry, the reason badge (Blurry, Too dark, Too bright) in plain words. Showing the
+  raw sharpness score is not required.
+- **Context:** the summary line from face review (taken date, place) and its collapsible details block (capture
+  time, file name and size, dimensions, camera, albums, people recognised). Both are read-only and are reused
+  from `web/src/lib/gallery/people/` (`suggestion-asset-summary`, `suggestion-asset-details`). The builder
+  moves them to a neutral folder (for example `web/src/lib/gallery/asset-context/`) and updates the face review
+  imports, with no change to face review's behaviour. The details block remembers whether it is open, as it
+  does in face review, with its own storage key.
+- **Links:** "Open in new tab" (to `/photos/{id}`, through `Route.viewAsset`) and "Open in viewer" (the full
+  viewer in place, as double-click does).
+- **Actions:** Keep and Trash for this photo, using the queue's existing paths (`keep`, `trashWithUndo`, with
+  their confirmation, undo and animations), and a Select / Deselect toggle that mirrors the tile. After Keep or
+  Trash the modal moves on to the next photo; past the last one it closes.
+- **Moving through the queue:** previous and next arrows, and ← / → keys, step through the photos currently
+  loaded on the page in their grid order, loading the next page when the end is reached, as the grid does.
+- **Keys** (shown in the modal's footer, same keycap style as face review): ← → move, Space select, K keep,
+  Delete trash, O open in new tab, Esc close.
+
+### Motion
+
+- The modal grows out of the tile that opened it (the photo scales from the tile's position to its full size)
+  and shrinks back into it on close; reduced motion fades instead.
+- Stepping to the next photo slides it in from the direction of travel. Keep and Trash use the queue's
+  existing animations on the grid behind the modal once it closes.
+
+### Tests
+
+- The expand button opens the modal for its own photo and does not change the selection.
+- Space opens the modal; double-click still opens the viewer.
+- ← / → step through the loaded photos; Keep and Trash call the queue's paths and advance; Select toggles the
+  same selection the grid shows.
+- Face review's existing specs still pass after the components move.
 
 ## i18n
 
