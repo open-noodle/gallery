@@ -3,30 +3,30 @@ import path from 'node:path';
 import { compileUtilities, hasRuleFor } from '#test-data/tailwind';
 
 /**
- * Guards whole utility families against names that compile to nothing.
- *
- * Tailwind emits nothing at all for a name it does not recognise, so a near-miss spelling silently
- * styles nothing. Two families have shipped that way already:
- *
- * - `wrap-*`: Tailwind v4 renamed v3's `break-words` to the singular `wrap-break-word` and added
- *   `wrap-anywhere` / `wrap-normal`. The plural `wrap-break-words` reads perfectly natural and is
- *   what v3 muscle memory produces. It shipped twice — the Filter panel's tag label (#881), where
- *   long tag names clipped instead of wrapping, and `Combobox.svelte`, which came in from upstream
- *   and so will keep arriving on every rebase until upstream fixes it.
- * - `grid-cols-*`: the singular `grid-col-2` sat in the reassign and merge people pickers, so both
- *   grids silently fell back to one column and rendered one enormous face per row on a phone
- *   (#1082).
- *
- * Nothing else catches this. eslint's `better-tailwindcss/enforce-consistent-class-order` only
- * orders classes it recognises and leaves unknown ones alone; the unit suite runs on happy-dom,
- * which resolves no stylesheets; and the class name is still right there in the markup, so reading
- * the diff does not help either.
- *
- * Scoped to specific prefixes deliberately. Every token matched below is a Tailwind utility in this
- * codebase, so compiling them all is safe; widening the scan to arbitrary prefixes would start
- * picking up `@immich/ui` theme classes and dynamic fragments that legitimately produce no CSS on
- * their own.
- */
+Guards whole utility families against names that compile to nothing.
+
+Tailwind emits nothing at all for a name it does not recognise, so a near-miss spelling silently
+styles nothing. Two families have shipped that way already:
+
+- `wrap-*`: Tailwind v4 renamed v3's `break-words` to the singular `wrap-break-word` and added
+  `wrap-anywhere` / `wrap-normal`. The plural `wrap-break-words` reads perfectly natural and is
+  what v3 muscle memory produces. It shipped twice — the Filter panel's tag label (#881), where
+  long tag names clipped instead of wrapping, and `Combobox.svelte`, which came in from upstream
+  and so will keep arriving on every rebase until upstream fixes it.
+- `grid-cols-*`: the singular `grid-col-2` sat in the reassign and merge people pickers, so both
+  grids silently fell back to one column and rendered one enormous face per row on a phone
+  (#1082).
+
+Nothing else catches this. eslint's `better-tailwindcss/enforce-consistent-class-order` only
+orders classes it recognises and leaves unknown ones alone; the unit suite runs on happy-dom,
+which resolves no stylesheets; and the class name is still right there in the markup, so reading
+the diff does not help either.
+
+Scoped to specific prefixes deliberately. Every token matched below is a Tailwind utility in this
+codebase, so compiling them all is safe; widening the scan to arbitrary prefixes would start
+picking up `@immich/ui` theme classes and dynamic fragments that legitimately produce no CSS on
+their own.
+*/
 const SOURCE_ROOT = path.resolve(process.cwd(), 'src');
 const SOURCE_EXTENSIONS = new Set(['.svelte', '.ts', '.js']);
 

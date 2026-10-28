@@ -301,10 +301,10 @@ describe('buildMapTimelineOptions', () => {
 });
 
 /**
- * #802 — the Map view was missing the "Text" filter section entirely. These cover the option
- * builders forwarding the three text fields the section produces. The map timeline hits
- * TimeBucketDto (which already supports them); markers hit FilteredMapMarkerDto.
- */
+#802 — the Map view was missing the "Text" filter section entirely. These cover the option
+builders forwarding the three text fields the section produces. The map timeline hits
+TimeBucketDto (which already supports them); markers hit FilteredMapMarkerDto.
+*/
 describe('text filters (#802)', () => {
   const textFilters = {
     ...createFilterState(),

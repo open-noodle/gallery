@@ -46,22 +46,22 @@ export interface NavigationItem {
   descriptionKey: string;
   icon: string;
   /** Non-empty route. All navigation items lead to a real page; stateless side-effects
-   * live in the commands registry (command-items.ts) instead. */
+  live in the commands registry (command-items.ts) instead. */
   route: string;
   adminOnly: boolean;
   /**
-   * Optional feature-flag gate. Item is hidden when
-   * `featureFlagsManager.valueOrUndefined?.[featureFlag]` is falsy.
-   */
+  Optional feature-flag gate. Item is hidden when
+  `featureFlagsManager.valueOrUndefined?.[featureFlag]` is falsy.
+  */
   featureFlag?: keyof ServerFeaturesDto;
 }
 
 /**
- * System-settings accordions. Each item deep-links to the system-settings page with
- * the `isOpen=<key>` query param which opens the matching accordion on load.
- * Keys mirror `web/src/routes/admin/system-settings/+page.svelte` — a drift-guard
- * test in navigation-items.spec.ts grep-validates against that source file.
- */
+System-settings accordions. Each item deep-links to the system-settings page with
+the `isOpen=<key>` query param which opens the matching accordion on load.
+Keys mirror `web/src/routes/admin/system-settings/+page.svelte` — a drift-guard
+test in navigation-items.spec.ts grep-validates against that source file.
+*/
 const SYSTEM_SETTINGS_SOURCE: ReadonlyArray<[key: string, baseKey: string, icon: string]> = [
   ['authentication', 'authentication_settings', mdiLockOutline],
   ['backup', 'backup_settings', mdiBackupRestore],
@@ -254,15 +254,15 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [...SYSTEM_SETTINGS, 
 const MIN_MATCH_LENGTH = 3;
 
 /**
- * "Almost exact" match — used to promote a navigation item to the palette's
- * "Top result" band above photos/places/etc. when the query unambiguously
- * points at its label.
- *
- * See {@link isAlmostExactWordMatch} for the rule. The 3-char floor keeps
- * single keystrokes from promoting the first match in the catalog, while
- * working at word granularity lets compound queries like `auto-classification`
- * still promote `Classification Settings` on their second token.
- */
+"Almost exact" match — used to promote a navigation item to the palette's
+"Top result" band above photos/places/etc. when the query unambiguously
+points at its label.
+
+See {@link isAlmostExactWordMatch} for the rule. The 3-char floor keeps
+single keystrokes from promoting the first match in the catalog, while
+working at word granularity lets compound queries like `auto-classification`
+still promote `Classification Settings` on their second token.
+*/
 export function isAlmostExactNavMatch(query: string, label: string): boolean {
   return isAlmostExactWordMatch(query, label, MIN_MATCH_LENGTH);
 }

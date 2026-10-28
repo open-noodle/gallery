@@ -5,21 +5,21 @@ import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 
 /**
- * Machine-readable error codes returned by the server when a people-merge would destructively reach past what
- * the actor controls (issue #733). Mirrors `CROSS_OWNER_MERGE_ERROR_CODE` in the server's merge policy.
- */
+Machine-readable error codes returned by the server when a people-merge would destructively reach past what
+the actor controls (issue #733). Mirrors `CROSS_OWNER_MERGE_ERROR_CODE` in the server's merge policy.
+*/
 export const CrossOwnerMergeErrorCode = {
   /** The merge would collapse another user's people, or people in a space the actor can't edit, and the
-   * instance toggle is off. An administrator can enable it. */
+  instance toggle is off. An administrator can enable it. */
   Blocked: 'cross_owner_merge_blocked',
   /** The instance toggle is on: the merge is permitted but must be explicitly confirmed first. */
   ConfirmationRequired: 'cross_owner_merge_confirmation_required',
 } as const;
 
 /**
- * Other terminal merge error codes (issue #733 review, L7). Each maps to a localized message so the merge flows
- * surface a clean toast instead of the raw, truncated "(… Server Error)" server sentence.
- */
+Other terminal merge error codes (issue #733 review, L7). Each maps to a localized message so the merge flows
+surface a clean toast instead of the raw, truncated "(… Server Error)" server sentence.
+*/
 const TERMINAL_MERGE_ERROR_MESSAGE = {
   merge_not_accessible: 'merge_error_not_accessible',
   merge_conflict: 'merge_error_conflict',
@@ -52,10 +52,10 @@ export interface CrossOwnerMergeHandlers {
 }
 
 /**
- * The standard cross-owner merge handlers shared by every scoped-merge entry point (the people
- * detail page, the space people detail page, and the merge-suggestion modal): a strong danger
- * confirmation dialog and a localized blocked-merge toast, all using i18n.
- */
+The standard cross-owner merge handlers shared by every scoped-merge entry point (the people
+detail page, the space people detail page, and the merge-suggestion modal): a strong danger
+confirmation dialog and a localized blocked-merge toast, all using i18n.
+*/
 export const createCrossOwnerMergeHandlers = (): CrossOwnerMergeHandlers => ({
   confirmCrossOwner: () => {
     const $t = get(t);
@@ -74,18 +74,18 @@ export const createCrossOwnerMergeHandlers = (): CrossOwnerMergeHandlers => ({
 });
 
 /**
- * Run any people-merge call, transparently handling the destructive cross-boundary case (issue #733):
- * - a `blocked` response invokes `handlers.onBlocked` (a localized "an admin can enable this" toast);
- * - a `confirmationRequired` response asks `handlers.confirmCrossOwner`, and — only if accepted —
- *   re-runs `merge` with `confirmCrossOwner: true` so the server commits it.
- *
- * `merge` is called once with no argument, and — on a confirmed retry — once more with `true`. It
- * is the caller's responsibility to fold that flag into whichever merge request body it sends
- * (`MergePersonDto`, `MergeScopedPeopleDto`, `SharedSpacePersonMergeDto` all carry it).
- *
- * Returns `true` when the merge committed, `false` when it was blocked or the user declined. Any
- * other error propagates to the caller.
- */
+Run any people-merge call, transparently handling the destructive cross-boundary case (issue #733):
+- a `blocked` response invokes `handlers.onBlocked` (a localized "an admin can enable this" toast);
+- a `confirmationRequired` response asks `handlers.confirmCrossOwner`, and — only if accepted —
+  re-runs `merge` with `confirmCrossOwner: true` so the server commits it.
+
+`merge` is called once with no argument, and — on a confirmed retry — once more with `true`. It
+is the caller's responsibility to fold that flag into whichever merge request body it sends
+(`MergePersonDto`, `MergeScopedPeopleDto`, `SharedSpacePersonMergeDto` all carry it).
+
+Returns `true` when the merge committed, `false` when it was blocked or the user declined. Any
+other error propagates to the caller.
+*/
 export const runMergeWithCrossOwnerConfirmation = async (
   merge: (confirmCrossOwner?: boolean) => Promise<unknown>,
   handlers: CrossOwnerMergeHandlers,
@@ -128,9 +128,9 @@ export const runMergeWithCrossOwnerConfirmation = async (
 };
 
 /**
- * Thin wrapper over {@link runMergeWithCrossOwnerConfirmation} for the scoped merge endpoint
- * (`POST /people/same-person`).
- */
+Thin wrapper over {@link runMergeWithCrossOwnerConfirmation} for the scoped merge endpoint
+(`POST /people/same-person`).
+*/
 export const runScopedMergeWithCrossOwnerConfirmation = (
   mergeScopedPeopleDto: MergeScopedPeopleDto,
   handlers: CrossOwnerMergeHandlers,
