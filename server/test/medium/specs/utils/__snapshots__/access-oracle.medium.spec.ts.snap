@@ -391,6 +391,9 @@ exports[`checkAccess oracle > asset.read 1`] = `
 
 exports[`checkAccess oracle > asset.share 1`] = `
 {
+  "albumViewer": [
+    "ownAsset",
+  ],
   "owner": [
     "albumSpaceAsset",
     "archivedSpaceAsset",
