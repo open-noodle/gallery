@@ -336,6 +336,8 @@ describe(DuplicateService.name, () => {
       });
     });
 
+    // immich-32603 scopes the group to the caller's assets: another owner's copy is ignored rather than refused, so
+    // nothing is kept and the caller's copy is trashed. The fork's invariant still holds: no write lands on theirs.
     it("should not write onto another owner's keeper in a group the caller joined", async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
@@ -370,15 +372,10 @@ describe(DuplicateService.name, () => {
         exifInfo: { description: 'theirs' },
         tags: [],
       });
-      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ deletedAt: null });
-      expect(results).toEqual([
-        {
-          id: duplicateId,
-          success: false,
-          error: BulkIdErrorReason.NO_PERMISSION,
-          errorMessage: 'No permission to update assets',
-        },
-      ]);
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({
+        deletedAt: expect.any(Date),
+      });
+      expect(results).toEqual([{ id: duplicateId, success: true }]);
     });
 
     it('should resolve several groups in one request', async () => {
