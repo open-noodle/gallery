@@ -501,6 +501,7 @@ features:
         - server/src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints.ts
         - server/src/schema/migrations-gallery/1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex.ts
         - server/src/schema/migrations-gallery/1790000000000-FixFaceRepairScanInFlightIndex.ts
+        - server/src/schema/migrations-gallery/1790900000000-SplitSharedPersonGroups.ts
         - server/src/schema/migrations-gallery/1791000000000-RepointFaceReviewToPersonGroup.ts
         - server/src/schema/migrations-gallery/1792123120451-AddSharedLinkSpaceId.ts
         - server/src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.ts
