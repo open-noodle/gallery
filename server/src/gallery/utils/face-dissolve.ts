@@ -80,6 +80,31 @@ export const handDrawnFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>):
   eb.exists(eb.selectFrom('asset_face_creator').whereRef('asset_face_creator.assetFaceId', '=', 'asset_face.id'));
 
 /**
+ * Revision 2 (specs/2026-09-06-dissolve-person-design.md): each in-scope face gets exactly one treatment, decided by
+ * where it came from. The three predicates below are disjoint and, together, cover every in-scope face; callers
+ * combine each with dissolveFacePredicate.
+ *
+ * Kept (unassigned, left on the photo): a box a person drew. Recognition never re-clusters a non-ML face, and no
+ * re-scan can recreate one, so unassigning is the only safe treatment.
+ */
+export const keepFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
+  eb.or([handDrawnFacePredicate(eb), eb('asset_face.sourceType', '=', SourceType.Manual)]);
+
+/**
+ * Hidden (the "Not a face" tombstone): a detected face. Unassigning it would hand it straight back to recognition,
+ * and deleting it would let the next re-scan detect the same box again; a tombstone is skipped by both.
+ */
+export const hideFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
+  eb.and([eb('asset_face.sourceType', '=', SourceType.MachineLearning), eb.not(keepFacePredicate(eb))]);
+
+/**
+ * Deleted, and its photo re-scanned: an imported metadata face. A hidden one would block the repair, because a
+ * fresh detection at IoU > 0.5 matches any existing face, tombstones included (L12), instead of adding a new one.
+ */
+export const deleteFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
+  eb.and([eb('asset_face.sourceType', '=', SourceType.Exif), eb.not(keepFacePredicate(eb))]);
+
+/**
  * The faces a DELETE outcome actually deletes: in scope, and not hand-drawn. Shared for the same reason as
  * dissolveFacePredicate — the repository's delete statement must not be able to disagree with this rule.
  */
