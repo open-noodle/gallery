@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
+import { FACE_THUMBNAIL_SIZE, THUMBNAIL_DECODING_TIER } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
@@ -179,6 +179,7 @@ export class BackendMediaServer {
         progressive: false,
         processInvalidImages: false,
         size: FACE_THUMBNAIL_SIZE,
+        decodingTier: THUMBNAIL_DECODING_TIER,
         edits: [
           {
             action: AssetEditAction.Crop,

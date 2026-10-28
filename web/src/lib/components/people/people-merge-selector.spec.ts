@@ -41,7 +41,7 @@ describe('PeopleMergeSelector', () => {
     vi.resetAllMocks();
     Element.prototype.animate = getAnimateMock();
     Element.prototype.getAnimations = vi.fn().mockReturnValue([]);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
   });
 
   it('loads merge candidates and merges selected people into the current target', async () => {
