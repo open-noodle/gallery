@@ -19,6 +19,7 @@
       ],
       "forkForeignKeys": [
         "asset_face_creator_assetFaceId_fkey",
+        "face_dissolve_face_assetFaceId_fkey",
         "face_identity_face_assetFaceId_fkey",
         "face_identity_representativeFaceId_fkey",
         "face_person_verdict_assetFaceId_fkey",
@@ -97,6 +98,8 @@
         "asset_quality_ownerId_fkey",
         "cleanup_day_review_userId_fkey",
         "cleanup_decision_userId_fkey",
+        "face_dissolve_actorId_fkey",
+        "face_dissolve_ownerId_fkey",
         "face_person_verdict_actorId_fkey",
         "face_repair_decline_declinedBy_fkey",
         "face_repair_scan_requestedBy_fkey",
