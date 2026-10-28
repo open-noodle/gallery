@@ -1,5 +1,7 @@
 import { Kysely } from 'kysely';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
+import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
 import { DB } from 'src/schema/index.js';
 import { mediumFactory } from 'test/medium.factory.js';
 import { newUuid } from 'test/small.factory.js';
@@ -68,6 +70,8 @@ export const seedFace = async (
     withEmbedding?: boolean;
     isPet?: boolean;
     deletedAt?: Date;
+    /** false = hidden by an edit crop. */
+    isVisible?: boolean;
     /** A hand-drawn box: the user who drew it (asset_face_creator). Omitted = a detector/import face. */
     createdBy?: string;
   },
@@ -77,6 +81,7 @@ export const seedFace = async (
     personGroupId: dto.personGroupId,
     sourceType: dto.sourceType ?? SourceType.MachineLearning,
     deletedAt: dto.deletedAt,
+    ...(dto.isVisible === false && { isVisible: false }),
   });
   await db.insertInto('asset_face').values(face).execute();
   if (dto.createdBy) {
@@ -98,4 +103,54 @@ export const setFacesRecognizedAt = async (db: Kysely<DB>, assetId: string, at: 
     .values({ assetId, facesRecognizedAt: at })
     .onConflict((oc) => oc.column('assetId').doUpdateSet({ facesRecognizedAt: at }))
     .execute();
+};
+
+/**
+ * Runs a dissolve the way the service does: inside one transaction, attributed to the person's owner. A person that
+ * does not exist gets a throwaway owner id; nothing is touched, so nothing is written under it.
+ */
+export const runDissolve = async (
+  db: Kysely<DB>,
+  repo: FaceDissolveRepository,
+  personGroupId: string,
+  scope: DissolveScope,
+) => {
+  const person = await db
+    .selectFrom('person')
+    .select(['name', 'ownerId'])
+    .where('personGroupId', '=', personGroupId)
+    .executeTakeFirst();
+  const ownerId = person?.ownerId ?? newUuid();
+  return db
+    .transaction()
+    .execute((trx) =>
+      repo.dissolve({ personGroupId, scope, ownerId, actorId: ownerId, personName: person?.name ?? '' }, trx),
+    );
+};
+
+export const seedSpace = async (db: Kysely<DB>, createdById: string) => {
+  const space = await db
+    .insertInto('shared_space')
+    .values(mediumFactory.sharedSpaceInsert({ createdById }))
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return space.id;
+};
+
+/** A Space person linked to `faceIds`; the first face is its representative unless told otherwise. */
+export const seedSpacePerson = async (
+  db: Kysely<DB>,
+  spaceId: string,
+  faceIds: string[],
+  representativeFaceId: string | null = faceIds[0] ?? null,
+) => {
+  const id = newUuid();
+  await db.insertInto('shared_space_person').values({ id, spaceId, name: '', representativeFaceId }).execute();
+  if (faceIds.length > 0) {
+    await db
+      .insertInto('shared_space_person_face')
+      .values(faceIds.map((assetFaceId) => ({ personId: id, assetFaceId })))
+      .execute();
+  }
+  return id;
 };

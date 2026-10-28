@@ -10,12 +10,7 @@ import {
 } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { DB } from 'src/schema/index.js';
-import {
-  DissolveScope,
-  dissolveDeletableFacePredicate,
-  dissolveFacePredicate,
-  handDrawnFacePredicate,
-} from 'src/gallery/utils/face-dissolve.js';
+import { deleteFacePredicate, handDrawnFacePredicate, hideFacePredicate } from 'src/gallery/utils/face-dissolve.js';
 
 // Offline Kysely — compiles SQL without executing it. The medium specs prove the behaviour against a real
 // database; this pins the shape of the rule so a refactor cannot quietly drop the hand-drawn exclusion.
@@ -47,17 +42,13 @@ describe('handDrawnFacePredicate', () => {
   });
 });
 
-describe('dissolveDeletableFacePredicate', () => {
-  it.each(Object.values(DissolveScope))('is the %s scope minus hand-drawn faces', (scope) => {
-    const { sql, parameters } = compileWhere((eb) => dissolveDeletableFacePredicate(eb, 'person-1', scope));
-    const { sql: inScopeSql } = compileWhere((eb) => dissolveFacePredicate(eb, 'person-1', scope));
-
-    // The full in-scope predicate is embedded verbatim, so the delete can never touch a face the preview
-    // did not count …
-    const inScopeWhere = inScopeSql.slice(inScopeSql.indexOf(' where ') + ' where '.length);
-    expect(sql).toContain(inScopeWhere);
-    // … and the hand-drawn exclusion is ANDed on top of it.
-    expect(sql).toContain('and not exists (select from "asset_face_creator"');
-    expect(parameters).toContain('person-1');
+describe('hide and delete predicates', () => {
+  it.each([
+    ['hide', hideFacePredicate, 'machine-learning'],
+    ['delete', deleteFacePredicate, 'exif'],
+  ] as const)('%s never matches a hand-drawn face', (_name, predicate, sourceType) => {
+    const { sql, parameters } = compileWhere((eb) => predicate(eb));
+    expect(parameters).toContain(sourceType);
+    expect(sql).toContain('and not (exists (select from "asset_face_creator"');
   });
 });

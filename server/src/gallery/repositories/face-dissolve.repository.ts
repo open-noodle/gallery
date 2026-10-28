@@ -3,15 +3,16 @@ import { Expression, ExpressionBuilder, Kysely, SqlBool, Transaction, sql } from
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
-import { personIsPet } from 'src/gallery/utils/person-sidecar.js';
-import { DB } from 'src/schema/index.js';
 import {
+  deleteFacePredicate,
   DissolveScope,
-  dissolveDeletableFacePredicate,
   dissolveFacePredicate,
   dissolveScopePredicate,
-  handDrawnFacePredicate,
+  hideFacePredicate,
+  keepFacePredicate,
 } from 'src/gallery/utils/face-dissolve.js';
+import { personIsPet } from 'src/gallery/utils/person-sidecar.js';
+import { DB } from 'src/schema/index.js';
 
 export interface DissolveWriteInput {
   /**
@@ -21,41 +22,44 @@ export interface DissolveWriteInput {
    */
   personGroupId: string;
   scope: DissolveScope;
-  outcome: 'unassign' | 'delete-faces' | 'delete-faces-and-person';
-  redetect: boolean;
+  /** Snapshotted onto the restore record, which outlives the person. */
+  ownerId: string;
+  personName: string;
+  actorId: string;
 }
 
 export interface DissolveWriteResult {
-  /** Every in-scope face touched: deleted plus unassigned. */
-  faces: number;
-  /** Of `faces`, the hand-drawn ones a delete outcome kept and unassigned instead (always 0 for `unassign`). */
-  handDrawnUnassigned: number;
+  /** The restore record; null when the dissolve touched no face, so nothing was recorded. */
+  dissolveId: string | null;
+  /** The detected faces this dissolve hid. Faces that were already hidden are not in it. */
+  hiddenFaceIds: string[];
+  deleted: number;
+  unassigned: number;
   assetsCleared: number;
-  orphanedSpacePersonIds: string[];
+  personRemoved: boolean;
   deletedThumbnailPath: string | null;
+  orphanedSpacePersonIds: string[];
 }
 
 export interface DissolveCounts {
+  /** Every in-scope row, hidden and crop-hidden included: what the apply touches, and its concurrency guard. */
   faces: number;
-  exif: number;
-  mlWithEmbedding: number;
-  mlWithoutEmbedding: number;
+  /** In-scope faces by treatment (keepFacePredicate / hideFacePredicate / deleteFacePredicate). */
+  hide: number;
+  delete: number;
+  keep: number;
   softDeleted: number;
   assets: number;
+  /** Photos of the faces that get deleted: the only ones re-scanned. `sharedAssets`/`notRedetectable` are among these. */
+  rescanAssets: number;
   sharedAssets: number;
   notRedetectable: number;
-  /**
-   * The person's live faces this dissolve does NOT touch — counted with PersonCleanup's own definition of
-   * "has a face" (`getAllWithoutFaces`: `deletedAt IS NULL AND isVisible IS TRUE`). Zero means an `unassign`
-   * leaves the person faceless, so the nightly cleanup will delete it even though the admin chose the
-   * outcome that keeps it. We do not queue that job ourselves (L2), but the dialog must not imply survival.
-   */
-  remainingLiveFaces: number;
-  /**
-   * In-scope faces someone drew by hand (`createdBy IS NOT NULL`). A delete outcome never deletes these — it
-   * unassigns them instead (handDrawnFacePredicate) — so the dialog has to say so. Included in `faces`.
-   */
-  handDrawn: number;
+  /** Faces of the person outside the scope; the person is removed when none remain. */
+  remainingFaces: number;
+  personRemoved: boolean;
+  spacePersonsRemoved: number;
+  spacePersonsKept: number;
+  spacesKept: number;
 }
 
 export interface PersonHealthRow {
@@ -86,16 +90,24 @@ const hasEmbedding = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
       .whereRef('face_search.faceId', '=', 'asset_face.id'),
   );
 
+/** Faces a dissolve takes off every Space person: the ones it hides and the ones it deletes. */
+const leavesSpaces = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+  eb.or([hideFacePredicate(eb), deleteFacePredicate(eb)]);
+
+/** Postgres caps one statement at 65535 bind parameters; record rows go in well under that. */
+const RECORD_CHUNK = 1000;
+
 @Injectable()
 export class FaceDissolveRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * Clears the recognition watermark for every asset holding an in-scope face of `personGroupId`, so the ordinary
-   * non-forced "Detect faces (missing)" pass re-processes exactly those assets. streamForDetectFacesJob
-   * applies the `facesRecognizedAt IS NULL` filter only when `force === false` (asset-job.repository.ts:458).
+   * Clears the recognition watermark for the photos of the in-scope faces a dissolve DELETES, so the ordinary
+   * non-forced "Detect faces (missing)" pass re-processes exactly those photos. streamForDetectFacesJob applies the
+   * `facesRecognizedAt IS NULL` filter only when `force === false`. Detected faces are hidden instead and their photos
+   * are never re-scanned: the detector would find the same boxes again.
    *
-   * MUST run BEFORE the face rows are deleted — afterwards there is no personGroupId left to find the assets by.
+   * MUST run BEFORE the face rows are deleted — afterwards there is no personGroupId left to find the photos by.
    */
   @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
   async clearFacesRecognizedAt(
@@ -111,8 +123,9 @@ export class FaceDissolveRepository {
           .selectFrom('asset_face')
           .select('asset_face.assetId')
           .distinct()
-          .where('asset_face.personGroupId', '=', personGroupId)
-          .where((inner) => dissolveScopePredicate(inner, scope)),
+          .where((inner) =>
+            inner.and([dissolveFacePredicate(inner, personGroupId, scope), deleteFacePredicate(inner)]),
+          ),
       )
       .executeTakeFirst();
 
@@ -120,56 +133,51 @@ export class FaceDissolveRepository {
   }
 
   /**
-   * `notRedetectable` mirrors assetsWithPreviews() (asset-job.repository.ts:181) exactly: non-hidden,
-   * not trashed, carrying a Preview file. On anything else the dissolve deletes the junk and recovers
-   * nothing (L11), so the dialog must never promise a repair for those assets.
+   * The preview. Uses the same predicates as dissolve(), so the dialog and the transaction cannot disagree.
+   * `notRedetectable` mirrors assetsWithPreviews() exactly: non-hidden, not trashed, carrying a Preview file (L11).
    */
   @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
   async getCounts(personGroupId: string, scope: DissolveScope): Promise<DissolveCounts> {
-    // Shared with dissolve() below — see dissolveFacePredicate: the preview and the apply must never be
-    // able to drift apart.
     const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personGroupId, scope);
 
     const faceRow = await this.db
       .selectFrom('asset_face')
       .select((eb) => [
         eb.fn.countAll<number>().as('faces'),
-        eb.fn.countAll<number>().filterWhere('asset_face.sourceType', '=', SourceType.Exif).as('exif'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) => hideFacePredicate(inner))
+          .as('hide'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) => deleteFacePredicate(inner))
+          .as('delete'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) => keepFacePredicate(inner))
+          .as('keep'),
         eb.fn.countAll<number>().filterWhere('asset_face.deletedAt', 'is not', null).as('softDeleted'),
-        eb.fn
-          .countAll<number>()
-          .filterWhere((inner) => handDrawnFacePredicate(inner))
-          .as('handDrawn'),
-        eb.fn
-          .countAll<number>()
-          .filterWhere((inner) =>
-            inner.and([inner('asset_face.sourceType', '=', SourceType.MachineLearning), hasEmbedding(inner)]),
-          )
-          .as('mlWithEmbedding'),
-        eb.fn
-          .countAll<number>()
-          .filterWhere((inner) =>
-            inner.and([
-              inner('asset_face.sourceType', '=', SourceType.MachineLearning),
-              inner.not(hasEmbedding(inner)),
-            ]),
-          )
-          .as('mlWithoutEmbedding'),
         eb.fn.count<number>('asset_face.assetId').distinct().as('assets'),
       ])
       .where((eb) => inScope(eb))
       .executeTakeFirstOrThrow();
 
-    const assetIds = this.db
+    const rescanAssetIds = this.db
       .selectFrom('asset_face')
       .select('asset_face.assetId')
       .distinct()
-      .where((eb) => inScope(eb));
+      .where((eb) => eb.and([inScope(eb), deleteFacePredicate(eb)]));
+
+    const rescanRow = await this.db
+      .selectFrom('asset')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('asset.id', 'in', rescanAssetIds)
+      .executeTakeFirstOrThrow();
 
     const sharedRow = await this.db
       .selectFrom('asset')
       .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('asset.id', 'in', assetIds)
+      .where('asset.id', 'in', rescanAssetIds)
       .where((eb) =>
         eb.exists(
           eb
@@ -179,8 +187,8 @@ export class FaceDissolveRepository {
             .where('other.personGroupId', 'is not', null)
             .where('other.personGroupId', '!=', personGroupId)
             .where('other.deletedAt', 'is', null)
-            // Pet faces can never be lost to re-detection: handleDetectFaces keeps face.isPet out of
-            // faceIdsToRemove (person.service.ts:940-946), so a sibling pet carries no L3 risk (F1).
+            // Pet faces can never be lost to re-detection: handleDetectFaces keeps them out of faceIdsToRemove,
+            // so a sibling pet carries no L3 risk (F1).
             .where((inner) =>
               inner.not(
                 inner.or([
@@ -206,7 +214,7 @@ export class FaceDissolveRepository {
     const notRedetectableRow = await this.db
       .selectFrom('asset')
       .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('asset.id', 'in', assetIds)
+      .where('asset.id', 'in', rescanAssetIds)
       .where((eb) =>
         eb.or([
           eb('asset.visibility', '=', AssetVisibility.Hidden),
@@ -224,29 +232,62 @@ export class FaceDissolveRepository {
       )
       .executeTakeFirstOrThrow();
 
-    // Deliberately NOT filtered by inScope — this is what the dissolve LEAVES BEHIND. Mirrors
-    // getAllWithoutFaces (person.repository.ts:669) exactly, because that is the query PersonCleanup uses
-    // to decide a person is faceless and delete it.
-    const remainingLiveRow = await this.db
+    // What still carries the person after the dissolve: every out-of-scope face, in any state. dissolve() removes
+    // the person exactly when this is zero.
+    const remainingRow = await this.db
       .selectFrom('asset_face')
       .select((eb) => eb.fn.countAll<number>().as('count'))
       .where('asset_face.personGroupId', '=', personGroupId)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', 'is', true)
       .where((eb) => eb.not(dissolveScopePredicate(eb, scope)))
       .executeTakeFirstOrThrow();
 
+    // A Space person survives when it is still linked to any face this dissolve does not take off it. NOT IN over
+    // face ids, never a negated personGroupId comparison: other faces' personGroupId may be NULL.
+    const spaceRows = await this.db
+      .selectFrom('shared_space_person')
+      .select((eb) => [
+        'shared_space_person.spaceId',
+        eb
+          .exists(
+            eb
+              .selectFrom('shared_space_person_face as link')
+              .select(sql`1`.as('one'))
+              .whereRef('link.personId', '=', 'shared_space_person.id')
+              .where('link.assetFaceId', 'not in', (inner) =>
+                inner
+                  .selectFrom('asset_face')
+                  .select('asset_face.id')
+                  .where((face) => face.and([inScope(face), leavesSpaces(face)])),
+              ),
+          )
+          .as('kept'),
+      ])
+      .where('shared_space_person.id', 'in', (eb) =>
+        eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .select('shared_space_person_face.personId')
+          .where((inner) => inner.and([inScope(inner), leavesSpaces(inner)])),
+      )
+      .execute();
+    const kept = spaceRows.filter((row) => row.kept);
+
+    const remainingFaces = Number(remainingRow.count);
     return {
       faces: Number(faceRow.faces),
-      exif: Number(faceRow.exif),
-      mlWithEmbedding: Number(faceRow.mlWithEmbedding),
-      mlWithoutEmbedding: Number(faceRow.mlWithoutEmbedding),
+      hide: Number(faceRow.hide),
+      delete: Number(faceRow.delete),
+      keep: Number(faceRow.keep),
       softDeleted: Number(faceRow.softDeleted),
       assets: Number(faceRow.assets),
+      rescanAssets: Number(rescanRow.count),
       sharedAssets: Number(sharedRow.count),
       notRedetectable: Number(notRedetectableRow.count),
-      remainingLiveFaces: Number(remainingLiveRow.count),
-      handDrawn: Number(faceRow.handDrawn),
+      remainingFaces,
+      personRemoved: remainingFaces === 0,
+      spacePersonsRemoved: spaceRows.length - kept.length,
+      spacePersonsKept: kept.length,
+      spacesKept: new Set(kept.map((row) => row.spaceId)).size,
     };
   }
 
@@ -324,107 +365,195 @@ export class FaceDissolveRepository {
   }
 
   /**
-   * One transaction. Ordering is load-bearing:
-   *  1. capture space-person ids first (L1) — afterwards the shared_space_person_face rows are gone;
-   *  2. clear the watermark — afterwards there is no personGroupId to find the assets by;
-   *  3. only then write — and on a delete outcome, unassign the in-scope hand-drawn faces BEFORE deleting the
-   *     rest and before the person row goes, so nothing a person-delete touches still points at them.
-   * Every statement is scoped by personGroupId + scope. Never call the unscoped GC helpers here (L1/L2/L5).
+   * The write. The caller owns the transaction (the service drains pending suggestions in the same one). Each
+   * in-scope face gets one treatment by source: kept faces are unassigned, detected faces hidden and recorded for
+   * restore, imported faces deleted with their photos re-queued. Ordering is load-bearing:
+   *  1. capture the Space persons first — after the delete their links are gone;
+   *  2. clear the watermark — after the delete there is no personGroupId to find the photos by;
+   *  3. only then write. Every statement is scoped by personGroupId + scope. Never call the unscoped GC helpers
+   *     here (L1/L2/L5).
    */
-  async dissolve(input: DissolveWriteInput): Promise<DissolveWriteResult> {
-    const { personGroupId, scope, outcome, redetect } = input;
+  async dissolve(input: DissolveWriteInput, trx: Transaction<DB>): Promise<DissolveWriteResult> {
+    const { personGroupId, scope } = input;
+    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personGroupId, scope);
+    const and =
+      (...predicates: Array<(eb: ExpressionBuilder<DB, 'asset_face'>) => Expression<SqlBool>>) =>
+      (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+        eb.and([inScope(eb), ...predicates.map((predicate) => predicate(eb))]);
 
-    return this.db.transaction().execute(async (trx) => {
-      // The SAME predicate the preview counted with — see dissolveFacePredicate.
-      const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personGroupId, scope);
-
-      const spacePersonRows = await trx
+    // 1. The Space persons this dissolve may empty.
+    const spacePersonIds = (
+      await trx
         .selectFrom('shared_space_person_face')
         .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
         .select('shared_space_person_face.personId as id')
         .distinct()
-        .where((eb) => inScope(eb))
+        .where(and(leavesSpaces))
+        .execute()
+    ).map((row) => row.id);
+
+    // 2. Only the photos of deleted faces are re-scanned.
+    const assetsCleared = await this.clearFacesRecognizedAt(personGroupId, scope, trx);
+
+    // 3. Kept faces: unassigned, human-placement record cleared too (a stale manual link marks a face settled
+    //    forever, person.repository.ts). Keyed by OUR face ids, never by identity id (L4).
+    await trx
+      .deleteFrom('face_identity_face')
+      .where('assetFaceId', 'in', (eb) =>
+        eb.selectFrom('asset_face').select('asset_face.id').where(and(keepFacePredicate)),
+      )
+      .execute();
+    const unassigned = await trx
+      .updateTable('asset_face')
+      .set({ personGroupId: null })
+      .where(and(keepFacePredicate))
+      .executeTakeFirst();
+
+    // 4. Detected faces: the "Not a face" tombstone. Recognition (getAllFaces, searchFaces) skips deletedAt faces, and
+    //    a re-scan matches the tombstone instead of adding the box again.
+    const hiddenFaceIds = (
+      await trx
+        .updateTable('asset_face')
+        .set({ deletedAt: new Date(), personGroupId: null })
+        .where(and(hideFacePredicate, (eb) => eb('asset_face.deletedAt', 'is', null)))
+        .returning('asset_face.id')
+        .execute()
+    ).map((row) => row.id);
+    if (hiddenFaceIds.length > 0) {
+      await trx
+        .deleteFrom('face_identity_face')
+        .where('assetFaceId', '=', (eb) => eb.fn.any(eb.val(hiddenFaceIds)))
         .execute();
+    }
 
-      const assetsCleared = redetect ? await this.clearFacesRecognizedAt(personGroupId, scope, trx) : 0;
+    // 5. Detected faces that were already hidden: only the person link goes. Not recorded, so a restore of this
+    //    dissolve leaves them hidden.
+    const alreadyHidden = await trx
+      .updateTable('asset_face')
+      .set({ personGroupId: null })
+      .where(and(hideFacePredicate, (eb) => eb('asset_face.deletedAt', 'is not', null)))
+      .executeTakeFirst();
 
-      // Unassign = clear the human-placement record AND the person link. Clearing only the link is the bug
-      // documented at person.repository.ts:327: stale face_identity_face rows mark the faces settled forever,
-      // excluding them from recognition and suggestions. Keyed by OUR face ids, never by identityId:
-      // identities are shared across people after a merge (L4).
-      const unassignWhere = async (where: (eb: ExpressionBuilder<DB, 'asset_face'>) => Expression<SqlBool>) => {
+    // 6. Imported faces, soft-deleted ones included: a surviving tombstone would absorb the re-scan's detection (L12).
+    const deleted = await trx.deleteFrom('asset_face').where(and(deleteFacePredicate)).executeTakeFirst();
+
+    // 7-9. Spaces. A hidden face's row survives, so nothing cascades: unlink it here, remove only the Space persons
+    //      this left with no face (never deleteAllOrphanedPersons, L1), and repoint a survivor showing a hidden face.
+    if (hiddenFaceIds.length > 0) {
+      await trx
+        .deleteFrom('shared_space_person_face')
+        .where('assetFaceId', '=', (eb) => eb.fn.any(eb.val(hiddenFaceIds)))
+        .execute();
+    }
+    let orphanedSpacePersonIds: string[] = [];
+    if (spacePersonIds.length > 0) {
+      orphanedSpacePersonIds = (
         await trx
-          .deleteFrom('face_identity_face')
-          .where('assetFaceId', 'in', (eb) =>
+          .deleteFrom('shared_space_person')
+          .where('id', '=', (eb) => eb.fn.any(eb.val(spacePersonIds)))
+          .where((eb) =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_person_face')
+                  .select(sql`1`.as('one'))
+                  .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+              ),
+            ),
+          )
+          .returning('id')
+          .execute()
+      ).map((row) => row.id);
+
+      await trx
+        .updateTable('shared_space_person')
+        .set((eb) => ({
+          representativeFaceId: eb
+            .selectFrom('shared_space_person_face as link')
+            .innerJoin('asset_face', 'asset_face.id', 'link.assetFaceId')
+            .select('link.assetFaceId')
+            .whereRef('link.personId', '=', 'shared_space_person.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .orderBy('link.assetFaceId')
+            .limit(1),
+        }))
+        .where('id', '=', (eb) => eb.fn.any(eb.val(spacePersonIds)))
+        .where((eb) =>
+          eb.exists(
             eb
               .selectFrom('asset_face')
-              .select('id')
-              .where((inner) => where(inner)),
+              .select(sql`1`.as('one'))
+              .whereRef('asset_face.id', '=', 'shared_space_person.representativeFaceId')
+              .where('asset_face.deletedAt', 'is not', null),
+          ),
+        )
+        .execute();
+    }
+
+    // 10. Exactly one person row, and only once no face carries it (never PersonCleanup, L2).
+    let personRemoved = false;
+    let deletedThumbnailPath: string | null = null;
+    const remaining = await trx
+      .selectFrom('asset_face')
+      .select('asset_face.id')
+      .where('asset_face.personGroupId', '=', personGroupId)
+      .limit(1)
+      .execute();
+    if (remaining.length === 0) {
+      const removed = await trx
+        .deleteFrom('person')
+        .where('personGroupId', '=', personGroupId)
+        .returning('thumbnailPath')
+        .executeTakeFirst();
+      if (removed) {
+        personRemoved = true;
+        deletedThumbnailPath = removed.thumbnailPath === '' ? null : removed.thumbnailPath;
+      }
+    }
+
+    // 11. The restore record, written only when a face was touched.
+    const unassignedCount = Number(unassigned.numUpdatedRows ?? 0);
+    const deletedCount = Number(deleted.numDeletedRows ?? 0);
+    const touched =
+      hiddenFaceIds.length + unassignedCount + deletedCount + Number(alreadyHidden.numUpdatedRows ?? 0) > 0;
+    let dissolveId: string | null = null;
+    if (touched) {
+      const record = await trx
+        .insertInto('face_dissolve')
+        .values({
+          ownerId: input.ownerId,
+          personGroupId,
+          personName: input.personName,
+          scope,
+          actorId: input.actorId,
+          hiddenCount: hiddenFaceIds.length,
+          deletedCount,
+          unassignedCount,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      dissolveId = record.id;
+      for (let index = 0; index < hiddenFaceIds.length; index += RECORD_CHUNK) {
+        await trx
+          .insertInto('face_dissolve_face')
+          .values(
+            hiddenFaceIds
+              .slice(index, index + RECORD_CHUNK)
+              .map((assetFaceId) => ({ dissolveId: record.id, assetFaceId })),
           )
           .execute();
-
-        const updated = await trx
-          .updateTable('asset_face')
-          .set({ personGroupId: null })
-          .where((eb) => where(eb))
-          .executeTakeFirst();
-        return Number(updated.numUpdatedRows ?? 0);
-      };
-
-      let faces: number;
-      let handDrawnUnassigned = 0;
-      if (outcome === 'unassign') {
-        faces = await unassignWhere(inScope);
-      } else {
-        // A dissolve never deletes a hand-drawn box (handDrawnFacePredicate). Those in scope get the unassign
-        // treatment instead, BEFORE the delete, so they no longer carry this personGroupId by the time the
-        // person row goes (delete-faces-and-person). The delete is additionally scoped by
-        // dissolveDeletableFacePredicate, so the rule holds even without relying on that ordering.
-        handDrawnUnassigned = await unassignWhere((eb) => eb.and([inScope(eb), handDrawnFacePredicate(eb)]));
-
-        const deleted = await trx
-          .deleteFrom('asset_face')
-          .where((eb) => dissolveDeletableFacePredicate(eb, personGroupId, scope))
-          .executeTakeFirst();
-        faces = Number(deleted.numDeletedRows ?? 0) + handDrawnUnassigned;
       }
+    }
 
-      // Only the space persons WE orphaned. deleteAllOrphanedPersons() is instance-wide (L1).
-      const orphanedSpacePersonIds: string[] = [];
-      if (spacePersonRows.length > 0) {
-        const candidateIds = spacePersonRows.map((r) => r.id);
-        const stillLinked = await trx
-          .selectFrom('shared_space_person_face')
-          .select('personId')
-          .distinct()
-          .where('personId', 'in', candidateIds)
-          .execute();
-        const linked = new Set(stillLinked.map((r) => r.personId));
-        for (const id of candidateIds) {
-          if (!linked.has(id)) {
-            orphanedSpacePersonIds.push(id);
-          }
-        }
-        if (orphanedSpacePersonIds.length > 0) {
-          await trx.deleteFrom('shared_space_person').where('id', 'in', orphanedSpacePersonIds).execute();
-        }
-      }
-
-      // Exactly one person row, never a library-wide cleanup (L2).
-      let deletedThumbnailPath: string | null = null;
-      if (outcome === 'delete-faces-and-person') {
-        const person = await trx
-          .selectFrom('person')
-          .select(['thumbnailPath'])
-          .where('personGroupId', '=', personGroupId)
-          .executeTakeFirst();
-        if (person) {
-          deletedThumbnailPath = person.thumbnailPath === '' ? null : person.thumbnailPath;
-          await trx.deleteFrom('person').where('personGroupId', '=', personGroupId).execute();
-        }
-      }
-
-      return { faces, handDrawnUnassigned, assetsCleared, orphanedSpacePersonIds, deletedThumbnailPath };
-    });
+    return {
+      dissolveId,
+      hiddenFaceIds,
+      deleted: deletedCount,
+      unassigned: unassignedCount,
+      assetsCleared,
+      personRemoved,
+      deletedThumbnailPath,
+      orphanedSpacePersonIds,
+    };
   }
 }
