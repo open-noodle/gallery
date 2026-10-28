@@ -723,7 +723,7 @@
   </div>
 
   <div
-    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md md:rounded-full"
+    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md"
     data-motion-reveal
     data-testid="cleanup-rewind-actionbar"
   >

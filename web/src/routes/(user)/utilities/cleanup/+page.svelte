@@ -43,6 +43,8 @@
 
   const PEEK_DEBOUNCE_MS = 150;
   const PEEK_THUMBNAILS = 14;
+  /** Below this share of the full banner still on screen, the slim one pins. */
+  const PIN_RATIO = 0.35;
   const QUEUES = [
     CleanupCountQueue.SpaceHogs,
     CleanupCountQueue.Bursts,
@@ -215,9 +217,14 @@
     if (!banner || typeof IntersectionObserver === 'undefined') {
       return;
     }
-    const observer = new IntersectionObserver(([entry]) => {
-      pinned = !entry.isIntersecting && entry.boundingClientRect.top < 0;
-    });
+    // Pinned once most of it has gone off the top: a thin strip left under the top bar is not a preview.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const above = entry.boundingClientRect.top < (entry.rootBounds?.height ?? innerHeight) / 2;
+        pinned = above && (entry.intersectionRatio ?? 0) < PIN_RATIO;
+      },
+      { threshold: [0, PIN_RATIO, 1] },
+    );
     observer.observe(banner);
     return () => observer.disconnect();
   });

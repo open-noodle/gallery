@@ -64,7 +64,7 @@ test.describe('Cleanup Utility', () => {
     const asset: AssetMediaResponseDto = await utils.createAsset(admin.accessToken, { fileCreatedAt });
 
     await page.reload();
-    await page.getByRole('link', { name: 'Rewind today' }).click();
+    await page.getByTestId('cleanup-banner-start').click();
     await expect(page).toHaveURL(`/utilities/cleanup/rewind/${monthDay}`);
 
     const tile = page.getByTestId(`cleanup-rewind-tile-${asset.id}`);
@@ -106,6 +106,34 @@ test.describe('Cleanup Utility', () => {
 
     await page.goto('/utilities/cleanup');
     await expect(page.getByTestId(`cleanup-cal-${monthDay}`)).toHaveAttribute('data-state', 'reviewed');
+  });
+
+  test('opens a blurry photo in the photo window and steps with the arrow key', async ({ page }) => {
+    const [first, second] = await Promise.all([
+      utils.createAsset(admin.accessToken),
+      utils.createAsset(admin.accessToken),
+    ]);
+    const client = await utils.connectDatabase();
+    for (const asset of [first, second]) {
+      // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue.
+      await client.query(
+        'INSERT INTO asset_quality ("assetId", "ownerId", sharpness, version) VALUES ($1, $2, 5, 1) ON CONFLICT DO NOTHING',
+        [asset.id, admin.userId],
+      );
+    }
+
+    await page.goto('/utilities/cleanup/blurry');
+    const tile = page.getByTestId(`cleanup-item-${first.id}`);
+    await expect(tile).toBeVisible();
+    await tile.hover();
+    await page.getByTestId(`cleanup-expand-${first.id}`).click();
+
+    const photo = page.getByTestId('cleanup-photo-window-photo');
+    await expect(photo).toBeVisible();
+    const shownFirst = await photo.getAttribute('data-asset-id');
+    await page.keyboard.press('ArrowRight');
+    await expect(photo).not.toHaveAttribute('data-asset-id', shownFirst ?? '');
+    await expect(tile).toHaveAttribute('data-selected', 'false');
   });
 
   test.describe('Space hogs queue', () => {

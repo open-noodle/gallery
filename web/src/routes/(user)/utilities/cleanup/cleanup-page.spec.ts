@@ -167,9 +167,28 @@ describe('Cleanup hub page', () => {
     observers.callbacks.at(-1)!([scrolledAway], {} as IntersectionObserver);
     await waitFor(() => expect(screen.getByTestId('cleanup-banner-slim')).toBeInTheDocument());
 
-    const back = { isIntersecting: true, boundingClientRect: { top: 80 } } as IntersectionObserverEntry;
+    const back = {
+      isIntersecting: true,
+      intersectionRatio: 1,
+      boundingClientRect: { top: 80 },
+    } as IntersectionObserverEntry;
     observers.callbacks.at(-1)!([back], {} as IntersectionObserver);
     await waitFor(() => expect(screen.queryByTestId('cleanup-banner-slim')).not.toBeInTheDocument());
+  });
+
+  it('pins once most of the banner has scrolled away, even while a strip of it still shows', async () => {
+    renderPage();
+    await waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
+
+    const mostlyGone = {
+      isIntersecting: true,
+      intersectionRatio: 0.1,
+      boundingClientRect: { top: -180 },
+      rootBounds: { height: 800 },
+    } as unknown as IntersectionObserverEntry;
+    observers.callbacks.at(-1)!([mostlyGone], {} as IntersectionObserver);
+
+    await waitFor(() => expect(screen.getByTestId('cleanup-banner-slim')).toBeInTheDocument());
   });
 
   it('pops the day just finished in rewind', async () => {
