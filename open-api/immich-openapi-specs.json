@@ -36869,6 +36869,7 @@
           "backup.delete",
           "clusterGroup.read",
           "clusterGroup.leave",
+          "clusterGroup.admin",
           "clusterGroupRequest.create",
           "clusterGroupRequest.read",
           "clusterGroupRequest.delete",
@@ -40440,11 +40441,13 @@
       "ServerFeatureLevel": {
         "description": "Server feature level",
         "enum": [
-          1
+          1,
+          2
         ],
         "type": "integer",
         "x-enum-varnames": [
-          "FeatureLevel"
+          "FeatureLevel",
+          "Passkeys"
         ]
       },
       "ServerFeaturesDto": {
