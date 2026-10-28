@@ -847,7 +847,7 @@ describe('Spaces people page', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
     sdkMock.getSpacePeople.mockResolvedValue(people);
     sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
@@ -878,7 +878,7 @@ describe('Spaces people page', () => {
       data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
       message: 'raw',
     });
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
@@ -908,7 +908,7 @@ describe('Spaces people page', () => {
         message: 'raw',
       })
       .mockResolvedValueOnce(undefined as never);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);

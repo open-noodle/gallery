@@ -17,7 +17,7 @@ describe('RemoveFromAlbumAction', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(modalManager, 'showDialog').mockResolvedValue(true);
+    vi.spyOn(modalManager, 'showDialog').mockResolvedValue(true as never); // @immich/ui 0.91 types showDialog as Promise<never>
     vi.mocked(getAlbumInfo).mockResolvedValue(album);
     assetMultiSelectManager.clear();
   });

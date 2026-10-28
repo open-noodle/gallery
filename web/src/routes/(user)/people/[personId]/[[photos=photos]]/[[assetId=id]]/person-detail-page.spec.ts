@@ -288,7 +288,7 @@ describe('Person detail page', () => {
         message: 'raw',
       })
       .mockResolvedValueOnce([{ id: 'person-candidate', success: true }]);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
 
     renderPage();
 
@@ -702,7 +702,7 @@ describe('Person detail page', () => {
   });
 
   it('detaches the personal profile after confirmation', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     renderPage();
 
     await userEvent.click(screen.getByText('separate_from_grouped_person'));

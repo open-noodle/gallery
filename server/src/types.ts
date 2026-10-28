@@ -45,19 +45,14 @@ export type DeepPartial<T> = T extends Date
 
 export type RepositoryInterface<T extends object> = Pick<T, keyof T>;
 
-export type FullsizeImageOptions = {
-  format: ImageFormat;
-  quality: number;
-  enabled: boolean;
-  progressive?: boolean;
-};
-
 export type ImageOptions = {
   format: ImageFormat;
   quality: number;
-  size: number;
   progressive?: boolean;
+  decodingTier: 0 | 1 | 2 | 3 | 4;
 };
+
+export type FullsizeImageOptions = ImageOptions & { enabled: boolean };
 
 export type RawImageInfo = {
   width: number;
@@ -88,9 +83,7 @@ export type TransformOptions = {
   adjust?: ImageAdjust;
 };
 
-export type GenerateThumbnailOptions = Pick<ImageOptions, 'format' | 'quality' | 'progressive'> &
-  ImageColorOptions &
-  TransformOptions;
+export type GenerateThumbnailOptions = ImageOptions & ImageColorOptions & TransformOptions;
 export type GenerateThumbhashOptions = ImageColorOptions & Pick<TransformOptions, 'edits' | 'adjust'>;
 
 export interface VideoStreamInfo {

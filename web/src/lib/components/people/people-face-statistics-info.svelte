@@ -5,7 +5,6 @@
     setCachedPeopleFaceStatistics,
   } from '#lib/components/people/people-face-statistics-info-cache.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
-  import { generateId } from '#lib/utils/generate-id.ts';
   import { IconButton } from '@immich/ui';
   import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
   import { mdiInformationOutline } from '@mdi/js';
@@ -30,7 +29,8 @@
 
   const panelWidth = 288;
   const panelMargin = 8;
-  const detailsId = `people-face-statistics-details-${generateId()}`;
+  const uid = $props.id();
+  const detailsId = `people-face-statistics-details-${uid}`;
 
   const formatNumber = (value: number) => value.toLocaleString($locale);
 

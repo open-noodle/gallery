@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AlbumUserRole, Permission } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -69,4 +70,21 @@ export const hasDirectAlbumReadAccess = async (
   }
   const isShared = await access.album.checkSharedAlbumAccess(userId, ids, AlbumUserRole.Viewer);
   return isShared.has(albumId);
+};
+
+/**
+ * AssetShare as it stood before immich-32609: owner ∪ partner, without upstream's new album arm.
+ *
+ * Upstream lets an album member re-share the album's assets (adding them to their own albums). Gallery keeps that
+ * for albums, but not for adding assets to a space: a space Owner/Editor holds AssetUpdate over every space asset
+ * (checkSpaceEditAccess), so an album Viewer adding the owner's photos to their own space would turn read access into
+ * write access (rbac-2). SharedSpaceService.addAssets uses this instead of Permission.AssetShare.
+ */
+export const requireSpaceShareAccess = async (access: AccessRepository, auth: AuthDto, assetIds: string[]) => {
+  const ids = new Set(assetIds);
+  const owned = await access.asset.checkOwnerAccess(auth.user.id, ids, false);
+  const partner = await access.asset.checkPartnerAccess(auth.user.id, ids.difference(owned));
+  if (owned.union(partner).size !== ids.size) {
+    throw new BadRequestException(`Not found or no ${Permission.AssetShare} access`);
+  }
 };

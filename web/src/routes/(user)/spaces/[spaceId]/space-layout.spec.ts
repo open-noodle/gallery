@@ -240,7 +240,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleDelete: removes the space and navigates to the spaces route when confirmed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
       renderLayout(SharedSpaceRole.Owner);
 
       await clickOverflowOption('spaces_delete');
@@ -250,7 +250,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleDelete: does nothing when the confirm dialog is dismissed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderLayout(SharedSpaceRole.Owner);
 
       await clickOverflowOption('spaces_delete');
@@ -294,7 +294,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleLeave: removes the current user from the space and navigates to the spaces list when confirmed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
       renderLayout(SharedSpaceRole.Editor, { member: member({ role: SharedSpaceRole.Editor }) });
 
       await clickOverflowOption('spaces_leave');
@@ -304,7 +304,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleLeave: does nothing when the confirm dialog is dismissed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderLayout(SharedSpaceRole.Editor, { member: member({ role: SharedSpaceRole.Editor }) });
 
       await clickOverflowOption('spaces_leave');
@@ -315,7 +315,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleLeave: uses the plain confirmation when the leaving member has no linked albums', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderLayout(SharedSpaceRole.Editor, {
         member: member({ role: SharedSpaceRole.Editor }),
         linkedAlbums: [{ addedById: 'someone-else' }],
@@ -331,7 +331,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleLeave: warns that linked albums will be removed when the leaving member linked albums of their own (L16)', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderLayout(SharedSpaceRole.Editor, {
         member: member({ role: SharedSpaceRole.Editor }),
         linkedAlbums: [{ addedById: 'u1' }],
@@ -347,7 +347,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleBulkAddAssets: bulk-adds assets for an editor when confirmed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
       renderLayout(SharedSpaceRole.Editor, { member: member({ role: SharedSpaceRole.Editor }) });
 
       await clickOverflowOption('add_all_photos');
@@ -357,7 +357,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleBulkAddAssets: does nothing when the confirm dialog is dismissed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderLayout(SharedSpaceRole.Editor, { member: member({ role: SharedSpaceRole.Editor }) });
 
       await clickOverflowOption('add_all_photos');

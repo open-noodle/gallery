@@ -796,7 +796,11 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       const motionAsset = AssetFactory.from().owner(auth.user).build();
       const asset = AssetFactory.create();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      // AssetUpdate on the asset, the fork's owner-only linkage check (rbac-3), then AssetUpdate on the motion video
+      mocks.access.asset.checkOwnerAccess
+        .mockResolvedValueOnce(new Set([asset.id]))
+        .mockResolvedValueOnce(new Set([asset.id]))
+        .mockResolvedValueOnce(new Set([motionAsset.id]));
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
 
@@ -851,7 +855,12 @@ describe(AssetService.name, () => {
     it('should link a live video', async () => {
       const motionAsset = AssetFactory.create({ type: AssetType.Video, visibility: AssetVisibility.Timeline });
       const stillAsset = AssetFactory.create();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([stillAsset.id]));
+      // AssetUpdate on the asset, the fork's owner-only linkage check (rbac-3), then AssetUpdate on the motion video
+      mocks.access.asset.checkOwnerAccess
+        .mockResolvedValueOnce(new Set([stillAsset.id]))
+        .mockResolvedValueOnce(new Set([stillAsset.id]))
+        .mockResolvedValueOnce(new Set([motionAsset.id]))
+        .mockResolvedValue(new Set([stillAsset.id]));
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(stillAsset));

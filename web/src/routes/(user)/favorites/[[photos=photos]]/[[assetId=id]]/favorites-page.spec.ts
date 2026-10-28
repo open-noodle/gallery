@@ -46,7 +46,7 @@ vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('#lib/components/timeline/actions/ArchiveAction.svelte', async () => {
+vi.mock('#lib/gallery/actions/ArchiveAction.svelte', async () => {
   const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });

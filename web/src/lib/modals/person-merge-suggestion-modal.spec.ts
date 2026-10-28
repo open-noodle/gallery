@@ -152,7 +152,7 @@ describe('PersonMergeSuggestionModal', () => {
     sdkMock.mergePersonLegacy
       .mockRejectedValueOnce(httpError(409, { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 }))
       .mockResolvedValueOnce([{ id: 'person-source', success: true }]);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     const onClose = vi.fn();
 
     render(PersonMergeSuggestionModal, {

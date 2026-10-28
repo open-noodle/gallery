@@ -71,6 +71,7 @@ import {
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum.js';
+import { requireSpaceShareAccess } from 'src/gallery/utils/access-grants.js';
 import { AlbumAssetCount } from 'src/repositories/album.repository.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,
@@ -924,9 +925,9 @@ export class SharedSpaceService extends BaseService {
     // rbac-2: AssetRead's space arm (checkSpaceAccess) includes an un-role-gated shared_space_album branch,
     // so a space Viewer of a space linking album X could read X's assets and re-add them as DIRECT assets
     // into a space they own — gaining AssetUpdate over the owner's assets via checkSpaceEditAccess. AssetShare
-    // (owner ∪ partner only, no album/space arm) is the same permission album-add already requires and closes
-    // the read→re-share→write escalation.
-    await this.requireAccess({ auth, permission: Permission.AssetShare, ids: assetIds });
+    // (owner ∪ partner only, no album/space arm) closes the read→re-share→write escalation. Upstream's AssetShare now
+    // also admits album members (immich-32609), so this checks the narrower pre-32609 rule explicitly.
+    await requireSpaceShareAccess(this.accessRepository, auth, assetIds);
     const inserted = await this.sharedSpaceRepository.addAssets(
       assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );
