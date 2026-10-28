@@ -1,6 +1,6 @@
 # Dissolve a person — design
 
-Status: revision 1 implemented (see "What shipped, and what did not" below); **revision 2 approved for build**
+Status: revision 1 implemented (see "What shipped, and what did not" below); **revision 2 implemented**
 (see "Revision 2" below, which overrides any earlier section it contradicts)
 Date: 2026-09-06, revised 2026-10-28
 Surface: admin face cleanup console (`/admin/face-cleanup`)
@@ -203,7 +203,12 @@ person is gone, then restores it.
 - Pending face suggestions for hidden faces are drained the way the "Not a face" detach drains them
   (`facePersonVerdictRepository.drainPendingForFaces`), in the same transaction.
 - Confirm that stock mobile apps treat a soft-deleted face the same way they already do for the console's
-  "Not a face" action; this revision adds no new sync behaviour.
+  "Not a face" action; this revision adds no new sync behaviour. **[built]** Confirmed: the `asset_face` sync
+  columns include `deletedAt`, and the mobile people strip (`data/db/main/dao/person.dart`,
+  `watchPeopleForAsset`) filters `deletedAt IS NULL`.
+- **[built]** The hide step is a dissolve-specific statement, not `detachFaces`, because it must also cover
+  crop-hidden faces. Surviving Space persons are repointed inline, to the lowest-id linked face that is not
+  hidden.
 
 ## What shipped, and what did not
 
