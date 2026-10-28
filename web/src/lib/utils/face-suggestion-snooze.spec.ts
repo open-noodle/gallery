@@ -1,12 +1,12 @@
+import { SUGGESTION_SNOOZE_MS, isSuggestionSnoozed, snoozeSuggestions } from '#lib/utils/face-suggestion-snooze.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SUGGESTION_SNOOZE_MS, isSuggestionSnoozed, snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
 
 // Snooze entries are scoped per signed-in user (mirrors cmdk-recent.spec.ts's hoisted-mock pattern) so a
 // shared/demo browser with multiple accounts never lets user A's snooze hide user B's suggestions.
 const { mockAuth } = vi.hoisted(() => ({
   mockAuth: { current: { id: 'user-a' } as { id: string } | null },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockAuth.current !== null;

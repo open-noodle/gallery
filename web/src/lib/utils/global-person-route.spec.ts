@@ -1,13 +1,13 @@
-import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
-import type { MessageFormatter } from 'svelte-i18n';
-import { getPersonActions, updatePersonName } from '$lib/services/person.service';
+import { getPersonActions, updatePersonName } from '#lib/services/person.service.ts';
 import {
   getGlobalPersonHref,
   getGlobalPersonThumbnailUrl,
   getSpacePersonThumbnailUrl,
   getSpaceProfile,
-} from '$lib/utils/global-person-route';
-import { getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
+} from '#lib/utils/global-person-route.ts';
+import { getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
+import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
+import type { MessageFormatter } from 'svelte-i18n';
 
 vi.mock('@immich/ui', async (orig) => ({
   ...(await orig<typeof import('@immich/ui')>()),

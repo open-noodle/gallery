@@ -1,8 +1,8 @@
+import TextFilter from '#lib/components/filter-panel/text-filter.svelte';
+import { TEXT_FILTER_PARAM_MAX_LENGTH } from '#lib/utils/filter-url.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import TextFilter from '$lib/components/filter-panel/text-filter.svelte';
-import { TEXT_FILTER_PARAM_MAX_LENGTH } from '$lib/utils/filter-url';
 
 describe('TextFilter', () => {
   beforeEach(() => {

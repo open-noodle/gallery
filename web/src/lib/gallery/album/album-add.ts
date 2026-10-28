@@ -1,16 +1,16 @@
-import { addAssetsToAlbum, BulkIdErrorReason } from '@immich/sdk';
-import { notifyAddToAlbum } from '$lib/gallery/album/notify-add-to-album';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { eventManager } from '$lib/managers/event-manager.svelte';
+import { notifyAddToAlbum } from '#lib/gallery/album/notify-add-to-album.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import {
   addAssetsToAlbumsMutation,
   createAlbumMutation,
   invalidateAlbum,
   invalidateAlbums,
-} from '$lib/queries/album.query';
-import { executeMutation } from '$lib/queries/client';
-import { handleError } from '$lib/utils/handle-error';
-import { getFormatter } from '$lib/utils/i18n';
+} from '#lib/queries/album.query.ts';
+import { executeMutation } from '#lib/queries/client.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
+import { addAssetsToAlbum, BulkIdErrorReason } from '@immich/sdk';
 
 /**
  * Single-album add that reports WHICH assets the server accepted.

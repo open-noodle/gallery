@@ -3,7 +3,7 @@
     "module": "es2022",
     "noImplicitOverride": true,
     "paths": {
-      "#i18n/*": ["../i18n/*"],
+      "#i18n/*": ["../i18n/gallery/merged/*"],
       "#test-data/*": ["./src/test-data/*"],
       "#tests/*": ["./src/../tests/*"]
     },

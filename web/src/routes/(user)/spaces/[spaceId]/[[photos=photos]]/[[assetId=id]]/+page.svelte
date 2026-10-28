@@ -1,23 +1,23 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
-  import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
-  import SpaceAssetLimitWarning from '$lib/components/spaces/space-asset-limit-warning.svelte';
-  import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
-  import Timeline from '$lib/components/timeline/Timeline.svelte';
-  import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import { createSpaceTimeline } from '$lib/gallery/filtered-timeline/space-timeline';
-  import FilteredTimeline from '$lib/gallery/filtered-timeline/FilteredTimeline.svelte';
-  import { registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
-  import { eventManager } from '$lib/managers/event-manager.svelte';
-  import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
-  import { Route } from '$lib/route';
-  import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import SpaceNewAssetsDivider from '#lib/components/spaces/space-new-assets-divider.svelte';
+  import SpaceOnboardingBanner from '#lib/components/spaces/space-onboarding-banner.svelte';
+  import SpaceAssetLimitWarning from '#lib/components/spaces/space-asset-limit-warning.svelte';
+  import SelectionToolbar from '#lib/components/timeline/SelectionToolbar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import { createSpaceTimeline } from '#lib/gallery/filtered-timeline/space-timeline.ts';
+  import FilteredTimeline from '#lib/gallery/filtered-timeline/FilteredTimeline.svelte';
+  import { registerSpaceContext } from '#lib/managers/command-context-manager.svelte.ts';
+  import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+  import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
+  import { Route } from '#lib/route.ts';
+  import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     addAssets,
     AssetVisibility,

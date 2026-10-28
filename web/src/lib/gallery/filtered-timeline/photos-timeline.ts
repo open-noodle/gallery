@@ -1,9 +1,9 @@
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
+import { buildMapFilterConfig } from '#lib/utils/map-filter-config.ts';
+import { buildPhotosTimelineOptions } from '#lib/utils/photos-filter-options.ts';
 import { AssetVisibility } from '@immich/sdk';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
-import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
-import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 
 const scope = { withSharedSpaces: true };

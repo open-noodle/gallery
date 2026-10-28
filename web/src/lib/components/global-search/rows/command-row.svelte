@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
-  import type { CommandItem } from '$lib/managers/command-items';
+  import type { CommandItem } from '#lib/managers/command-items.ts';
   import type { Translations } from 'svelte-i18n';
 
   interface Props {

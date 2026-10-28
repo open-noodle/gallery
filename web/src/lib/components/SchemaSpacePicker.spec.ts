@@ -1,10 +1,10 @@
+import SchemaSpacePickerWrapper from '#lib/components/SchemaSpacePicker.test-wrapper.svelte';
 import { getAllSpaces } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import SchemaSpacePickerWrapper from '$lib/components/SchemaSpacePicker.test-wrapper.svelte';
 
 // Module mocks, matching the pattern used across this suite. `vi.spyOn` on these is not the
 // convention here, and an unmocked @immich/sdk would attempt a real fetch under happy-dom.
@@ -26,7 +26,7 @@ const boundValue = () => screen.getByTestId('wrapper-space-ids');
 // placeholder, so load actual English strings here, matching the convention established by
 // space-albums-controls.spec.ts and its siblings.
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
   await waitLocale('en-US');
 });

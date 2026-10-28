@@ -37,7 +37,7 @@
              `toBeEmptyDOMElement()` (which only ignores comment nodes) reports a false positive for
              "not empty" on a zero-action render unless the each never mounts at all. -->
         {#each actions as id (id)}
-          {@const meta = FACE_ACTIONS[id]}
+          {const meta = $derived(FACE_ACTIONS[id])}
           <div
             class="flex gap-3.5 border-b border-gray-200 py-4 last:border-b-0 dark:border-gray-700"
             data-testid={`help-row-${id}`}

@@ -78,8 +78,8 @@
       return undefined;
     }
 
-    const patch = buildPersonFilterPatch(page.url, person);
-    return patch ? buildContextualFilterUrl(page.url, patch) : undefined;
+    const patch = buildPersonFilterPatch(new URL(page.url.href), person);
+    return patch ? buildContextualFilterUrl(new URL(page.url.href), patch) : undefined;
   };
 
   /**
@@ -89,7 +89,7 @@
    * never renders a raw id.
    */
   const rememberPersonName = (person: AssetPerson, href: string) => {
-    const patch = buildPersonFilterPatch(page.url, person);
+    const patch = buildPersonFilterPatch(new URL(page.url.href), person);
     const personId = patch?.personIds?.[0];
     if (personId) {
       rememberContextualPersonName(href, personId, person.name);

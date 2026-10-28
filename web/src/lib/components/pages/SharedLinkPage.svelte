@@ -10,7 +10,7 @@
   import { navigate } from '#lib/utils/navigation.ts';
   import { sharedLinkLogin, SharedLinkType, type AssetResponseDto, type SharedLinkResponseDto } from '@immich/sdk';
   import { Button, PasswordInput } from '@immich/ui';
-  import Logo from '$lib/components/shared-components/Logo.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { onDestroy, tick } from 'svelte';
   import { t } from 'svelte-i18n';
 

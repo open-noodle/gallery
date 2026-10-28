@@ -1,8 +1,8 @@
+import { Route } from '#lib/route.ts';
 import { Breadcrumbs } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import { Route } from '$lib/route';
 import { faceCleanupBreadcrumbs, guidedCrumb } from './breadcrumbs';
 
 // Every other test asserts against admin-page-layout.stub.svelte, never the real @immich/ui

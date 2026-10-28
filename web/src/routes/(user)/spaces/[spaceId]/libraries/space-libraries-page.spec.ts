@@ -1,12 +1,12 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import SpaceLinkLibraryModal from '#lib/modals/SpaceLinkLibraryModal.svelte';
 import { type SharedSpaceLinkedLibraryDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { invalidateAll } from '$app/navigation';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SpaceLinkLibraryModal from '$lib/modals/SpaceLinkLibraryModal.svelte';
 import SpaceLibrariesPage from './+page.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
@@ -53,7 +53,7 @@ function renderPage(libraries: SharedSpaceLinkedLibraryDto[]) {
 
 describe('Space libraries page', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

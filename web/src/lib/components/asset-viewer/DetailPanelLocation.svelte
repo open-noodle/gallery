@@ -30,7 +30,7 @@
   // centers it on this asset. Null on an album, which has no map URL (see buildContextualMapUrl).
   const mapUrl = $derived(
     buildContextualMapUrl(
-      page.url,
+      new URL(page.url.href),
       asset.exifInfo?.latitude && asset.exifInfo.longitude
         ? { lat: asset.exifInfo.latitude, lng: asset.exifInfo.longitude, zoom: 12.5 }
         : undefined,

@@ -1,34 +1,34 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
-  import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
-  import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
-  import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
-  import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
-  import CreateSharedLink from '$lib/components/timeline/actions/CreateSharedLinkAction.svelte';
-  import DeleteAssets from '$lib/components/timeline/actions/DeleteAssetsAction.svelte';
-  import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
-  import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
-  import RemoveFromAlbum from '$lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
-  import RemoveFromSpaceAction from '$lib/components/timeline/actions/RemoveFromSpaceAction.svelte';
-  import RotateAction from '$lib/components/timeline/actions/RotateAction.svelte';
-  import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
-  import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
-  import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import ArchiveAction from '#lib/components/timeline/actions/ArchiveAction.svelte';
+  import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
+  import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
+  import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
+  import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
+  import CreateSharedLink from '#lib/components/timeline/actions/CreateSharedLinkAction.svelte';
+  import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
+  import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
+  import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
+  import RemoveFromAlbum from '#lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
+  import RemoveFromSpaceAction from '#lib/components/timeline/actions/RemoveFromSpaceAction.svelte';
+  import RotateAction from '#lib/components/timeline/actions/RotateAction.svelte';
+  import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
+  import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type {
     AlbumContext,
     CommandContext,
     SelectionCommandContext,
     SpaceContext,
-  } from '$lib/managers/command-context-manager.svelte';
-  import { getSelectionCapabilities } from '$lib/managers/selection-capabilities';
-  import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import { getAssetBulkActions } from '$lib/services/asset.service';
-  import { resolveEditableAssetIds } from '$lib/utils/asset-editability';
-  import type { OnArchive, OnDelete, OnFavorite, OnSetVisibility, OnUndoDelete } from '$lib/utils/actions';
+  } from '#lib/managers/command-context-manager.svelte.ts';
+  import { getSelectionCapabilities } from '#lib/managers/selection-capabilities.ts';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import { getAssetBulkActions } from '#lib/services/asset.service.ts';
+  import { resolveEditableAssetIds } from '#lib/utils/asset-editability.ts';
+  import type { OnArchive, OnDelete, OnFavorite, OnSetVisibility, OnUndoDelete } from '#lib/utils/actions.ts';
   import {
     AlbumUserRole,
     type AlbumResponseDto,
@@ -236,7 +236,7 @@
 
 {#if assetInteraction.selectionActive}
   <AssetSelectControlBar>
-    {@const Actions = getAssetBulkActions($t, { editableSelectedAssetIds })}
+    {const Actions = $derived(getAssetBulkActions($t, { editableSelectedAssetIds }))}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
     {#if caps.canShare}
       <CreateSharedLink spaceId={shareSpaceId} />

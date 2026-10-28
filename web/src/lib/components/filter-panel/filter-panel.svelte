@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
   import { mdiClose, mdiTune } from '@mdi/js';

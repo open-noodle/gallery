@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { PickerCollection } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
-  import CollectionPickerModal from '$lib/modals/CollectionPickerModal.svelte';
-  import { addAssetsToCollections } from '$lib/services/collection.service';
+  import type { PickerCollection } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
+  import CollectionPickerModal from '#lib/modals/CollectionPickerModal.svelte';
+  import { addAssetsToCollections } from '#lib/services/collection.service.ts';
 
   type Props = {
     assetIds: string[];

@@ -1,6 +1,6 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { clearFilterParams, decodeFilterParams, encodeFilterParams } from '#lib/utils/filter-url.ts';
 import { describe, expect, it } from 'vitest';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { clearFilterParams, decodeFilterParams, encodeFilterParams } from '$lib/utils/filter-url';
 
 const encode = (filters: Partial<FilterState>): URLSearchParams => {
   const params = new URLSearchParams();

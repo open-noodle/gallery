@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
+  import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import type { AssetResponseDto } from '@immich/sdk';
 
   /**

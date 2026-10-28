@@ -1,5 +1,5 @@
+import { Route } from '#lib/route.ts';
 import { redirect } from '@sveltejs/kit';
-import { Route } from '$lib/route';
 import type { PageLoad } from './$types';
 
 // The declines-only manage page was replaced by the unified Resolutions page (declines + locks). Keep this

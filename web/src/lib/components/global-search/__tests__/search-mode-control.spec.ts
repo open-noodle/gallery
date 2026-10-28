@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import SearchModeControl from '../search-mode-control.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

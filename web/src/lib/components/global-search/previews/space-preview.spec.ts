@@ -11,7 +11,7 @@ vi.mock('@immich/ui', async (orig) => ({
 beforeAll(async () => {
   // Load the real en bundle so `$t('cmdk_preview_photo_count')` and
   // `$t('cmdk_preview_member_count')` resolve to English ICU output rather than raw keys.
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

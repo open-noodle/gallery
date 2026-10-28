@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { isApplePlatform as isApplePlatformFor, searchHotkeyLabel } from '$lib/gallery/search/search-hotkey';
+  import { isApplePlatform as isApplePlatformFor, searchHotkeyLabel } from '#lib/gallery/search/search-hotkey.ts';
   import { Icon, IconButton, Modal, modalManager, ModalBody } from '@immich/ui';
   import { mdiClose, mdiMagnify } from '@mdi/js';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
-  import { clickOutside } from '$lib/actions/click-outside';
-  import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
+  import { clickOutside } from '#lib/actions/click-outside.ts';
+  import type { GlobalSearchManager, SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
   import GlobalSearchSection from './global-search-section.svelte';
   import LiveTypedFilterSection from './live-typed-filter-section.svelte';
   import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
@@ -21,21 +21,21 @@
   import CommandRow from './rows/command-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
   import GlobalSearchPreview from './global-search-preview.svelte';
-  import SearchModeControl from '$lib/components/global-search/search-mode-control.svelte';
-  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
-  import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { NAVIGATION_ITEMS, type NavigationItem } from '$lib/managers/navigation-items';
-  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+  import SearchModeControl from '#lib/components/global-search/search-mode-control.svelte';
+  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
+  import { getEntries, type RecentEntry } from '#lib/stores/cmdk-recent.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { NAVIGATION_ITEMS, type NavigationItem } from '#lib/managers/navigation-items.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { page } from '$app/state';
-  import { getSearchablePageState } from '$lib/utils/searchable-page-search';
-  import { getTypedSearchDisplayText } from '$lib/utils/typed-search/typed-search-name-cache';
+  import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
+  import { getTypedSearchDisplayText } from '#lib/utils/typed-search/typed-search-name-cache.ts';
   import TypedSearchTokenRail from './typed-search-token-rail.svelte';
   import {
     liveTypedSearchChoiceValue,
     type LiveTypedSearchChoice,
-  } from '$lib/utils/typed-search/typed-search-live-suggestions';
+  } from '#lib/utils/typed-search/typed-search-live-suggestions.ts';
 
   interface Props {
     manager: GlobalSearchManager;
@@ -57,7 +57,7 @@
   let inputValue = $state('');
   const showDropdownPanel = $derived(manager.isOpen && manager.presentation === 'dropdown');
   const closedDropdownSearchState = $derived.by(() =>
-    variant === 'dropdown' ? getSearchablePageState(page.url) : null,
+    variant === 'dropdown' ? getSearchablePageState(new URL(page.url.href)) : null,
   );
   $effect(() => {
     if (variant === 'dropdown' && !showDropdownPanel) {
@@ -559,7 +559,7 @@
       e.preventDefault();
       return;
     }
-    if (e.key === 'Enter' && inputValue.trim() === '' && getSearchablePageState(page.url).query !== '') {
+    if (e.key === 'Enter' && inputValue.trim() === '' && getSearchablePageState(new URL(page.url.href)).query !== '') {
       void manager.activateSearch('');
       e.preventDefault();
       return;

@@ -2,7 +2,7 @@ import {
   computeFaceCroppedCoordinates,
   computeImageContentMetrics,
   computeSelectorPosition,
-} from '$lib/utils/face-box-drag';
+} from '#lib/utils/face-box-drag.ts';
 
 // A minimal stand-in for HTMLImageElement -- getNaturalSize (container-utils.ts) only ever reads
 // naturalWidth/naturalHeight off it, and `instanceof HTMLVideoElement` is false for this shape in

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { dateFormats } from '$lib/constants';
-  import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
-  import { faceSuggestionContextExpanded as expanded } from '$lib/gallery/people/face-suggestion-context.store';
-  import { getSuggestionAssetHref } from '$lib/gallery/people/suggestion-asset-href';
+  import { dateFormats } from '#lib/constants.ts';
+  import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
+  import { faceSuggestionContextExpanded as expanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
+  import { getSuggestionAssetHref } from '#lib/gallery/people/suggestion-asset-href.ts';
   import { DateTime } from 'luxon';
   import { locale, t } from 'svelte-i18n';
 

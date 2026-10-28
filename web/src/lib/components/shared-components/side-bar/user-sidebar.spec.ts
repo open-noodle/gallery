@@ -1,6 +1,6 @@
+import UserSidebar from '#lib/components/shared-components/side-bar/UserSidebar.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
-import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
 
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/photos') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -25,46 +25,46 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/components/sidebar/sidebar-shell.svelte', async () => {
-  const module = await import('@test-data/mocks/sidebar-shell.stub.svelte');
+vi.mock('#lib/components/sidebar/sidebar-shell.svelte', async () => {
+  const module = await import('#test-data/mocks/sidebar-shell.stub.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/BottomInfo.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/side-bar/BottomInfo.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/rail-storage.svelte', async () => {
-  const module = await import('@test-data/mocks/rail-storage.stub.svelte');
+vi.mock('#lib/components/shared-components/side-bar/rail-storage.svelte', async () => {
+  const module = await import('#test-data/mocks/rail-storage.stub.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/recent-spaces.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/side-bar/recent-spaces.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: mocks.authManager,
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: mocks.featureFlagsManager,
 }));
 
-vi.mock('$lib/components/sidebar/sidebar-nav-item.svelte', async () => {
-  const module = await import('@test-data/mocks/sidebar-nav-item.stub.svelte');
+vi.mock('#lib/components/sidebar/sidebar-nav-item.svelte', async () => {
+  const module = await import('#test-data/mocks/sidebar-nav-item.stub.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/sidebar/sidebar-nav-group.svelte', async () => {
-  const module = await import('@test-data/mocks/navbar-group.stub.svelte');
+vi.mock('#lib/components/sidebar/sidebar-nav-group.svelte', async () => {
+  const module = await import('#test-data/mocks/navbar-group.stub.svelte');
   return { default: module.default };
 });
 
@@ -76,7 +76,7 @@ const sidebarMocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: sidebarMocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: sidebarMocks.sidebarModeStore }));
 
 describe('UserSidebar', () => {
   beforeEach(() => {

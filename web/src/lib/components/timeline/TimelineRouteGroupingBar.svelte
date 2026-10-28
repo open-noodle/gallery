@@ -1,9 +1,13 @@
 <script lang="ts">
-  import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
-  import SearchAddAllButton from '$lib/components/search/SearchAddAllButton.svelte';
-  import { buildFilterContext, createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-  import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+  import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
+  import FilterToolbar from '#lib/components/filter-panel/filter-toolbar.svelte';
+  import SearchAddAllButton from '#lib/components/search/SearchAddAllButton.svelte';
+  import {
+    buildFilterContext,
+    createFilterState,
+    type FilterState,
+  } from '#lib/components/filter-panel/filter-panel.ts';
+  import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
   import { twMerge } from 'tailwind-merge';
 
   interface Props {

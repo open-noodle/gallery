@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     createFaceRepairOwnerPerson,
     getFaceRepairOwnerPeople,
@@ -174,8 +174,8 @@
 
       <div class="max-h-72 overflow-y-auto">
         {#each people as person (person.id)}
-          {@const suggested = person.id === suggestedPersonId}
-          {@const unnamed = !person.name.trim()}
+          {const suggested = $derived(person.id === suggestedPersonId)}
+          {const unnamed = $derived(!person.name.trim())}
           <button
             type="button"
             class="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800"

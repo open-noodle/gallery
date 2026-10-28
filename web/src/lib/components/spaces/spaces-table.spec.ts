@@ -1,9 +1,9 @@
+import SpacesTable from '#lib/components/spaces/spaces-table.svelte';
 import { SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import SpacesTable from '$lib/components/spaces/spaces-table.svelte';
 
-vi.mock('$lib/route', () => ({
+vi.mock('#lib/route.js', () => ({
   Route: {
     viewSpace: ({ id }: { id: string }) => `/spaces/${id}`,
   },

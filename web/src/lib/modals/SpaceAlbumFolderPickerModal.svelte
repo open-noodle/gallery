@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { buildFolderTree, isDescendant, type FolderNode } from '$lib/utils/space-album-folders';
+  import { buildFolderTree, isDescendant, type FolderNode } from '#lib/utils/space-album-folders.ts';
   import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
   import { FormModal, Icon } from '@immich/ui';
   import { mdiFolder } from '@mdi/js';

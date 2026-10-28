@@ -1,7 +1,7 @@
 <script lang="ts">
-  import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
-  import { handleError } from '$lib/utils/handle-error';
-  import { appendUniqueById } from '$lib/utils/people-utils';
+  import SpaceActivityFeed from '#lib/components/spaces/space-activity-feed.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { appendUniqueById } from '#lib/utils/people-utils.ts';
   import { getSpaceActivities } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';

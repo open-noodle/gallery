@@ -1,10 +1,10 @@
+import RemoveFromAlbumAction from '#lib/components/timeline/actions/remove-from-album-action.test-wrapper.svelte';
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { BulkIdErrorReason, getAlbumInfo, removeAssetFromAlbum, type AlbumResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import RemoveFromAlbumAction from '$lib/components/timeline/actions/remove-from-album-action.test-wrapper.svelte';
-import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 
 vi.mock('@immich/sdk', async (original) => ({
   ...(await original()),

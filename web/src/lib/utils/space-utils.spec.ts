@@ -1,6 +1,6 @@
+import { spaceRoleLabelKey, splitPinnedSpaces } from '#lib/utils/space-utils.ts';
 import { SharedSpaceRole } from '@immich/sdk';
-import { spaceRoleLabelKey, splitPinnedSpaces } from '$lib/utils/space-utils';
-import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
+import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 
 describe('spaceRoleLabelKey', () => {
   it('maps owner to the existing owner key', () => {

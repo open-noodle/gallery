@@ -1,12 +1,12 @@
-import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
+import { AlbumSortBy, SortOrder } from '#lib/stores/preferences.store.ts';
 import {
   SpaceAlbumSortBy,
   findSpaceAlbumSortOptionMetadata,
   sortSpaceAlbums,
   spaceAlbumMenuColumnStyle,
   spaceAlbumSortOptionsMetadata,
-} from '$lib/utils/space-album-sort';
+} from '#lib/utils/space-album-sort.ts';
+import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 
 const A = (o: Partial<SharedSpaceLinkedAlbumDto>): SharedSpaceLinkedAlbumDto => ({
   id: 'x',

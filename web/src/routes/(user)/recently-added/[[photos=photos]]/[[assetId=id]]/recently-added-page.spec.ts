@@ -1,3 +1,6 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { buildRecentlyAddedTimelineOptions } from '#lib/utils/recently-added-filter-options.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -5,9 +8,6 @@ import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { SvelteURL } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { buildRecentlyAddedTimelineOptions } from '$lib/utils/recently-added-filter-options';
 import RecentlyAddedPage from './+page.svelte';
 
 const { mockPage, mockAssetMultiSelectManager, mockAuthManager, mockRegisterSearchablePageFilters } = vi.hoisted(
@@ -34,147 +34,147 @@ const { mockPage, mockAssetMultiSelectManager, mockAuthManager, mockRegisterSear
 );
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('$app/state', () => ({ page: mockPage }));
+vi.mock('$app/state', () => ({ page: mockPage, navigating: { to: null } }));
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/ActionMenuItem.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/ActionMenuItem.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
+vi.mock('#lib/components/filter-panel/active-filters-bar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/active-filters-bar-actions.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/filter-panel.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/bindable-filter-panel.stub.svelte');
+vi.mock('#lib/components/filter-panel/filter-panel.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/bindable-filter-panel.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/EmptyPlaceholder.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/EmptyPlaceholder.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
+vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockComponent } =
     await import('../../../albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/mock-timeline.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/ArchiveAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/ArchiveAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/ChangeDateAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/ChangeDateAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/ChangeDescriptionAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/ChangeDescriptionAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/ChangeLocationAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/ChangeLocationAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/DeleteAssetsAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/DeleteAssetsAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/FavoriteAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/FavoriteAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/LinkLivePhotoAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/LinkLivePhotoAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/SelectAllAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/SelectAllAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/SetVisibilityAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/SetVisibilityAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/StackAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/StackAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/TagAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/TagAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
   assetMultiSelectManager: mockAssetMultiSelectManager,
 }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: { isViewing: false },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: mockAuthManager,
 }));
 
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
   },
 }));
 
-vi.mock('$lib/services/asset.service', () => ({
+vi.mock('#lib/services/asset.service.js', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 
-vi.mock('$lib/utils/file-uploader', () => ({
+vi.mock('#lib/utils/file-uploader.js', () => ({
   openFileUploadDialog: vi.fn(),
 }));
 
-vi.mock('$lib/utils/recently-added-filter-options', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/utils/recently-added-filter-options')>();
+vi.mock('#lib/utils/recently-added-filter-options.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/utils/recently-added-filter-options.ts')>();
   return {
     ...actual,
     buildRecentlyAddedTimelineOptions: vi.fn(actual.buildRecentlyAddedTimelineOptions),
@@ -273,9 +273,8 @@ describe('Recently Added page filters', () => {
     await fireEvent.click(await screen.findByTestId('filter-panel-set-country'));
 
     expect(goto).toHaveBeenCalledWith('/recently-added?country=Germany', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 
@@ -286,9 +285,8 @@ describe('Recently Added page filters', () => {
     await fireEvent.click(await screen.findByTestId('active-filters-clear-all'));
 
     expect(goto).toHaveBeenLastCalledWith('/recently-added', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 
@@ -329,7 +327,7 @@ describe('Recently Added page query mode', () => {
     // count's `$t('items_count', { values: { count } })` needs real ICU plural interpolation to
     // tell "12 items" apart from "2 items". Load the real English bundle, mirroring
     // `recent-row.spec.ts`'s precedent for the same `items_count` key.
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

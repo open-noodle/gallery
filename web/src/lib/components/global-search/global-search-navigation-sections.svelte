@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { NavigationItem, NavigationCategory } from '$lib/managers/navigation-items';
-  import type { ProviderStatus } from '$lib/managers/global-search-manager.svelte';
+  import type { NavigationItem, NavigationCategory } from '#lib/managers/navigation-items.ts';
+  import type { ProviderStatus } from '#lib/managers/global-search-manager.svelte.ts';
   import { Command } from 'bits-ui';
   import { t, type Translations } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';

@@ -1,7 +1,7 @@
+import FaceCrop from '#lib/components/faces-page/face-crop.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import FaceCrop from '$lib/components/faces-page/face-crop.svelte';
 
 const face = {
   assetId: 'asset-1',

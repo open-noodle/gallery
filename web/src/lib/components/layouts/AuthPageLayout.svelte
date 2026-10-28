@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Card, CardBody, CardHeader, Heading, VStack } from '@immich/ui';
-  import Logo from '$lib/components/shared-components/Logo.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import type { Snippet } from 'svelte';
   interface Props {
     title?: string;

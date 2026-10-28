@@ -3,7 +3,7 @@ import { init, register, waitLocale } from 'svelte-i18n';
 import SortToggle from '../sort-toggle.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

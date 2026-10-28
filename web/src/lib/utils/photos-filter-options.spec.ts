@@ -1,6 +1,6 @@
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { buildPhotosTimelineOptions } from '#lib/utils/photos-filter-options.ts';
 import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 
 const MY_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 

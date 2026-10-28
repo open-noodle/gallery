@@ -1,8 +1,8 @@
+import { Route } from '#lib/route.ts';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
-import { Route } from '$lib/route';
 
 /**
  * Toast the outcome of an add-to-album call truthfully (#764). The server returns HTTP 200 with

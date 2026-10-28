@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
+  import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
   import {
     addMember,
     getAllGroups,
@@ -13,8 +13,8 @@
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
 
   type Props = {
     spaceId: string;
@@ -127,7 +127,7 @@
     {#if filteredGroups.length > 0}
       <div class="mb-3 flex flex-wrap gap-2">
         {#each filteredGroups as group (group.id)}
-          {@const eligibleCount = group.members.filter((m) => !existingMemberIds.includes(m.userId)).length}
+          {const eligibleCount = $derived(group.members.filter((m) => !existingMemberIds.includes(m.userId)).length)}
           <button
             type="button"
             class="rounded-full border px-3 py-1 text-xs font-medium transition-all {activeGroupIds.has(group.id)

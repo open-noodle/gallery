@@ -1,4 +1,4 @@
-import { duration, ease, prefersReducedMotion, spring, springEasing } from '$lib/gallery/motion/tokens';
+import { duration, ease, prefersReducedMotion, spring, springEasing } from '#lib/gallery/motion/tokens.ts';
 
 /**
  * Site-wide press and hover feedback: every button-like control squishes while held and springs back

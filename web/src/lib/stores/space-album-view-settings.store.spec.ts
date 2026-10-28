@@ -1,7 +1,7 @@
+import { AlbumSortBy, AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
 import { get } from 'svelte/store';
-import { AlbumSortBy, AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
-import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
 
 describe('space-album-view-settings store', () => {
   beforeEach(() => {
@@ -47,7 +47,7 @@ describe('space-album-view-settings store', () => {
       }),
     );
     vi.resetModules();
-    const reloaded = await import('$lib/stores/space-album-view-settings.store');
+    const reloaded = await import('#lib/stores/space-album-view-settings.store.ts');
     expect(get(reloaded.spaceAlbumViewSettings).sortBy).toBe(AlbumSortBy.Title);
     expect(get(reloaded.spaceAlbumViewSettings).sortOrder).toBe(SortOrder.Asc);
   });

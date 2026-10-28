@@ -1,8 +1,8 @@
+import SpaceAlbumFolderBreadcrumb from '#lib/components/spaces/space-album-folder-breadcrumb.svelte';
+import { getActiveDragPayload, setActiveDragPayload, writeDragPayload } from '#lib/utils/space-album-folder-dnd.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import SpaceAlbumFolderBreadcrumb from '$lib/components/spaces/space-album-folder-breadcrumb.svelte';
-import { getActiveDragPayload, setActiveDragPayload, writeDragPayload } from '$lib/utils/space-album-folder-dnd';
 
 const crumb = (id: string, name: string, parentId: string | null = null) =>
   ({

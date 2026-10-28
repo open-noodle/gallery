@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ImportProgress } from '$lib/managers/import-manager.svelte';
+  import type { ImportProgress } from '#lib/managers/import-manager.svelte.ts';
   import { Button, Icon } from '@immich/ui';
   import {
     mdiAlertCircle,

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
+  import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+  import SmartSearchResults from '#lib/components/search/smart-search-results.svelte';
   import type { AssetResponseDto } from '@immich/sdk';
 
   /**

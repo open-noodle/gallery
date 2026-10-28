@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ShortcutsModal from './ShortcutsModal.svelte';
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     authenticated: false,
     preferences: { ratings: { enabled: false } },

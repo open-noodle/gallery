@@ -10,7 +10,7 @@ import { GlobalSearchManager } from './global-search-manager.svelte';
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user', isAdmin: true } as { id: string; isAdmin: boolean } | null },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;
@@ -26,7 +26,7 @@ const { mockFlags } = vi.hoisted(() => ({
     valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
   },
 }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: mockFlags,
 }));
 

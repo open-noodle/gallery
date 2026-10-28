@@ -1,4 +1,4 @@
-import { shouldCrossfade } from '$lib/gallery/motion/page-transition';
+import { shouldCrossfade } from '#lib/gallery/motion/page-transition.ts';
 
 const at = (id: string, params: Record<string, string> = {}) => ({ route: { id }, params, url: new URL('http://x') });
 

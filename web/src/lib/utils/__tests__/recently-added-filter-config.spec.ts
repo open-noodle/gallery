@@ -1,7 +1,7 @@
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { buildRecentlyAddedFilterConfig } from '#lib/utils/recently-added-filter-config.ts';
 import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, searchSmartFacets, Type } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildRecentlyAddedFilterConfig } from '$lib/utils/recently-added-filter-config';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
