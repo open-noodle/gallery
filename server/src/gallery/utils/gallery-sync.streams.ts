@@ -2,7 +2,8 @@ import { Writable } from 'node:stream';
 import { SyncStreamDto } from 'src/dtos/sync.dto.js';
 import { MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
-import { SyncQueryOptions } from 'src/repositories/sync.repository.js';
+import { SyncBackfillOptions, SyncQueryOptions } from 'src/repositories/sync.repository.js';
+import { SyncAck } from 'src/types.js';
 import {
   CheckpointMap,
   getStartId,
@@ -49,6 +50,8 @@ const GALLERY_SYNC_ORDER = [
   SyncRequestType.SharedSpaceAlbumToAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetExifsV1,
+  // After every stream that delivers the stacked photos (mobile needs no order: stack_id has no foreign key).
+  SyncRequestType.SharedSpaceStacksV1,
   // #763: favorites reference assets a viewer does not own, so this overlay stream sits after
   // EVERY asset-delivering stream (own, partner, album, library, shared-space, space-album) —
   // same delivering-stream-first pattern as PartnerAssetExifsV1. It stays BEFORE the memory types
@@ -120,6 +123,12 @@ export type GallerySyncContext = {
   checkpointMap: CheckpointMap;
   sessionId: string;
 };
+
+type StackRows = ReturnType<GallerySyncRepository['sharedSpaceStack']['getSpaceBackfill']>;
+type StackBackfillType =
+  | SyncEntityType.SharedSpaceStackBackfillV1
+  | SyncEntityType.SharedSpaceStackAlbumBackfillV1
+  | SyncEntityType.SharedSpaceStackLibraryBackfillV1;
 
 // The handler bodies moved verbatim from SyncService; `syncRepository` here is the GallerySyncRepository.
 class GallerySyncHandlers {
@@ -284,6 +293,88 @@ class GallerySyncHandlers {
         first = false;
       }
       await send(response, { type: createType, ids: [updateId], data: mapSyncAssetV1(data) });
+    }
+  }
+
+  // The backfills cover what a newly reached space, linked album or library brings, up to the live checkpoint, as in
+  // syncSharedSpaceAssetsV1 and syncLibraryAssetsV1. Unlike those handlers, the three loops share backfillStacks.
+  async syncSharedSpaceStacksV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    sessionId: string,
+  ) {
+    const repository = this.syncRepository.sharedSpaceStack;
+    const { userId } = options;
+
+    const deleteType = SyncEntityType.SharedSpaceStackDeleteV1;
+    for await (const { id, ...data } of repository.getDeletes({ ...options, ack: checkpointMap[deleteType] })) {
+      await send(response, { type: deleteType, ids: [id], data });
+    }
+
+    const upsertType = SyncEntityType.SharedSpaceStackV1;
+    const upsertAck = checkpointMap[upsertType];
+    const context = { options, response, checkpointMap, sessionId };
+    await this.backfillStacks(
+      context,
+      SyncEntityType.SharedSpaceStackBackfillV1,
+      upsertAck,
+      (afterCreateId) => this.syncRepository.sharedSpace.getCreatedAfter({ ...options, afterCreateId }),
+      (window, spaceId) => repository.getSpaceBackfill(window, spaceId, userId),
+    );
+    await this.backfillStacks(
+      context,
+      SyncEntityType.SharedSpaceStackAlbumBackfillV1,
+      upsertAck,
+      (afterCreateId) => this.syncRepository.sharedSpaceAlbum.getCreatedAfter({ ...options, afterCreateId }),
+      (window, albumId) => repository.getAlbumBackfill(window, albumId, userId),
+    );
+    await this.backfillStacks(
+      context,
+      SyncEntityType.SharedSpaceStackLibraryBackfillV1,
+      upsertAck,
+      (afterCreateId) => this.syncRepository.library.getCreatedAfter({ ...options, afterCreateId }),
+      (window, libraryId) => repository.getLibraryBackfill(window, libraryId, userId),
+    );
+
+    for await (const { updateId, ...data } of repository.getUpserts({ ...options, ack: upsertAck })) {
+      await send(response, { type: upsertType, ids: [updateId], data });
+    }
+  }
+
+  private async backfillStacks(
+    {
+      options,
+      response,
+      checkpointMap,
+      sessionId,
+    }: Pick<GallerySyncContext, 'options' | 'response' | 'checkpointMap' | 'sessionId'>,
+    type: StackBackfillType,
+    liveAck: SyncAck | undefined,
+    getEntities: (afterCreateId?: string) => Promise<{ id: string; createId: string }[]>,
+    getBackfill: (window: SyncBackfillOptions, id: string) => StackRows,
+  ) {
+    const checkpoint = checkpointMap[type];
+    const entities = await getEntities(checkpoint?.updateId);
+    if (!liveAck) {
+      // First sync: the live stream sends everything, so the backfill starts after these entities.
+      if (entities.length > 0) {
+        await this.upsertBackfillCheckpoint({ type, sessionId, createId: entities.at(-1)!.createId });
+      }
+      return;
+    }
+
+    for (const { id, createId } of entities) {
+      if (isEntityBackfillComplete(createId, checkpoint)) {
+        continue;
+      }
+
+      const window = { ...options, afterUpdateId: getStartId(createId, checkpoint), beforeUpdateId: liveAck.updateId };
+      for await (const { updateId, ...data } of getBackfill(window, id)) {
+        await send(response, { type, ids: [createId, updateId], data });
+      }
+
+      await sendEntityBackfillCompleteAck(response, type, createId);
     }
   }
 
@@ -1093,6 +1184,7 @@ const handlers = ({
       h.syncSharedSpaceAssetExifsV1(options, response, checkpointMap, sessionId),
     [SyncRequestType.SharedSpaceToAssetsV1]: () =>
       h.syncSharedSpaceToAssetsV1(options, response, checkpointMap, sessionId),
+    [SyncRequestType.SharedSpaceStacksV1]: () => h.syncSharedSpaceStacksV1(options, response, checkpointMap, sessionId),
     // Library sync handlers.
     [SyncRequestType.LibrariesV1]: () => h.syncLibrariesV1(options, response, checkpointMap),
     [SyncRequestType.LibraryAssetsV1]: () => h.syncLibraryAssetsV1(options, response, checkpointMap, sessionId),

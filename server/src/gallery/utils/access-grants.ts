@@ -7,6 +7,7 @@ type Grant = (access: AccessRepository, userId: string, ids: Set<string>) => Pro
 
 const spaceAssetRead: Grant = (access, userId, ids) => access.spaceAsset.checkSpaceAccess(userId, ids);
 const spaceAssetEdit: Grant = (access, userId, ids) => access.spaceAsset.checkSpaceEditAccess(userId, ids);
+const spaceStackRead: Grant = (access, userId, ids) => access.spaceAsset.checkSpaceStackAccess(userId, ids);
 const spaceAlbumRead: Grant = (access, userId, ids) => access.spaceAlbum.checkSpaceLinkedAlbumReadAccess(userId, ids);
 const spaceAlbumWrite: Grant = (access, userId, ids) => access.spaceAlbum.checkSpaceLinkedAlbumAccess(userId, ids);
 
@@ -35,6 +36,9 @@ export const galleryAccessGrants: Partial<Record<Permission, Grant>> = {
   [Permission.AlbumDownload]: spaceAlbumRead,
   [Permission.AlbumAssetCreate]: spaceAlbumWrite,
   [Permission.AlbumAssetDelete]: spaceAlbumWrite,
+
+  // #1243: the viewer's stack strip. StackUpdate and StackDelete stay with the owner.
+  [Permission.StackRead]: spaceStackRead,
 
   [Permission.SharedSpaceRead]: (access, userId, ids) => access.sharedSpace.checkMemberAccess(userId, ids),
 };

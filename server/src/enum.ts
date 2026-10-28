@@ -1199,6 +1199,7 @@ export enum SyncRequestType {
   SharedSpaceAssetsV1 = 'SharedSpaceAssetsV1',
   SharedSpaceAssetExifsV1 = 'SharedSpaceAssetExifsV1',
   SharedSpaceToAssetsV1 = 'SharedSpaceToAssetsV1',
+  SharedSpaceStacksV1 = 'SharedSpaceStacksV1',
 
   LibrariesV1 = 'LibrariesV1',
   LibraryAssetsV1 = 'LibraryAssetsV1',
@@ -1330,6 +1331,12 @@ export enum SyncEntityType {
   SharedSpaceToAssetV1 = 'SharedSpaceToAssetV1',
   SharedSpaceToAssetDeleteV1 = 'SharedSpaceToAssetDeleteV1',
   SharedSpaceToAssetBackfillV1 = 'SharedSpaceToAssetBackfillV1',
+
+  SharedSpaceStackV1 = 'SharedSpaceStackV1',
+  SharedSpaceStackBackfillV1 = 'SharedSpaceStackBackfillV1',
+  SharedSpaceStackAlbumBackfillV1 = 'SharedSpaceStackAlbumBackfillV1',
+  SharedSpaceStackLibraryBackfillV1 = 'SharedSpaceStackLibraryBackfillV1',
+  SharedSpaceStackDeleteV1 = 'SharedSpaceStackDeleteV1',
 
   LibraryV1 = 'LibraryV1',
   LibraryDeleteV1 = 'LibraryDeleteV1',

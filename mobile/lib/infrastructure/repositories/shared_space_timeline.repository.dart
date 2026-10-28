@@ -250,13 +250,11 @@ class SharedSpaceTimelineRepository {
     // DISTINCT remote_asset.id.
     //
     // Stack collapse: we LEFT JOIN stack_entity and keep an asset when it has
-    // no stack, when it IS the stack's primary (cover), OR when the stack row
-    // is not present locally (stack_entity.id IS NULL). That last arm matters
-    // for shared spaces: stack_entity only syncs for the viewer's own and
-    // partners' stacks (there is no shared-space stack sync), yet a non-owned
-    // space asset still carries its stack_id. Without the `IS NULL` fallback
-    // such a stack would collapse against a missing primary and vanish
-    // entirely; instead we show its frames flat (as before collapse existed).
+    // no stack, when it IS the stack's primary (cover), OR when the cover is not
+    // on the device (_stackCoverMissing): a stack row not synced yet, or a cover
+    // that does not reach the viewer through a space. Without that fallback such
+    // a stack would collapse against a missing primary and vanish entirely;
+    // instead we show its frames flat (as before collapse existed).
 
     if (groupBy == GroupAssetsBy.none) {
       final countExp = _db.remoteAssetEntity.id.count(distinct: true);
@@ -302,7 +300,7 @@ class SharedSpaceTimelineRepository {
                   _db.sharedSpaceLibraryEntity.libraryId.isNotNull() |
                   _db.sharedSpaceAlbumLinkEntity.albumId.isNotNull()) &
               (_db.remoteAssetEntity.stackId.isNull() |
-                  _db.stackEntity.id.isNull() |
+                  _stackCoverMissing |
                   _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
         );
       return countQuery
@@ -353,7 +351,7 @@ class SharedSpaceTimelineRepository {
                 _db.sharedSpaceLibraryEntity.libraryId.isNotNull() |
                 _db.sharedSpaceAlbumLinkEntity.albumId.isNotNull()) &
             (_db.remoteAssetEntity.stackId.isNull() |
-                _db.stackEntity.id.isNull() |
+                _stackCoverMissing |
                 _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
       )
       ..groupBy([dateExp])
@@ -420,7 +418,7 @@ class SharedSpaceTimelineRepository {
                 _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
                 membership &
                 (_db.remoteAssetEntity.stackId.isNull() |
-                    _db.stackEntity.id.isNull() |
+                    _stackCoverMissing |
                     _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
           )
           ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
@@ -604,6 +602,16 @@ class SharedSpaceTimelineRepository {
         _getFavoriteAssets(userId, offset: offset, count: count, temporalScope: temporalScope),
     origin: TimelineOrigin.favorite,
   );
+
+  /// True when the cover of the joined stack_entity row is not on the device, or there is no row (#1243).
+  Expression<bool> get _stackCoverMissing {
+    final cover = _db.alias(_db.remoteAssetEntity, 'stack_cover');
+    return notExistsQuery(
+      _db.selectOnly(cover)
+        ..addColumns([cover.id])
+        ..where(cover.id.equalsExp(_db.stackEntity.primaryAssetId)),
+    );
+  }
 
   /// LEFT OUTER JOINs + WHERE term for the Favorites scope (see [favorite]). Real joins rather than
   /// isInQuery so Drift's readsFrom tracks every table and the bucket stream stays reactive.
@@ -1442,6 +1450,7 @@ AND (
 AND (
   rae.stack_id IS NULL
   OR rae.id = se.primary_asset_id
+  OR NOT EXISTS (SELECT 1 FROM remote_asset_entity cover WHERE cover.id = se.primary_asset_id)
 )
 ''';
 }

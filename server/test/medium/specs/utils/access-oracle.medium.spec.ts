@@ -112,6 +112,31 @@ const seed = async () => {
     spaceId: space.id,
   });
 
+  // #1243: a stack whose photos are all in the space (members may read it), and one with a photo outside the space
+  // (owner only, or the stack would hand that photo to members). Their assets stay unlabeled, so only the stack
+  // labels are new.
+  const { asset: spaceStackCover } = await ctx.newAsset({ ownerId: owner.id });
+  const { asset: spaceStackOriginal } = await ctx.newAsset({ ownerId: owner.id });
+  await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceStackCover.id });
+  await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceStackOriginal.id });
+  const { stack: spaceStack } = await ctx.newStack({ ownerId: owner.id }, [spaceStackCover.id, spaceStackOriginal.id]);
+  const { asset: partialStackCover } = await ctx.newAsset({ ownerId: owner.id });
+  const { asset: partialStackPrivate } = await ctx.newAsset({ ownerId: owner.id });
+  await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: partialStackCover.id });
+  const { stack: partialSpaceStack } = await ctx.newStack({ ownerId: owner.id }, [
+    partialStackCover.id,
+    partialStackPrivate.id,
+  ]);
+  // ...and one whose photos reach the space only through its linked album.
+  const { asset: albumStackCover } = await ctx.newAsset({ ownerId: owner.id });
+  const { asset: albumStackOriginal } = await ctx.newAsset({ ownerId: owner.id });
+  await ctx.newAlbumAsset({ albumId: spaceAlbum.id, assetId: albumStackCover.id });
+  await ctx.newAlbumAsset({ albumId: spaceAlbum.id, assetId: albumStackOriginal.id });
+  const { stack: albumSpaceStack } = await ctx.newStack({ ownerId: owner.id }, [
+    albumStackCover.id,
+    albumStackOriginal.id,
+  ]);
+
   const labels = new Map<string, string>(
     Object.entries({
       owner: owner.id,
@@ -147,6 +172,9 @@ const seed = async () => {
       libraryFace,
       albumFace,
       spaceAlbumLink: spaceAlbumLink.id,
+      spaceStack: spaceStack.id,
+      partialSpaceStack: partialSpaceStack.id,
+      albumSpaceStack: albumSpaceStack.id,
     }).map(([label, id]) => [id as string, label]),
   );
 
