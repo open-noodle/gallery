@@ -37,7 +37,7 @@
 </script>
 
 <!-- The row under the photo in the face suggestion review (#1039). It needs no request: the date is on the
-     suggestion payload and the link is built from ids. The Details toggle opens suggestion-asset-details, which
+     suggestion payload and the link is built from ids. The Details toggle opens asset-context/asset-context-details, which
      the review modal places under the photo or beside it. -->
 <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="suggestion-context">
   {#if summaryDate}

@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
+import SuggestionAssetDetails from '$lib/gallery/asset-context/asset-context-details.svelte';
 import { assetFactory } from '@test-data/factories/asset-factory';
 
 vi.mock('svelte-i18n', () => ({
