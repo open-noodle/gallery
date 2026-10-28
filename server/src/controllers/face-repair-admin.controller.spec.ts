@@ -1056,7 +1056,7 @@ describe(FaceRepairAdminController.name, () => {
   });
 
   describe('POST /admin/face-repair/person/:personId/dissolve', () => {
-    const body = { scope: 'exif', outcome: 'delete-faces', redetect: true, expectedFaceCount: 1 };
+    const body = { scope: 'exif', expectedFaceCount: 1 };
 
     it('requires authentication', async () => {
       // Matches this file's other "should be an authenticated route" checks: the AuthService mock is
@@ -1085,11 +1085,27 @@ describe(FaceRepairAdminController.name, () => {
       expect(status).toBe(400);
     });
 
+    it('passes the caller to the service with only scope and expectedFaceCount', async () => {
+      const personId = factory.uuid();
+      const adminUserId = factory.uuid();
+      ctx.authenticate.mockResolvedValue({ user: { id: adminUserId } } as never);
+      dissolveService.apply.mockResolvedValue({} as never);
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/admin/face-repair/person/${personId}/dissolve`)
+        .send(body);
+      expect(status).toBe(201);
+      expect(dissolveService.apply).toHaveBeenCalledWith(
+        expect.objectContaining({ user: { id: adminUserId } }),
+        personId,
+        body,
+      );
+    });
+
     it('rejects a missing expectedFaceCount', async () => {
-      const { scope, outcome, redetect } = body;
+      const { scope } = body;
       const { status } = await request(ctx.getHttpServer())
         .post(`/admin/face-repair/person/${factory.uuid()}/dissolve`)
-        .send({ scope, outcome, redetect });
+        .send({ scope });
       expect(status).toBe(400);
     });
   });

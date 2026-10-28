@@ -1,7 +1,17 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DissolveRequest, DissolveResponse, DissolveWarning, PeopleHealthQuery } from 'src/gallery/dtos/face-dissolve.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { JobName, QueueName } from 'src/enum.js';
-import { DissolveCounts, PersonHealthRow } from 'src/gallery/repositories/face-dissolve.repository.js';
+import {
+  DissolveRequest,
+  DissolveResponse,
+  DissolveWarning,
+  PeopleHealthQuery,
+} from 'src/gallery/dtos/face-dissolve.dto.js';
+import {
+  DissolveCounts,
+  DissolveWriteResult,
+  PersonHealthRow,
+} from 'src/gallery/repositories/face-dissolve.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 
 @Injectable()
@@ -23,119 +33,121 @@ export class FaceDissolveService extends BaseService {
 
   async preview(personId: string, dto: DissolveRequest): Promise<DissolveResponse> {
     const person = await this.requirePerson(personId);
-    this.validate(dto);
-
     const counts = await this.faceDissolveRepository.getCounts(personId, dto.scope);
     return {
       personId: person.personGroupId,
       counts,
       expectedFaceCount: counts.faces,
-      warnings: await this.buildWarnings(dto, counts),
+      warnings: await this.buildWarnings(counts),
     };
   }
 
-  async apply(personId: string, dto: DissolveRequest): Promise<DissolveResponse> {
+  async apply(auth: AuthDto, personId: string, dto: DissolveRequest): Promise<DissolveResponse> {
     const person = await this.requirePerson(personId);
-    this.validate(dto);
-
-    // L13 — mirrors triggerScan's refusal at face-repair.service.ts:573.
-    if (await this.jobRepository.isActive(QueueName.FacialRecognition)) {
-      throw new ConflictException('Refusing to dissolve while facial recognition is active');
-    }
+    await this.refuseWhileRecognitionRuns();
 
     const counts = await this.faceDissolveRepository.getCounts(personId, dto.scope);
     if (counts.faces !== dto.expectedFaceCount) {
       throw new ConflictException('The faces changed since the preview. Review the preview again.');
     }
 
-    const result = await this.faceDissolveRepository.dissolve({
-      personGroupId: personId,
-      scope: dto.scope,
-      outcome: dto.outcome,
-      redetect: dto.redetect,
+    // One transaction: the write, and the pending suggestions of the faces it hid. A hidden face's stale suggestion
+    // must clear iff the hide commits, the same pairing the console's "Not a face" detach uses.
+    const result: DissolveWriteResult = await this.databaseRepository.transaction(async (trx) => {
+      const written = await this.faceDissolveRepository.dissolve(
+        {
+          personGroupId: personId,
+          scope: dto.scope,
+          ownerId: person.ownerId,
+          personName: person.name,
+          actorId: auth.user.id,
+        },
+        trx,
+      );
+      await this.facePersonVerdictRepository.drainPendingForFaces(written.hiddenFaceIds, trx);
+      return written;
     });
 
     if (result.deletedThumbnailPath) {
       await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [result.deletedThumbnailPath] } });
     }
 
-    // person.faceAssetId was SET NULL by the cascade; only a surviving person needs a new thumbnail.
-    if (dto.outcome !== 'delete-faces-and-person') {
-      await this.jobRepository.queue({
-        name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: person.ownerId, personGroupId: personId },
-      });
+    // A surviving person must never keep a hidden or deleted face as its thumbnail.
+    if (!result.personRemoved) {
+      const repointed = await this.faceRepairRepository.reconcileRepresentativeFaces([personId]);
+      if (repointed.length > 0) {
+        await this.jobRepository.queueAll(
+          repointed.map(({ ownerId, personGroupId }) => ({
+            name: JobName.PersonGenerateThumbnail as const,
+            data: { ownerId, personGroupId },
+          })),
+        );
+      }
     }
 
-    // The repair. NOT PersonCleanup (L2), NOT deleteUnreferencedIdentities (L5),
-    // NOT deleteAllOrphanedPersons (L1) — all three are unscoped.
-    if (dto.redetect) {
+    // The repair for deleted imported faces. Detected faces are hidden and never re-scanned. NOT PersonCleanup (L2),
+    // NOT deleteUnreferencedIdentities (L5), NOT deleteAllOrphanedPersons (L1): all three are unscoped.
+    if (result.assetsCleared > 0) {
       await this.jobRepository.queue({ name: JobName.AssetDetectFacesQueueAll, data: { force: false } });
     }
 
     this.logger.log(
-      `Dissolved person ${personId} (${person.name}): ${result.faces} faces ` +
-        `(${result.handDrawnUnassigned} hand-drawn kept and unassigned), ` +
-        `${result.assetsCleared} assets requeued, outcome=${dto.outcome}, scope=${dto.scope}`,
+      `Dissolved person ${personId} (${person.name}), scope=${dto.scope}: ${result.hiddenFaceIds.length} hidden, ` +
+        `${result.deleted} deleted, ${result.unassigned} unassigned, ${result.assetsCleared} photos re-queued, ` +
+        `person ${result.personRemoved ? 'removed' : 'kept'}`,
     );
 
-    return { personId, counts, expectedFaceCount: counts.faces, warnings: await this.buildWarnings(dto, counts) };
+    return {
+      personId,
+      counts,
+      expectedFaceCount: counts.faces,
+      warnings: await this.buildWarnings(counts),
+      ...(result.dissolveId && { dissolveId: result.dissolveId }),
+    };
   }
 
   private async requirePerson(personId: string) {
-    // `personId` here is the person's public id, which upstream's person_group repointing made
-    // `person.personGroupId`; getByGroupIdOnly is the fork's accessor for call sites that only carry it.
     const person = await this.personRepository.getByGroupIdOnly(personId);
     if (!person) {
       throw new NotFoundException('Person not found');
     }
-    // Pet re-detection is a separate pipeline; clearing facesRecognizedAt would not repair a pet (L6).
+    // Pet re-detection is a separate pipeline (L6).
     if (person.type === 'pet') {
       throw new BadRequestException('Pets cannot be dissolved');
     }
     return person;
   }
 
-  private validate(dto: DissolveRequest) {
-    if (dto.outcome !== 'unassign' && !dto.redetect) {
-      throw new BadRequestException('Deleting faces always re-detects the affected photos');
+  /** A dissolve or restore under a running recognition or detection pass would race it (L13). */
+  protected async refuseWhileRecognitionRuns() {
+    for (const queue of [QueueName.FacialRecognition, QueueName.FaceDetection]) {
+      if (await this.jobRepository.isActive(queue)) {
+        throw new ConflictException('Refusing while face detection or recognition is running');
+      }
     }
   }
 
-  private async buildWarnings(dto: DissolveRequest, counts: DissolveCounts): Promise<DissolveWarning[]> {
+  private async buildWarnings(counts: DissolveCounts): Promise<DissolveWarning[]> {
     const warnings: DissolveWarning[] = [];
-    const strandable = counts.exif + counts.mlWithoutEmbedding;
 
-    if (dto.outcome === 'unassign' && strandable > 0) {
-      warnings.push({ code: 'strands-faces', count: strandable });
+    if (counts.keep > 0) {
+      warnings.push({ code: 'hand-drawn-kept', count: counts.keep });
     }
-    if (dto.outcome === 'unassign' && counts.mlWithEmbedding > 0) {
-      warnings.push({ code: 'recluster-similar', count: counts.mlWithEmbedding });
-    }
-    // "Unassign only" reads as the least destructive choice, but it leaves the person faceless and the
-    // nightly PersonCleanup deletes a faceless person on its own schedule. We never queue that job (L2) —
-    // which is exactly why the admin must be told it will still happen.
-    if (dto.outcome === 'unassign' && counts.faces > 0 && counts.remainingLiveFaces === 0) {
-      warnings.push({ code: 'person-will-be-cleaned-up', count: 0 });
-    }
-    // A dissolve never deletes a box someone drew by hand (handDrawnFacePredicate): a delete outcome keeps
-    // and unassigns those instead. The admin chose "delete", so the dialog must say which faces survive it.
-    if (dto.outcome !== 'unassign' && counts.handDrawn > 0) {
-      warnings.push({ code: 'hand-drawn-kept', count: counts.handDrawn });
-    }
-    if (dto.redetect && counts.notRedetectable > 0) {
+    if (counts.notRedetectable > 0) {
       warnings.push({ code: 'not-redetectable', count: counts.notRedetectable });
     }
-    if (dto.redetect && counts.sharedAssets > 0) {
+    if (counts.sharedAssets > 0) {
       warnings.push({ code: 'shared-assets', count: counts.sharedAssets });
     }
-    // EXIF faces prove the setting was on when the files were imported, NOT that it is on now. The copy is a
-    // factual claim about the current setting, so read the current setting: telling an admin who already
-    // turned it off that it is on, on the panel guarding an irreversible delete, is a lie in ten languages.
-    if (counts.exif > 0) {
+    if (counts.spacePersonsKept > 0) {
+      warnings.push({ code: 'space-persons-kept', count: counts.spacePersonsKept });
+    }
+    // Imported faces prove the setting was on when the files were imported, NOT that it is on now: read the
+    // current setting before telling the admin a re-import will bring them back.
+    if (counts.delete > 0) {
       const { metadata } = await this.getConfig({ withCache: true });
       if (metadata.faces.import) {
-        warnings.push({ code: 'metadata-import-on', count: counts.exif });
+        warnings.push({ code: 'metadata-import-on', count: counts.delete });
       }
     }
     return warnings;

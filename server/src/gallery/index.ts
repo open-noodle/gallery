@@ -10,6 +10,7 @@ import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.co
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -21,6 +22,7 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -33,7 +35,6 @@ import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
-import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -44,7 +45,6 @@ import { StorageMigrationRepository } from 'src/repositories/storage-migration.r
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { AppMetricsService } from 'src/services/app-metrics.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
-import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
 import { LibraryManifestService } from 'src/services/library-manifest.service.js';

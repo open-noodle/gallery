@@ -1,15 +1,15 @@
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SourceType } from 'src/enum.js';
-import { DB } from 'src/schema/index.js';
 import {
+  DissolveScope,
   deleteFacePredicate,
   dissolveFacePredicate,
-  DissolveScope,
   dissolveScopePredicate,
   hideFacePredicate,
   keepFacePredicate,
 } from 'src/gallery/utils/face-dissolve.js';
+import { DB } from 'src/schema/index.js';
 import { seedAsset, seedFace, seedPerson, seedUser } from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -65,16 +65,16 @@ describe('dissolveScopePredicate', () => {
   });
 });
 
-describe('treatment predicates', () => {
-  const ids = (personGroupId: string, treatment?: typeof keepFacePredicate) =>
-    db
-      .selectFrom('asset_face')
-      .select('asset_face.id')
-      .where((eb) => dissolveFacePredicate(eb, personGroupId, DissolveScope.All))
-      .$if(!!treatment, (qb) => qb.where((eb) => treatment!(eb)))
-      .execute()
-      .then((rows) => rows.map((r) => r.id).sort());
+const ids = (personGroupId: string, treatment?: typeof keepFacePredicate) =>
+  db
+    .selectFrom('asset_face')
+    .select('asset_face.id')
+    .where((eb) => dissolveFacePredicate(eb, personGroupId, DissolveScope.All))
+    .$if(!!treatment, (qb) => qb.where((eb) => treatment!(eb)))
+    .execute()
+    .then((rows) => rows.map((r) => r.id).sort());
 
+describe('treatment predicates', () => {
   it('assigns every in-scope face exactly one treatment', async () => {
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });

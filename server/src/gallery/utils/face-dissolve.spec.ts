@@ -9,8 +9,8 @@ import {
   SqlBool,
 } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import { DB } from 'src/schema/index.js';
 import { deleteFacePredicate, handDrawnFacePredicate, hideFacePredicate } from 'src/gallery/utils/face-dissolve.js';
+import { DB } from 'src/schema/index.js';
 
 // Offline Kysely — compiles SQL without executing it. The medium specs prove the behaviour against a real
 // database; this pins the shape of the rule so a refactor cannot quietly drop the hand-drawn exclusion.

@@ -654,24 +654,34 @@ export type FaceRepairPersonMetadataResponseDto = {
 };
 export type DissolveRequestDto = {
     expectedFaceCount: number;
-    outcome: DissolveOutcome;
-    redetect: boolean;
     scope: DissolveScope;
 };
 export type DissolveResponseDto = {
     counts: {
         assets: number;
-        exif: number;
+        /** Imported metadata faces that will be deleted, their photos re-scanned */
+        "delete": number;
+        /** Every in-scope face; the apply must be sent this as expectedFaceCount */
         faces: number;
-        /** In-scope hand-drawn faces; a delete outcome unassigns these instead */
-        handDrawn: number;
-        mlWithEmbedding: number;
-        mlWithoutEmbedding: number;
+        /** Detected faces that will be hidden, and can be restored */
+        hide: number;
+        /** Hand-drawn or manual faces that will be unassigned and kept on the photo */
+        keep: number;
         notRedetectable: number;
-        remainingLiveFaces: number;
+        personRemoved: boolean;
+        /** Faces of the person outside the selection */
+        remainingFaces: number;
+        /** Photos re-scanned: those of the deleted faces */
+        rescanAssets: number;
         sharedAssets: number;
         softDeleted: number;
+        /** Space persons that also hold other photos and will remain */
+        spacePersonsKept: number;
+        spacePersonsRemoved: number;
+        spacesKept: number;
     };
+    /** The restore record, set by an apply that touched any face */
+    dissolveId?: string;
     expectedFaceCount: number;
     personId: string;
     warnings: {
@@ -11698,11 +11708,6 @@ export enum ReleaseChannel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
-}
-export enum DissolveOutcome {
-    Unassign = "unassign",
-    DeleteFaces = "delete-faces",
-    DeleteFacesAndPerson = "delete-faces-and-person"
 }
 export enum DissolveScope {
     All = "all",

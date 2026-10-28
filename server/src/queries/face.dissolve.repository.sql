@@ -11,24 +11,41 @@ where
     from
       "asset_face"
     where
-      "asset_face"."personGroupId" = $2
-      and not (
-        exists (
-          select
-            1 as "one"
-          from
-            "pet_search"
-          where
-            "pet_search"."faceId" = "asset_face"."id"
+      (
+        (
+          "asset_face"."personGroupId" = $2
+          and not (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+            )
+          )
         )
-        or exists (
-          select
-            1 as "one"
-          from
-            "person"
-            inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
-          where
-            "person"."personGroupId" = "asset_face"."personGroupId"
+        and (
+          "asset_face"."sourceType" = $3
+          and not (
+            exists (
+              select
+              from
+                "asset_face_creator"
+              where
+                "asset_face_creator"."assetFaceId" = "asset_face"."id"
+            )
+            or "asset_face"."sourceType" = $4
+          )
         )
       )
   )
@@ -38,56 +55,59 @@ select
   count(*) as "faces",
   count(*) filter (
     where
-      "asset_face"."sourceType" = $1
-  ) as "exif",
-  count(*) filter (
-    where
-      "asset_face"."deletedAt" is not null
-  ) as "softDeleted",
-  count(*) filter (
-    where
-      exists (
-        select
-        from
-          "asset_face_creator"
-        where
-          "asset_face_creator"."assetFaceId" = "asset_face"."id"
-      )
-  ) as "handDrawn",
-  count(*) filter (
-    where
       (
-        "asset_face"."sourceType" = $2
-        and exists (
-          select
-            1 as "one"
-          from
-            "face_search"
-          where
-            "face_search"."faceId" = "asset_face"."id"
+        "asset_face"."sourceType" = $1
+        and not (
+          exists (
+            select
+            from
+              "asset_face_creator"
+            where
+              "asset_face_creator"."assetFaceId" = "asset_face"."id"
+          )
+          or "asset_face"."sourceType" = $2
         )
       )
-  ) as "mlWithEmbedding",
+  ) as "hide",
   count(*) filter (
     where
       (
         "asset_face"."sourceType" = $3
-        and not exists (
-          select
-            1 as "one"
-          from
-            "face_search"
-          where
-            "face_search"."faceId" = "asset_face"."id"
+        and not (
+          exists (
+            select
+            from
+              "asset_face_creator"
+            where
+              "asset_face_creator"."assetFaceId" = "asset_face"."id"
+          )
+          or "asset_face"."sourceType" = $4
         )
       )
-  ) as "mlWithoutEmbedding",
+  ) as "delete",
+  count(*) filter (
+    where
+      (
+        exists (
+          select
+          from
+            "asset_face_creator"
+          where
+            "asset_face_creator"."assetFaceId" = "asset_face"."id"
+        )
+        or "asset_face"."sourceType" = $5
+      )
+  ) as "keep",
+  count(*) filter (
+    where
+      "asset_face"."deletedAt" is not null
+  ) as "softDeleted",
   count(distinct "asset_face"."assetId") as "assets"
 from
   "asset_face"
 where
   (
-    "asset_face"."personGroupId" = $4
+    "asset_face"."personGroupId" = $6
     and not (
       exists (
         select
@@ -120,24 +140,88 @@ where
       "asset_face"
     where
       (
-        "asset_face"."personGroupId" = $1
-        and not (
-          exists (
-            select
-              1 as "one"
-            from
-              "pet_search"
-            where
-              "pet_search"."faceId" = "asset_face"."id"
+        (
+          "asset_face"."personGroupId" = $1
+          and not (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+            )
           )
-          or exists (
-            select
-              1 as "one"
-            from
-              "person"
-              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
-            where
-              "person"."personGroupId" = "asset_face"."personGroupId"
+        )
+        and (
+          "asset_face"."sourceType" = $2
+          and not (
+            exists (
+              select
+              from
+                "asset_face_creator"
+              where
+                "asset_face_creator"."assetFaceId" = "asset_face"."id"
+            )
+            or "asset_face"."sourceType" = $3
+          )
+        )
+      )
+  )
+select
+  count(*) as "count"
+from
+  "asset"
+where
+  "asset"."id" in (
+    select distinct
+      "asset_face"."assetId"
+    from
+      "asset_face"
+    where
+      (
+        (
+          "asset_face"."personGroupId" = $1
+          and not (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+            )
+          )
+        )
+        and (
+          "asset_face"."sourceType" = $2
+          and not (
+            exists (
+              select
+              from
+                "asset_face_creator"
+              where
+                "asset_face_creator"."assetFaceId" = "asset_face"."id"
+            )
+            or "asset_face"."sourceType" = $3
           )
         )
       )
@@ -150,7 +234,7 @@ where
     where
       "other"."assetId" = "asset"."id"
       and "other"."personGroupId" is not null
-      and "other"."personGroupId" != $2
+      and "other"."personGroupId" != $4
       and "other"."deletedAt" is null
       and not (
         exists (
@@ -183,30 +267,45 @@ where
       "asset_face"
     where
       (
-        "asset_face"."personGroupId" = $1
-        and not (
-          exists (
-            select
-              1 as "one"
-            from
-              "pet_search"
-            where
-              "pet_search"."faceId" = "asset_face"."id"
+        (
+          "asset_face"."personGroupId" = $1
+          and not (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+            )
           )
-          or exists (
-            select
-              1 as "one"
-            from
-              "person"
-              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
-            where
-              "person"."personGroupId" = "asset_face"."personGroupId"
+        )
+        and (
+          "asset_face"."sourceType" = $2
+          and not (
+            exists (
+              select
+              from
+                "asset_face_creator"
+              where
+                "asset_face_creator"."assetFaceId" = "asset_face"."id"
+            )
+            or "asset_face"."sourceType" = $3
           )
         )
       )
   )
   and (
-    "asset"."visibility" = $2
+    "asset"."visibility" = $4
     or "asset"."deletedAt" is not null
     or not exists (
       select
@@ -215,7 +314,7 @@ where
         "asset_file"
       where
         "asset_file"."assetId" = "asset"."id"
-        and "asset_file"."type" = $3
+        and "asset_file"."type" = $5
     )
   )
 select
@@ -224,8 +323,6 @@ from
   "asset_face"
 where
   "asset_face"."personGroupId" = $1
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
   and not not (
     exists (
       select
@@ -244,6 +341,138 @@ where
       where
         "person"."personGroupId" = "asset_face"."personGroupId"
     )
+  )
+select
+  "shared_space_person"."spaceId",
+  exists (
+    select
+      1 as "one"
+    from
+      "shared_space_person_face" as "link"
+    where
+      "link"."personId" = "shared_space_person"."id"
+      and "link"."assetFaceId" not in (
+        select
+          "asset_face"."id"
+        from
+          "asset_face"
+        where
+          (
+            (
+              "asset_face"."personGroupId" = $1
+              and not (
+                exists (
+                  select
+                    1 as "one"
+                  from
+                    "pet_search"
+                  where
+                    "pet_search"."faceId" = "asset_face"."id"
+                )
+                or exists (
+                  select
+                    1 as "one"
+                  from
+                    "person"
+                    inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+                  where
+                    "person"."personGroupId" = "asset_face"."personGroupId"
+                )
+              )
+            )
+            and (
+              (
+                "asset_face"."sourceType" = $2
+                and not (
+                  exists (
+                    select
+                    from
+                      "asset_face_creator"
+                    where
+                      "asset_face_creator"."assetFaceId" = "asset_face"."id"
+                  )
+                  or "asset_face"."sourceType" = $3
+                )
+              )
+              or (
+                "asset_face"."sourceType" = $4
+                and not (
+                  exists (
+                    select
+                    from
+                      "asset_face_creator"
+                    where
+                      "asset_face_creator"."assetFaceId" = "asset_face"."id"
+                  )
+                  or "asset_face"."sourceType" = $5
+                )
+              )
+            )
+          )
+      )
+  ) as "kept"
+from
+  "shared_space_person"
+where
+  "shared_space_person"."id" in (
+    select
+      "shared_space_person_face"."personId"
+    from
+      "shared_space_person_face"
+      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+    where
+      (
+        (
+          "asset_face"."personGroupId" = $6
+          and not (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+            )
+          )
+        )
+        and (
+          (
+            "asset_face"."sourceType" = $7
+            and not (
+              exists (
+                select
+                from
+                  "asset_face_creator"
+                where
+                  "asset_face_creator"."assetFaceId" = "asset_face"."id"
+              )
+              or "asset_face"."sourceType" = $8
+            )
+          )
+          or (
+            "asset_face"."sourceType" = $9
+            and not (
+              exists (
+                select
+                from
+                  "asset_face_creator"
+                where
+                  "asset_face_creator"."assetFaceId" = "asset_face"."id"
+              )
+              or "asset_face"."sourceType" = $10
+            )
+          )
+        )
+      )
   )
 
 -- FaceDissolveRepository.getPeopleHealth

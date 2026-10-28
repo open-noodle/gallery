@@ -1,21 +1,18 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { JobName } from 'src/enum.js';
+import { JobName, QueueName } from 'src/enum.js';
+import { DissolveCounts, DissolveWriteResult } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
+import { factory } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
-const dto = (over: Record<string, unknown> = {}) => ({
-  scope: DissolveScope.Exif,
-  outcome: 'delete-faces' as const,
-  redetect: true,
-  expectedFaceCount: 10,
-  ...over,
-});
+const dto = (over: Record<string, unknown> = {}) => ({ scope: DissolveScope.All, expectedFaceCount: 10, ...over });
 
 describe(FaceDissolveService.name, () => {
   let sut: FaceDissolveService;
   let mocks: ServiceMocks;
+  const auth = factory.auth();
 
   // `personGroupId` is the person's public id since upstream repointed asset_face at person_group
   // and dropped person.id.
@@ -26,20 +23,38 @@ describe(FaceDissolveService.name, () => {
     name: 'Target',
     thumbnailPath: '/t.jpg',
   };
-  const counts = {
+  // Every warning input is zero by default, so each warning test switches on exactly the one it is about.
+  const counts: DissolveCounts = {
     faces: 10,
-    exif: 10,
-    mlWithEmbedding: 0,
-    mlWithoutEmbedding: 0,
+    hide: 10,
+    delete: 0,
+    keep: 0,
     softDeleted: 0,
     assets: 8,
-    sharedAssets: 3,
-    notRedetectable: 1,
-    // Non-zero by default: the "this person will be cleaned up anyway" warning must NOT fire unless a test
-    // explicitly says the dissolve leaves the person faceless.
-    remainingLiveFaces: 4,
-    // Zero by default: the "hand-drawn faces will be kept" warning must only fire when a test seeds them.
-    handDrawn: 0,
+    rescanAssets: 0,
+    sharedAssets: 0,
+    notRedetectable: 0,
+    remainingFaces: 0,
+    personRemoved: true,
+    spacePersonsRemoved: 0,
+    spacePersonsKept: 0,
+    spacesKept: 0,
+  };
+  const written: DissolveWriteResult = {
+    dissolveId: 'dissolve-1',
+    hiddenFaceIds: ['face-1', 'face-2'],
+    deleted: 0,
+    unassigned: 0,
+    assetsCleared: 0,
+    personRemoved: true,
+    deletedThumbnailPath: '/t.jpg',
+    orphanedSpacePersonIds: [],
+  };
+
+  const warningCodes = async (over: Partial<DissolveCounts>) => {
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, ...over });
+    const { warnings } = await sut.preview('person-1', dto());
+    return warnings.map((warning) => warning.code);
   };
 
   beforeEach(() => {
@@ -48,190 +63,127 @@ describe(FaceDissolveService.name, () => {
     // The metadata-import warning asserts the CURRENT setting, so every warning test has to say what it is.
     mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
     mocks.faceDissolve.getCounts.mockResolvedValue(counts);
-    mocks.faceDissolve.dissolve.mockResolvedValue({
-      faces: 10,
-      handDrawnUnassigned: 0,
-      assetsCleared: 8,
-      orphanedSpacePersonIds: [],
-      deletedThumbnailPath: '/t.jpg',
-    });
+    mocks.faceDissolve.dissolve.mockResolvedValue(written);
+    mocks.facePersonVerdict.drainPendingForFaces.mockResolvedValue(0);
+    mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
     mocks.job.isActive.mockResolvedValue(false);
   });
 
   it('rejects a pet person', async () => {
     mocks.person.getByGroupIdOnly.mockResolvedValue({ ...person, type: 'pet' } as never);
-    await expect(sut.apply('person-1', dto())).rejects.toBeInstanceOf(BadRequestException);
+    await expect(sut.apply(auth, 'person-1', dto())).rejects.toBeInstanceOf(BadRequestException);
     expect(mocks.faceDissolve.dissolve).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown person', async () => {
     mocks.person.getByGroupIdOnly.mockResolvedValue(void 0 as never);
-    await expect(sut.apply('nope', dto())).rejects.toBeInstanceOf(NotFoundException);
+    await expect(sut.apply(auth, 'nope', dto())).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('refuses while facial recognition is running', async () => {
-    mocks.job.isActive.mockResolvedValue(true);
-    await expect(sut.apply('person-1', dto())).rejects.toBeInstanceOf(ConflictException);
+  it.each([QueueName.FacialRecognition, QueueName.FaceDetection])('refuses while %s is running', async (queue) => {
+    mocks.job.isActive.mockImplementation((name) => Promise.resolve(name === queue));
+    await expect(sut.apply(auth, 'person-1', dto())).rejects.toBeInstanceOf(ConflictException);
     expect(mocks.faceDissolve.dissolve).not.toHaveBeenCalled();
   });
 
   it('refuses when the face count drifted since the preview', async () => {
-    await expect(sut.apply('person-1', dto({ expectedFaceCount: 9 }))).rejects.toBeInstanceOf(ConflictException);
+    await expect(sut.apply(auth, 'person-1', dto({ expectedFaceCount: 9 }))).rejects.toBeInstanceOf(ConflictException);
     expect(mocks.faceDissolve.dissolve).not.toHaveBeenCalled();
   });
 
-  it('rejects redetect:false on a delete outcome rather than silently overriding it', async () => {
-    await expect(sut.apply('person-1', dto({ redetect: false }))).rejects.toBeInstanceOf(BadRequestException);
+  it('passes the caller as the actor and the person as the record owner', async () => {
+    await sut.apply(auth, 'person-1', dto());
+    expect(mocks.faceDissolve.dissolve).toHaveBeenCalledWith(
+      {
+        personGroupId: 'person-1',
+        scope: DissolveScope.All,
+        ownerId: 'owner-1',
+        personName: 'Target',
+        actorId: auth.user.id,
+      },
+      expect.anything(),
+    );
   });
 
-  it('queues re-detection and the thumbnail delete, and never the unscoped cleanups', async () => {
-    await sut.apply('person-1', dto({ outcome: 'delete-faces-and-person' }));
+  it('drains suggestions for the hidden faces in the same transaction', async () => {
+    await sut.apply(auth, 'person-1', dto());
+    expect(mocks.database.transaction).toHaveBeenCalledTimes(1);
+    const trx = mocks.faceDissolve.dissolve.mock.calls[0][1];
+    expect(mocks.facePersonVerdict.drainPendingForFaces).toHaveBeenCalledWith(['face-1', 'face-2'], trx);
+  });
 
-    expect(mocks.job.queue).toHaveBeenCalledWith({
-      name: JobName.AssetDetectFacesQueueAll,
-      data: { force: false },
-    });
+  it('queues a re-scan only when imported faces were deleted', async () => {
+    await sut.apply(auth, 'person-1', dto());
+    expect(mocks.job.queue).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+    );
+
+    mocks.faceDissolve.dissolve.mockResolvedValue({ ...written, deleted: 3, assetsCleared: 2 });
+    await sut.apply(auth, 'person-1', dto());
+    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetDetectFacesQueueAll, data: { force: false } });
+  });
+
+  it('deletes the thumbnail and regenerates nothing when the person was removed', async () => {
+    await sut.apply(auth, 'person-1', dto());
     expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FileDelete, data: { files: ['/t.jpg'] } });
-
-    const queued = mocks.job.queue.mock.calls.map(([job]) => job.name);
-    expect(queued).not.toContain(JobName.PersonCleanup);
-    expect(mocks.faceIdentity.deleteUnreferencedIdentities).not.toHaveBeenCalled();
-    expect(mocks.sharedSpace.deleteAllOrphanedPersons).not.toHaveBeenCalled();
+    expect(mocks.faceRepair.reconcileRepresentativeFaces).not.toHaveBeenCalled();
+    expect(mocks.job.queueAll).not.toHaveBeenCalled();
   });
 
-  it('regenerates the thumbnail only when the person survives', async () => {
-    await sut.apply('person-1', dto());
-    expect(mocks.job.queue).toHaveBeenCalledWith({
-      name: JobName.PersonGenerateThumbnail,
-      data: { ownerId: 'owner-1', personGroupId: 'person-1' },
-    });
+  it('repoints and regenerates the thumbnail of a surviving person', async () => {
+    mocks.faceDissolve.dissolve.mockResolvedValue({ ...written, personRemoved: false, deletedThumbnailPath: null });
+    mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([
+      { personGroupId: 'person-1', ownerId: 'owner-1' },
+    ]);
+
+    await sut.apply(auth, 'person-1', dto());
+
+    expect(mocks.faceRepair.reconcileRepresentativeFaces).toHaveBeenCalledWith(['person-1']);
+    expect(mocks.job.queueAll).toHaveBeenCalledWith([
+      { name: JobName.PersonGenerateThumbnail, data: { ownerId: 'owner-1', personGroupId: 'person-1' } },
+    ]);
+    expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FileDelete }));
   });
 
-  it('does not regenerate the thumbnail when the person is deleted', async () => {
-    await sut.apply('person-1', dto({ outcome: 'delete-faces-and-person' }));
-    const queued = mocks.job.queue.mock.calls.map(([job]) => job.name);
-    expect(queued).not.toContain(JobName.PersonGenerateThumbnail);
+  it('never queues the unscoped cleanups', async () => {
+    mocks.faceDissolve.dissolve.mockResolvedValue({ ...written, deleted: 3, assetsCleared: 2 });
+    await sut.apply(auth, 'person-1', dto());
+    const names = mocks.job.queue.mock.calls.map(([job]) => job.name);
+    expect(names).not.toContain(JobName.PersonCleanup);
+    expect(names).not.toContain(JobName.FacialRecognitionQueueAll);
   });
 
-  it('does not queue a file delete for an empty thumbnail path', async () => {
-    mocks.faceDissolve.dissolve.mockResolvedValue({
-      faces: 10,
-      handDrawnUnassigned: 0,
-      assetsCleared: 8,
-      orphanedSpacePersonIds: [],
-      deletedThumbnailPath: null,
-    });
-    await sut.apply('person-1', dto({ outcome: 'delete-faces-and-person' }));
-    const queued = mocks.job.queue.mock.calls.map(([job]) => job.name);
-    expect(queued).not.toContain(JobName.FileDelete);
+  it('returns the restore record id', async () => {
+    await expect(sut.apply(auth, 'person-1', dto())).resolves.toMatchObject({ dissolveId: 'dissolve-1' });
   });
 
-  it('does not queue re-detection when unassigning without redetect', async () => {
-    await sut.apply('person-1', dto({ outcome: 'unassign', redetect: false }));
-    const queued = mocks.job.queue.mock.calls.map(([job]) => job.name);
-    expect(queued).not.toContain(JobName.AssetDetectFacesQueueAll);
+  it('raises no warning for a plain junk person', async () => {
+    await expect(warningCodes({})).resolves.toEqual([]);
   });
 
-  it('warns that detaching embedding-less faces strands them', async () => {
-    const result = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(result.warnings).toContainEqual({ code: 'strands-faces', count: 10 });
+  it('warns that hand-drawn and manual faces are kept', async () => {
+    await expect(warningCodes({ keep: 2 })).resolves.toEqual(['hand-drawn-kept']);
   });
 
-  it('warns that some assets can never be re-detected', async () => {
-    const result = await sut.preview('person-1', dto());
-    expect(result.warnings).toContainEqual({ code: 'not-redetectable', count: 1 });
+  it('warns about re-scanned photos shared with other people', async () => {
+    await expect(warningCodes({ delete: 1, sharedAssets: 3 })).resolves.toContain('shared-assets');
   });
 
-  it('warns that unassigning may recluster faces with an embedding into someone else', async () => {
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, mlWithEmbedding: 5 });
-
-    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(unassigning.warnings).toContainEqual({ code: 'recluster-similar', count: 5 });
-
-    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
-    expect(deleting.warnings).not.toContainEqual(expect.objectContaining({ code: 'recluster-similar' }));
-
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, mlWithEmbedding: 0 });
-    const noEmbedding = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(noEmbedding.warnings).not.toContainEqual(expect.objectContaining({ code: 'recluster-similar' }));
+  it('warns about re-scanned photos that can never be re-detected', async () => {
+    await expect(warningCodes({ delete: 1, notRedetectable: 1 })).resolves.toContain('not-redetectable');
   });
 
-  it('warns that re-detection touches assets shared by other people', async () => {
-    const redetecting = await sut.preview('person-1', dto());
-    expect(redetecting.warnings).toContainEqual({ code: 'shared-assets', count: 3 });
-
-    const notRedetecting = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(notRedetecting.warnings).not.toContainEqual(expect.objectContaining({ code: 'shared-assets' }));
-
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, sharedAssets: 0 });
-    const noSharedAssets = await sut.preview('person-1', dto());
-    expect(noSharedAssets.warnings).not.toContainEqual(expect.objectContaining({ code: 'shared-assets' }));
+  it('warns that metadata import is on when imported faces are deleted and the setting is on now', async () => {
+    await expect(warningCodes({ delete: 2 })).resolves.toEqual(['metadata-import-on']);
   });
 
-  it('warns that metadata import will keep re-adding exif faces regardless of outcome', async () => {
-    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(unassigning.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
-
-    const deletingPerson = await sut.preview('person-1', dto({ outcome: 'delete-faces-and-person' }));
-    expect(deletingPerson.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
-
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, exif: 0 });
-    const noExif = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(noExif.warnings).not.toContainEqual(expect.objectContaining({ code: 'metadata-import-on' }));
-  });
-
-  // The copy is a factual claim about the CURRENT setting ("Import faces from metadata is on."). EXIF faces
-  // only prove it was on at import time, so an admin who already turned it off must not be told otherwise.
-  it('stays silent about metadata import when the setting is actually off', async () => {
+  it('stays silent about metadata import when the setting is off now', async () => {
     mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: false } } });
-
-    const result = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(result.counts.exif).toBe(10);
-    expect(result.warnings).not.toContainEqual(expect.objectContaining({ code: 'metadata-import-on' }));
-    // The other warnings still fire, so this is the config gate and not a swallowed warning list.
-    expect(result.warnings).toContainEqual({ code: 'strands-faces', count: 10 });
+    await expect(warningCodes({ delete: 2 })).resolves.toEqual([]);
   });
 
-  // "Unassign only" is presented as the least destructive outcome, but it leaves the person faceless and the
-  // nightly PersonCleanup deletes a faceless person on its own schedule. We never queue that job (L2).
-  it('warns that an unassign leaves the person for the nightly cleanup to delete', async () => {
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 0 });
-    const emptied = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(emptied.warnings).toContainEqual({ code: 'person-will-be-cleaned-up', count: 0 });
-
-    // A person keeping out-of-scope faces survives, so the warning would be a lie.
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 2 });
-    const survives = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(survives.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
-
-    // The delete outcomes remove the faces outright; delete-faces-and-person removes the person itself, and
-    // delete-faces has its own honest story. Neither is the "you think you kept it" trap.
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 0 });
-    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
-    expect(deleting.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
-
-    // Nothing in scope means we caused nothing; the warning must not claim a consequence we did not cause.
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, faces: 0, remainingLiveFaces: 0 });
-    const noop = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false, expectedFaceCount: 0 }));
-    expect(noop.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
-  });
-
-  it('warns that a delete outcome keeps and unassigns hand-drawn faces instead of deleting them', async () => {
-    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, handDrawn: 2 });
-
-    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
-    expect(deleting.warnings).toContainEqual({ code: 'hand-drawn-kept', count: 2 });
-
-    const deletingPerson = await sut.preview('person-1', dto({ outcome: 'delete-faces-and-person' }));
-    expect(deletingPerson.warnings).toContainEqual({ code: 'hand-drawn-kept', count: 2 });
-
-    // `unassign` already does exactly this to every face, so there is nothing to call out.
-    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(unassigning.warnings).not.toContainEqual(expect.objectContaining({ code: 'hand-drawn-kept' }));
-
-    mocks.faceDissolve.getCounts.mockResolvedValue(counts);
-    const none = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
-    expect(none.warnings).not.toContainEqual(expect.objectContaining({ code: 'hand-drawn-kept' }));
+  it('warns that some Space persons remain', async () => {
+    await expect(warningCodes({ spacePersonsKept: 2, spacesKept: 1 })).resolves.toEqual(['space-persons-kept']);
   });
 
   it('preview never writes', async () => {

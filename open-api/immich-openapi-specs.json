@@ -31738,15 +31738,6 @@
         ],
         "type": "object"
       },
-      "DissolveOutcome": {
-        "description": "What a dissolve does with the faces it touches",
-        "enum": [
-          "unassign",
-          "delete-faces",
-          "delete-faces-and-person"
-        ],
-        "type": "string"
-      },
       "DissolveRequestDto": {
         "properties": {
           "expectedFaceCount": {
@@ -31754,20 +31745,12 @@
             "minimum": 0,
             "type": "integer"
           },
-          "outcome": {
-            "$ref": "#/components/schemas/DissolveOutcome"
-          },
-          "redetect": {
-            "type": "boolean"
-          },
           "scope": {
             "$ref": "#/components/schemas/DissolveScope"
           }
         },
         "required": [
           "expectedFaceCount",
-          "outcome",
-          "redetect",
           "scope"
         ],
         "type": "object"
@@ -31781,28 +31764,26 @@
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
-              "exif": {
+              "delete": {
+                "description": "Imported metadata faces that will be deleted, their photos re-scanned",
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
               "faces": {
+                "description": "Every in-scope face; the apply must be sent this as expectedFaceCount",
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
-              "handDrawn": {
-                "description": "In-scope hand-drawn faces; a delete outcome unassigns these instead",
+              "hide": {
+                "description": "Detected faces that will be hidden, and can be restored",
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
-              "mlWithEmbedding": {
-                "maximum": 9007199254740991,
-                "minimum": -9007199254740991,
-                "type": "integer"
-              },
-              "mlWithoutEmbedding": {
+              "keep": {
+                "description": "Hand-drawn or manual faces that will be unassigned and kept on the photo",
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
@@ -31812,7 +31793,17 @@
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
-              "remainingLiveFaces": {
+              "personRemoved": {
+                "type": "boolean"
+              },
+              "remainingFaces": {
+                "description": "Faces of the person outside the selection",
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "rescanAssets": {
+                "description": "Photos re-scanned: those of the deleted faces",
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
@@ -31826,21 +31817,45 @@
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
                 "type": "integer"
+              },
+              "spacePersonsKept": {
+                "description": "Space persons that also hold other photos and will remain",
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "spacePersonsRemoved": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "spacesKept": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               }
             },
             "required": [
               "faces",
-              "exif",
-              "mlWithEmbedding",
-              "mlWithoutEmbedding",
+              "hide",
+              "delete",
+              "keep",
               "softDeleted",
               "assets",
+              "rescanAssets",
               "sharedAssets",
               "notRedetectable",
-              "remainingLiveFaces",
-              "handDrawn"
+              "remainingFaces",
+              "personRemoved",
+              "spacePersonsRemoved",
+              "spacePersonsKept",
+              "spacesKept"
             ],
             "type": "object"
+          },
+          "dissolveId": {
+            "description": "The restore record, set by an apply that touched any face",
+            "type": "string"
           },
           "expectedFaceCount": {
             "maximum": 9007199254740991,
