@@ -1,6 +1,6 @@
 <script lang="ts">
-  import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
-  import { Route } from '$lib/route';
+  import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { Route } from '#lib/route.ts';
   import { createScanTriageModel, type ScanTriageModel } from './scan-triage.svelte';
   import ConfidentLane from './ConfidentLane.svelte';
   import { declineFaceRepair, getFaceRepairPersonFaces, getLatestScan, resolveFaces, triggerScan } from '@immich/sdk';
@@ -11,7 +11,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { faceCleanupBreadcrumbs, guidedCrumb } from '../breadcrumbs';
-  import { handleError } from '$lib/utils/handle-error';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import type { PageData } from './$types';
 
   // Local types for the loosely-typed SDK response
@@ -536,7 +536,7 @@
 
         <!-- The two non-actionable numbers the stat cards used to carry, demoted to quiet footnotes. -->
         {#if scan.totals}
-          {@const tot = scan.totals}
+          {const tot = $derived(scan.totals)}
           <div class="mt-4 flex flex-wrap gap-x-6 gap-y-1 px-1">
             <span class="inline-flex items-center gap-2 text-xs text-gray-400">
               <span class="size-1.5 rounded-full bg-green-500"></span>

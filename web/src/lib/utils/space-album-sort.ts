@@ -1,8 +1,8 @@
+import { AlbumSortBy, SortOrder } from '#lib/stores/preferences.store.ts';
+import { sortAlbums, sortOptionsMetadata, stringToSortOrder } from '#lib/utils/album-utils.ts';
 import type { AlbumResponseDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { orderBy } from 'lodash-es';
 import type { Translations } from 'svelte-i18n';
-import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
-import { sortAlbums, sortOptionsMetadata, stringToSortOrder } from '$lib/utils/album-utils';
 
 /**
  * Space album lists offer everything the regular album list offers, plus

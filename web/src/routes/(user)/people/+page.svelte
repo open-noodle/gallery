@@ -225,7 +225,7 @@
   };
 
   const onResetSearchBar = async () => {
-    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, page.url);
+    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, new URL(page.url.href));
   };
 
   let people = $derived(data.people.people);

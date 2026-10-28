@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 
   interface Props {
     asset: TimelineAsset;

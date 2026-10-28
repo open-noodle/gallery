@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ScopedSearchButton from './scoped-search-button.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

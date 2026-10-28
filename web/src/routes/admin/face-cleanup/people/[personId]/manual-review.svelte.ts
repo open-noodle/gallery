@@ -1,5 +1,5 @@
+import { FACE_ACTIONS } from '#lib/components/face-cleanup/face-actions.ts';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { FACE_ACTIONS } from '$lib/components/face-cleanup/face-actions';
 
 // Manual review has no scan (design specs/2026-07-23-manual-face-review-mode-design.md §6.4,
 // §6.5). Guided's review.svelte.ts model cannot serve this page without being rewritten, so this is a

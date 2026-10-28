@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ColorPicker from '$lib/components/spaces/color-picker.svelte';
-  import { celebrate } from '$lib/gallery/motion';
+  import ColorPicker from '#lib/components/spaces/color-picker.svelte';
+  import { celebrate } from '#lib/gallery/motion/index.ts';
   import { createSpace, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, Textarea } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';

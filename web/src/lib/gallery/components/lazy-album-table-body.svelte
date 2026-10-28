@@ -1,6 +1,6 @@
 <script lang="ts">
-  import AlbumTableRow from '$lib/components/album-page/AlbumsTableRow.svelte';
-  import LazyChunks from '$lib/gallery/components/lazy-chunks.svelte';
+  import AlbumTableRow from '#lib/components/album-page/AlbumsTableRow.svelte';
+  import LazyChunks from '#lib/gallery/components/lazy-chunks.svelte';
   import type { AlbumResponseDto } from '@immich/sdk';
 
   interface Props {

@@ -1,11 +1,11 @@
-import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
 import {
   ALL_FILTER_SECTIONS,
   buildFilterContext,
   type FilterPanelConfig,
   type FilterState,
-} from '$lib/components/filter-panel/filter-panel';
-import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
+} from '#lib/components/filter-panel/filter-panel.ts';
+import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
+import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
 
 /**
  * Album *detail* is scoped to a single album, and asset.repository.ts guards both `isInAlbum` and

@@ -1,10 +1,10 @@
+import PersonSuggestionBanner from '#lib/components/faces-page/person-suggestion-banner.svelte';
+import { snoozeSuggestions } from '#lib/utils/face-suggestion-snooze.ts';
 import type { PersonFaceSuggestionResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
-import { snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -12,7 +12,7 @@ vi.mock('svelte-i18n', () => ({
 
 // Snooze is keyed per signed-in user (D17) — the banner drives isSuggestionSnoozed/snoozeSuggestions through
 // a real (unmocked) face-suggestion-snooze module, which needs a stable authenticated user to key against.
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: { authenticated: true, user: { id: 'test-user' } },
 }));
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
+  import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   import { NavbarGroup } from '@immich/ui';
 
   interface Props {

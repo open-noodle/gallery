@@ -1,5 +1,5 @@
 import { AssetTypeEnum } from '@immich/sdk';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 const COLLAPSED_KEY = 'gallery-filter-collapsed';
 

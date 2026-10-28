@@ -1,4 +1,4 @@
-import { contrastRatio } from '$lib/styles/contrast';
+import { contrastRatio } from '#lib/styles/contrast.ts';
 
 describe('contrastRatio', () => {
   it('returns 21 for black on white', () => {

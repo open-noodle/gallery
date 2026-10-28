@@ -1,6 +1,6 @@
+import { applyTextFilters, buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { handleRemoveFilter } from '#lib/utils/filter-remove.ts';
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
-import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { handleRemoveFilter } from '$lib/utils/filter-remove';
 
 export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = { spaceId, withStacked: true };

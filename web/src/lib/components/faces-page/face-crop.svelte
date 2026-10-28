@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { getFaceCropTransform, type FaceBox } from '$lib/utils/people-utils';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getFaceCropTransform, type FaceBox } from '#lib/utils/people-utils.ts';
   import { AssetMediaSize } from '@immich/sdk';
 
   interface Props {

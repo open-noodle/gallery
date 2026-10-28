@@ -1,5 +1,5 @@
+import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
 import TimelineGroupingControl from './TimelineGroupingControl.svelte';
 
 describe('TimelineGroupingControl', () => {

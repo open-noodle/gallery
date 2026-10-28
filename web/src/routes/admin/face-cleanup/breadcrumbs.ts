@@ -1,6 +1,6 @@
+import { Route } from '#lib/route.ts';
 import type { BreadcrumbItem } from '@immich/ui';
 import type { Translations } from 'svelte-i18n';
-import { Route } from '$lib/route';
 
 // The single place the Face cleanup console's page hierarchy is written down. Before this module every page
 // hand-wrote its own `BreadcrumbItem[]`, and two of them drifted: `/[personId]` and `/resolutions` both

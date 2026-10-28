@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 describe('cmdk top search label', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });
