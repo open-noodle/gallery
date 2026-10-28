@@ -50,7 +50,6 @@ export class ViewRepository {
     hiddenScope?: TimelineHiddenScope,
     visibleSpaceIds?: string[],
   ) {
-
     return (
       this.db
         .selectFrom('asset')

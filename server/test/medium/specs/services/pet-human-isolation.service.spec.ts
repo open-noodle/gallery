@@ -28,14 +28,16 @@ beforeAll(async () => {
 });
 
 /**
- * A 512-d unit-ish vector on one half of the embedding space. The exact values are irrelevant here —
- * these tests never cluster, they only prove rows survive (or don't) a human-pipeline reset.
- */
+A 512-d unit-ish vector on one half of the embedding space. The exact values are irrelevant here —
+these tests never cluster, they only prove rows survive (or don't) a human-pipeline reset.
+*/
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const embedding = (axis: 'first' | 'second') => {
   const values = Array.from({ length: 512 }, (_, index) => (index < 256 === (axis === 'first') ? 1 : 0));
   return '[' + values.join(',') + ']';
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   clearConfigCache();
 
@@ -80,9 +82,10 @@ const setup = (db?: Kysely<DB>) => {
 };
 
 /**
- * A named pet: person(type=pet) + a machine-learning asset_face + its pet_search embedding + a
- * pet-typed face_identity link. This is exactly the state a human force reset used to destroy (F1).
- */
+A named pet: person(type=pet) + a machine-learning asset_face + its pet_search embedding + a
+pet-typed face_identity link. This is exactly the state a human force reset used to destroy (F1).
+*/
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const seedNamedPet = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string, name = 'Rex') => {
   const { person } = await ctx.newPerson({ ownerId, type: 'pet', species: 'dog', name });
   const { asset } = await ctx.newAsset({ ownerId });
@@ -108,6 +111,7 @@ const seedNamedPet = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: strin
 };
 
 /** A named human: person + a machine-learning asset_face. The reset is supposed to reset this. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const seedNamedHuman = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string, name = 'Alice') => {
   const { person } = await ctx.newPerson({ ownerId, name });
   const { asset } = await ctx.newAsset({ ownerId });

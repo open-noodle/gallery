@@ -1,24 +1,24 @@
 /**
- * Slice 11 — Exhaustive RBAC visibility matrix (regression lock).
- *
- * Seeds {Timeline, Archive, Hidden, Locked} × {direct, library, album(showInTimeline=true),
- * album(showInTimeline=false), soft-deleted-album} and asserts the correct visible set
- * on EVERY surface touched by the space-albums RBAC hardening work (Slices 1–10).
- *
- * KEY RULES encoded here:
- *  - download / access / sync / search: Timeline + Archive present; Hidden + Locked ABSENT.
- *  - map / memory / view / folders: Timeline ONLY (Archive excluded by design).
- *  - showInTimeline=false album: ABSENT on projection surfaces; PRESENT on grant surfaces
- *    (album-asset sync backfill, direct album download/access). EXCEPTION since #1041 (slice 9):
- *    view/folders is a personal-timeline-like surface — the SHARED flag no longer gates it for a
- *    viewer who has not personally hidden the album (albumTimelineGate: 'personal'); see SURFACE 17.
- *  - soft-deleted album: ABSENT on all surfaces.
- *  - space people-facets: a face on another member's Hidden asset must NOT surface the
- *    space-person (visibility-gated by getPersonsBySpaceId + getPersonAssetIds).
- *
- * If ANY cell is RED (unexpected failure), that is a real gap in a prior slice —
- * DO NOT weaken the assertion; report it.
- */
+Slice 11 — Exhaustive RBAC visibility matrix (regression lock).
+
+Seeds {Timeline, Archive, Hidden, Locked} × {direct, library, album(showInTimeline=true),
+album(showInTimeline=false), soft-deleted-album} and asserts the correct visible set
+on EVERY surface touched by the space-albums RBAC hardening work (Slices 1–10).
+
+KEY RULES encoded here:
+ - download / access / sync / search: Timeline + Archive present; Hidden + Locked ABSENT.
+ - map / memory / view / folders: Timeline ONLY (Archive excluded by design).
+ - showInTimeline=false album: ABSENT on projection surfaces; PRESENT on grant surfaces
+   (album-asset sync backfill, direct album download/access). EXCEPTION since #1041 (slice 9):
+   view/folders is a personal-timeline-like surface — the SHARED flag no longer gates it for a
+   viewer who has not personally hidden the album (albumTimelineGate: 'personal'); see SURFACE 17.
+ - soft-deleted album: ABSENT on all surfaces.
+ - space people-facets: a face on another member's Hidden asset must NOT surface the
+   space-person (visibility-gated by getPersonsBySpaceId + getPersonAssetIds).
+
+If ANY cell is RED (unexpected failure), that is a real gap in a prior slice —
+DO NOT weaken the assertion; report it.
+*/
 
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, TimeBucketSize } from 'src/enum.js';
@@ -115,6 +115,7 @@ const makeBucketReadyAsset = async (
   ctx: ReturnType<typeof setup>['ctx'],
   ownerId: string,
   vis: AssetVisibility,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   opts: { libraryId?: string } = {},
 ) => {
   const { asset } = await ctx.newAsset({
@@ -1198,6 +1199,7 @@ describe('matrix: timeline (getTimeBuckets)', () => {
 
     const when = new Date('2024-01-15T12:00:00.000Z');
 
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const makeTimelineReady = async (vis: AssetVisibility, opts: { albumId?: string; libraryId?: string } = {}) => {
       const { asset } = await ctx.newAsset({
         ownerId: owner.id,

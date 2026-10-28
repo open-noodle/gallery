@@ -12,25 +12,25 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { getConfig } from 'src/utils/config.js';
 
 /**
- * Backups live under `backups/` on both backends, which is `StorageFolder.Backups` — the folder upstream
- * already reserves for them under the media location. Media keys are namespaced by the other five
- * `StorageFolder` values (`upload/`, `library/`, `thumbs/`, `encoded-video/`, `profile/`), so sharing the
- * media bucket cannot collide with them, and the bucket ends up mirroring the on-disk layout. Fixing it
- * rather than configuring it is what makes that guarantee hold: there is no setting an admin can get
- * wrong, and the staging and remote keys are the same string.
- */
+Backups live under `backups/` on both backends, which is `StorageFolder.Backups` — the folder upstream
+already reserves for them under the media location. Media keys are namespaced by the other five
+`StorageFolder` values (`upload/`, `library/`, `thumbs/`, `encoded-video/`, `profile/`), so sharing the
+media bucket cannot collide with them, and the bucket ends up mirroring the on-disk layout. Fixing it
+rather than configuring it is what makes that guarantee hold: there is no setting an admin can get
+wrong, and the staging and remote keys are the same string.
+*/
 export const BACKUP_PREFIX = `${StorageFolder.Backups}/`;
 
 /**
- * Where a database backup lives.
- *
- * `staging` is always the disk backend: `pg_dump` writes there, and a backup that fails to reach S3 stays
- * there rather than being lost. It is typed as the concrete `DiskStorageBackend` (not the `StorageBackend`
- * interface) because the local-only promote needs its disk-only `rename`.
- *
- * `remote` is present only when the gate in {@link BackupStoreResolver.resolve} is satisfied. Both backends
- * take the same key, so there is one `key()` rather than one per backend.
- */
+Where a database backup lives.
+
+`staging` is always the disk backend: `pg_dump` writes there, and a backup that fails to reach S3 stays
+there rather than being lost. It is typed as the concrete `DiskStorageBackend` (not the `StorageBackend`
+interface) because the local-only promote needs its disk-only `rename`.
+
+`remote` is present only when the gate in {@link BackupStoreResolver.resolve} is satisfied. Both backends
+take the same key, so there is one `key()` rather than one per backend.
+*/
 export interface BackupStore {
   staging: DiskStorageBackend;
   remote?: { backend: StorageBackend; bucket: string };
@@ -39,11 +39,11 @@ export interface BackupStore {
 }
 
 /**
- * Cross-field rule for the `ConfigValidate` event. It cannot be a `superRefine` on the config schema: those
- * schemas feed `createZodDto` and OpenAPI generation (see src/utils/config.ts), which a refinement would not
- * survive. Without this an admin could reach a state over the API that the UI never offers, because the UI
- * hides the whole group when the storage backend is not S3.
- */
+Cross-field rule for the `ConfigValidate` event. It cannot be a `superRefine` on the config schema: those
+schemas feed `createZodDto` and OpenAPI generation (see src/utils/config.ts), which a refinement would not
+survive. Without this an admin could reach a state over the API that the UI never offers, because the UI
+hides the whole group when the storage backend is not S3.
+*/
 export const validateBackupS3Config = (
   newConfig: SystemConfig,
   oldConfig: SystemConfig,
@@ -62,13 +62,13 @@ export const validateBackupS3Config = (
 };
 
 /**
- * Resolves where the next database backup goes. `resolve()` reads the config fresh on every call, so an admin
- * edit applies without restarting the server; only the S3 client is cached, and it is rebuilt when the
- * resolved settings change.
- *
- * A provider rather than a static, so the backup service can be given a stub, and so the S3 client is owned by
- * something with a lifecycle rather than by module scope.
- */
+Resolves where the next database backup goes. `resolve()` reads the config fresh on every call, so an admin
+edit applies without restarting the server; only the S3 client is cached, and it is rebuilt when the
+resolved settings change.
+
+A provider rather than a static, so the backup service can be given a stub, and so the S3 client is owned by
+something with a lifecycle rather than by module scope.
+*/
 @Injectable()
 export class BackupStoreResolver {
   private cached?: { signature: string; backend: StorageBackend };

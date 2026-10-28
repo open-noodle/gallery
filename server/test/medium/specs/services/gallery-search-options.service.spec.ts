@@ -1,9 +1,9 @@
 /**
- * `POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1): the counting, narrowing and
- * scope SQL against a real database. The core invariant is that every total equals what the results call returns for
- * the same request, so most tests compare against the real `SearchService.searchMetadata` / `searchSmart` and
- * `TimelineService.getTimeBuckets` on the same seeded data.
- */
+`POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1): the counting, narrowing and
+scope SQL against a real database. The core invariant is that every total equals what the results call returns for
+the same request, so most tests compare against the real `SearchService.searchMetadata` / `searchSmart` and
+`TimelineService.getTimeBuckets` on the same seeded data.
+*/
 import { Kysely, sql } from 'kysely';
 import { SmartSearchDto } from 'src/dtos/search.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';

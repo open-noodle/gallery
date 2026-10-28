@@ -96,20 +96,20 @@ const order = (upstreamOrder: SyncRequestType[]): SyncRequestType[] => [
 const forkSyncRequestTypes = new Set<SyncRequestType>(GALLERY_SYNC_ORDER);
 
 /**
- * A stock Immich client aborts its whole sync on a value its generated client cannot decode,
- * so fork-only rows (rule memories) and pets reach fork-aware clients only.
- */
+A stock Immich client aborts its whole sync on a value its generated client cannot decode,
+so fork-only rows (rule memories) and pets reach fork-aware clients only.
+*/
 const isForkAwareClient = (dto: SyncStreamDto) => dto.types.some((type) => forkSyncRequestTypes.has(type));
 
 /**
- * Gallery's memory sync policy, shared by every memory stream version and by the memory photo
- * links (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md):
- * - `birthday` rows (immich-30831) reach no client: Gallery's birthday memory is a rule, and an
- *   installed Gallery app cannot decode the type;
- * - `rule` rows reach fork-aware clients only (#1013): a stock Immich app cannot decode the type
- *   and would abort its whole sync. That holds on MemoriesV2 too: a stock app at 3.3+ requests it
- *   from a Gallery server, whose 5.x version clears upstream's 3.3.0 gate.
- */
+Gallery's memory sync policy, shared by every memory stream version and by the memory photo
+links (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md):
+- `birthday` rows (immich-30831) reach no client: Gallery's birthday memory is a rule, and an
+  installed Gallery app cannot decode the type;
+- `rule` rows reach fork-aware clients only (#1013): a stock Immich app cannot decode the type
+  and would abort its whole sync. That holds on MemoriesV2 too: a stock app at 3.3+ requests it
+  from a Gallery server, whose 5.x version clears upstream's 3.3.0 gate.
+*/
 const syncedMemoryTypes = (isForkAwareClient: boolean): MemoryType[] =>
   isForkAwareClient ? [MemoryType.OnThisDay, MemoryType.Rule] : [MemoryType.OnThisDay];
 

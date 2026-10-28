@@ -45,13 +45,13 @@ export class BackendMediaServer {
   constructor(private deps: BackendMediaServerDependencies) {}
 
   /**
-   * @param options.acceptsRanges set by callers whose route forwards the client's `Range`
-   *        header, so the response may advertise `Accept-Ranges: bytes`.
-   * @param options.range the client's raw `Range` header, when the route forwards one.
-   *        The backend decides whether to honor it: disk serves ranges through express,
-   *        and S3 in redirect mode leaves them to S3 — so it only changes the S3 proxy
-   *        stream path, which previously ignored ranges entirely.
-   */
+  @param options.acceptsRanges set by callers whose route forwards the client's `Range`
+         header, so the response may advertise `Accept-Ranges: bytes`.
+  @param options.range the client's raw `Range` header, when the route forwards one.
+         The backend decides whether to honor it: disk serves ranges through express,
+         and S3 in redirect mode leaves them to S3 — so it only changes the S3 proxy
+         stream path, which previously ignored ranges entirely.
+  */
   async serveFromBackend(
     filePath: string,
     contentType: string,
@@ -111,16 +111,16 @@ export class BackendMediaServer {
   }
 
   /**
-   * For assets on S3 backends, download to a local temp file for processing by
-   * tools that require a filesystem path (ffmpeg, exiftool, sharp). Caller is
-   * responsible for catching `downloadToTemp` errors or letting them propagate.
-   *
-   * @param filePath absolute disk path OR S3 relative key (anything that might
-   *                 come from a DB column such as `asset.originalPath`).
-   * @returns { localPath, cleanup } — cleanup is a no-op for disk paths and
-   *          removes the temp file for S3-sourced paths. Declare the result with
-   *          `await using` (disposal runs cleanup), or call cleanup in a `finally` block.
-   */
+  For assets on S3 backends, download to a local temp file for processing by
+  tools that require a filesystem path (ffmpeg, exiftool, sharp). Caller is
+  responsible for catching `downloadToTemp` errors or letting them propagate.
+  
+  @param filePath absolute disk path OR S3 relative key (anything that might
+                  come from a DB column such as `asset.originalPath`).
+  @returns { localPath, cleanup } — cleanup is a no-op for disk paths and
+           removes the temp file for S3-sourced paths. Declare the result with
+           `await using` (disposal runs cleanup), or call cleanup in a `finally` block.
+  */
   async ensureLocalFile(
     filePath: string,
   ): Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable> {
@@ -130,19 +130,19 @@ export class BackendMediaServer {
   }
 
   /**
-   * Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
-   * or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
-   * does NOT download the object, so it is safe to call inside a request handler.
-   */
+  Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
+  or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
+  does NOT download the object, so it is safe to call inside a request handler.
+  */
   async getProbeInput(filePath: string): Promise<string> {
     const backend = await this.backendFor(filePath);
     return backend.getReadableUrl(filePath);
   }
 
   /**
-   * The storage backend that owns `key`, as StorageService.backendFor decides. An absolute path is read through
-   * the owning service's StorageRepository, so disk I/O goes where upstream code (and its specs) expect it.
-   */
+  The storage backend that owns `key`, as StorageService.backendFor decides. An absolute path is read through
+  the owning service's StorageRepository, so disk I/O goes where upstream code (and its specs) expect it.
+  */
   async backendFor(key: string): Promise<StorageBackend> {
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('../../services/storage.service.js');

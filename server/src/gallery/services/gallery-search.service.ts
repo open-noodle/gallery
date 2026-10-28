@@ -23,15 +23,15 @@ type SearchOptionsFilters = Omit<SearchOptionsRequestDto, 'query' | 'queryAssetI
 type ResolvedRequest = SearchOptionsQuery extends infer T ? (T extends unknown ? Omit<T, 'dimensions'> : never) : never;
 
 /**
- * `POST /search/options`: the narrowed filter options with per-option counts that the mobile search mode shows beside
- * its results (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1). Each mode resolves the request exactly as
- * its results call does, so the counts are counts of that call's own query:
- * - browse (no `query` / `queryAssetId`): `GET /timeline/buckets` — `TimelineService.timeBucketChecks` and
- *   `buildTimeBucketOptions`, step for step, with the same helpers (`getMyPartnerIds`, `getAlbumSpaceIds`,
- *   `resolveViewerScope('timeline')`). The medium tests compare every scope against the real `TimelineService`.
- * - query: `POST /search/smart` — `SearchService.resolveSmartSearch`: `resolveViewerScope('search')`, the caller plus
- *   timeline partners (none under an album scope, where album access is the boundary).
- */
+`POST /search/options`: the narrowed filter options with per-option counts that the mobile search mode shows beside
+its results (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1). Each mode resolves the request exactly as
+its results call does, so the counts are counts of that call's own query:
+- browse (no `query` / `queryAssetId`): `GET /timeline/buckets` — `TimelineService.timeBucketChecks` and
+  `buildTimeBucketOptions`, step for step, with the same helpers (`getMyPartnerIds`, `getAlbumSpaceIds`,
+  `resolveViewerScope('timeline')`). The medium tests compare every scope against the real `TimelineService`.
+- query: `POST /search/smart` — `SearchService.resolveSmartSearch`: `resolveViewerScope('search')`, the caller plus
+  timeline partners (none under an album scope, where album access is the boundary).
+*/
 @Injectable()
 export class GallerySearchService extends BaseService {
   private embeddingCache = new LRUMap<string, string>(100);
@@ -115,17 +115,17 @@ export class GallerySearchService extends BaseService {
   }
 
   /**
-   * The unfiltered state (a screen's scope with no filter: what every search opens on) is cached per user, scope and
-   * dimension. An entry is valid while the watermark of every table the options read is unchanged (a few index-only
-   * lookups; see `SmartFacetRepository.getSearchOptionsWatermark`), and an entry is the computation's promise, so the
-   * parallel per-dimension requests a client fires share one computation each.
-   *
-   * Stale while revalidate: an active library (uploads, face jobs) moves the watermark constantly, so after a change the
-   * last result is still served at once, flagged `stale: true`, while one background computation per key refreshes it.
-   * Bounds: a key recomputes at most once per `SEARCH_OPTIONS_REFRESH_INTERVAL_MS` (30 s), and a result computed more
-   * than `SEARCH_OPTIONS_MAX_STALE_MS` (10 min) ago is never served stale: the request computes it instead.
-   * In-process: each API worker keeps its own cache.
-   */
+  The unfiltered state (a screen's scope with no filter: what every search opens on) is cached per user, scope and
+  dimension. An entry is valid while the watermark of every table the options read is unchanged (a few index-only
+  lookups; see `SmartFacetRepository.getSearchOptionsWatermark`), and an entry is the computation's promise, so the
+  parallel per-dimension requests a client fires share one computation each.
+  
+  Stale while revalidate: an active library (uploads, face jobs) moves the watermark constantly, so after a change the
+  last result is still served at once, flagged `stale: true`, while one background computation per key refreshes it.
+  Bounds: a key recomputes at most once per `SEARCH_OPTIONS_REFRESH_INTERVAL_MS` (30 s), and a result computed more
+  than `SEARCH_OPTIONS_MAX_STALE_MS` (10 min) ago is never served stale: the request computes it instead.
+  In-process: each API worker keeps its own cache.
+  */
   private async fromCache(
     auth: AuthDto,
     filters: SearchOptionsFilters,

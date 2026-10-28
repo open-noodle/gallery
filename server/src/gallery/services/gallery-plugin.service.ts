@@ -8,10 +8,10 @@ const GALLERY_PLUGIN = 'gallery-core';
 @Injectable()
 export class GalleryPluginService extends BaseService {
   /**
-   * The Immich trial in the switch-back guide disables the gallery-core plugin, and nothing turns it back on: upstream's
-   * plugin import never touches `enabled`. Without this line a forgotten re-enable only shows up as
-   * "No loaded plugin found for <uuid>" on every workflow run that has a Gallery step.
-   */
+  The Immich trial in the switch-back guide disables the gallery-core plugin, and nothing turns it back on: upstream's
+  plugin import never touches `enabled`. Without this line a forgotten re-enable only shows up as
+  "No loaded plugin found for <uuid>" on every workflow run that has a Gallery step.
+  */
   @OnEvent({ name: 'AppBootstrap', priority: BootstrapEventPriority.PluginLoad, workers: [ImmichWorker.Microservices] })
   async onPluginLoad() {
     const plugin = await this.pluginRepository.getByName(GALLERY_PLUGIN);

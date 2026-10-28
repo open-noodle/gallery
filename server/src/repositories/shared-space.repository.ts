@@ -54,15 +54,15 @@ export interface TimelineHiddenScope {
 // transaction) when a promote would collide with an existing folder name at the destination.
 // `folderName` is null for the raced-23505 backstop path, which has no name to report.
 /**
- * [reason] distinguishes the two structurally different ways a promote collides, because they need
- * different advice:
- * - `sibling` — the child's name is already taken by another folder under the DESTINATION parent.
- * - `parent` — the child is named like the folder being deleted, which is still alive when the
- *   promote UPDATE runs (it is dropped a few statements later). Spec F-04 permits that name pair,
- *   so this is reachable, and telling the user to look at the destination sends them somewhere
- *   nothing is wrong.
- * - `unknown` — the raced 23505 backstop, which has no name and no idea which of the two it was.
- */
+[reason] distinguishes the two structurally different ways a promote collides, because they need
+different advice:
+- `sibling` — the child's name is already taken by another folder under the DESTINATION parent.
+- `parent` — the child is named like the folder being deleted, which is still alive when the
+  promote UPDATE runs (it is dropped a few statements later). Spec F-04 permits that name pair,
+  so this is reachable, and telling the user to look at the destination sends them somewhere
+  nothing is wrong.
+- `unknown` — the raced 23505 backstop, which has no name and no idea which of the two it was.
+*/
 class AlbumFolderPromotionConflictError extends Error {
   constructor(
     readonly folderName: string | null,
@@ -73,37 +73,37 @@ class AlbumFolderPromotionConflictError extends Error {
 }
 
 /**
- * Hard stop for the folder-tree recursive CTEs.
- *
- * The service refuses to CREATE a cycle (moveAlbumFolderChecked re-checks the ancestor chain
- * under a per-space advisory lock), but nothing stops one already being in the data: a restored
- * backup, a manual `UPDATE`, or a defect in a future code path. A `WITH RECURSIVE` walk over a
- * cyclic adjacency list never terminates — it does not error, it spins, holding a connection
- * until something kills it. Every one of these walks is on the request path, so that is an
- * availability bug, not a data bug.
- *
- * Bounding the walk turns it into a refusal instead. It is deliberately ABOVE the service's
- * depth cap (SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH), so a legitimate chain is always returned
- * whole and the bound can never make a folder look shallower than it is — which would let a
- * create through that should have been refused. Anything that does hit the bound is either
- * cyclic or already deeper than the cap, and both correctly end in a 400.
- *
- * `shared-space-album-folder.repository.spec.ts` pins the ordering against the service's cap.
- */
+Hard stop for the folder-tree recursive CTEs.
+
+The service refuses to CREATE a cycle (moveAlbumFolderChecked re-checks the ancestor chain
+under a per-space advisory lock), but nothing stops one already being in the data: a restored
+backup, a manual `UPDATE`, or a defect in a future code path. A `WITH RECURSIVE` walk over a
+cyclic adjacency list never terminates — it does not error, it spins, holding a connection
+until something kills it. Every one of these walks is on the request path, so that is an
+availability bug, not a data bug.
+
+Bounding the walk turns it into a refusal instead. It is deliberately ABOVE the service's
+depth cap (SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH), so a legitimate chain is always returned
+whole and the bound can never make a folder look shallower than it is — which would let a
+create through that should have been refused. Anything that does hit the bound is either
+cyclic or already deeper than the cap, and both correctly end in a 400.
+
+`shared-space-album-folder.repository.spec.ts` pins the ordering against the service's cap.
+*/
 export const ALBUM_FOLDER_TRAVERSAL_LIMIT = 32;
 
 /**
- * How deep a folder chain may nest, root counting as 1.
- *
- * Lives here rather than in the service because the WRITER has to be the one that enforces it.
- * The service's pre-check runs outside the per-space advisory lock, so two concurrent moves can
- * each pass it against a tree that is still shallow and then compose past the cap once both
- * commit — the same reason the cycle check is re-run under the lock in moveAlbumFolderChecked.
- * The service still pre-checks, because that is what produces the specific 400 message; this is
- * the backstop that makes the cap an actual invariant rather than an advisory one.
- *
- * Re-exported from shared-space.service.ts, which is where callers have always imported it from.
- */
+How deep a folder chain may nest, root counting as 1.
+
+Lives here rather than in the service because the WRITER has to be the one that enforces it.
+The service's pre-check runs outside the per-space advisory lock, so two concurrent moves can
+each pass it against a tree that is still shallow and then compose past the cap once both
+commit — the same reason the cycle check is re-run under the lock in moveAlbumFolderChecked.
+The service still pre-checks, because that is what produces the specific 400 message; this is
+the backstop that makes the cap an actual invariant rather than an advisory one.
+
+Re-exported from shared-space.service.ts, which is where callers have always imported it from.
+*/
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
 
 type SpacePersonStatistics = {
@@ -296,10 +296,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * The actor's role in each of the given spaces, for spaces where they are a member (non-members are absent
-   * from the map). Used by the merge propagation planner to decide whether a fan-out space collapse is one the
-   * actor is allowed to perform. Accepts a transaction so the check reads consistently inside a merge.
-   */
+  The actor's role in each of the given spaces, for spaces where they are a member (non-members are absent
+  from the map). Used by the merge propagation planner to decide whether a fan-out space collapse is one the
+  actor is allowed to perform. Accepts a transaction so the check reads consistently inside a merge.
+  */
   async getActorSpaceRoles(
     userId: string,
     spaceIds: string[],
@@ -350,13 +350,13 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Cross-owner contribution eligibility (#764). For each of `assetIds`, returns the space it may be
-   * contributed to `albumId` through — i.e. a space `S` such that: the album is linked to `S`, the
-   * caller is an Owner/Editor of `S`, and the asset is space-visible to the caller via `S` (direct
-   * pool ∪ linked library ∪ another linked album) under the visibility gate (no Hidden/Locked). Only
-   * NON-owned assets are eligible (the caller's own photos take the ordinary `album_asset` path). One
-   * row per eligible asset (the tether space); assets with no eligible space are simply absent.
-   */
+  Cross-owner contribution eligibility (#764). For each of `assetIds`, returns the space it may be
+  contributed to `albumId` through — i.e. a space `S` such that: the album is linked to `S`, the
+  caller is an Owner/Editor of `S`, and the asset is space-visible to the caller via `S` (direct
+  pool ∪ linked library ∪ another linked album) under the visibility gate (no Hidden/Locked). Only
+  NON-owned assets are eligible (the caller's own photos take the ordinary `album_asset` path). One
+  row per eligible asset (the tether space); assets with no eligible space are simply absent.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, [DummyValue.UUID]] })
   @ChunkedArray({ paramIndex: 2 })
   async getContributableAssetSpaces(
@@ -376,10 +376,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Batched form of {@link getContributableAssetSpaces} for the add-to-album picker: per album in
-   * `albumIds`, how many of `assetIds` may be contributed to it. Albums with none are absent. Chunked
-   * on `assetIds`, so a caller must sum `count` per album across rows.
-   */
+  Batched form of {@link getContributableAssetSpaces} for the add-to-album picker: per album in
+  `albumIds`, how many of `assetIds` may be contributed to it. Albums with none are absent. Chunked
+  on `assetIds`, so a caller must sum `count` per album across rows.
+  */
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], [DummyValue.UUID]] })
   @ChunkedArray({ paramIndex: 2 })
   async getContributableAssetCounts(
@@ -490,20 +490,20 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * #763: every space the caller belongs to, WITHOUT the `showInTimeline` filter its sibling
-   * applies. `showInTimeline` is a preference about the personal HOME TIMELINE, not a revocation of
-   * access — the member still sees the space, and #1041 already exempts Favorites (with Archive and
-   * Trash) from the personal-timeline hide because those are curation/recovery surfaces where
-   * subtracting an asset strands it with no way back to it in the UI.
-   *
-   * Favoriting is that same kind of explicit, per-asset act, so a favorite must stay reachable on
-   * /favorites even when the space it lives in is hidden from the home timeline. Reported against
-   * pr-819-rc.2: the heart said "Added to favorites" and the page then never listed it.
-   *
-   * Widening the scope is safe here ONLY because every caller pairs it with `isFavorite: true`,
-   * which narrows to the caller's OWN `asset_favorite` rows — it can never surface another member's
-   * content. Do not reuse it for an unfiltered browse.
-   */
+  #763: every space the caller belongs to, WITHOUT the `showInTimeline` filter its sibling
+  applies. `showInTimeline` is a preference about the personal HOME TIMELINE, not a revocation of
+  access — the member still sees the space, and #1041 already exempts Favorites (with Archive and
+  Trash) from the personal-timeline hide because those are curation/recovery surfaces where
+  subtracting an asset strands it with no way back to it in the UI.
+  
+  Favoriting is that same kind of explicit, per-asset act, so a favorite must stay reachable on
+  /favorites even when the space it lives in is hidden from the home timeline. Reported against
+  pr-819-rc.2: the heart said "Added to favorites" and the page then never listed it.
+  
+  Widening the scope is safe here ONLY because every caller pairs it with `isFavorite: true`,
+  which narrows to the caller's OWN `asset_favorite` rows — it can never surface another member's
+  content. Do not reuse it for an unfiltered browse.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getAllMemberSpaceIds(userId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
     return db.selectFrom('shared_space_member').where('userId', '=', userId).select('spaceId').execute();
@@ -692,10 +692,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Assets visible in the space's timeline (direct pool, linked library, on-timeline linked album,
-   * cross-owner contribution), as one `asset` scan with EXISTS arms. Unlike a UNION of the four
-   * sources, nothing has to be deduplicated, so a count or a top-N stays a single pass.
-   */
+  Assets visible in the space's timeline (direct pool, linked library, on-timeline linked album,
+  cross-owner contribution), as one `asset` scan with EXISTS arms. Unlike a UNION of the four
+  sources, nothing has to be deduplicated, so a count or a top-N stays a single pass.
+  */
   private selectSpaceTimelineAssets(spaceId: string) {
     return this.db
       .selectFrom('asset')
@@ -755,19 +755,19 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Returns the set of space IDs that contain ANY of the given asset IDs
-   * via direct membership (`shared_space_asset`) AND in which the user has
-   * Owner or Editor role.
-   *
-   * Library-linked content (`shared_space_library`) is deliberately excluded
-   * — only direct per-asset membership counts. See dedup-space-sync design
-   * doc for rationale.
-   *
-   * Returns `Set<string>` (not `Map<assetId, spaceIds[]>` as
-   * `albumRepository.getByAssetIds` does) because the dedup sync caller
-   * applies every matched space to every keeper, so the per-asset grouping
-   * is unused.
-   */
+  Returns the set of space IDs that contain ANY of the given asset IDs
+  via direct membership (`shared_space_asset`) AND in which the user has
+  Owner or Editor role.
+  
+  Library-linked content (`shared_space_library`) is deliberately excluded
+  — only direct per-asset membership counts. See dedup-space-sync design
+  doc for rationale.
+  
+  Returns `Set<string>` (not `Map<assetId, spaceIds[]>` as
+  `albumRepository.getByAssetIds` does) because the dedup sync caller
+  applies every matched space to every keeper, so the per-asset grouping
+  is unused.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
   async getEditableByAssetIds(userId: string, assetIds: Set<string>): Promise<Set<string>> {
@@ -820,11 +820,11 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * The linked albums (id + name) in this space that project any of the given assets into the space —
-   * via the global `album_asset` arm OR the cross-owner `album_space_asset` contribution arm. Used to
-   * explain why "Remove from space" is a no-op on an album-projected asset: it is present via a linked
-   * album, not as a direct space member, so the user must remove it from that album instead.
-   */
+  The linked albums (id + name) in this space that project any of the given assets into the space —
+  via the global `album_asset` arm OR the cross-owner `album_space_asset` contribution arm. Used to
+  explain why "Remove from space" is a no-op on an album-projected asset: it is present via a linked
+  album, not as a direct space member, so the user must remove it from that album instead.
+  */
   async getLinkedAlbumsContainingAssets(
     spaceId: string,
     assetIds: string[],
@@ -852,10 +852,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Current names for the given album ids (live albums only). Used to resolve the CURRENT album name
-   * for link/unlink activities, so an album created-then-renamed isn't stuck showing the empty or stale
-   * name captured at link time.
-   */
+  Current names for the given album ids (live albums only). Used to resolve the CURRENT album name
+  for link/unlink activities, so an album created-then-renamed isn't stuck showing the empty or stale
+  name captured at link time.
+  */
   async getAlbumNamesByIds(albumIds: string[]): Promise<{ id: string; albumName: string }[]> {
     if (albumIds.length === 0) {
       return [];
@@ -869,18 +869,18 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Slice 4.B DIRECT-path purge: when the owner flips one of these assets OUT of
-   * the space-shareable visibility set (Timeline/Archive) to Hidden or Locked,
-   * the `shared_space_asset` join row is NOT deleted, so the delete-audit trigger
-   * never fires and already-synced member devices keep the bytes. Emit a
-   * `shared_space_asset_audit` tombstone for every join row referencing the given
-   * assets so `SharedSpaceToAssetSync.getDeletes` purges those devices.
-   *
-   * `shared_space_asset_audit` is space-only (NOT shared with normal album sync),
-   * so writing to it here does not bleed into non-space behavior. `id` and
-   * `deletedAt` are DB-generated (immich_uuid_v7 / clock_timestamp), giving every
-   * tombstone a fresh id > any prior checkpoint.
-   */
+  Slice 4.B DIRECT-path purge: when the owner flips one of these assets OUT of
+  the space-shareable visibility set (Timeline/Archive) to Hidden or Locked,
+  the `shared_space_asset` join row is NOT deleted, so the delete-audit trigger
+  never fires and already-synced member devices keep the bytes. Emit a
+  `shared_space_asset_audit` tombstone for every join row referencing the given
+  assets so `SharedSpaceToAssetSync.getDeletes` purges those devices.
+  
+  `shared_space_asset_audit` is space-only (NOT shared with normal album sync),
+  so writing to it here does not bleed into non-space behavior. `id` and
+  `deletedAt` are DB-generated (immich_uuid_v7 / clock_timestamp), giving every
+  tombstone a fresh id > any prior checkpoint.
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitDirectAssetVisibilityPurge(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -900,16 +900,16 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Slice 4.B DIRECT-path restore: when the owner flips one of these assets back
-   * INTO the space-shareable set (Timeline/Archive), the join row already exists
-   * but its `updateId` is unchanged, so `SharedSpaceToAssetSync.getUpserts` (gated
-   * by `updateId` > checkpoint) won't re-add it to devices that purged it. Touch
-   * the referencing rows so the `updated_at` BEFORE-UPDATE trigger bumps
-   * `updateId = immich_uuid_v7(clock_timestamp())` and getUpserts re-emits.
-   *
-   * Over-emitting a restore for an already-visible asset is harmless (the device
-   * simply re-upserts a join row it already has).
-   */
+  Slice 4.B DIRECT-path restore: when the owner flips one of these assets back
+  INTO the space-shareable set (Timeline/Archive), the join row already exists
+  but its `updateId` is unchanged, so `SharedSpaceToAssetSync.getUpserts` (gated
+  by `updateId` > checkpoint) won't re-add it to devices that purged it. Touch
+  the referencing rows so the `updated_at` BEFORE-UPDATE trigger bumps
+  `updateId = immich_uuid_v7(clock_timestamp())` and getUpserts re-emits.
+  
+  Over-emitting a restore for an already-visible asset is harmless (the device
+  simply re-upserts a join row it already has).
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitDirectAssetVisibilityRestore(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -952,13 +952,13 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Slice 1 ALBUM-path purge: when the owner flips an album-linked asset to
-   * Hidden, the album_asset join row is retained (unlike Locked), so no
-   * album_asset_audit trigger fires. Emit one shared_space_album_asset_audit
-   * tombstone per (albumId, assetId) where the album is space-linked, so
-   * SharedSpaceAlbumToAssetSync.getDeletes delivers the delete to members.
-   * Only space-linked albums are targeted — normal album members are unaffected.
-   */
+  Slice 1 ALBUM-path purge: when the owner flips an album-linked asset to
+  Hidden, the album_asset join row is retained (unlike Locked), so no
+  album_asset_audit trigger fires. Emit one shared_space_album_asset_audit
+  tombstone per (albumId, assetId) where the album is space-linked, so
+  SharedSpaceAlbumToAssetSync.getDeletes delivers the delete to members.
+  Only space-linked albums are targeted — normal album members are unaffected.
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitAlbumAssetVisibilityPurge(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -998,17 +998,17 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Slice 1 ALBUM-path restore: when the owner flips a Hidden album-linked
-   * asset back to Timeline/Archive, the album_asset row was retained. Touch
-   * the rows so the updated_at BEFORE-UPDATE trigger bumps album_asset.updateId
-   * and SharedSpaceAlbumToAssetSync.getUpserts re-emits the membership to devices
-   * that purged it. Only space-linked albums are targeted. Re-emitting to normal
-   * album members is idempotent.
-   *
-   * Note: after Locked, album_asset rows were deleted by removeAssetsFromAll, so
-   * this method finds nothing to bump and the asset does not return to the album —
-   * matching Immich Locked semantics (see A8).
-   */
+  Slice 1 ALBUM-path restore: when the owner flips a Hidden album-linked
+  asset back to Timeline/Archive, the album_asset row was retained. Touch
+  the rows so the updated_at BEFORE-UPDATE trigger bumps album_asset.updateId
+  and SharedSpaceAlbumToAssetSync.getUpserts re-emits the membership to devices
+  that purged it. Only space-linked albums are targeted. Re-emitting to normal
+  album members is idempotent.
+  
+  Note: after Locked, album_asset rows were deleted by removeAssetsFromAll, so
+  this method finds nothing to bump and the asset does not return to the album —
+  matching Immich Locked semantics (see A8).
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitAlbumAssetVisibilityRestore(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -1034,17 +1034,17 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Slice 2 LIBRARY-path purge: when the owner flips a library-linked space asset
-   * to Hidden or Locked, write a tombstone per (libraryId, assetId) in
-   * shared_space_library_asset_audit for each asset that belongs to a space-linked
-   * library. LibraryAssetSync.getDeletes unions this table (owner-gated) so member
-   * devices drop the asset. The owner is never purged — the union arm filters
-   * asset.ownerId != userId. The ASSET ROW's restore is automatic (the visibility
-   * UPDATE bumps asset.updateId; LibraryAssetSync.getUpserts re-emits the
-   * now-visible asset) — but its EXIF is NOT (see emitLibraryAssetVisibilityRestore
-   * below). Only space-linked libraries are targeted — the library owner's own
-   * sync stream and any non-space library member are unaffected.
-   */
+  Slice 2 LIBRARY-path purge: when the owner flips a library-linked space asset
+  to Hidden or Locked, write a tombstone per (libraryId, assetId) in
+  shared_space_library_asset_audit for each asset that belongs to a space-linked
+  library. LibraryAssetSync.getDeletes unions this table (owner-gated) so member
+  devices drop the asset. The owner is never purged — the union arm filters
+  asset.ownerId != userId. The ASSET ROW's restore is automatic (the visibility
+  UPDATE bumps asset.updateId; LibraryAssetSync.getUpserts re-emits the
+  now-visible asset) — but its EXIF is NOT (see emitLibraryAssetVisibilityRestore
+  below). Only space-linked libraries are targeted — the library owner's own
+  sync stream and any non-space library member are unaffected.
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitLibraryAssetVisibilityPurge(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -1069,20 +1069,20 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * L4 LIBRARY-path EXIF restore: when the owner flips a library-linked space
-   * asset back to Timeline/Archive, the asset ROW re-upserts automatically (its
-   * own updateId is bumped by the visibility UPDATE), but asset_exif.updateId is
-   * untouched by a visibility flip. LibraryAssetExifSync.getUpserts is gated on
-   * `asset_exif.updateId > ack`, so without this, a member who already
-   * synced-then-purged the asset would see the asset row reappear with EXIF
-   * missing forever. Touch asset_exif.updatedAt (mirrors
-   * emitDirectAssetVisibilityRestore / emitAlbumAssetVisibilityRestore) for every
-   * restored asset that belongs to a space-linked library so the updated_at
-   * BEFORE-UPDATE trigger bumps updateId and getUpserts re-emits.
-   *
-   * Over-emitting for an already-visible asset is harmless (the device simply
-   * re-upserts an exif row it already has).
-   */
+  L4 LIBRARY-path EXIF restore: when the owner flips a library-linked space
+  asset back to Timeline/Archive, the asset ROW re-upserts automatically (its
+  own updateId is bumped by the visibility UPDATE), but asset_exif.updateId is
+  untouched by a visibility flip. LibraryAssetExifSync.getUpserts is gated on
+  `asset_exif.updateId > ack`, so without this, a member who already
+  synced-then-purged the asset would see the asset row reappear with EXIF
+  missing forever. Touch asset_exif.updatedAt (mirrors
+  emitDirectAssetVisibilityRestore / emitAlbumAssetVisibilityRestore) for every
+  restored asset that belongs to a space-linked library so the updated_at
+  BEFORE-UPDATE trigger bumps updateId and getUpserts re-emits.
+  
+  Over-emitting for an already-visible asset is harmless (the device simply
+  re-upserts an exif row it already has).
+  */
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async emitLibraryAssetVisibilityRestore(assetIds: string[]) {
     if (assetIds.length === 0) {
@@ -3746,17 +3746,17 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Spec §6.4 (Slice 4): detach one face from one space person. Unlike the two bulk removals
-   * above, this is the single-pair primitive the DELETE route uses.
-   *
-   * Deletes ONLY the `shared_space_person_face` projection row. Whether the face's
-   * `face_identity_face` link goes too is the service's call (`detachFaceFromSpacePerson`, §6.4
-   * revised): that link is the face's GLOBAL identity, shared by every space (§5.1).
-   *
-   * Must recount (F-32): `addPersonFaces` recounts on the way in, so a detach that skips this
-   * leaves `faceCount`/`assetCount` overstated — columns the people-list ordering index and the
-   * `minimumFaceCount` filters both read, so drift here silently reorders and hides people.
-   */
+  Spec §6.4 (Slice 4): detach one face from one space person. Unlike the two bulk removals
+  above, this is the single-pair primitive the DELETE route uses.
+  
+  Deletes ONLY the `shared_space_person_face` projection row. Whether the face's
+  `face_identity_face` link goes too is the service's call (`detachFaceFromSpacePerson`, §6.4
+  revised): that link is the face's GLOBAL identity, shared by every space (§5.1).
+  
+  Must recount (F-32): `addPersonFaces` recounts on the way in, so a detach that skips this
+  leaves `faceCount`/`assetCount` overstated — columns the people-list ordering index and the
+  `minimumFaceCount` filters both read, so drift here silently reorders and hides people.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async removePersonFace(
     personId: string,
@@ -4675,10 +4675,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Returns the (spaceId, personId) pairs for every shared-space person face that references
-   * an asset_face belonging to the given asset.  Must be called BEFORE the asset row is deleted
-   * (i.e. before the asset → asset_face → shared_space_person_face cascade runs).
-   */
+  Returns the (spaceId, personId) pairs for every shared-space person face that references
+  an asset_face belonging to the given asset.  Must be called BEFORE the asset row is deleted
+  (i.e. before the asset → asset_face → shared_space_person_face cascade runs).
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getSpacePersonsForAsset(assetId: string) {
     return this.db
@@ -4746,12 +4746,12 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Spec §6.6 (Slice 6, Task 3): every space person, in EVERY space (not scoped to one, unlike
-   * `removePersonFaceAssignmentsForSpaceFace` above) currently holding `assetFaceId`. The caller
-   * hard-deletes an editor-drawn face row after this; the `ON DELETE CASCADE` on
-   * `shared_space_person_face.assetFaceId` removes the projection rows for free but does NOT
-   * recount, so the caller must snapshot the affected person ids here first and recount itself.
-   */
+  Spec §6.6 (Slice 6, Task 3): every space person, in EVERY space (not scoped to one, unlike
+  `removePersonFaceAssignmentsForSpaceFace` above) currently holding `assetFaceId`. The caller
+  hard-deletes an editor-drawn face row after this; the `ON DELETE CASCADE` on
+  `shared_space_person_face.assetFaceId` removes the projection rows for free but does NOT
+  recount, so the caller must snapshot the affected person ids here first and recount itself.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async getPersonIdsHoldingFace(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<string[]> {
     const rows = await db
@@ -4763,27 +4763,27 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * Spec §6.1 (Slice 3): every live, visible face on `assetId`, joined to the space person
-   * holding it in THIS space, if any — a face held by a person in a DIFFERENT space reads as
-   * unassigned here.
-   *
-   * That scoping has to happen INSIDE the join, in the derived table below, not as a condition on
-   * a second join hanging off an unscoped `shared_space_person_face`: the projection table is
-   * per-space, so joining it directly emits one row per space that named the face, and the
-   * `shared_space_person.spaceId` condition then merely NULLs the other spaces' columns instead of
-   * dropping their rows. The read must be one row per face — the editor's panel keys its `{#each}`
-   * on the face id, and Svelte aborts the render on a duplicate key, so a face named in two spaces
-   * used to leave the panel spinning for good (#992 field report).
-   *
-   * The hidden-person exclusions mirror `FacePersonVerdictRepository.isFaceAssignableInSpace`
-   * exactly (owner `person.isHidden`) plus the space-projection exclusion the asset detail read
-   * already applies (`shared_space_person.isHidden`, matching `asset.service.ts:135`) — so an
-   * editor can never attach a face this list would not show them (F-8/F-9, F-12).
-   *
-   * Reachability of `assetId` itself in `spaceId` is NOT re-checked here: the caller
-   * (`SharedSpaceService.getSpaceAssetFaces`) asserts that separately via `isAssetInSpace`
-   * before calling this, so a read of an asset that has left the space never reaches here.
-   */
+  Spec §6.1 (Slice 3): every live, visible face on `assetId`, joined to the space person
+  holding it in THIS space, if any — a face held by a person in a DIFFERENT space reads as
+  unassigned here.
+  
+  That scoping has to happen INSIDE the join, in the derived table below, not as a condition on
+  a second join hanging off an unscoped `shared_space_person_face`: the projection table is
+  per-space, so joining it directly emits one row per space that named the face, and the
+  `shared_space_person.spaceId` condition then merely NULLs the other spaces' columns instead of
+  dropping their rows. The read must be one row per face — the editor's panel keys its `{#each}`
+  on the face id, and Svelte aborts the render on a duplicate key, so a face named in two spaces
+  used to leave the panel spinning for good (#992 field report).
+  
+  The hidden-person exclusions mirror `FacePersonVerdictRepository.isFaceAssignableInSpace`
+  exactly (owner `person.isHidden`) plus the space-projection exclusion the asset detail read
+  already applies (`shared_space_person.isHidden`, matching `asset.service.ts:135`) — so an
+  editor can never attach a face this list would not show them (F-8/F-9, F-12).
+  
+  Reachability of `assetId` itself in `spaceId` is NOT re-checked here: the caller
+  (`SharedSpaceService.getSpaceAssetFaces`) asserts that separately via `isAssetInSpace`
+  before calling this, so a read of an asset that has left the space never reaches here.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async getAssetFacesForSpace(spaceId: string, assetId: string): Promise<SpaceAssetFace[]> {
     const rows = await this.db

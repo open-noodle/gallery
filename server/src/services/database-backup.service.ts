@@ -43,10 +43,10 @@ import { handlePromiseError } from 'src/utils/misc.js';
 const backupContentType = (filename: string) => (filename.endsWith('.gz') ? 'application/gzip' : 'application/sql');
 
 /**
- * Prefix of the safety backup the restore flow takes before it overwrites the database. These stay on the
- * staging disk: they exist to recover a restore that goes wrong, so they must not depend on the same remote
- * the restore may be reading from. Upstream never prunes them either.
- */
+Prefix of the safety backup the restore flow takes before it overwrites the database. These stay on the
+staging disk: they exist to recover a restore that goes wrong, so they must not depend on the same remote
+the restore may be reading from. Upstream never prunes them either.
+*/
 const RESTORE_POINT_PREFIX = 'restore-point-';
 
 const isRestorePoint = (filename: string) => filename.startsWith(RESTORE_POINT_PREFIX);
@@ -263,13 +263,13 @@ export class DatabaseBackupService {
   }
 
   /**
-   * Returns the backup's filename, which every other operation here resolves to a backend key.
-   *
-   * Staged write: `pg_dump | gzip` lands on the staging disk under a `.tmp` key and the finished file is
-   * then renamed to its real name, so a dump killed half way can never be mistaken for a valid backup.
-   * Uploading it to S3 and removing the local copy is `cleanupDatabaseBackups`' job — see the note at the
-   * end of this method.
-   */
+  Returns the backup's filename, which every other operation here resolves to a backend key.
+  
+  Staged write: `pg_dump | gzip` lands on the staging disk under a `.tmp` key and the finished file is
+  then renamed to its real name, so a dump killed half way can never be mistaken for a valid backup.
+  Uploading it to S3 and removing the local copy is `cleanupDatabaseBackups`' job — see the note at the
+  end of this method.
+  */
   async createDatabaseBackup(filenamePrefix: string = '', signal?: AbortSignal): Promise<string> {
     this.logger.debug(`Database Backup Started`);
 
@@ -333,13 +333,13 @@ export class DatabaseBackupService {
   }
 
   /**
-   * The staged promote: stream the finished local file to the bucket, then delete the local copy.
-   *
-   * Throws on upload failure, leaving the local file in place. `cleanupDatabaseBackups` catches that and
-   * carries on so retention still runs; `uploadBackup` lets it reach the admin, who is waiting on the
-   * request. A delete failure after a good upload is only logged, because the object is safely in S3 and
-   * the straggler is swept by the next cleanup. A no-op when no remote is configured.
-   */
+  The staged promote: stream the finished local file to the bucket, then delete the local copy.
+  
+  Throws on upload failure, leaving the local file in place. `cleanupDatabaseBackups` catches that and
+  carries on so retention still runs; `uploadBackup` lets it reach the admin, who is waiting on the
+  request. A delete failure after a good upload is only logged, because the object is safely in S3 and
+  the straggler is swept by the next cleanup. A no-op when no remote is configured.
+  */
   private async promoteToRemote(store: BackupStore, filename: string): Promise<void> {
     const { remote } = store;
     if (!remote) {
@@ -392,9 +392,9 @@ export class DatabaseBackupService {
   }
 
   /**
-   * Local first, then remote. A backup whose upload failed is still on disk, and must stay downloadable
-   * and restorable from there; everything else has been promoted and only exists in the bucket.
-   */
+  Local first, then remote. A backup whose upload failed is still on disk, and must stay downloadable
+  and restorable from there; everything else has been promoted and only exists in the bucket.
+  */
   private async locate(store: BackupStore, filename: string): Promise<{ backend: StorageBackend; key: string }> {
     const key = store.key(filename);
     if (await store.staging.exists(key)) {
@@ -444,10 +444,10 @@ export class DatabaseBackupService {
   }
 
   /**
-   * Returns a served response rather than a path, because an S3 object has no path. The three
-   * strategies a backend can answer with map onto the three responses `sendFile` already handles, so
-   * both call sites (the admin controller and the maintenance worker) are unchanged.
-   */
+  Returns a served response rather than a path, because an S3 object has no path. The three
+  strategies a backend can answer with map onto the three responses `sendFile` already handles, so
+  both call sites (the admin controller and the maintenance worker) are unchanged.
+  */
   async downloadBackup(fileName: string): Promise<ImmichMediaResponse> {
     if (!isValidDatabaseBackupName(fileName)) {
       throw new BadRequestException('Invalid backup name!');
@@ -801,13 +801,13 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Feeds a backup's raw stream through `decoder` (a gunzip, or a pass-through for plain SQL) and returns the
- * decoded side. `pipe` does not forward errors, and a read that fails part way is a real possibility now
- * that the source may be S3 (a dropped socket, an expired credential). `pipeline` puts an error listener on
- * both streams straight away and moves a failure onto `decoder`, where the restore's own read rejects with
- * it. Listening only once that read starts is too late: an error before then (an early drop, or a corrupt
- * gzip header) is uncaught and takes the worker down instead of failing the restore.
- */
+Feeds a backup's raw stream through `decoder` (a gunzip, or a pass-through for plain SQL) and returns the
+decoded side. `pipe` does not forward errors, and a read that fails part way is a real possibility now
+that the source may be S3 (a dropped socket, an expired credential). `pipeline` puts an error listener on
+both streams straight away and moves a failure onto `decoder`, where the restore's own read rejects with
+it. Listening only once that read starts is too late: an error before then (an early drop, or a corrupt
+gzip header) is uncaught and takes the worker down instead of failing the restore.
+*/
 function readBackup(source: Readable, decoder: Duplex): Readable {
   pipelineCallback(source, decoder, () => {
     // the error, if any, is already on `decoder`, where the restore reads it

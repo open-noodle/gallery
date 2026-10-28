@@ -302,10 +302,10 @@ export class AlbumService extends BaseService {
   }
 
   /**
-   * #764: upgrade `no_permission` results to cross-owner contributions where eligible. Mutates
-   * `results` in place (denied → success, or → duplicate if already contributed) and returns the set
-   * of asset ids that became contributions.
-   */
+  #764: upgrade `no_permission` results to cross-owner contributions where eligible. Mutates
+  `results` in place (denied → success, or → duplicate if already contributed) and returns the set
+  of asset ids that became contributions.
+  */
   private async tryContributeDeniedAssets(
     auth: AuthDto,
     albumId: string,

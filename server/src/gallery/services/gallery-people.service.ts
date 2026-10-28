@@ -70,13 +70,13 @@ export class GalleryPeopleService extends BaseService {
   }
 
   /**
-   * The scoped merge (POST /people/same-person): merge people named by scoped refs — the actor's own people and
-   * any space person they can repair. The planner resolves and RBAC-checks the refs, collapses profiles that
-   * would land in the same scope, and propagates the identity merge everywhere it is attached (issue #733).
-   *
-   * The only thing gated here is the destructive cross-owner case: a merge that would combine two of ANOTHER
-   * user's people. Re-pointing another owner's single person is free — that is what recognition does on its own.
-   */
+  The scoped merge (POST /people/same-person): merge people named by scoped refs — the actor's own people and
+  any space person they can repair. The planner resolves and RBAC-checks the refs, collapses profiles that
+  would land in the same scope, and propagates the identity merge everywhere it is attached (issue #733).
+  
+  The only thing gated here is the destructive cross-owner case: a merge that would combine two of ANOTHER
+  user's people. Re-pointing another owner's single person is free — that is what recognition does on its own.
+  */
   async mergeScopedPeople(auth: AuthDto, dto: MergeScopedPeopleDto): Promise<void> {
     await this.identityMergePropagationService.mergeScopedProfiles(
       auth,

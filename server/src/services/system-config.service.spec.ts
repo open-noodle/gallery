@@ -32,17 +32,17 @@ const partialConfig = {
 } satisfies DeepPartial<SystemConfig>;
 
 /**
- * Every registry memory type, with alternating values. `memories.types` is a `z.record` whose keys
- * are data rather than schema, so an override map that gets truncated, key-filtered, or collapsed to
- * a single boolean must not be able to satisfy a deep-equality assertion against this.
- */
+Every registry memory type, with alternating values. `memories.types` is a `z.record` whose keys
+are data rather than schema, so an override map that gets truncated, key-filtered, or collapsed to
+a single boolean must not be able to satisfy a deep-equality assertion against this.
+*/
 const buildAlternatingMemoryTypes = (): Record<string, boolean> =>
   Object.fromEntries(MEMORY_TYPE_KEYS.map((key, index) => [key, index % 2 === 0]));
 
 /**
- * Wires the system-metadata mock as a real read/write store, so a round-trip assertion reads back
- * whatever `updateConfig` actually persisted instead of a value the mock was primed to return.
- */
+Wires the system-metadata mock as a real read/write store, so a round-trip assertion reads back
+whatever `updateConfig` actually persisted instead of a value the mock was primed to return.
+*/
 const useMetadataStore = (mocks: ServiceMocks) => {
   const store: { partial: DeepPartial<SystemConfig> } = { partial: {} };
 

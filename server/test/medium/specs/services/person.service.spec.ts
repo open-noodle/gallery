@@ -77,6 +77,7 @@ const setup = (db?: Kysely<DB>) => {
   return { sut, ctx };
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupFaceDetection = (db?: Kysely<DB>) => {
   clearConfigCache();
 
@@ -125,10 +126,10 @@ const seedPersonAcrossVisibilities = async (ctx: ReturnType<typeof setup>['ctx']
 };
 
 /**
- * #869 follow-up: seed a person whose representative face (`person.faceAssetId`, which points at an
- * ASSET_FACE row) sits on an asset of the given visibility, so the thumbnail source is reachable as
- * person -> asset_face -> asset.
- */
+#869 follow-up: seed a person whose representative face (`person.faceAssetId`, which points at an
+ASSET_FACE row) sits on an asset of the given visibility, so the thumbnail source is reachable as
+person -> asset_face -> asset.
+*/
 const seedPersonWithRepresentativeFace = async (
   ctx: ReturnType<typeof setup>['ctx'],
   ownerId: string,
@@ -169,12 +170,12 @@ const setupRecognition = (db?: Kysely<DB>) => {
 };
 
 /**
- * #808: reproduces the reported shape against a real database — `person.birthDate` is NULL and the
- * birthday only ever existed on a `shared_space_person` profile reached through the shared
- * `identityId`. This is the payload the asset viewer Info panel renders for the owner, so the age
- * has to survive the trip. The small tests stub the resolver; these prove the real
- * `hydrateAccessiblePeople` query actually returns the space birthday for this shape.
- */
+#808: reproduces the reported shape against a real database — `person.birthDate` is NULL and the
+birthday only ever existed on a `shared_space_person` profile reached through the shared
+`identityId`. This is the payload the asset viewer Info panel renders for the owner, so the age
+has to survive the trip. The small tests stub the resolver; these prove the real
+`hydrateAccessiblePeople` query actually returns the space birthday for this shape.
+*/
 const seedSpaceOnlyBirthday = async (birthDateSource: 'manual' | 'inherited') => {
   const { sut, ctx } = setup();
   const faceIdentityRepository = ctx.get(FaceIdentityRepository);

@@ -1,24 +1,24 @@
 import { Kysely, sql } from 'kysely';
 
 /**
- * Fork migrations run in two different orders relative to upstream's `1787148183729-ClusterGroups`,
- * and several of them care which one they got.
- *
- * On a **fresh install** (and on a Gallery database from before ClusterGroups) both folders run in one
- * timestamp order, so every fork migration numbered below 1787148183729 runs first and sees the pre-#30739
- * schema: `person.id` exists and the face column is `asset_face.personId`.
- *
- * On an **Immich-to-Gallery switch** the database already has every upstream migration applied,
- * including ClusterGroups, before a single fork migration runs. `person.id` is gone, the primary key
- * is `(ownerId, personGroupId)`, and the face column is already `asset_face.personGroupId`. The fork
- * migrations then apply in their own timestamp order on top of that — so the ones written against the
- * old shape now run *after* the change they were written to precede.
- *
- * The fork's own ledger (`gallery_migrations`, see `src/schema/gallery-migration-ledger.ts`) is what lets
- * fork migrations apply after upstream ones on that second path. These helpers let the affected migrations ask which
- * world they are in rather than assuming, and are covered end-to-end by
- * `test/medium/specs/services/database-migration.service.spec.ts`.
- */
+Fork migrations run in two different orders relative to upstream's `1787148183729-ClusterGroups`,
+and several of them care which one they got.
+
+On a **fresh install** (and on a Gallery database from before ClusterGroups) both folders run in one
+timestamp order, so every fork migration numbered below 1787148183729 runs first and sees the pre-#30739
+schema: `person.id` exists and the face column is `asset_face.personId`.
+
+On an **Immich-to-Gallery switch** the database already has every upstream migration applied,
+including ClusterGroups, before a single fork migration runs. `person.id` is gone, the primary key
+is `(ownerId, personGroupId)`, and the face column is already `asset_face.personGroupId`. The fork
+migrations then apply in their own timestamp order on top of that — so the ones written against the
+old shape now run *after* the change they were written to precede.
+
+The fork's own ledger (`gallery_migrations`, see `src/schema/gallery-migration-ledger.ts`) is what lets
+fork migrations apply after upstream ones on that second path. These helpers let the affected migrations ask which
+world they are in rather than assuming, and are covered end-to-end by
+`test/medium/specs/services/database-migration.service.spec.ts`.
+*/
 
 // Migrations are typed `Kysely<any>` — they run against schemas older than the current one, so the
 // generated DB interface does not describe them.
@@ -35,9 +35,9 @@ const columnExists = async (db: AnyDb, table: string, column: string): Promise<b
 };
 
 /**
- * True once upstream's ClusterGroups migration has run: `person.id` is gone, and the thing a fork
- * face-review key must reference is `person_group.id`.
- */
+True once upstream's ClusterGroups migration has run: `person.id` is gone, and the thing a fork
+face-review key must reference is `person_group.id`.
+*/
 export const clusterGroupsApplied = (db: AnyDb): Promise<boolean> => columnExists(db, 'person', 'personGroupId');
 
 /** The table a fork face-review column should reference, for the schema currently in the database. */

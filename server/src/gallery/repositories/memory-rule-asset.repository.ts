@@ -261,10 +261,10 @@ export class MemoryRuleAssetRepository {
   }
 
   /**
-   * One row per (person, calendar day) among `personIds`, with the distinct asset count that day.
-   * Predicates mirror `getMemoryFacesForPeriod` — Timeline visibility, not deleted, previewable —
-   * so a person's density is never skewed by archived or preview-less assets.
-   */
+  One row per (person, calendar day) among `personIds`, with the distinct asset count that day.
+  Predicates mirror `getMemoryFacesForPeriod` — Timeline visibility, not deleted, previewable —
+  so a person's density is never skewed by archived or preview-less assets.
+  */
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], { takenBefore: DummyValue.DATE }] })
   getMemoryPersonDailyCounts(
     ownerId: string,
@@ -306,11 +306,11 @@ export class MemoryRuleAssetRepository {
   }
 
   /**
-   * Assets of one person inside an inclusive `[from, to]` day window (`to` is a calendar day, so
-   * the upper bound is exclusive of the following day). Bounded by a ≤14-day window — no `LIMIT`.
-   * Do not copy `getMemoryAssetsForPerson`'s `ORDER BY asset.id … LIMIT 60` — that returns the 60
-   * lowest UUIDs, an arbitrary sample, not the most recent assets.
-   */
+  Assets of one person inside an inclusive `[from, to]` day window (`to` is a calendar day, so
+  the upper bound is exclusive of the following day). Bounded by a ≤14-day window — no `LIMIT`.
+  Do not copy `getMemoryAssetsForPerson`'s `ORDER BY asset.id … LIMIT 60` — that returns the 60
+  lowest UUIDs, an arbitrary sample, not the most recent assets.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { from: DummyValue.DATE, to: DummyValue.DATE }] })
   getMemoryAssetsForPersonWindow(
     ownerId: string,
@@ -349,10 +349,10 @@ export class MemoryRuleAssetRepository {
   }
 
   /**
-   * Memories of one owner whose visible window overlaps `window`, with the asset ids they
-   * actually render. The asset filters MUST stay identical to `MemoryRepository.search` — floors are measured
-   * over what the card shows, and an asset carrying a hidden person's face is not shown.
-   */
+  Memories of one owner whose visible window overlaps `window`, with the asset ids they
+  actually render. The asset filters MUST stay identical to `MemoryRepository.search` — floors are measured
+  over what the card shows, and an asset carrying a hidden person's face is not shown.
+  */
   @GenerateSql({ params: [DummyValue.UUID, { from: DummyValue.DATE, to: DummyValue.DATE }] })
   getForOverlapReconcile(ownerId: string, window: { from: Date; to: Date }) {
     return this.db
@@ -395,9 +395,9 @@ export class MemoryRuleAssetRepository {
   }
 
   /**
-   * Earliest day any memory becomes visible, across all owners — the start of the one-off
-   * overlap backfill. `coalesce` mirrors `MemoryRepository.cleanup`, so a memory with no `showAt` still counts.
-   */
+  Earliest day any memory becomes visible, across all owners — the start of the one-off
+  overlap backfill. `coalesce` mirrors `MemoryRepository.cleanup`, so a memory with no `showAt` still counts.
+  */
   @GenerateSql()
   async getOldestMemoryDate(): Promise<Date | null> {
     const row = await this.db
@@ -410,16 +410,16 @@ export class MemoryRuleAssetRepository {
   }
 
   /**
-   * Remove the plain `on_this_day` memory a rule memory has just superseded. Scoped to one
-   * owner, one trigger day and one year, and never touches a saved memory.
-   *
-   * Written as an unconditional DELETE ... WHERE rather than a read-then-delete: when the
-   * owner has `on_this_day` disabled, or retention already removed the row, there is simply
-   * nothing to match. That keeps correctness independent of whether the on-this-day loop has
-   * run for the day — it only decides whether this has any effect. (In practice it always
-   * has: the on-this-day loop writes up to 3 days ahead and runs first inside the same lock,
-   * so the row exists before any rule for that day is evaluated.)
-   */
+  Remove the plain `on_this_day` memory a rule memory has just superseded. Scoped to one
+  owner, one trigger day and one year, and never touches a saved memory.
+  
+  Written as an unconditional DELETE ... WHERE rather than a read-then-delete: when the
+  owner has `on_this_day` disabled, or retention already removed the row, there is simply
+  nothing to match. That keeps correctness independent of whether the on-this-day loop has
+  run for the day — it only decides whether this has any effect. (In practice it always
+  has: the on-this-day loop writes up to 3 days ahead and runs first inside the same lock,
+  so the row exists before any rule for that day is evaluated.)
+  */
   @GenerateSql({ params: [{ ownerId: DummyValue.UUID, year: DummyValue.NUMBER, showAt: DummyValue.DATE }] })
   async deleteOnThisDay({ ownerId, year, showAt }: { ownerId: string; year: number; showAt: Date }) {
     await this.db

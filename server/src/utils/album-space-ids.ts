@@ -12,21 +12,21 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether.js';
 
 /**
- * The live member-spaces whose contributions `albumId` may surface for this caller, or `undefined`
- * when there are none (a personal album, an `album_user` share, a pre-#1018 spaceless link) — in
- * which case the caller falls back to `album_asset` alone, exactly as before #764.
- *
- * - **Shared link**: at most the ONE space the link was created from, never the creator's full
- *   membership — that would leak a contribution from any OTHER space they happen to share the album
- *   into. Role-gated for the same reason the access tether is (#1018): a creator demoted to Viewer no
- *   longer holds the authority that published the contributions.
- * - **Authenticated**: every space the viewer is a live member of that currently links the album,
- *   any role. Not preference-filtered — a member who hid the space from their home timeline still
- *   sees the album's contributions on the album itself.
- *
- * Both branches go through `getMemberSpaceIdsLinkingAlbum`, which enforces the live album↔space
- * link, live membership, and A1 (album not soft-deleted).
- */
+The live member-spaces whose contributions `albumId` may surface for this caller, or `undefined`
+when there are none (a personal album, an `album_user` share, a pre-#1018 spaceless link) — in
+which case the caller falls back to `album_asset` alone, exactly as before #764.
+
+- **Shared link**: at most the ONE space the link was created from, never the creator's full
+  membership — that would leak a contribution from any OTHER space they happen to share the album
+  into. Role-gated for the same reason the access tether is (#1018): a creator demoted to Viewer no
+  longer holds the authority that published the contributions.
+- **Authenticated**: every space the viewer is a live member of that currently links the album,
+  any role. Not preference-filtered — a member who hid the space from their home timeline still
+  sees the album's contributions on the album itself.
+
+Both branches go through `getMemberSpaceIdsLinkingAlbum`, which enforces the live album↔space
+link, live membership, and A1 (album not soft-deleted).
+*/
 export const getAlbumSpaceIds = async ({
   auth,
   albumId,

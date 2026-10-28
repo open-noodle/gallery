@@ -25,12 +25,12 @@ interface RankedCandidate {
 }
 
 /**
- * "Times with Anna" — a person who hasn't appeared in the user's photos for
- * `dormancyMonths` or more, resurfaced via their densest chapter (D4/D9). Gap length is never
- * shown and never scored (D1/D5); ranking rewards chapter richness, with a mild `recencyBonus`
- * nudge (D6). Returns up to `MAX_CANDIDATES` so the engine's per-key dedup can skip an
- * already-fired person (D8).
- */
+"Times with Anna" — a person who hasn't appeared in the user's photos for
+`dormancyMonths` or more, resurfaced via their densest chapter (D4/D9). Gap length is never
+shown and never scored (D1/D5); ranking rewards chapter richness, with a mild `recencyBonus`
+nudge (D6). Returns up to `MAX_CANDIDATES` so the engine's per-key dedup can skip an
+already-fired person (D8).
+*/
 export class PersonThrowbackMemoryRule implements MemoryRule {
   readonly id = 'person_throwback';
 

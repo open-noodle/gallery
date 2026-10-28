@@ -12,6 +12,7 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
@@ -21,6 +22,7 @@ const setup = (db?: Kysely<DB>) => {
   return { ctx };
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupRepo = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,

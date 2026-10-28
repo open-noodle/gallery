@@ -8,6 +8,7 @@ import { getForAssetFace } from 'test/mappers.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 // #1061: a stored flagged face carrying the photo context getScanFlaggedFaces now returns.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const stored = (assetFaceId: string) => ({
   assetFaceId,
   suspectedOwnerId: 'owner-1',

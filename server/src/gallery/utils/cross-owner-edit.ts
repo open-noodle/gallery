@@ -11,16 +11,16 @@ import { checkAccess } from 'src/utils/access.js';
 const MAX_ATTRIBUTION_ASSETS = 500;
 
 /**
- * Records an edit made by someone who is not the asset owner, so the owner can see
- * what changed and who changed it. Owner self-edits (nearly all editing) log nothing,
- * which is what keeps this low-volume.
- *
- * Grouped by resolved space, one row per space: a bulk edit can span several spaces, and
- * attributing all of it to whichever space resolved first would be wrong. Assets that
- * resolve to no space contribute no row.
- *
- * Never throws. Attribution is secondary to the edit that triggered it.
- */
+Records an edit made by someone who is not the asset owner, so the owner can see
+what changed and who changed it. Owner self-edits (nearly all editing) log nothing,
+which is what keeps this low-volume.
+
+Grouped by resolved space, one row per space: a bulk edit can span several spaces, and
+attributing all of it to whichever space resolved first would be wrong. Assets that
+resolve to no space contribute no row.
+
+Never throws. Attribution is secondary to the edit that triggered it.
+*/
 export const logCrossOwnerEdit = async (
   accessRepository: AccessRepository,
   sharedSpaceRepository: SharedSpaceRepository,

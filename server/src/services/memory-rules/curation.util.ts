@@ -1,7 +1,7 @@
 /**
- * Small, dependency-free helpers shared by the memory rules for curating and scoring
- * candidate asset sets. Kept pure so the rules stay trivially unit-testable.
- */
+Small, dependency-free helpers shared by the memory rules for curating and scoring
+candidate asset sets. Kept pure so the rules stay trivially unit-testable.
+*/
 
 interface TimedAsset {
   id: string;
@@ -9,9 +9,9 @@ interface TimedAsset {
 }
 
 /**
- * Pick `count` items spread evenly across `items` (first and last always included when
- * `count >= 2`). Ported verbatim from the original inline logic in `recent-trip.rule.ts`.
- */
+Pick `count` items spread evenly across `items` (first and last always included when
+`count >= 2`). Ported verbatim from the original inline logic in `recent-trip.rule.ts`.
+*/
 export const pickEvenlySpaced = <T>(items: T[], count: number): T[] => {
   if (count <= 0 || items.length === 0) {
     return [];
@@ -43,13 +43,13 @@ export const medianTime = (assets: Pick<TimedAsset, 'localDateTime'>[]): Date =>
 };
 
 /**
- * Sample up to `cap` ids spread evenly across `groups`, and evenly in time within each group.
- *
- * A multi-year card must show every year it claims, not just the busiest one, so slots are
- * handed out one at a time in round-robin order: every group is served once before any group
- * gets a second. A group smaller than its share simply stops taking slots and the rest absorb
- * them. Group order is preserved in the result.
- */
+Sample up to `cap` ids spread evenly across `groups`, and evenly in time within each group.
+
+A multi-year card must show every year it claims, not just the busiest one, so slots are
+handed out one at a time in round-robin order: every group is served once before any group
+gets a second. A group smaller than its share simply stops taking slots and the rest absorb
+them. Group order is preserved in the result.
+*/
 export const sampleAssetsAcrossGroups = <T extends TimedAsset>(groups: T[][], cap: number): string[] => {
   const quotas = Array.from({ length: groups.length }, () => 0);
   let remaining = Math.min(
@@ -83,10 +83,10 @@ export interface DominantGroup<T> {
 }
 
 /**
- * Group `items` by `key` and return the largest group with its share of the total.
- * Ties break toward the larger group, then the lexicographically smaller key, so the
- * result is deterministic across runs. Empty input yields an empty group with ratio 0.
- */
+Group `items` by `key` and return the largest group with its share of the total.
+Ties break toward the larger group, then the lexicographically smaller key, so the
+result is deterministic across runs. Empty input yields an empty group with ratio 0.
+*/
 export const dominantBy = <T>(items: T[], key: (item: T) => string): DominantGroup<T> => {
   if (items.length === 0) {
     return { key: '', items: [], ratio: 0 };
@@ -131,11 +131,11 @@ export interface PairStat {
 }
 
 /**
- * For every unordered pair of distinct subjects that co-occur on at least one asset, collect the
- * assets where both appear. A person with two faces on the same asset collapses to one subject
- * (no self-pair, no double count). Returned pairs are sorted by co-occurrence count desc, then by
- * the ordered id pair ascending, so the result is deterministic regardless of input row order.
- */
+For every unordered pair of distinct subjects that co-occur on at least one asset, collect the
+assets where both appear. A person with two faces on the same asset collapses to one subject
+(no self-pair, no double count). Returned pairs are sorted by co-occurrence count desc, then by
+the ordered id pair ascending, so the result is deterministic regardless of input row order.
+*/
 export const pairCounts = (rows: FaceRow[]): PairStat[] => {
   const subjectsByAsset = new Map<string, Map<string, { id: string; name: string }>>();
   const assetTimes = new Map<string, Date>();

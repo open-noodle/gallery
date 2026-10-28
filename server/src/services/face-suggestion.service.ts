@@ -16,18 +16,18 @@ const PERSON_SUGGESTION_EMBEDDING_SAMPLE = 20;
 const PERSON_SUGGESTION_NUM_RESULTS = 100;
 
 /**
- * Slice 13 (fork isolation): the fork's face-suggestion engine, extracted out of `person.service.ts`
- * — the same isolation `face-repair.service.ts`, `classification.service.ts` and
- * `shared-space.service.ts` already get. This code never interleaves with upstream `PersonService`
- * logic, so keeping it here means an upstream rebase touching `person.service.ts` never conflicts
- * with it. Mechanical move only: every route path, DTO and job name is unchanged, and the OpenAPI
- * output is byte-identical to before the move (verified by the zero-diff gate in the slice 13 commit).
- *
- * `person.service.ts` keeps only the in-place hook this engine needs from upstream code it cannot
- * own outright: the re-scan queue in `update()`. The backfill-completion queue
- * (`handleFaceIdentityBackfill`) and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
- * `onConfigValidate`, `onConfigUpdate`) live in `src/gallery/services/face-identity-maintenance.service.ts`.
- */
+Slice 13 (fork isolation): the fork's face-suggestion engine, extracted out of `person.service.ts`
+— the same isolation `face-repair.service.ts`, `classification.service.ts` and
+`shared-space.service.ts` already get. This code never interleaves with upstream `PersonService`
+logic, so keeping it here means an upstream rebase touching `person.service.ts` never conflicts
+with it. Mechanical move only: every route path, DTO and job name is unchanged, and the OpenAPI
+output is byte-identical to before the move (verified by the zero-diff gate in the slice 13 commit).
+
+`person.service.ts` keeps only the in-place hook this engine needs from upstream code it cannot
+own outright: the re-scan queue in `update()`. The backfill-completion queue
+(`handleFaceIdentityBackfill`) and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
+`onConfigValidate`, `onConfigUpdate`) live in `src/gallery/services/face-identity-maintenance.service.ts`.
+*/
 @Injectable()
 export class FaceSuggestionService extends BaseService {
   private async findOrFail(id: string) {

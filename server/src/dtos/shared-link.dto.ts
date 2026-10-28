@@ -113,12 +113,12 @@ export function mapSharedLink(
   options: {
     auth: AuthDto;
     /**
-     * #1018: set on the two paths an ANONYMOUS visitor can reach (`getMine`, `login`). A link may
-     * now carry photos its creator does not own, and `ownerId` would name the member behind each
-     * one. Before this feature an individual link only ever held the creator's own assets, so no
-     * third party's id was reachable here. Hidden metadata already drops it (the sanitized
-     * shape omits `ownerId`), so this only matters for links that show metadata.
-     */
+    #1018: set on the two paths an ANONYMOUS visitor can reach (`getMine`, `login`). A link may
+    now carry photos its creator does not own, and `ownerId` would name the member behind each
+    one. Before this feature an individual link only ever held the creator's own assets, so no
+    third party's id was reachable here. Hidden metadata already drops it (the sanitized
+    shape omits `ownerId`), so this only matters for links that show metadata.
+    */
     redactAssetOwners?: boolean;
   },
 ): SharedLinkResponseDto {

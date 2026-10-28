@@ -22,9 +22,9 @@ import { curateTripAssets } from 'src/services/memory-rules/trip.util.js';
 import * as videoMoments from 'src/services/memory-rules/video-moments.rule.js';
 
 /**
- * The smallest asset count each rule can actually emit. This is NOT always its pool gate:
- * the trip rules burst-collapse before sampling, so a 7-asset trip can emit 2. See spec §6.4.
- */
+The smallest asset count each rule can actually emit. This is NOT always its pool gate:
+the trip rules burst-collapse before sampling, so a 7-asset trip can emit 2. See spec §6.4.
+*/
 const SMALLEST_EMITTED_SAMPLE: Record<string, number> = {
   on_this_day: 1, // no gate at all — the defect in spec §2.3
   birthday: 4, // fallback path requires exactly 4

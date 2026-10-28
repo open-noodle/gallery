@@ -11,12 +11,12 @@ export interface MemoryTypeMetadata {
   /** whether an admin can globally disable this type */
   adminConfigurable: boolean;
   /**
-   * Fewest assets a generated memory of this type may still hold after overlap reservation
-   * (spec §6.4). Below this it is deleted rather than shown. Set from the smallest sample the
-   * rule can actually emit — which is not its pool gate for the burst-collapsing trip rules.
-   * `on_this_day` is the deliberate exception: its floor is above what it can emit, which is
-   * how the one-photo "N years ago" card gets removed.
-   */
+  Fewest assets a generated memory of this type may still hold after overlap reservation
+  (spec §6.4). Below this it is deleted rather than shown. Set from the smallest sample the
+  rule can actually emit — which is not its pool gate for the burst-collapsing trip rules.
+  `on_this_day` is the deliberate exception: its floor is above what it can emit, which is
+  how the one-photo "N years ago" card gets removed.
+  */
   minAssets: number;
 }
 
@@ -70,10 +70,10 @@ type AdminMemoriesConfig = {
 };
 
 /**
- * Resolve which type keys are globally available, applying precedence:
- * explicit `types[key]` > legacy bool (`birthday`/`recentTrips`) > `metadata.defaultEnabled`.
- * Keys not present in the registry are ignored.
- */
+Resolve which type keys are globally available, applying precedence:
+explicit `types[key]` > legacy bool (`birthday`/`recentTrips`) > `metadata.defaultEnabled`.
+Keys not present in the registry are ignored.
+*/
 export const getAdminAvailableMemoryTypeKeys = (config: AdminMemoriesConfig): Set<string> => {
   const available = new Set<string>();
   for (const meta of MEMORY_TYPE_METADATA) {

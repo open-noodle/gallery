@@ -2,6 +2,7 @@ import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const asset = (id: string, stackId: string | null) => ({ id, stackId }) as never;
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const stack = (id: string, memberIds: string[]) =>
   ({ id, assets: memberIds.map((memberId) => ({ id: memberId })) }) as never;
 

@@ -29,10 +29,10 @@ export const seasonOf = (month: number): Season => {
 };
 
 /**
- * The "season-year" a (month, year) belongs to. For winter, January and February belong to
- * the previous December's winter, so they map to `year - 1`; every other month maps to its
- * own calendar year.
- */
+The "season-year" a (month, year) belongs to. For winter, January and February belong to
+the previous December's winter, so they map to `year - 1`; every other month maps to its
+own calendar year.
+*/
 export const seasonYearOf = (month: number, year: number): number => (month === 1 || month === 2 ? year - 1 : year);
 
 /** The season starting on `target`, or `null` if `target` is not a season's first day. */

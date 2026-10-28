@@ -14,12 +14,12 @@ export interface Chapter {
 const MS_PER_DAY = 86_400_000;
 
 /**
- * Widest-count window of at most `maxSpanDays` consecutive calendar days.
- * Sorts `days` ascending defensively — the query already orders them, but the
- * two-pointer sweep silently returns garbage on unsorted input rather than
- * failing, so the contract is enforced here rather than assumed.
- * Ties resolve to the MOST RECENT window. Returns null for empty input.
- */
+Widest-count window of at most `maxSpanDays` consecutive calendar days.
+Sorts `days` ascending defensively — the query already orders them, but the
+two-pointer sweep silently returns garbage on unsorted input rather than
+failing, so the contract is enforced here rather than assumed.
+Ties resolve to the MOST RECENT window. Returns null for empty input.
+*/
 export const densestChapter = (days: DayCount[], maxSpanDays: number): Chapter | null => {
   if (days.length === 0) {
     return null;

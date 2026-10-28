@@ -1,26 +1,26 @@
 import { Kysely, sql } from 'kysely';
 
 /**
- * Runs AFTER upstream's `1787148183729-ClusterGroups`, and completes what
- * `1787100000000-DropPersonFksBeforeClusterGroups` began.
- *
- * Upstream deleted `person.id` and made the primary key `(ownerId, personGroupId)`. Gallery's three
- * face-review columns previously referenced `person.id`; they are repointed at `person_group.id`.
- *
- * No data migration is required. Upstream's migration seeds the new ids from the old ones:
- *
- *   INSERT INTO person_group ("id", ...) SELECT "id", ... FROM person;
- *   UPDATE person SET "personGroupId" = "id";
- *
- * so every value already stored in these columns is still the correct key — only the name of the
- * thing it points at changed. This migration is therefore purely structural.
- *
- * It also installs the unique index that holds option M together: Gallery does not adopt upstream's
- * cluster-groups feature (cross-user recognition is answered by shared spaces + `face_identity`), so
- * a person_group here always holds exactly one person row. That is what lets the fork address a
- * person by `personGroupId` alone. The index makes it a database-enforced fact rather than a
- * convention — see PersonRepository.getByGroupIdOnly.
- */
+Runs AFTER upstream's `1787148183729-ClusterGroups`, and completes what
+`1787100000000-DropPersonFksBeforeClusterGroups` began.
+
+Upstream deleted `person.id` and made the primary key `(ownerId, personGroupId)`. Gallery's three
+face-review columns previously referenced `person.id`; they are repointed at `person_group.id`.
+
+No data migration is required. Upstream's migration seeds the new ids from the old ones:
+
+  INSERT INTO person_group ("id", ...) SELECT "id", ... FROM person;
+  UPDATE person SET "personGroupId" = "id";
+
+so every value already stored in these columns is still the correct key — only the name of the
+thing it points at changed. This migration is therefore purely structural.
+
+It also installs the unique index that holds option M together: Gallery does not adopt upstream's
+cluster-groups feature (cross-user recognition is answered by shared spaces + `face_identity`), so
+a person_group here always holds exactly one person row. That is what lets the fork address a
+person by `personGroupId` alone. The index makes it a database-enforced fact rather than a
+convention — see PersonRepository.getByGroupIdOnly.
+*/
 export async function up(db: Kysely<any>): Promise<void> {
   // Guard: option M is only sound while a group holds one person. Fail with an explanation rather
   // than a bare uniqueness violation.

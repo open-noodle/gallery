@@ -136,9 +136,9 @@ const parseChunks = (chunks: string[]) => {
 };
 
 /**
- * Create mock sub-repos for SyncRepository. The automock doesn't handle
- * nested instance properties created in the constructor, so we wire them up manually.
- */
+Create mock sub-repos for SyncRepository. The automock doesn't handle
+nested instance properties created in the constructor, so we wire them up manually.
+*/
 const makeSub = () => ({
   getDeletes: vi.fn().mockReturnValue(makeStream([])),
   getUpserts: vi.fn().mockReturnValue(makeStream([])),

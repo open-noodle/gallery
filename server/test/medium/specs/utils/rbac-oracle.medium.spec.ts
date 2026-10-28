@@ -1,10 +1,10 @@
 /**
- * RBAC oracle for the viewer-scoped read surfaces: runs every surface that applies resolveViewerScope or the
- * space visibility rules, for a fixed cast of actors over one seeded world, and snapshots what each actor gets back
- * by label. An asset label ends in `*` when that surface reports it as a favourite for that actor, and a call that
- * throws is recorded as `error:<class>`. A refactor of the scope, favourite or album-membership code must leave the
- * snapshot untouched; a deliberate behaviour change updates it with `-u` and says so in its commit.
- */
+RBAC oracle for the viewer-scoped read surfaces: runs every surface that applies resolveViewerScope or the
+space visibility rules, for a fixed cast of actors over one seeded world, and snapshots what each actor gets back
+by label. An asset label ends in `*` when that surface reports it as a favourite for that actor, and a call that
+throws is recorded as `error:<class>`. A refactor of the scope, favourite or album-membership code must leave the
+snapshot untouched; a deliberate behaviour change updates it with `-u` and says so in its commit.
+*/
 import { Kysely } from 'kysely';
 import { DownloadInfoDto } from 'src/dtos/download.dto.js';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';

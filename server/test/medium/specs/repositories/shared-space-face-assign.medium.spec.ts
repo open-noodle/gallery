@@ -1,20 +1,20 @@
 /**
- * Medium tests for `FacePersonVerdictRepository.isFaceAssignableInSpace` — the data half
- * of the #734-follow-up authority rule (spec §3, §9.1).
- *
- * Rule: a face is assignable in space S if its asset is reachable through S by any of the
- * three paths, the face is live and visible, and the face does not belong to a person its
- * OWNER marked hidden.
- *
- * Deliberately NOT the #992 rule: there is no owner-is-member clause here (F-6). An editor
- * may name Carol's face even though Carol never joined the space. Since §6.3.1 was revised,
- * owner membership instead decides how far the edit reaches: only a member's own library is
- * written, so for Carol the edit stays in the space's own taxonomy (see the §3 block below).
- *
- * Discipline: every deny row below is mutation-proved non-vacuous. Each uses a fixture that
- * a GRANT row in the same block also uses, so a deny can only be explained by the specific
- * property under test.
- */
+Medium tests for `FacePersonVerdictRepository.isFaceAssignableInSpace` — the data half
+of the #734-follow-up authority rule (spec §3, §9.1).
+
+Rule: a face is assignable in space S if its asset is reachable through S by any of the
+three paths, the face is live and visible, and the face does not belong to a person its
+OWNER marked hidden.
+
+Deliberately NOT the #992 rule: there is no owner-is-member clause here (F-6). An editor
+may name Carol's face even though Carol never joined the space. Since §6.3.1 was revised,
+owner membership instead decides how far the edit reaches: only a member's own library is
+written, so for Carol the edit stays in the space's own taxonomy (see the §3 block below).
+
+Discipline: every deny row below is mutation-proved non-vacuous. Each uses a fixture that
+a GRANT row in the same block also uses, so a deny can only be explained by the specific
+property under test.
+*/
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it, vi } from 'vitest';

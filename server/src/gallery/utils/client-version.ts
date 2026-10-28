@@ -15,10 +15,10 @@ export const stockClientRoom = (room?: string) => (room ? `${STOCK_CLIENT_ROOM}:
 const GALLERY_APP_MIN_MAJOR = 5;
 
 /**
- * A Gallery client sends `x-gallery-app` (socket.io browsers cannot set headers, so the web sends it in the
- * handshake auth payload) or a Gallery app User-Agent (`immich-android/5.x`). Everything else, including stock
- * Immich apps, the stock CLI, third-party tools and plain browsers, is a stock client.
- */
+A Gallery client sends `x-gallery-app` (socket.io browsers cannot set headers, so the web sends it in the
+handshake auth payload) or a Gallery app User-Agent (`immich-android/5.x`). Everything else, including stock
+Immich apps, the stock CLI, third-party tools and plain browsers, is a stock client.
+*/
 export const isGalleryClient = (headers: IncomingHttpHeaders, socketAuth?: Record<string, unknown>): boolean => {
   if (headers[GALLERY_APP_HEADER] || socketAuth?.[GALLERY_APP_HEADER]) {
     return true;
