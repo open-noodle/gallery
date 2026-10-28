@@ -449,6 +449,17 @@ export type AdminConfigServerDto = {
     /** Public users */
     publicUsers: boolean;
 };
+export type AdminConfigStorageRoutingDto = {
+    /** Where newly written transcoded videos are stored */
+    encodedVideo: StorageRouting;
+    /** Where newly written original files and sidecars are stored */
+    originals: StorageRouting;
+    /** Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored */
+    thumbnails: StorageRouting;
+};
+export type AdminConfigStorageDto = {
+    routing: AdminConfigStorageRoutingDto;
+};
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */
     enabled: boolean;
@@ -506,6 +517,7 @@ export type AdminConfigDto = {
     passwordLogin: AdminConfigPasswordLoginDto;
     reverseGeocoding: AdminConfigReverseGeocodingDto;
     server: AdminConfigServerDto;
+    storage: AdminConfigStorageDto;
     storageTemplate: AdminConfigStorageTemplateDto;
     storageUsage: AdminConfigStorageUsageDto;
     templates: AdminConfigTemplatesDto;
@@ -3787,6 +3799,8 @@ export type ServerFeaturesDto = {
     realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
+    /** Whether an S3 bucket is configured */
+    s3Configured: boolean;
     /** Whether the server is running on the S3 storage backend */
     s3Storage: boolean;
     /** Whether search is enabled */
@@ -4394,6 +4408,17 @@ export type StackCreateDto = {
 export type StackUpdateDto = {
     /** Primary asset ID */
     primaryAssetId?: string;
+};
+export type StorageRoutingStatusEntryDto = {
+    /** Number of files of this kind currently stored on the other backend */
+    misplacedCount: number;
+    /** The resolved backend new files of this kind are written to */
+    routedTo: RoutedTo;
+};
+export type StorageRoutingStatusDto = {
+    encodedVideo: StorageRoutingStatusEntryDto;
+    originals: StorageRoutingStatusEntryDto;
+    thumbnails: StorageRoutingStatusEntryDto;
 };
 export type StorageMigrationFileTypesDto = {
     /** Include encoded video files */
@@ -10470,6 +10495,17 @@ export function rollback({ batchId }: {
     }));
 }
 /**
+ * Get storage routing status
+ */
+export function getRoutingStatus(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: StorageRoutingStatusDto;
+    }>("/storage-migration/routing", {
+        ...opts
+    }));
+}
+/**
  * Start storage migration
  */
 export function start({ storageMigrationStartDto }: {
@@ -11605,6 +11641,11 @@ export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
 }
+export enum StorageRouting {
+    Auto = "auto",
+    Disk = "disk",
+    S3 = "s3"
+}
 export enum Recommendation {
     Confident = "confident",
     ReviewFirst = "review-first"
@@ -12181,6 +12222,10 @@ export enum RepresentativeFaceSource {
 export enum StorageMigrationDirection {
     ToS3 = "toS3",
     ToDisk = "toDisk"
+}
+export enum RoutedTo {
+    Disk = "disk",
+    S3 = "s3"
 }
 export enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
