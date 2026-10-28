@@ -998,15 +998,15 @@ const assetJobStatusInsert = (
 };
 
 /**
- * Option M: `person.personGroupId` is a NOT NULL foreign key to `person_group`, which itself keys on
- * the owner's cluster group. Specs that insert into `person` directly — rather than through
- * `ctx.newPerson`, which does this for them — must mint the group first or every insert fails its
- * foreign key.
- */
+Option M: `person.personGroupId` is a NOT NULL foreign key to `person_group`, which itself keys on
+the owner's cluster group. Specs that insert into `person` directly — rather than through
+`ctx.newPerson`, which does this for them — must mint the group first or every insert fails its
+foreign key.
+*/
 /**
- * Option M: `user.clusterGroupId` is a NOT NULL foreign key. `ctx.newUser` mints the group through
- * ClusterGroupRepository; specs that build a user row by hand need the same.
- */
+Option M: `user.clusterGroupId` is a NOT NULL foreign key. `ctx.newUser` mints the group through
+ClusterGroupRepository; specs that build a user row by hand need the same.
+*/
 /** Updates a person row together with its fork sidecar fields (person_identity, person_pet). */
 export const updatePersonForTest = async (
   db: Kysely<DB>,

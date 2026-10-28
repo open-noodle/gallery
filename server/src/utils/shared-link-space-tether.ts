@@ -24,20 +24,20 @@ import { DB } from 'src/schema/index.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 /**
- * The space roles that may publish a link covering other members' photos. Single source of truth for
- * the create gate and every read gate, so they cannot drift apart.
- */
+The space roles that may publish a link covering other members' photos. Single source of truth for
+the create gate and every read gate, so they cannot drift apart.
+*/
 export const sharedLinkPublisherRoles = [SharedSpaceRole.Owner, SharedSpaceRole.Editor];
 
 /**
- * Condition 1 — the link's creator still holds a write role in the space it was created from.
- *
- * Deliberately the ROLE, not bare membership: Owner/Editor is what authorised publishing another
- * member's photo in the first place (`shared-link.service.requireSpaceEditor`), so a creator demoted
- * to Viewer must stop publishing, exactly as one removed from the space does. Checking only
- * membership would leave a demoted editor holding a public link over photos they may no longer act
- * on — and with no space-level view of published links, nobody could find it to revoke it.
- */
+Condition 1 — the link's creator still holds a write role in the space it was created from.
+
+Deliberately the ROLE, not bare membership: Owner/Editor is what authorised publishing another
+member's photo in the first place (`shared-link.service.requireSpaceEditor`), so a creator demoted
+to Viewer must stop publishing, exactly as one removed from the space does. Checking only
+membership would leave a demoted editor holding a public link over photos they may no longer act
+on — and with no space-level view of published links, nobody could find it to revoke it.
+*/
 export const sharedLinkCreatorCanPublish = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
   eb.exists(
     eb
@@ -49,9 +49,9 @@ export const sharedLinkCreatorCanPublish = (eb: ExpressionBuilder<DB, keyof DB>)
   );
 
 /**
- * Conditions 1 + 2 for the outer `asset` row: the full tether. Correlates on `asset.id` /
- * `asset.libraryId`, so the caller must have `asset` in scope.
- */
+Conditions 1 + 2 for the outer `asset` row: the full tether. Correlates on `asset.id` /
+`asset.libraryId`, so the caller must have `asset` in scope.
+*/
 export const sharedLinkSpaceTether = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
   eb.and([
     eb('shared_link_space.spaceId', 'is not', null),
@@ -68,16 +68,16 @@ export const sharedLinkSpaceTether = (eb: ExpressionBuilder<DB, keyof DB>): Expr
   ]);
 
 /**
- * An asset is servable through a link when the creator owns it (always theirs to share) or the
- * tether currently holds. Correlates on the outer `asset` row.
- */
+An asset is servable through a link when the creator owns it (always theirs to share) or the
+tether currently holds. Correlates on the outer `asset` row.
+*/
 export const sharedLinkAssetIsServable = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
   eb.or([eb(eb.ref('asset.ownerId'), '=', eb.ref('shared_link.userId')), sharedLinkSpaceTether(eb)]);
 
 /**
- * Kysely types every table inside a LEFT JOIN's `ON` context as `Nullable<...>`, which makes that
- * builder structurally incompatible with the helpers above even though they only reach base tables
- * through correlated EXISTS subqueries, where the outer nullability cannot matter. One named alias
- * documents the widening instead of scattering casts across the call sites.
- */
+Kysely types every table inside a LEFT JOIN's `ON` context as `Nullable<...>`, which makes that
+builder structurally incompatible with the helpers above even though they only reach base tables
+through correlated EXISTS subqueries, where the outer nullability cannot matter. One named alias
+documents the widening instead of scattering casts across the call sites.
+*/
 export const asBaseEb = (eb: unknown) => eb as ExpressionBuilder<DB, keyof DB>;

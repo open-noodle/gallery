@@ -59,18 +59,18 @@ export type SearchOptionsSmartQuery = Omit<AssetSearchBuilderOptions, 'visibilit
 };
 
 /**
- * What one request computes. `availability` is the chip row: whether each dimension has any option, the #910 flags
- * and whether anything matches, all from LIMIT 1 probes. Every other value is one option list with counts, so a client
- * asks for availability first and fetches the lists it needs in parallel.
- */
+What one request computes. `availability` is the chip row: whether each dimension has any option, the #910 flags
+and whether anything matches, all from LIMIT 1 probes. Every other value is one option list with counts, so a client
+asks for availability first and fetches the lists it needs in parallel.
+*/
 
 /**
- * The resolved options of a search options request, in the shape its results call runs them, so every count is a
- * count of that call's own query:
- * - `browse`: `/timeline/buckets`, i.e. `withTimeBucketAssetFilters` over `TimelineService`'s options. `favorites` is the
- *   same request resolved with `isFavorite: true` (whose scope differs, #763), for the hasFavorites probe.
- * - `query`: `/search/smart`, i.e. `searchAssetBuilderWithLocalTaken` (rating a minimum) over the smart-search candidates.
- */
+The resolved options of a search options request, in the shape its results call runs them, so every count is a
+count of that call's own query:
+- `browse`: `/timeline/buckets`, i.e. `withTimeBucketAssetFilters` over `TimelineService`'s options. `favorites` is the
+  same request resolved with `isFavorite: true` (whose scope differs, #763), for the hasFavorites probe.
+- `query`: `/search/smart`, i.e. `searchAssetBuilderWithLocalTaken` (rating a minimum) over the smart-search candidates.
+*/
 export type SearchOptionsQuery = {
   callerId: string;
   dimensions: SearchOptionsDimension[];
@@ -91,10 +91,10 @@ export type SearchOptionsQuery = {
 type Facet = 'time' | 'places' | 'cameras' | 'tags' | 'ratings' | 'mediaTypes' | 'favorites' | 'albums';
 
 /**
- * Browse: the keys each list drops. Tags are ANY there, a union the user widens one tag at a time, so like the
- * single-choice lists they drop their own filter: a tag counts the photos it would match with everything else.
- * The favourites probe runs on its own request (`favorites`) instead.
- */
+Browse: the keys each list drops. Tags are ANY there, a union the user widens one tag at a time, so like the
+single-choice lists they drop their own filter: a tag counts the photos it would match with everything else.
+The favourites probe runs on its own request (`favorites`) instead.
+*/
 const browseExcludes: Record<Exclude<Facet, 'favorites'>, (keyof TimeBucketOptions)[]> = {
   time: ['takenAfter', 'takenBefore'],
   places: ['country', 'state', 'city'],
@@ -106,9 +106,9 @@ const browseExcludes: Record<Exclude<Facet, 'favorites'>, (keyof TimeBucketOptio
 };
 
 /**
- * Query: the keys each list drops. Tags are ALL there, so they keep their filter and list what co-occurs with the
- * selection; Untagged (`tagIds: null`) goes, since choosing a tag replaces it.
- */
+Query: the keys each list drops. Tags are ALL there, so they keep their filter and list what co-occurs with the
+selection; Untagged (`tagIds: null`) goes, since choosing a tag replaces it.
+*/
 const queryExcludes: Record<Facet, (options: SearchOptionsSmartQuery) => (keyof AssetSearchBuilderOptions)[]> = {
   time: () => ['takenAfter', 'takenBefore'],
   places: () => ['country', 'state', 'city'],
@@ -180,12 +180,12 @@ type AvailabilityProbe = {
 };
 
 /**
- * A space's set, materialised, for the lists that join another table (tags, places, cameras, ratings) and the
- * availability probes. Given the space scope inline, the planner
- * drives the tag list from every tag_asset row, and a LIMIT 1 probe walks the caller's own assets hoping for an early
- * hit, re-running the space-path checks per row (5–10 s at 500k assets); materialised, the space's assets are found
- * once (0.3 s). Elsewhere the inline join plans well, and materialising would hide the set's size from the planner.
- */
+A space's set, materialised, for the lists that join another table (tags, places, cameras, ratings) and the
+availability probes. Given the space scope inline, the planner
+drives the tag list from every tag_asset row, and a LIMIT 1 probe walks the caller's own assets hoping for an early
+hit, re-running the space-path checks per row (5–10 s at 500k assets); materialised, the space's assets are found
+once (0.3 s). Elsewhere the inline join plans well, and materialising would hide the set's size from the planner.
+*/
 const spaceScope = (db: Kysely<DB>, scoped: ScopedAssets, spaceId?: string): ScopedAssets =>
   spaceId ? materialized(db, scoped) : scoped;
 
@@ -233,6 +233,7 @@ const hedgedOnPool = async (
 };
 
 /** Visible, live faces. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const liveFace = (alias: string) =>
   sql<SqlBool>`${sql.ref(`${alias}.deletedAt`)} IS NULL AND ${sql.ref(`${alias}.isVisible`)}`;
 
@@ -268,9 +269,9 @@ const byPersonCount = (a: SearchOptionsPerson, b: SearchOptionsPerson) =>
   b.count - a.count || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 
 /**
- * Folds `(parent, child, count)` rows into parents with their children, both most assets first. A parent counts its
- * rows with no child too (a photo in Portugal with no city); only named children are listed.
- */
+Folds `(parent, child, count)` rows into parents with their children, both most assets first. A parent counts its
+rows with no child too (a photo in Portugal with no city); only named children are listed.
+*/
 const groupCounts = <P extends string, C extends string>(
   rows: Array<{ [key in P | C]: string | null } & { count: number | string | bigint }>,
   parentKey: P,
@@ -373,21 +374,21 @@ export class SmartFacetRepository {
   }
 
   /**
-   * `POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1): the requested dimensions of
-   * the filter options. Each list is the results call's own query (see `SearchOptionsQuery`) with that list's table
-   * joined straight onto it, so the total IS the result count; a list only drops its own filter keys. Single-choice
-   * lists (place, camera, rating, type, date) drop their filter so the user can switch value. People are AND in both
-   * modes, so they keep theirs and list who else is in those photos (the selection included, with a count equal to the
-   * total). Tags follow the mode: see `browseExcludes` and `queryExcludes`.
-   *
-   * Joined, not `asset_exif.assetId IN (<set>)` and not a CTE: an IN lets the planner drive from the list's table and
-   * re-run the scope checks per row (8 s for one space's tags at 500k assets), and a CTE hides the set's size from it
-   * (an estimate of 200 rows for 617k, then 617k nested-loop lookups per list). See
-   * specs/research/2026-10-23-search-options-500k-benchmark.md.
-   *
-   * Query mode first collects the smart-search candidates the facets use (`createSmartFacetCandidates`) and confines
-   * every set to them.
-   */
+  `POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1): the requested dimensions of
+  the filter options. Each list is the results call's own query (see `SearchOptionsQuery`) with that list's table
+  joined straight onto it, so the total IS the result count; a list only drops its own filter keys. Single-choice
+  lists (place, camera, rating, type, date) drop their filter so the user can switch value. People are AND in both
+  modes, so they keep theirs and list who else is in those photos (the selection included, with a count equal to the
+  total). Tags follow the mode: see `browseExcludes` and `queryExcludes`.
+  
+  Joined, not `asset_exif.assetId IN (<set>)` and not a CTE: an IN lets the planner drive from the list's table and
+  re-run the scope checks per row (8 s for one space's tags at 500k assets), and a CTE hides the set's size from it
+  (an estimate of 200 rows for 617k, then 617k nested-loop lookups per list). See
+  specs/research/2026-10-23-search-options-500k-benchmark.md.
+  
+  Query mode first collects the smart-search candidates the facets use (`createSmartFacetCandidates`) and confines
+  every set to them.
+  */
   @GenerateSql({
     params: [
       {
@@ -434,14 +435,14 @@ export class SmartFacetRepository {
   }
 
   /**
-   * A cheap marker of every write that can change any search option: the newest `updateId` (or audit id, for deletes)
-   * of each table the options read, all indexed, plus Postgres' write counters for the tables with no such indexed
-   * column (`tag_asset`, `tag_closure`, `asset_face`, `shared_space_person_face`, `ocr_search`). Those counters are
-   * late: a connection sends its counts to the statistics view at most every 500 ms (PG14), and a connection that goes
-   * idle sooner keeps them until it next runs a statement. On the server's busy pool that is usually under a second;
-   * the watermark query itself flushes the connection it runs on. Global, not per user: it can only invalidate too
-   * often, never too rarely, apart from that delay.
-   */
+  A cheap marker of every write that can change any search option: the newest `updateId` (or audit id, for deletes)
+  of each table the options read, all indexed, plus Postgres' write counters for the tables with no such indexed
+  column (`tag_asset`, `tag_closure`, `asset_face`, `shared_space_person_face`, `ocr_search`). Those counters are
+  late: a connection sends its counts to the statistics view at most every 500 ms (PG14), and a connection that goes
+  idle sooner keeps them until it next runs a statement. On the server's busy pool that is usually under a second;
+  the watermark query itself flushes the connection it runs on. Global, not per user: it can only invalidate too
+  often, never too rarely, apart from that delay.
+  */
   @GenerateSql()
   async getSearchOptionsWatermark(): Promise<string> {
     const { rows } = await sql<{ watermark: string }>`
@@ -471,6 +472,7 @@ export class SmartFacetRepository {
   }
 
   private async computeSearchOptions(db: Kysely<DB>, options: SearchOptionsQuery): Promise<SearchOptionsResult> {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const scoped = (facet?: Facet, overrides: Partial<SearchOptionsSmartQuery> = {}) =>
       this.searchOptionsScope(db, options, facet, overrides);
     const scope = options.mode === 'browse' ? options.timeline : options.search;
@@ -639,9 +641,9 @@ export class SmartFacetRepository {
   }
 
   /**
-   * The chip row: does each list have any option (its own filter dropped, as the list itself), the #910 flags, and
-   * does anything match at all. LIMIT 1 probes, run concurrently.
-   */
+  The chip row: does each list have any option (its own filter dropped, as the list itself), the #910 flags, and
+  does anything match at all. LIMIT 1 probes, run concurrently.
+  */
   private async getSearchOptionsAvailability(
     db: Kysely<DB>,
     options: SearchOptionsQuery,
@@ -734,6 +736,7 @@ export class SmartFacetRepository {
     });
     // The probes read only `asset.id` and `asset.type`, so the CTE carries both under the name `asset`: an empty answer
     // scans the set without looking each id up in `asset` again.
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const materializedShared = (on: Kysely<DB>) =>
       on
         .with(
@@ -749,6 +752,7 @@ export class SmartFacetRepository {
           }),
         )
         .executeTakeFirstOrThrow() as Promise<Partial<SearchOptionsAvailability>>;
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const materializedOwn = (on: Kysely<DB>, name: AvailabilityFlag) =>
       exists(probes[name].build(materialized(on, probes[name].scope(on))));
 
@@ -785,11 +789,12 @@ export class SmartFacetRepository {
   }
 
   /**
-   * Whether the people list would hold a named person: the list's own rules, as one EXISTS that stops at the first
-   * named face. (Whether unnamed people appear needs every face checked when there are none, so it comes with the
-   * people list instead.)
-   */
+  Whether the people list would hold a named person: the list's own rules, as one EXISTS that stops at the first
+  named face. (Whether unnamed people appear needs every face checked when there are none, so it comes with the
+  people list instead.)
+  */
   private searchOptionsPeopleProbe(scope: PeopleScope, scoped: ScopedAssets): AvailabilityQuery {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const named = (column: string) => sql<SqlBool>`NULLIF(${sql.ref(column)}, '') IS NOT NULL`;
     const one = sql<number>`1`.as(SEARCH_OPTIONS_PROBE);
 

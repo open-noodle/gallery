@@ -28,16 +28,16 @@ export type MergeProfile = {
 };
 
 /**
- * The subset of a profile the plan builder needs from an origin: which scope it lives in, and which identity
- * it carries. Survivor selection reads face counts and names from the *attached* profiles, not from these.
- */
+The subset of a profile the plan builder needs from an origin: which scope it lives in, and which identity
+it carries. Survivor selection reads face counts and names from the *attached* profiles, not from these.
+*/
 export type MergeOriginProfile = Pick<MergeProfile, 'kind' | 'id' | 'ownerId' | 'spaceId' | 'identityId' | 'type'>;
 
 /**
- * Runs against the built plan, inside the merge transaction and before anything is written, so a refusal rolls
- * back even the identities the builder may have minted. Authorization policy (and the config it reads) lives in
- * the calling service — the planner stays an engine.
- */
+Runs against the built plan, inside the merge transaction and before anything is written, so a refusal rolls
+back even the identities the builder may have minted. Authorization policy (and the config it reads) lives in
+the calling service — the planner stays an engine.
+*/
 export type MergeAuthorizer = (plan: IdentityMergePropagationPlan) => Promise<void>;
 
 export type ProfileMergeStep = {
@@ -91,22 +91,22 @@ export type IdentityMergePropagationPlan = {
   profileIdentityUpdates: Array<{ kind: MergeProfileKind; profileId: string; identityId: string }>;
   affectedOwnerIds: string[];
   /**
-   * Owners other than the actor whose single person on the identity set is merely re-pointed at the surviving
-   * identity. Their row keeps its name, faces and thumbnail — nothing is destroyed, and this is precisely what
-   * the recognition job already does unattended when it fuses identities across libraries. Ungated.
-   */
+  Owners other than the actor whose single person on the identity set is merely re-pointed at the surviving
+  identity. Their row keeps its name, faces and thumbnail — nothing is destroyed, and this is precisely what
+  the recognition job already does unattended when it fuses identities across libraries. Ungated.
+  */
   repointedOwnerIds: string[];
   /**
-   * Owners other than the actor who hold people on BOTH identities, so committing the merge would merge two of
-   * THEIR people: one row deleted, its faces moved. That is destructive and irreversible for someone who never
-   * asked for it — and the automatic paths refuse to do it. This is what the cross-owner gate exists for.
-   */
+  Owners other than the actor who hold people on BOTH identities, so committing the merge would merge two of
+  THEIR people: one row deleted, its faces moved. That is destructive and irreversible for someone who never
+  asked for it — and the automatic paths refuse to do it. This is what the cross-owner gate exists for.
+  */
   collapsedOwnerIds: string[];
   /**
-   * Spaces whose profiles this merge would collapse (one row deleted, its faces moved) but where the actor is
-   * not an Owner/Editor. Collapsing a space's people is an editor-only action, and the fan-out must not reach it
-   * for a viewer or non-member. Populated for every merge path; enforced (toggle-independently) by the policy.
-   */
+  Spaces whose profiles this merge would collapse (one row deleted, its faces moved) but where the actor is
+  not an Owner/Editor. Collapsing a space's people is an editor-only action, and the fan-out must not reach it
+  for a viewer or non-member. Populated for every merge path; enforced (toggle-independently) by the policy.
+  */
   unrepairableSpaceCollapseIds: string[];
   affectedSpaceIds: string[];
   followUpJobs: MergePropagationFollowUpJob[];
@@ -160,9 +160,9 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * The scoped merge (POST /people/same-person). Same engine as the personal and in-space merges — it is only
-   * the origin refs that differ, so a same-scope profile conflict is collapsed here exactly as it is there.
-   */
+  The scoped merge (POST /people/same-person). Same engine as the personal and in-space merges — it is only
+  the origin refs that differ, so a same-scope profile conflict is collapsed here exactly as it is there.
+  */
   async mergeScopedProfiles(auth: AuthDto, dto: MergeScopedPeopleDto, authorize?: MergeAuthorizer): Promise<void> {
     const { plan, followUps } = await this.runMergeTransaction(async (db) => {
       await this.lockMergePropagation(db);
@@ -220,20 +220,20 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * The gate every merge entry point applies before execution. `authorize` is optional so the engine's mechanics
-   * can be tested in isolation — but a plan that would DESTRUCTIVELY collapse another owner's people, or people in
-   * a space the actor cannot edit, must never execute without one. Failing closed here means a future merge path
-   * (or a call to `executePlan`) that forgets the authorizer cannot silently re-open the #733 cross-owner hole; it
-   * throws instead. Tests that intentionally exercise destructive execution pass an explicit permissive authorizer.
-   */
+  The gate every merge entry point applies before execution. `authorize` is optional so the engine's mechanics
+  can be tested in isolation — but a plan that would DESTRUCTIVELY collapse another owner's people, or people in
+  a space the actor cannot edit, must never execute without one. Failing closed here means a future merge path
+  (or a call to `executePlan`) that forgets the authorizer cannot silently re-open the #733 cross-owner hole; it
+  throws instead. Tests that intentionally exercise destructive execution pass an explicit permissive authorizer.
+  */
   /**
-   * Runs the merge transaction, translating a concurrency collision into a retriable 409 instead of a 500 (#733
-   * review L2). The automatic recognition/dedup/reconciliation and detach paths do NOT take the merge advisory
-   * lock, so between this plan's read snapshot and its writes one of them can insert or move a profile on an
-   * involved identity. The plan's unguarded identity move then hits the unique (scope, identity) index (23505), or
-   * the post-merge conflict re-check (`mergeIdentitiesAfterProfileResolution`) fires. Nothing is lost — the
-   * transaction rolls back — but the caller should be told to try again, not shown an internal error.
-   */
+  Runs the merge transaction, translating a concurrency collision into a retriable 409 instead of a 500 (#733
+  review L2). The automatic recognition/dedup/reconciliation and detach paths do NOT take the merge advisory
+  lock, so between this plan's read snapshot and its writes one of them can insert or move a profile on an
+  involved identity. The plan's unguarded identity move then hits the unique (scope, identity) index (23505), or
+  the post-merge conflict re-check (`mergeIdentitiesAfterProfileResolution`) fires. Nothing is lost — the
+  transaction rolls back — but the caller should be told to try again, not shown an internal error.
+  */
   private async runMergeTransaction<T>(fn: (db: Transaction<DB>) => Promise<T>): Promise<T> {
     try {
       return await this.deps.databaseRepository.transaction(fn);
@@ -398,11 +398,11 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * Record a committed cross-owner COLLAPSE (issue #733 review A1). Collapsing another owner's two people deletes
-   * one of their person rows — an irreversible action on data the actor does not own. A collapse that touches a
-   * space leaves a space-activity trace, but a purely-personal one leaves none at all, so log every one here.
-   * Runs post-commit (from the best-effort follow-up step), so it only records merges that actually landed.
-   */
+  Record a committed cross-owner COLLAPSE (issue #733 review A1). Collapsing another owner's two people deletes
+  one of their person rows — an irreversible action on data the actor does not own. A collapse that touches a
+  space leaves a space-activity trace, but a purely-personal one leaves none at all, so log every one here.
+  Runs post-commit (from the best-effort follow-up step), so it only records merges that actually landed.
+  */
   private auditDestructiveCrossOwnerCollapse(plan: IdentityMergePropagationPlan): void {
     if (plan.collapsedOwnerIds.length === 0) {
       return;
@@ -454,9 +454,9 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * Ensures identities for the initiating target/source profiles before loading attached profiles;
-   * this may persist newly-created identities.
-   */
+  Ensures identities for the initiating target/source profiles before loading attached profiles;
+  this may persist newly-created identities.
+  */
   async buildPersonalMergePlan(
     input: {
       actorUserId: string;
@@ -505,13 +505,13 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * The scoped merge (POST /people/same-person): the target and each source are named by a scoped ref, so a
-   * single merge can span the actor's own library and any space they can repair. This is the merge the global
-   * People page issues whenever one of the selected people is only visible through a space (issue #733).
-   *
-   * The refs are RBAC-checked on resolution; everything the identities are *attached* to is then collapsed by
-   * the shared tail, exactly as for the personal and in-space merges.
-   */
+  The scoped merge (POST /people/same-person): the target and each source are named by a scoped ref, so a
+  single merge can span the actor's own library and any space they can repair. This is the merge the global
+  People page issues whenever one of the selected people is only visible through a space (issue #733).
+  
+  The refs are RBAC-checked on resolution; everything the identities are *attached* to is then collapsed by
+  the shared tail, exactly as for the personal and in-space merges.
+  */
   async buildScopedMergePlan(
     input: {
       actorUserId: string;
@@ -570,21 +570,21 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * The shared tail of every merge plan, and the only place profile conflicts are resolved: fan out to every
-   * profile attached to the involved identities, group them by scope (owner, space), pick one survivor per
-   * scope and collapse the rest into it. A scope may hold only one profile per identity
-   * (person_ownerId_identityId_key / shared_space_person_spaceId_identityId_key), so without this collapse the
-   * identity merge could not commit at all.
-   *
-   * The survivor of the actor's *own* scope is pinned to the profile they targeted; every other scope picks by
-   * face count, then name, then id.
-   */
+  The shared tail of every merge plan, and the only place profile conflicts are resolved: fan out to every
+  profile attached to the involved identities, group them by scope (owner, space), pick one survivor per
+  scope and collapse the rest into it. A scope may hold only one profile per identity
+  (person_ownerId_identityId_key / shared_space_person_spaceId_identityId_key), so without this collapse the
+  identity merge could not commit at all.
+  
+  The survivor of the actor's *own* scope is pinned to the profile they targeted; every other scope picks by
+  face count, then name, then id.
+  */
   /**
-   * Of the spaces this merge would collapse, the ones where the actor is not an Owner/Editor. The actor's role
-   * is read per space (member spaces only); a space the actor is a viewer of, or not a member of at all, is not
-   * repairable and so is returned. The initiating space of an in-space merge is Editor-checked upstream, so it
-   * never appears here.
-   */
+  Of the spaces this merge would collapse, the ones where the actor is not an Owner/Editor. The actor's role
+  is read per space (member spaces only); a space the actor is a viewer of, or not a member of at all, is not
+  repairable and so is returned. The initiating space of an in-space merge is Editor-checked upstream, so it
+  never appears here.
+  */
   private async resolveUnrepairableSpaceCollapses(
     actorUserId: string,
     collapsedSpaceIds: string[],
@@ -745,9 +745,9 @@ export class IdentityMergePropagationService {
   }
 
   /**
-   * Ensures identities for the initiating target/source space profiles before loading attached profiles;
-   * this may persist newly-created identities.
-   */
+  Ensures identities for the initiating target/source space profiles before loading attached profiles;
+  this may persist newly-created identities.
+  */
   async buildSpaceMergePlan(
     input: {
       actorUserId: string;

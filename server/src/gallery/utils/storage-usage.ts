@@ -9,15 +9,15 @@ const UUID_LENGTH = 36;
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
 /**
- * Derivative files are laid out by owner, not by library, so a plain folder walk cannot tell an
- * external-library asset's thumbnail from an uploaded asset's thumbnail. Every asset-derived
- * filename starts with the asset UUID (see StorageCore.getImagePath / getEncodedVideoPath), so the
- * caller can recover the id and check it against the owner's external asset ids.
- *
- * Returns null for files that are not keyed on an asset id (HLS segments, Android motion sidecars).
- * Note: person thumbnails also match the <uuid>. pattern and ARE returned; the caller filters by
- * membership in the owner's external-asset-id set, so person ids are naturally excluded.
- */
+Derivative files are laid out by owner, not by library, so a plain folder walk cannot tell an
+external-library asset's thumbnail from an uploaded asset's thumbnail. Every asset-derived
+filename starts with the asset UUID (see StorageCore.getImagePath / getEncodedVideoPath), so the
+caller can recover the id and check it against the owner's external asset ids.
+
+Returns null for files that are not keyed on an asset id (HLS segments, Android motion sidecars).
+Note: person thumbnails also match the <uuid>. pattern and ARE returned; the caller filters by
+membership in the owner's external-asset-id set, so person ids are naturally excluded.
+*/
 export const getDerivativeAssetId = (filename: string): string | null => {
   const candidate = filename.slice(0, UUID_LENGTH);
   if (!UUID_PATTERN.test(candidate)) {
@@ -44,11 +44,11 @@ type PhysicalUsageDeps = {
 };
 
 /**
- * Total bytes this user occupies on disk and in S3: originals, profile images, thumbnails and
- * transcodes. Upstream counts only originals and excludes external-library assets entirely
- * (user.repository.ts syncUsage, `libraryId is null`); derivative files are laid out by ownerId
- * with no library dimension, so external assets are filtered out here by asset id instead.
- */
+Total bytes this user occupies on disk and in S3: originals, profile images, thumbnails and
+transcodes. Upstream counts only originals and excludes external-library assets entirely
+(user.repository.ts syncUsage, `libraryId is null`); derivative files are laid out by ownerId
+with no library dimension, so external assets are filtered out here by asset id instead.
+*/
 export const computePhysicalUsage = async ({
   user,
   assetRepository,

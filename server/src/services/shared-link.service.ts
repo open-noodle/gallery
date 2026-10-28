@@ -164,10 +164,10 @@ export class SharedLinkService extends BaseService {
   }
 
   /**
-   * #1018: only a space Owner/Editor may publish a link that reaches other members' photos.
-   * Rejects BEFORE any asset or album lookup, so a Viewer never learns what a space contains
-   * from the shape of the error.
-   */
+  #1018: only a space Owner/Editor may publish a link that reaches other members' photos.
+  Rejects BEFORE any asset or album lookup, so a Viewer never learns what a space contains
+  from the shape of the error.
+  */
   private async requireSpaceEditor(auth: AuthDto, spaceId: string): Promise<void> {
     const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
     if (!member || !sharedLinkPublisherRoles.includes(member.role as SharedSpaceRole)) {

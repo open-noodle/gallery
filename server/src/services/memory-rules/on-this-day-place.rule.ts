@@ -8,13 +8,13 @@ export const MIN_ASSETS = 4;
 /** Per contributing year: the dominant place's share of that year's geotagged photos. */
 export const MIN_DOMINANCE = 0.6;
 /**
- * How many past years must share a place before a card is emitted.
- *
- * One year in one city is already what the plain `on_this_day` memory shows — naming the city
- * adds nothing the "3 years ago" card does not carry, which is why a single year is not worth
- * a card of its own. The memory earns its place when you have been back on this date: "you
- * were in Lisbon on this day in 2021 and again in 2023" is a thing no other memory type says.
- */
+How many past years must share a place before a card is emitted.
+
+One year in one city is already what the plain `on_this_day` memory shows — naming the city
+adds nothing the "3 years ago" card does not carry, which is why a single year is not worth
+a card of its own. The memory earns its place when you have been back on this date: "you
+were in Lisbon on this day in 2021 and again in 2023" is a thing no other memory type says.
+*/
 export const MIN_YEARS = 2;
 /** Cap on cards per day — one per place, highest scoring first. */
 export const MAX_PLACES = 3;
@@ -27,26 +27,26 @@ export const MAX_COUNT_BONUS = 30;
 /** Per extra year the place recurs, so a three-year run outranks a two-year one. */
 export const YEAR_BONUS = 10;
 /**
- * Ceiling on the multi-year bonus, mirroring MAX_COUNT_BONUS.
- *
- * `trip_anniversary` shares this rule's dedupe key and is meant to always win the collision,
- * which its spec pins as an invariant: trip's MINIMUM score (260 + 2*4 + 7 = 275) must beat this
- * rule's MAXIMUM. Without a ceiling, a place you are in on this date every year — your home city,
- * most often — would add 10 a year and eventually outscore a real trip. Capped, this rule tops out
- * at 100 + 90 + 9 + 30 = 229.
- */
+Ceiling on the multi-year bonus, mirroring MAX_COUNT_BONUS.
+
+`trip_anniversary` shares this rule's dedupe key and is meant to always win the collision,
+which its spec pins as an invariant: trip's MINIMUM score (260 + 2*4 + 7 = 275) must beat this
+rule's MAXIMUM. Without a ceiling, a place you are in on this date every year — your home city,
+most often — would add 10 a year and eventually outscore a real trip. Capped, this rule tops out
+at 100 + 90 + 9 + 30 = 229.
+*/
 export const MAX_YEAR_BONUS = 30;
 /**
- * Share of *all* of a year's photos for the day — not just the geotagged ones — that the card
- * must hold before it stands in for that year's plain "N years ago" memory.
- *
- * MIN_DOMINANCE is measured over geotagged assets only, so a year that is 60% Lisbon-tagged and
- * 40% untagged still contributes. Superseding on that would silently drop the untagged 40% from
- * the memory lane, so supersession asks the stricter question: does this card actually represent
- * that year's day? At 0.75 a year loses at most a quarter of its photos, and only when three
- * quarters of them share one place. Evaluated per year: a card can stand in for one of its years
- * and not another.
- */
+Share of *all* of a year's photos for the day — not just the geotagged ones — that the card
+must hold before it stands in for that year's plain "N years ago" memory.
+
+MIN_DOMINANCE is measured over geotagged assets only, so a year that is 60% Lisbon-tagged and
+40% untagged still contributes. Superseding on that would silently drop the untagged 40% from
+the memory lane, so supersession asks the stricter question: does this card actually represent
+that year's day? At 0.75 a year loses at most a quarter of its photos, and only when three
+quarters of them share one place. Evaluated per year: a card can stand in for one of its years
+and not another.
+*/
 export const SUPERSEDE_COVERAGE = 0.75;
 
 /** A usable place needs a non-blank city (EXIF city is usually null when absent, but can be ''). */

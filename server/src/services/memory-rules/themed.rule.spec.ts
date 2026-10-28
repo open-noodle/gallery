@@ -4,6 +4,7 @@ import { ASSET_CAP, FETCH_SIZE, MAX_YEARS_BACK, ThemedMemoryRule } from 'src/ser
 
 const target = DateTime.fromISO('2026-07-22', { zone: 'utc' });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const asset = (id: string, year: number, month: number, day: number, hour = 0): ThemeSearchAsset => ({
   id,
   localDateTime: DateTime.utc(year, month, day, hour).toJSDate(),
@@ -19,10 +20,10 @@ interface FakePort {
 }
 
 /**
- * `assetsByYear` keys off the calendar year the rule is querying for (derived from the widened
- * `takenAfter` bound the rule passes), mirroring the real adapter: a single call for year `Y` can
- * return assets whose own `localDateTime` spills into `Y-1`/`Y+1` (§3.4.1 widened-window skew).
- */
+`assetsByYear` keys off the calendar year the rule is querying for (derived from the widened
+`takenAfter` bound the rule passes), mirroring the real adapter: a single call for year `Y` can
+return assets whose own `localDateTime` spills into `Y-1`/`Y+1` (§3.4.1 widened-window skew).
+*/
 const ruleWith = (
   assetsByYear: Record<number, ThemeSearchAsset[]> = {},
   options: { embedding?: string | null; rejectEmbedding?: boolean } = {},

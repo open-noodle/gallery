@@ -23,9 +23,9 @@ export interface MemoryRuleDeps {
   memoryRepository: MemoryRepository;
   themeSearchPort: ThemeSearchPort;
   /**
-   * Admin-tunable knobs from `SystemConfig['memories']`. Optional so callers that construct rules
-   * without config (tests, tooling) fall back to each rule's own default.
-   */
+  Admin-tunable knobs from `SystemConfig['memories']`. Optional so callers that construct rules
+  without config (tests, tooling) fall back to each rule's own default.
+  */
   memories?: Pick<SystemConfig['memories'], 'personThrowbackDormancyMonths'>;
 }
 

@@ -31,6 +31,7 @@ const axisEmbedding = (axis: 'first' | 'second') => {
   return '[' + values.join(',') + ']';
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(FaceRepairService, {
     database: db || defaultDatabase,
@@ -467,6 +468,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
 // Uses a dedicated isolated DB so getBackfillWork() is not polluted by other test suites.
 let repairDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupRepair = (db?: Kysely<DB>) => {
   return newMediumService(FaceRepairService, {
     database: db ?? repairDatabase,
@@ -490,6 +492,7 @@ const buildLinkedCluster = async (
   ctx: ReturnType<typeof setupRepair>['ctx'],
   ownerId: string,
   embedding: string,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   faceCount: number,
 ) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
@@ -840,6 +843,7 @@ describe('FaceRepairService.executeRepair', () => {
 
 let runRepairDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupRunRepair = (db?: Kysely<DB>) => {
   return newMediumService(FaceRepairService, {
     database: db ?? runRepairDatabase,
@@ -1220,6 +1224,7 @@ describe('FaceRepairService.runRepair', () => {
 
 let declineDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupDecline = (db?: Kysely<DB>) => {
   return newMediumService(FaceRepairService, {
     database: db ?? declineDatabase,

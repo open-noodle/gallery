@@ -12,10 +12,10 @@ const face = (assetId: string, personId: string, personName: string, iso: string
 };
 
 /**
- * One row-pair (both subjects on the same asset) per entry in `days` (a day-of-month string),
- * so `days.length` controls the photo count and the number of *distinct* entries controls
- * `distinctDays`.
- */
+One row-pair (both subjects on the same asset) per entry in `days` (a day-of-month string),
+so `days.length` controls the photo count and the number of *distinct* entries controls
+`distinctDays`.
+*/
 const pairRows = (
   year: number,
   a: { id: string; name: string },

@@ -20,6 +20,7 @@ let defaultDatabase: Kysely<DB>;
 
 const NOW_ID = 'ffffffff-ffff-7fff-bfff-ffffffffffff';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = async (db?: Kysely<DB>) => {
   const ctx = new SyncTestContext(db || defaultDatabase);
   const { auth, user, session } = await ctx.newSyncAuthUser();

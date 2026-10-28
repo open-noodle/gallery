@@ -1,20 +1,20 @@
 /**
- * #1041 slices 8 + 9 + 13 — "hide from timeline" actually hides.
- *
- * Every scenario is named after its row in specs/2026-08-31-space-hide-from-timeline-design.md
- * §9.1 (S1-S16, E1-E17) so a failure names the rule it broke. S16 (sync never delivers another
- * member's hidden row) and E11/E11b (unlink cascade / re-link does not resurrect) are already
- * pinned by earlier slices — see shared-space-album-hidden-sync.spec.ts and
- * shared-space-album-hidden.migration.spec.ts — and are not duplicated here. E1/E7b/rule-level
- * resolution correctness (soft-delete, contribution pairing, the MINUS) are pinned at the
- * resolution layer by shared-space-album-hidden.repository.spec.ts; this file adds END-TO-END
- * coverage that the resolved scope is actually WIRED into the personal timeline (slice 8), folder
- * view (slice 9) and memories (slice 13) queries — which is what slices 8/9/13 change.
- *
- * §9.6 test-honesty: every S2-S8 scenario gives the viewer a SECOND, unrelated, visible space so
- * the empty-scope collapse in ownerArmWithHiddenSubtraction / hiddenFromOwnTimeline cannot run —
- * this exact shape hid a real bug behind 139 green tests in this repo before.
- */
+#1041 slices 8 + 9 + 13 — "hide from timeline" actually hides.
+
+Every scenario is named after its row in specs/2026-08-31-space-hide-from-timeline-design.md
+§9.1 (S1-S16, E1-E17) so a failure names the rule it broke. S16 (sync never delivers another
+member's hidden row) and E11/E11b (unlink cascade / re-link does not resurrect) are already
+pinned by earlier slices — see shared-space-album-hidden-sync.spec.ts and
+shared-space-album-hidden.migration.spec.ts — and are not duplicated here. E1/E7b/rule-level
+resolution correctness (soft-delete, contribution pairing, the MINUS) are pinned at the
+resolution layer by shared-space-album-hidden.repository.spec.ts; this file adds END-TO-END
+coverage that the resolved scope is actually WIRED into the personal timeline (slice 8), folder
+view (slice 9) and memories (slice 13) queries — which is what slices 8/9/13 change.
+
+§9.6 test-honesty: every S2-S8 scenario gives the viewer a SECOND, unrelated, visible space so
+the empty-scope collapse in ownerArmWithHiddenSubtraction / hiddenFromOwnTimeline cannot run —
+this exact shape hid a real bug behind 139 green tests in this repo before.
+*/
 
 import { Kysely, expressionBuilder } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto.js';

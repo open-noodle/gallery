@@ -60,7 +60,7 @@ const collectTsFiles = (dir: string): string[] =>
     if (entry.isDirectory()) {
       return collectTsFiles(full);
     }
-    return entry.isFile() && entry.name.endsWith('.ts') ? [full] : [];
+    return entry.isFile() && entry.name.endsWith('.ts') ? full : [];
   });
 
 // Specs may seed the column like a stock server would; migrations keep their historical bodies.
@@ -87,10 +87,10 @@ const keyName = (name: ts.PropertyName) => {
 };
 
 /**
- * `isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE (including an
- * INSERT's `onConflict` update), and Kysely's `.set('isFavorite', value)`. A pre-built object passed by reference
- * is not followed.
- */
+`isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE (including an
+INSERT's `onConflict` update), and Kysely's `.set('isFavorite', value)`. A pre-built object passed by reference
+is not followed.
+*/
 const findColumnWrites = (path: string, content: string) => {
   const file = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
   const offenders: string[] = [];

@@ -83,6 +83,7 @@ const setup = (db?: Kysely<DB>, { realStorage = false } = {}) => {
   return { sut, ctx };
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupFaceImport = (db?: Kysely<DB>) => {
   clearConfigCache();
 

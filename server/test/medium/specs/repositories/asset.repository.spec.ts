@@ -28,7 +28,6 @@ interface TimeBucketAssets {
 
 let defaultDatabase: Kysely<DB>;
 
-// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,

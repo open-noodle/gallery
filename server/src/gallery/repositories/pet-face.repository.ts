@@ -15,13 +15,13 @@ const withPetSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
 };
 
 /**
- * Every embedded pet face: unassigned (recognition-written, not yet clustered) faces are invisible
- * to a person-scoped delete — the `pet_search` join is the only thing that identifies them. Shared
- * by {@link PetFaceRepository.deleteAllPets} (full purge) and
- * {@link PetFaceRepository.purgePetRecognitionArtifacts} (scoped purge) as their first statement:
- * both need this same delete, and it must run before anything that would remove the `pet_search`
- * rows it joins against (F5).
- */
+Every embedded pet face: unassigned (recognition-written, not yet clustered) faces are invisible
+to a person-scoped delete — the `pet_search` join is the only thing that identifies them. Shared
+by {@link PetFaceRepository.deleteAllPets} (full purge) and
+{@link PetFaceRepository.purgePetRecognitionArtifacts} (scoped purge) as their first statement:
+both need this same delete, and it must run before anything that would remove the `pet_search`
+rows it joins against (F5).
+*/
 const deleteEmbeddedPetFaces = (trx: Transaction<DB>) =>
   trx
     .deleteFrom('asset_face')
@@ -57,24 +57,24 @@ export class PetFaceRepository {
   }
 
   /**
-   * Truncates `pet_search` outright, independent of `deleteAllPets()`'s delete order. Used by
-   * {@link PetRecognitionService.handleQueuePetRecognition}'s force purge (enabling recognition or
-   * switching model) as the explicit, order-independent guarantee that no stale embedding survives
-   * — `deleteAllPets()` already removes most rows via the `asset_face` CASCADE, but a truncate
-   * doesn't depend on that cascade to have run first or completely. A no-op (not an error) when the
-   * table is already empty.
-   */
+  Truncates `pet_search` outright, independent of `deleteAllPets()`'s delete order. Used by
+  {@link PetRecognitionService.handleQueuePetRecognition}'s force purge (enabling recognition or
+  switching model) as the explicit, order-independent guarantee that no stale embedding survives
+  — `deleteAllPets()` already removes most rows via the `asset_face` CASCADE, but a truncate
+  doesn't depend on that cascade to have run first or completely. A no-op (not an error) when the
+  table is already empty.
+  */
   async deleteAllPetSearch(): Promise<void> {
     await sql`truncate ${sql.table('pet_search')}`.execute(this.db);
   }
 
   /**
-   * The SCOPED purge used by {@link PetRecognitionService}'s model-switch handler. Unlike
-   * {@link deleteAllPets} (the FULL purge behind the admin Reset button, which also wipes species
-   * buckets — the requeue rebuilds them, and the confirmation dialog promises exactly that), a
-   * model switch invalidates only embeddings and the individuals recognition created from them.
-   * Species buckets are pure detector output, are not model-coupled, and must survive every switch.
-   */
+  The SCOPED purge used by {@link PetRecognitionService}'s model-switch handler. Unlike
+  {@link deleteAllPets} (the FULL purge behind the admin Reset button, which also wipes species
+  buckets — the requeue rebuilds them, and the confirmation dialog promises exactly that), a
+  model switch invalidates only embeddings and the individuals recognition created from them.
+  Species buckets are pure detector output, are not model-coupled, and must survive every switch.
+  */
   async purgePetRecognitionArtifacts(): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       // 1. Every embedded pet face. Bucket faces have no pet_search row, so they are untouched.
@@ -119,12 +119,12 @@ export class PetFaceRepository {
   }
 
   /**
-   * Pet-recognition equivalent of {@link PersonRepository.getAllFaces}'s `{ personGroupId: null }` case, used by
-   * {@link PetRecognitionService.handleQueuePetRecognition}'s non-force fan-out: every pet face that
-   * has been embedded (has a `pet_search` row) but not yet assigned to a person. The inner join on
-   * `pet_search` is the "has an embedding" filter — a face detected before recognition was enabled
-   * has no `pet_search` row and is deliberately excluded (it gets one the next time detection runs).
-   */
+  Pet-recognition equivalent of {@link PersonRepository.getAllFaces}'s `{ personGroupId: null }` case, used by
+  {@link PetRecognitionService.handleQueuePetRecognition}'s non-force fan-out: every pet face that
+  has been embedded (has a `pet_search` row) but not yet assigned to a person. The inner join on
+  `pet_search` is the "has an embedding" filter — a face detected before recognition was enabled
+  has no `pet_search` row and is deliberately excluded (it gets one the next time detection runs).
+  */
   getUnassignedPetFaces() {
     return this.db
       .selectFrom('asset_face')
@@ -137,11 +137,11 @@ export class PetFaceRepository {
   }
 
   /**
-   * Pet-recognition equivalent of {@link PersonRepository.getFaceForFacialRecognitionJob}: face + owning asset +
-   * `pet_search` embedding for {@link PetRecognitionService.handlePetRecognition}. Pets have no
-   * birthdate/visibility gating (see `PetEmbeddingSearch`), so the asset selection is narrower —
-   * just `ownerId`.
-   */
+  Pet-recognition equivalent of {@link PersonRepository.getFaceForFacialRecognitionJob}: face + owning asset +
+  `pet_search` embedding for {@link PetRecognitionService.handlePetRecognition}. Pets have no
+  birthdate/visibility gating (see `PetEmbeddingSearch`), so the asset selection is narrower —
+  just `ownerId`.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getPetFaceForRecognition(id: string) {
     return this.db
@@ -159,20 +159,20 @@ export class PetFaceRepository {
   }
 
   /**
-   * Pet-recognition equivalent of {@link PersonRepository.refreshFaces}, simplified: pets have no "remove stale
-   * faces" step here (that lives in the detection pipeline, not recognition).
-   *
-   * Like `refreshFaces`, the caller pre-generates each face's id (`CryptoRepository.randomUUID`)
-   * and pairs embeddings to faces by explicit `faceId`. The previous version let the DB generate
-   * ids and paired `embeddingsToAdd[i]` with the i-th `INSERT … RETURNING` row, which is only
-   * correct while postgres happens to return insert order (F7) — nothing in the SQL standard or
-   * Kysely guarantees it, and a mispairing silently attaches one pet's embedding to another pet's
-   * face.
-   *
-   * Every face must have exactly one embedding: callers route embedding-less pets to the species
-   * bucket instead, so a mismatch here is a broken contract and throws rather than writing a
-   * partially-embedded batch.
-   */
+  Pet-recognition equivalent of {@link PersonRepository.refreshFaces}, simplified: pets have no "remove stale
+  faces" step here (that lives in the detection pipeline, not recognition).
+  
+  Like `refreshFaces`, the caller pre-generates each face's id (`CryptoRepository.randomUUID`)
+  and pairs embeddings to faces by explicit `faceId`. The previous version let the DB generate
+  ids and paired `embeddingsToAdd[i]` with the i-th `INSERT … RETURNING` row, which is only
+  correct while postgres happens to return insert order (F7) — nothing in the SQL standard or
+  Kysely guarantees it, and a mispairing silently attaches one pet's embedding to another pet's
+  face.
+  
+  Every face must have exactly one embedding: callers route embedding-less pets to the species
+  bucket instead, so a mismatch here is a broken contract and throws rather than writing a
+  partially-embedded batch.
+  */
   @GenerateSql({
     params: [
       [{ id: DummyValue.UUID, assetId: DummyValue.UUID }],
@@ -213,14 +213,14 @@ export class PetFaceRepository {
   }
 
   /**
-   * Pet-recognition equivalent of {@link PersonRepository.getLatestFaceDate}, used by the nightly
-   * `handleQueuePetRecognition` skip check: pets have no `personsAssignedAt`-style column, so
-   * `petsDetectedAt` (stamped by `handlePetDetection`) is the closest analogue of "a pet was added
-   * since the last nightly run". Unlike the sibling, this returns the `Date` directly rather than
-   * pg-text (F11) — `state.lastRun` is an ISO string with a `T` separator, and comparing it against
-   * pg's `::text` timestamp format (space-separated) mis-ordered same-day timestamps. The service
-   * compares two `Date`s instead.
-   */
+  Pet-recognition equivalent of {@link PersonRepository.getLatestFaceDate}, used by the nightly
+  `handleQueuePetRecognition` skip check: pets have no `personsAssignedAt`-style column, so
+  `petsDetectedAt` (stamped by `handlePetDetection`) is the closest analogue of "a pet was added
+  since the last nightly run". Unlike the sibling, this returns the `Date` directly rather than
+  pg-text (F11) — `state.lastRun` is an ISO string with a `T` separator, and comparing it against
+  pg's `::text` timestamp format (space-separated) mis-ordered same-day timestamps. The service
+  compares two `Date`s instead.
+  */
   async getLatestPetDate(): Promise<Date | undefined> {
     const result = await this.db
       .selectFrom('asset_job_status_gallery')

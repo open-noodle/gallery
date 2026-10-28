@@ -796,6 +796,7 @@ describe(ClassificationService.name, () => {
 
     const setupQueueAll = (
       categories: ClassificationCategoryConfig[] = [],
+      // eslint-disable-next-line unicorn/no-unnecessary-parameters
       enabled = true,
       facialRecognitionEnabled = true,
     ) => {

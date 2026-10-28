@@ -5,6 +5,7 @@ import { MonthRecapMemoryRule } from 'src/services/memory-rules/month-recap.rule
 
 const target = DateTime.fromISO('2026-07-01', { zone: 'utc' });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const assetsForYear = (year: number, count: number, month = 7): MemoryPeriodAsset[] =>
   Array.from({ length: count }, (_, index) => ({
     id: `a-${year}-${index}`,

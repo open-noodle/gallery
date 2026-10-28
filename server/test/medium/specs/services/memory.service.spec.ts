@@ -83,6 +83,7 @@ const seedRuleAsset = async (
     localDateTime,
     city = null,
     country = null,
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     isFavorite = false,
     type = AssetType.Image,
     duration = null,
@@ -115,11 +116,11 @@ const seedRuleAsset = async (
 };
 
 /**
- * A dormant person with a qualifying chapter: 4 assets in Jan 2020 (padding the lifetime total to
- * MIN_TOTAL_ASSETS (10) without competing for chapter density) plus a 6-day, one-photo-per-day
- * chapter in Aug 2023 (exactly MIN_CHAPTER_ASSETS (6), the only dense window). Both clusters sit
- * well before any dormancy cutoff used in this file's target dates (2026-02-13 or later).
- */
+A dormant person with a qualifying chapter: 4 assets in Jan 2020 (padding the lifetime total to
+MIN_TOTAL_ASSETS (10) without competing for chapter density) plus a 6-day, one-photo-per-day
+chapter in Aug 2023 (exactly MIN_CHAPTER_ASSETS (6), the only dense window). Both clusters sit
+well before any dormancy cutoff used in this file's target dates (2026-02-13 or later).
+*/
 const seedDormantPersonChapter = async (
   ctx: ReturnType<typeof setup>['ctx'],
   {

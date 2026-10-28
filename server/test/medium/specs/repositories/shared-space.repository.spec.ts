@@ -11,6 +11,7 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
@@ -25,9 +26,9 @@ beforeAll(async () => {
 });
 
 /**
- * Anna views; Bob owns both the space and the asset. Anna is only ever a member -- used by the
- * `findSpaceForAssetAndUser` block, where the point is which reach paths resolve for a member.
- */
+Anna views; Bob owns both the space and the asset. Anna is only ever a member -- used by the
+`findSpaceForAssetAndUser` block, where the point is which reach paths resolve for a member.
+*/
 const newSpaceWithViewer = async (ctx: ReturnType<typeof setup>['ctx']) => {
   const { user: anna } = await ctx.newUser();
   const { user: bob } = await ctx.newUser();

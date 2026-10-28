@@ -1,15 +1,15 @@
 /**
- * Medium tests for `DownloadService.getDownloadInfo` on a space-linked album — issue #1048.
- *
- * A share link created from inside a Space (#1018) shows every member's photos, and so does the
- * album page for a member browsing it. "Download all" must ship exactly what was shown: the album
- * owner's own `album_asset` rows AND the cross-owner `album_space_asset` contributions (#764).
- *
- * These run the real service against the real DB so both halves of the download are covered — the
- * archive manifest built here, and the `AssetDownload` gate `downloadArchive` applies to the ids it
- * returns. A manifest listing an asset the gate then rejects would 400 the whole download, so the
- * two are asserted together.
- */
+Medium tests for `DownloadService.getDownloadInfo` on a space-linked album — issue #1048.
+
+A share link created from inside a Space (#1018) shows every member's photos, and so does the
+album page for a member browsing it. "Download all" must ship exactly what was shown: the album
+owner's own `album_asset` rows AND the cross-owner `album_space_asset` contributions (#764).
+
+These run the real service against the real DB so both halves of the download are covered — the
+archive manifest built here, and the `AssetDownload` gate `downloadArchive` applies to the ids it
+returns. A manifest listing an asset the gate then rejects would 400 the whole download, so the
+two are asserted together.
+*/
 import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { SharedLinkType, SharedSpaceRole } from 'src/enum.js';
@@ -49,9 +49,9 @@ beforeAll(async () => {
 });
 
 /**
- * A space whose owner (`sharer`) owns the linked album, plus an Editor (`contributor`) who owns one
- * photo contributed to it. `contributed` is never owned by the sharer — that is the whole point.
- */
+A space whose owner (`sharer`) owns the linked album, plus an Editor (`contributor`) who owns one
+photo contributed to it. `contributed` is never owned by the sharer — that is the whole point.
+*/
 const seedSpaceAlbum = async () => {
   const { sut, ctx } = setup();
   const { user: sharer } = await ctx.newUser();

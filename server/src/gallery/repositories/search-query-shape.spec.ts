@@ -76,6 +76,7 @@ const FAILURE_MESSAGE =
   'Secondary ORDER BY keys force Parallel Seq Scan on smart_search instead of ' +
   'the vchord clip_index ordered scan (~100× slowdown at 200k rows).';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const countOrderByExpressions = (compiledSql: string, anchor: string): number => {
   // Find the ORDER BY that immediately precedes the given anchor (or LIMIT/OFFSET).
   // Kysely's PostgresQueryCompiler emits a single-line compact SQL string.

@@ -47,18 +47,18 @@ export interface SearchUserIdOptions {
   libraryId?: string | null;
   userIds?: string[];
   /**
-   * Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`, which
-   * is the owner SCOPING predicate (database.ts:677/687/770). Merging a contributor filter into
-   * userIds would widen the result set instead of narrowing it.
-   */
+  Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`, which
+  is the owner SCOPING predicate (database.ts:677/687/770). Merging a contributor filter into
+  userIds would widen the result set instead of narrowing it.
+  */
   ownerId?: string;
   /**
-   * #763: the caller making the request — NOT `userIds` (the timeline/search *target*, which
-   * differs from the caller on space/album scoped paths — e.g. `getFilteredMapMarkers`'s
-   * `userIds: dto.spaceId ? undefined : [auth.user.id]` leaves `userIds` unset entirely when
-   * browsing a specific space). Required by `searchAssetBuilder` and the smart-facet pipeline
-   * whenever `isFavorite` is set, so they resolve the `asset_favorite` overlay for the right user.
-   */
+  #763: the caller making the request — NOT `userIds` (the timeline/search *target*, which
+  differs from the caller on space/album scoped paths — e.g. `getFilteredMapMarkers`'s
+  `userIds: dto.spaceId ? undefined : [auth.user.id]` leaves `userIds` unset entirely when
+  browsing a specific space). Required by `searchAssetBuilder` and the smart-facet pipeline
+  whenever `isFavorite` is set, so they resolve the `asset_favorite` overlay for the right user.
+  */
   authUserId?: string;
 }
 
@@ -124,16 +124,16 @@ export interface SearchExifOptions {
 export interface SearchEmbeddingOptions {
   embedding: string;
   /**
-   * Owner scoping. Optional — and left unset on purpose under an `albumIds` scope, where the
-   * caller's AlbumRead check is the access boundary and `albumConfinedToViewer` re-gates the rows
-   * (the same shape `searchMetadata` has always used). Matches `SearchUserIdOptions.userIds`.
-   */
+  Owner scoping. Optional — and left unset on purpose under an `albumIds` scope, where the
+  caller's AlbumRead check is the access boundary and `albumConfinedToViewer` re-gates the rows
+  (the same shape `searchMetadata` has always used). Matches `SearchUserIdOptions.userIds`.
+  */
   userIds?: string[];
   /**
-   * The searching user. Deliberately SEPARATE from `userIds`, which is an owner-scoping predicate
-   * and is absent under an album scope: the facets' people list still has to resolve identity
-   * people for the viewer, so it needs the caller even when nothing is owner-scoped.
-   */
+  The searching user. Deliberately SEPARATE from `userIds`, which is an owner-scoping predicate
+  and is absent under an album scope: the facets' people list still has to resolve identity
+  people for the viewer, so it needs the caller even when nothing is owner-scoped.
+  */
   callerId?: string;
   maxDistance?: number;
 }
@@ -157,12 +157,12 @@ export interface SearchTagOptions {
 export interface SearchAlbumOptions {
   albumIds?: string[];
   /**
-   * Opts an `albumIds` query OUT of `albumConfinedToViewer`, for a caller whose
-   * album ACCESS check (e.g. Permission.AlbumRead) is already the access boundary — matching the
-   * album grid and the pre-fork `GET /albums/{id}/map-markers` endpoint (issue #656). Defaults to
-   * false/absent, which preserves the existing shared-space re-gate for album-scoped
-   * SearchService queries (database.ts:600-607) — do not flip this default.
-   */
+  Opts an `albumIds` query OUT of `albumConfinedToViewer`, for a caller whose
+  album ACCESS check (e.g. Permission.AlbumRead) is already the access boundary — matching the
+  album grid and the pre-fork `GET /albums/{id}/map-markers` endpoint (issue #656). Defaults to
+  false/absent, which preserves the existing shared-space re-gate for album-scoped
+  SearchService queries (database.ts:600-607) — do not flip this default.
+  */
   albumAccessIsBoundary?: boolean;
 }
 
@@ -171,13 +171,13 @@ export interface SearchSpaceOptions {
   spacePersonIds?: string[];
   timelineSpaceIds?: string[];
   /**
-   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
-   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
-   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
-   * the "is the Favourites section worth offering" answer has to span the same set the favourites
-   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
-   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
-   */
+  #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+  to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+  stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+  the "is the Favourites section worth offering" answer has to span the same set the favourites
+  filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+  OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+  */
   favoriteSpaceIds?: string[];
 }
 
@@ -204,14 +204,14 @@ type BaseAssetSearchOptions = SearchDateOptions &
   SearchSpaceOptions;
 
 /**
- * Visibility modes `searchAssetBuilder` (src/utils/database.ts) understands:
- * - a concrete `AssetVisibility` — exactly that state
- * - `'not-locked'` — everything except Locked; note this STILL admits Hidden
- * - `'timeline-or-archive'` — Archive | Timeline, what the timeline and the album grid show
- *   (`withDefaultVisibility`). Used only by the album-boundary map query (shared-space.service.ts),
- *   which must match the grid it is reached from.
- * - `undefined` — no visibility clause at all (admits Hidden and Locked)
- */
+Visibility modes `searchAssetBuilder` (src/utils/database.ts) understands:
+- a concrete `AssetVisibility` — exactly that state
+- `'not-locked'` — everything except Locked; note this STILL admits Hidden
+- `'timeline-or-archive'` — Archive | Timeline, what the timeline and the album grid show
+  (`withDefaultVisibility`). Used only by the album-boundary map query (shared-space.service.ts),
+  which must match the grid it is reached from.
+- `undefined` — no visibility clause at all (admits Hidden and Locked)
+*/
 export type AssetSearchVisibility = AssetVisibility | 'not-locked' | 'timeline-or-archive';
 
 export type AssetSearchOptions = Omit<BaseAssetSearchOptions, 'visibility'> &
@@ -280,10 +280,10 @@ export interface PetEmbeddingSearch extends SearchEmbeddingOptions {
   numResults: number;
   maxDistance: number;
   /**
-   * Required here, unlike the optional base: pet recognition has no album- or space-scoped caller,
-   * so every `searchPets` scan is owner-scoped and the `asset.ownerId` predicate below is
-   * unconditional. (`FaceSearchRepository.searchFaces` can drop it because a space scope replaces it.)
-   */
+  Required here, unlike the optional base: pet recognition has no album- or space-scoped caller,
+  so every `searchPets` scan is owner-scoped and the `asset.ownerId` predicate below is
+  unconditional. (`FaceSearchRepository.searchFaces` can drop it because a space scope replaces it.)
+  */
   userIds: string[];
 }
 
@@ -323,6 +323,8 @@ export interface GetCameraLensModelsOptions {
 }
 
 /** Skip threshold when disabled (0), undefined, or at max cosine distance (>= 2) since it would filter nothing */
+// `??` (not a default parameter) also covers a null maxDistance.
+// eslint-disable-next-line unicorn/prefer-default-parameters
 export function isActiveDistanceThreshold(maxDistance: number | undefined): boolean {
   return (maxDistance ?? 0) > 0 && (maxDistance ?? 0) < 2;
 }

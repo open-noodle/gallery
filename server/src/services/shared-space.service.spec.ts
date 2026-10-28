@@ -111,6 +111,7 @@ const setupAlbumLink = (mocks: ServiceMocks) => {
 const setupAlbumFolderMove = (
   mocks: ServiceMocks,
   folderOverrides: Partial<Record<string, unknown>> = {},
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   targetOverrides: Partial<Record<string, unknown>> = {},
 ) => {
   const { auth, space } = setupAlbumFolderEditor(mocks);

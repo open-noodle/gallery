@@ -42,9 +42,9 @@ const createGalleryMigrator = (db: Kysely<any>) =>
   });
 
 /**
- * Brings a database written by any earlier build to the split layout: fork rows in
- * `gallery_migrations`, upstream rows in `kysely_migrations`, no row without a file. Idempotent.
- */
+Brings a database written by any earlier build to the split layout: fork rows in
+`gallery_migrations`, upstream rows in `kysely_migrations`, no row without a file. Idempotent.
+*/
 const bootstrapGalleryLedger = async (db: Kysely<any>, galleryNames: string[], upstreamNames: string[]) => {
   const counts = { renamed: 0, deleted: 0, moved: 0 };
   const { rows } = await sql<{ exists: boolean }>`
@@ -141,12 +141,12 @@ const migrationNames = async (migrator: Migrator) => {
 };
 
 /**
- * Bootstraps the ledgers, then runs every pending migration of both folders in one name order, each
- * recorded in its own ledger. A single order is load-bearing: an older Gallery database must drop its
- * fork foreign keys (1787100000000) before upstream's ClusterGroups (1787148183729) runs. Everything
- * runs in one transaction, so a failed boot leaves the database as it found it. Inside that transaction
- * the 1 h `lock_timeout` kysely sets for its migration lock also bounds every migration statement.
- */
+Bootstraps the ledgers, then runs every pending migration of both folders in one name order, each
+recorded in its own ledger. A single order is load-bearing: an older Gallery database must drop its
+fork foreign keys (1787100000000) before upstream's ClusterGroups (1787148183729) runs. Everything
+runs in one transaction, so a failed boot leaves the database as it found it. Inside that transaction
+the 1 h `lock_timeout` kysely sets for its migration lock also bounds every migration statement.
+*/
 export const migrateGalleryToLatest = async (
   db: Kysely<any>,
   createUpstreamMigrator: (db: Kysely<any>) => Migrator,

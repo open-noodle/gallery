@@ -74,9 +74,9 @@ const spaceBucketAssetIds = async (
 };
 
 /**
- * An album on the viewer's PERSONAL timeline, holding a mix of owners (D3 fixture — see the
- * '/photos: albumId ANDs with userId' describe for what each asset is there to prove).
- */
+An album on the viewer's PERSONAL timeline, holding a mix of owners (D3 fixture — see the
+'/photos: albumId ANDs with userId' describe for what each asset is there to prove).
+*/
 const createPhotosAlbumFixture = async (ctx: ReturnType<typeof setup>['ctx']) => {
   // viewer is a member of the two-owner space (timeline-enabled) and owns nothing in it.
   const { viewer, annaAsset } = await createTwoOwnerSpace(ctx);
@@ -785,15 +785,15 @@ describe(TimelineService.name, () => {
     });
 
     /**
-     * THE ACTUAL WIDENING VECTOR. The userIds/timelineSpaceIds OR-group at
-     * asset.repository.ts:362-380 only fires when `timelineSpaceIds` is set, and that only
-     * happens under `withSharedSpaces: true` (timeline.service.ts:81-86).
-     *
-     * Every other test in this file leaves timelineSpaceIds undefined, so the `:359` clause
-     * already ANDs — meaning an implementer who WRONGLY merged ownerId into options.userIds
-     * would still pass all of them. These two tests are the only thing standing between that
-     * mistake and a data leak. Do not delete them.
-     */
+    THE ACTUAL WIDENING VECTOR. The userIds/timelineSpaceIds OR-group at
+    asset.repository.ts:362-380 only fires when `timelineSpaceIds` is set, and that only
+    happens under `withSharedSpaces: true` (timeline.service.ts:81-86).
+    
+    Every other test in this file leaves timelineSpaceIds undefined, so the `:359` clause
+    already ANDs — meaning an implementer who WRONGLY merged ownerId into options.userIds
+    would still pass all of them. These two tests are the only thing standing between that
+    mistake and a data leak. Do not delete them.
+    */
     it('E21b: ownerId of a stranger under withSharedSpaces returns EMPTY (the real leak vector)', async () => {
       const { sut, ctx } = setup();
       const { viewer } = await createTwoOwnerSpace(ctx);
@@ -868,25 +868,25 @@ describe(TimelineService.name, () => {
   });
 
   /**
-   * D3 — the album gate ANDs with the owner gate on the PERSONAL timeline.
-   *
-   * `timeBucketChecks` deliberately does NOT default `userId` under an `albumId` (that branch is
-   * what E22 above depends on: on the ALBUM page, album ACCESS is the entire scope, and a viewer
-   * must see the owner's assets). So the *caller* decides the scope, and /photos — which is my
-   * personal timeline — must send `userId` alongside the album chip
-   * (web/src/lib/utils/photos-filter-options.ts). The tests below pin what each shape means, so a
-   * "fix" that defaults userId server-side (breaking E22) or a web regression that drops it (the
-   * D3 bug: `?albumId=A&ownerId=<co-member>` listing a co-member's assets, and the Favorites chip
-   * the album OWNER's favourites, on MY timeline) both get caught.
-   *
-   * THE FIXTURE TRAP: /photos also sends `withPartners` + `withSharedSpaces`, so `userIds` is not a
-   * plain AND — asset.repository.ts makes the scope `ownerId IN userIds` **OR** "in one of my
-   * timeline spaces". A co-member asset that ALSO lives in one of my timeline spaces therefore
-   * stays visible, correctly. The asset that must drop out is the **album-only** one: owned by
-   * someone else, in the album, in NO shared space of mine (`carolAsset` / `carolFavoriteAsset`).
-   * `annaAsset` (in the album AND in my space) is asserted present in the same test to keep that
-   * distinction honest — a fixture without it would pass an over-narrow implementation too.
-   */
+  D3 — the album gate ANDs with the owner gate on the PERSONAL timeline.
+  
+  `timeBucketChecks` deliberately does NOT default `userId` under an `albumId` (that branch is
+  what E22 above depends on: on the ALBUM page, album ACCESS is the entire scope, and a viewer
+  must see the owner's assets). So the *caller* decides the scope, and /photos — which is my
+  personal timeline — must send `userId` alongside the album chip
+  (web/src/lib/utils/photos-filter-options.ts). The tests below pin what each shape means, so a
+  "fix" that defaults userId server-side (breaking E22) or a web regression that drops it (the
+  D3 bug: `?albumId=A&ownerId=<co-member>` listing a co-member's assets, and the Favorites chip
+  the album OWNER's favourites, on MY timeline) both get caught.
+  
+  THE FIXTURE TRAP: /photos also sends `withPartners` + `withSharedSpaces`, so `userIds` is not a
+  plain AND — asset.repository.ts makes the scope `ownerId IN userIds` **OR** "in one of my
+  timeline spaces". A co-member asset that ALSO lives in one of my timeline spaces therefore
+  stays visible, correctly. The asset that must drop out is the **album-only** one: owned by
+  someone else, in the album, in NO shared space of mine (`carolAsset` / `carolFavoriteAsset`).
+  `annaAsset` (in the album AND in my space) is asserted present in the same test to keep that
+  distinction honest — a fixture without it would pass an over-narrow implementation too.
+  */
   describe('/photos: albumId ANDs with userId (D3)', () => {
     it("an album chip does not put a co-member's album-only asset on my personal timeline", async () => {
       const { sut, ctx } = setup();
@@ -946,15 +946,15 @@ describe(TimelineService.name, () => {
   });
 
   /**
-   * `spaceId` + `albumId` together: BOTH permissions must be checked.
-   *
-   * The check used to be an `else if` chain, so with both set only AlbumRead was verified while the
-   * space predicate still applied to the query — letting a caller with album access learn WHICH of
-   * that album's assets belong to a space they are not a member of (a membership oracle; no asset
-   * leaks, since every returned asset is in an album they can read). The filtered map endpoint
-   * refuses the same combination outright (shared-space.service.ts getFilteredMapMarkers), but the
-   * timeline answers it — so it must at least enforce the space boundary it is querying.
-   */
+  `spaceId` + `albumId` together: BOTH permissions must be checked.
+  
+  The check used to be an `else if` chain, so with both set only AlbumRead was verified while the
+  space predicate still applied to the query — letting a caller with album access learn WHICH of
+  that album's assets belong to a space they are not a member of (a membership oracle; no asset
+  leaks, since every returned asset is in an album they can read). The filtered map endpoint
+  refuses the same combination outright (shared-space.service.ts getFilteredMapMarkers), but the
+  timeline answers it — so it must at least enforce the space boundary it is querying.
+  */
   describe('spaceId + albumId requires access to BOTH', () => {
     it('rejects an album query that also scopes to a space the caller is not a member of', async () => {
       const { sut, ctx } = setup();

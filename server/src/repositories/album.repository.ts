@@ -67,20 +67,20 @@ export class AlbumRepository {
   }
 
   /**
-   * Albums containing `assetId` that the caller can actually open — the asset-viewer info panel
-   * reads this to render "Contained in" (#796). Two access paths are unioned: shared directly into
-   * the album (`album_user`), or the album is linked into a shared space the caller can access.
-   *
-   * Deliberately NOT every album containing the asset: album names are user-authored and a space
-   * member must not learn the owner's private album titles. Callers do not separately authorize
-   * `assetId` (see AlbumService.getAll) — this scoping IS the access check.
-   *
-   * An asset reaches an album through EITHER membership table, so both are checked (#1095): the
-   * owner's own `album_asset` row, or a cross-owner `album_space_asset` contribution (#764). The
-   * previous `innerJoin('album_asset')` dropped every contribution-only album, so a member who
-   * added someone else's space asset saw it in the album grid but never in "Contained in" — the
-   * count from `getMetadataForIds` already unions both arms, and this now agrees with it.
-   */
+  Albums containing `assetId` that the caller can actually open — the asset-viewer info panel
+  reads this to render "Contained in" (#796). Two access paths are unioned: shared directly into
+  the album (`album_user`), or the album is linked into a shared space the caller can access.
+  
+  Deliberately NOT every album containing the asset: album names are user-authored and a space
+  member must not learn the owner's private album titles. Callers do not separately authorize
+  `assetId` (see AlbumService.getAll) — this scoping IS the access check.
+  
+  An asset reaches an album through EITHER membership table, so both are checked (#1095): the
+  owner's own `album_asset` row, or a cross-owner `album_space_asset` contribution (#764). The
+  previous `innerJoin('album_asset')` dropped every contribution-only album, so a member who
+  added someone else's space asset saw it in the album grid but never in "Contained in" — the
+  count from `getMetadataForIds` already unions both arms, and this now agrees with it.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   getByAssetId(ownerId: string, assetId: string) {
     // A space member must never learn that another member's Hidden/Locked asset sits in a linked

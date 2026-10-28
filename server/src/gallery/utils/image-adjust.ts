@@ -4,23 +4,23 @@ import { type ImageAdjust, isNeutralImageAdjust } from 'src/gallery/dtos/image-a
 const clamp01 = (value: number) => (value < 0 ? 0 : Math.min(value, 1));
 
 /**
- * Applies the adjustment to an already edited and resized bitmap exactly as the web editor previews it: the CSS
- * filter list `saturate() invert() brightness() contrast()` built by `imageAdjustFilter` in
- * web/src/lib/gallery/edit/image-adjust.ts (keep the two in step), with the CSS Filter Effects definitions
- * (https://www.w3.org/TR/filter-effects-1/#ShorthandEquivalents). Invert runs before exposure and contrast so that, on
- * a scanned film negative, they act on the positive the user sees: a negative exposure darkens it.
- *
- * - each function clamps its output to the colour range before the next one runs, as browsers do. Folding exposure and
- *   contrast into one linear map does not: exposure +100 then contrast -50 turns red 199 into 191 in the browser, 255
- *   when folded;
- * - the functions act on the encoded values, not linear light, so this runs after the scRGB edit and resize pass and
- *   on its 8-bit (or 16-bit) output, never inside it;
- * - alpha is left as it is. The scRGB pass hands back straight alpha even though sharp flags it premultiplied, and
- *   the functions are defined on straight alpha.
- *
- * Plain arithmetic over the raw buffer rather than sharp's `linear`/`recomb`/`negate`: those are single option slots
- * that libvips applies in a fixed order without clamping between them.
- */
+Applies the adjustment to an already edited and resized bitmap exactly as the web editor previews it: the CSS
+filter list `saturate() invert() brightness() contrast()` built by `imageAdjustFilter` in
+web/src/lib/gallery/edit/image-adjust.ts (keep the two in step), with the CSS Filter Effects definitions
+(https://www.w3.org/TR/filter-effects-1/#ShorthandEquivalents). Invert runs before exposure and contrast so that, on
+a scanned film negative, they act on the positive the user sees: a negative exposure darkens it.
+
+- each function clamps its output to the colour range before the next one runs, as browsers do. Folding exposure and
+  contrast into one linear map does not: exposure +100 then contrast -50 turns red 199 into 191 in the browser, 255
+  when folded;
+- the functions act on the encoded values, not linear light, so this runs after the scRGB edit and resize pass and
+  on its 8-bit (or 16-bit) output, never inside it;
+- alpha is left as it is. The scRGB pass hands back straight alpha even though sharp flags it premultiplied, and
+  the functions are defined on straight alpha.
+
+Plain arithmetic over the raw buffer rather than sharp's `linear`/`recomb`/`negate`: those are single option slots
+that libvips applies in a fixed order without clamping between them.
+*/
 export const applyImageAdjust = (image: Bitmap, adjust: ImageAdjust): Bitmap => {
   if (isNeutralImageAdjust(adjust)) {
     return image;

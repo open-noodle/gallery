@@ -52,10 +52,10 @@ describe(MemoryService.name, () => {
   let mocks: ServiceMocks;
 
   /**
-   * One `systemMetadata.get` mock answers EVERY key, so it must be keyed. Returning the
-   * memories-state object for `SystemConfig` too would feed junk into config parsing — which is
-   * why the existing tests in this file pass `null`.
-   */
+  One `systemMetadata.get` mock answers EVERY key, so it must be keyed. Returning the
+  memories-state object for `SystemConfig` too would feed junk into config parsing — which is
+  why the existing tests in this file pass `null`.
+  */
   const stubMetadata = () =>
     mocks.systemMetadata.get.mockImplementation((key: SystemMetadataKey) =>
       Promise.resolve(

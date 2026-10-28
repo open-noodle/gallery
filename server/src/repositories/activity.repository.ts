@@ -86,7 +86,7 @@ export class ActivityRepository {
     albumId: string;
     assetId?: string;
     /** I2: when true, drop album-level (assetId IS NULL) rows from the counts — for space-only
-     * readers, who must not learn album-level comment/like totals. */
+    readers, who must not learn album-level comment/like totals. */
     excludeAlbumLevel?: boolean;
   }): Promise<{ comments: number; likes: number }> {
     const result = await this.db

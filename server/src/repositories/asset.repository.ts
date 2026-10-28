@@ -111,11 +111,11 @@ interface AssetBuilderOptions {
   isDuplicate?: boolean;
   albumId?: string;
   /**
-   * #752 P0-2: live member-spaces of the viewer that currently link `albumId` — resolved by
-   * timeline.service (getMemberSpaceIdsLinkingAlbum), NEVER for shared-link auth. When set, the
-   * albumId arm unions member-gated album_space_asset contributions. Distinct from
-   * timelineSpaceIds (home-timeline preference set, separate consumers — PR #778).
-   */
+  #752 P0-2: live member-spaces of the viewer that currently link `albumId` — resolved by
+  timeline.service (getMemberSpaceIdsLinkingAlbum), NEVER for shared-link auth. When set, the
+  albumId arm unions member-gated album_space_asset contributions. Distinct from
+  timelineSpaceIds (home-timeline preference set, separate consumers — PR #778).
+  */
   albumSpaceIds?: string[];
   spaceId?: string;
   tagId?: string;
@@ -131,10 +131,10 @@ interface AssetBuilderOptions {
   tagIds?: string[];
   userIds?: string[];
   /**
-   * Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`,
-   * which expresses timeline COMPOSITION and is OR-ed with `timelineSpaceIds` below. Routing a
-   * contributor filter through `userIds` would WIDEN results inside a Space instead of narrowing.
-   */
+  Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`,
+  which expresses timeline COMPOSITION and is OR-ed with `timelineSpaceIds` below. Routing a
+  contributor filter through `userIds` would WIDEN results inside a Space instead of narrowing.
+  */
   ownerId?: string;
   timelineSpaceIds?: string[];
   withStacked?: boolean;
@@ -167,32 +167,32 @@ export interface TimeBucketOptions extends AssetBuilderOptions {
   /** Consumed by getTimeBucketCovers only; ignored by getTimeBuckets. */
   timeBuckets?: string[];
   /**
-   * #1041: the REQUESTING user's own id, distinct from `userIds` (which also carries partner ids
-   * — timeline.service.ts pushes `getMyPartnerIds` into it). Used to attach the `hiddenScope`
-   * subtraction ONLY to the caller's own-id arm — never to `userIds`, which would remove a
-   * partner's photos based on the caller's flags. See §6.4 of the hide-from-timeline design doc.
-   */
+  #1041: the REQUESTING user's own id, distinct from `userIds` (which also carries partner ids
+  — timeline.service.ts pushes `getMyPartnerIds` into it). Used to attach the `hiddenScope`
+  subtraction ONLY to the caller's own-id arm — never to `userIds`, which would remove a
+  partner's photos based on the caller's flags. See §6.4 of the hide-from-timeline design doc.
+  */
   callerId?: string;
   /**
-   * #1041 §6.2: the caller's resolved "hidden from my own timeline" scope
-   * (`SharedSpaceRepository.getTimelineHiddenScope`). Resolved ONCE per request by the service,
-   * not per bucket. Applied only to the `callerId` arm (see `callerId` above); `undefined` — or a
-   * scope with all four lists empty — means "nothing hidden", so the arm is emitted exactly as it
-   * was before #1041, at no cost to callers who have hidden nothing.
-   */
+  #1041 §6.2: the caller's resolved "hidden from my own timeline" scope
+  (`SharedSpaceRepository.getTimelineHiddenScope`). Resolved ONCE per request by the service,
+  not per bucket. Applied only to the `callerId` arm (see `callerId` above); `undefined` — or a
+  scope with all four lists empty — means "nothing hidden", so the arm is emitted exactly as it
+  was before #1041, at no cost to callers who have hidden nothing.
+  */
   hiddenScope?: TimelineHiddenScope;
   /**
-   * #1041 §3: the spaces the caller still shows (`getSpaceIdsForTimeline`), used ONLY to build the
-   * "another visible path re-admits this photo" rescue inside the subtraction. Distinct from
-   * `timelineSpaceIds`, which additionally MERGES other members' assets into the result — this one
-   * never widens the result set, so it is resolved even when `withSharedSpaces` is off.
-   */
+  #1041 §3: the spaces the caller still shows (`getSpaceIdsForTimeline`), used ONLY to build the
+  "another visible path re-admits this photo" rescue inside the subtraction. Distinct from
+  `timelineSpaceIds`, which additionally MERGES other members' assets into the result — this one
+  never widens the result set, so it is resolved even when `withSharedSpaces` is off.
+  */
   visibleSpaceIds?: string[];
   /**
-   * #763: the caller making the request — NOT `userIds` (the timeline *target*, which differs
-   * from the caller on space/album browse paths). Required whenever `isFavorite` is set, so
-   * `withTimeBucketAssetFilters` can resolve the `asset_favorite` overlay for the right user.
-   */
+  #763: the caller making the request — NOT `userIds` (the timeline *target*, which differs
+  from the caller on space/album browse paths). Required whenever `isFavorite` is set, so
+  `withTimeBucketAssetFilters` can resolve the `asset_favorite` overlay for the right user.
+  */
   authUserId?: string;
 }
 
@@ -218,10 +218,10 @@ interface AssetExploreFieldOptions {
   maxFields: number;
   minAssetsPerField: number;
   /**
-   * #867: spaces the viewer kept on their home timeline. When set, the city scan widens from
-   * "assets I own" to "assets I own OR reach through one of these spaces", so the Explore places
-   * strip matches what the location filter and the filtered timeline already show.
-   */
+  #867: spaces the viewer kept on their home timeline. When set, the city scan widens from
+  "assets I own" to "assets I own OR reach through one of these spaces", so the Explore places
+  strip matches what the location filter and the filtered timeline already show.
+  */
   timelineSpaceIds?: string[];
 }
 
@@ -308,16 +308,16 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
 };
 
 /**
- * #1041 §6.4: the caller's-own-timeline arm, with the "hidden from my own timeline" subtraction
- * attached ONLY to the caller's own id — never to the whole `userIds` set, which also carries
- * partner ids (`timeline.service.ts` pushes `getMyPartnerIds` into it). AND-ing the subtraction
- * across `userIds` would remove a PARTNER's photos based on the CALLER's flags — the "partner trap"
- * E10 pins.
- *
- * When there is nothing to subtract (no `callerId`, no `hiddenScope`, or an empty scope — the common
- * case, a viewer who has hidden nothing), this emits EXACTLY the pre-#1041 predicate,
- * `ownerId = ANY(userIds)`, so that caller pays nothing and the SQL is unchanged.
- */
+#1041 §6.4: the caller's-own-timeline arm, with the "hidden from my own timeline" subtraction
+attached ONLY to the caller's own id — never to the whole `userIds` set, which also carries
+partner ids (`timeline.service.ts` pushes `getMyPartnerIds` into it). AND-ing the subtraction
+across `userIds` would remove a PARTNER's photos based on the CALLER's flags — the "partner trap"
+E10 pins.
+
+When there is nothing to subtract (no `callerId`, no `hiddenScope`, or an empty scope — the common
+case, a viewer who has hidden nothing), this emits EXACTLY the pre-#1041 predicate,
+`ownerId = ANY(userIds)`, so that caller pays nothing and the SQL is unchanged.
+*/
 function ownerArmWithHiddenSubtraction(
   eb: ExpressionBuilder<DB, 'asset'>,
   options: TimeBucketOptions,

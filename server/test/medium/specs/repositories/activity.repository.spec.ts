@@ -31,14 +31,14 @@ beforeAll(async () => {
 
 describe('ActivityRepository — visibility gate', () => {
   /**
-   * TDD: Verifies that Hidden and Locked asset activity rows are filtered
-   * out from search() and getStatistics() so that album members cannot
-   * enumerate existence/content of non-visible assets.
-   *
-   * The check constraint on the activity table requires:
-   *   - comment IS NOT NULL  when isLiked = false (a comment row)
-   *   - comment IS NULL      when isLiked = true  (a like row)
-   */
+  TDD: Verifies that Hidden and Locked asset activity rows are filtered
+  out from search() and getStatistics() so that album members cannot
+  enumerate existence/content of non-visible assets.
+  
+  The check constraint on the activity table requires:
+    - comment IS NOT NULL  when isLiked = false (a comment row)
+    - comment IS NULL      when isLiked = true  (a like row)
+  */
 
   it('search() excludes activity on Hidden assets', async () => {
     const { ctx, activityRepo } = setup();

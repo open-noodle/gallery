@@ -21,6 +21,7 @@ let defaultDatabase: Kysely<DB>;
 const matchingEmbedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
 const farEmbedding = `[${Array.from({ length: 512 }, () => '-0.01').join(',')}]`;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
@@ -50,9 +51,9 @@ const addEmbedding = async (db: Kysely<DB>, assetId: string, embedding = matchin
 };
 
 /**
- * Two Canon bodies on one owner: an R5 image and a 7D image. Every #858 test narrows some
- * dimension so that only the R5 asset survives, then asserts the 7D model disappeared.
- */
+Two Canon bodies on one owner: an R5 image and a 7D image. Every #858 test narrows some
+dimension so that only the R5 asset survives, then asserts the 7D model disappeared.
+*/
 const newCanonPair = async (ctx: Awaited<ReturnType<typeof setup>>['ctx'], userId: string) => {
   const { asset: r5 } = await ctx.newAsset({ ownerId: userId });
   await ctx.newExif({ assetId: r5.id, make: 'Canon', model: 'Canon EOS R5' });

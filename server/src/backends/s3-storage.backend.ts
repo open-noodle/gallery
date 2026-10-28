@@ -129,10 +129,10 @@ export class S3StorageBackend implements StorageBackend {
   }
 
   /**
-   * `range` is the client's raw `Range` header, handed to S3 untouched — S3
-   * understands `bytes=a-b`, `bytes=a-`, and `bytes=-n`, and answers with
-   * `ContentRange` plus a `ContentLength` covering only the returned bytes.
-   */
+  `range` is the client's raw `Range` header, handed to S3 untouched — S3
+  understands `bytes=a-b`, `bytes=a-`, and `bytes=-n`, and answers with
+  `ContentRange` plus a `ContentLength` covering only the returned bytes.
+  */
   private async getObject(
     key: string,
     range?: string,
@@ -254,10 +254,10 @@ export class S3StorageBackend implements StorageBackend {
   }
 
   /**
-   * Wraps a proxied S3 body so the read slot it holds is released however the read ends: drained,
-   * failed, destroyed by the consumer, aborted with the response, or gone idle. The consumer's only
-   * duty is the generic one, destroying the stream it stops piping.
-   */
+  Wraps a proxied S3 body so the read slot it holds is released however the read ends: drained,
+  failed, destroyed by the consumer, aborted with the response, or gone idle. The consumer's only
+  duty is the generic one, destroying the stream it stops piping.
+  */
   private holdSlotUntilClosed(body: Readable, release: () => void, signal?: AbortSignal): Readable {
     let lastDataAt = Date.now();
     // a Transform rather than a 'data' listener on the body: a 'data' listener would start the

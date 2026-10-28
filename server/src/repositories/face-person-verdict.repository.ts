@@ -903,16 +903,16 @@ export class FacePersonVerdictRepository {
   }
 
   /**
-   * "May an editor assign this face in this space?" — `isFaceReachableInSpace` plus the
-   * hidden-person exclusion (spec §6.1).
-   *
-   * The exclusion is here, not at the call site, so the read (§6.1) and the write (§6.3)
-   * cannot disagree: an editor must never be able to attach a face the list would not show
-   * them by guessing its id (F-8/F-9).
-   *
-   * Scoped to the OWNER's `person.isHidden`. A space person's own `isHidden` is a separate
-   * concern handled by the read's projection filter.
-   */
+  "May an editor assign this face in this space?" — `isFaceReachableInSpace` plus the
+  hidden-person exclusion (spec §6.1).
+  
+  The exclusion is here, not at the call site, so the read (§6.1) and the write (§6.3)
+  cannot disagree: an editor must never be able to attach a face the list would not show
+  them by guessing its id (F-8/F-9).
+  
+  Scoped to the OWNER's `person.isHidden`. A space person's own `isHidden` is a separate
+  concern handled by the read's projection filter.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async isFaceAssignableInSpace(spaceId: string, assetFaceId: string): Promise<boolean> {
     const row = await this.db
@@ -944,29 +944,29 @@ export class FacePersonVerdictRepository {
   }
 
   /**
-   * §6.3.1: the face's own `personGroupId`, plus — when it is set — that OWNER `person`'s
-   * `identityId`. This is the pair `attachFaceToSpacePerson` needs to decide whether the face
-   * already belongs to one of the owner's own people, and if so, whether that person's identity
-   * already matches the space person being attached to (row 2) or differs (row 3, where the
-   * identity write must be skipped).
-   *
-   * Also carries `assetOwnerId` — the asset (not the space role) that §6.7's owner-self
-   * attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
-   * attach/detach transaction that already calls this method.
-   *
-   * `ownerPersonName` is that owner person's name, which `linkFaceToSpacePerson` compares against
-   * an identity-less space person's name to decide whether they are the same human (§6.3.1).
-   *
-   * Also carries `ownerIsSpaceMember` — whether the asset owner is a member of `spaceId`. Only
-   * then may a space edit propagate into the owner's own people layer (§3, §6.3.1): an owner who
-   * never joined the space, e.g. one reached through a linked album, keeps their library untouched
-   * and the edit stays in the space's projection. Same owner-is-member rule as #992's
-   * `checkSpaceEditAccess`.
-   *
-   * Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
-   * has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
-   * second implicit contract on call order.
-   */
+  §6.3.1: the face's own `personGroupId`, plus — when it is set — that OWNER `person`'s
+  `identityId`. This is the pair `attachFaceToSpacePerson` needs to decide whether the face
+  already belongs to one of the owner's own people, and if so, whether that person's identity
+  already matches the space person being attached to (row 2) or differs (row 3, where the
+  identity write must be skipped).
+  
+  Also carries `assetOwnerId` — the asset (not the space role) that §6.7's owner-self
+  attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
+  attach/detach transaction that already calls this method.
+  
+  `ownerPersonName` is that owner person's name, which `linkFaceToSpacePerson` compares against
+  an identity-less space person's name to decide whether they are the same human (§6.3.1).
+  
+  Also carries `ownerIsSpaceMember` — whether the asset owner is a member of `spaceId`. Only
+  then may a space edit propagate into the owner's own people layer (§3, §6.3.1): an owner who
+  never joined the space, e.g. one reached through a linked album, keeps their library untouched
+  and the edit stays in the space's projection. Same owner-is-member rule as #992's
+  `checkSpaceEditAccess`.
+  
+  Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
+  has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
+  second implicit contract on call order.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async getFaceOwnerLink(
     spaceId: string,
@@ -1007,25 +1007,25 @@ export class FacePersonVerdictRepository {
   }
 
   /**
-   * F-37: serializes concurrent `attachFaceToSpacePerson` calls that target the SAME face.
-   * `shared_space_person_face`'s primary key is `(personId, assetFaceId)`, not `assetFaceId`
-   * alone, so nothing at the schema level stops two different target space people from each
-   * inserting their own row for the same face if their transactions interleave. Taking this lock
-   * as the FIRST statement in the attach transaction forces a second concurrent attach on the
-   * same face to wait for the first to commit, then see its result (via the reassign read) rather
-   * than race past it — the loser becomes an ordinary sequential reassign, never a duplicate row.
-   */
+  F-37: serializes concurrent `attachFaceToSpacePerson` calls that target the SAME face.
+  `shared_space_person_face`'s primary key is `(personId, assetFaceId)`, not `assetFaceId`
+  alone, so nothing at the schema level stops two different target space people from each
+  inserting their own row for the same face if their transactions interleave. Taking this lock
+  as the FIRST statement in the attach transaction forces a second concurrent attach on the
+  same face to wait for the first to commit, then see its result (via the reassign read) rather
+  than race past it — the loser becomes an ordinary sequential reassign, never a duplicate row.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async lockFaceForAssignment(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
     await db.selectFrom('asset_face').select('id').where('id', '=', assetFaceId).forUpdate().executeTakeFirst();
   }
 
   /**
-   * Spec §6.6: who drew this box by hand, if anyone. NEVER `sourceType` — `PersonService.createFace`
-   * already writes `SourceType.Manual` for an OWNER-drawn box too, so `sourceType` cannot tell the
-   * two apart. `undefined` means the face row does not exist; `null` means it exists but was not
-   * editor-drawn (a detection, or an existing row from before this column existed).
-   */
+  Spec §6.6: who drew this box by hand, if anyone. NEVER `sourceType` — `PersonService.createFace`
+  already writes `SourceType.Manual` for an OWNER-drawn box too, so `sourceType` cannot tell the
+  two apart. `undefined` means the face row does not exist; `null` means it exists but was not
+  editor-drawn (a detection, or an existing row from before this column existed).
+  */
   async getFaceCreatedBy(
     assetFaceId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,

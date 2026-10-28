@@ -104,8 +104,7 @@ const groupOf = async (ownerId: string, faceId: string) => {
 
 describe('1790900000000-SplitSharedPersonGroups', () => {
   it('splits every multi-owner group one per owner, and down() restores it exactly', async () => {
-    const seeded = await seed();
-    const { alice, bob, carol, group, sharedGroup, soloGroup, recognizedFaces, sharedFaces, soloFace } = seeded;
+    const { alice, bob, carol, group, sharedGroup, soloGroup, recognizedFaces, sharedFaces, soloFace } = await seed();
     const before = await snapshot();
     expect(before.shares).toHaveLength(2);
 

@@ -23,13 +23,13 @@ import {
 } from 'src/utils/shared-space-album-scope.js';
 
 /**
- * - `timeline`: time buckets (personal timeline, Trash/Archive/Favorites, album and space browse) and
- *   the hide previews' own-timeline count.
- * - `search`: metadata/smart search, statistics, random, large assets, suggestions, explore.
- * - `map`: the plain `/map/markers` endpoint.
- * - `filtered-map`: the filtered map markers endpoint (`/gallery/map/markers`).
- * - `memories`, `folders`: the memory lane and the folder view.
- */
+- `timeline`: time buckets (personal timeline, Trash/Archive/Favorites, album and space browse) and
+  the hide previews' own-timeline count.
+- `search`: metadata/smart search, statistics, random, large assets, suggestions, explore.
+- `map`: the plain `/map/markers` endpoint.
+- `filtered-map`: the filtered map markers endpoint (`/gallery/map/markers`).
+- `memories`, `folders`: the memory lane and the folder view.
+*/
 export type ViewerSurface = 'timeline' | 'search' | 'map' | 'filtered-map' | 'memories' | 'folders';
 
 export type ViewerScopeRequest = {
@@ -45,10 +45,10 @@ export type ViewerScopeRequest = {
   isFavorite?: boolean;
   isTrashed?: boolean;
   /**
-   * Search only (#763): resolve every space the viewer belongs to instead of their timeline spaces. A
-   * favourite-filtered query narrows to the viewer's own `asset_favorite` rows, so a favourite placed in a
-   * space hidden from the home timeline stays findable. Never set it for an unfiltered browse.
-   */
+  Search only (#763): resolve every space the viewer belongs to instead of their timeline spaces. A
+  favourite-filtered query narrows to the viewer's own `asset_favorite` rows, so a favourite placed in a
+  space hidden from the home timeline stays findable. Never set it for an unfiltered browse.
+  */
   favoriteScoped?: boolean;
   /** Search only (#763): also return `favoriteSpaceIds`, for the hasFavorites facet. */
   withFavoriteSpaces?: boolean;
@@ -58,11 +58,11 @@ export type ViewerScope = {
   /** The viewer's timeline spaces this query is widened to; `undefined` when not widening (or none). */
   timelineSpaceIds?: string[];
   /**
-   * #763: every space the viewer belongs to, for the hasFavorites facet only, on a `withSharedSpaces`
-   * request that asked for it. The other facets stay on `timelineSpaceIds`: widening those would pull a
-   * hidden space's cities/tags/people back into the panel, but "is the Favourites section worth offering"
-   * has to span the same spaces the favourites filter itself searches.
-   */
+  #763: every space the viewer belongs to, for the hasFavorites facet only, on a `withSharedSpaces`
+  request that asked for it. The other facets stay on `timelineSpaceIds`: widening those would pull a
+  hidden space's cities/tags/people back into the panel, but "is the Favourites section worth offering"
+  has to span the same spaces the favourites filter itself searches.
+  */
   favoriteSpaceIds?: string[];
   /** What the viewer hid from their own timeline — only on surfaces that subtract it. */
   hiddenScope?: TimelineHiddenScope;
@@ -145,12 +145,12 @@ const surfaceRule = (surface: ViewerSurface, request: ViewerScopeRequest): Surfa
 };
 
 /**
- * #1041 §4: the subtraction is a PERSONAL TIMELINE rule. Trash, Archive and Favorites reach the
- * timeline too, but each is a recovery/curation surface where subtracting an owned asset makes it
- * unreachable from the UI (E2/E2b/E2c); Hidden/Locked are the caller's own private buckets. Written
- * as an exclusion list so a client that omits `visibility` still gets the hide (fails CLOSED, E2e).
- * Independent of `withSharedSpaces`, which is a merge switch, not a surface (E12).
- */
+#1041 §4: the subtraction is a PERSONAL TIMELINE rule. Trash, Archive and Favorites reach the
+timeline too, but each is a recovery/curation surface where subtracting an owned asset makes it
+unreachable from the UI (E2/E2b/E2c); Hidden/Locked are the caller's own private buckets. Written
+as an exclusion list so a client that omits `visibility` still gets the hide (fails CLOSED, E2e).
+Independent of `withSharedSpaces`, which is a merge switch, not a surface (E12).
+*/
 const isPersonalTimeline = (request: ViewerScopeRequest) =>
   !!request.userId &&
   !request.isTrashed &&
@@ -160,9 +160,9 @@ const isPersonalTimeline = (request: ViewerScopeRequest) =>
   request.visibility !== AssetVisibility.Locked;
 
 /**
- * Only search carries a visibility default; every other surface leaves the caller's visibility alone.
- * Typed per surface so a surface's scope can be spread straight into its own options type.
- */
+Only search carries a visibility default; every other surface leaves the caller's visibility alone.
+Typed per surface so a surface's scope can be spread straight into its own options type.
+*/
 export type ViewerScopeFor<S extends ViewerSurface> = S extends 'search'
   ? ViewerScope
   : Omit<ViewerScope, 'visibility'>;
@@ -267,10 +267,10 @@ export type StructuredSearchRequest = {
 };
 
 /**
- * The viewer-scope request for a structured search. `withSharedSpaces` is the only Gallery flat field with a
- * structured meaning; the others have no structured form, so they are rejected rather than ignored, which would
- * answer with a wider set than was asked for.
- */
+The viewer-scope request for a structured search. `withSharedSpaces` is the only Gallery flat field with a
+structured meaning; the others have no structured form, so they are rejected rather than ignored, which would
+answer with a wider set than was asked for.
+*/
 export const structuredSearchViewerRequest = (dto: StructuredSearchRequest, albumIds: string[]): ViewerScopeRequest => {
   if (dto.spaceId || dto.spacePersonIds?.length || dto.ownerId || dto.isInAlbum !== undefined) {
     throw new BadRequestException('spaceId, spacePersonIds, ownerId and isInAlbum need the flat search fields');
@@ -285,12 +285,12 @@ export const structuredSearchViewerRequest = (dto: StructuredSearchRequest, albu
 };
 
 /**
- * Gallery's hooks on upstream's structured-search scope, from the resolved viewer scope. They give search V3 the
- * flat search's rules: the universe is the viewer and partners plus, on a `withSharedSpaces` request, what their
- * timeline spaces share with them; album-confined parts get the album re-gate and count contributions made through
- * those spaces; `isFavorite` is the caller's own favourite. A person filter the viewer may not use empties the
- * result, and a shared link may not filter by favourite, as on the flat search.
- */
+Gallery's hooks on upstream's structured-search scope, from the resolved viewer scope. They give search V3 the
+flat search's rules: the universe is the viewer and partners plus, on a `withSharedSpaces` request, what their
+timeline spaces share with them; album-confined parts get the album re-gate and count contributions made through
+those spaces; `isFavorite` is the caller's own favourite. A person filter the viewer may not use empties the
+result, and a shared link may not filter by favourite, as on the flat search.
+*/
 export const searchScopeV3 = (
   auth: AuthDto,
   dto: StructuredSearchRequest,

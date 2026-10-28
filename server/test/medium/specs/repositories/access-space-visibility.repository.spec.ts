@@ -1,12 +1,12 @@
 /**
- * Medium tests for `AccessRepository.spaceAsset.checkSpaceAccess` — visibility filter (Slice 3).
- *
- * Security requirement: space-membership asset access via any path (direct /
- * library / album) must only expose assets whose visibility is `Timeline` or
- * `Archive`. `Hidden` and `Locked` are NEVER exposed through the space gate.
- *
- * Each test seeds a clean context so there is no shared-state cross-contamination.
- */
+Medium tests for `AccessRepository.spaceAsset.checkSpaceAccess` — visibility filter (Slice 3).
+
+Security requirement: space-membership asset access via any path (direct /
+library / album) must only expose assets whose visibility is `Timeline` or
+`Archive`. `Hidden` and `Locked` are NEVER exposed through the space gate.
+
+Each test seeds a clean context so there is no shared-state cross-contamination.
+*/
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';

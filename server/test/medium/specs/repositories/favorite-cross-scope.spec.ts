@@ -26,6 +26,7 @@ const TOTAL_ASSETS = SPACE_COUNT * ASSETS_PER_OWNER;
 const CHUNK_SIZE = 1000;
 const PERF_CEILING_MS = 5000;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const chunk = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {

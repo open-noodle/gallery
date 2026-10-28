@@ -11,12 +11,12 @@ import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
 
 /**
- * Upper bound on full re-scan passes one backfill chain may take when getBackfillWork() keeps
- * reporting identity work. Repair passes are designed to converge in one or two passes; work that
- * is still outstanding at the cap indicates a convergence bug, and re-queueing would otherwise
- * loop full-table scans forever. The next external trigger (bootstrap, post-recognition
- * maintenance, or a manual run) starts a fresh chain.
- */
+Upper bound on full re-scan passes one backfill chain may take when getBackfillWork() keeps
+reporting identity work. Repair passes are designed to converge in one or two passes; work that
+is still outstanding at the cap indicates a convergence bug, and re-queueing would otherwise
+loop full-table scans forever. The next external trigger (bootstrap, post-recognition
+maintenance, or a manual run) starts a fresh chain.
+*/
 export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
 @Injectable()
@@ -40,31 +40,31 @@ export class FaceIdentityMaintenanceService extends BaseService {
   }
 
   /**
-   * Face suggestions ship enabled (`config.ts` defaults). An instance that upgrades *into* that default
-   * never emits a `ConfigUpdate`, so `onConfigUpdate`'s false -> true transition — the thing that normally
-   * starts the work — cannot fire for it. `FaceSuggestionMaintenance` has no cron either, so without this
-   * the settings page would report the feature on while the queue stayed empty until someone renamed a
-   * person or ran the job by hand: the same "the feature seems to be missing" report the opt-in toggle was
-   * introduced to fix, in a new shape.
-   *
-   * Runs at most once per instance, guarded by a system-metadata marker (same pattern as
-   * SharedSpaceService.onBootstrap). This method only ever QUEUES; the marker is written by the sweep
-   * itself, in `FaceSuggestionService.handleFaceSuggestionMaintenance`'s success path. Two failure modes make that
-   * split load-bearing, and burning the marker here reintroduces both:
-   *
-   *   - feature off at this boot. The old code burnt the marker anyway, reasoning that a later opt-in is
-   *     served by `onConfigUpdate`'s false -> true transition. That is untrue under IMMICH_CONFIG_FILE:
-   *     `updateSystemConfig` throws outright for file-mode instances, and a YAML edit + restart emits only
-   *     `ConfigInit`. Such an admin would get a toggle reading "on" over a queue nothing ever fills. The
-   *     cost of leaving it unset is one config read per boot.
-   *   - the sweep fails. `FaceSuggestionMaintenance` runs with `attempts: 1` and `removeOnFail: true`
-   *     (job.repository.ts), so a marker written at queue time would outlive a job that failed and
-   *     vanished — recorded as swept, never actually run, never retried.
-   *
-   * A fresh install still burns it on the first boot, against an empty library, which costs nothing: the
-   * sweep finds no named people, and `handleFaceIdentityBackfill`'s completion path keeps the queue current
-   * from then on.
-   */
+  Face suggestions ship enabled (`config.ts` defaults). An instance that upgrades *into* that default
+  never emits a `ConfigUpdate`, so `onConfigUpdate`'s false -> true transition — the thing that normally
+  starts the work — cannot fire for it. `FaceSuggestionMaintenance` has no cron either, so without this
+  the settings page would report the feature on while the queue stayed empty until someone renamed a
+  person or ran the job by hand: the same "the feature seems to be missing" report the opt-in toggle was
+  introduced to fix, in a new shape.
+  
+  Runs at most once per instance, guarded by a system-metadata marker (same pattern as
+  SharedSpaceService.onBootstrap). This method only ever QUEUES; the marker is written by the sweep
+  itself, in `FaceSuggestionService.handleFaceSuggestionMaintenance`'s success path. Two failure modes make that
+  split load-bearing, and burning the marker here reintroduces both:
+  
+    - feature off at this boot. The old code burnt the marker anyway, reasoning that a later opt-in is
+      served by `onConfigUpdate`'s false -> true transition. That is untrue under IMMICH_CONFIG_FILE:
+      `updateSystemConfig` throws outright for file-mode instances, and a YAML edit + restart emits only
+      `ConfigInit`. Such an admin would get a toggle reading "on" over a queue nothing ever fills. The
+      cost of leaving it unset is one config read per boot.
+    - the sweep fails. `FaceSuggestionMaintenance` runs with `attempts: 1` and `removeOnFail: true`
+      (job.repository.ts), so a marker written at queue time would outlive a job that failed and
+      vanished — recorded as swept, never actually run, never retried.
+  
+  A fresh install still burns it on the first boot, against an empty library, which costs nothing: the
+  sweep finds no named people, and `handleFaceIdentityBackfill`'s completion path keeps the queue current
+  from then on.
+  */
   private async queueInitialFaceSuggestionSweep(): Promise<void> {
     const state = await this.systemMetadataRepository.get(SystemMetadataKey.FaceSuggestionDefaultOnState);
     if (state?.sweptAt) {

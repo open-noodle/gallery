@@ -26,6 +26,7 @@ let internals: Internals;
 
 // Deterministic, valid UUIDs (version 4, variant 8) keyed by a small integer.
 const uuid = (n: number) => `00000000-0000-4000-8000-${n.toString().padStart(12, '0')}`;
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const vec = (x: number, y: number, z: number) => `[${x},${y},${z}]`;
 
 const insertFace = (faceId: string, embedding: string) =>

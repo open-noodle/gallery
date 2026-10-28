@@ -78,6 +78,7 @@ const emptyPackets = {
 
 // Shape exiftool-vendored (39.x sets zoneSource and the deprecated tzSource together) returns for a
 // QuickTime video with no zone (verified against a real file): the UTC zone is an assumption, not data.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const videoAssumedUtc = (exifDate: string): Partial<ImmichTags> => ({
   CreateDate: ExifDateTime.fromEXIF(exifDate, 'UTC'),
   zone: 'UTC',

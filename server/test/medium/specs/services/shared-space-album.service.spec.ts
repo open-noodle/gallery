@@ -1169,10 +1169,10 @@ describe('removeAssets (medium) — stack expansion bounded to direct members (S
 });
 
 /**
- * Wire SharedSpaceService + AlbumService sharing a real EventRepository so that
- * AlbumService.delete emits AlbumDelete and the SharedSpaceService.onAlbumDelete
- * handler fires synchronously (mirrors production: emit runs handlers before returning).
- */
+Wire SharedSpaceService + AlbumService sharing a real EventRepository so that
+AlbumService.delete emits AlbumDelete and the SharedSpaceService.onAlbumDelete
+handler fires synchronously (mirrors production: emit runs handlers before returning).
+*/
 const setupWithAlbumDelete = () => {
   // SharedSpaceService context — supplies all real face/space repos and the sut
   const spaceResult = newMediumService(SharedSpaceService, {
@@ -1427,15 +1427,15 @@ describe('SharedSpaceService — removeMember atomicity (L7)', () => {
 });
 
 /**
- * Wire SharedSpaceService + UserService sharing a real EventRepository so that
- * UserService.handleUserDelete emits AlbumDelete and SharedSpaceService.onAlbumDelete
- * fires BEFORE albums are hard-deleted (same emit-then-delete ordering that the GREEN
- * implementation must guarantee). Mirrors the setupWithAlbumDelete pattern above.
- *
- * Assets are owned by Bob (not Alice) so that when Alice's user row is hard-deleted
- * the asset rows — and their associated asset_face / shared_space_person_face rows —
- * are NOT cascade-deleted.  This gives us clean, inspectable state after the call.
- */
+Wire SharedSpaceService + UserService sharing a real EventRepository so that
+UserService.handleUserDelete emits AlbumDelete and SharedSpaceService.onAlbumDelete
+fires BEFORE albums are hard-deleted (same emit-then-delete ordering that the GREEN
+implementation must guarantee). Mirrors the setupWithAlbumDelete pattern above.
+
+Assets are owned by Bob (not Alice) so that when Alice's user row is hard-deleted
+the asset rows — and their associated asset_face / shared_space_person_face rows —
+are NOT cascade-deleted.  This gives us clean, inspectable state after the call.
+*/
 const setupWithUserDelete = () => {
   // SharedSpaceService context — supplies all real face/space repos and the sut
   const spaceResult = newMediumService(SharedSpaceService, {
@@ -1610,15 +1610,15 @@ describe('UserService — handleUserDelete: space face cleanup (faces F2)', () =
 });
 
 /**
- * Wire SharedSpaceService + UserAdminService sharing a real EventRepository so that
- * UserAdminService.delete() emits AlbumDelete and SharedSpaceService.onAlbumDelete fires
- * synchronously while the album_asset / shared_space_album rows still exist (mirrors the
- * setupWithUserDelete pattern above). The UserAdminService JobRepository is mocked so the
- * restore() re-projection queue calls can be asserted.
- *
- * Assets are owned by Bob (not Alice) so soft-deleting/restoring Alice's account leaves the
- * asset_face / shared_space_person_face rows intact for inspection.
- */
+Wire SharedSpaceService + UserAdminService sharing a real EventRepository so that
+UserAdminService.delete() emits AlbumDelete and SharedSpaceService.onAlbumDelete fires
+synchronously while the album_asset / shared_space_album rows still exist (mirrors the
+setupWithUserDelete pattern above). The UserAdminService JobRepository is mocked so the
+restore() re-projection queue calls can be asserted.
+
+Assets are owned by Bob (not Alice) so soft-deleting/restoring Alice's account leaves the
+asset_face / shared_space_person_face rows intact for inspection.
+*/
 const setupWithUserAdminDelete = () => {
   // SharedSpaceService context — supplies all real face/space repos and the onAlbumDelete handler
   const spaceResult = newMediumService(SharedSpaceService, {
@@ -1790,12 +1790,12 @@ describe('UserAdminService — restore: space face re-projection (faces F3b)', (
 });
 
 /**
- * Emit-timing note: AssetDelete fires AFTER the asset row (and cascaded asset_face →
- * shared_space_person_face rows) are already deleted.  The onAssetDelete handler therefore
- * receives the affected (spaceId, personId) pairs pre-captured at the emit site in
- * asset.service.ts BEFORE deletion.  These tests exercise the handler directly with
- * the pre-captured payload and verify it correctly recounts surviving persons and removes orphans.
- */
+Emit-timing note: AssetDelete fires AFTER the asset row (and cascaded asset_face →
+shared_space_person_face rows) are already deleted.  The onAssetDelete handler therefore
+receives the affected (spaceId, personId) pairs pre-captured at the emit site in
+asset.service.ts BEFORE deletion.  These tests exercise the handler directly with
+the pre-captured payload and verify it correctly recounts surviving persons and removes orphans.
+*/
 describe('SharedSpaceService — onAssetDelete face cleanup', () => {
   it('getSpacePersonsForAsset returns (spaceId, personId) pairs for faces on the asset', async () => {
     const { ctx } = setup();

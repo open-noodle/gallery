@@ -2,11 +2,11 @@ import { SharedSpaceRole } from 'src/enum.js';
 import { MediumTestContext } from 'test/medium.factory.js';
 
 /**
- * The bucket (and the date inside it) every asset of the two-owner Space fixture is seeded into.
- *
- * The timeline suite addresses the fixture with `timeBucket: SPACE_BUCKET`; the search suite ignores
- * dates entirely. Keeping both fixtures on one date means the same seed serves both.
- */
+The bucket (and the date inside it) every asset of the two-owner Space fixture is seeded into.
+
+The timeline suite addresses the fixture with `timeBucket: SPACE_BUCKET`; the search suite ignores
+dates entirely. Keeping both fixtures on one date means the same seed serves both.
+*/
 export const SPACE_BUCKET = '2026-01-01';
 export const SPACE_DATE = new Date('2026-01-15T10:00:00Z');
 
@@ -40,18 +40,18 @@ export const newSpaceAssetWithExif = async (
 };
 
 /**
- * A Space with TWO contributing owners (anna, ben) plus a viewer and an editor who own NOTHING.
- *
- * The two-owner shape is load-bearing: with a single owner every RBAC assertion built on this
- * fixture passes vacuously and the #655 bug class ("viewers get empty facets for assets owned by
- * someone else") stays invisible. Likewise, a viewer/editor who owns nothing is what makes an
- * "only anna's assets" assertion meaningful — a caller who owns assets of their own could satisfy
- * it through the ownership scope rather than the filter under test. Do not collapse either.
- *
- * Shared between the timeline medium suite (contextual filters over `withTimeBucketAssetFilters`)
- * and the search medium suite (the same filters over `searchAssetBuilder`) — two DIFFERENT query
- * builders that must enforce the same RBAC contract, so they are pinned against one fixture.
- */
+A Space with TWO contributing owners (anna, ben) plus a viewer and an editor who own NOTHING.
+
+The two-owner shape is load-bearing: with a single owner every RBAC assertion built on this
+fixture passes vacuously and the #655 bug class ("viewers get empty facets for assets owned by
+someone else") stays invisible. Likewise, a viewer/editor who owns nothing is what makes an
+"only anna's assets" assertion meaningful — a caller who owns assets of their own could satisfy
+it through the ownership scope rather than the filter under test. Do not collapse either.
+
+Shared between the timeline medium suite (contextual filters over `withTimeBucketAssetFilters`)
+and the search medium suite (the same filters over `searchAssetBuilder`) — two DIFFERENT query
+builders that must enforce the same RBAC contract, so they are pinned against one fixture.
+*/
 export const createTwoOwnerSpace = async (ctx: MediumTestContext) => {
   const { user: anna } = await ctx.newUser();
   const { user: ben } = await ctx.newUser();

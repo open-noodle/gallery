@@ -30,13 +30,13 @@ const WORKER_WATCH_INTERVAL_MS = 30_000;
 const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
 
 /**
- * Per-queue worker lock overrides. BullMQ defaults to a 30s lock + 30s stalled check + maxStalledCount
- * 1, which is fine for short handlers but dangerous for queues whose handlers can legitimately run for
- * minutes. The FacialRecognition queue (concurrency 1) runs space face-match-all, identity
- * reconciliation, and per-pass dedup; on a large space a single healthy handler can exceed 30s, get
- * declared stalled, and be orphaned in the "active" list — starving the whole queue, core face
- * recognition included. A longer lock + stalled interval keeps slow-but-healthy jobs alive.
- */
+Per-queue worker lock overrides. BullMQ defaults to a 30s lock + 30s stalled check + maxStalledCount
+1, which is fine for short handlers but dangerous for queues whose handlers can legitimately run for
+minutes. The FacialRecognition queue (concurrency 1) runs space face-match-all, identity
+reconciliation, and per-pass dedup; on a large space a single healthy handler can exceed 30s, get
+declared stalled, and be orphaned in the "active" list — starving the whole queue, core face
+recognition included. A longer lock + stalled interval keeps slow-but-healthy jobs alive.
+*/
 const WORKER_OPTIONS_BY_QUEUE: Partial<Record<QueueName, Pick<WorkerOptions, 'lockDuration' | 'stalledInterval'>>> = {
   [QueueName.FacialRecognition]: { lockDuration: 300_000, stalledInterval: 300_000 },
 };
@@ -219,20 +219,20 @@ export class JobRepository {
   }
 
   /**
-   * Slice 14 (fork isolation): `getJobCounts` is a pure delegate upstream — every read-only caller
-   * (the admin queue poll in queue.service.ts, media.service.ts, person.service.ts's recognition-queue
-   * checks, storage-migration.service.ts, and this repository's own getTelemetryMetrics) expects a read
-   * that never mutates Redis. `removeDanglingActiveJobs` used to run unconditionally inside
-   * `getJobCounts`, so those upstream call paths silently wrote to Redis on every poll.
-   *
-   * This variant carries that repair. `waitForQueueCompletion` is the one caller that genuinely needs
-   * it: it blocks in a loop deciding whether a queue (including the fork's PeopleBackfill, where the
-   * dangling-active-entry bug this repair fixes was originally found — see the "fix(server): clean
-   * dangling active queue entries" commit) has actually drained, and a dangling active entry with no
-   * backing job hash would otherwise read as perpetually "still active." A blocking wait loop paying for
-   * an extra bounded Redis scan per poll is a reasonable trade against a passive per-request read paying
-   * the same cost for no benefit.
-   */
+  Slice 14 (fork isolation): `getJobCounts` is a pure delegate upstream — every read-only caller
+  (the admin queue poll in queue.service.ts, media.service.ts, person.service.ts's recognition-queue
+  checks, storage-migration.service.ts, and this repository's own getTelemetryMetrics) expects a read
+  that never mutates Redis. `removeDanglingActiveJobs` used to run unconditionally inside
+  `getJobCounts`, so those upstream call paths silently wrote to Redis on every poll.
+  
+  This variant carries that repair. `waitForQueueCompletion` is the one caller that genuinely needs
+  it: it blocks in a loop deciding whether a queue (including the fork's PeopleBackfill, where the
+  dangling-active-entry bug this repair fixes was originally found — see the "fix(server): clean
+  dangling active queue entries" commit) has actually drained, and a dangling active entry with no
+  backing job hash would otherwise read as perpetually "still active." A blocking wait loop paying for
+  an extra bounded Redis scan per poll is a reasonable trade against a passive per-request read paying
+  the same cost for no benefit.
+  */
   async getJobCountsWithRepair(name: QueueName): Promise<JobCounts> {
     await this.removeDanglingActiveJobs(name);
     return this.getJobCounts(name);
@@ -335,13 +335,13 @@ export class JobRepository {
   }
 
   /**
-   * S9 (F19): the trailing-options form keeps every existing call site's variadic syntax
-   * (`waitForQueueCompletion(a, b, c)`) byte-identical — only a caller that explicitly appends a
-   * trailing options object opts into the bounded wait. Without `timeoutMs` this is the original
-   * unbounded `while (pending.length > 0)` poll; with it, a forced recognition run that gives up
-   * waiting still proceeds instead of parking indefinitely while F17/F18's suggestion sweep keeps
-   * the PeopleBackfill queue busy.
-   */
+  S9 (F19): the trailing-options form keeps every existing call site's variadic syntax
+  (`waitForQueueCompletion(a, b, c)`) byte-identical — only a caller that explicitly appends a
+  trailing options object opts into the bounded wait. Without `timeoutMs` this is the original
+  unbounded `while (pending.length > 0)` poll; with it, a forced recognition run that gives up
+  waiting still proceeds instead of parking indefinitely while F17/F18's suggestion sweep keeps
+  the PeopleBackfill queue busy.
+  */
   async waitForQueueCompletion(
     ...args: [...queues: QueueName[]] | [...queues: QueueName[], options: WaitForQueueCompletionOptions]
   ): Promise<void> {
