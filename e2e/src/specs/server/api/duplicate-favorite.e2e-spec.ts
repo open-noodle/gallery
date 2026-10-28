@@ -13,6 +13,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // owner's overlay row; `AssetFavoriteRepository.mergeOnto` carries everyone else's. See
 // specs/2026-07-20-per-user-favorites-design.md (E21).
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const putFavorites = (token: string, ids: string[], isFavorite: boolean) =>
   request(app).put('/assets/favorites').set(asBearerAuth(token)).send({ ids, isFavorite });
 

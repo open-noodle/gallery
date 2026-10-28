@@ -57,9 +57,9 @@ interface CrossOwnerFixture {
 }
 
 /**
- * @param withCollapse when true, userB also holds a person on identity T, so merging S into T would merge two
- * of userB's people — the destructive (b) case. Otherwise userB holds a single person and is merely re-pointed.
- */
+@param withCollapse when true, userB also holds a person on identity T, so merging S into T would merge two
+of userB's people — the destructive (b) case. Otherwise userB holds a single person and is merely re-pointed.
+*/
 const setupCrossOwnerMerge = async (options: { withCollapse: boolean }): Promise<CrossOwnerFixture> => {
   const db = await utils.connectDatabase();
   const admin = await utils.adminSetup();

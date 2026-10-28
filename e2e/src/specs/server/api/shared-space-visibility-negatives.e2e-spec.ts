@@ -1,17 +1,17 @@
 /**
- * Slice 11 — e2e RBAC negatives for space visibility gate.
- *
- * As a non-owner member, asserts that Hidden/Locked assets:
- *   1. Return 400 on GET /assets/:id
- *   2. Return 400 on GET /assets/:id/original
- *   3. Are absent from POST /download/info (spaceId) zip manifest
- *   4. Are absent from POST /download/info (albumId) zip manifest (via AlbumDownload space grant)
- *
- * Each test creates a fresh space + assets to avoid cross-test state contamination.
- *
- * Timeline and Archive assets are verified accessible (positive control) so that
- * 400 responses on Hidden/Locked are confirmed to be gate failures, not setup bugs.
- */
+Slice 11 — e2e RBAC negatives for space visibility gate.
+
+As a non-owner member, asserts that Hidden/Locked assets:
+  1. Return 400 on GET /assets/:id
+  2. Return 400 on GET /assets/:id/original
+  3. Are absent from POST /download/info (spaceId) zip manifest
+  4. Are absent from POST /download/info (albumId) zip manifest (via AlbumDownload space grant)
+
+Each test creates a fresh space + assets to avoid cross-test state contamination.
+
+Timeline and Archive assets are verified accessible (positive control) so that
+400 responses on Hidden/Locked are confirmed to be gate failures, not setup bugs.
+*/
 
 import {
   AlbumUserRole,
@@ -42,6 +42,7 @@ const parseSyncStream = (text: string): SyncLine[] =>
     .map((line) => JSON.parse(line) as SyncLine);
 
 /** POST /sync/stream and return the parsed NDJSON lines, for the given access token. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const syncStream = async (accessToken: string, types: SyncRequestType[], reset = false): Promise<SyncLine[]> => {
   const response = await request(app)
     .post('/sync/stream')
@@ -106,9 +107,9 @@ describe('shared-space visibility negatives (Slice 11)', () => {
   };
 
   /**
-   * Call POST /download/info with the given body as member.
-   * Returns the flat list of assetIds from all archives.
-   */
+  Call POST /download/info with the given body as member.
+  Returns the flat list of assetIds from all archives.
+  */
   const downloadInfoIds = async (body: Record<string, unknown>): Promise<string[]> => {
     const { status, body: resBody } = await request(app)
       .post('/download/info')
