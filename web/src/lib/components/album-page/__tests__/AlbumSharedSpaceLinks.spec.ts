@@ -28,7 +28,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
   });
 
   it('renders one row per space link with the space name', () => {
@@ -82,7 +82,7 @@ describe('AlbumSharedSpaceLinks', () => {
   });
 
   it('does NOT call unlinkAlbum when the confirmation is declined', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
     renderWithTooltips(AlbumSharedSpaceLinks, {
       album: albumFactory.build({
         id: 'album-1',

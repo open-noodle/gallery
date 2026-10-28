@@ -378,7 +378,7 @@ describe('Space people page', () => {
     const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
     sdkMock.getSpacePeople.mockResolvedValue([norgy]);
     sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     renderPage([norgy, unnamed]);
 
     const user = userEvent.setup();
@@ -412,7 +412,7 @@ describe('Space people page', () => {
     const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
     sdkMock.getSpacePeople.mockResolvedValue([norgy]);
     sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     renderPage([norgy, unnamed]);
 
     const user = userEvent.setup();
@@ -434,7 +434,7 @@ describe('Space people page', () => {
     const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
     const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
     sdkMock.getSpacePeople.mockResolvedValue([norgy]);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
     renderPage([norgy, unnamed]);
 
     const user = userEvent.setup();
@@ -455,7 +455,7 @@ describe('Space people page', () => {
     const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
     sdkMock.getSpacePeople.mockResolvedValue([norgy]);
     sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     renderPage([norgy, unnamed]);
 
     const user = userEvent.setup();
@@ -487,7 +487,7 @@ describe('Space people page', () => {
       data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
       message: 'raw',
     });
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     renderPage([norgy, unnamed]);
 
     const user = userEvent.setup();
