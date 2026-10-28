@@ -183,4 +183,52 @@ spec passes.
 
 ## Remote CI
 
-Pending.
+Final tip `48265b454f6`. Each workflow's latest run:
+
+| Workflow | Tip | Result |
+|---|---|---|
+| Test | `48265b454f6` | green (run 40669840902) |
+| Docker | `aaf60697289` | green (run 40663285147); `48265b454f6` re-run pending its OpenVINO ML build |
+| Release Candidate Build (`rolling-v34-rc4`, server + ML) | `48265b454f6` | green |
+| Gallery Revert-to-Immich Validation (`gallery_image=rolling-v34-rc3`, `upstream_image=commit-11bf875…`) | `6669e593964` | green |
+| Gallery Rebase Smoke, Storage Migration Tests, Storage Migration E2E | `aaf60697289` | green |
+| Static Code Analysis, Gallery Build Mobile, Gallery Mobile Smoke, Gallery ML Smoke | `92b2fd2539a` | green (later commits touch no mobile or ML code) |
+
+Failures CI found after the push, all fixed:
+
+- **Image builds** (RC, Docker, Rebase Smoke, Storage Migration E2E, web/server E2E): web's new `prepare` hook ran the
+  i18n merge before the Dockerfile copies `i18n/`. It now skips the merge when the overlay is absent; `vite build`
+  builds it again. Then **CLI on Windows**: the guard was a POSIX shell test, now an inline `node -e`.
+- **Test Branding**: upstream's reworded RKNN docs said "Immich" twice on a fork-owned page.
+- **Medium (server)**: `/search/options` still refused a partner browse with no visibility, which the timeline
+  now accepts (immich-32565); the options follow the timeline, so the filter sheet counts what the timeline shows.
+- **Server e2e (search contract)**: #1238's fixtures were recorded against `main`. Re-recorded on this branch:
+  `/server/version` gains upstream's `featureLevel`; the two partner-without-visibility cases are 200 now and were
+  renamed from `*-reject-*` to say so. Mobile search tests (248) pass on the new fixtures.
+- **Web e2e (`spaces-albums-journey`)**: a stranger opening a space photo deep link is stopped by upstream's `(user)`
+  layout fetching the asset; SvelteKit 3 renders that as the generic "Something went wrong" page instead of the
+  server's "no access" text, so the test accepts that page as blocked (it is).
+
+## Staging (2026-10-28) — `rolling-v34-rc4` DEPLOYED (server and ML)
+
+- infra-gitops `0a7a131` (ML) and `6d7f963` (server); previous pins `main-v335-rc1` / `v5.8.0`.
+- Before: live migration parity against the branch, **0 orphans**, 2 pending (`1792511451454-AddPasskeyTable`,
+  `1792517020180-AddUpdateIdIndexes`). Dump `~/gallery-backups/staging-pre-rolling-v34-rc4-2026-10-28.dump`
+  (122 tables, sha256 `48b9fd68…cc220`, verified against the pod copy, which was then deleted).
+- **Rollback**: restore that dump and pin the previous images. `gallery-migrations.js revert` undoes fork migrations
+  first, so it is not the tool for these two upstream ones.
+- Boot: both migrations succeeded, `No schema drift detected` on Api and Microservices, 0 error lines, `[v5.9.0-rc.1]`.
+- Smoke (temp admin API key, deleted afterwards, then 401): ping, features, config, shared spaces, people with spaces,
+  albums, map markers, timeline buckets (partners + spaces), memories, tags, workflow triggers, passkeys, suggestions,
+  ML health — all 200; `GET /` 200; `/icon.svg` is the Gallery mark.
+- `/server/version`: Gallery web 5.9.0-rc.1, a stock Android UA 3.3.5, both with `featureLevel`.
+- Search: CLIP smart search "beach" → 5 hits (first call downloaded the v2 CLIP model); a real city (`Alcamo`, from
+  suggestions) returns the same asset in V3 (`filter.city.eq`) and flat shape.
+- Partner default: `withPartners` with no visibility 200 on buckets and options, with `archive` 400.
+- ML v2 end to end: an uploaded portrait got 1 face (`buffalo_l`), a CLIP embedding and a pet-detection stamp
+  (`rfdetr-nano` downloaded, loaded and ran) within ~15 s; the upload was force-deleted. **Pets were not proven to be
+  found**: staging has 0 pet faces and no cat/dog test photo was at hand, so the ML v2 pet-model landing check stays
+  open.
+- **Upstream bug seen live**: upstream's `web/src/app.css` (immich-32737) declares the fonts as
+  `url('#lib/assets/fonts/…ttf')`; Vite leaves that untouched in CSS, so browsers cannot load GoogleSans and fall
+  back to a system font. Present at `11bf8753137` upstream; not a fork change.
