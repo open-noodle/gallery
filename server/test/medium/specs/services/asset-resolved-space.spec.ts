@@ -1,12 +1,13 @@
 import { Kysely } from 'kysely';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { AssetVisibility, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
@@ -18,6 +19,7 @@ import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetService } from 'src/services/asset.service.js';
@@ -39,6 +41,7 @@ const setup = () => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      ConfigRepository,
       // The owner branch overlays identity-resolved person metadata.
       FaceIdentityRepository,
       SharedLinkAssetRepository,
@@ -47,8 +50,20 @@ const setup = () => {
       UserRepository,
       SharedLinkRepository,
     ],
-    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository],
+    mock: [
+      EventRepository,
+      LoggingRepository,
+      JobRepository,
+      StorageRepository,
+      OcrRepository,
+      SystemMetadataRepository,
+    ],
   });
+  // Gallery-fork: `AssetService.get` attaches `familyRelationLabel` to the people it embeds, which reads the config
+  // first. A bare `{}` yields the defaults, so the family tree stays off.
+  ctx
+    .getMock(SystemMetadataRepository)
+    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
   const { sut: timelineService } = newMediumService(TimelineService, {
     database: defaultDatabase,
     real: [AssetRepository, AccessRepository, FaceIdentityRepository, PartnerRepository, SharedSpaceRepository],

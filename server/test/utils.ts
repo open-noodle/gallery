@@ -55,6 +55,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -334,6 +335,7 @@ export type ServiceOverrides = {
   gallerySync: GallerySyncRepository;
   videoTrim: VideoTrimRepository;
   imageAdjust: ImageAdjustRepository;
+  family: FamilyRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -453,6 +455,8 @@ export const getMocks = () => {
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { strict: false }),
     imageAdjust: automock(ImageAdjustRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    family: automock(FamilyRepository, { args: [, loggerMock], strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -545,6 +549,7 @@ export const newTestService = <T extends BaseService>(
     overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
     overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
     overrides.imageAdjust || (mocks.imageAdjust as As<ImageAdjustRepository>),
+    overrides.family || (mocks.family as As<FamilyRepository>),
   );
 
   return {

@@ -12,9 +12,13 @@ const UNAUTHENTICATED_ADMIN_ROUTES = new Set([
 
 /** Admin-only routes that live outside `admin/`, i.e. `@Authenticated({ admin: true })` */
 const ADMIN_ROUTES = new Set([
+  // fork-only: per-user family-tree access grants are administered by admins only
+  'DELETE family/access/:userId',
   'DELETE libraries/:id',
   'DELETE queues/:name/jobs',
   'DELETE server/license',
+  // fork-only: per-user family-tree access grants are administered by admins only
+  'GET family/access',
   'GET jobs',
   'GET libraries',
   'GET libraries/:id',
@@ -44,6 +48,8 @@ const ADMIN_ROUTES = new Set([
   'POST storage-migration/rollback/:batchId',
   'POST storage-migration/start',
   'POST system-metadata/admin-onboarding',
+  // fork-only: per-user family-tree access grants are administered by admins only
+  'PUT family/access/:userId',
   'PUT jobs/:name',
   'PUT libraries/:id',
   'PUT queues/:name',
