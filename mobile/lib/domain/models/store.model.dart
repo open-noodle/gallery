@@ -26,6 +26,8 @@ enum StoreKey<T> {
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
+  // Server-advertised chunk size (bytes) for the chunked-upload protocol. 0/absent means unsupported.
+  uploadChunkSize<int>._(90007),
 
   syncMigrationStatus<String>._(1013),
 
