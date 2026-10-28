@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetFileType, AssetVisibility, JobName, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
@@ -180,7 +180,8 @@ const seedJunkBesideRealPerson = async (setup: Setup) => {
   const { person: real } = await setup.ctx.newPerson({ ownerId: user.id, name: 'Real' });
   const junkFaces = [];
   for (const degrees of [8, 16, 24, 32, 40, 48]) {
-    junkFaces.push((await seedFace(setup, { ownerId: user.id, personGroupId: junk.personGroupId, degrees })).face);
+    const { face } = await seedFace(setup, { ownerId: user.id, personGroupId: junk.personGroupId, degrees });
+    junkFaces.push(face);
   }
   for (let index = 0; index < 6; index++) {
     await seedFace(setup, { ownerId: user.id, personGroupId: real.personGroupId, degrees: 0 });
@@ -223,7 +224,8 @@ describe('a dissolved person stays gone', () => {
       expect(row.deletedAt).toBeInstanceOf(Date);
     }
     expect(await faceCount(real.personGroupId)).toBe(6);
-    expect((await peopleOf(user.id)).sort()).toEqual(peopleBefore.filter((id) => id !== junk.personGroupId).sort());
+    const peopleAfter = await peopleOf(user.id);
+    expect(peopleAfter.sort()).toEqual(peopleBefore.filter((id) => id !== junk.personGroupId).sort());
   });
 
   it('nightly-skips: the nightly recognition pass queues none of the hidden faces', async () => {
@@ -286,9 +288,8 @@ describe('a dissolved person stays gone', () => {
     const { person: junk } = await context.ctx.newPerson({ ownerId: user.id, name: 'Junk' });
     const junkFaces = [];
     for (let index = 0; index < 6; index++) {
-      junkFaces.push(
-        (await seedFace(context, { ownerId: user.id, personGroupId: junk.personGroupId, degrees: 90 })).face,
-      );
+      const { face } = await seedFace(context, { ownerId: user.id, personGroupId: junk.personGroupId, degrees: 90 });
+      junkFaces.push(face);
     }
     await dissolveAll(context, user.id, junk.personGroupId, junkFaces.length);
 
