@@ -161,7 +161,7 @@ describe('Members tab', () => {
 
   describe('remove member', () => {
     it('confirms then removes the member and revalidates', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
       renderPage(SharedSpaceRole.Owner, [
         member(),
         member({ userId: 'u2', role: SharedSpaceRole.Editor, name: 'Ann' }),
@@ -177,7 +177,7 @@ describe('Members tab', () => {
     });
 
     it('does NOT remove the member when the confirm dialog is dismissed', async () => {
-      vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+      vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
       renderPage(SharedSpaceRole.Owner, [
         member(),
         member({ userId: 'u2', role: SharedSpaceRole.Editor, name: 'Ann' }),

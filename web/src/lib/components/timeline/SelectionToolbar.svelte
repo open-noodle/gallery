@@ -1,7 +1,7 @@
 <script lang="ts">
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
-  import ArchiveAction from '#lib/components/timeline/actions/ArchiveAction.svelte';
+  import ArchiveAction from '#lib/gallery/actions/ArchiveAction.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
