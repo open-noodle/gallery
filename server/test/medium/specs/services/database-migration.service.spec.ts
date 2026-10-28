@@ -1,14 +1,28 @@
 import { DatabaseConnectionParams, createPostgres } from '@immich/sql-tools';
 import { Kysely, sql } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
+import { readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { serverVersion } from 'src/constants.js';
+import { JobStatus } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
+import { PersonService } from 'src/services/person.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { getKyselyConfig } from 'src/utils/database.js';
+import { mediumFactory, newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
 
 // eslint-disable-next-line unicorn/prefer-module
 const upstreamFolder = join(__dirname, '../../../../src/schema/migrations');
@@ -376,4 +390,571 @@ describe('Database Migration Scenarios', { timeout: 60_000 }, () => {
       await db.destroy();
     }
   });
+});
+
+// The switch an Immich 3.3 user makes when their users shared people (cluster groups, person sharing), end to end:
+// a stock Immich database seeded the way Immich stores those people, Gallery's boot (the runMigrations call that
+// failed with "Cannot enforce one person per person_group"), stock Immich's boot on the result,
+// scripts/revert-to-immich.sql, and a second switch. These live here because they build databases from scratch:
+// upstream's 1746636476623-DropExtraIndexes runs ALTER DATABASE, which writes a cluster-wide catalog, so two files
+// doing this at once fail with "tuple concurrently updated". See specs/2026-10-28-shared-person-groups-split-design.md.
+// eslint-disable-next-line unicorn/prefer-module
+const repoRoot = join(__dirname, '../../../../..');
+
+const bootStockImmich = async (db: Kysely<any>) => {
+  const { error, results = [] } = await stockImmichMigrator(db).migrateToLatest();
+  expect(error).toBeUndefined();
+  return results;
+};
+
+const bootGallery = (db: Kysely<any>) => createRepo(db).runMigrations();
+
+const runRevertScript = async (db: Kysely<any>) => {
+  const script = readFileSync(join(repoRoot, 'scripts', 'revert-to-immich.sql'), 'utf8')
+    .split('\n')
+    .filter((line) => !line.startsWith('\\'))
+    .join('\n');
+  await sql.raw(`SET gallery.revert_token = 'i_accept_data_loss';\n${script}`).execute(db);
+};
+
+// Deterministic, so a failure reproduces.
+const random = (() => {
+  let state = 20_261_028;
+  return () => {
+    state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return state / 2_147_483_648;
+  };
+})();
+const pick = <T>(items: T[]) => items[Math.floor(random() * items.length)];
+const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, minute));
+
+// What Immich 3.3 leaves behind once three users joined a cluster group:
+// - groups recognition pooled across owners, each owner holding their own name, hidden and favourite state;
+// - person_user shares, whose trigger added the recipient's row, including a chain and a cleared name;
+// - faces whose asset owner has no row in the group, soft-deleted and hidden faces, unassigned faces;
+// - a fourth user outside the cluster with a pending request to join it, and single-owner groups.
+const seedImmich = async (db: Kysely<any>) => {
+  const cluster = await db.insertInto('cluster_group').defaultValues().returning('id').executeTakeFirstOrThrow();
+  const outsiderCluster = await db
+    .insertInto('cluster_group')
+    .defaultValues()
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  const users = [];
+  for (let i = 0; i < 3; i++) {
+    users.push(
+      await db
+        .insertInto('user')
+        .values(mediumFactory.userInsert({ clusterGroupId: cluster.id }))
+        .returning(['id'])
+        .executeTakeFirstOrThrow(),
+    );
+  }
+  const outsider = await db
+    .insertInto('user')
+    .values(mediumFactory.userInsert({ clusterGroupId: outsiderCluster.id }))
+    .returning(['id'])
+    .executeTakeFirstOrThrow();
+  await db.insertInto('cluster_group_request').values({ clusterGroupId: cluster.id, userId: outsider.id }).execute();
+  const [alice, bob, carol] = users.map(({ id }) => id);
+
+  const assetsByOwner = new Map<string, string[]>();
+  for (const ownerId of [alice, bob, carol, outsider.id]) {
+    const assets = [];
+    for (let i = 0; i < 12; i++) {
+      assets.push(mediumFactory.assetInsert({ ownerId }));
+    }
+    await db.insertInto('asset').values(assets).execute();
+    assetsByOwner.set(
+      ownerId,
+      assets.map(({ id }) => id),
+    );
+  }
+
+  let minute = 0;
+  const newGroup = async (clusterGroupId = cluster.id) => {
+    const group = await db
+      .insertInto('person_group')
+      .values({ clusterGroupId, createdAt: at(minute) })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return group.id as string;
+  };
+  const newPerson = (ownerId: string, personGroupId: string, overrides: Record<string, unknown> = {}) =>
+    db
+      .insertInto('person')
+      .values({
+        ...mediumFactory.personInsert({ ownerId, personGroupId }),
+        name: `person ${minute}`,
+        createdAt: at(minute++),
+        isHidden: random() < 0.2,
+        isFavorite: random() < 0.2,
+        birthDate: random() < 0.3 ? '1950-06-01' : null,
+        color: random() < 0.3 ? '#ff0000' : null,
+        thumbnailPath: `/thumbs/${ownerId}/${personGroupId}.jpeg`,
+        ...overrides,
+      })
+      .execute();
+  const newFaces = async (ownerId: string, personGroupId: string | null, count: number) => {
+    const faces = [];
+    for (let i = 0; i < count; i++) {
+      faces.push(
+        mediumFactory.assetFaceInsert({
+          assetId: pick(assetsByOwner.get(ownerId)!),
+          personGroupId,
+          deletedAt: random() < 0.1 ? new Date() : null,
+          isVisible: random() >= 0.1,
+        }),
+      );
+    }
+    if (faces.length > 0) {
+      await db.insertInto('asset_face').values(faces).execute();
+    }
+    return faces.map(({ id }) => id);
+  };
+
+  // Pooled by recognition: two or three owners per group, in a random creation order.
+  const pooled: string[] = [];
+  for (let i = 0; i < 120; i++) {
+    const group = await newGroup();
+    const owners = [alice, bob, carol].toSorted(() => random() - 0.5).slice(0, random() < 0.4 ? 3 : 2);
+    for (const ownerId of owners) {
+      await newPerson(ownerId, group);
+      await newFaces(ownerId, group, Math.floor(random() * 4));
+    }
+    // A face of a cluster member who has no row in the group.
+    const rowless = [alice, bob, carol].find((id) => !owners.includes(id));
+    if (rowless && random() < 0.3) {
+      await newFaces(rowless, group, 1);
+    }
+    pooled.push(group);
+  }
+
+  // Shared: the sharer's row, then person_user rows, whose trigger adds each recipient's row.
+  const shared: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    const group = await newGroup();
+    const [sharer, first, second] = [alice, bob, carol].toSorted(() => random() - 0.5);
+    await newPerson(sharer, group, { name: `shared ${i}` });
+    await newFaces(sharer, group, 2);
+    minute++;
+    await db
+      .insertInto('person_user')
+      .values({ personGroupId: group, sharedById: sharer, sharedWithId: first, role: pick(['read', 'write', 'admin']) })
+      .execute();
+    if (i % 3 === 0) {
+      // Passed on by the recipient: a chain, whose sharer is not the group's first row.
+      await db
+        .insertInto('person_user')
+        .values({ personGroupId: group, sharedById: first, sharedWithId: second, role: 'read' })
+        .execute();
+    }
+    if (i % 5 === 0) {
+      // The recipient cleared the name the trigger copied.
+      await db
+        .updateTable('person')
+        .set({ name: '' })
+        .where('ownerId', '=', first)
+        .where('personGroupId', '=', group)
+        .execute();
+    }
+    await newFaces(first, group, 1);
+    shared.push(group);
+  }
+
+  // Groups with one owner, inside and outside the cluster, and faces nobody was assigned.
+  const solo: string[] = [];
+  for (const ownerId of [alice, bob, carol]) {
+    const group = await newGroup();
+    await newPerson(ownerId, group);
+    await newFaces(ownerId, group, 2);
+    solo.push(group);
+  }
+  const outsiderGroup = await newGroup(outsiderCluster.id);
+  await newPerson(outsider.id, outsiderGroup);
+  await newFaces(outsider.id, outsiderGroup, 2);
+  await newFaces(alice, null, 3);
+
+  return {
+    alice,
+    bob,
+    carol,
+    outsider: outsider.id,
+    cluster: cluster.id,
+    pooled,
+    shared,
+    solo: [...solo, outsiderGroup],
+  };
+};
+
+// Everything Immich owns that the switch touches. updatedAt/updateId are left out: a move bumps them, which
+// is what makes a phone pick it up.
+const immichState = async (db: Kysely<any>) => {
+  const people = await db.selectFrom('person').selectAll().orderBy(['personGroupId', 'ownerId']).execute();
+  return {
+    person: people.map(({ updatedAt: _updatedAt, updateId: _updateId, ...person }) => person),
+    faces: await db
+      .selectFrom('asset_face')
+      .select(['id', 'assetId', 'personGroupId', 'deletedAt', 'isVisible'])
+      .orderBy('id')
+      .execute(),
+    shares: await db
+      .selectFrom('person_user')
+      .selectAll()
+      .orderBy(['personGroupId', 'sharedById', 'sharedWithId'])
+      .execute(),
+    groups: await db.selectFrom('person_group').select(['id', 'clusterGroupId', 'createdAt']).orderBy('id').execute(),
+    clusters: await db.selectFrom('cluster_group').select(['id', 'name']).orderBy('id').execute(),
+    requests: await db.selectFrom('cluster_group_request').select(['clusterGroupId', 'userId']).execute(),
+    users: await db.selectFrom('user').select(['id', 'clusterGroupId']).orderBy('id').execute(),
+  };
+};
+
+const key = (person: Record<string, any>) => `${person.ownerId}/${person.personGroupId}`;
+
+// What the split must do with each shared group: the keeper is its oldest row with a visible face on the owner's
+// photos (else its oldest row); every other row with such a face moves to a group of its own, and the rest are
+// parked whole, since Gallery's PersonCleanup would delete a person left with no face.
+const splitPlan = async (db: Kysely<any>, before: Awaited<ReturnType<typeof immichState>>) => {
+  const assets = await db.selectFrom('asset').select(['id', 'ownerId']).execute();
+  const assetOwner = new Map(assets.map(({ id, ownerId }) => [id, ownerId as string]));
+  const withFaces = new Set(
+    before.faces
+      .filter((face) => face.deletedAt === null && face.isVisible !== false)
+      .map((face) => `${assetOwner.get(face.assetId)}/${face.personGroupId}`),
+  );
+  const rowsBefore = Map.groupBy(before.person, (person) => person.personGroupId);
+  const moves: (typeof before.person)[number][] = [];
+  const parked: (typeof before.person)[number][] = [];
+  for (const rows of rowsBefore.values()) {
+    const ordered = rows.toSorted(
+      (a, b) =>
+        Number(withFaces.has(key(b))) - Number(withFaces.has(key(a))) ||
+        a.createdAt - b.createdAt ||
+        a.ownerId.localeCompare(b.ownerId),
+    );
+    for (const row of ordered.slice(1)) {
+      (withFaces.has(key(row)) ? moves : parked).push(row);
+    }
+  }
+  return { assetOwner, rowsBefore, moves, parked };
+};
+
+// Checks the split state against what Immich had, row by row. Returns how many rows left their group.
+const expectSplit = async (db: Kysely<any>, before: Awaited<ReturnType<typeof immichState>>) => {
+  const after = await immichState(db);
+  const splits = await db.selectFrom('person_group_split').selectAll().execute();
+  const parkedRows = await db.selectFrom('person_group_split_person').selectAll().execute();
+  const originalOf = (groupId: string) =>
+    splits.find((split) => split.splitGroupId === groupId)?.originalGroupId ?? groupId;
+  const { assetOwner, rowsBefore, moves, parked } = await splitPlan(db, before);
+
+  // One row per group, so Gallery's index holds.
+  await expect(
+    sql`SELECT "personGroupId" FROM "person" GROUP BY 1 HAVING count(*) > 1`.execute(db),
+  ).resolves.toMatchObject({ rows: [] });
+
+  // Every person survives with all of its own state: in a group that traces back to its original one, or parked.
+  expect(after.person.length + parkedRows.length).toBe(before.person.length);
+  const original = new Map(before.person.map((person) => [key(person), person]));
+  for (const person of after.person) {
+    const from = original.get(key({ ownerId: person.ownerId, personGroupId: originalOf(person.personGroupId) }));
+    expect(from, key(person)).toBeDefined();
+    expect({ ...person, personGroupId: from!.personGroupId }).toEqual(from);
+  }
+  for (const row of parkedRows) {
+    expect(row, key(row)).toEqual(original.get(key(row)));
+  }
+
+  // The keeper stays; rows with faces of their own move, the others are parked; each is recorded once.
+  expect(splits.map(({ ownerId, originalGroupId }) => `${ownerId}/${originalGroupId}`).toSorted()).toEqual(
+    moves.map((person) => key(person)).toSorted(),
+  );
+  expect(parkedRows.map((row) => key(row)).toSorted()).toEqual(parked.map((person) => key(person)).toSorted());
+
+  // Every face keeps its group lineage, and sits with its asset owner's row when that row moved or stayed.
+  const parkedKeys = new Set(parked.map((person) => key(person)));
+  const facesBefore = new Map(before.faces.map((face) => [face.id, face]));
+  expect(after.faces).toHaveLength(before.faces.length);
+  for (const face of after.faces) {
+    const from = facesBefore.get(face.id)!;
+    expect({ ...face, personGroupId: from.personGroupId }, face.id).toEqual(from);
+    if (from.personGroupId === null) {
+      expect(face.personGroupId).toBeNull();
+      continue;
+    }
+    expect(originalOf(face.personGroupId)).toBe(from.personGroupId);
+    const owner = assetOwner.get(face.assetId)!;
+    const ownerRow = `${owner}/${from.personGroupId}`;
+    const ownerHadRow = rowsBefore.get(from.personGroupId)!.some((person) => person.ownerId === owner);
+    if (ownerHadRow && !parkedKeys.has(ownerRow)) {
+      const holder = after.person.find((person) => person.personGroupId === face.personGroupId);
+      expect(holder?.ownerId, face.id).toBe(owner);
+    } else {
+      expect(face.personGroupId, face.id).toBe(from.personGroupId);
+    }
+  }
+
+  // Split groups stay in their cluster; Immich's cluster data is untouched.
+  for (const split of splits) {
+    const group = after.groups.find(({ id }) => id === split.splitGroupId)!;
+    expect(group.clusterGroupId).toBe(before.groups.find(({ id }) => id === split.originalGroupId)!.clusterGroupId);
+  }
+  expect(after.clusters).toEqual(before.clusters);
+  expect(after.requests).toEqual(before.requests);
+  expect(after.users).toEqual(before.users);
+
+  // Shares are held aside, verbatim.
+  expect(after.shares).toEqual([]);
+  await expect(
+    db
+      .selectFrom('person_group_split_share')
+      .selectAll()
+      .orderBy(['personGroupId', 'sharedById', 'sharedWithId'])
+      .execute(),
+  ).resolves.toEqual(before.shares);
+
+  // Phones are told to drop each row that left its group. The table keeps earlier rows (a revert adds its own),
+  // so check that every move and parked row has one, and that no row still in its group was audited.
+  const auditRows = await db.selectFrom('person_audit').select(['personGroupId', 'ownerId']).execute();
+  const audit = new Set(auditRows.map((row) => key(row)));
+  const missing = [...moves, ...parked].map((person) => key(person)).filter((entry) => !audit.has(entry));
+  expect(missing).toEqual([]);
+  const keptRows = after.person.filter((person) =>
+    splits.every((split) => split.splitGroupId !== person.personGroupId),
+  );
+  const auditedKept = keptRows.filter((person) => audit.has(key(person)));
+  expect(auditedKept.map((person) => key(person))).toEqual([]);
+
+  return moves.length + parked.length;
+};
+
+// What Immich's own nightly PersonCleanup leaves: a group with no visible face loses its people and is deleted,
+// so its faces lose their group and its shares go. Gallery's cleanup on a split database must end the same way.
+const afterImmichCleanup = (before: Awaited<ReturnType<typeof immichState>>) => {
+  const faced = new Set(
+    before.faces
+      .filter((face) => face.deletedAt === null && face.isVisible !== false && face.personGroupId !== null)
+      .map((face) => face.personGroupId),
+  );
+  const gone = new Set(before.person.map((person) => person.personGroupId).filter((id) => !faced.has(id)));
+  return {
+    ...before,
+    person: before.person.filter((person) => !gone.has(person.personGroupId)),
+    faces: before.faces.map((face) =>
+      face.personGroupId !== null && gone.has(face.personGroupId) ? { ...face, personGroupId: null } : face,
+    ),
+    shares: before.shares.filter((share) => !gone.has(share.personGroupId)),
+    groups: before.groups.filter((group) => !gone.has(group.id)),
+  };
+};
+
+const runNightlyPersonCleanup = async (db: Kysely<any>) => {
+  clearConfigCache();
+  const { sut, ctx } = newMediumService(PersonService, {
+    database: db as Kysely<DB>,
+    real: [PersonRepository, SharedSpaceRepository],
+    mock: [JobRepository, LoggingRepository],
+  });
+  // Thumbnail deletes and the space metadata backfill it queues are not under test.
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  await expect(sut.handlePersonCleanup()).resolves.toBe(JobStatus.Success);
+};
+
+describe('Switching from Immich 3.3 with people shared between users', { timeout: 60_000 }, () => {
+  it('switches, survives a stock Immich boot, reverts to exactly what Immich had, and switches again', () =>
+    withDatabase('migration_test_shared_people_switch', async (db) => {
+      const upstreamNames = await fileNames(upstreamFolder);
+      expect(await bootStockImmich(db)).toHaveLength(upstreamNames.length);
+      await seedImmich(db);
+      const before = await immichState(db);
+      expect(before.shares.length).toBeGreaterThan(30);
+
+      // The boot that used to fail. Each ledger then holds its own folder, and stock Immich finds nothing to run.
+      await bootGallery(db);
+      await expectSplitLedgers(db);
+      await expect(
+        sql`SELECT to_regclass('"person_personGroupId_key"') IS NOT NULL AS "exists"`.execute(db),
+      ).resolves.toMatchObject({ rows: [{ exists: true }] });
+      await expect(expectSplit(db, before)).resolves.toBeGreaterThan(100);
+
+      // Gallery's next boot has nothing left to do.
+      await expect(bootGallery(db)).resolves.toBe(0);
+
+      // A night on Gallery: its PersonCleanup must not delete anything the revert needs.
+      await runNightlyPersonCleanup(db);
+
+      // A trial boot of stock Immich on the Gallery database, which the switch-back guide allows: its migrator
+      // finds only its own migrations, in order.
+      await expect(bootStockImmich(db)).resolves.toEqual([]);
+
+      await runRevertScript(db);
+      await expect(immichState(db)).resolves.toEqual(afterImmichCleanup(before));
+      await expect(
+        sql`SELECT to_regclass('person_group_split') AS "split", to_regclass('gallery_migrations') AS "ledger"`.execute(
+          db,
+        ),
+      ).resolves.toMatchObject({ rows: [{ split: null, ledger: null }] });
+      await expect(bootStockImmich(db)).resolves.toEqual([]);
+
+      // And back to Gallery once more.
+      const reverted = await immichState(db);
+      await bootGallery(db);
+      await expect(expectSplit(db, reverted)).resolves.toBeGreaterThan(100);
+    }));
+
+  it('round-trips the fixture the revert validation workflow seeds into stock Immich', () =>
+    withDatabase('migration_test_shared_people_fixture', async (db) => {
+      await bootStockImmich(db);
+      const fixture = readFileSync(join(repoRoot, '.github', 'scripts', 'revert-to-immich-shared-people.sql'), 'utf8');
+      await sql.raw(fixture).execute(db);
+      const before = await immichState(db);
+      expect(before.shares).toHaveLength(6);
+
+      await bootGallery(db);
+      // 10 pooled groups with two or three owners, 5 shared groups with one recipient, one with a second.
+      await expect(expectSplit(db, before)).resolves.toBe(15 + 6);
+      // The six people shared with a user have no face on that user's photos: they are parked, so the night
+      // keeps them. Only the fixture's faceless 'Solo' goes, as Immich's own cleanup would take it too.
+      await runNightlyPersonCleanup(db);
+      await expect(bootStockImmich(db)).resolves.toEqual([]);
+      await runRevertScript(db);
+      const expected = afterImmichCleanup(before);
+      expect(before.person.length - expected.person.length).toBe(1);
+      await expect(immichState(db)).resolves.toEqual(expected);
+    }));
+
+  it('keeps working on Gallery after the switch, and the revert still restores Immich', () =>
+    withDatabase('migration_test_shared_people_use', async (db) => {
+      await bootStockImmich(db);
+      const { alice, bob, carol, pooled } = await seedImmich(db);
+      await bootGallery(db);
+
+      // Gallery's identity backfill, which runs after a switch, links every person, split or not.
+      const identities = new FaceIdentityRepository(db as Kysely<DB>);
+      let cursor: string | undefined;
+      do {
+        ({ nextCursor: cursor } = await identities.backfillPersonalIdentities({ cursor, limit: 50 }));
+      } while (cursor);
+      const people = await db.selectFrom('person').select(['personGroupId']).execute();
+      await expect(db.selectFrom('person_identity').select('personGroupId').execute()).resolves.toHaveLength(
+        people.length,
+      );
+
+      // Each user reads their own people through Gallery's service: every one resolves, belongs to them, and
+      // counts the photos of theirs it is on.
+      clearConfigCache();
+      const { sut: personService, ctx } = newMediumService(PersonService, {
+        database: db as Kysely<DB>,
+        real: [
+          AccessRepository,
+          ConfigRepository,
+          DatabaseRepository,
+          FaceIdentityRepository,
+          PersonRepository,
+          UserRepository,
+        ],
+        mock: [JobRepository, LoggingRepository, StorageRepository, SystemMetadataRepository],
+      });
+      ctx.getMock(SystemMetadataRepository).get.mockResolvedValue(undefined as any);
+      for (const ownerId of [alice, bob, carol]) {
+        const auth = factory.auth({ user: { id: ownerId } });
+        const own = await db.selectFrom('person').select('personGroupId').where('ownerId', '=', ownerId).execute();
+        expect(own.length).toBeGreaterThan(50);
+        for (const { personGroupId } of own) {
+          await expect(personService.getById(auth, personGroupId)).resolves.toMatchObject({ id: personGroupId });
+          const { assets } = await personService.getStatistics(auth, personGroupId);
+          const expected = await db
+            .selectFrom('asset_face')
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .select((eb) => eb.fn.count<number>('asset.id').distinct().as('count'))
+            .where('asset_face.personGroupId', '=', personGroupId)
+            .where('asset.ownerId', '=', ownerId)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', '=', true)
+            .executeTakeFirstOrThrow();
+          expect(assets, personGroupId).toBe(Number(expected.count));
+        }
+        const { people: listed } = await personService.getAll(auth, { withHidden: true, page: 1, size: 1000 } as any);
+        expect(new Set(listed.map(({ id }) => id)).size).toBe(listed.length);
+        for (const { id } of listed) {
+          expect(
+            own.some(({ personGroupId }) => personGroupId === id),
+            id,
+          ).toBe(true);
+        }
+      }
+
+      // Bob renames his copy of a person that was pooled with others, and merges another of his people into it.
+      const split = await db
+        .selectFrom('person_group_split')
+        .selectAll()
+        .where('ownerId', '=', bob)
+        .where('originalGroupId', 'in', pooled)
+        .orderBy('originalGroupId')
+        .limit(2)
+        .execute();
+      const [renamed, merged] = split;
+      await db
+        .updateTable('person')
+        .set({ name: 'Grandpa' })
+        .where('ownerId', '=', bob)
+        .where('personGroupId', '=', renamed.splitGroupId)
+        .execute();
+      const mergedFaces = await db
+        .updateTable('asset_face')
+        .set({ personGroupId: renamed.splitGroupId })
+        .where('personGroupId', '=', merged.splitGroupId)
+        .returning('id')
+        .execute();
+      await db
+        .deleteFrom('person')
+        .where('ownerId', '=', bob)
+        .where('personGroupId', '=', merged.splitGroupId)
+        .execute();
+      await db.deleteFrom('person_group').where('id', '=', merged.splitGroupId).execute();
+
+      await runRevertScript(db);
+      await bootStockImmich(db);
+
+      // Bob's renamed person is back in the group Immich made, with the faces he merged into it.
+      await expect(
+        db
+          .selectFrom('person')
+          .select('name')
+          .where('ownerId', '=', bob)
+          .where('personGroupId', '=', renamed.originalGroupId)
+          .executeTakeFirst(),
+      ).resolves.toEqual({ name: 'Grandpa' });
+      if (mergedFaces.length > 0) {
+        await expect(
+          db
+            .selectFrom('asset_face')
+            .select('personGroupId')
+            .where(
+              'id',
+              'in',
+              mergedFaces.map(({ id }) => id),
+            )
+            .execute(),
+        ).resolves.toEqual(mergedFaces.map(() => ({ personGroupId: renamed.originalGroupId })));
+      }
+      // The person he merged away stays gone; the others in that group are untouched.
+      await expect(
+        db
+          .selectFrom('person')
+          .select('ownerId')
+          .where('personGroupId', '=', merged.originalGroupId)
+          .where('ownerId', '=', bob)
+          .execute(),
+      ).resolves.toEqual([]);
+      // No share points at a row that no longer exists.
+      await expect(
+        sql`
+          SELECT count(*)::int AS "orphans" FROM "person_user" pu
+          WHERE NOT EXISTS (SELECT FROM "person" p WHERE p."personGroupId" = pu."personGroupId" AND p."ownerId" = pu."sharedWithId")
+        `.execute(db),
+      ).resolves.toMatchObject({ rows: [{ orphans: 0 }] });
+    }));
 });

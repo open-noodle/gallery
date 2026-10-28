@@ -143,6 +143,67 @@ BEGIN
   END IF;
 END $$;
 
+-- Person groups split on the way in (1790900000000-SplitSharedPersonGroups).
+-- Immich 3.3 lets several users own a person row in one person group (cluster
+-- groups and person sharing); Gallery split those one per owner and recorded
+-- how. This puts every row, its faces and the person_user shares back, so
+-- cluster groups and person sharing work again in Immich. It needs Gallery's
+-- one-row-per-group index gone first (section 4 drops it again, a no-op).
+-- The statements match server/src/gallery/utils/person-group-split.ts.
+DROP INDEX IF EXISTS "person_personGroupId_key";
+DO $$
+BEGIN
+  IF to_regclass('public.person_group_split') IS NOT NULL THEN
+    WITH "pending" AS MATERIALIZED (
+      SELECT "split"."splitGroupId", "split"."originalGroupId", "split"."ownerId"
+      FROM "person_group_split" AS "split"
+      WHERE EXISTS (
+        SELECT FROM "person" WHERE "person"."personGroupId" = "split"."splitGroupId" AND "person"."ownerId" = "split"."ownerId"
+      )
+      AND NOT EXISTS (
+        SELECT FROM "person" WHERE "person"."personGroupId" = "split"."originalGroupId" AND "person"."ownerId" = "split"."ownerId"
+      )
+    ),
+    "people" AS (
+      UPDATE "person" SET "personGroupId" = "pending"."originalGroupId"
+      FROM "pending"
+      WHERE "person"."personGroupId" = "pending"."splitGroupId" AND "person"."ownerId" = "pending"."ownerId"
+    ),
+    "faces" AS (
+      UPDATE "asset_face" SET "personGroupId" = "pending"."originalGroupId"
+      FROM "pending"
+      WHERE "asset_face"."personGroupId" = "pending"."splitGroupId"
+    )
+    INSERT INTO "person_audit" ("personGroupId", "ownerId")
+    SELECT "splitGroupId", "ownerId" FROM "pending";
+    DELETE FROM "person_group"
+    USING "person_group_split"
+    WHERE "person_group"."id" = "person_group_split"."splitGroupId"
+      AND NOT EXISTS (SELECT FROM "person" WHERE "person"."personGroupId" = "person_group"."id")
+      AND NOT EXISTS (SELECT FROM "asset_face" WHERE "asset_face"."personGroupId" = "person_group"."id");
+    INSERT INTO "person" ("ownerId", "personGroupId", "createdAt", "name", "thumbnailPath", "isHidden", "birthDate", "faceAssetId", "isFavorite", "color")
+    SELECT "parked"."ownerId", "parked"."personGroupId", "parked"."createdAt", "parked"."name", "parked"."thumbnailPath", "parked"."isHidden", "parked"."birthDate",
+      (SELECT "asset_face"."id" FROM "asset_face" WHERE "asset_face"."id" = "parked"."faceAssetId"), "parked"."isFavorite", "parked"."color"
+    FROM "person_group_split_person" AS "parked"
+    ON CONFLICT DO NOTHING;
+    ALTER TABLE "person_user" DISABLE TRIGGER "person_user_after_insert";
+    INSERT INTO "person_user" ("personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt", "updateId")
+    SELECT "share"."personGroupId", "share"."sharedById", "share"."sharedWithId", "share"."role", "share"."createdAt", "share"."updatedAt", "share"."updateId"
+    FROM "person_group_split_share" AS "share"
+    WHERE EXISTS (
+      SELECT FROM "person" WHERE "person"."personGroupId" = "share"."personGroupId" AND "person"."ownerId" = "share"."sharedById"
+    )
+    AND EXISTS (
+      SELECT FROM "person" WHERE "person"."personGroupId" = "share"."personGroupId" AND "person"."ownerId" = "share"."sharedWithId"
+    )
+    ON CONFLICT DO NOTHING;
+    ALTER TABLE "person_user" ENABLE TRIGGER "person_user_after_insert";
+    DELETE FROM "person_group_split_share";
+    DELETE FROM "person_group_split_person";
+    DELETE FROM "person_group_split";
+  END IF;
+END $$;
+
 -- Rule memories. Immich's MemoryType has no 'rule', and its MemoriesV2 sync
 -- stream sends every type, so one such row breaks mobile sync. memory_asset
 -- rows cascade.
@@ -406,6 +467,9 @@ DROP TABLE IF EXISTS "shared_space" CASCADE;
 -- Face identities
 DROP TABLE IF EXISTS "person_identity" CASCADE;
 DROP TABLE IF EXISTS "person_pet" CASCADE;
+DROP TABLE IF EXISTS "person_group_split" CASCADE;
+DROP TABLE IF EXISTS "person_group_split_share" CASCADE;
+DROP TABLE IF EXISTS "person_group_split_person" CASCADE;
 DROP TABLE IF EXISTS "face_repair_scan_flagged_face" CASCADE;
 DROP TABLE IF EXISTS "face_repair_decline" CASCADE;
 DROP TABLE IF EXISTS "face_repair_lock" CASCADE;
@@ -831,6 +895,7 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
   '1787100000000-DropPersonFksBeforeClusterGroups',
   '1790000000000-FixFaceRepairScanInFlightIndex',
+  '1790900000000-SplitSharedPersonGroups',
   '1791000000000-RepointFaceReviewToPersonGroup',
   '1792123120451-AddSharedLinkSpaceId',
   '1793000000000-AddSharedSpaceAlbumHidden',
@@ -967,6 +1032,7 @@ BEGIN
        'asset_image_adjust',
        'person_identity',
        'person_pet',
+       'person_group_split', 'person_group_split_share', 'person_group_split_person',
        'gallery_migrations', 'gallery_migrations_lock'
      );
   IF fork_tables_left > 0 THEN
