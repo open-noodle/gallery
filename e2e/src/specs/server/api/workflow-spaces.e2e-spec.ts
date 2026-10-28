@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // removed, the wasm plugin fails to instantiate and every test here goes red — which is the point.
 
 /** Polls until `check` returns truthy. waitForQueueFinish reports "done" while work remains. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const until = async <T>(check: () => Promise<T>, timeoutMs = 30_000): Promise<T> => {
   const deadline = Date.now() + timeoutMs;
   for (;;) {

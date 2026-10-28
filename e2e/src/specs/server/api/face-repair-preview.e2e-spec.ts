@@ -1,10 +1,10 @@
 /**
- * #1061 — the Face Cleanup console must be able to show the SOURCE PHOTO behind a face crop, including for
- * assets the admin does not own. That cross-owner read is the whole point of the route and the one thing no
- * unit test exercises end to end: the owner-scoped asset routes enforce Permission.AssetView with no admin
- * bypass, so a naive implementation via /assets/:id/thumbnail would pass every unit test and 403 in
- * production on exactly the clusters this console exists to repair.
- */
+#1061 — the Face Cleanup console must be able to show the SOURCE PHOTO behind a face crop, including for
+assets the admin does not own. That cross-owner read is the whole point of the route and the one thing no
+unit test exercises end to end: the owner-scoped asset routes enforce Permission.AssetView with no admin
+bypass, so a naive implementation via /assets/:id/thumbnail would pass every unit test and 403 in
+production on exactly the clusters this console exists to repair.
+*/
 
 import { LoginResponseDto } from '@immich/sdk';
 import { app, asBearerAuth, utils } from 'src/utils.js';
@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // isQueueEmpty (used by waitForQueueFinish) counts a PAUSED queue as empty, which can report the
 // thumbnailGeneration queue "done" before the preview file actually exists on disk. Rather than trust that
 // signal alone, poll the route itself until the source photo is actually servable.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const waitForFacePreview = async (accessToken: string, assetFaceId: string, timeoutMs = 20_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
   while (true) {

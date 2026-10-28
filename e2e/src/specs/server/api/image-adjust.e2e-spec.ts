@@ -14,6 +14,7 @@ const videoFixture = resolve(import.meta.dirname, '../../../../../server/test/fi
 const neutral = { exposure: 0, contrast: 0, saturation: 0, invert: false };
 
 // The edit job runs after the request returns; wait for its outcome rather than for the queue.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const waitFor = async (check: () => Promise<boolean>, timeout = 30_000) => {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {

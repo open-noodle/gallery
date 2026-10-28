@@ -1,17 +1,17 @@
 /**
- * Slice 2 — M1: `GET /people/:id/faces` (the representative-face picker) must scope a non-owner
- * (space-granted) caller to faces on assets that are space-reachable-by-them AND pass the shareable
- * visibility gate. The owner keeps the full, unscoped list.
- *
- * Before this fix, `getRepresentativeFaces` had no visibility/space predicate at all, so ANY caller
- * who could read the person (granted via `checkSharedSpaceAccess` — which only requires ONE
- * space-reachable, shareable-visibility face) would see EVERY face of that person, including the
- * owner's Hidden/never-shared faces.
- *
- * `person.id` here (owned by `spaceOwner`) grants the viewer PersonRead only because it has one
- * space-reachable Timeline face (`spaceFaceId`) — see `GalleryPersonAccess.checkSharedSpaceAccess` — so that
- * face is both the access-grant anchor and the sole face the viewer's scoped picker call must return.
- */
+Slice 2 — M1: `GET /people/:id/faces` (the representative-face picker) must scope a non-owner
+(space-granted) caller to faces on assets that are space-reachable-by-them AND pass the shareable
+visibility gate. The owner keeps the full, unscoped list.
+
+Before this fix, `getRepresentativeFaces` had no visibility/space predicate at all, so ANY caller
+who could read the person (granted via `checkSharedSpaceAccess` — which only requires ONE
+space-reachable, shareable-visibility face) would see EVERY face of that person, including the
+owner's Hidden/never-shared faces.
+
+`person.id` here (owned by `spaceOwner`) grants the viewer PersonRead only because it has one
+space-reachable Timeline face (`spaceFaceId`) — see `GalleryPersonAccess.checkSharedSpaceAccess` — so that
+face is both the access-grant anchor and the sole face the viewer's scoped picker call must return.
+*/
 
 import { AssetVisibility } from '@immich/sdk';
 import { type SpaceContext, buildSpaceContext } from 'src/actors.js';

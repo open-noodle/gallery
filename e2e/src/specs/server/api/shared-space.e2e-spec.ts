@@ -1428,14 +1428,14 @@ describe('/shared-spaces', () => {
 
   describe('checkSpaceAccess visibility gate (Slice 3) — Hidden/Locked assets blocked', () => {
     /**
-     * user1 owns the space and assets. user2 is a plain viewer member.
-     * For each test a fresh space + asset pair is created to avoid state leakage.
-     *
-     * Endpoints tested per the brief:
-     *   GET /assets/:id            (AssetRead)
-     *   GET /assets/:id/original   (AssetDownload)
-     *   GET /assets/:id/thumbnail  (AssetView)
-     */
+    user1 owns the space and assets. user2 is a plain viewer member.
+    For each test a fresh space + asset pair is created to avoid state leakage.
+    
+    Endpoints tested per the brief:
+      GET /assets/:id            (AssetRead)
+      GET /assets/:id/original   (AssetDownload)
+      GET /assets/:id/thumbnail  (AssetView)
+    */
 
     it('member CANNOT read a Locked direct-space asset (GET /assets/:id → 400)', async () => {
       // Add while Timeline (the add-assets endpoint rejects Locked and filters Hidden), THEN flip —

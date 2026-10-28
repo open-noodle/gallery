@@ -1,18 +1,18 @@
 /**
- * RBAC matrix for PATCH /shared-spaces/:id.
- *
- * The endpoint splits its DTO into three field groups with two different role floors
- * (shared-space.service.ts, `update`):
- *
- *   naming     — name, description, color            → Editor
- *   cover      — thumbnailAssetId, thumbnailCropY    → Editor
- *   settings   — faceRecognitionEnabled, petsEnabled → Owner
- *
- * The role check runs against the WHOLE dto before any write, so a mixed payload is
- * rejected outright — never partially applied. That last property is the one most
- * likely to regress silently if the gate is ever refactored per-field, so it gets a
- * dedicated read-back assertion.
- */
+RBAC matrix for PATCH /shared-spaces/:id.
+
+The endpoint splits its DTO into three field groups with two different role floors
+(shared-space.service.ts, `update`):
+
+  naming     — name, description, color            → Editor
+  cover      — thumbnailAssetId, thumbnailCropY    → Editor
+  settings   — faceRecognitionEnabled, petsEnabled → Owner
+
+The role check runs against the WHOLE dto before any write, so a mixed payload is
+rejected outright — never partially applied. That last property is the one most
+likely to regress silently if the gate is ever refactored per-field, so it gets a
+dedicated read-back assertion.
+*/
 
 import { authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors.js';
 import { app, utils } from 'src/utils.js';

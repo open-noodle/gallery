@@ -8,10 +8,10 @@ import { PNG } from 'pngjs';
 import { utils } from 'src/utils.js';
 
 /**
- * Creates a Google Takeout zip file with the expected directory structure:
- *   Takeout/Google Photos/<albumName>/<filename>
- *   Takeout/Google Photos/<albumName>/<filename>.json  (sidecar)
- */
+Creates a Google Takeout zip file with the expected directory structure:
+  Takeout/Google Photos/<albumName>/<filename>
+  Takeout/Google Photos/<albumName>/<filename>.json  (sidecar)
+*/
 function createTakeoutZip(
   items: { filename: string; album: string; favorite?: boolean; lat?: number; lng?: number; timestamp?: string }[],
 ): string {
