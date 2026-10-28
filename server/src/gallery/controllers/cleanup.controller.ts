@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import { ApiTag, Permission } from 'src/enum.js';
 import {
   CleanupCalendarQueryDto,
   CleanupCalendarResponseDto,
@@ -20,10 +21,9 @@ import {
   CleanupRewindYearParamDto,
   CleanupRewindYearsResponseDto,
   CleanupTrashResponseDto,
-} from 'src/dtos/cleanup.dto.js';
-import { ApiTag, Permission } from 'src/enum.js';
+} from 'src/gallery/dtos/cleanup.dto.js';
+import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
-import { CleanupService } from 'src/services/cleanup.service.js';
 
 @ApiTags(ApiTag.Cleanup)
 @Controller('cleanup')

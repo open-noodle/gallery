@@ -1,14 +1,14 @@
 import { Kysely } from 'kysely';
 import { AssetStatus, CleanupQueue } from 'src/enum.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
+import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
-import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { DB } from 'src/schema/index.js';
-import { CleanupService } from 'src/services/cleanup.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';

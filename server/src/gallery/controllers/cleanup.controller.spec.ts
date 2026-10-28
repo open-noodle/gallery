@@ -1,7 +1,7 @@
 import request from 'supertest';
-import { CleanupController } from 'src/controllers/cleanup.controller.js';
 import { Permission } from 'src/enum.js';
-import { CleanupService } from 'src/services/cleanup.service.js';
+import { CleanupController } from 'src/gallery/controllers/cleanup.controller.js';
+import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { factory } from 'test/small.factory.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 

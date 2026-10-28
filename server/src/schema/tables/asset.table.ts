@@ -15,7 +15,7 @@ import {
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
-import { CLEANUP_MONTH_DAY_INDEX_WHERE, MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
+import { CLEANUP_MONTH_DAY_INDEX_WHERE, MONTH_DAY_SQL } from 'src/gallery/utils/cleanup-sql.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
 import {
   asset_delete_audit,

@@ -22,6 +22,7 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -44,7 +45,6 @@ import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
-import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';

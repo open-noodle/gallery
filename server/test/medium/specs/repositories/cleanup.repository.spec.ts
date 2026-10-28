@@ -1,10 +1,10 @@
 import { CompiledQuery, Kysely, sql } from 'kysely';
 import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CleanupQueue } from 'src/enum.js';
-import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
+import { CleanupCursor } from 'src/gallery/utils/cleanup.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import { CleanupCursor } from 'src/utils/cleanup.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';

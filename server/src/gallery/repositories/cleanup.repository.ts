@@ -2,11 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { AliasableExpression, Expression, ExpressionBuilder, Kysely, SelectQueryBuilder, SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
-import { CleanupAssetDto } from 'src/dtos/cleanup.dto.js';
 import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CleanupDecisionType, CleanupQueue } from 'src/enum.js';
-import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
-import { DB } from 'src/schema/index.js';
+import { CleanupAssetDto } from 'src/gallery/dtos/cleanup.dto.js';
+import { MONTH_DAY_SQL } from 'src/gallery/utils/cleanup-sql.js';
 import {
   BurstRow,
   CLEANUP_BLURRY_DEFAULTS,
@@ -17,7 +15,9 @@ import {
   CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
   CleanupCursor,
   CleanupStrictnessValue,
-} from 'src/utils/cleanup.js';
+} from 'src/gallery/utils/cleanup.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
 
 /**

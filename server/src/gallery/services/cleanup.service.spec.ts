@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { AssetStatus, AssetType, AssetVisibility, CleanupQueue, JobName, JobStatus } from 'src/enum.js';
-import { CleanupAssetRow } from 'src/repositories/cleanup.repository.js';
-import { CleanupService } from 'src/services/cleanup.service.js';
+import { CleanupAssetRow } from 'src/gallery/repositories/cleanup.repository.js';
+import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import {
   BurstRow,
   CLEANUP_BURST_MAX_EXTENSIONS,
@@ -9,7 +9,8 @@ import {
   CLEANUP_BURST_WINDOW,
   decodeCursor,
   encodeCursor,
-} from 'src/utils/cleanup.js';
+} from 'src/gallery/utils/cleanup.js';
+import { readGreyscalePixels } from 'src/gallery/utils/image-quality.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
@@ -51,6 +52,8 @@ const serveBurstLibrary = (mocks: ServiceMocks, library: BurstRow[]) =>
         : library.findIndex((row) => row.cursorT > after || (row.cursorT === after && row.id > afterId!));
     return Promise.resolve(start === -1 ? [] : library.slice(start, start + limit));
   });
+
+vi.mock('src/gallery/utils/image-quality.js', () => ({ readGreyscalePixels: vi.fn() }));
 
 describe(CleanupService.name, () => {
   let sut: CleanupService;
@@ -310,7 +313,7 @@ describe(CleanupService.name, () => {
       vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
       const px = new Uint8Array(25);
       px[12] = 255;
-      mocks.media.getGreyscalePixels.mockResolvedValue({ data: Buffer.from(px), width: 5, height: 5 });
+      vi.mocked(readGreyscalePixels).mockResolvedValue({ data: Buffer.from(px), width: 5, height: 5 });
       mocks.cleanup.getForQualityAnalysis.mockResolvedValue({
         id: 'a',
         ownerId: 'u',
@@ -326,7 +329,7 @@ describe(CleanupService.name, () => {
         height: 1,
       } as never);
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Success);
-      expect(mocks.media.getGreyscalePixels).toHaveBeenCalledWith('/tmp/x', 512);
+      expect(vi.mocked(readGreyscalePixels)).toHaveBeenCalledWith('/tmp/x', 512);
       expect(mocks.cleanup.upsertQuality).toHaveBeenCalledWith(
         expect.objectContaining({
           assetId: 'a',
@@ -341,7 +344,7 @@ describe(CleanupService.name, () => {
     it('records null scores and does not throw when decoding fails, and always cleans up', async () => {
       const cleanup = vi.fn();
       vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
-      mocks.media.getGreyscalePixels.mockRejectedValue(new Error('corrupt'));
+      vi.mocked(readGreyscalePixels).mockRejectedValue(new Error('corrupt'));
       mocks.cleanup.getForQualityAnalysis.mockResolvedValue({
         id: 'a',
         ownerId: 'u',

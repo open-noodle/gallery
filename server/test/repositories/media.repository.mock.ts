@@ -24,6 +24,5 @@ export const newMediaRepositoryMock = (): Mocked<RepositoryInterface<MediaReposi
     trim: vitest.fn(),
     extractFrame: vitest.fn(),
     getImageMetadata: vitest.fn(),
-    getGreyscalePixels: vitest.fn().mockResolvedValue({ data: Buffer.from(''), width: 0, height: 0 }),
   };
 };

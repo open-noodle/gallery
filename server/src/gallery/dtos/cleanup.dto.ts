@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { AssetTypeSchema, CleanupQueue } from 'src/enum.js';
-import { CLEANUP_MAX_IDS, CLEANUP_PAGE_LIMIT, isValidMonthDay, isValidTimeZone } from 'src/utils/cleanup.js';
+import { CLEANUP_MAX_IDS, CLEANUP_PAGE_LIMIT, isValidMonthDay, isValidTimeZone } from 'src/gallery/utils/cleanup.js';
 import { stringToBool } from 'src/validation.js';
 
 export const CleanupQueueSchema = z.enum(CleanupQueue).describe('Cleanup queue').meta({ id: 'CleanupQueue' });

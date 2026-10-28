@@ -12,7 +12,7 @@ import {
   isValidTimeZone,
   laplacianVariance,
   suggestKeep,
-} from 'src/utils/cleanup.js';
+} from 'src/gallery/utils/cleanup.js';
 
 const checkerboard = (w: number, h: number) => {
   const px = new Uint8Array(w * h);

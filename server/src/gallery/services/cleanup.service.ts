@@ -3,6 +3,7 @@ import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetStatus, AssetType, AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
 import {
   CleanupCalendarResponseDto,
   CleanupCommitDto,
@@ -15,10 +16,8 @@ import {
   CleanupRewindAssetsResponseDto,
   CleanupRewindYearsResponseDto,
   CleanupTrashResponseDto,
-} from 'src/dtos/cleanup.dto.js';
-import { AssetStatus, AssetType, AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
-import { CleanupAssetRow } from 'src/repositories/cleanup.repository.js';
-import { BaseService } from 'src/services/base.service.js';
+} from 'src/gallery/dtos/cleanup.dto.js';
+import { CleanupAssetRow } from 'src/gallery/repositories/cleanup.repository.js';
 import {
   ALL_MONTH_DAYS,
   BurstGroup,
@@ -45,7 +44,9 @@ import {
   isScreenshotCandidate,
   laplacianVariance,
   suggestKeep,
-} from 'src/utils/cleanup.js';
+} from 'src/gallery/utils/cleanup.js';
+import { readGreyscalePixels } from 'src/gallery/utils/image-quality.js';
+import { BaseService } from 'src/services/base.service.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 
 export type CleanupCountQueue = 'space_hogs' | 'bursts' | 'screenshots' | 'blurry' | 'duplicates';
@@ -518,7 +519,7 @@ export class CleanupService extends BaseService {
 
     const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(asset.previewPath);
     try {
-      const { data, width, height } = await this.mediaRepository.getGreyscalePixels(localPath, CLEANUP_ANALYSIS_SIZE);
+      const { data, width, height } = await readGreyscalePixels(localPath, CLEANUP_ANALYSIS_SIZE);
       await this.cleanupRepository.upsertQuality({
         ...base,
         sharpness: laplacianVariance(data, width, height),
