@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flipMotion } from '$lib/gallery/motion';
+  import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import type { RewindMark } from '$lib/managers/rewind-session.svelte';
   import { Route } from '$lib/route';
@@ -125,12 +127,14 @@
 
       {#key asset.id}
         <button
+          data-motion-reveal
           type="button"
           class="block w-[min(520px,100%)] overflow-hidden rounded-[10px] {ringClass}"
           aria-label={asset.originalFileName}
           ondblclick={() => onOpen(asset.id)}
           data-testid="cleanup-rewind-stage-{asset.id}"
           data-asset-id={asset.id}
+          data-asset={asset.id}
           data-mark={mark ?? 'none'}
         >
           <img
@@ -168,6 +172,7 @@
           {#each upNext as next (next.id)}
             {@const nextMark = marks.get(next.id)}
             <button
+              animate:flip={flipMotion()}
               type="button"
               class="block rounded-md"
               aria-label={next.originalFileName}

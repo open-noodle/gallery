@@ -115,6 +115,7 @@
             : ''}"
           data-testid="cleanup-item-{asset.id}"
           data-asset-id={asset.id}
+          data-asset={asset.id}
           data-mark={tileMark}
           aria-label={asset.originalFileName}
           aria-pressed={tileMark === 'keep'}

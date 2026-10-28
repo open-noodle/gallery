@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flipMotion } from '$lib/gallery/motion';
+  import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
@@ -46,12 +48,14 @@
     {#each items as item (item.id)}
       {@const busy = busyIds?.has(item.id) ?? false}
       <div
+        animate:flip={flipMotion()}
         class="grid grid-cols-[60px_minmax(0,1fr)_auto] items-center gap-3.5 px-3.5 py-2.5 md:grid-cols-[72px_minmax(0,1fr)_200px_auto] {focusedId ===
         item.id
           ? 'bg-primary/5'
           : ''}"
         data-testid="cleanup-hog-row-{item.id}"
         data-asset-id={item.id}
+        data-asset={item.id}
       >
         <button
           type="button"

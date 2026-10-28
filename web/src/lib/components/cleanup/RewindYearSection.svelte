@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flipMotion } from '$lib/gallery/motion';
+  import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import type { RewindMark } from '$lib/managers/rewind-session.svelte';
   import type { CleanupAssetDto } from '@immich/sdk';
@@ -51,6 +53,7 @@
         </Button>
       {:else}
         <span
+          data-motion-reveal
           class="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success"
         >
           {$t('cleanup_year_reviewed')}
@@ -64,10 +67,12 @@
       {@const tileMark = markOf(asset)}
       {@const focused = focusedId === asset.id}
       <button
+        animate:flip={flipMotion()}
         type="button"
         class="relative block rounded-md outline-none {focused ? 'outline-3 outline-offset-2 outline-primary' : ''}"
         data-testid="cleanup-rewind-tile-{asset.id}"
         data-asset-id={asset.id}
+        data-asset={asset.id}
         data-mark={tileMark}
         data-focused={focused}
         aria-label={asset.originalFileName}

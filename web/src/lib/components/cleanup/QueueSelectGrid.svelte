@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flipMotion } from '$lib/gallery/motion';
+  import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import { CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
@@ -39,6 +41,7 @@
     {@const isSelected = selected.has(item.id)}
     {@const reason = variant === 'blurry' && item.reason ? REASON_LABELS[item.reason] : undefined}
     <button
+      animate:flip={flipMotion()}
       type="button"
       class="relative block rounded-md outline-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary {focusedId ===
       item.id
@@ -46,6 +49,7 @@
         : ''}"
       data-testid="cleanup-item-{item.id}"
       data-asset-id={item.id}
+      data-asset={item.id}
       data-selected={isSelected}
       aria-label={item.originalFileName}
       aria-pressed={isSelected}

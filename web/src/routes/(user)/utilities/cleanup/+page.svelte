@@ -3,6 +3,7 @@
   import CleanupQueueRail from '$lib/components/cleanup/CleanupQueueRail.svelte';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
+  import { countMotion } from '$lib/gallery/motion';
   import { Route } from '$lib/route';
   import { handleEmptyTrash } from '$lib/services/trash.service';
   import { getByteUnitString } from '$lib/utils/byte-units';
@@ -28,6 +29,7 @@
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
   import { locale, t } from 'svelte-i18n';
+  import { Tween } from 'svelte/motion';
   import { SvelteMap } from 'svelte/reactivity';
   import type { PageData } from './$types';
 
@@ -77,6 +79,8 @@
   const couldStillFree = $derived(
     settledCounts < QUEUES.length ? undefined : Object.values(counts).reduce((sum, count) => sum + count.bytes, 0),
   );
+  // Counts up from zero once every queue has reported, then follows later changes.
+  const couldStillFreeShown = Tween.of(() => couldStillFree ?? 0, countMotion());
   const peekLoaded = $derived(peek?.monthDay === peekDay ? peek : undefined);
 
   const loadCover = async (queue: CleanupCountQueue) => {
@@ -213,7 +217,9 @@
             class="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium whitespace-nowrap text-success tabular-nums"
             data-testid="cleanup-could-still-free"
           >
-            {$t('cleanup_could_still_free', { values: { size: getByteUnitString(couldStillFree, lang) } })}
+            {$t('cleanup_could_still_free', {
+              values: { size: getByteUnitString(Math.round(couldStillFreeShown.current), lang) },
+            })}
           </span>
         {/if}
         <Button href={Route.cleanupRewind({ monthDay: today })} size="small" leadingIcon={mdiRewind}>
@@ -257,13 +263,10 @@
 
             <div class="flex min-w-0 gap-1 overflow-hidden">
               {#if peekLoaded}
-                {#each peekLoaded.assets as asset (asset.id)}
-                  <CleanupTile
-                    id={asset.id}
-                    thumbhash={asset.thumbhash}
-                    alt={asset.originalFileName}
-                    class="w-14 shrink-0"
-                  />
+                {#each peekLoaded.assets as asset, index (asset.id)}
+                  <div class="w-14 shrink-0" data-motion-reveal style:animation-delay="{index * 25}ms">
+                    <CleanupTile id={asset.id} thumbhash={asset.thumbhash} alt={asset.originalFileName} />
+                  </div>
                 {/each}
               {:else}
                 {#each { length: 6 }, i (i)}

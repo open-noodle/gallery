@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   showDialog: vi.fn(),
   handleError: vi.fn(),
   flags: { value: { trash: true } },
+  animateRemoval: vi.fn(),
 }));
 
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
@@ -20,6 +21,7 @@ vi.mock('@immich/ui', () => ({
   modalManager: { showDialog: mocks.showDialog },
 }));
 vi.mock('$lib/utils/handle-error', () => ({ handleError: mocks.handleError }));
+vi.mock('$lib/gallery/motion', () => ({ animateRemoval: mocks.animateRemoval }));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
 
 const ids = (count: number, prefix = 'id') => Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
@@ -143,6 +145,29 @@ describe('cleanup actions', () => {
   });
 
   describe('commitWithUndo', () => {
+    it('sends the trashed photos into the Trash before they leave the view', async () => {
+      const onRemoved = vi.fn(() => expect(mocks.animateRemoval).toHaveBeenCalled());
+
+      await commitWithUndo(CleanupQueue.Bursts, { trashIds: ['a', 'b'], keepIds: ['c'] }, onRemoved, vi.fn());
+
+      expect(mocks.animateRemoval).toHaveBeenCalledWith(['a', 'b'], 'trash');
+      expect(onRemoved).toHaveBeenCalledOnce();
+    });
+
+    it('dissolves the photos in place when the trash is off', async () => {
+      mocks.flags.value.trash = false;
+
+      await commitWithUndo(CleanupQueue.Blurry, { trashIds: ['a'] }, vi.fn(), vi.fn());
+
+      expect(mocks.animateRemoval).toHaveBeenCalledWith(['a'], 'delete');
+    });
+
+    it('animates nothing when a decision only keeps photos', async () => {
+      await commitWithUndo(CleanupQueue.Bursts, { keepIds: ['a'] }, vi.fn(), vi.fn());
+
+      expect(mocks.animateRemoval).not.toHaveBeenCalled();
+    });
+
     it('resolves a burst group in one commit and only warns about the photos being trashed', async () => {
       await commitWithUndo(CleanupQueue.Bursts, { trashIds: ['b', 'c'], keepIds: ['a'] }, vi.fn(), vi.fn());
 

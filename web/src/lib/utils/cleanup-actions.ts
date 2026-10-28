@@ -9,6 +9,7 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { animateRemoval, type RemovalKind } from '$lib/gallery/motion';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { chunk } from '$lib/utils/cleanup';
 import { handleError } from '$lib/utils/handle-error';
@@ -32,6 +33,15 @@ type OnIds = (ids: string[]) => void;
  * trash action asks for a "permanently delete" confirmation and never offers Undo.
  */
 export const isTrashEnabled = () => featureFlagsManager.value.trash;
+
+/**
+ * Sends the trashed photos off screen: into the sidebar's Trash link, or dissolving in place when
+ * the trash is off and the delete is permanent. Call it before the photos leave the DOM.
+ */
+export const animateCleanupRemoval = (ids: string[]) => {
+  const kind: RemovalKind = isTrashEnabled() ? 'trash' : 'delete';
+  animateRemoval(ids, kind);
+};
 
 /**
  * Confirms a Cleanup trash before anything is committed.
@@ -165,6 +175,7 @@ export const commitWithUndo = async (
   }
 
   if (result.trashed.length > 0) {
+    animateCleanupRemoval(result.trashed);
     onRemoved(result.trashed);
     showRemovedToast(result.trashed, onRestored);
   }

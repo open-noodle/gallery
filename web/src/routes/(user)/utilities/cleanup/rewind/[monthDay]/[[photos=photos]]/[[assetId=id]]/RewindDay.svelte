@@ -9,10 +9,11 @@
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { RewindSession, type RewindMark } from '$lib/managers/rewind-session.svelte';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import { celebrate, countMotion } from '$lib/gallery/motion';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
-  import { confirmCleanupTrash, showRemovedToast } from '$lib/utils/cleanup-actions';
+  import { animateCleanupRemoval, confirmCleanupTrash, showRemovedToast } from '$lib/utils/cleanup-actions';
   import {
     browserTimeZone,
     burstMemberIds,
@@ -36,6 +37,7 @@
   import { mdiCheck, mdiKeyboard, mdiSlashForward } from '@mdi/js';
   import { onMount, tick } from 'svelte';
   import { locale, t } from 'svelte-i18n';
+  import { Tween } from 'svelte/motion';
 
   type Props = {
     monthDay: number;
@@ -111,6 +113,7 @@
       .filter(([, mark]) => mark === 'trash')
       .reduce((sum, [id]) => sum + (assetById.get(id)?.fileSize ?? 0), 0),
   );
+  const trashBytesShown = Tween.of(() => trashBytes, countMotion());
   const focusedIndex = $derived(flat.findIndex((asset) => asset.id === session.focusedId));
   const current = $derived(focusedIndex === -1 ? flat[0] : flat[focusedIndex]);
   const busy = $derived(session.progress !== null || checkingSpaces);
@@ -238,6 +241,9 @@
       return;
     }
     session.mark(current.id, kind);
+    if (kind === 'fav') {
+      celebrate('favorite');
+    }
     step(1);
   };
 
@@ -339,6 +345,7 @@
     try {
       const { trashed, skipped } = await session.commitTrash();
       const removed = trashed.map((id) => assetById.get(id)).filter((asset) => asset !== undefined);
+      animateCleanupRemoval(trashed);
       removeAssets(trashed);
       showRemovedToast(trashed, () => reinsertAssets(removed));
       showSkippedToast(skipped);
@@ -358,6 +365,8 @@
     }
     try {
       const { trashed, skipped } = await session.finishDay();
+      animateCleanupRemoval(trashed);
+      celebrate('success');
       toastManager.success($t('cleanup_day_complete'));
       showRemovedToast(trashed);
       showSkippedToast(skipped);
@@ -549,7 +558,7 @@
               keep: session.counts.keep,
               fav: session.counts.fav,
               trash: session.counts.trash,
-              size: getByteUnitString(trashBytes, lang),
+              size: getByteUnitString(Math.round(trashBytesShown.current), lang),
               left: Math.max(total - reviewed, 0),
             },
           })}
@@ -563,7 +572,7 @@
         aria-valuenow={reviewed}
       >
         <div
-          class="h-full rounded-full bg-linear-to-r from-success to-success-400 transition-[width]"
+          class="h-full rounded-full bg-linear-to-r from-success to-success-400 transition-[width] duration-(--motion-slow) ease-(--ease-settle)"
           style:width="{total > 0 ? (reviewed / total) * 100 : 0}%"
         ></div>
       </div>

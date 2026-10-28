@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flipMotion } from '$lib/gallery/motion';
+  import { flip } from 'svelte/animate';
   import { shortcuts } from '$lib/actions/shortcut';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import BurstGroupCard from '$lib/components/cleanup/BurstGroupCard.svelte';
@@ -310,18 +312,20 @@
 </QueueHeader>
 
 {#each pager.groups as group (group.groupId)}
-  <BurstGroupCard
-    {group}
-    {marks}
-    {focusedId}
-    busy={pageBusy || busyGroups.has(group.groupId)}
-    onToggle={(id) => setMark(id)}
-    onKeepAll={() => void onKeepAll(group)}
-    onStack={() => void onStack(group)}
-    onResolve={() => void onResolve(group)}
-    onOpen={onTileOpen}
-    onFocus={(id) => (focusedId = id)}
-  />
+  <div animate:flip={flipMotion()}>
+    <BurstGroupCard
+      {group}
+      {marks}
+      {focusedId}
+      busy={pageBusy || busyGroups.has(group.groupId)}
+      onToggle={(id) => setMark(id)}
+      onKeepAll={() => void onKeepAll(group)}
+      onStack={() => void onStack(group)}
+      onResolve={() => void onResolve(group)}
+      onOpen={onTileOpen}
+      onFocus={(id) => (focusedId = id)}
+    />
+  </div>
 {/each}
 
 <QueueFooter {pager} empty={pager.groups.length === 0} onLoadMore={() => void load()} />
