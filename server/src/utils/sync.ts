@@ -34,9 +34,9 @@ export const serialize = <T extends keyof SyncItem, D extends SyncItem[T]>({
   type,
   data,
   ids,
-  ackType,
+  ackType = type,
 }: SerializeOptions<T, D>) =>
-  mapJsonLine({ type, data, ack: toAck({ type: ackType ?? type, updateId: ids[0], extraId: ids[1] }) });
+  mapJsonLine({ type, data, ack: toAck({ type: ackType, updateId: ids[0], extraId: ids[1] }) });
 
 // Stream helpers shared by SyncService and the fork's GallerySyncStreams (src/gallery/utils/gallery-sync.streams.ts).
 export type CheckpointMap = Partial<Record<SyncEntityType, SyncAck>>;

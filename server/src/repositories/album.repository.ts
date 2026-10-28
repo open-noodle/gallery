@@ -297,12 +297,12 @@ export class AlbumRepository {
   }
 
   /**
-   * Get asset IDs for the given album ID.
-   *
-   * @param albumId Album ID to get asset IDs for.
-   * @param assetIds Optional list of asset IDs to filter on.
-   * @returns Set of Asset IDs for the given album ID.
-   */
+  Get asset IDs for the given album ID.
+  
+  @param albumId Album ID to get asset IDs for.
+  @param assetIds Optional list of asset IDs to filter on.
+  @returns Set of Asset IDs for the given album ID.
+  */
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   @ChunkedSet({ paramIndex: 1 })
   async getAssetIds(albumId: string, assetIds: string[]): Promise<Set<string>> {
@@ -448,13 +448,13 @@ export class AlbumRepository {
   }
 
   /**
-   * Makes sure all thumbnails for albums are updated by:
-   * - Removing thumbnails from albums without assets
-   * - Removing references of thumbnails to assets outside the album
-   * - Setting a thumbnail when none is set and the album contains assets
-   *
-   * @returns Amount of updated album thumbnails or undefined when unknown
-   */
+  Makes sure all thumbnails for albums are updated by:
+  - Removing thumbnails from albums without assets
+  - Removing references of thumbnails to assets outside the album
+  - Setting a thumbnail when none is set and the album contains assets
+  
+  @returns Amount of updated album thumbnails or undefined when unknown
+  */
   async updateThumbnails(): Promise<number | undefined> {
     // Subquery for getting a new thumbnail.
 
@@ -500,12 +500,12 @@ export class AlbumRepository {
   }
 
   /**
-   * Get per-user asset contribution counts for a single album.
-   * Excludes deleted assets, orders by count desc.
-   * L1: also excludes Hidden/Locked assets (withDefaultVisibility) — the per-user totals are
-   * PII-adjacent (album.service.get gates the whole field to direct readers), and without this
-   * gate a contributor's Hidden/Locked asset count could still be inferred from the total.
-   */
+  Get per-user asset contribution counts for a single album.
+  Excludes deleted assets, orders by count desc.
+  L1: also excludes Hidden/Locked assets (withDefaultVisibility) — the per-user totals are
+  PII-adjacent (album.service.get gates the whole field to direct readers), and without this
+  gate a contributor's Hidden/Locked asset count could still be inferred from the total.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getContributorCounts(id: string) {
     return withDefaultVisibility(
