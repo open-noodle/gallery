@@ -377,5 +377,32 @@ describe(ViewRepository.name, () => {
       const asOwner = await sut.getAssetsByOriginalPath(owner.id, path);
       expect(asOwner).toEqual([expect.objectContaining({ id: asset.id, isFavoriteForUser: false })]);
     });
+
+    // immich-32612 anchors the match at an absolute path; S3 originals are relative keys (isDiskPath),
+    // and the web folder tree sends the same slash-less path back for both kinds.
+    it('GRANT — an S3 original (relative key) is listed in its folder', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: `upload/${user.id}/2024/1.jpg` });
+      await ctx.newAsset({ ownerId: user.id, originalPath: `upload/${user.id}/2024/sub/2.jpg` });
+      await ctx.newAsset({ ownerId: user.id, originalPath: `backup/upload/${user.id}/2024/3.jpg` });
+
+      for (const path of [`upload/${user.id}/2024`, `upload/${user.id}/2024/`, `/upload/${user.id}/2024`]) {
+        const result = await sut.getAssetsByOriginalPath(user.id, path);
+        expect(result.map(({ id }) => id)).toEqual([asset.id]);
+      }
+    });
+
+    it('DENY — a disk folder and an S3 folder with the same name do not leak into each other', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: disk } = await ctx.newAsset({ ownerId: user.id, originalPath: '/data/photos/1.jpg' });
+      const { asset: s3 } = await ctx.newAsset({ ownerId: user.id, originalPath: 'data/photos/2.jpg' });
+      await ctx.newAsset({ ownerId: user.id, originalPath: '/mnt/data/photos/3.jpg' });
+      await ctx.newAsset({ ownerId: user.id, originalPath: 'mnt/data/photos/4.jpg' });
+
+      const result = await sut.getAssetsByOriginalPath(user.id, 'data/photos');
+      expect(result.map(({ id }) => id).toSorted()).toEqual([disk.id, s3.id].toSorted());
+    });
   });
 });

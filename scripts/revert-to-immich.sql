@@ -302,8 +302,9 @@ UPDATE "api_key" k
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
                 'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
-                -- Post-tag upstream values (passkeys, immich-32194): the tagged release cannot decode them.
-                'passkey.read', 'passkey.update', 'passkey.delete'
+                -- Post-tag upstream values (passkeys, immich-32194; cluster group admin, immich-32787):
+                -- the tagged release cannot decode them.
+                'passkey.read', 'passkey.update', 'passkey.delete', 'clusterGroup.admin'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -708,6 +709,9 @@ DROP INDEX IF EXISTS "stack_updateId_idx";
 DROP INDEX IF EXISTS "workflow_updateId_idx";
 DROP INDEX IF EXISTS "asset_face_updateId_idx";
 
+-- 1792568637987-AddAssetOwnerIdUpdateIdIndex (immich-32624): (ownerId, updateId) index on asset.
+DROP INDEX IF EXISTS "asset_ownerId_updateId_idx";
+
 -- Before 3.3.5 none needed reversing: on 3.3.1 this branch's upstream migrations were identical to
 -- the tag's. The 3.3.0 -> 3.3.1 bump removed nothing.
 -- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
@@ -876,7 +880,8 @@ DELETE FROM "kysely_migrations"
    -- Post-tag upstream migrations pulled in by rebase, paired with schema rollbacks in step 7
    -- and kept timestamp-sorted (`upstream.version` is 3.3.5).
    '1792511451454-AddPasskeyTable',
-   '1792517020180-AddUpdateIdIndexes'
+   '1792517020180-AddUpdateIdIndexes',
+   '1792568637987-AddAssetOwnerIdUpdateIdIndex'
  );
 
 -- Gallery builds since the ledger split record fork migrations in their own table instead. The
