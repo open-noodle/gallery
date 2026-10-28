@@ -1,4 +1,4 @@
-import { celebrate, trajectory } from '$lib/gallery/motion/celebrate';
+import { celebrate, pulse, trajectory } from '$lib/gallery/motion/celebrate';
 
 describe('trajectory', () => {
   it('launches along the angle and falls under gravity', () => {
@@ -46,5 +46,33 @@ describe('celebrate', () => {
     vi.spyOn(globalThis, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
     celebrate('success', { x: 0, y: 0 });
     expect(document.querySelector('[data-gallery-celebration]')).toBeNull();
+  });
+});
+
+describe('pulse', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('swells an element once on top of its own scale', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const element = document.createElement('button');
+    const animate = vi.fn();
+    element.animate = animate;
+
+    pulse(element);
+
+    expect(animate).toHaveBeenCalledWith(
+      [{ scale: 1 }, { scale: 1.08 }, { scale: 1 }],
+      expect.objectContaining({ composite: 'add' }),
+    );
+  });
+
+  it('stays still under reduced motion', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const element = document.createElement('button');
+    element.animate = vi.fn();
+
+    pulse(element);
+
+    expect(element.animate).not.toHaveBeenCalled();
   });
 });

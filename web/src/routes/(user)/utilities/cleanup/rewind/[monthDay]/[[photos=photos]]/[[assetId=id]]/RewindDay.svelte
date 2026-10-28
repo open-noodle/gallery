@@ -13,9 +13,10 @@
   import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
   import { explainerSeen } from '$lib/gallery/cleanup/explainer-seen';
   import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+  import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
   import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
   import { getAssetMediaUrl } from '$lib/utils';
-  import { celebrate, countMotion } from '$lib/gallery/motion';
+  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '$lib/gallery/motion';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
@@ -473,6 +474,29 @@
     }
   });
 
+  let root = $state<HTMLElement>();
+  let daySections = $state<HTMLElement>();
+  // Stepping to the next or previous date slides its photos in from that side.
+  onMount(() => {
+    const direction = rewindDirection.take();
+    if (direction !== 0 && daySections?.animate) {
+      daySections.animate(slideFrom(direction, 24), { duration: duration.slow, easing: ease.settle });
+    }
+  });
+
+  // "Move to trash" swells once when it first has something to do, then stays still.
+  let previousTrashCount = 0;
+  $effect(() => {
+    const count = session.counts.trash;
+    if (previousTrashCount === 0 && count > 0) {
+      const button = root?.querySelector('[data-testid="cleanup-move-to-trash"]');
+      if (button) {
+        pulse(button);
+      }
+    }
+    previousTrashCount = count;
+  });
+
   onMount(() => {
     if (mode === 'grid' && session.focusedId) {
       tileFor(session.focusedId)?.focus({ preventScroll: true });
@@ -502,7 +526,7 @@
 
 <OnEvents {onAssetsDelete} />
 
-<div class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4" data-testid="cleanup-rewind">
+<div bind:this={root} class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4" data-testid="cleanup-rewind">
   <header class="mb-4 flex flex-wrap items-end gap-3">
     <div class="min-w-0">
       <Breadcrumbs
@@ -579,6 +603,7 @@
         color="secondary"
         shape="round"
         title={$t('previous')}
+        onclick={() => rewindDirection.set(-1)}
         data-testid="cleanup-rewind-previous"
       >
         ‹ {monthDayShortLabel(previousDay, lang)}
@@ -590,6 +615,7 @@
         color="secondary"
         shape="round"
         title={$t('next')}
+        onclick={() => rewindDirection.set(1)}
         data-testid="cleanup-rewind-next"
       >
         {monthDayShortLabel(nextDay, lang)} ›
@@ -635,7 +661,9 @@
         aria-valuenow={reviewed}
       >
         <div
-          class="h-full rounded-full bg-linear-to-r from-success to-success-400 transition-[width] duration-(--motion-slow) ease-(--ease-settle)"
+          data-testid="cleanup-rewind-progress-bar"
+          data-complete={total > 0 && reviewed >= total ? 'true' : undefined}
+          class="h-full rounded-full bg-linear-to-r from-success to-success-400 transition-[width,box-shadow] duration-(--spring-gentle-duration) ease-(--spring-gentle) data-[complete=true]:shadow-[0_0_14px_var(--color-success)]"
           style:width="{total > 0 ? (reviewed / total) * 100 : 0}%"
         ></div>
       </div>
@@ -648,52 +676,55 @@
     </label>
   </div>
 
-  {#if mode === 'grid'}
-    {#if total === 0}
-      <p class="py-16 text-center text-muted">{$t('no_assets_to_show')}</p>
-    {/if}
-    {#each sections as section (section.year)}
-      <RewindYearSection
-        year={section.year}
-        yearsAgo={currentYear - section.year}
-        count={section.count}
-        city={section.city}
-        assets={section.visible}
+  <div bind:this={daySections}>
+    {#if mode === 'grid'}
+      {#if total === 0}
+        <p class="py-16 text-center text-muted">{$t('no_assets_to_show')}</p>
+      {/if}
+      {#each sections as section (section.year)}
+        <RewindYearSection
+          year={section.year}
+          yearsAgo={currentYear - section.year}
+          count={section.count}
+          city={section.city}
+          assets={section.visible}
+          marks={session.marks}
+          focusedId={session.focusedId}
+          onCycle={(id) => {
+            session.focusedId = id;
+            session.cycle(id);
+          }}
+          onOpen={onTileOpen}
+          {onKeepRemaining}
+        />
+      {/each}
+      {#if unloadedCount > 0}
+        <div use:observeSentinel class="grid place-items-center py-6" data-testid="cleanup-rewind-sentinel">
+          <span class="h-3 w-40 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></span>
+        </div>
+      {/if}
+    {:else}
+      <RewindOneAtATime
+        asset={current}
+        mark={current ? session.marks.get(current.id) : undefined}
+        index={Math.max(focusedIndex, 0) + 1}
+        total={flat.length}
+        upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
         marks={session.marks}
-        focusedId={session.focusedId}
-        onCycle={(id) => {
-          session.focusedId = id;
-          session.cycle(id);
-        }}
-        onOpen={onTileOpen}
-        {onKeepRemaining}
+        inBurst={current ? burstIds.has(current.id) : false}
+        onTrash={() => markCurrent('trash')}
+        onSkip={() => step(1)}
+        onFavorite={() => markCurrent('fav')}
+        onKeep={() => markCurrent('keep')}
+        onSelect={(id) => void focusAsset(id)}
+        onOpen={(id) => void openAsset(id)}
       />
-    {/each}
-    {#if unloadedCount > 0}
-      <div use:observeSentinel class="grid place-items-center py-6" data-testid="cleanup-rewind-sentinel">
-        <span class="h-3 w-40 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></span>
-      </div>
     {/if}
-  {:else}
-    <RewindOneAtATime
-      asset={current}
-      mark={current ? session.marks.get(current.id) : undefined}
-      index={Math.max(focusedIndex, 0) + 1}
-      total={flat.length}
-      upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
-      marks={session.marks}
-      inBurst={current ? burstIds.has(current.id) : false}
-      onTrash={() => markCurrent('trash')}
-      onSkip={() => step(1)}
-      onFavorite={() => markCurrent('fav')}
-      onKeep={() => markCurrent('keep')}
-      onSelect={(id) => void focusAsset(id)}
-      onOpen={(id) => void openAsset(id)}
-    />
-  {/if}
+  </div>
 
   <div
-    class="sticky bottom-0 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-2xl border bg-light px-3.5 py-2.5 text-xs shadow-[0_-4px_20px_rgba(20,24,40,0.08)]"
+    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md md:rounded-full"
+    data-motion-reveal
     data-testid="cleanup-rewind-actionbar"
   >
     <div class="flex flex-wrap items-center gap-3 text-muted">

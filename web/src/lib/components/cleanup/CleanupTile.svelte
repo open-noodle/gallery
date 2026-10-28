@@ -14,6 +14,8 @@
     class?: string;
     /** Tile shape; square by default. */
     aspect?: string;
+    /** Corner radius class; `rounded-md` by default. */
+    radius?: string;
     /** Bottom-left badge, e.g. a ▶ video tag. */
     badge?: Snippet;
     /** Top-left corner, e.g. a selection circle or ★ SHARPEST. */
@@ -30,6 +32,7 @@
     duration,
     alt = '',
     aspect = 'aspect-square',
+    radius = 'rounded-md',
     class: className = '',
     badge,
     topLeft,
@@ -49,7 +52,7 @@
 </script>
 
 <div
-  class="relative {aspect} overflow-hidden rounded-md bg-gray-200 dark:bg-gray-700 {className}"
+  class="relative {aspect} overflow-hidden {radius} bg-gray-200 dark:bg-gray-700 {className}"
   data-testid="cleanup-tile"
 >
   {#if thumbhash && !loaded}

@@ -5,6 +5,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
+import { pulse } from '$lib/gallery/motion';
 import RewindDay from './RewindDay.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +38,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
 });
 vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
+vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pulse: vi.fn() }));
 vi.mock('$app/state', () => ({
   page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
 }));
@@ -528,5 +531,40 @@ describe('RewindDay', () => {
 
     await waitFor(() => expect(mocks.goto).toHaveBeenCalled());
     expect(finishedDay.take()).toBe(923);
+  });
+
+  it('pulses "Move to trash" once when the first photo is marked for trash, not on later marks', async () => {
+    renderDay();
+    expect(pulse).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    expect(pulse).toHaveBeenCalledTimes(1);
+    expect(pulse).toHaveBeenCalledWith(screen.getByTestId('cleanup-move-to-trash'));
+
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    expect(pulse).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the progress bar complete once every photo is reviewed', async () => {
+    renderDay();
+    const bar = screen.getByTestId('cleanup-rewind-progress-bar');
+    expect(bar).not.toHaveAttribute('data-complete');
+
+    for (let i = 0; i < 3; i++) {
+      await fireEvent.keyDown(document, { key: 'k' });
+    }
+
+    expect(bar).toHaveAttribute('data-complete', 'true');
+  });
+
+  it('records the direction of travel when moving to the next or previous date', async () => {
+    rewindDirection.take();
+    renderDay();
+
+    await fireEvent.click(screen.getByTestId('cleanup-rewind-next'));
+    expect(rewindDirection.take()).toBe(1);
+
+    await fireEvent.click(screen.getByTestId('cleanup-rewind-previous'));
+    expect(rewindDirection.take()).toBe(-1);
   });
 });

@@ -1,7 +1,10 @@
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import RewindYearSection from '$lib/components/cleanup/RewindYearSection.svelte';
+import { pop } from '$lib/gallery/motion';
 import type { RewindMark } from '$lib/managers/rewind-session.svelte';
+
+vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pop: vi.fn() }));
 
 const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,
@@ -124,5 +127,59 @@ describe('RewindYearSection', () => {
 
     expect(screen.queryByRole('button', { name: 'cleanup_keep_all_remaining' })).toBeNull();
     expect(screen.getByText('cleanup_year_reviewed')).toBeVisible();
+  });
+
+  describe('motion', () => {
+    const baseProps = {
+      year: 2018,
+      yearsAgo: 7,
+      count: 3,
+      city: 'Lisbon',
+      assets: [asset('a'), asset('b'), asset('c')],
+      focusedId: null,
+      onCycle: vi.fn(),
+      onOpen: vi.fn(),
+      onKeepRemaining: vi.fn(),
+    };
+
+    beforeEach(() => vi.mocked(pop).mockClear());
+
+    it('pops a badge when its tile is marked, not when the page loads with marks', async () => {
+      const { rerender } = render(RewindYearSection, { ...baseProps, marks: new Map([['b', 'fav' as RewindMark]]) });
+      expect(pop).not.toHaveBeenCalled();
+
+      await rerender({
+        marks: new Map([
+          ['b', 'fav' as RewindMark],
+          ['a', 'keep' as RewindMark],
+        ]),
+      });
+
+      expect(pop).toHaveBeenCalledTimes(1);
+      expect(pop).toHaveBeenCalledWith(screen.getByTestId('cleanup-mark-badge-a'));
+    });
+
+    it('pops the "Year reviewed" badge when the last photo is marked, not on load', async () => {
+      const all = new Map<string, RewindMark>([
+        ['a', 'keep'],
+        ['b', 'keep'],
+        ['c', 'keep'],
+      ]);
+      const loaded = render(RewindYearSection, { ...baseProps, marks: all });
+      expect(pop).not.toHaveBeenCalledWith(screen.getByTestId('cleanup-year-reviewed'));
+      loaded.unmount();
+      vi.mocked(pop).mockClear();
+
+      const { rerender } = render(RewindYearSection, {
+        ...baseProps,
+        marks: new Map<string, RewindMark>([
+          ['a', 'keep'],
+          ['b', 'keep'],
+        ]),
+      });
+      await rerender({ marks: all });
+
+      expect(pop).toHaveBeenCalledWith(screen.getByTestId('cleanup-year-reviewed'));
+    });
   });
 });

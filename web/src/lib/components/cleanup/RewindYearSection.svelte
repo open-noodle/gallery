@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flipMotion } from '$lib/gallery/motion';
+  import { flipMotion, pop } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import type { RewindMark } from '$lib/managers/rewind-session.svelte';
@@ -29,6 +29,36 @@
 
   const markOf = (asset: CleanupAssetDto) => marks.get(asset.id) ?? (asset.kept ? 'kept' : 'none');
 
+  let section = $state<HTMLElement>();
+  let reviewedBadge = $state<HTMLElement>();
+  // Bookkeeping for the effects below, not state: what was marked last time, so only a change pops.
+  let previousMarks: Map<string, RewindMark | undefined> | undefined;
+  let previousRemaining: number | undefined;
+
+  // A badge lands with a pop when the user marks its tile; marks already there when the page loads stay still.
+  $effect(() => {
+    const current = new Map(assets.map((asset) => [asset.id, marks.get(asset.id)]));
+    if (previousMarks) {
+      for (const [id, mark] of current) {
+        if ((mark !== 'keep' && mark !== 'fav') || previousMarks.get(id) === mark) {
+          continue;
+        }
+        const badge = section?.querySelector(`[data-testid="cleanup-mark-badge-${CSS.escape(id)}"]`);
+        if (badge) {
+          pop(badge);
+        }
+      }
+    }
+    previousMarks = current;
+  });
+
+  $effect(() => {
+    if (previousRemaining !== undefined && previousRemaining > 0 && remaining === 0 && reviewedBadge) {
+      pop(reviewedBadge);
+    }
+    previousRemaining = remaining;
+  });
+
   const onTileClick = (event: MouseEvent, id: string) => {
     // The second click of a double-click opens the viewer instead of cycling the mark again.
     if (event.detail > 1) {
@@ -38,7 +68,7 @@
   };
 </script>
 
-<section class="mt-5 first:mt-2" data-testid="cleanup-rewind-year-{year}">
+<section bind:this={section} class="mt-5 first:mt-2" data-testid="cleanup-rewind-year-{year}">
   <div class="mb-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
     <Heading size="small" tag="h3" class="tabular-nums">{year}</Heading>
     <span class="text-sm text-muted tabular-nums" data-testid="cleanup-rewind-year-meta">
@@ -53,6 +83,8 @@
         </Button>
       {:else}
         <span
+          bind:this={reviewedBadge}
+          data-testid="cleanup-year-reviewed"
           data-motion-reveal
           class="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success"
         >
@@ -69,7 +101,7 @@
       <button
         animate:flip={flipMotion()}
         type="button"
-        class="relative block rounded-md outline-none {focused ? 'outline-3 outline-offset-2 outline-primary' : ''}"
+        class="relative block rounded-xl outline-none {focused ? 'outline-3 outline-offset-2 outline-primary' : ''}"
         data-testid="cleanup-rewind-tile-{asset.id}"
         data-asset-id={asset.id}
         data-asset={asset.id}
@@ -84,15 +116,25 @@
           id={asset.id}
           thumbhash={asset.thumbhash}
           duration={asset.duration}
-          class={tileMark === 'trash' ? '[&_canvas]:grayscale [&_img]:brightness-60 [&_img]:grayscale' : ''}
+          radius="rounded-xl"
+          class="[&_img]:transition-[filter] [&_img]:duration-(--motion-base) [&_img]:ease-(--ease-standard) {tileMark ===
+          'trash'
+            ? '[&_canvas]:grayscale [&_img]:brightness-50 [&_img]:grayscale'
+            : ''}"
         >
           {#snippet topRight()}
             {#if tileMark === 'keep'}
-              <span class="grid size-5.5 place-items-center rounded-full bg-success text-white shadow-sm">
+              <span
+                class="grid size-5.5 place-items-center rounded-full bg-success text-white shadow-sm"
+                data-testid="cleanup-mark-badge-{asset.id}"
+              >
                 <Icon icon={mdiCheck} size="14" />
               </span>
             {:else if tileMark === 'fav'}
-              <span class="grid size-5.5 place-items-center rounded-full bg-pink-500 text-white shadow-sm">
+              <span
+                class="grid size-5.5 place-items-center rounded-full bg-pink-500 text-white shadow-sm"
+                data-testid="cleanup-mark-badge-{asset.id}"
+              >
                 <Icon icon={mdiHeart} size="13" />
               </span>
             {:else if tileMark === 'kept'}
@@ -103,9 +145,11 @@
           {/snippet}
           {#snippet mark()}
             {#if tileMark === 'keep'}
-              <span class="pointer-events-none absolute inset-0 rounded-md border-3 border-success"></span>
+              <span class="pointer-events-none absolute inset-0 rounded-xl border-3 border-success" data-motion-reveal
+              ></span>
             {:else if tileMark === 'fav'}
-              <span class="pointer-events-none absolute inset-0 rounded-md border-3 border-pink-500"></span>
+              <span class="pointer-events-none absolute inset-0 rounded-xl border-3 border-pink-500" data-motion-reveal
+              ></span>
             {:else if tileMark === 'trash'}
               <span
                 class="pointer-events-none absolute inset-0 grid place-items-center bg-danger/35 text-xs font-bold tracking-wide text-white uppercase"
