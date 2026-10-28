@@ -6,12 +6,10 @@
   import { onDestroy, onMount } from 'svelte';
   import { t, type Translations } from 'svelte-i18n';
 
-  // Both fields are generated ENUMS, whose members are exactly these strings at runtime; `${...}` widens each
-  // to that literal union. Deliberate: an enum is a runtime VALUE, so importing it would break any spec that
-  // stubs `@immich/sdk` with a factory mock of just the two endpoints. buildRequest is the single place the
-  // two representations meet.
+  // A generated ENUM, whose members are exactly these strings at runtime; `${...}` widens it to that literal
+  // union. Deliberate: an enum is a runtime VALUE, so importing it would break any spec that stubs
+  // `@immich/sdk` with a factory mock of just the two endpoints. buildRequest is where the two meet.
   type DissolveScope = `${DissolveRequestDto['scope']}`;
-  type DissolveOutcome = `${DissolveRequestDto['outcome']}`;
 
   type Props = {
     personId: string;
@@ -28,36 +26,23 @@
     { value: 'without-embedding', label: 'admin.face_cleanup_dissolve_scope_no_embedding' },
   ];
 
-  const OUTCOMES: { value: DissolveOutcome; label: Translations }[] = [
-    { value: 'delete-faces', label: 'admin.face_cleanup_dissolve_outcome_delete' },
-    { value: 'delete-faces-and-person', label: 'admin.face_cleanup_dissolve_outcome_delete_person' },
-    { value: 'unassign', label: 'admin.face_cleanup_dissolve_outcome_unassign' },
-  ];
-
-  // Contract with buildWarnings() in face-dissolve.service.ts — those seven codes and no others. Typed
+  // Contract with buildWarnings() in face-dissolve.service.ts — those five codes and no others. Typed
   // `Translations`, not `string`: `$t` only accepts keys that exist in en.json, so a typo here is a build
   // error rather than a raw key rendered at an admin. An unknown code renders nothing at all.
   const WARNING_KEY_BY_CODE: Record<string, Translations | undefined> = {
-    'strands-faces': 'admin.face_cleanup_dissolve_warn_strands_faces',
-    'recluster-similar': 'admin.face_cleanup_dissolve_warn_recluster_similar',
-    'person-will-be-cleaned-up': 'admin.face_cleanup_dissolve_warn_person_will_be_cleaned_up',
     'not-redetectable': 'admin.face_cleanup_dissolve_warn_not_redetectable',
     'shared-assets': 'admin.face_cleanup_dissolve_warn_shared_assets',
     'metadata-import-on': 'admin.face_cleanup_dissolve_warn_metadata_import_on',
     'hand-drawn-kept': 'admin.face_cleanup_dissolve_warn_hand_drawn_kept',
+    'space-persons-kept': 'admin.face_cleanup_dissolve_warn_space_persons_kept',
   };
 
   const PREVIEW_DEBOUNCE_MS = 250;
 
-  // `exif` by default, not `all`: the imported-metadata faces are the contamination this dialog exists for,
-  // and the broadest destructive selection is the wrong opening state for an operation with no undo. Widening
-  // to `all` is one click; a delete the admin did not intend is not undoable at all.
+  // `exif` by default, not `all`: on a real person polluted by imported faces, `all` would also hide every real
+  // detected face. Hiding can be restored, deleting imported faces cannot; widening to `all` (a junk cluster) is
+  // one click.
   let scope = $state<DissolveScope>('exif');
-  let outcome = $state<DissolveOutcome>('delete-faces');
-  // The server REFUSES a delete outcome carrying redetect:false with a 400 rather than silently overriding it
-  // (validate(), face-dissolve.service.ts), so the checkbox is forced on and locked for both deletes. This
-  // holds the admin's own choice, which only ever reaches the wire for `unassign`.
-  let redetectWhenUnassigning = $state(true);
   let preview = $state<DissolveResponseDto | null>(null);
   // True from mount until the first preview lands, and again while a control change is unaccounted for. The
   // counts are the only thing between an admin and an irreversible delete, so applying while they describe a
@@ -66,9 +51,6 @@
   let confirmation = $state('');
   let applying = $state(false);
 
-  const isDelete = $derived(outcome !== 'unassign');
-  const redetect = $derived(isDelete || redetectWhenUnassigning);
-  const outcomeLabel = $derived(OUTCOMES.find(({ value }) => value === outcome)!.label);
   // The length check is not redundant: a blank `personName` would otherwise make an empty box "match" and hand
   // an irreversible delete a gate that is already open.
   const expectedName = $derived(personName.trim().toLowerCase());
@@ -89,26 +71,12 @@
   );
 
   // Face-level counts first, then photo-level ones. `notRedetectable` earns its cell even though its warning
-  // repeats the number: it is the one part of the blast radius that no re-detection can put back, and the
-  // warning is suppressed entirely when redetect is off.
+  // repeats the number: it is the one part of the blast radius that no re-scan can put back.
   const countCells = $derived([
     { key: 'faces', label: 'admin.face_cleanup_col_faces' as Translations, value: preview?.counts.faces },
-    { key: 'exif', label: 'admin.face_cleanup_dissolve_scope_exif' as Translations, value: preview?.counts.exif },
-    {
-      key: 'ml',
-      label: 'admin.face_cleanup_dissolve_scope_ml' as Translations,
-      value: preview?.counts.mlWithEmbedding,
-    },
-    {
-      key: 'no-embedding',
-      label: 'admin.face_cleanup_dissolve_scope_no_embedding' as Translations,
-      value: preview?.counts.mlWithoutEmbedding,
-    },
-    {
-      key: 'detached',
-      label: 'admin.face_cleanup_review_tile_detach_ribbon' as Translations,
-      value: preview?.counts.softDeleted,
-    },
+    { key: 'hide', label: 'admin.face_cleanup_dissolve_scope_ml' as Translations, value: preview?.counts.hide },
+    { key: 'delete', label: 'admin.face_cleanup_dissolve_scope_exif' as Translations, value: preview?.counts.delete },
+    { key: 'keep', label: 'admin.face_cleanup_dissolve_count_kept' as Translations, value: preview?.counts.keep },
     { key: 'assets', label: 'photos' as Translations, value: preview?.counts.assets },
     {
       key: 'not-redetectable',
@@ -117,10 +85,27 @@
     },
   ]);
 
+  // What happens to each kind of face, in words. Only the treatments this selection actually uses are shown.
+  const treatments = $derived(
+    previewing || !preview
+      ? []
+      : [
+          { key: 'hide', label: 'admin.face_cleanup_dissolve_hide_count' as Translations, count: preview.counts.hide },
+          {
+            key: 'delete',
+            label: 'admin.face_cleanup_dissolve_delete_count' as Translations,
+            count: preview.counts.delete,
+          },
+          {
+            key: 'unassign',
+            label: 'admin.face_cleanup_dissolve_unassign_count' as Translations,
+            count: preview.counts.keep,
+          },
+        ].filter((treatment) => treatment.count > 0),
+  );
+
   const buildRequest = (expectedFaceCount: number): DissolveRequestDto => ({
     scope: scope as DissolveRequestDto['scope'],
-    outcome: outcome as DissolveRequestDto['outcome'],
-    redetect,
     expectedFaceCount,
   });
 
@@ -162,16 +147,6 @@
 
   const selectScope = (value: DissolveScope) => {
     scope = value;
-    schedulePreview();
-  };
-
-  const selectOutcome = (value: DissolveOutcome) => {
-    outcome = value;
-    schedulePreview();
-  };
-
-  const toggleRedetect = (event: Event) => {
-    redetectWhenUnassigning = (event.currentTarget as HTMLInputElement).checked;
     schedulePreview();
   };
 
@@ -243,27 +218,27 @@
         </ul>
       {/if}
 
-      <!-- Outcome: native radios, so the group is one tab stop and reads as a choice to a screen reader. -->
-      <fieldset class="flex flex-col gap-2">
-        <legend class="sr-only">{$t('admin.face_cleanup_dissolve')}</legend>
-        {#each OUTCOMES as option (option.value)}
-          <label class="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="dissolve-outcome"
-              value={option.value}
-              checked={outcome === option.value}
-              onchange={() => selectOutcome(option.value)}
-            />
-            {$t(option.label)}
-          </label>
-        {/each}
-      </fieldset>
+      {#if treatments.length > 0}
+        <ul class="flex flex-col gap-1 text-sm" data-testid="dissolve-treatments">
+          {#each treatments as treatment (treatment.key)}
+            <li data-testid="dissolve-treatment-{treatment.key}">
+              {$t(treatment.label, { values: { count: treatment.count } })}
+            </li>
+          {/each}
+        </ul>
+      {/if}
 
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={redetect} disabled={isDelete} onchange={toggleRedetect} />
-        {$t('admin.face_cleanup_dissolve_redetect')}
-      </label>
+      {#if preview && !previewing}
+        <p class="text-sm" data-testid="dissolve-person-outcome">
+          {preview.counts.personRemoved
+            ? $t('admin.face_cleanup_dissolve_person_removed')
+            : $t('admin.face_cleanup_dissolve_person_kept', { values: { count: preview.counts.remainingFaces } })}
+        </p>
+      {/if}
+
+      <p class="text-sm text-gray-500 dark:text-gray-400" data-testid="dissolve-real-faces-note">
+        {$t('admin.face_cleanup_dissolve_real_faces_note')}
+      </p>
 
       <div class="flex flex-col gap-2">
         <label class="text-sm font-semibold" for="dissolve-confirmation">
@@ -283,7 +258,9 @@
   <ModalFooter>
     <div class="flex w-full justify-end gap-2">
       <Button shape="round" color="secondary" onclick={() => onClose(false)}>{$t('cancel')}</Button>
-      <Button shape="round" color="danger" disabled={!canApply} onclick={apply}>{$t(outcomeLabel)}</Button>
+      <Button shape="round" color="danger" disabled={!canApply} onclick={apply}
+        >{$t('admin.face_cleanup_dissolve_apply')}</Button
+      >
     </div>
   </ModalFooter>
 </Modal>
