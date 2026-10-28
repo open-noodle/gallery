@@ -143,6 +143,7 @@ export class ServerService extends BaseService {
       configFile: !!configFile,
       email: notifications.smtp.enabled,
       realtimeTranscoding: ffmpeg.realtime.enabled,
+      s3Configured: !!storage.s3.bucket,
       peopleStatistics,
       s3Storage: storage.backend === 's3',
       // Capability signal for mobile sync gating: /sync/stream 400s the whole request on any

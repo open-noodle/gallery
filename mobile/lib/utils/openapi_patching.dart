@@ -45,6 +45,7 @@ final Map<String, Map<String, Object?>> openApiPatches = {
     'peopleStatistics': false,
     'smartSearchHasCutoff': false,
     's3Storage': false,
+    's3Configured': false,
   },
   // A raw map rather than the generated DTO: `enabled` is nullable there, and these are the
   // server-side defaults an older server would have behaved as (backups stay on local disk).

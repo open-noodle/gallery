@@ -161,6 +161,7 @@ describe(ServerService.name, () => {
         localTakenRange: true,
         searchOptions: true,
         searchFavoritesAcrossSpaces: true,
+        s3Configured: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
@@ -177,6 +178,11 @@ describe(ServerService.name, () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
       const features = await sut.getFeatures();
       expect(features.s3Storage).toBe(true);
+    });
+
+    it('should report s3Configured when a bucket is configured', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { bucket: 'photos' } } } as never));
+      await expect(sut.getFeatures()).resolves.toEqual(expect.objectContaining({ s3Configured: true }));
     });
 
     // Regression guard: getFeatures is called on every web-app page load; must

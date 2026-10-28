@@ -151,6 +151,8 @@ const ServerFeaturesSchema = z
     email: z.boolean().describe('Whether email notifications are enabled'),
     ocr: z.boolean().describe('Whether OCR is enabled'),
     realtimeTranscoding: z.boolean().describe('Whether real-time transcoding is enabled'),
+    // Gallery-fork: an S3 bucket is configured, so S3 can be chosen per file type even on the disk backend.
+    s3Configured: z.boolean().describe('Whether an S3 bucket is configured'),
     peopleStatistics: z.boolean().describe('Whether the people face statistics UI is enabled'),
     // Gallery-fork: the admin UI hides config that only applies on the S3 storage backend (database
     // backups to S3), and the client has no other signal for which backend the server is running on.
