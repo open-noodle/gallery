@@ -1,30 +1,30 @@
 /**
- * Slice S4a — API e2e behavioral matrix for the space-albums timeline surfaces.
- *
- * Source: SPACE-ALBUMS-RBAC-REMEDIATION-SPEC-2026-07-11.md, section "S4 — Comprehensive
- * space-albums behavioral e2e safety net" / "S4a — API e2e behavioral matrix". This is the
- * end-to-end regression lock for S1 (H-1 trash gate), S2 (M-2 sync trash gate) and S3 (M-1
- * Locked album strip convergence), on top of proving the day-to-day link/toggle/add/remove
- * behavior actually moves assets in and out of the relevant surfaces.
- *
- * Two DISTINCT `showInTimeline` toggles exist and must be kept straight (verified in
- * server/src/dtos/shared-space.dto.ts):
- *   - ALBUM-level `shared_space_album.showInTimeline` (PATCH /shared-spaces/:id/albums/:albumId)
- *     — "include this album's assets in the SPACE Photos timeline". It gates ONLY the
- *     `spaceId`/`withSharedSpaces` arms of the timeline/search builders (via
- *     `spaceAlbumAssetExists({ requireShowInTimeline: true })`); the `albumId`-scoped timeline
- *     query (the album view) joins `album_asset` directly and never looks at this flag.
- *   - MEMBER-level `shared_space_member.showInTimeline` (PATCH
- *     /shared-spaces/:id/members/me/timeline) — "include this space's assets in MY
- *     personal/main timeline" (`GET /timeline/buckets?withSharedSpaces=true`). It does not gate
- *     the space's own Photos tab (`GET /timeline/buckets?spaceId=...`), which a member can
- *     still browse directly.
- *
- * Fixture: owner O, editor E, viewer V, non-member X; a fresh space S per test group; O owns
- * album A (2 Timeline assets, E as an album-editor participant so E can add/remove assets);
- * A is linked into S. Assertions check DATA PRESENCE (asset ids in the relevant list
- * responses), not just status codes, per the remediation spec's explicit ask.
- */
+Slice S4a — API e2e behavioral matrix for the space-albums timeline surfaces.
+
+Source: SPACE-ALBUMS-RBAC-REMEDIATION-SPEC-2026-07-11.md, section "S4 — Comprehensive
+space-albums behavioral e2e safety net" / "S4a — API e2e behavioral matrix". This is the
+end-to-end regression lock for S1 (H-1 trash gate), S2 (M-2 sync trash gate) and S3 (M-1
+Locked album strip convergence), on top of proving the day-to-day link/toggle/add/remove
+behavior actually moves assets in and out of the relevant surfaces.
+
+Two DISTINCT `showInTimeline` toggles exist and must be kept straight (verified in
+server/src/dtos/shared-space.dto.ts):
+  - ALBUM-level `shared_space_album.showInTimeline` (PATCH /shared-spaces/:id/albums/:albumId)
+    — "include this album's assets in the SPACE Photos timeline". It gates ONLY the
+    `spaceId`/`withSharedSpaces` arms of the timeline/search builders (via
+    `spaceAlbumAssetExists({ requireShowInTimeline: true })`); the `albumId`-scoped timeline
+    query (the album view) joins `album_asset` directly and never looks at this flag.
+  - MEMBER-level `shared_space_member.showInTimeline` (PATCH
+    /shared-spaces/:id/members/me/timeline) — "include this space's assets in MY
+    personal/main timeline" (`GET /timeline/buckets?withSharedSpaces=true`). It does not gate
+    the space's own Photos tab (`GET /timeline/buckets?spaceId=...`), which a member can
+    still browse directly.
+
+Fixture: owner O, editor E, viewer V, non-member X; a fresh space S per test group; O owns
+album A (2 Timeline assets, E as an album-editor participant so E can add/remove assets);
+A is linked into S. Assertions check DATA PRESENCE (asset ids in the relevant list
+responses), not just status codes, per the remediation spec's explicit ask.
+*/
 
 import {
   AlbumResponseDto,
@@ -48,12 +48,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // ─── module-level read/mutation helpers (no describe-scoped closures) ───────
 
 /**
- * Collects every asset id across all time buckets returned for the given query string
- * (e.g. `spaceId=...`, `albumId=...`, `withSharedSpaces=true`), as the given token.
- * Asserts 200 on both the buckets list and each bucket fetch — only call this for a
- * caller expected to have read access to the scope; use raw `request(app)` calls directly
- * to assert a non-2xx status.
- */
+Collects every asset id across all time buckets returned for the given query string
+(e.g. `spaceId=...`, `albumId=...`, `withSharedSpaces=true`), as the given token.
+Asserts 200 on both the buckets list and each bucket fetch — only call this for a
+caller expected to have read access to the scope; use raw `request(app)` calls directly
+to assert a non-2xx status.
+*/
 const timelineIds = async (token: string, query: string): Promise<string[]> => {
   const bucketsRes = await request(app)
     .get(`/timeline/buckets?bucketSize=month&${query}`)
@@ -79,11 +79,11 @@ const spaceTimelineIds = (token: string, spaceId: string) => timelineIds(token, 
 const albumTimelineIds = (token: string, albumId: string) => timelineIds(token, `albumId=${albumId}`);
 
 /**
- * The caller's personal/main timeline, expanded to include timeline-enabled shared spaces.
- * `withSharedSpaces` requires an explicit `visibility=timeline`: the endpoint 400s on the default
- * (archived) view for a shared-spaces union, mirroring `withPartners` (see
- * timeline.service.ts `timeBucketChecks`), and every caller in timeline.e2e-spec.ts passes it too.
- */
+The caller's personal/main timeline, expanded to include timeline-enabled shared spaces.
+`withSharedSpaces` requires an explicit `visibility=timeline`: the endpoint 400s on the default
+(archived) view for a shared-spaces union, mirroring `withPartners` (see
+timeline.service.ts `timeBucketChecks`), and every caller in timeline.e2e-spec.ts passes it too.
+*/
 const mainTimelineWithSpacesIds = (token: string) => timelineIds(token, 'visibility=timeline&withSharedSpaces=true');
 
 /** POST /search/metadata as the given token; returns the flat list of returned asset ids. */
@@ -115,10 +115,10 @@ const setMemberShowInTimeline = (token: string, spaceId: string, showInTimeline:
   );
 
 /**
- * PATCH the per-member ALBUM-level timeline preference (#1041 slice 2). No `@immich/sdk` function
- * exists for this endpoint yet (the OpenAPI/Dart regen is a separate, later task), so this goes
- * through raw supertest. `token: undefined` sends the request unauthenticated.
- */
+PATCH the per-member ALBUM-level timeline preference (#1041 slice 2). No `@immich/sdk` function
+exists for this endpoint yet (the OpenAPI/Dart regen is a separate, later task), so this goes
+through raw supertest. `token: undefined` sends the request unauthenticated.
+*/
 const patchAlbumTimeline = (token: string | undefined, spaceId: string, albumId: string, showInTimeline: boolean) => {
   const req = request(app).patch(`/shared-spaces/${spaceId}/albums/${albumId}/me/timeline`);
   if (token) {
@@ -130,12 +130,12 @@ const patchAlbumTimeline = (token: string | undefined, spaceId: string, albumId:
 const PIN_CODE = '123456';
 
 /**
- * Elevate a session so it can read/modify Locked-folder assets. A Locked asset is invisible to
- * checkOwnerAccess without an elevated (PIN) session (access.repository.ts gates
- * `visibility != Locked` when `!hasElevatedPermission`), so unlocking one via PUT /assets 400s on a
- * plain token. Set up the PIN (tolerant of a repeat call on a vitest retry — a re-setup 4xx is
- * ignored; only the session/unlock is asserted) then unlock the session.
- */
+Elevate a session so it can read/modify Locked-folder assets. A Locked asset is invisible to
+checkOwnerAccess without an elevated (PIN) session (access.repository.ts gates
+`visibility != Locked` when `!hasElevatedPermission`), so unlocking one via PUT /assets 400s on a
+plain token. Set up the PIN (tolerant of a repeat call on a vitest retry — a re-setup 4xx is
+ignored; only the session/unlock is asserted) then unlock the session.
+*/
 const elevateSession = async (token: string) => {
   await request(app).post('/auth/pin-code').set(asBearerAuth(token)).send({ pinCode: PIN_CODE });
   await request(app).post('/auth/session/unlock').set(asBearerAuth(token)).send({ pinCode: PIN_CODE }).expect(204);
