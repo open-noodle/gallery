@@ -203,10 +203,15 @@ export function withExif<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
   return qb.leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId').select(selectExifInfo);
 }
 
+const selectReturnedExifInfo = (eb: ExpressionBuilder<DB, 'asset'>) =>
+  jsonObjectFrom(eb.selectFrom('asset_exif').select(columns.exif).whereRef('asset_exif.assetId', '=', 'asset.id')).as(
+    'exifInfo',
+  );
+
 export function withExifInner<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
   return qb
     .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-    .select((eb) => eb.fn.toJson(eb.table('asset_exif')).as('exifInfo'))
+    .select(selectReturnedExifInfo)
     .$narrowType<{ exifInfo: NotNull }>();
 }
 
@@ -1062,7 +1067,7 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       .selectFrom('asset')
       // postgres eliminates the left join when no exif column is referenced, so unused joins are free
       .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-      .$if(!!options.withExif, (qb) => qb.select(selectExifInfo))
+      .$if(!!options.withExif, (qb) => qb.select(selectReturnedExifInfo))
       .$if(scopeGlobally, (qb) => qb.where(ownershipPredicate))
       .$if(topConfined && !!confinedPredicate, (qb) => qb.where(confinedPredicate!))
       .where((eb) =>
@@ -1364,14 +1369,14 @@ export type ReindexVectorIndexOptions = { indexName: string; lists?: number };
 
 type VectorIndexQueryOptions = { table: string; vectorExtension: VectorExtension } & ReindexVectorIndexOptions;
 
-export function vectorIndexQuery({ vectorExtension, table, indexName, lists }: VectorIndexQueryOptions): string {
+export function vectorIndexQuery({ vectorExtension, table, indexName, lists = 1 }: VectorIndexQueryOptions): string {
   switch (vectorExtension) {
     case DatabaseExtension.VectorChord: {
       return `
         CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} USING vchordrq (embedding vector_cosine_ops) WITH (options = $$
         residual_quantization = false
         [build.internal]
-        lists = [${lists ?? 1}]
+        lists = [${lists}]
         spherical_centroids = true
         build_threads = 4
         sampling_factor = 1024

@@ -37,9 +37,7 @@ import { createMaintenanceLoginUrl, detectPriorInstall } from 'src/utils/mainten
 import { getExternalDomain } from 'src/utils/misc.js';
 import { detectMediaLocation } from 'src/utils/storage.js';
 
-/**
- * This service is available inside of maintenance mode to manage maintenance mode
- */
+/** This service is available inside of maintenance mode to manage maintenance mode */
 @Injectable()
 export class MaintenanceWorkerService {
   #secret: string | null = null;
@@ -96,9 +94,7 @@ export class MaintenanceWorkerService {
     }
   }
 
-  /**
-   * {@link _BaseService.configRepos}
-   */
+  /** {@link _BaseService.configRepos} */
   private get configRepos() {
     return {
       configRepo: this.configRepository,
@@ -107,25 +103,19 @@ export class MaintenanceWorkerService {
     };
   }
 
-  /**
-   * {@link _BaseService.prototype.getConfig}
-   */
+  /** {@link _BaseService.prototype.getConfig} */
   private getConfig(options: { withCache: boolean }) {
     return getConfig(this.configRepos, options);
   }
 
-  /**
-   * {@link _ServerService.getSystemConfig}
-   */
+  /** {@link _ServerService.getSystemConfig} */
   getSystemConfig() {
     return {
       maintenanceMode: true,
     } as ServerConfigDto;
   }
 
-  /**
-   * {@link _VersionService.getVersion}
-   */
+  /** {@link _VersionService.getVersion} */
   getVersion(headers: IncomingHttpHeaders) {
     return ServerVersionResponseDto.fromSemVer(getClientServerVersion(headers));
   }
@@ -134,9 +124,7 @@ export class MaintenanceWorkerService {
     return { res: 'pong' };
   }
 
-  /**
-   * {@link _ApiService.ssr}
-   */
+  /** {@link _ApiService.ssr} */
   ssr(excludePaths: string[]) {
     const { resourcePaths } = this.configRepository.getEnv();
 
