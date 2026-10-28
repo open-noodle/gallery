@@ -1,8 +1,8 @@
+import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
 import { closePaletteOnNavigate } from './close-palette-on-navigate';
 
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: {
     isOpen: false,
     close: vi.fn(),

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { t } from 'svelte-i18n';

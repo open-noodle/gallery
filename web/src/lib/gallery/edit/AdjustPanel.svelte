@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { imageAdjustManager } from '$lib/gallery/edit/image-adjust-manager.svelte';
+  import { imageAdjustManager } from '#lib/gallery/edit/image-adjust-manager.svelte.ts';
   import { Button, Field, HStack, Switch } from '@immich/ui';
   import { t } from 'svelte-i18n';
 

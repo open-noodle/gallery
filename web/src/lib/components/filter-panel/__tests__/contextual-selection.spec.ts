@@ -1,8 +1,8 @@
+import { buildPersonFilterPatch } from '#lib/utils/filter-target.ts';
+import { getPhotosPersonFilterId } from '#lib/utils/photos-filter-options.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { buildPersonFilterPatch } from '$lib/utils/filter-target';
-import { getPhotosPersonFilterId } from '$lib/utils/photos-filter-options';
 import type { FilterPanelConfig, FilterState, FilterSuggestionsResponse } from '../filter-panel';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
@@ -18,7 +18,7 @@ import FilterPanel from '../filter-panel.svelte';
  */
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

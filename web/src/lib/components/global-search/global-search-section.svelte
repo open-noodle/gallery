@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends { id?: string; latitude?: number; longitude?: number }">
-  import type { ProviderStatus } from '$lib/managers/global-search-manager.svelte';
+  import type { ProviderStatus } from '#lib/managers/global-search-manager.svelte.ts';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { Command } from 'bits-ui';

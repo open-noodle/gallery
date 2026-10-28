@@ -513,7 +513,7 @@
     });
     await loadSuggestionSummary(currentPerson);
     if (result && result.confirmed > 0) {
-      await invalidateAll();
+      await refreshAll();
       thumbnailData = getScopedThumbnailUrl(person, Date.now().toString());
     }
   };
@@ -610,7 +610,7 @@
         await detachScopedPerson({
           detachScopedPersonDto: { profile: { type: ScopedPersonProfileType.Person, id: person.id } },
         });
-        await invalidateAll();
+        await refreshAll();
         toastManager.primary($t('separate_from_grouped_person'));
       } catch (error) {
         handleError(error, $t('errors.unable_to_save_name'));

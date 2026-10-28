@@ -1,6 +1,6 @@
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { faceManager } from '#lib/stores/face.svelte.ts';
 import { getAssetInfo } from '@immich/sdk';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { faceManager } from '$lib/stores/face.svelte';
 
 /**
  * Re-read an asset after its people changed, and push the result everywhere that renders them.

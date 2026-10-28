@@ -66,7 +66,7 @@ const mocks = vi.hoisted(() => ({
   openAccordions: ['facial-recognition', 'pet-recognition'] as string[],
 }));
 
-vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), () => ({
   featureFlagsManager: {
     get value() {
       return mocks.featureFlags;
@@ -74,7 +74,7 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
   } as never,
 }));
 
-vi.mock(import('$lib/queries/client'), () => ({
+vi.mock(import('#lib/queries/client.js'), () => ({
   createPreloadedQuery: ((optionsFn: () => { queryKey: readonly unknown[] }) => ({
     get data() {
       return optionsFn().queryKey.includes('defaults') ? mocks.defaultSystemConfig : mocks.systemConfig;
@@ -89,7 +89,7 @@ vi.mock(import('@tanstack/svelte-query'), async (importOriginal) => ({
 
 // SettingAccordion drives open/close through accordionManager (which navigates via goto);
 // stub it to keep the facial-recognition section open and avoid SvelteKit navigation in tests.
-vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/accordion-manager.svelte.js'), () => ({
   accordionManager: {
     isOpen: (key: string) => mocks.openAccordions.includes(key),
     open: vi.fn(),

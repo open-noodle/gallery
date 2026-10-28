@@ -1,9 +1,9 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 import MemoriesPage from './+page.svelte';
 
 // Fork delta guard. Upstream's memory card renders the title only, but the fork's rule engine
@@ -23,13 +23,13 @@ const { mockMemoryManager, mockUserPreferencesManager } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/managers/memory-manager.svelte', () => ({ memoryManager: mockMemoryManager }));
-vi.mock('$lib/managers/user-preferences-manager.svelte', () => ({
+vi.mock('#lib/managers/memory-manager.svelte.js', () => ({ memoryManager: mockMemoryManager }));
+vi.mock('#lib/managers/user-preferences-manager.svelte.js', () => ({
   userPreferencesManager: mockUserPreferencesManager,
 }));
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 

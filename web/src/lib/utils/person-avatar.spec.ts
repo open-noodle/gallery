@@ -1,6 +1,6 @@
+import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '#lib/utils/person-avatar.ts';
 import type { PersonResponseDto } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
-import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '$lib/utils/person-avatar';
 
 const person = (overrides: Partial<PersonResponseDto> = {}): PersonResponseDto =>
   ({

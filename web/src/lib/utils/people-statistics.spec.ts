@@ -1,4 +1,4 @@
-import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
+import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
 
 describe(formatPeopleHeaderDescription.name, () => {
   it('formats visible people with plural detected faces', () => {

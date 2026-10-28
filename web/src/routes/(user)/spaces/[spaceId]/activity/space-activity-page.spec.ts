@@ -1,15 +1,15 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { SharedSpaceActivityResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import ActivityPage from './+page.svelte';
 
 const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
 
-vi.mock('$lib/utils/handle-error', () => ({ handleError: handleErrorMock }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: handleErrorMock }));
 
 const space = (o: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto =>
   ({ id: 's1', name: 'Trip', color: 'primary', ...o }) as never;

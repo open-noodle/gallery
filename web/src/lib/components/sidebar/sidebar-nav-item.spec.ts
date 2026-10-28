@@ -1,9 +1,9 @@
+import SidebarNavItem from '#lib/components/sidebar/sidebar-nav-item.svelte';
 import { mdiImageMultiple } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import SidebarNavItem from '$lib/components/sidebar/sidebar-nav-item.svelte';
-import { reactiveProps } from '@test-data/reactive-props.svelte';
+import { reactiveProps } from '#test-data/reactive-props.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   page: { url: new URL('https://gallery.test/photos') },
 }));
 
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
 vi.mock('$app/state', () => ({ page: mocks.page }));
 
 const setLayout = (layout: 'overlay' | 'rail' | 'expanded', hoverExpanded = false) => {

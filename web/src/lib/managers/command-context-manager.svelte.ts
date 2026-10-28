@@ -1,3 +1,7 @@
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+import type { OnArchive, OnDelete, OnFavorite, OnUndoDelete } from '#lib/utils/actions.ts';
+import { isAlbumsRoute, isSpacesRoute } from '#lib/utils/navigation.ts';
 import {
   AlbumUserRole,
   AssetVisibility,
@@ -7,10 +11,6 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { page } from '$app/state';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import type { OnArchive, OnDelete, OnFavorite, OnUndoDelete } from '$lib/utils/actions';
-import { isAlbumsRoute, isSpacesRoute } from '$lib/utils/navigation';
 
 export interface AlbumContext {
   id: string;

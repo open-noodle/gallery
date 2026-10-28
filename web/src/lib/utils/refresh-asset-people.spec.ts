@@ -6,8 +6,8 @@ const { eventManagerMock, faceManagerMock, getAssetInfoMock } = vi.hoisted(() =>
   getAssetInfoMock: vi.fn(),
 }));
 
-vi.mock('$lib/managers/event-manager.svelte', () => ({ eventManager: eventManagerMock }));
-vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
+vi.mock('#lib/managers/event-manager.svelte.js', () => ({ eventManager: eventManagerMock }));
+vi.mock('#lib/stores/face.svelte.js', () => ({ faceManager: faceManagerMock }));
 vi.mock('@immich/sdk', () => ({ getAssetInfo: getAssetInfoMock }));
 
 const { refreshAssetPeople } = await import('./refresh-asset-people');

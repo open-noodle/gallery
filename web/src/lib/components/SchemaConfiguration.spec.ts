@@ -1,11 +1,11 @@
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import SchemaConfiguration from '#lib/components/SchemaConfiguration.svelte';
+import type { JSONSchemaProperty } from '#lib/types.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
 import { screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import SchemaConfiguration from '$lib/components/SchemaConfiguration.svelte';
-import type { JSONSchemaProperty } from '$lib/types';
-import { renderWithTooltips } from '$tests/helpers';
 
 vi.mock('@immich/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@immich/sdk')>()),
@@ -24,7 +24,7 @@ const spaceAlbumSchema = {
 } as JSONSchemaProperty;
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
   await waitLocale('en-US');
 });

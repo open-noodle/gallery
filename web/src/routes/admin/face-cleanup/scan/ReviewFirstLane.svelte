@@ -1,7 +1,7 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
-  import { Route } from '$lib/route';
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import { Route } from '#lib/route.ts';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { getPeopleThumbnailPath, type UserAdminResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAlertCircle, mdiArrowRight, mdiChevronRight, mdiClose, mdiMagnify } from '@mdi/js';
@@ -102,10 +102,10 @@
         <div class="{COL_REASONS} {COL_HEADING}">{$t('admin.face_cleanup_col_reasons')}</div>
       </div>
       {#each visible as person (person.personId)}
-        {@const dest = person.suspectedOwners[0]}
-        {@const owner = usersById.get(person.ownerId)}
-        {@const bad = person.reviewReasons.includes('bad-target')}
-        {@const pct = Math.round(person.flaggedFraction * 100)}
+        {const dest = $derived(person.suspectedOwners[0])}
+        {const owner = $derived(usersById.get(person.ownerId))}
+        {const bad = $derived(person.reviewReasons.includes('bad-target'))}
+        {const pct = $derived(Math.round(person.flaggedFraction * 100))}
         <div
           class="group relative border-b border-gray-200 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/50"
         >
@@ -189,9 +189,9 @@
                  with EVERY reason spelled out in the title tooltip. The width is constant — including the
                  no-reason placeholder — so this column can never push % / destination out of line across rows. -->
             {#if person.reviewReasons.length > 0}
-              {@const primaryReason = bad ? 'bad-target' : person.reviewReasons[0]}
-              {@const reasonLabels = person.reviewReasons.map((r) =>
-                Object.hasOwn(reasonKeys, r) ? $t(reasonKeys[r] as Translations) : r,
+              {const primaryReason = $derived(bad ? 'bad-target' : person.reviewReasons[0])}
+              {const reasonLabels = $derived(
+                person.reviewReasons.map((r) => (Object.hasOwn(reasonKeys, r) ? $t(reasonKeys[r] as Translations) : r)),
               )}
               <div
                 class="{COL_REASONS} items-center gap-1.5"

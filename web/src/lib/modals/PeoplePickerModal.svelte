@@ -8,7 +8,7 @@
   import { Button, HStack, Modal, ModalBody, ModalFooter } from '@immich/ui';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     multiple?: boolean;

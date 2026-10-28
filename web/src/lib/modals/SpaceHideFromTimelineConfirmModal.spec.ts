@@ -6,8 +6,8 @@
 //
 // `$t` is not initialised in these specs, so it returns the KEY — which is exactly what makes
 // "is the retained sentence part of the prompt?" a clean assertion.
+import '#lib/__mocks__/sdk.mock.ts';
 import { render } from '@testing-library/svelte';
-import '$lib/__mocks__/sdk.mock';
 import SpaceHideFromTimelineConfirmModal from './SpaceHideFromTimelineConfirmModal.svelte';
 
 const RETAINED_KEY = 'spaces_hide_from_timeline_confirm_retained';

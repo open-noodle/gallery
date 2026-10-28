@@ -24,7 +24,7 @@
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import ImageThumbnail from '../assets/thumbnail/ImageThumbnail.svelte';
   import AssignFaceSidePanel from './AssignFaceSidePanel.svelte';
 

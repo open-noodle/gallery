@@ -258,7 +258,7 @@
     {/if}
 
     {#each chips as chip (`${chip.type}-${chip.id ?? chip.labelKey ?? chip.label}`)}
-      {@const chipLabel = chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? '')}
+      {const chipLabel = $derived(chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? ''))}
       <span
         class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200/70 bg-gray-100 py-1 pr-1 pl-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-white/10 dark:bg-white/6 dark:text-gray-200 dark:hover:bg-white/10"
         data-testid="active-chip"

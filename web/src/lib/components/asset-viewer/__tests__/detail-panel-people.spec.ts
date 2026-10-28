@@ -1,12 +1,12 @@
+import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
+import { consumeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import type { AssetFaceResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildContextualFilterUrl } from '$lib/utils/filter-target';
-import { consumeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelPeople from '../DetailPanelPeople.svelte';
 
 // Task 5 of Slice 7 (asset-viewer-contextual-filters).
@@ -33,13 +33,13 @@ const { gotoMock, faceManagerMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
 
-vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
+vi.mock('#lib/stores/face.svelte.js', () => ({ faceManager: faceManagerMock }));
 
-vi.mock('$lib/utils/people-utils', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
+vi.mock('#lib/utils/people-utils.js', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
 
 const authManagerMock = vi.hoisted(() => ({
   authenticated: true,
@@ -49,7 +49,7 @@ const authManagerMock = vi.hoisted(() => ({
   preferences: {},
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: authManagerMock }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: authManagerMock }));
 
 const assetViewerManagerMock = vi.hoisted(() => ({
   clearHighlightedFaces: vi.fn(),
@@ -62,7 +62,7 @@ const assetViewerManagerMock = vi.hoisted(() => ({
   toggleHiddenPeople: vi.fn(),
 }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({ assetViewerManager: assetViewerManagerMock }));
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({ assetViewerManager: assetViewerManagerMock }));
 
 const PERSON_UUID = 'aaaaaaaa-0000-4000-8000-000000000001';
 const SPACE_PERSON_UUID = 'bbbbbbbb-0000-4000-8000-000000000002';

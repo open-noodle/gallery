@@ -1,4 +1,4 @@
-import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
 
 export function closePaletteOnNavigate() {
   if (!globalSearchManager.isOpen || globalSearchManager.consumeKeepOpenOnNextNavigate()) {

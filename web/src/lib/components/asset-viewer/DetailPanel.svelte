@@ -91,7 +91,7 @@
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
   let canFilter = $derived(!authManager.isSharedLink);
 
-  let filterTarget = $derived(resolveFilterTarget(page.url));
+  let filterTarget = $derived(resolveFilterTarget(new URL(page.url.href)));
 
   // E5 — the 🔍 "search everywhere" icon is redundant (a no-op) when already on /photos.
   let isOnPhotos = $derived(filterTarget?.kind === 'photos');
@@ -158,7 +158,9 @@
    * viewer on the global map). It reuses buildContextualMapUrl now, exactly like the location row's
    * pin: null (→ no control at all) on an album, which has no map URL to be honest with.
    */
-  let mapViewUrl = $derived(latlng && canFilter ? buildContextualMapUrl(page.url, { ...latlng, zoom: 12.5 }) : null);
+  let mapViewUrl = $derived(
+    latlng && canFilter ? buildContextualMapUrl(new URL(page.url.href), { ...latlng, zoom: 12.5 }) : null,
+  );
 
   let previousId: string | undefined = $state();
   let previousRoute = $derived(currentAlbum?.id ? Route.viewAlbum(currentAlbum) : Route.photos());
