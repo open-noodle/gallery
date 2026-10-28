@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import type { ThumbnailLoadQueue } from '$lib/components/people/thumbnail-load-queue.svelte';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import type { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
   import { onDestroy, untrack } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
 

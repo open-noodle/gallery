@@ -1,3 +1,6 @@
+import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '#lib/utils/cross-owner-merge.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
+import { normalizeSearchString } from '#lib/utils/string-utils.ts';
 import {
   getSpacePeople,
   mergeSpacePeople,
@@ -8,9 +11,6 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
-import { handleError } from '$lib/utils/handle-error';
-import { normalizeSearchString } from '$lib/utils/string-utils';
 
 /**
  * The space person already carrying `name` (case- and accent-insensitive), other than `excludeId`.

@@ -1,4 +1,4 @@
-import { clusterMarkerIdsInBBox } from '$lib/utils/map-cluster-selection';
+import { clusterMarkerIdsInBBox } from '#lib/utils/map-cluster-selection.ts';
 
 const bbox = { west: 1, south: 1, east: 5, north: 5 };
 

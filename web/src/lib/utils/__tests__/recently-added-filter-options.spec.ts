@@ -1,12 +1,12 @@
-import { AssetOrder, AssetOrderBy, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
-import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import {
   buildRecentlyAddedPickerBucketOptions,
   buildRecentlyAddedSuggestionRequest,
   buildRecentlyAddedTimelineOptions,
   shouldShowRecentlyAddedCount,
-} from '$lib/utils/recently-added-filter-options';
+} from '#lib/utils/recently-added-filter-options.ts';
+import { AssetOrder, AssetOrderBy, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
+import { describe, expect, it } from 'vitest';
 
 const MY_USER_ID = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';
 

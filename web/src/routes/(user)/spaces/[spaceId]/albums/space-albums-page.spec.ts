@@ -1,3 +1,10 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import SpaceLinkAlbumModal from '#lib/modals/SpaceLinkAlbumModal.svelte';
+import { spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+import { setActiveDragPayload, writeDragPayload, type DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
 import {
   SharedSpaceRole,
   type AlbumResponseDto,
@@ -11,15 +18,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { goto, invalidateAll } from '$app/navigation';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
-import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { setActiveDragPayload, writeDragPayload, type DragPayload } from '$lib/utils/space-album-folder-dnd';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
 
 // A mutable holder so individual tests can point `page.url` at a `?folder=` query string before
@@ -40,7 +40,7 @@ const { modalManagerMock } = vi.hoisted(() => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('@test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
   return {
     ...original,
     ContextMenuButton: MockContextMenuButton,
@@ -53,7 +53,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
 // (rather than relying on the real implementation's toastManager.danger call, which the
 // @immich/ui mock above doesn't stub) makes that assertable directly.
 const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
-vi.mock('$lib/utils/handle-error', () => ({ handleError: handleErrorMock }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: handleErrorMock }));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
   id: 'space-1',
@@ -241,7 +241,7 @@ async function dropOnCrumb(payload: DragPayload, targetFolderId: string | null):
 
 describe('Space albums page', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

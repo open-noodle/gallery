@@ -1,8 +1,8 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { UserResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import PartnerPage from './+page.svelte';
 
 type TimelineStubGlobals = typeof globalThis & {
@@ -22,36 +22,36 @@ const { gotoMock, mockAssetMultiSelectManager } = vi.hoisted(() => ({
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
-vi.mock('$lib/components/shared-components/control-app-bar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/control-app-bar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/bindable-timeline.stub.svelte');
+vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/bindable-timeline.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
   assetMultiSelectManager: mockAssetMultiSelectManager,
 }));
 
-vi.mock('$lib/services/asset.service', () => ({
+vi.mock('#lib/services/asset.service.js', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 

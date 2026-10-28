@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { cleanClass } from '$lib';
-  import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
-  import { getDimensions } from '$lib/utils/asset-utils';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
+  import { cleanClass } from '#lib';
+  import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
+  import { getDimensions } from '#lib/utils/asset-utils.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { getAllAlbums, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCalendarBlankOutline, mdiCamera, mdiImageAlbum, mdiImageOutline, mdiMapMarkerOutline } from '@mdi/js';

@@ -6,7 +6,7 @@ import RatingFilter from '../rating-filter.svelte';
 import TagsFilter from '../tags-filter.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

@@ -1,4 +1,3 @@
-import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import {
   buildFolderSummaries,
   buildFolderTree,
@@ -8,7 +7,8 @@ import {
   getFolderPreviewAssetIds,
   getRecursiveAlbumCount,
   isDescendant,
-} from '$lib/utils/space-album-folders';
+} from '#lib/utils/space-album-folders.ts';
+import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 
 const folder = (id: string, name: string, parentId: string | null = null): SharedSpaceAlbumFolderDto =>
   ({

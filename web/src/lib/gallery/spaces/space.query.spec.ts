@@ -1,17 +1,17 @@
+import { getAllSpacesQuery, getSpaceAlbumsQuery, spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { recentSpacesDropdown } from '#lib/stores/preferences.store.ts';
 import { getAllSpaces, getSharedSpaceAlbums, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { get } from 'svelte/store';
-import { getAllSpacesQuery, getSpaceAlbumsQuery, spacesQueryKey } from '$lib/gallery/spaces/space.query';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { queryClient } from '$lib/queries/client';
-import { recentSpacesDropdown } from '$lib/stores/preferences.store';
-import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
+import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
   getAllSpaces: vi.fn(),
   getSharedSpaceAlbums: vi.fn(),
 }));
-vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: vi.fn() }));
 
 const isInvalidated = (queryKey: readonly unknown[]) => queryClient.getQueryState(queryKey)?.isInvalidated;
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-  import { Route } from '$lib/route';
+  import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+  import { Route } from '#lib/route.ts';
   import { Icon } from '@immich/ui';
   import { mdiMapOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';

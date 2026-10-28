@@ -1,7 +1,7 @@
+import { Route } from '#lib/route.ts';
 import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import { Route } from '$lib/route';
 import Page from './+page.svelte';
 
 // The chooser at /admin/face-cleanup: two equal-weight cards (guided scan vs. manual review), covering
@@ -12,7 +12,7 @@ import Page from './+page.svelte';
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return {
     ...mod,
     // Stub Icon to a no-op to avoid undefined-path errors in happy-dom (matches the sibling face-cleanup specs).
@@ -62,8 +62,8 @@ vi.mock('$app/stores', () => ({
   },
 }));
 
-vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
+  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 

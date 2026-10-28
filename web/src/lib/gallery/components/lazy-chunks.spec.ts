@@ -1,6 +1,6 @@
+import LazyChunks from '#lib/gallery/components/lazy-chunks.svelte';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet, flushSync } from 'svelte';
-import LazyChunks from '$lib/gallery/components/lazy-chunks.svelte';
 
 describe('LazyChunks', () => {
   let report: (entries: Array<{ target: Element; isIntersecting: boolean }>) => void;

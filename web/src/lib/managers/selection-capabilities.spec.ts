@@ -1,11 +1,11 @@
-import type { AlbumResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { describe, expect, it } from 'vitest';
 import type {
   AlbumContext,
   CommandContext,
   SelectionCommandContext,
   SpaceContext,
-} from '$lib/managers/command-context-manager.svelte';
+} from '#lib/managers/command-context-manager.svelte.ts';
+import type { AlbumResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
+import { describe, expect, it } from 'vitest';
 import { getSelectionCapabilities, type SelectionCapabilities } from './selection-capabilities';
 
 // ---------------------------------------------------------------------------

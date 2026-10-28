@@ -1,7 +1,7 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { formatTimeAgo } from '$lib/utils/timesince';
+  import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { formatTimeAgo } from '#lib/utils/timesince.ts';
   import { UserAvatarColor, type SharedSpaceActivityResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiChevronDown } from '@mdi/js';
@@ -217,7 +217,7 @@
               </div>
             </div>
             {#if activity.type === 'asset_add'}
-              {@const assetIds = ((activity.data as Record<string, unknown>).assetIds as string[]) ?? []}
+              {const assetIds = $derived(((activity.data as Record<string, unknown>).assetIds as string[]) ?? [])}
               {#if assetIds.length > 0}
                 <div class="mt-2 flex gap-1.5">
                   {#each assetIds.slice(0, 4) as assetId (assetId)}

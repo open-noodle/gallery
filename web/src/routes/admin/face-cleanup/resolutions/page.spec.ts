@@ -1,10 +1,10 @@
+import { Route } from '#lib/route.ts';
 import { getFaceRepairResolutions, removeFaceRepairResolutions } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { init, locale, register, waitLocale } from 'svelte-i18n';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route } from '$lib/route';
 import Page from './+page.svelte';
 
 // Unified resolutions manage page: NEGATIVE verdicts only ("this face is not that person"), from BOTH
@@ -21,7 +21,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -40,7 +40,7 @@ vi.mock('@immich/ui', async (original) => {
 // wrong person and every test would still pass. Real interpolation is what makes those assertions
 // discriminating.
 beforeAll(async () => {
-  register('en', () => import('$i18n/en.json'));
+  register('en', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en', initialLocale: 'en' });
   await waitLocale('en');
 });
@@ -73,8 +73,8 @@ vi.mock('$app/stores', () => ({
   },
 }));
 
-vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
+  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 

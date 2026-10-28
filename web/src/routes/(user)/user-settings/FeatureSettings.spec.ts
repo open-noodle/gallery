@@ -1,9 +1,9 @@
+import { queryClient } from '#lib/queries/client.ts';
+import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryClient } from '$lib/queries/client';
-import { getServerConfigQuery } from '$lib/queries/server.query';
 import FeatureSettings from './FeatureSettings.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   updateMyPreferences: vi.fn(),
 }));
 
-vi.mock(import('$lib/managers/auth-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/auth-manager.svelte.js'), () => ({
   authManager: {
     get preferences() {
       return mocks.preferences;
@@ -29,7 +29,7 @@ vi.mock(import('@immich/sdk'), async (importOriginal) => {
 
 // SettingAccordion drives open/close through accordionManager (which navigates via goto);
 // stub it to keep the memories section open and avoid SvelteKit navigation in tests.
-vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/accordion-manager.svelte.js'), () => ({
   accordionManager: {
     isOpen: (key: string) => key === 'memories',
     open: vi.fn(),

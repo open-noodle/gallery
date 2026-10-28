@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { clickOutside } from '$lib/actions/click-outside';
+  import { clickOutside } from '#lib/actions/click-outside.ts';
   import {
     getCachedPeopleFaceStatistics,
     setCachedPeopleFaceStatistics,
-  } from '$lib/components/people/people-face-statistics-info-cache';
-  import { locale } from '$lib/stores/preferences.store';
-  import { generateId } from '$lib/utils/generate-id';
+  } from '#lib/components/people/people-face-statistics-info-cache.ts';
+  import { locale } from '#lib/stores/preferences.store.ts';
+  import { generateId } from '#lib/utils/generate-id.ts';
   import { IconButton } from '@immich/ui';
   import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
   import { mdiInformationOutline } from '@mdi/js';

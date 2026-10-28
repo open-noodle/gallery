@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import type {
   FilterPanelConfig,
   FilterState,
   FilterSuggestionsResponse,
-} from '$lib/components/filter-panel/filter-panel';
+} from '#lib/components/filter-panel/filter-panel.ts';
+import { describe, expect, it } from 'vitest';
 import { withNameCapture } from './filter-name-capture';
 
 const EMPTY_SUGGESTIONS: FilterSuggestionsResponse = {

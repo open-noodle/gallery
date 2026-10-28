@@ -1,4 +1,4 @@
-import type { ScanProgress, ScanResult } from '$lib/utils/google-takeout-scanner';
+import type { ScanProgress, ScanResult } from '#lib/utils/google-takeout-scanner.ts';
 
 /**
  * Helper to create a zip blob in memory using zip.js.
@@ -34,11 +34,11 @@ function blobToFile(blob: Blob, name: string): File {
 
 describe('scanTakeoutFiles', () => {
   // Dynamically import to avoid issues with module resolution in tests
-  let scanTakeoutFiles: typeof import('$lib/utils/google-takeout-scanner').scanTakeoutFiles;
+  let scanTakeoutFiles: typeof import('#lib/utils/google-takeout-scanner.ts').scanTakeoutFiles;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const mod = await import('$lib/utils/google-takeout-scanner');
+    const mod = await import('#lib/utils/google-takeout-scanner.ts');
     scanTakeoutFiles = mod.scanTakeoutFiles;
   });
 
@@ -118,7 +118,7 @@ describe('scanTakeoutFiles', () => {
     }));
 
     try {
-      const { scanTakeoutFiles } = await import('$lib/utils/google-takeout-scanner');
+      const { scanTakeoutFiles } = await import('#lib/utils/google-takeout-scanner.ts');
       const result = await scanTakeoutFiles({
         files: [new File(['zip-placeholder'], 'takeout.zip', { type: 'application/zip' })],
       });
@@ -139,7 +139,7 @@ describe('scanTakeoutFiles', () => {
     } finally {
       vi.doUnmock('@zip.js/zip.js');
       vi.resetModules();
-      const mod = await import('$lib/utils/google-takeout-scanner');
+      const mod = await import('#lib/utils/google-takeout-scanner.ts');
       scanTakeoutFiles = mod.scanTakeoutFiles;
     }
   });
@@ -291,11 +291,11 @@ function createFileWithPath(content: string, name: string, relativePath: string,
 }
 
 describe('scanTakeoutFiles — folder support', () => {
-  let scanTakeoutFiles: typeof import('$lib/utils/google-takeout-scanner').scanTakeoutFiles;
+  let scanTakeoutFiles: typeof import('#lib/utils/google-takeout-scanner.ts').scanTakeoutFiles;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const mod = await import('$lib/utils/google-takeout-scanner');
+    const mod = await import('#lib/utils/google-takeout-scanner.ts');
     scanTakeoutFiles = mod.scanTakeoutFiles;
   });
 
@@ -391,11 +391,11 @@ describe('scanTakeoutFiles — folder support', () => {
 });
 
 describe('localized Google Photos root (Gap #1)', () => {
-  let scanTakeoutFiles: typeof import('$lib/utils/google-takeout-scanner').scanTakeoutFiles;
+  let scanTakeoutFiles: typeof import('#lib/utils/google-takeout-scanner.ts').scanTakeoutFiles;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const mod = await import('$lib/utils/google-takeout-scanner');
+    const mod = await import('#lib/utils/google-takeout-scanner.ts');
     scanTakeoutFiles = mod.scanTakeoutFiles;
   });
 
@@ -499,11 +499,11 @@ describe('localized Google Photos root (Gap #1)', () => {
 });
 
 describe('sidecar matching edge cases end-to-end', () => {
-  let scanTakeoutFiles: typeof import('$lib/utils/google-takeout-scanner').scanTakeoutFiles;
+  let scanTakeoutFiles: typeof import('#lib/utils/google-takeout-scanner.ts').scanTakeoutFiles;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const mod = await import('$lib/utils/google-takeout-scanner');
+    const mod = await import('#lib/utils/google-takeout-scanner.ts');
     scanTakeoutFiles = mod.scanTakeoutFiles;
   });
 

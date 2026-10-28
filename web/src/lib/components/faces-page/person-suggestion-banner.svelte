@@ -1,6 +1,6 @@
 <script lang="ts">
-  import FaceCrop from '$lib/components/faces-page/face-crop.svelte';
-  import { isSuggestionSnoozed, snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
+  import FaceCrop from '#lib/components/faces-page/face-crop.svelte';
+  import { isSuggestionSnoozed, snoozeSuggestions } from '#lib/utils/face-suggestion-snooze.ts';
   import type { PersonFaceSuggestionResponseDto, PersonResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiAccountQuestionOutline } from '@mdi/js';

@@ -1,6 +1,6 @@
+import { FACE_ACTIONS, GUIDED_STATE_IDS } from '#lib/components/face-cleanup/face-actions.ts';
 import type { FaceRepairResolveRequestDto } from '@immich/sdk';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { FACE_ACTIONS, GUIDED_STATE_IDS } from '$lib/components/face-cleanup/face-actions';
 
 // Model B (full per-face resolution, specs/2026-07-10-face-cleanup-full-resolution-design.md). Every
 // flagged face resolves to exactly one of six terminal states.

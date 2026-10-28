@@ -8,7 +8,7 @@
   import { onMount } from 'svelte';
   import uPlot, { type AlignedData, type Axis } from 'uplot';
   import 'uplot/dist/uPlot.min.css';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     queue: QueueResponseDto;

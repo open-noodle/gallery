@@ -4,10 +4,10 @@ import {
   sidebarModeStore,
   type SidebarLayout,
   type SidebarMode,
-} from '$lib/stores/sidebar-mode.svelte';
+} from '#lib/stores/sidebar-mode.svelte.ts';
 
 const mocks = vi.hoisted(() => ({ sidebarMedia: { isFullSidebar: false, isWideSidebar: false } }));
-vi.mock('$lib/stores/sidebar-media.svelte', () => ({ sidebarMedia: mocks.sidebarMedia }));
+vi.mock('#lib/stores/sidebar-media.svelte.js', () => ({ sidebarMedia: mocks.sidebarMedia }));
 
 const setViewport = (width: 'phone' | 'medium' | 'wide') => {
   mocks.sidebarMedia.isFullSidebar = width !== 'phone';
