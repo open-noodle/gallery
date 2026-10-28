@@ -11,6 +11,7 @@
   },
   "response": {
     "body": {
+      "featureLevel": 1,
       "major": 3,
       "minor": 0,
       "patch": 0,

@@ -1389,8 +1389,8 @@ const fixtureCases = (): FixtureCase[] => [
     }),
   ),
   options(
-    'options-reject-partners-without-visibility',
-    'Rejected as on /timeline/buckets: withPartners, no visibility, not favourites',
+    'options-partners-without-visibility',
+    'As on /timeline/buckets since immich-32565: withPartners with no visibility (not favourites) means the timeline',
     () => ({ withPartners: true, isFavorite: false }),
   ),
   options('options-reject-partners-archive', 'Rejected as on /timeline/buckets: withPartners with archive', () => ({
@@ -1444,8 +1444,8 @@ const fixtureCases = (): FixtureCase[] => [
     request: { method: 'GET', path: '/api/timeline/buckets', query: { withSharedSpaces: 'true' } },
   },
   {
-    name: 'timeline-buckets-reject-partners-without-visibility',
-    description: 'Rejected: withPartners without a visibility, not favourites',
+    name: 'timeline-buckets-partners-without-visibility',
+    description: 'Since immich-32565: withPartners without a visibility (not favourites) means the timeline',
     actor: 'me',
     request: { method: 'GET', path: '/api/timeline/buckets', query: { withPartners: 'true', isFavorite: 'false' } },
   },
