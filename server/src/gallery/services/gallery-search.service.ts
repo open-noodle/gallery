@@ -345,6 +345,11 @@ export class GallerySearchService extends BaseService {
 
 /** Browse mode: the request checks `TimelineService.timeBucketChecks` makes before any access check, same messages. */
 const checkBrowseRequest = (filters: SearchOptionsFilters, albumIds: string[] | undefined) => {
+  // Like TimelineService since immich-32565: a partner browse with no visibility means the timeline, except the
+  // Favorites screen's request (see isFavoritesAcrossScope), so the options match the buckets they filter.
+  if (filters.withPartners && !isFavoritesAcrossScope(filters)) {
+    filters.visibility ??= AssetVisibility.Timeline;
+  }
   const { withPartners, withSharedSpaces, spaceId, visibility } = filters;
   if (albumIds && albumIds.length > 1) {
     throw new BadRequestException('Browse mode takes at most one album');

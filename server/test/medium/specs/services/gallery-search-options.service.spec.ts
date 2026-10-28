@@ -832,26 +832,24 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
 
       const refused: SearchOptionsRequestDto[] = [
         { withSharedSpaces: true },
-        { withPartners: true },
-        { withSharedSpaces: true, withPartners: true, isFavorite: false },
+        // A partner browse with visibility unset is no longer refused, alone or with shared spaces: like the timeline
+        // (immich-32565) it defaults to timeline visibility.
         { withSharedSpaces: true, isFavorite: true, visibility: AssetVisibility.Archive },
         { withPartners: true, isFavorite: true, visibility: AssetVisibility.Archive },
       ];
       for (const dto of refused) {
         await expect(timeline.getTimeBuckets(auth(me.id), toTimelineDto(dto)), JSON.stringify(dto)).rejects.toThrow(
-          /only supported for non-archived/,
+          /non-archived/i,
         );
         await expect(
           timeline.getTimeBucket(auth(me.id), { ...toTimelineDto(dto), timeBucket: '2024-06-01' }),
           JSON.stringify(dto),
-        ).rejects.toThrow(/only supported for non-archived/);
-        await expect(optionsFor(sut, me.id, dto), JSON.stringify(dto)).rejects.toThrow(
-          /only supported for non-archived/,
-        );
+        ).rejects.toThrow(/non-archived/i);
+        await expect(optionsFor(sut, me.id, dto), JSON.stringify(dto)).rejects.toThrow(/non-archived/i);
       }
       await expect(
         timeline.getTimeBuckets(auth(me.id), { isFavorite: true, withSharedSpaces: true, isTrashed: true }),
-      ).rejects.toThrow(/only supported for non-archived/);
+      ).rejects.toThrow(/non-archived/i);
     });
   });
 
