@@ -52,6 +52,7 @@ async function openAlbumsTab(page: Page, spaceId: string) {
 }
 
 // Hop 6: click the linked album's card -> album detail.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 async function openAlbumCard(page: Page, spaceId: string, name: string) {
   await page.getByTestId('space-album-card-link').filter({ hasText: name }).click();
   await page.waitForURL(new RegExp(`/spaces/${spaceId}/albums/[^/]+$`));

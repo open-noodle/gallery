@@ -1,32 +1,32 @@
 /**
- * Spec §6.3.1 (REVISED 2026-08-25): a space editor's face edits propagate into the ASSET OWNER's
- * own layer -- `asset_face.personId` and the face identity -- instead of stopping at the
- * `shared_space_person_face` projection.
- *
- * Why this spec exists as its own file rather than another case in the Slice 9 journey: the
- * behaviour it pins is specifically what the OWNER sees, and the owner's view is a different read
- * path from every assertion in that journey (which reads space surfaces as the editor). The bug
- * that motivated the revision was invisible to space-side assertions -- the editor's own face
- * editor showed "Unassigned" correctly while the asset-detail People row kept rendering the person
- * she had just removed, and no reload converged, because `findSpacePersonsByLinkedPersonIds` is not
- * scoped to the asset and kept resolving a person still attached elsewhere in the space.
- *
- * So each case below asserts BOTH halves:
- *   - `asset_face.personId` via SQL -- which column actually moved;
- *   - `GET /assets/:id` as BOB, the owner, with no space context -- the user-visible result, read
- *     through the path that was broken. Asserting only the first would pass even if the owner's
- *     view never changed, which is precisely the failure this revision was about.
- *
- * Faces are seeded unassigned via `utils.createUnassignedFace` for the same reason the Slice 9
- * journey does it: no HTTP path leaves a face unassigned, and ML detection does not run in this
- * stack.
- *
- * Every space person here is created WITH its seed face (`assetFaceId`), which is both the real UI
- * flow ("add a name" on a face, `CreateSpaceFaceModal`) and deliberate test hygiene: a space person
- * created with no faces is briefly empty, and the background identity/metadata backfills race that
- * window -- an earlier draft of this spec that created the person first and attached second failed
- * roughly one run in three with "Person not found". Do not split them back apart.
- */
+Spec §6.3.1 (REVISED 2026-08-25): a space editor's face edits propagate into the ASSET OWNER's
+own layer -- `asset_face.personId` and the face identity -- instead of stopping at the
+`shared_space_person_face` projection.
+
+Why this spec exists as its own file rather than another case in the Slice 9 journey: the
+behaviour it pins is specifically what the OWNER sees, and the owner's view is a different read
+path from every assertion in that journey (which reads space surfaces as the editor). The bug
+that motivated the revision was invisible to space-side assertions -- the editor's own face
+editor showed "Unassigned" correctly while the asset-detail People row kept rendering the person
+she had just removed, and no reload converged, because `findSpacePersonsByLinkedPersonIds` is not
+scoped to the asset and kept resolving a person still attached elsewhere in the space.
+
+So each case below asserts BOTH halves:
+  - `asset_face.personId` via SQL -- which column actually moved;
+  - `GET /assets/:id` as BOB, the owner, with no space context -- the user-visible result, read
+    through the path that was broken. Asserting only the first would pass even if the owner's
+    view never changed, which is precisely the failure this revision was about.
+
+Faces are seeded unassigned via `utils.createUnassignedFace` for the same reason the Slice 9
+journey does it: no HTTP path leaves a face unassigned, and ML detection does not run in this
+stack.
+
+Every space person here is created WITH its seed face (`assetFaceId`), which is both the real UI
+flow ("add a name" on a face, `CreateSpaceFaceModal`) and deliberate test hygiene: a space person
+created with no faces is briefly empty, and the background identity/metadata backfills race that
+window -- an earlier draft of this spec that created the person first and attached second failed
+roughly one run in three with "Person not found". Do not split them back apart.
+*/
 import { attachSpacePersonFace, createSpacePerson, detachSpacePersonFace, getAssetInfo } from '@immich/sdk';
 import { authHeaders, buildSpaceContext, type SpaceContext } from 'src/actors';
 import { app, asBearerAuth, utils } from 'src/utils';
@@ -34,12 +34,12 @@ import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * `asset_face.personId` / that person's name, read straight from the owner's own layer.
- *
- * Destructured rather than `(await ...).personId` inline because eslint's
- * `unicorn/no-await-expression-member` rejects member access on an await expression. At module
- * scope because they close over nothing (`unicorn/consistent-function-scoping`).
- */
+`asset_face.personId` / that person's name, read straight from the owner's own layer.
+
+Destructured rather than `(await ...).personId` inline because eslint's
+`unicorn/no-await-expression-member` rejects member access on an await expression. At module
+scope because they close over nothing (`unicorn/consistent-function-scoping`).
+*/
 const ownerPersonIdOf = async (assetFaceId: string) => {
   const { personId } = await utils.getFaceOwnerPerson(assetFaceId);
   return personId;
@@ -102,16 +102,16 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
   });
 
   /**
-   * The EDITOR's own view, read the way DetailPanel re-reads it after a face edit: with `spaceId`
-   * passed explicitly. That is a different server branch from the owner's inferred-space read every
-   * other case here uses, and it is the branch behind "I tag a new person and it doesn't show up
-   * until I refresh" -- the newly created space person has to survive the branch's
-   * `spacePersonId` filter, which it can only do because the attach now writes the owner-side
-   * `asset_face.personId` the filter's lookup keys off.
-   *
-   * Also pins `resolvedSpaceId` on this branch: the panel's edit affordances fall back to it when
-   * the route carries no space, so a response without it silently disables them.
-   */
+  The EDITOR's own view, read the way DetailPanel re-reads it after a face edit: with `spaceId`
+  passed explicitly. That is a different server branch from the owner's inferred-space read every
+  other case here uses, and it is the branch behind "I tag a new person and it doesn't show up
+  until I refresh" -- the newly created space person has to survive the branch's
+  `spacePersonId` filter, which it can only do because the attach now writes the owner-side
+  `asset_face.personId` the filter's lookup keys off.
+  
+  Also pins `resolvedSpaceId` on this branch: the panel's edit affordances fall back to it when
+  the route carries no space, so a response without it silently disables them.
+  */
   it("shows a newly tagged person in the editor's space-scoped read", async () => {
     const { assetFaceId } = await editorNamesNewFace('Freshly Tagged Dana');
 
@@ -126,17 +126,17 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
   });
 
   /**
-   * The HTTP-level half of "an editor's detach does not reach beyond the face it names": a detach
-   * on one face leaves a tag Bob set on ANOTHER face untouched, end to end through the real stack.
-   *
-   * It deliberately does NOT prove the same-human guard itself. Two faces are used here, and
-   * `setFaceOwnerPerson` is scoped to one `assetFaceId`, so the surviving tag would survive with or
-   * without the identity comparison -- the guard needs both people on ONE face, which the API
-   * cannot set up (an attach aligns the identities by design). That case is covered where it can be
-   * built directly, in `shared-space-face-assign.medium.spec.ts` ("leaves the owner's tag alone when
-   * the detached space person is a different human") and, for the compare-and-set underneath it, in
-   * `person.repository.spec.ts` ("setFaceOwnerPerson"). Both are mutation-proved.
-   */
+  The HTTP-level half of "an editor's detach does not reach beyond the face it names": a detach
+  on one face leaves a tag Bob set on ANOTHER face untouched, end to end through the real stack.
+  
+  It deliberately does NOT prove the same-human guard itself. Two faces are used here, and
+  `setFaceOwnerPerson` is scoped to one `assetFaceId`, so the surviving tag would survive with or
+  without the identity comparison -- the guard needs both people on ONE face, which the API
+  cannot set up (an attach aligns the identities by design). That case is covered where it can be
+  built directly, in `shared-space-face-assign.medium.spec.ts` ("leaves the owner's tag alone when
+  the detached space person is a different human") and, for the compare-and-set underneath it, in
+  `person.repository.spec.ts` ("setFaceOwnerPerson"). Both are mutation-proved.
+  */
   it("leaves the owner's own unrelated tag alone when the editor detaches a different person", async () => {
     const ownTaggedFaceId = await utils.createUnassignedFace(ctx.spaceAssetId);
 
@@ -163,11 +163,11 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
   });
 
   /**
-   * Re-attaching after a detach must restore the owner's tag, not leave the face permanently
-   * unassigned. This is the round trip the reported bug made impossible to observe, and it also
-   * covers the case where the owner person already exists (created by the first attach) so
-   * `getOrCreateOwnerPersonForIdentity` takes its find branch rather than its insert branch.
-   */
+  Re-attaching after a detach must restore the owner's tag, not leave the face permanently
+  unassigned. This is the round trip the reported bug made impossible to observe, and it also
+  covers the case where the owner person already exists (created by the first attach) so
+  `getOrCreateOwnerPersonForIdentity` takes its find branch rather than its insert branch.
+  */
   it('restores the owner personId when the editor re-attaches a detached face', async () => {
     const { assetFaceId, personId } = await editorNamesNewFace('Round Trip Cara');
     const firstOwnerPersonId = await ownerPersonIdOf(assetFaceId);

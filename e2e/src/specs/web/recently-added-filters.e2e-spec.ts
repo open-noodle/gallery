@@ -335,6 +335,7 @@ test.describe('Recently Added text search', () => {
   async function gotoRecentlyAdded(
     context: import('@playwright/test').BrowserContext,
     page: import('@playwright/test').Page,
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     path = '/recently-added',
   ) {
     await utils.setAuthCookies(context, admin.accessToken);

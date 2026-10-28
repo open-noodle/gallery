@@ -1,44 +1,44 @@
 /**
- * Face Cleanup admin page — smoke + decline/undo + full-resolution flow (X1/X2) + temporal-consistency
- * hardening (Consistency X1/X2) + manual review mode (Slice 11) tests.
- *
- * Scope: the dashboard/empty-state/decline smoke tests below are a reduced fallback — a real face-repair
- * SCAN JOB requires live CLIP embeddings, which are unavailable in this ML-disabled e2e stack
- * (IMMICH_MACHINE_LEARNING_ENABLED=false, e2e/docker-compose.yml). X1/X2 instead seed a completed scan
- * directly (face_search dummy embedding + face_repair_scan + face_repair_scan_flagged_face rows), mirroring
- * exactly how the server's own medium/testcontainer tests do it
- * (server/test/medium/specs/services/face-repair.resolve.spec.ts) — the ML dependency lives in *producing*
- * suggested embeddings, not in resolving already-flagged faces, so this is a faithful (not synthetic) test
- * of the review → resolve → drain flow.
- *
- * What this file covers:
- *   1. Dashboard page renders and, since this stack has never scanned, offers the first-run action
- *      ("Run first scan") rather than "Re-scan".
- *   2. Review page (/admin/face-cleanup/[personId]) renders for a valid person; empty state is
- *      shown since there are no flagged faces (no scan has run yet).
- *   3. Resolutions page (/admin/face-cleanup/resolutions) renders the empty state.
- *   4. A person-level dismiss seeded directly via the API renders a row (with an Undo button) on the
- *      resolutions page. The interactive Undo click is covered by the medium tests, not here.
- *   5. X1 — seeding a flagged cluster and driving the review page: select → route one face into each of the
- *      five terminal states via the bulk bar → Apply → assert the resolve payload and that the person drains
- *      from the console.
- *   6. X2 — Resolutions page: undoing a lock re-enables flagging (re-checked against the same persisted scan
- *      snapshot, which is the same mechanism a subsequent scan run applies — see the test body for the exact
- *      scope this covers vs. the medium/component tests).
- *   7. Consistency X1/X2 (temporal-consistency hardening design §7.6, distinct from the X1/X2 above, which
- *      predate and cover the full-resolution feature) — see the test bodies for what each proves and the
- *      "re-scan" proxy technique both use (a real, live-embeddings scan job isn't available in this
- *      ML-disabled stack, same constraint as X1/X2 above).
- *   8. Slice 11 (manual review mode, design specs/2026-07-23-manual-face-review-mode-design.md
- *      §7/§8) — the manual flow end to end: a never-scanned person is reviewed through
- *      /admin/face-cleanup/people/[personId], routing faces into move/lock/detach and asserting the durable DB
- *      state each writes. Then the cross-engine invariant: a later (seeded) scan must honour every one of
- *      those manual decisions exactly as it would a guided one — the locked face is never re-flagged, the
- *      detached face stays gone, the moved face is not re-proposed.
- *
- * The tests follow the proven `rebase-smoke-pages` canary pattern (admin-page-header landmark,
- * `.first()`, explicit timeout).
- */
+Face Cleanup admin page — smoke + decline/undo + full-resolution flow (X1/X2) + temporal-consistency
+hardening (Consistency X1/X2) + manual review mode (Slice 11) tests.
+
+Scope: the dashboard/empty-state/decline smoke tests below are a reduced fallback — a real face-repair
+SCAN JOB requires live CLIP embeddings, which are unavailable in this ML-disabled e2e stack
+(IMMICH_MACHINE_LEARNING_ENABLED=false, e2e/docker-compose.yml). X1/X2 instead seed a completed scan
+directly (face_search dummy embedding + face_repair_scan + face_repair_scan_flagged_face rows), mirroring
+exactly how the server's own medium/testcontainer tests do it
+(server/test/medium/specs/services/face-repair.resolve.spec.ts) — the ML dependency lives in *producing*
+suggested embeddings, not in resolving already-flagged faces, so this is a faithful (not synthetic) test
+of the review → resolve → drain flow.
+
+What this file covers:
+  1. Dashboard page renders and, since this stack has never scanned, offers the first-run action
+     ("Run first scan") rather than "Re-scan".
+  2. Review page (/admin/face-cleanup/[personId]) renders for a valid person; empty state is
+     shown since there are no flagged faces (no scan has run yet).
+  3. Resolutions page (/admin/face-cleanup/resolutions) renders the empty state.
+  4. A person-level dismiss seeded directly via the API renders a row (with an Undo button) on the
+     resolutions page. The interactive Undo click is covered by the medium tests, not here.
+  5. X1 — seeding a flagged cluster and driving the review page: select → route one face into each of the
+     five terminal states via the bulk bar → Apply → assert the resolve payload and that the person drains
+     from the console.
+  6. X2 — Resolutions page: undoing a lock re-enables flagging (re-checked against the same persisted scan
+     snapshot, which is the same mechanism a subsequent scan run applies — see the test body for the exact
+     scope this covers vs. the medium/component tests).
+  7. Consistency X1/X2 (temporal-consistency hardening design §7.6, distinct from the X1/X2 above, which
+     predate and cover the full-resolution feature) — see the test bodies for what each proves and the
+     "re-scan" proxy technique both use (a real, live-embeddings scan job isn't available in this
+     ML-disabled stack, same constraint as X1/X2 above).
+  8. Slice 11 (manual review mode, design specs/2026-07-23-manual-face-review-mode-design.md
+     §7/§8) — the manual flow end to end: a never-scanned person is reviewed through
+     /admin/face-cleanup/people/[personId], routing faces into move/lock/detach and asserting the durable DB
+     state each writes. Then the cross-engine invariant: a later (seeded) scan must honour every one of
+     those manual decisions exactly as it would a guided one — the locked face is never re-flagged, the
+     detached face stays gone, the moved face is not re-proposed.
+
+The tests follow the proven `rebase-smoke-pages` canary pattern (admin-page-header landmark,
+`.first()`, explicit timeout).
+*/
 import {
   getFaceRepairPersonFaces,
   mergePersonLegacy,
@@ -68,12 +68,12 @@ const seedFaceSearch = (db: PgClient, faceId: string) =>
   );
 
 /**
- * Seeds a completed face-repair scan flagging every face in `faceIds` (already created via
- * `utils.createFace`) toward `suspectedOwnerId`, without running a real (ML-driven) scan job. This is the
- * same data shape `FaceRepairService.getPersonFlaggedFaces`/`getLatestScanStatus` read — `personName`/
- * `ownerName`/`thumbnailFaceId` are left null because `withCurrentNames` overlays them from the live
- * `person` table at read time, so the actual names created via `utils.createPerson` are what the UI shows.
- */
+Seeds a completed face-repair scan flagging every face in `faceIds` (already created via
+`utils.createFace`) toward `suspectedOwnerId`, without running a real (ML-driven) scan job. This is the
+same data shape `FaceRepairService.getPersonFlaggedFaces`/`getLatestScanStatus` read — `personName`/
+`ownerName`/`thumbnailFaceId` are left null because `withCurrentNames` overlays them from the live
+`person` table at read time, so the actual names created via `utils.createPerson` are what the UI shows.
+*/
 const seedFlaggedScan = async (
   db: PgClient,
   args: {
@@ -144,15 +144,15 @@ const seedFlaggedScan = async (
 };
 
 /**
- * Like seedFlaggedScan, but flags faces across MULTIPLE persons within a SINGLE scan (one `face_repair_scan`
- * row). The Slice 11 cross-engine invariant test below needs this: seeding two SEPARATE scans (one per person)
- * would each stamp `now()`, and `getFaceRepairPersonFaces` reads only `getLatestScan()` — a documented
- * nondeterminism trap on this feature (two scans stamped the same `now()` make the "latest" tie-break
- * unreliable). Worse, with two scans only the second seed's snapshot is ever read back, so a naive two-scan
- * seed would pass its "not re-flagged" assertions vacuously (the face simply isn't mentioned in whichever scan
- * happens to be "latest") rather than because the manual decision was actually honoured. One scan, multiple
- * persons, sidesteps the whole class of flake.
- */
+Like seedFlaggedScan, but flags faces across MULTIPLE persons within a SINGLE scan (one `face_repair_scan`
+row). The Slice 11 cross-engine invariant test below needs this: seeding two SEPARATE scans (one per person)
+would each stamp `now()`, and `getFaceRepairPersonFaces` reads only `getLatestScan()` — a documented
+nondeterminism trap on this feature (two scans stamped the same `now()` make the "latest" tie-break
+unreliable). Worse, with two scans only the second seed's snapshot is ever read back, so a naive two-scan
+seed would pass its "not re-flagged" assertions vacuously (the face simply isn't mentioned in whichever scan
+happens to be "latest") rather than because the manual decision was actually honoured. One scan, multiple
+persons, sidesteps the whole class of flake.
+*/
 const seedFlaggedScanMulti = async (
   db: PgClient,
   args: {
@@ -234,19 +234,19 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Seeds one face on `personId` that looks machine-clustered rather than human-placed. `utils.createFace`
-   * always links a face source='manual' (utils.ts:529-530) — its shortcut for a full face→identity link — but
-   * a face a REAL scan would cluster is, by definition, an ML attribution, not a human placement. Left as
-   * 'manual' it would already read as "settled" to the verdict layer (manualLinkedFaceIds is owner-agnostic —
-   * see face-verdict.service.ts), making the cross-engine invariant test's "not re-flagged" assertions vacuous
-   * rather than meaningful — the exact trap seedFlaggedScan's downgrade above exists to avoid, reproduced here
-   * for a cluster with NO scan at all (seedFlaggedScan can't be reused directly for that — it always creates a
-   * face_repair_scan row, and the manual-flow test's whole point is a review with none).
-   *
-   * Also seeds a `face_search` row: both getClusterFacePage (the manual review page's face listing) and
-   * getEligibleFaceIdsForPerson (the `lock` bulk action's eligibility check) inner-join it, so a face with no
-   * embedding row would silently vanish from the review grid and 400 out of "lock" as ineligible.
-   */
+  Seeds one face on `personId` that looks machine-clustered rather than human-placed. `utils.createFace`
+  always links a face source='manual' (utils.ts:529-530) — its shortcut for a full face→identity link — but
+  a face a REAL scan would cluster is, by definition, an ML attribution, not a human placement. Left as
+  'manual' it would already read as "settled" to the verdict layer (manualLinkedFaceIds is owner-agnostic —
+  see face-verdict.service.ts), making the cross-engine invariant test's "not re-flagged" assertions vacuous
+  rather than meaningful — the exact trap seedFlaggedScan's downgrade above exists to avoid, reproduced here
+  for a cluster with NO scan at all (seedFlaggedScan can't be reused directly for that — it always creates a
+  face_repair_scan row, and the manual-flow test's whole point is a review with none).
+  
+  Also seeds a `face_search` row: both getClusterFacePage (the manual review page's face listing) and
+  getEligibleFaceIdsForPerson (the `lock` bulk action's eligibility check) inner-join it, so a face with no
+  embedding row would silently vanish from the review grid and 400 out of "lock" as ineligible.
+  */
   const seedMlClusterFace = async (db: PgClient, args: { assetId: string; personGroupId: string }): Promise<string> => {
     const faceId = await utils.createFace(args);
     await seedFaceSearch(db, faceId);
@@ -273,13 +273,13 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Decline flow — review page (reduced: empty-state only; `decline-btn` requires ML flagged faces).
-   *
-   * Navigating to `/admin/face-cleanup/{personId}` with a real person ID but no completed scan
-   * renders the review page in its "no flagged faces" empty state.  This confirms the route
-   * mounts without error.  The `decline-btn` data-testid (added in Slice 4) lives in the face
-   * tiles grid which is only rendered when flagged faces exist; it cannot be exercised here.
-   */
+  Decline flow — review page (reduced: empty-state only; `decline-btn` requires ML flagged faces).
+  
+  Navigating to `/admin/face-cleanup/{personId}` with a real person ID but no completed scan
+  renders the review page in its "no flagged faces" empty state.  This confirms the route
+  mounts without error.  The `decline-btn` data-testid (added in Slice 4) lives in the face
+  tiles grid which is only rendered when flagged faces exist; it cannot be exercised here.
+  */
   test('review page renders for a valid person (no flagged faces — no scan has run yet)', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
 
@@ -297,13 +297,13 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Resolutions page — empty state.
-   *
-   * Before any decline/lock is recorded the page shows the top-level empty-state placeholder.
-   * Text from admin.face_cleanup_resolutions_empty = "No decisions recorded yet". (The declines-only
-   * `/admin/face-cleanup/declined` route was replaced by this unified page in Slice 7 — it now 307-redirects
-   * here; see web/src/routes/admin/face-cleanup/declined/+page.ts.)
-   */
+  Resolutions page — empty state.
+  
+  Before any decline/lock is recorded the page shows the top-level empty-state placeholder.
+  Text from admin.face_cleanup_resolutions_empty = "No decisions recorded yet". (The declines-only
+  `/admin/face-cleanup/declined` route was replaced by this unified page in Slice 7 — it now 307-redirects
+  here; see web/src/routes/admin/face-cleanup/declined/+page.ts.)
+  */
   test('resolutions page shows empty state when there are no declines or locks', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
 
@@ -314,10 +314,10 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * A "keep here" (soft-decline) recorded through the cleanup console is a NEGATIVE verdict in the shared
-   * layer, and the resolutions page lists it with an Undo. Clicking Undo removes the verdict, so a later scan
-   * may flag the face again. (Cluster-level dismisses are console-local and intentionally NOT listed here.)
-   */
+  A "keep here" (soft-decline) recorded through the cleanup console is a NEGATIVE verdict in the shared
+  layer, and the resolutions page lists it with an Undo. Clicking Undo removes the verdict, so a later scan
+  may flag the face again. (Cluster-level dismisses are console-local and intentionally NOT listed here.)
+  */
   test('a cleanup keep-here verdict appears on the resolutions page and Undo re-enables flagging', async ({
     context,
     page,
@@ -500,17 +500,17 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * The action dock stays pinned to the bottom even when the review is short.
-   *
-   * It used to be `sticky bottom-0` inside the scrolled content. Sticky only pins while its containing block
-   * still extends below it — so on a review with a handful of faces the page never overflowed, sticky was inert,
-   * and the bar came to rest wherever the content happened to end: adrift in the middle of the page (reported by
-   * a user). It now renders through AdminPageLayout's `footer` slot, OUTSIDE the scroll area.
-   *
-   * This can only be caught here. The AdminPageLayout test stub renders `children` and `footer` into the same
-   * element, so putting the dock back inside the scrolled content would keep every component test green while
-   * reintroducing exactly this bug.
-   */
+  The action dock stays pinned to the bottom even when the review is short.
+  
+  It used to be `sticky bottom-0` inside the scrolled content. Sticky only pins while its containing block
+  still extends below it — so on a review with a handful of faces the page never overflowed, sticky was inert,
+  and the bar came to rest wherever the content happened to end: adrift in the middle of the page (reported by
+  a user). It now renders through AdminPageLayout's `footer` slot, OUTSIDE the scroll area.
+  
+  This can only be caught here. The AdminPageLayout test stub renders `children` and `footer` into the same
+  element, so putting the dock back inside the scrolled content would keep every component test green while
+  reintroducing exactly this bug.
+  */
   test('the action dock stays pinned to the bottom of the viewport on a short review', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
     const db = await utils.connectDatabase();
@@ -566,18 +566,18 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * X2 — Resolutions page: Undo removes the row and re-enables flagging.
-   *
-   * Scope note: this drives the interactive Undo click and verifies its server-side effect directly (rather
-   * than by triggering a brand-new scan job, which needs live embeddings this ML-disabled e2e stack doesn't
-   * have): after Undo, `getFaceRepairPersonFaces` — the SAME query the review page calls, re-evaluating the
-   * live decline/lock state against the persisted scan snapshot — includes the face again. That re-evaluation
-   * (`applyDeclineFilters` dropping locked/declined faces) is exactly the mechanism a subsequent scan's
-   * persistence would also go through (see FaceRepairService.removeResolutions's comment: "Removing a lock
-   * re-enables flagging: the face drops out of getLockedFaceIds() and the next scan can suspect it again").
-   * The interactive select→lock→Apply route through the review page is covered by X1; medium tests M5/M16
-   * cover the full re-scan-drops-a-locked-face semantics against a real second scan.
-   */
+  X2 — Resolutions page: Undo removes the row and re-enables flagging.
+  
+  Scope note: this drives the interactive Undo click and verifies its server-side effect directly (rather
+  than by triggering a brand-new scan job, which needs live embeddings this ML-disabled e2e stack doesn't
+  have): after Undo, `getFaceRepairPersonFaces` — the SAME query the review page calls, re-evaluating the
+  live decline/lock state against the persisted scan snapshot — includes the face again. That re-evaluation
+  (`applyDeclineFilters` dropping locked/declined faces) is exactly the mechanism a subsequent scan's
+  persistence would also go through (see FaceRepairService.removeResolutions's comment: "Removing a lock
+  re-enables flagging: the face drops out of getLockedFaceIds() and the next scan can suspect it again").
+  The interactive select→lock→Apply route through the review page is covered by X1; medium tests M5/M16
+  cover the full re-scan-drops-a-locked-face semantics against a real second scan.
+  */
   test('X2: un-confirming a human-placed face re-enables flagging for that face', async () => {
     // A confirm/lock records the human placement as the face's manual identity link (there is no separate
     // lock row any more). Un-confirming it — via POST /admin/face-repair/unconfirm — downgrades that link so
@@ -624,19 +624,19 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Consistency X1 (temporal-consistency hardening design §7.6 — distinct from X1 above, which predates and
-   * covers the full-resolution feature): a deliberate "Move → chosen person" with the picker's lock toggle ON
-   * durably locks the moved face so it is never re-flagged — without this, a plain move writes no persisted
-   * marker at all (design §1, gap 3).
-   *
-   * "Re-scan" proxy: this ML-disabled stack can't run a real, live-embeddings scan job (see the file header),
-   * so durability is proven the same way the existing X2 test above proves it for a plain lock — by seeding a
-   * FRESH completed scan snapshot that (as a later real scan would) proposes the SAME face flagged again, then
-   * reading it back through `getFaceRepairPersonFaces`. That endpoint runs the exact seam a real scan's
-   * `buildRepairPlan` now also runs (a scoped `getDeclineMaps` read + `applyDeclineFilters`, Slice 4) — since
-   * the lock is owner-agnostic, this proves the face would be dropped by a later scan regardless of who it
-   * re-suspects.
-   */
+  Consistency X1 (temporal-consistency hardening design §7.6 — distinct from X1 above, which predates and
+  covers the full-resolution feature): a deliberate "Move → chosen person" with the picker's lock toggle ON
+  durably locks the moved face so it is never re-flagged — without this, a plain move writes no persisted
+  marker at all (design §1, gap 3).
+  
+  "Re-scan" proxy: this ML-disabled stack can't run a real, live-embeddings scan job (see the file header),
+  so durability is proven the same way the existing X2 test above proves it for a plain lock — by seeding a
+  FRESH completed scan snapshot that (as a later real scan would) proposes the SAME face flagged again, then
+  reading it back through `getFaceRepairPersonFaces`. That endpoint runs the exact seam a real scan's
+  `buildRepairPlan` now also runs (a scoped `getDeclineMaps` read + `applyDeclineFilters`, Slice 4) — since
+  the lock is owner-agnostic, this proves the face would be dropped by a later scan regardless of who it
+  re-suspects.
+  */
   test('Consistency X1: a move-and-lock via the picker survives a later re-scan', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
     const db = await utils.connectDatabase();
@@ -717,15 +717,15 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Consistency X2 (temporal-consistency hardening design §7.6 — distinct from X2 above, which predates and
-   * covers the full-resolution feature): locking a face, then merging its person into a different one via the
-   * real merge API, must not lose the lock — before Slice 1 of this design, `face_repair_lock.personId` was a
-   * `CASCADE`-deleting FK, so merging the locked-on person away silently destroyed the lock and re-exposed the
-   * face to the next scan (design §1, gap 1 — "the most serious hole ... in the strongest guarantee").
-   *
-   * Uses the same "re-scan" proxy as Consistency X1 above (see its docstring) since a real, live-embeddings
-   * scan job isn't available in this ML-disabled stack.
-   */
+  Consistency X2 (temporal-consistency hardening design §7.6 — distinct from X2 above, which predates and
+  covers the full-resolution feature): locking a face, then merging its person into a different one via the
+  real merge API, must not lose the lock — before Slice 1 of this design, `face_repair_lock.personId` was a
+  `CASCADE`-deleting FK, so merging the locked-on person away silently destroyed the lock and re-exposed the
+  face to the next scan (design §1, gap 1 — "the most serious hole ... in the strongest guarantee").
+  
+  Uses the same "re-scan" proxy as Consistency X1 above (see its docstring) since a real, live-embeddings
+  scan job isn't available in this ML-disabled stack.
+  */
   test('Consistency X2: a lock survives a person merge and the face is still not re-flagged on a later scan', async ({
     context,
   }) => {
@@ -799,14 +799,14 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Slice 7 (D7): admin cleanup + resolutions surfaces render face crops for clusters the admin does not own.
-   * Every scenario above seeds under `admin` itself, so the person-scoped `/people/.../faces/.../thumbnail`
-   * route (still owner/access-checked) happens to work by construction — it never exercises the broken-image
-   * case a real deployment hits constantly (an admin reviewing a REGULAR user's flagged cluster). This test
-   * seeds a cluster owned by a SECOND user and asserts the face `<img>` elements the admin sees actually
-   * decode (naturalWidth > 0), on both the review grid and — after a "keep here" negative verdict, which has
-   * no person↔face join at all — the resolutions page (the structural-404 site).
-   */
+  Slice 7 (D7): admin cleanup + resolutions surfaces render face crops for clusters the admin does not own.
+  Every scenario above seeds under `admin` itself, so the person-scoped `/people/.../faces/.../thumbnail`
+  route (still owner/access-checked) happens to work by construction — it never exercises the broken-image
+  case a real deployment hits constantly (an admin reviewing a REGULAR user's flagged cluster). This test
+  seeds a cluster owned by a SECOND user and asserts the face `<img>` elements the admin sees actually
+  decode (naturalWidth > 0), on both the review grid and — after a "keep here" negative verdict, which has
+  no person↔face join at all — the resolutions page (the structural-404 site).
+  */
   test('admin renders face crops for a cluster owned by a different user (review grid + resolutions)', async ({
     context,
     page,
@@ -877,17 +877,17 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Slice 11 (manual review mode, design §7/§8 of
-   * specs/2026-07-23-manual-face-review-mode-design.md) — manual flow end to end.
-   *
-   * Seeds a person with faces and NO scan at all — the chooser must still treat manual mode as reachable
-   * (design §6.2: "manual must be reachable on a brand-new instance"), and the manual review page must list
-   * every one of the person's faces rather than a scan-flagged subset (manual mode ignores scan state
-   * entirely, §7). Drives all three write-bearing bulk actions this page has (move-to-chosen-person, lock,
-   * "not a face") plus a fourth face left untouched at the default `keep`, then asserts the DURABLE DB STATE
-   * each action produced — not UI text, per plan instructions — since that state is what the cross-engine
-   * invariant test below depends on and re-verifies after a later scan.
-   */
+  Slice 11 (manual review mode, design §7/§8 of
+  specs/2026-07-23-manual-face-review-mode-design.md) — manual flow end to end.
+  
+  Seeds a person with faces and NO scan at all — the chooser must still treat manual mode as reachable
+  (design §6.2: "manual must be reachable on a brand-new instance"), and the manual review page must list
+  every one of the person's faces rather than a scan-flagged subset (manual mode ignores scan state
+  entirely, §7). Drives all three write-bearing bulk actions this page has (move-to-chosen-person, lock,
+  "not a face") plus a fourth face left untouched at the default `keep`, then asserts the DURABLE DB STATE
+  each action produced — not UI text, per plan instructions — since that state is what the cross-engine
+  invariant test below depends on and re-verifies after a later scan.
+  */
   test('manual review: reviewing a never-scanned person applies move/lock/not-a-face and writes durable state', async ({
     context,
     page,
@@ -1043,17 +1043,17 @@ test.describe.serial('Face Cleanup', () => {
   });
 
   /**
-   * Slice 11 — cross-engine invariant (design §7, "the point of the feature").
-   *
-   * After the manual-flow test's decisions, simulate a LATER scan re-deriving the surviving faces as
-   * candidates and proposing them flagged again — toward an owner neither face has ever been associated with
-   * before, so there is no way a stale pairing could accidentally save this assertion — and confirm the manual
-   * decisions are honoured exactly as guided ones would be: the locked face is not re-flagged, the moved face
-   * is not re-proposed, and the detached face stays gone. Asserts durable DB state (identity-link source, plus
-   * the flagged-snapshot read every review page and dashboard already goes through), never re-scan ordering —
-   * two scans stamped the same `now()` make getLatestScan nondeterministic, a flake this feature has already
-   * produced once (see seedFlaggedScanMulti's docstring above for why this seeds ONE scan, not two).
-   */
+  Slice 11 — cross-engine invariant (design §7, "the point of the feature").
+  
+  After the manual-flow test's decisions, simulate a LATER scan re-deriving the surviving faces as
+  candidates and proposing them flagged again — toward an owner neither face has ever been associated with
+  before, so there is no way a stale pairing could accidentally save this assertion — and confirm the manual
+  decisions are honoured exactly as guided ones would be: the locked face is not re-flagged, the moved face
+  is not re-proposed, and the detached face stays gone. Asserts durable DB state (identity-link source, plus
+  the flagged-snapshot read every review page and dashboard already goes through), never re-scan ordering —
+  two scans stamped the same `now()` make getLatestScan nondeterministic, a flake this feature has already
+  produced once (see seedFlaggedScanMulti's docstring above for why this seeds ONE scan, not two).
+  */
   test('manual review: a later scan honours every manual decision exactly as a guided one (cross-engine invariant)', async () => {
     if (!manualFlow) {
       throw new Error('manual review fixture is missing — the preceding test must have run and passed first');

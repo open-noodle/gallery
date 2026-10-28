@@ -161,6 +161,7 @@ async function hideAlbumFromSpacePhotos(
   spaceId: string,
   albumId: string,
   card: Locator,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   { alsoHideFromMyTimeline }: { alsoHideFromMyTimeline: boolean },
 ) {
   const cardMenu = await openCardMenu(card);

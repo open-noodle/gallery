@@ -1,17 +1,17 @@
 /**
- * #1041 slice 12 (§8.1) — the two read-only preview endpoints behind the "hide from my timeline"
- * confirm dialogs:
- *
- *   GET /shared-spaces/:spaceId/timeline-hide-preview
- *   GET /shared-spaces/:spaceId/albums/:albumId/timeline-hide-preview
- *
- * Both return `{ hiddenAssetCount, retainedAssetCount }` — always the CALLER's own counts of photos
- * that would leave, and of photos that would stay because a path they did not hide still reaches
- * THEIR OWN personal timeline if they flipped the relevant "hide from my timeline" switch. This
- * file proves three things per endpoint: a non-member is rejected, the number genuinely matches
- * what `/timeline/buckets?withSharedSpaces=true` actually drops once the switch is flipped for
- * real, and the zero case returns 0 rather than erroring.
- */
+#1041 slice 12 (§8.1) — the two read-only preview endpoints behind the "hide from my timeline"
+confirm dialogs:
+
+  GET /shared-spaces/:spaceId/timeline-hide-preview
+  GET /shared-spaces/:spaceId/albums/:albumId/timeline-hide-preview
+
+Both return `{ hiddenAssetCount, retainedAssetCount }` — always the CALLER's own counts of photos
+that would leave, and of photos that would stay because a path they did not hide still reaches
+THEIR OWN personal timeline if they flipped the relevant "hide from my timeline" switch. This
+file proves three things per endpoint: a non-member is rejected, the number genuinely matches
+what `/timeline/buckets?withSharedSpaces=true` actually drops once the switch is flipped for
+real, and the zero case returns 0 rather than erroring.
+*/
 
 import { createUserDto } from 'src/fixtures.js';
 import { app, asBearerAuth, utils } from 'src/utils.js';

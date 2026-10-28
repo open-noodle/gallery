@@ -14,25 +14,25 @@ import { basename } from 'node:path';
 import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 /**
- * The two camera fixtures every scenario below is built on. They are picked so that no assertion can
- * pass vacuously:
- *
- * - `prairie_falcon.jpg` — a full Canon EXIF block (make `Canon`, model `Canon EOS R5`) and **no GPS**.
- * - `IMG_2682.heic`      — Apple / iPhone 7 EXIF **and** GPS.
- *
- * Two DISTINCT makes means a camera filter has something to exclude, and a map filtered by one make
- * has a second marker it must drop. A single-fixture test would pass even if the filter did nothing.
- */
+The two camera fixtures every scenario below is built on. They are picked so that no assertion can
+pass vacuously:
+
+- `prairie_falcon.jpg` — a full Canon EXIF block (make `Canon`, model `Canon EOS R5`) and **no GPS**.
+- `IMG_2682.heic`      — Apple / iPhone 7 EXIF **and** GPS.
+
+Two DISTINCT makes means a camera filter has something to exclude, and a map filtered by one make
+has a second marker it must drop. A single-fixture test would pass even if the filter did nothing.
+*/
 const CANON_FIXTURE = 'albums/nature/prairie_falcon.jpg';
 const APPLE_FIXTURE = 'formats/heic/IMG_2682.heic';
 
 /**
- * A second real, GPS-tagged Canon photo — Palisade, Colorado, USA, lens `Canon EF 24-105mm f/4L IS
- * II USM`, taken in 2022. Used by the value-affordance suites below alongside `APPLE_FIXTURE`
- * (Ralston, Nebraska, USA, iPhone 7, 2019). Every filterable dimension EXCEPT country differs
- * between the two, so each location/date/filename/lens filter has a genuine non-matching asset to
- * exclude. City/state/lens/date are read back from the SERVER in the suites, never hard-coded.
- */
+A second real, GPS-tagged Canon photo — Palisade, Colorado, USA, lens `Canon EF 24-105mm f/4L IS
+II USM`, taken in 2022. Used by the value-affordance suites below alongside `APPLE_FIXTURE`
+(Ralston, Nebraska, USA, iPhone 7, 2019). Every filterable dimension EXCEPT country differs
+between the two, so each location/date/filename/lens filter has a genuine non-matching asset to
+exclude. City/state/lens/date are read back from the SERVER in the suites, never hard-coded.
+*/
 const THOMPSON_FIXTURE = 'metadata/gps-position/thompson-springs.jpg';
 
 const upload = (accessToken: string, path: string) =>
@@ -41,12 +41,13 @@ const upload = (accessToken: string, path: string) =>
   });
 
 /**
- * `prairie_falcon.jpg` carries no GPS EXIF, so it has to be put on the map explicitly. The bulk
- * update reverse-geocodes the point server-side, which is what fills in city/state/country — and the
- * asset viewer's location row (and therefore its 🗺️ pin) only renders once `country` is set.
- *
- * Must run AFTER metadata extraction has drained, or the extraction job overwrites it back to null.
- */
+`prairie_falcon.jpg` carries no GPS EXIF, so it has to be put on the map explicitly. The bulk
+update reverse-geocodes the point server-side, which is what fills in city/state/country — and the
+asset viewer's location row (and therefore its 🗺️ pin) only renders once `country` is set.
+
+Must run AFTER metadata extraction has drained, or the extraction job overwrites it back to null.
+*/
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setAssetGeo = (accessToken: string, id: string, latitude: number, longitude: number) =>
   updateAssets({ assetBulkUpdateDto: { ids: [id], latitude, longitude } }, { headers: asBearerAuth(accessToken) });
 
@@ -60,10 +61,10 @@ const readCamera = async (accessToken: string, id: string) => {
 };
 
 /**
- * `commit`, not the default `load`: the asset viewer downloads the FULL-SIZE original, and waiting
- * for the page's load event therefore waits for that image. Nothing here needs the pixels — the
- * detail panel is driven by the asset's JSON — and the two waits below are the real barrier.
- */
+`commit`, not the default `load`: the asset viewer downloads the FULL-SIZE original, and waiting
+for the page's load event therefore waits for that image. Nothing here needs the pixels — the
+detail panel is driven by the asset's JSON — and the two waits below are the real barrier.
+*/
 const openDetailPanel = async (page: Page, path: string) => {
   await page.goto(path, { waitUntil: 'commit' });
   await page.waitForSelector('#immich-asset-viewer');
@@ -72,39 +73,39 @@ const openDetailPanel = async (page: Page, path: string) => {
 };
 
 /**
- * The map's markers, straight from the API — deliberately NOT through `page.request`, which shares
- * the browser context's cookie jar and turned this pure data-setup call into a flake.
- */
+The map's markers, straight from the API — deliberately NOT through `page.request`, which shares
+the browser context's cookie jar and turned this pure data-setup call into a flake.
+*/
 const markerIds = async (accessToken: string, params: Parameters<typeof getFilteredMapMarkers>[0]) => {
   const markers = await getFilteredMapMarkers(params, { headers: asBearerAuth(accessToken) });
   return markers.map((marker) => marker.id);
 };
 
 /**
- * `/map` mounts MapLibre, which pulls its style and tiles from an EXTERNAL host. Waiting for the
- * page's `load` event (waitForURL's default) therefore waits on a third party and times out under
- * load. Nothing asserted here needs a rendered tile: the URL, the marker query and the chip bar all
- * come from the app itself, so commit is the right barrier.
- */
+`/map` mounts MapLibre, which pulls its style and tiles from an EXTERNAL host. Waiting for the
+page's `load` event (waitForURL's default) therefore waits on a third party and times out under
+load. Nothing asserted here needs a rendered tile: the URL, the marker query and the chip bar all
+come from the app itself, so commit is the right barrier.
+*/
 const waitForMapUrl = (page: Page) => page.waitForURL((url) => url.pathname === '/map', { waitUntil: 'commit' });
 
 /**
- * Slice 7's headline scenario, end to end (spec §5.4/§6, plan R8, P1).
- *
- * Inside a Space, clicking a metadata value in the asset viewer filters THAT SPACE — the viewer
- * closes, the URL carries the filter, and a removable chip appears. The 🔍 icon is the escape hatch:
- * the same filter, but across the whole library.
- *
- * The person case is the one that cannot be caught by inspecting the URL alone (R8): a Space sends
- * `FilterState.personIds` as **`spacePersonIds`**, which the server validates as `z.array(z.uuidv4())`
- * — a BARE uuid. A `space-person:<uuid>` token there is a zod reject → **400** → the whole Space
- * timeline errors out. So this file drives a real Space, with a real space person, against the real
- * server, and asserts the timeline request comes back 200 with the asset still in it.
- *
- * The viewer is a SPACE MEMBER, not the owner: a member is the only viewer for whom the asset's
- * people are resolved to the space's people (`asset.people[].spacePersonId`), which is exactly the
- * shape the person patch depends on.
- */
+Slice 7's headline scenario, end to end (spec §5.4/§6, plan R8, P1).
+
+Inside a Space, clicking a metadata value in the asset viewer filters THAT SPACE — the viewer
+closes, the URL carries the filter, and a removable chip appears. The 🔍 icon is the escape hatch:
+the same filter, but across the whole library.
+
+The person case is the one that cannot be caught by inspecting the URL alone (R8): a Space sends
+`FilterState.personIds` as **`spacePersonIds`**, which the server validates as `z.array(z.uuidv4())`
+— a BARE uuid. A `space-person:<uuid>` token there is a zod reject → **400** → the whole Space
+timeline errors out. So this file drives a real Space, with a real space person, against the real
+server, and asserts the timeline request comes back 200 with the asset still in it.
+
+The viewer is a SPACE MEMBER, not the owner: a member is the only viewer for whom the asset's
+people are resolved to the space's people (`asset.people[].spacePersonId`), which is exactly the
+shape the person patch depends on.
+*/
 test.describe('Asset viewer contextual filters', () => {
   let admin: LoginResponseDto;
   let member: LoginResponseDto;
@@ -211,11 +212,11 @@ test.describe('Asset viewer contextual filters', () => {
   });
 
   /**
-   * R8 — the one that would 400. Following the spec's original "always send the scoped token" rule
-   * here sends `people=space-person:<uuid>` to a Space, which the space timeline forwards as
-   * `spacePersonIds` → zod rejects → 400 → the whole timeline errors out. The shipped rule is
-   * target-dependent: a Space gets the BARE space-person uuid.
-   */
+  R8 — the one that would 400. Following the spec's original "always send the scoped token" rule
+  here sends `people=space-person:<uuid>` to a Space, which the space timeline forwards as
+  `spacePersonIds` → zod rejects → 400 → the whole timeline errors out. The shipped rule is
+  target-dependent: a Space gets the BARE space-person uuid.
+  */
   test('a person inside a Space filters by the bare space-person id, and the timeline does not error', async ({
     context,
     page,
@@ -247,13 +248,13 @@ test.describe('Asset viewer contextual filters', () => {
 });
 
 /**
- * S1 — the same grammar on the two surfaces the Space suite above does not cover: an ALBUM and
- * `/photos`. The filter has to land on the surface you are standing on, not on the library by
- * default, and the escape hatch has to disappear where it would be a no-op.
- *
- * E5: on `/photos` there is no 🔍. `/photos` IS everywhere — a "search everywhere" button next to a
- * filter that already searches everywhere would navigate to the page it is already on.
- */
+S1 — the same grammar on the two surfaces the Space suite above does not cover: an ALBUM and
+`/photos`. The filter has to land on the surface you are standing on, not on the library by
+default, and the escape hatch has to disappear where it would be a no-op.
+
+E5: on `/photos` there is no 🔍. `/photos` IS everywhere — a "search everywhere" button next to a
+filter that already searches everywhere would navigate to the page it is already on.
+*/
 test.describe('Asset viewer contextual filters on an album and /photos', () => {
   let admin: LoginResponseDto;
   let albumId: string;
@@ -360,14 +361,14 @@ test.describe('Asset viewer contextual filters on an album and /photos', () => {
 });
 
 /**
- * S2 (E10) and S3 (#767) — the map, the one affordance that changes surface.
- *
- * S3 is the ORIGINAL bug report and the reason slices 3–5 exist: a Space filtered to a camera used to
- * hand the map nothing but its `spaceId`, so the map cheerfully showed every pin in the space while
- * the chip claimed a filter was active. Asserting the URL alone would NOT catch that — the fix lives
- * in what the map then DOES with the filter — so the space here holds two geotagged assets with
- * DIFFERENT makes and the test asserts the non-matching marker is gone.
- */
+S2 (E10) and S3 (#767) — the map, the one affordance that changes surface.
+
+S3 is the ORIGINAL bug report and the reason slices 3–5 exist: a Space filtered to a camera used to
+hand the map nothing but its `spaceId`, so the map cheerfully showed every pin in the space while
+the chip claimed a filter was active. Asserting the URL alone would NOT catch that — the fix lives
+in what the map then DOES with the filter — so the space here holds two geotagged assets with
+DIFFERENT makes and the test asserts the non-matching marker is gone.
+*/
 test.describe('Asset viewer contextual filters — the map handoff', () => {
   let admin: LoginResponseDto;
   let spaceId: string;
@@ -476,16 +477,16 @@ test.describe('Asset viewer contextual filters — the map handoff', () => {
 });
 
 /**
- * S4 (E17) — the RBAC scenario the spec says must not be dropped for time: the end-to-end proof of
- * §4.4, that a NON-OWNER can filter by metadata of an asset they do not own and get that owner's
- * assets back.
- *
- * Every layer beneath this is already covered (the DTOs, the repository's RBAC projection, the
- * timeline service); this is the one that proves they compose in a browser. B owns NOTHING: every
- * asset in the space is A's, so a filter that quietly fell back to "my own assets" would return an
- * empty timeline, and one that ignored the filter would return both of A's assets. The negative
- * control (a second asset of A's, different camera) is what separates those two failures from a pass.
- */
+S4 (E17) — the RBAC scenario the spec says must not be dropped for time: the end-to-end proof of
+§4.4, that a NON-OWNER can filter by metadata of an asset they do not own and get that owner's
+assets back.
+
+Every layer beneath this is already covered (the DTOs, the repository's RBAC projection, the
+timeline service); this is the one that proves they compose in a browser. B owns NOTHING: every
+asset in the space is A's, so a filter that quietly fell back to "my own assets" would return an
+empty timeline, and one that ignored the filter would return both of A's assets. The negative
+control (a second asset of A's, different camera) is what separates those two failures from a pass.
+*/
 test.describe('Asset viewer contextual filters — a Space VIEWER filters another member’s asset (E17)', () => {
   let admin: LoginResponseDto;
   let viewer: LoginResponseDto;
@@ -590,13 +591,13 @@ test.describe('Asset viewer contextual filters — a Space VIEWER filters anothe
 });
 
 /**
- * The value affordances the camera/person suites above do not touch — location (city + the
- * sibling-staleness path), date, filename, lens, tag — plus the two rows that are edited in place
- * rather than filtered (rating, description). One `/photos` surface, two real fixtures that differ on
- * every dimension but country, so each filter has a genuine non-matching asset to exclude. Every
- * value under test is read back from the SERVER (never hard-coded) and pinned as distinct, so no
- * assertion can pass vacuously.
- */
+The value affordances the camera/person suites above do not touch — location (city + the
+sibling-staleness path), date, filename, lens, tag — plus the two rows that are edited in place
+rather than filtered (rating, description). One `/photos` surface, two real fixtures that differ on
+every dimension but country, so each filter has a genuine non-matching asset to exclude. Every
+value under test is read back from the SERVER (never hard-coded) and pinned as distinct, so no
+assertion can pass vacuously.
+*/
 test.describe('Asset viewer contextual filters — value affordances on /photos', () => {
   let admin: LoginResponseDto;
   let thompsonId: string;
@@ -823,11 +824,11 @@ test.describe('Asset viewer contextual filters — value affordances on /photos'
 });
 
 /**
- * The owner ("shared by") affordance. It renders ONLY on a shared album (DetailPanel gates it on
- * `currentAlbum.albumUsers.length > 0`), so this drives a genuinely TWO-OWNER album: admin owns one
- * asset, a co-editor owns the other. The owner filter is the only thing that can separate them, so a
- * filter that silently no-oped would leave both assets and this test would fail.
- */
+The owner ("shared by") affordance. It renders ONLY on a shared album (DetailPanel gates it on
+`currentAlbum.albumUsers.length > 0`), so this drives a genuinely TWO-OWNER album: admin owns one
+asset, a co-editor owns the other. The owner filter is the only thing that can separate them, so a
+filter that silently no-oped would leave both assets and this test would fail.
+*/
 test.describe('Asset viewer contextual filters — the shared-by owner affordance on a shared album', () => {
   let admin: LoginResponseDto;
   let contributor: LoginResponseDto;

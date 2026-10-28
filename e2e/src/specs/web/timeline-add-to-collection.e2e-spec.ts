@@ -18,11 +18,11 @@ import { asBearerAuth, utils } from 'src/utils.js';
 //   3. Multi-select (album + space) via add-collections-button; verified via both APIs.
 
 /**
- * Selects all visible assets on the timeline via their checkbox buttons, then
- * clicks the "Add to album or space" action button to open the picker modal.
- *
- * Returns a locator scoped to the open dialog.
- */
+Selects all visible assets on the timeline via their checkbox buttons, then
+clicks the "Add to album or space" action button to open the picker modal.
+
+Returns a locator scoped to the open dialog.
+*/
 async function openPickerWithAllAssets(page: import('@playwright/test').Page) {
   // Wait for at least one thumbnail to render before interacting.
   await expect(thumbnailUtils.locator(page).first()).toBeVisible();

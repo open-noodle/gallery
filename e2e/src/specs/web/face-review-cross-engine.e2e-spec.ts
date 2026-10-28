@@ -1,25 +1,25 @@
 /**
- * Face review — cross-engine guarantees (Slice 14).
- *
- * The unification's headline claim is that the admin cleanup console and the per-person suggestion queue
- * share ONE verdict layer, so a decision recorded by either engine binds the other. Until this file, that
- * claim was only ever exercised at the medium layer: `face-cleanup.e2e-spec.ts` contains zero references to
- * `face-suggestions`, and the two suggestion specs contain zero references to `face-repair`.
- *
- * These tests cover the parts of the guarantee that live at the HTTP boundary — role enforcement and the
- * Locked-asset policy — which the medium tests, running below the guard layer, structurally cannot prove.
- *
- * Seeding note (same constraint the sibling suites document at length): this stack runs with
- * IMMICH_MACHINE_LEARNING_ENABLED=false, so no real scan can produce embeddings. Both engines' inputs are
- * seeded directly — `face_repair_scan` + `face_repair_scan_flagged_face` for the cleanup console, and
- * pending `face_person_verdict` rows for the suggestion queue — exactly as
- * `face-cleanup.e2e-spec.ts` and `space-person-face-suggestions.e2e-spec.ts` already do. The ML dependency
- * lives in *producing* candidates, not in the gates under test here.
- *
- * Every absence assertion below carries a positive control in the same test body (spec §2): a control face
- * that IS surfaced under otherwise-identical conditions. Without it, "the locked face is not offered" would
- * pass just as happily if the endpoint returned nothing at all.
- */
+Face review — cross-engine guarantees (Slice 14).
+
+The unification's headline claim is that the admin cleanup console and the per-person suggestion queue
+share ONE verdict layer, so a decision recorded by either engine binds the other. Until this file, that
+claim was only ever exercised at the medium layer: `face-cleanup.e2e-spec.ts` contains zero references to
+`face-suggestions`, and the two suggestion specs contain zero references to `face-repair`.
+
+These tests cover the parts of the guarantee that live at the HTTP boundary — role enforcement and the
+Locked-asset policy — which the medium tests, running below the guard layer, structurally cannot prove.
+
+Seeding note (same constraint the sibling suites document at length): this stack runs with
+IMMICH_MACHINE_LEARNING_ENABLED=false, so no real scan can produce embeddings. Both engines' inputs are
+seeded directly — `face_repair_scan` + `face_repair_scan_flagged_face` for the cleanup console, and
+pending `face_person_verdict` rows for the suggestion queue — exactly as
+`face-cleanup.e2e-spec.ts` and `space-person-face-suggestions.e2e-spec.ts` already do. The ML dependency
+lives in *producing* candidates, not in the gates under test here.
+
+Every absence assertion below carries a positive control in the same test body (spec §2): a control face
+that IS surfaced under otherwise-identical conditions. Without it, "the locked face is not offered" would
+pass just as happily if the endpoint returned nothing at all.
+*/
 import {
   getFaceRepairPersonFaces,
   SharedSpaceRole,
@@ -67,17 +67,17 @@ test.describe.serial('Face review cross-engine', () => {
   });
 
   /**
-   * S14.4 — the four suggestion actions on a SPACE person are editor-gated.
-   *
-   * A viewer must be refused on every one of confirm / reject / ignore / dismiss, and — the control that
-   * makes those refusals mean something — an editor must succeed on the same call against the same space,
-   * the same person and an equivalent pending face. A blanket 403 (feature off, space misconfigured, person
-   * unreachable) would satisfy the viewer half alone.
-   *
-   * Each action gets its OWN face: these endpoints are idempotent and drain the pending row they act on, so
-   * reusing one face would make every action after the first a no-op and the editor's `acted` flag would
-   * stop discriminating.
-   */
+  S14.4 — the four suggestion actions on a SPACE person are editor-gated.
+  
+  A viewer must be refused on every one of confirm / reject / ignore / dismiss, and — the control that
+  makes those refusals mean something — an editor must succeed on the same call against the same space,
+  the same person and an equivalent pending face. A blanket 403 (feature off, space misconfigured, person
+  unreachable) would satisfy the viewer half alone.
+  
+  Each action gets its OWN face: these endpoints are idempotent and drain the pending row they act on, so
+  reusing one face would make every action after the first a no-op and the editor's `acted` flag would
+  stop discriminating.
+  */
   test('S14.4: a space viewer is refused every suggestion action; an editor is not', async ({ page }) => {
     const db = await utils.connectDatabase();
 
@@ -137,12 +137,12 @@ test.describe.serial('Face review cross-engine', () => {
   });
 
   /**
-   * S14.5 — a face on a Locked asset is invisible to BOTH engines, and its admin crop is refused.
-   *
-   * The Locked folder is designed to require the owner's elevated re-authentication; neither the cleanup
-   * console nor the suggestion queue re-authenticates, so neither may surface a crop from one (spec §4).
-   * Each half pairs the locked face with a control face on an ordinary asset, seeded identically.
-   */
+  S14.5 — a face on a Locked asset is invisible to BOTH engines, and its admin crop is refused.
+  
+  The Locked folder is designed to require the owner's elevated re-authentication; neither the cleanup
+  console nor the suggestion queue re-authenticates, so neither may surface a crop from one (spec §4).
+  Each half pairs the locked face with a control face on an ordinary asset, seeded identically.
+  */
   test('S14.5: a Locked-asset face reaches neither engine and its admin thumbnail is refused', async ({ page }) => {
     const db = await utils.connectDatabase();
 

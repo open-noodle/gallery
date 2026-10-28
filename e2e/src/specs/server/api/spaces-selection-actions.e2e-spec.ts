@@ -1,55 +1,55 @@
 /**
- * Slice 1 — Server/API RBAC matrix for the selection-toolbar-consistency spec.
- *
- * Source: specs/2026-07-24-selection-toolbar-consistency-design.md,
- * "### Server/API RBAC matrix (Slice 1 — runs first, gates now RESOLVED)". This suite is the
- * regression tripwire for the RBAC gate decisions the web capability rule engine (Slice 2) depends
- * on: Q1/Q2 (Share / Add-to-album are owner∪partner-only via `Permission.AssetShare`), decision C
- * (space-album Remove-from-album is role-gated, ownership grants nothing), and Q5 (an owner's own
- * mutations are never blocked just because the asset is album-path in a space).
- *
- * Fixture: `buildSpaceContext()` (src/actors.ts) gives spaceOwner/spaceEditor/spaceViewer/
- * spaceNonMember, a space owned by spaceOwner, and `spaceAssetId` — an asset OWNED by spaceOwner
- * and added DIRECTLY to the space (`shared_space_asset`). Every action below targets that asset
- * unless the action is destructive, in which case a dedicated throwaway asset is used instead (see
- * inline notes) so earlier assertions in this file never depend on execution order.
- *
- * ─────────────────────────────────────────────────────────────────────────────────────────────
- * TWO CORRECTIONS vs. the design doc's literal "Server/API RBAC matrix" text (verified against
- * the CURRENT server source, not just the doc's summary — flagged for whoever reviews this slice):
- *
- * 1. Favorite / metadata update of spaceAssetId is NOT "owner-only, others → 4xx". `PUT /assets`
- *    (bulk update) checks `Permission.AssetUpdate`, which is `isOwner ∪ checkSpaceEditAccess`
- *    (server/src/utils/access.ts:155-159). `checkSpaceEditAccess` (access.repository.ts:488-527)
- *    grants any space member with role Editor/Owner write access to every asset directly in that
- *    space's pool (`shared_space_asset`) — PROVIDED the asset's owner is themselves a member of
- *    that space (#734 spec §2.3; access.repository.ts's `owner_member` EXISTS clause). The only
- *    restriction is a dedicated guard for `visibility`/`livePhotoVideoId` (asset.service.ts:214-224,
- *    "rbac-3"), whose own comment says explicitly: "other metadata (description/rating/…) stays
- *    editor-allowed." That guard also covers `duplicateId`, but NOT `isFavorite`: favorites are a
- *    per-user overlay (#763), so the alias writes only the caller's own row.
- *    So for spaceAssetId (owned by spaceOwner, direct-add to the space): a metadata update or an
- *    alias favorite succeeds for spaceOwner AND spaceEditor; spaceViewer (role below Editor) and
- *    spaceNonMember (no membership) are rejected by the alias's AssetUpdate gate. The canonical
- *    `PUT /assets/favorites` is gated on AssetRead instead, so a spaceViewer may favorite too.
- *    (spaceOwner satisfies the owner-membership condition trivially here — `createSpace` auto-adds
- *    its creator as an Owner member, so spaceAssetId's owner is always a space member in this
- *    fixture; see access-space-edit.repository.spec.ts for the case where the owner is NOT a
- *    member, which denies regardless of the actor's role.)
- *    Delete is unaffected — `Permission.AssetDelete` is pure `checkOwnerAccess` with no space arm
- *    (access.ts:161-163), so Delete really is owner-only, matching the design doc there.
- *
- * 2. Add-to-album of a non-owned spaceAssetId into the actor's OWN (non-space) album does NOT
- *    return an HTTP 4xx for a non-owner. `PUT /albums/:id/assets` (album.service.ts `addAssets`,
- *    lines 253-262) only throws (400) if the actor lacks `AlbumAssetCreate` on the target ALBUM —
- *    trivially true here since every actor targets an album THEY just created. The per-ASSET
- *    `AssetShare` gate is applied via the non-throwing `checkAccess` (utils/asset.util.ts `addAssets`
- *    helper, lines 33-71) and reported per-item in the response body
- *    (`BulkIdResponseDto[]`: `{id, success, error}`), not as a request-level status code. So every
- *    actor gets HTTP 200; only the body's `success`/`error` fields differ (owner: success=true;
- *    others: success=false, error='no_permission'). Asserted on the body below rather than status.
- * ─────────────────────────────────────────────────────────────────────────────────────────────
- */
+Slice 1 — Server/API RBAC matrix for the selection-toolbar-consistency spec.
+
+Source: specs/2026-07-24-selection-toolbar-consistency-design.md,
+"### Server/API RBAC matrix (Slice 1 — runs first, gates now RESOLVED)". This suite is the
+regression tripwire for the RBAC gate decisions the web capability rule engine (Slice 2) depends
+on: Q1/Q2 (Share / Add-to-album are owner∪partner-only via `Permission.AssetShare`), decision C
+(space-album Remove-from-album is role-gated, ownership grants nothing), and Q5 (an owner's own
+mutations are never blocked just because the asset is album-path in a space).
+
+Fixture: `buildSpaceContext()` (src/actors.ts) gives spaceOwner/spaceEditor/spaceViewer/
+spaceNonMember, a space owned by spaceOwner, and `spaceAssetId` — an asset OWNED by spaceOwner
+and added DIRECTLY to the space (`shared_space_asset`). Every action below targets that asset
+unless the action is destructive, in which case a dedicated throwaway asset is used instead (see
+inline notes) so earlier assertions in this file never depend on execution order.
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+TWO CORRECTIONS vs. the design doc's literal "Server/API RBAC matrix" text (verified against
+the CURRENT server source, not just the doc's summary — flagged for whoever reviews this slice):
+
+1. Favorite / metadata update of spaceAssetId is NOT "owner-only, others → 4xx". `PUT /assets`
+   (bulk update) checks `Permission.AssetUpdate`, which is `isOwner ∪ checkSpaceEditAccess`
+   (server/src/utils/access.ts:155-159). `checkSpaceEditAccess` (access.repository.ts:488-527)
+   grants any space member with role Editor/Owner write access to every asset directly in that
+   space's pool (`shared_space_asset`) — PROVIDED the asset's owner is themselves a member of
+   that space (#734 spec §2.3; access.repository.ts's `owner_member` EXISTS clause). The only
+   restriction is a dedicated guard for `visibility`/`livePhotoVideoId` (asset.service.ts:214-224,
+   "rbac-3"), whose own comment says explicitly: "other metadata (description/rating/…) stays
+   editor-allowed." That guard also covers `duplicateId`, but NOT `isFavorite`: favorites are a
+   per-user overlay (#763), so the alias writes only the caller's own row.
+   So for spaceAssetId (owned by spaceOwner, direct-add to the space): a metadata update or an
+   alias favorite succeeds for spaceOwner AND spaceEditor; spaceViewer (role below Editor) and
+   spaceNonMember (no membership) are rejected by the alias's AssetUpdate gate. The canonical
+   `PUT /assets/favorites` is gated on AssetRead instead, so a spaceViewer may favorite too.
+   (spaceOwner satisfies the owner-membership condition trivially here — `createSpace` auto-adds
+   its creator as an Owner member, so spaceAssetId's owner is always a space member in this
+   fixture; see access-space-edit.repository.spec.ts for the case where the owner is NOT a
+   member, which denies regardless of the actor's role.)
+   Delete is unaffected — `Permission.AssetDelete` is pure `checkOwnerAccess` with no space arm
+   (access.ts:161-163), so Delete really is owner-only, matching the design doc there.
+
+2. Add-to-album of a non-owned spaceAssetId into the actor's OWN (non-space) album does NOT
+   return an HTTP 4xx for a non-owner. `PUT /albums/:id/assets` (album.service.ts `addAssets`,
+   lines 253-262) only throws (400) if the actor lacks `AlbumAssetCreate` on the target ALBUM —
+   trivially true here since every actor targets an album THEY just created. The per-ASSET
+   `AssetShare` gate is applied via the non-throwing `checkAccess` (utils/asset.util.ts `addAssets`
+   helper, lines 33-71) and reported per-item in the response body
+   (`BulkIdResponseDto[]`: `{id, success, error}`), not as a request-level status code. So every
+   actor gets HTTP 200; only the body's `success`/`error` fields differ (owner: success=true;
+   others: success=false, error='no_permission'). Asserted on the body below rather than status.
+─────────────────────────────────────────────────────────────────────────────────────────────
+*/
 
 import { AlbumUserRole, BulkIdErrorReason, SharedLinkType, addUsersToAlbum } from '@immich/sdk';
 import { authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors.js';

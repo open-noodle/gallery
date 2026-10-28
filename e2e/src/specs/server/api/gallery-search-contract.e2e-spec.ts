@@ -1,17 +1,17 @@
 /**
- * Mobile search ↔ server contract (specs/2026-10-23-mobile-search-redesign-design.md, "Testing approach").
- *
- * Seeds one library, then:
- * 1. asserts that `POST /search/options` totals equal the real results calls (`/search/metadata`, `/search/smart`,
- *    `/timeline/buckets`) over the scope matrix;
- * 2. records or verifies the search contract fixtures in `mobile/test/fixtures/search_contract/` (see the README
- *    there). Verify mode (the default) replays every fixture's request against this server and fails on any
- *    difference; `SEARCH_CONTRACT_RECORD=1` rewrites the fixtures from `fixtureCases` below instead.
- *
- * The stack runs with machine learning disabled, so a text `query` can never be encoded here. Query mode by reference
- * photo (`queryAssetId`) still works: those cases switch smart search on in the system config, read embeddings seeded
- * straight into `smart_search`, and switch it back off.
- */
+Mobile search ↔ server contract (specs/2026-10-23-mobile-search-redesign-design.md, "Testing approach").
+
+Seeds one library, then:
+1. asserts that `POST /search/options` totals equal the real results calls (`/search/metadata`, `/search/smart`,
+   `/timeline/buckets`) over the scope matrix;
+2. records or verifies the search contract fixtures in `mobile/test/fixtures/search_contract/` (see the README
+   there). Verify mode (the default) replays every fixture's request against this server and fails on any
+   difference; `SEARCH_CONTRACT_RECORD=1` rewrites the fixtures from `fixtureCases` below instead.
+
+The stack runs with machine learning disabled, so a text `query` can never be encoded here. Query mode by reference
+photo (`queryAssetId`) still works: those cases switch smart search on in the system config, read embeddings seeded
+straight into `smart_search`, and switch it back off.
+*/
 import { LoginResponseDto, SharedSpaceRole, getConfig, updateConfig } from '@immich/sdk';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -41,12 +41,12 @@ type ContractRequest = {
 };
 
 /**
- * How a fallback fixture shows a server this one is not (see the README):
- * - `older-gallery`: a Gallery server from before `POST /search/options`: `/server/features` without `searchOptions`;
- * - `own-favorites-only`: a Gallery server from before `searchFavoritesAcrossSpaces`, whose Favorites search is my own
- *   favourites only;
- * - `stock-immich`: a stock Immich server at the base version: `/server/features` with upstream's keys only.
- */
+How a fallback fixture shows a server this one is not (see the README):
+- `older-gallery`: a Gallery server from before `POST /search/options`: `/server/features` without `searchOptions`;
+- `own-favorites-only`: a Gallery server from before `searchFavoritesAcrossSpaces`, whose Favorites search is my own
+  favourites only;
+- `stock-immich`: a stock Immich server at the base version: `/server/features` with upstream's keys only.
+*/
 type ResponseView = 'older-gallery' | 'own-favorites-only' | 'stock-immich';
 
 type Fixture = {
@@ -647,11 +647,11 @@ const perDimension = (name: string, description: string, body: () => Record<stri
   );
 
 /**
- * One screen's search as the mobile app runs it (mobile/test/gallery/search/search_core_contract_test.dart): options
- * when search opens (availability, then one request per list), the same after two filters, then the results of the
- * filtered state: `/timeline/buckets` and its first bucket in browse mode, the first `/search/smart` page in query mode.
- * Each body is exactly what the app sends for that scope (mobile/lib/gallery/search/search_scope.dart).
- */
+One screen's search as the mobile app runs it (mobile/test/gallery/search/search_core_contract_test.dart): options
+when search opens (availability, then one request per list), the same after two filters, then the results of the
+filtered state: `/timeline/buckets` and its first bucket in browse mode, the first `/search/smart` page in query mode.
+Each body is exactly what the app sends for that scope (mobile/lib/gallery/search/search_scope.dart).
+*/
 type ScopeFlow = {
   name: string;
   description: string;
@@ -866,9 +866,9 @@ const scopeFlows = (): ScopeFlow[] => [
 ];
 
 /**
- * The compatibility fallbacks: an older Gallery server (no `searchOptions`) and a stock Immich server, as the new app
- * meets them. The app asks `/server/version` and `/server/features` first.
- */
+The compatibility fallbacks: an older Gallery server (no `searchOptions`) and a stock Immich server, as the new app
+meets them. The app asks `/server/version` and `/server/features` first.
+*/
 const fallbackCases = (): FixtureCase[] => {
   const olderFilters = (name: string, description: string, query: Query): FixtureCase => ({
     name,
@@ -968,10 +968,10 @@ const fallbackCases = (): FixtureCase[] => {
 };
 
 /**
- * Photos search mode as mobile/test/gallery/search/photos_search_mode_e2e_test.dart walks it: `@a` picks Anna, When
- * picks 2024, Places picks Kyoto. Each step is one options round (availability, then one request per list), the browse
- * results, and every month the grid opens.
- */
+Photos search mode as mobile/test/gallery/search/photos_search_mode_e2e_test.dart walks it: `@a` picks Anna, When
+picks 2024, Places picks Kyoto. Each step is one options round (availability, then one request per list), the browse
+results, and every month the grid opens.
+*/
 const photosModeSteps = () => {
   const anna = { ...photos, personIds: [`person:${id('person:anna')}`] };
   const year = { ...anna, takenAfter: '2024-01-01T00:00:00.000Z', takenBefore: '2025-01-01T00:00:00.000Z' };
@@ -999,9 +999,9 @@ const photosModeSteps = () => {
 };
 
 /**
- * The Filters sheet as mobile/test/gallery/search/filters_sheet_e2e_test.dart walks it on Photos: Favorites only, then
- * rating 3, then the camera model, then in-photo text. Same shape as `photosModeSteps`.
- */
+The Filters sheet as mobile/test/gallery/search/filters_sheet_e2e_test.dart walks it on Photos: Favorites only, then
+rating 3, then the camera model, then in-photo text. Same shape as `photosModeSteps`.
+*/
 const filtersSheetSteps = () => {
   const favorites = { ...photos, isFavorite: true };
   const rating = { ...favorites, rating: 3 };
@@ -1054,12 +1054,12 @@ const photosModeCases = (): FixtureCase[] =>
   ]);
 
 /**
- * Search mode on the album, space, space album and person pages as
- * mobile/test/gallery/search/scoped_search_albums_spaces_people_e2e_test.dart walks it: the grouping pill's search
- * button opens search mode (the unfiltered options are the `scope-<screen>-*` set; the unfiltered browse results are
- * recorded here as `screen-<screen>-timeline-buckets` where no other fixture has them), then one filter. Album scopes
- * send `albumIds` to /search/options and `albumId` to /timeline/*.
- */
+Search mode on the album, space, space album and person pages as
+mobile/test/gallery/search/scoped_search_albums_spaces_people_e2e_test.dart walks it: the grouping pill's search
+button opens search mode (the unfiltered options are the `scope-<screen>-*` set; the unfiltered browse results are
+recorded here as `screen-<screen>-timeline-buckets` where no other fixture has them), then one filter. Album scopes
+send `albumIds` to /search/options and `albumId` to /timeline/*.
+*/
 type ScreenStep = {
   name: string;
   description: string;
@@ -1133,10 +1133,10 @@ const scopedScreenSteps = (): ScreenStep[] => {
 };
 
 /**
- * Search mode on the place, favorites, archive, videos, recently taken and recently added pages as
- * mobile/test/gallery/search/scoped_search_other_screens_e2e_test.dart walks it: the pill opens search mode on the
- * `scope-<screen>-*` options and `screen-<screen>-timeline-buckets`, then one filter.
- */
+Search mode on the place, favorites, archive, videos, recently taken and recently added pages as
+mobile/test/gallery/search/scoped_search_other_screens_e2e_test.dart walks it: the pill opens search mode on the
+`scope-<screen>-*` options and `screen-<screen>-timeline-buckets`, then one filter.
+*/
 const placeLisbon = () => ({ ...photos, city: 'Lisbon' });
 const placeAnna = () => ({ ...placeLisbon(), personIds: [`person:${id('person:anna')}`] });
 const favoritesOsaka = () => ({ ...favoritesScreen, country: 'Japan', city: 'Osaka' });
@@ -1242,11 +1242,11 @@ const scopedScreenCases = (): FixtureCase[] =>
   });
 
 /**
- * Slice 5's switch-over as mobile/test/gallery/search/switch_over_e2e_test.dart walks it: Similar photos from the
- * asset viewer opens Photos search mode on the reference photo (its options are the scope-similar-* set, its first
- * results page is recorded here); on a stock Immich server, search mode opens with no filter yet, so its results are
- * the unfiltered metadata search and its exact total.
- */
+Slice 5's switch-over as mobile/test/gallery/search/switch_over_e2e_test.dart walks it: Similar photos from the
+asset viewer opens Photos search mode on the reference photo (its options are the scope-similar-* set, its first
+results page is recorded here); on a stock Immich server, search mode opens with no filter yet, so its results are
+the unfiltered metadata search and its exact total.
+*/
 const switchOverCases = (): FixtureCase[] => [
   {
     name: 'scope-similar-smart',
