@@ -1,6 +1,6 @@
 <script lang="ts">
   import CleanupCalendar from '$lib/components/cleanup/CleanupCalendar.svelte';
-  import CleanupQueueRail from '$lib/components/cleanup/CleanupQueueRail.svelte';
+  import CleanupQuickWins from '$lib/gallery/cleanup/CleanupQuickWins.svelte';
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import { countMotion } from '$lib/gallery/motion';
@@ -282,7 +282,7 @@
         </Card>
       </div>
 
-      <CleanupQueueRail {counts} {trash} {covers} {showTrash} onEmptyTrash={() => void onEmptyTrash()} />
+      <CleanupQuickWins {counts} {trash} {covers} {showTrash} onEmptyTrash={() => void onEmptyTrash()} />
     </div>
   </div>
 </UserPageLayout>

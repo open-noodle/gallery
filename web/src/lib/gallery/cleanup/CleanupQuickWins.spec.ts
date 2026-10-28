@@ -1,6 +1,6 @@
 import { CleanupCountQueue } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import CleanupQueueRail from '$lib/components/cleanup/CleanupQueueRail.svelte';
+import CleanupQuickWins from '$lib/gallery/cleanup/CleanupQuickWins.svelte';
 
 const loaded = {
   [CleanupCountQueue.SpaceHogs]: { count: 12, bytes: 5_000_000_000 },
@@ -10,9 +10,16 @@ const loaded = {
   [CleanupCountQueue.Blurry]: { count: 9, bytes: 40_000_000, analysedPercent: 72 },
 };
 
-describe('CleanupQueueRail', () => {
+const stubReducedMotion = (reduce: boolean) =>
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: reduce && query.includes('reduce') }));
+
+describe('CleanupQuickWins', () => {
+  // Counts tween to their value; reduced motion makes them land at once so the text can be read.
+  beforeEach(() => stubReducedMotion(true));
+  afterEach(() => vi.unstubAllGlobals());
+
   it('renders the five queues in the mockup order', () => {
-    render(CleanupQueueRail, { counts: loaded, onEmptyTrash: vi.fn() });
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
     const rows = screen.getAllByTestId(/^cleanup-queue-(?!skeleton)/);
     expect(rows.map((row) => row.dataset.testid)).toEqual([
@@ -25,7 +32,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('shows analysis progress only while a pixel queue is still being analysed', () => {
-    render(CleanupQueueRail, { counts: loaded, onEmptyTrash: vi.fn() });
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
     expect(within(screen.getByTestId('cleanup-queue-blurry')).getByText('cleanup_analysing_percent')).toBeVisible();
     expect(
@@ -34,7 +41,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('gives each count the unit the mockup shows', () => {
-    render(CleanupQueueRail, { counts: loaded, onEmptyTrash: vi.fn() });
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
     const row = (queue: string) => within(screen.getByTestId(`cleanup-queue-${queue}`));
     expect(row('space_hogs').getByText('cleanup_queue_count_files')).toBeVisible();
@@ -47,7 +54,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('shows a plain count for blurry once analysis has covered the library', () => {
-    render(CleanupQueueRail, {
+    render(CleanupQuickWins, {
       counts: { ...loaded, [CleanupCountQueue.Blurry]: { count: 9, bytes: 1, analysedPercent: 100 } },
       onEmptyTrash: vi.fn(),
     });
@@ -56,7 +63,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('links each queue to its page, and duplicates to the duplicates utility', () => {
-    render(CleanupQueueRail, { counts: loaded, onEmptyTrash: vi.fn() });
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
     expect(screen.getByTestId('cleanup-queue-duplicates')).toHaveAttribute('href', '/utilities/duplicates');
     expect(screen.getByTestId('cleanup-queue-space_hogs')).toHaveAttribute('href', '/utilities/cleanup/space-hogs');
@@ -64,7 +71,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('shows a skeleton for a queue whose count is still loading', () => {
-    render(CleanupQueueRail, {
+    render(CleanupQuickWins, {
       counts: { ...loaded, [CleanupCountQueue.Bursts]: undefined },
       onEmptyTrash: vi.fn(),
     });
@@ -76,7 +83,7 @@ describe('CleanupQueueRail', () => {
 
   it('empties the trash from the footer', async () => {
     const onEmptyTrash = vi.fn();
-    render(CleanupQueueRail, { counts: loaded, trash: { count: 4, bytes: 1_000_000 }, onEmptyTrash });
+    render(CleanupQuickWins, { counts: loaded, trash: { count: 4, bytes: 1_000_000 }, onEmptyTrash });
 
     expect(screen.getByText('cleanup_trash_holds')).toBeVisible();
     await fireEvent.click(screen.getByRole('button', { name: 'cleanup_trash_empty' }));
@@ -84,7 +91,7 @@ describe('CleanupQueueRail', () => {
   });
 
   it('hides the trash footer when the trash is turned off', () => {
-    render(CleanupQueueRail, {
+    render(CleanupQuickWins, {
       counts: loaded,
       trash: { count: 0, bytes: 0 },
       showTrash: false,
@@ -93,5 +100,49 @@ describe('CleanupQueueRail', () => {
 
     expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
     expect(screen.getByTestId('cleanup-queue-space_hogs')).toBeVisible();
+  });
+
+  it('shows "All clear" on a queue with nothing in it, still linking to its page', () => {
+    render(CleanupQuickWins, {
+      counts: { ...loaded, [CleanupCountQueue.Screenshots]: { count: 0, bytes: 0, analysedPercent: 100 } },
+      onEmptyTrash: vi.fn(),
+    });
+
+    const card = screen.getByTestId('cleanup-queue-screenshots');
+    expect(card).toHaveAttribute('data-state', 'clear');
+    expect(within(card).getByText('cleanup_all_clear')).toBeVisible();
+    expect(card).toHaveAttribute('href', '/utilities/cleanup/screenshots');
+    expect(screen.getByTestId('cleanup-queue-blurry')).not.toHaveAttribute('data-state', 'clear');
+  });
+
+  it('uses the cover photo where one is loaded and the queue icon otherwise', () => {
+    render(CleanupQuickWins, {
+      counts: loaded,
+      covers: {
+        [CleanupCountQueue.SpaceHogs]: { id: 'cover-1', thumbhash: null, originalFileName: 'a.mp4' } as never,
+      },
+      onEmptyTrash: vi.fn(),
+    });
+
+    expect(screen.getByTestId('cleanup-queue-space_hogs').querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('cover-1'),
+    );
+    expect(within(screen.getByTestId('cleanup-queue-bursts')).getByTestId('cleanup-card-icon')).toBeInTheDocument();
+  });
+
+  it('lifts as a card on hover', () => {
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+
+    expect(screen.getByTestId('cleanup-queue-bursts')).toHaveAttribute('data-motion-lift-group');
+  });
+
+  it('counts the bytes up from zero when motion is allowed', () => {
+    stubReducedMotion(false);
+    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+
+    expect(within(screen.getByTestId('cleanup-queue-space_hogs')).getByTestId('cleanup-card-bytes')).toHaveTextContent(
+      /^−0 B$/,
+    );
   });
 });
