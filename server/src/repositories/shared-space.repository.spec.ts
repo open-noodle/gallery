@@ -11,13 +11,13 @@ const fake = (execute: () => Promise<unknown>) => {
 };
 
 /**
- * The recount is a deadlock victim under a real delete storm (#864): the representativeFaceId
- * ON DELETE SET NULL cascade locks shared_space_person rows in face order, so Postgres can pick
- * a recount to kill even though the recount itself claims its rows in id order.
- *
- * These cover the retry wiring. The end-to-end effect is measured by the library-unmap repro,
- * which cannot be expressed as a deterministic unit test.
- */
+The recount is a deadlock victim under a real delete storm (#864): the representativeFaceId
+ON DELETE SET NULL cascade locks shared_space_person rows in face order, so Postgres can pick
+a recount to kill even though the recount itself claims its rows in id order.
+
+These cover the retry wiring. The end-to-end effect is measured by the library-unmap repro,
+which cannot be expressed as a deterministic unit test.
+*/
 describe(`${SharedSpaceRepository.name}.recountPersons deadlock retry (#864)`, () => {
   const ids = ['11111111-1111-4111-8111-111111111111'];
 

@@ -16,6 +16,7 @@ import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = async (db?: Kysely<DB>) => {
   const ctx = new SyncTestContext(db || defaultDatabase);
   const { auth, user, session } = await ctx.newSyncAuthUser();

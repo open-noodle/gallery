@@ -38,9 +38,9 @@ export class ImageAdjustRepository {
   }
 
   /**
-   * The adjustment the edit job renders into an image's edited outputs, keeping the image marked edited while it has
-   * one (see `markEdited`).
-   */
+  The adjustment the edit job renders into an image's edited outputs, keeping the image marked edited while it has
+  one (see `markEdited`).
+  */
   async getForRender(assetId: string): Promise<ImageAdjust | undefined> {
     const adjust = await this.get(assetId);
     if (adjust) {
@@ -50,9 +50,9 @@ export class ImageAdjustRepository {
   }
 
   /**
-   * Sets isEdited back on an adjusted asset. Removing its last crop/rotate/mirror clears the flag through Immich's
-   * asset_edit_delete trigger, which does not know about the adjustment. Writes nothing when the flag is already set.
-   */
+  Sets isEdited back on an adjusted asset. Removing its last crop/rotate/mirror clears the flag through Immich's
+  asset_edit_delete trigger, which does not know about the adjustment. Writes nothing when the flag is already set.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async markEdited(assetId: string): Promise<void> {
     await this.db
@@ -64,9 +64,9 @@ export class ImageAdjustRepository {
   }
 
   /**
-   * Removes the adjustment. The asset stays edited while asset_edit (crop, rotate, mirror) or a video trim still
-   * applies to it; returns whether there was an adjustment to remove.
-   */
+  Removes the adjustment. The asset stays edited while asset_edit (crop, rotate, mirror) or a video trim still
+  applies to it; returns whether there was an adjustment to remove.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async delete(assetId: string): Promise<boolean> {
     return await this.db.transaction().execute(async (tx) => {

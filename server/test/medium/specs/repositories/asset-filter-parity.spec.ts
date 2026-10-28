@@ -18,11 +18,11 @@ import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 /**
- * One filter, one asset set: the timeline, the filter-suggestion universe, the smart-search facets,
- * the filtered map and search results (smart and metadata) must agree on which assets a filter-panel
- * filter matches (src/utils/asset-filter.ts). Tag suggestions and the space people lists route their
- * taken range through the same module; their own medium specs cover them.
- */
+One filter, one asset set: the timeline, the filter-suggestion universe, the smart-search facets,
+the filtered map and search results (smart and metadata) must agree on which assets a filter-panel
+filter matches (src/utils/asset-filter.ts). Tag suggestions and the space people lists route their
+taken range through the same module; their own medium specs cover them.
+*/
 let defaultDatabase: Kysely<DB>;
 const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
 

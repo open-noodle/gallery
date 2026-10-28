@@ -7,19 +7,19 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { BaseService } from 'src/services/base.service.js';
 
 /**
- * Runs every #757 visibility-transition side-effect (removeAssetsFromAll on Locked + the direct/album/
- * library space purge/restore emits). Shared by updateAll (bulk), update (single) and the AssetHide/
- * AssetShow event handlers (motion photos).
- *
- * correctness-6 — NOT wrapped in a Kysely transaction: the UPDATE, removeAssetsFromAll and each emit run
- * on a DIFFERENT repository's own `this.db` handle, so a single `transaction()` would hit the
- * `this.db`-inside-`transaction()` pool deadlock (#595). Resilience instead comes from the purge being
- * UNCONDITIONAL-AND-IDEMPOTENT on a non-shareable next (M3): it no longer depends on the prior visibility
- * read before the write, so a retry that re-reads an already-Hidden/Locked asset (e.g. after a crash or a
- * failed emit) re-affirms the tombstone rather than silently no-op'ing. Re-running emits the same audit
- * rows harmlessly. A crash between the UPDATE and the emits therefore leaves a RECOVERABLE state (re-run
- * converges), not a corrupted one.
- */
+Runs every #757 visibility-transition side-effect (removeAssetsFromAll on Locked + the direct/album/
+library space purge/restore emits). Shared by updateAll (bulk), update (single) and the AssetHide/
+AssetShow event handlers (motion photos).
+
+correctness-6 — NOT wrapped in a Kysely transaction: the UPDATE, removeAssetsFromAll and each emit run
+on a DIFFERENT repository's own `this.db` handle, so a single `transaction()` would hit the
+`this.db`-inside-`transaction()` pool deadlock (#595). Resilience instead comes from the purge being
+UNCONDITIONAL-AND-IDEMPOTENT on a non-shareable next (M3): it no longer depends on the prior visibility
+read before the write, so a retry that re-reads an already-Hidden/Locked asset (e.g. after a crash or a
+failed emit) re-affirms the tombstone rather than silently no-op'ing. Re-running emits the same audit
+rows harmlessly. A crash between the UPDATE and the emits therefore leaves a RECOVERABLE state (re-run
+converges), not a corrupted one.
+*/
 export async function applyVisibilityTransitionSideEffects(
   {
     albumRepository,

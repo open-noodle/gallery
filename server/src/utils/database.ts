@@ -144,13 +144,13 @@ const DEADLOCK_ERROR_CODE = '40P01';
 export const isDeadlockError = (error: unknown) => (error as PostgresError)?.code === DEADLOCK_ERROR_CODE;
 
 /**
- * Retry an operation that Postgres aborted as a deadlock victim (#864).
- *
- * Lock ordering alone cannot prevent every cycle here: deleting an asset makes Postgres lock
- * `shared_space_person` rows itself, to satisfy the `representativeFaceId` ON DELETE SET NULL
- * foreign key, and it takes those locks in face-deletion order. No application-level ordering can
- * join that sequence, so the losing transaction has to be re-driven instead.
- */
+Retry an operation that Postgres aborted as a deadlock victim (#864).
+
+Lock ordering alone cannot prevent every cycle here: deleting an asset makes Postgres lock
+`shared_space_person` rows itself, to satisfy the `representativeFaceId` ON DELETE SET NULL
+foreign key, and it takes those locks in face-deletion order. No application-level ordering can
+join that sequence, so the losing transaction has to be re-driven instead.
+*/
 export const retryOnDeadlock = async <T>(
   operation: () => Promise<T>,
   options?: { attempts?: number; delayMs?: number },
@@ -179,13 +179,13 @@ export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>)
 }
 
 /**
- * Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename search for
- * "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match everything. Pairs
- * with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it does not double-escape
- * the wildcard escapes added afterwards. Used by both text-filter paths (the time-bucket queries in
- * asset.repository.ts and searchAssetBuilderLegacy below), which must agree: the map and the timeline
- * read the same filter chips.
- */
+Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename search for
+"IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match everything. Pairs
+with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it does not double-escape
+the wildcard escapes added afterwards. Used by both text-filter paths (the time-bucket queries in
+asset.repository.ts and searchAssetBuilderLegacy below), which must agree: the map and the timeline
+read the same filter chips.
+*/
 export const escapeLikePattern = (value: string): string =>
   value
     .replaceAll('\\', String.raw`\\`)
@@ -1395,8 +1395,8 @@ export function vectorIndexQuery({ vectorExtension, table, indexName, lists = 1 
 }
 
 /** A pet face: has a pet embedding, or is assigned to a pet person. Pet faces share
- *  sourceType 'machine-learning' with human faces, so this predicate is the ONLY way
- *  human-pipeline queries can avoid destroying pet data (F1–F4). */
+sourceType 'machine-learning' with human faces, so this predicate is the ONLY way
+human-pipeline queries can avoid destroying pet data (F1–F4). */
 export const petFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   eb.or([
     eb.exists(

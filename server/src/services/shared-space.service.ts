@@ -121,39 +121,39 @@ const isSamePersonName = (ownerPersonName: string | null | undefined, spacePerso
 };
 
 /**
- * Upper bound on chained {@link SharedSpaceService.handleSharedSpacePersonDedup} passes for one
- * space. Each job runs a single pass and re-queues the next; this caps the chain so a pathological
- * always-reappears bug can't queue passes forever.
- */
+Upper bound on chained {@link SharedSpaceService.handleSharedSpacePersonDedup} passes for one
+space. Each job runs a single pass and re-queues the next; this caps the chain so a pathological
+always-reappears bug can't queue passes forever.
+*/
 export const SHARED_SPACE_DEDUP_MAX_PASSES = 100;
 
 /**
- * Root is depth 1; the cap is inclusive, so a folder at depth 10 cannot take a child.
- *
- * Defined in the repository — the writer enforces it under the advisory lock — and re-exported
- * here, which is where every caller has always imported it from.
- */
+Root is depth 1; the cap is inclusive, so a folder at depth 10 cannot take a child.
+
+Defined in the repository — the writer enforces it under the advisory lock — and re-exported
+here, which is where every caller has always imported it from.
+*/
 export { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/repositories/shared-space.repository.js';
 /** Bounds the whole-space folder fetch the web client uses to render the tree. */
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 
 /**
- * The three folder-write rejection messages, in one place.
- *
- * All three are load-bearing STRINGS, not just copy. The mobile client has no error codes to work
- * with — `_folderErrorKey` in `mobile/lib/pages/library/spaces/space_albums.page.dart`
- * substring-matches each of these to choose a specific toast over a generic one, against the
- * fragments in `mobile/lib/pages/library/spaces/space_album_folder_errors.dart`. Rewording any of
- * them past its fragment silently downgrades mobile to "something went wrong".
- *
- * `shared-space.service.spec.ts` asserts each message still contains the fragment mobile looks
- * for, so that coupling fails a test rather than failing quietly in the app.
- *
- * The name-conflict message is additionally shared by the optimistic pre-check
- * ({@link SharedSpaceService.assertNoAlbumFolderNameConflict}) and the raced-23505 mapper
- * ({@link SharedSpaceService.withAlbumFolderConstraintsMapped}), so the two 400 paths cannot
- * drift apart in wording.
- */
+The three folder-write rejection messages, in one place.
+
+All three are load-bearing STRINGS, not just copy. The mobile client has no error codes to work
+with — `_folderErrorKey` in `mobile/lib/pages/library/spaces/space_albums.page.dart`
+substring-matches each of these to choose a specific toast over a generic one, against the
+fragments in `mobile/lib/pages/library/spaces/space_album_folder_errors.dart`. Rewording any of
+them past its fragment silently downgrades mobile to "something went wrong".
+
+`shared-space.service.spec.ts` asserts each message still contains the fragment mobile looks
+for, so that coupling fails a test rather than failing quietly in the app.
+
+The name-conflict message is additionally shared by the optimistic pre-check
+({@link SharedSpaceService.assertNoAlbumFolderNameConflict}) and the raced-23505 mapper
+({@link SharedSpaceService.withAlbumFolderConstraintsMapped}), so the two 400 paths cannot
+drift apart in wording.
+*/
 export const SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE = 'A folder with that name already exists here';
 
 /** @see SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE — mobile matches on 'nesting is limited to'. */
@@ -164,20 +164,20 @@ export const sharedSpaceAlbumFolderDepthMessage = (resultingDepth: number) =>
 export const SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE = `A space is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE} folders`;
 
 /**
- * Why a promote-on-delete was refused, worded per cause.
- *
- * The `parent` arm exists because the two collisions need opposite advice. A `sibling` collision is
- * genuinely at the destination — the user should look there. A `parent` collision is with the
- * folder being deleted itself, which still holds its unique-index entry while its children are
- * promoted past it; pointing at "the destination" sends the user to a parent where nothing is
- * wrong, and the actual fix is to rename the child. The old wording claimed `destination` for both,
- * and for the nameless raced case too.
- *
- * Unlike the depth/cap/name-conflict messages, mobile does NOT map these onto a localized string —
- * `space_album_folder_errors.dart` has no 'Cannot delete:' fragment, so all three surface as the
- * generic "Unable to delete folder" there. That is a separate gap; the wording still has to be
- * right for web, which shows the server message verbatim.
- */
+Why a promote-on-delete was refused, worded per cause.
+
+The `parent` arm exists because the two collisions need opposite advice. A `sibling` collision is
+genuinely at the destination — the user should look there. A `parent` collision is with the
+folder being deleted itself, which still holds its unique-index entry while its children are
+promoted past it; pointing at "the destination" sends the user to a parent where nothing is
+wrong, and the actual fix is to rename the child. The old wording claimed `destination` for both,
+and for the nameless raced case too.
+
+Unlike the depth/cap/name-conflict messages, mobile does NOT map these onto a localized string —
+`space_album_folder_errors.dart` has no 'Cannot delete:' fragment, so all three surface as the
+generic "Unable to delete folder" there. That is a separate gap; the wording still has to be
+right for web, which shows the server message verbatim.
+*/
 export const sharedSpaceAlbumFolderPromotionConflictMessage = (
   name: string,
   reason: 'sibling' | 'parent' | 'unknown',
@@ -192,15 +192,15 @@ export const sharedSpaceAlbumFolderPromotionConflictMessage = (
 };
 
 /**
- * The foreign keys that point AT a folder row. Used by
- * {@link SharedSpaceService.withAlbumFolderConstraintsMapped} to recognise "the folder was
- * deleted underneath us" and nothing else.
- *
- * Keyed on the constraint name rather than on error code 23503 alone, because the same writes
- * touch other foreign keys: a `shared_space_album` row also references the album and the space,
- * so a blanket 23503 → "Folder not found" would confidently misreport a concurrently-deleted
- * album as a missing folder.
- */
+The foreign keys that point AT a folder row. Used by
+{@link SharedSpaceService.withAlbumFolderConstraintsMapped} to recognise "the folder was
+deleted underneath us" and nothing else.
+
+Keyed on the constraint name rather than on error code 23503 alone, because the same writes
+touch other foreign keys: a `shared_space_album` row also references the album and the space,
+so a blanket 23503 → "Folder not found" would confidently misreport a concurrently-deleted
+album as a missing folder.
+*/
 const SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS = new Set([
   // shared_space_album.folderId -> shared_space_album_folder.id
   'shared_space_album_folderId_fkey',
@@ -209,15 +209,15 @@ const SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS = new Set([
 ]);
 
 /**
- * The partial unique indexes that enforce case-insensitive sibling-name uniqueness — the only two
- * ways a folder write can legitimately raise 23505.
- *
- * Narrowed by name for the same reason {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} is:
- * the wrapped operations touch more than these indexes. `linkAlbum` wraps `addAlbum`, whose
- * transaction also writes `shared_space_album` and `album_space_asset`, so a blanket 23505 →
- * "A folder with that name already exists here" would report a re-linked album as a folder-name
- * clash — naming a folder the caller never mentioned.
- */
+The partial unique indexes that enforce case-insensitive sibling-name uniqueness — the only two
+ways a folder write can legitimately raise 23505.
+
+Narrowed by name for the same reason {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} is:
+the wrapped operations touch more than these indexes. `linkAlbum` wraps `addAlbum`, whose
+transaction also writes `shared_space_album` and `album_space_asset`, so a blanket 23505 →
+"A folder with that name already exists here" would report a re-linked album as a folder-name
+clash — naming a folder the caller never mentioned.
+*/
 const SHARED_SPACE_ALBUM_FOLDER_NAME_CONSTRAINTS = new Set([
   'shared_space_album_folder_nested_name_key',
   'shared_space_album_folder_root_name_key',
@@ -901,12 +901,12 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Expand a set of asset ids to include every live sibling that shares a stack
-   * with them, so shared-space membership stays stack-atomic (discussion #751).
-   * The explicitly-passed ids are always preserved (even if soft-deleted) so an
-   * explicit add/remove is never silently dropped; the added siblings are the
-   * live stack members only.
-   */
+  Expand a set of asset ids to include every live sibling that shares a stack
+  with them, so shared-space membership stays stack-atomic (discussion #751).
+  The explicitly-passed ids are always preserved (even if soft-deleted) so an
+  explicit add/remove is never silently dropped; the added siblings are the
+  live stack members only.
+  */
   private async expandStackAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
     const stacked = await this.stackRepository.getStackedAssetIds(assetIds, visibilities);
     return [...new Set([...assetIds, ...stacked])];
@@ -1349,6 +1349,8 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
+  // `??` (not a default parameter) also covers a null name.
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   private normalizeAlbumFolderName(rawName: string): string {
     const name = (rawName ?? '').trim();
     if (!name) {
@@ -1373,28 +1375,28 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Maps the two ways a folder write can lose a race with another editor onto the same 400s the
-   * service's own pre-checks produce. Every other error propagates unchanged — the same error
-   * object, not rewrapped — so neither arm can swallow a genuine failure.
-   *
-   * **23505, a name collision.** The pre-check above (assertNoAlbumFolderNameConflict) is
-   * optimistic — see moveAlbumFolderChecked's comment on why a full re-check under lock isn't
-   * worth the cost for plain create/rename/move. A concurrent request can still race past it and
-   * hit one of the partial unique indexes (shared_space_album_folder_nested_name_key /
-   * _root_name_key). Mapped to the same shared message the pre-check throws.
-   *
-   * **23503, the folder was deleted underneath us.** Every folder write here is
-   * check-then-write, and another editor can delete the folder in between: `setAlbumFolder`
-   * validates with getAlbumFolderById and then writes `folderId`, `moveAlbumFolderChecked` reads
-   * its target and then reparents. Postgres rejects the write with a foreign-key violation, and
-   * without this arm that surfaced as a 500 — design §5.7 C-03 promises the move 400s, and the
-   * medium test `C-03b` in shared-space-album-folder.repository.spec.ts pins the raw repository
-   * behaviour being mapped here. [missingMessage] is the caller's own wording for that folder,
-   * so a missing destination and a missing placement target don't have to share one message.
-   *
-   * Only constraints in {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} count — see that
-   * constant for why the error code alone is not enough.
-   */
+  Maps the two ways a folder write can lose a race with another editor onto the same 400s the
+  service's own pre-checks produce. Every other error propagates unchanged — the same error
+  object, not rewrapped — so neither arm can swallow a genuine failure.
+  
+  **23505, a name collision.** The pre-check above (assertNoAlbumFolderNameConflict) is
+  optimistic — see moveAlbumFolderChecked's comment on why a full re-check under lock isn't
+  worth the cost for plain create/rename/move. A concurrent request can still race past it and
+  hit one of the partial unique indexes (shared_space_album_folder_nested_name_key /
+  _root_name_key). Mapped to the same shared message the pre-check throws.
+  
+  **23503, the folder was deleted underneath us.** Every folder write here is
+  check-then-write, and another editor can delete the folder in between: `setAlbumFolder`
+  validates with getAlbumFolderById and then writes `folderId`, `moveAlbumFolderChecked` reads
+  its target and then reparents. Postgres rejects the write with a foreign-key violation, and
+  without this arm that surfaced as a 500 — design §5.7 C-03 promises the move 400s, and the
+  medium test `C-03b` in shared-space-album-folder.repository.spec.ts pins the raw repository
+  behaviour being mapped here. [missingMessage] is the caller's own wording for that folder,
+  so a missing destination and a missing placement target don't have to share one message.
+  
+  Only constraints in {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} count — see that
+  constant for why the error code alone is not enough.
+  */
   private async withAlbumFolderConstraintsMapped<T>(operation: () => Promise<T>, missingMessage: string): Promise<T> {
     try {
       return await operation();
@@ -1595,11 +1597,11 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * The linked albums that project the given assets into this space. The web uses this to explain why
-   * "Remove from space" removed nothing for an album-projected asset (it's present via a linked album,
-   * not as a direct member) and to name the album the user should manage it in. Membership-gated: only
-   * surfaces albums linked to a space the caller belongs to (the same visibility as `getLinkedAlbums`).
-   */
+  The linked albums that project the given assets into this space. The web uses this to explain why
+  "Remove from space" removed nothing for an album-projected asset (it's present via a linked album,
+  not as a direct member) and to name the album the user should manage it in. Membership-gated: only
+  surfaces albums linked to a space the caller belongs to (the same visibility as `getLinkedAlbums`).
+  */
   async getAssetLinkedAlbums(
     auth: AuthDto,
     spaceId: string,
@@ -1941,15 +1943,15 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * The single implementation of "this face belongs to this space person" (spec §6.3).
-   *
-   * `writeIdentity: false` is §6.3.1 row 3 — the face already belongs to an owner `person`
-   * carrying a different identity. Writing the identity there would re-point an identity the
-   * OWNER's person depends on, and `applyResolvedPersonMetadata` resolves the owner's own view
-   * of names and ages through exactly that identity. Space-person reads go through
-   * `shared_space_person_face`, not the identity layer, so the projection alone is enough for
-   * the space to show the new name while the owner's library stays untouched.
-   */
+  The single implementation of "this face belongs to this space person" (spec §6.3).
+  
+  `writeIdentity: false` is §6.3.1 row 3 — the face already belongs to an owner `person`
+  carrying a different identity. Writing the identity there would re-point an identity the
+  OWNER's person depends on, and `applyResolvedPersonMetadata` resolves the owner's own view
+  of names and ages through exactly that identity. Space-person reads go through
+  `shared_space_person_face`, not the identity layer, so the projection alone is enough for
+  the space to show the new name while the owner's library stays untouched.
+  */
   private async linkFaceToSpacePerson(
     trx: Transaction<DB>,
     person: SharedSpacePerson,
@@ -2023,17 +2025,17 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * #734 follow-up (spec §6.3): attach a space person to a face directly — no pending ML
-   * suggestion required, unlike `confirmSpacePersonFaceSuggestion` above.
-   *
-   * The transaction below shares `linkFaceToSpacePerson` with that method (Slice 2), so the two
-   * can never drift on what "this face belongs to this space person" means.
-   *
-   * Idempotent: `addPersonFaces` is onConflict-doNothing and `replaceFaceIdentity` upserts, so
-   * a double-submit is a no-op. Returns whether it acted, matching the S11 convention on the
-   * sibling confirm/reject routes (a 200-vs-204 status signal is unreadable through
-   * @oazapfts/runtime's ok()).
-   */
+  #734 follow-up (spec §6.3): attach a space person to a face directly — no pending ML
+  suggestion required, unlike `confirmSpacePersonFaceSuggestion` above.
+  
+  The transaction below shares `linkFaceToSpacePerson` with that method (Slice 2), so the two
+  can never drift on what "this face belongs to this space person" means.
+  
+  Idempotent: `addPersonFaces` is onConflict-doNothing and `replaceFaceIdentity` upserts, so
+  a double-submit is a no-op. Returns whether it acted, matching the S11 convention on the
+  sibling confirm/reject routes (a 200-vs-204 status signal is unreadable through
+  @oazapfts/runtime's ok()).
+  */
   async attachFaceToSpacePerson(
     auth: AuthDto,
     spaceId: string,
@@ -2129,17 +2131,17 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.4 (Slice 4, revised): detach a face from a space person. Removes the space's
-   * `shared_space_person_face` projection row and, where the owner layer is the space's to touch,
-   * the face's `face_identity_face` link to this person's identity and the owner's tag. Like attach,
-   * the identity change reaches every space sharing that identity (§5.1).
-   *
-   * Writes a negative verdict first so the suggestion pipeline does not immediately re-offer the
-   * face back to this same person, mirroring the reassign arm of `attachFaceToSpacePerson`.
-   *
-   * F-38: `isFaceAssignableInSpace` is re-checked here at write time, never trusted from the
-   * §6.1 read — a face the read returned a moment ago may have left the space since.
-   */
+  Spec §6.4 (Slice 4, revised): detach a face from a space person. Removes the space's
+  `shared_space_person_face` projection row and, where the owner layer is the space's to touch,
+  the face's `face_identity_face` link to this person's identity and the owner's tag. Like attach,
+  the identity change reaches every space sharing that identity (§5.1).
+  
+  Writes a negative verdict first so the suggestion pipeline does not immediately re-offer the
+  face back to this same person, mirroring the reassign arm of `attachFaceToSpacePerson`.
+  
+  F-38: `isFaceAssignableInSpace` is re-checked here at write time, never trusted from the
+  §6.1 read — a face the read returned a moment ago may have left the space since.
+  */
   async detachFaceFromSpacePerson(
     auth: AuthDto,
     spaceId: string,
@@ -2222,19 +2224,19 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.2 (Slice 4): create a space person, optionally attaching a seed face ("add a name").
-   *
-   * When `assetFaceId` is present this is create-and-attach, and it runs as ONE transaction
-   * (F-15) — a crash between the create and the attach would leave a nameless orphan person in
-   * the space's people list, the same failure mode `confirmSpacePersonFaceSuggestion` guards
-   * against for the suggestion path.
-   *
-   * F-33: the `(spaceId, identityId)` unique index is the trap. A face whose identity a detach
-   * left in place (a non-member owner's own tag, §3), or one linked by ML backfill, may already
-   * resolve to an identity that some OTHER space person here already holds.
-   * `createOrGetPersonForIdentity` is used whenever the seed face already carries an identity, so
-   * that case returns the existing person instead of racing a plain insert into a duplicate key.
-   */
+  Spec §6.2 (Slice 4): create a space person, optionally attaching a seed face ("add a name").
+  
+  When `assetFaceId` is present this is create-and-attach, and it runs as ONE transaction
+  (F-15) — a crash between the create and the attach would leave a nameless orphan person in
+  the space's people list, the same failure mode `confirmSpacePersonFaceSuggestion` guards
+  against for the suggestion path.
+  
+  F-33: the `(spaceId, identityId)` unique index is the trap. A face whose identity a detach
+  left in place (a non-member owner's own tag, §3), or one linked by ML backfill, may already
+  resolve to an identity that some OTHER space person here already holds.
+  `createOrGetPersonForIdentity` is used whenever the seed face already carries an identity, so
+  that case returns the existing person instead of racing a plain insert into a duplicate key.
+  */
   async createSpacePerson(
     auth: AuthDto,
     spaceId: string,
@@ -2290,21 +2292,21 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
-   * exposes faces nobody has named yet, which a Viewer has no business seeing.
-   *
-   * The hidden-person exclusion lives in the repository read (`getAssetFacesForSpace`) so it
-   * cannot drift from `isFaceAssignableInSpace`'s write-side exclusion — an editor must never be
-   * able to attach a face this list would not show them (F-8/F-9).
-   *
-   * Boxes are STORED against the original bytes, and the client renders the edited preview and
-   * crops each face out of it, so they are projected on the way out — the same transform the
-   * owner's twin read applies (`PersonService.getFacesById` → `mapFaces`), and the exact inverse of
-   * the one `createSpaceAssetFace` applies on the way in. Returning them raw put this endpoint on
-   * the opposite convention from its own write, so every crop in the editor's panel was cut from
-   * the wrong region of an edited asset — and #992 is what makes editing a MEMBER's asset possible,
-   * so an edited member asset is an ordinary case here, not an exotic one.
-   */
+  Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
+  exposes faces nobody has named yet, which a Viewer has no business seeing.
+  
+  The hidden-person exclusion lives in the repository read (`getAssetFacesForSpace`) so it
+  cannot drift from `isFaceAssignableInSpace`'s write-side exclusion — an editor must never be
+  able to attach a face this list would not show them (F-8/F-9).
+  
+  Boxes are STORED against the original bytes, and the client renders the edited preview and
+  crops each face out of it, so they are projected on the way out — the same transform the
+  owner's twin read applies (`PersonService.getFacesById` → `mapFaces`), and the exact inverse of
+  the one `createSpaceAssetFace` applies on the way in. Returning them raw put this endpoint on
+  the opposite convention from its own write, so every crop in the editor's panel was cut from
+  the wrong region of an edited asset — and #992 is what makes editing a MEMBER's asset possible,
+  so an edited member asset is an ordinary case here, not an exotic one.
+  */
   async getSpaceAssetFaces(auth: AuthDto, spaceId: string, assetId: string): Promise<SpaceAssetFaceResponseDto[]> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
@@ -2349,21 +2351,21 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset.
-   *
-   * Coordinates arrive in the (possibly edited) PREVIEW image's space — #992 lets an editor
-   * rotate a member's asset, so a rotated preview is a likely path, not an exotic one (F-16).
-   * `convertFaceBoxToOriginalImageSpace` is the SAME transform `PersonService.createFace` uses
-   * for the owner path, so the two can never drift on this geometry (a drift here silently
-   * misplaces boxes).
-   *
-   * The created face gets `personId = NULL` (never the owner's), `sourceType = Manual`, and
-   * an `asset_face_creator` row for `auth.user.id` — the record §6.6 uses to decide whether the
-   * editor may later delete it, never `sourceType` (see that section's doc comment for why). It is then attached
-   * to the target space person through `linkFaceToSpacePerson`, always with `writeIdentity:
-   * true`: a face this call just created cannot already belong to one of the owner's own people
-   * (§6.3.1), so the identity-skip override case never applies here.
-   */
+  Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset.
+  
+  Coordinates arrive in the (possibly edited) PREVIEW image's space — #992 lets an editor
+  rotate a member's asset, so a rotated preview is a likely path, not an exotic one (F-16).
+  `convertFaceBoxToOriginalImageSpace` is the SAME transform `PersonService.createFace` uses
+  for the owner path, so the two can never drift on this geometry (a drift here silently
+  misplaces boxes).
+  
+  The created face gets `personId = NULL` (never the owner's), `sourceType = Manual`, and
+  an `asset_face_creator` row for `auth.user.id` — the record §6.6 uses to decide whether the
+  editor may later delete it, never `sourceType` (see that section's doc comment for why). It is then attached
+  to the target space person through `linkFaceToSpacePerson`, always with `writeIdentity:
+  true`: a face this call just created cannot already belong to one of the owner's own people
+  (§6.3.1), so the identity-skip override case never applies here.
+  */
   async createSpaceAssetFace(
     auth: AuthDto,
     spaceId: string,
@@ -2445,20 +2447,20 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.6 (Slice 6, Task 3): delete a face box an EDITOR of this space drew (§6.5).
-   *
-   * Deletable iff the face has an `asset_face_creator` row AND the face is reachable in a space where
-   * the actor is Owner/Editor — NEVER `sourceType`. `PersonService.createFace` already writes
-   * `SourceType.Manual` for an OWNER-drawn box too, so gating on `sourceType === Manual` would let
-   * a space editor delete boxes the owner drew by hand — the exact regression this whole design
-   * exists to avoid. A detected face (no creator row) is refused: `FaceDelete` stays
-   * owner-only for those.
-   *
-   * Hard-deletes the row. `shared_space_person_face` and `face_identity_face` both cascade away
-   * (`ON DELETE CASCADE`) in EVERY space holding this face, not just this one — the box itself is
-   * being destroyed, not merely detached here — but the cascade does not recount, so every
-   * affected space person is snapshotted first and recounted afterward (mirrors §6.4's detach).
-   */
+  Spec §6.6 (Slice 6, Task 3): delete a face box an EDITOR of this space drew (§6.5).
+  
+  Deletable iff the face has an `asset_face_creator` row AND the face is reachable in a space where
+  the actor is Owner/Editor — NEVER `sourceType`. `PersonService.createFace` already writes
+  `SourceType.Manual` for an OWNER-drawn box too, so gating on `sourceType === Manual` would let
+  a space editor delete boxes the owner drew by hand — the exact regression this whole design
+  exists to avoid. A detected face (no creator row) is refused: `FaceDelete` stays
+  owner-only for those.
+  
+  Hard-deletes the row. `shared_space_person_face` and `face_identity_face` both cascade away
+  (`ON DELETE CASCADE`) in EVERY space holding this face, not just this one — the box itself is
+  being destroyed, not merely detached here — but the cascade does not recount, so every
+  affected space person is snapshotted first and recounted afterward (mirrors §6.4's detach).
+  */
   async deleteSpaceAssetFace(auth: AuthDto, spaceId: string, assetFaceId: string): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
@@ -3006,14 +3008,14 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * L7: delete the membership row and unlink the departing user's OWNED albums (albums-6)
-   * in ONE transaction, so a failure between the two can never leave the ex-member's own
-   * album linked with no membership row backing it (or vice versa). Fork rule: never run
-   * `this.db` queries inside a Kysely transaction() callback — both repo calls thread the
-   * `trx` handle instead (mirrors recountPersons). Returns the unlinked album ids so the
-   * caller can run face cleanup (outside the transaction — see cleanupDepartingMemberFaces)
-   * and enqueue grant reconciliation.
-   */
+  L7: delete the membership row and unlink the departing user's OWNED albums (albums-6)
+  in ONE transaction, so a failure between the two can never leave the ex-member's own
+  album linked with no membership row backing it (or vice versa). Fork rule: never run
+  `this.db` queries inside a Kysely transaction() callback — both repo calls thread the
+  `trx` handle instead (mirrors recountPersons). Returns the unlinked album ids so the
+  caller can run face cleanup (outside the transaction — see cleanupDepartingMemberFaces)
+  and enqueue grant reconciliation.
+  */
   private async removeMemberAndOwnedAlbumsAtomically(spaceId: string, userId: string): Promise<string[]> {
     return this.databaseRepository.transaction(async (trx) => {
       await this.sharedSpaceRepository.removeMember(spaceId, userId, trx);
@@ -3022,13 +3024,13 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * albums-6 / L6: clean up any now-orphaned space person faces for the departing member's
-   * just-unlinked albums (mirrors unlinkAlbum's cleanup). Deliberately OUTSIDE the membership
-   * transaction (no `this.db` inside a Kysely transaction()) and re-drivable: a failure here
-   * doesn't roll back the already-committed membership/album-link removal — it falls back to
-   * the durable per-space reconcile (enqueueSpaceFaceProjectionReconcile / L6's stale-face
-   * sweep) instead of silently leaving stale face rows.
-   */
+  albums-6 / L6: clean up any now-orphaned space person faces for the departing member's
+  just-unlinked albums (mirrors unlinkAlbum's cleanup). Deliberately OUTSIDE the membership
+  transaction (no `this.db` inside a Kysely transaction()) and re-drivable: a failure here
+  doesn't roll back the already-committed membership/album-link removal — it falls back to
+  the durable per-space reconcile (enqueueSpaceFaceProjectionReconcile / L6's stale-face
+  sweep) instead of silently leaving stale face rows.
+  */
   private async cleanupDepartingMemberFaces(
     spaceId: string,
     unlinkedAlbumIds: string[],
@@ -3332,13 +3334,13 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Collapses every same-space `shared_space_person` pair that would block the identity merge.
-   * For each pair the survivor is chosen by nameSource precedence (manual > inherited > auto >
-   * none), tie-broken by face count then id; the loser's faces and aliases move to the survivor and
-   * the loser row is deleted. The survivor's winning name is preserved by construction (it always
-   * has at least the loser's nameSource precedence). The subsequent mergeIdentities then sets the
-   * survivor onto the canonical target identity without colliding.
-   */
+  Collapses every same-space `shared_space_person` pair that would block the identity merge.
+  For each pair the survivor is chosen by nameSource precedence (manual > inherited > auto >
+  none), tie-broken by face count then id; the loser's faces and aliases move to the survivor and
+  the loser row is deleted. The survivor's winning name is preserved by construction (it always
+  has at least the loser's nameSource precedence). The subsequent mergeIdentities then sets the
+  survivor onto the canonical target identity without colliding.
+  */
   private async collapseSameSpaceReconciliationConflicts(claim: SharedSpaceIdentityReconciliationClaim): Promise<void> {
     const pairs = await this.faceIdentityRepository.getSpaceMergeConflictPairs({
       targetIdentityId: claim.targetIdentityId,

@@ -42,9 +42,9 @@ const dummyQueryOptions = {
 };
 
 /**
- * Gallery's sync streams (favorites overlay, shared spaces, libraries, space albums), kept out of
- * the upstream SyncRepository. SyncService reaches them through GallerySyncStreams.
- */
+Gallery's sync streams (favorites overlay, shared spaces, libraries, space albums), kept out of
+the upstream SyncRepository. SyncService reaches them through GallerySyncStreams.
+*/
 @Injectable()
 export class GallerySyncRepository {
   assetFavorite: AssetFavoriteSync;

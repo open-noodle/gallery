@@ -66,6 +66,7 @@ const FAVORITE_FILTER = {
   visibility: AssetVisibility.Timeline,
 } as const;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const database = db || defaultDatabase;
   const timeline = newMediumService(TimelineService, {
