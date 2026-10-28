@@ -1,23 +1,23 @@
 /**
- * End-to-end journey for Slice 9 of the space-editor face-assignment feature (spec
- * `specs/2026-08-23-space-editor-face-assignment-design.md` §6.1-§6.7): a
- * Shared Space Editor names faces on a fellow member's photo, corrects a mistaken match, draws
- * and deletes her own box, and both mutations she made land in the space's activity feed
- * attributed to her -- plus the negative half that proves the widened permission has a ceiling.
- *
- * Fixture: `buildSpaceContext()` gives `spaceOwner` ("Bob") and `spaceEditor` ("Anna") as members
- * of the same space, with `ctx.spaceAssetId` already a photo of Bob's, reachable in the space.
- * There is no HTTP path that leaves a face unassigned (`POST /faces` requires a `personId`, and
- * the space draw endpoint always attaches on creation) -- production faces come from ML
- * detection, which does not run in this stack -- so unassigned faces are seeded directly via
- * `utils.createUnassignedFace`, mirroring how the sibling journey seeds its own asset instead of
- * depending on a pipeline this stack does not run.
- *
- * Rule under test (spec §6.3, §6.6): a space Owner/Editor may name, correct, draw, and delete
- * their own drawn boxes on ANY member's asset reachable through the space -- but `PersonUpdate`
- * (the owner-only personal-person path) and a DETECTED face's deletability stay untouched, and
- * none of it reaches a face whose asset has left the space.
- */
+End-to-end journey for Slice 9 of the space-editor face-assignment feature (spec
+`specs/2026-08-23-space-editor-face-assignment-design.md` §6.1-§6.7): a
+Shared Space Editor names faces on a fellow member's photo, corrects a mistaken match, draws
+and deletes her own box, and both mutations she made land in the space's activity feed
+attributed to her -- plus the negative half that proves the widened permission has a ceiling.
+
+Fixture: `buildSpaceContext()` gives `spaceOwner` ("Bob") and `spaceEditor` ("Anna") as members
+of the same space, with `ctx.spaceAssetId` already a photo of Bob's, reachable in the space.
+There is no HTTP path that leaves a face unassigned (`POST /faces` requires a `personId`, and
+the space draw endpoint always attaches on creation) -- production faces come from ML
+detection, which does not run in this stack -- so unassigned faces are seeded directly via
+`utils.createUnassignedFace`, mirroring how the sibling journey seeds its own asset instead of
+depending on a pipeline this stack does not run.
+
+Rule under test (spec §6.3, §6.6): a space Owner/Editor may name, correct, draw, and delete
+their own drawn boxes on ANY member's asset reachable through the space -- but `PersonUpdate`
+(the owner-only personal-person path) and a DETECTED face's deletability stay untouched, and
+none of it reaches a face whose asset has left the space.
+*/
 import {
   attachSpacePersonFace,
   createSpaceAssetFace,

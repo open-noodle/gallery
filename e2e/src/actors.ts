@@ -31,10 +31,10 @@ export type Actor = {
 };
 
 /**
- * Build the request `Authorization` header for an actor. Returns an empty object
- * for `anon` so call sites can do `request(app).get(...).set(authHeaders(actor))`
- * without conditionals.
- */
+Build the request `Authorization` header for an actor. Returns an empty object
+for `anon` so call sites can do `request(app).get(...).set(authHeaders(actor))`
+without conditionals.
+*/
 export const authHeaders = (actor: Actor): Record<string, string> =>
   actor.token ? { Authorization: `Bearer ${actor.token}` } : {};
 
@@ -59,24 +59,24 @@ export type SpaceContext = {
 
 export type BuildSpaceContextOptions = {
   /**
-   * If true, also creates a partner user who has shared their assets with `spaceOwner`,
-   * uploads one asset, and exposes them as `partner` / `partnerAssetId` on the returned
-   * SpaceContext. Costs one extra user setup + one createPartner call.
-   */
+  If true, also creates a partner user who has shared their assets with `spaceOwner`,
+  uploads one asset, and exposes them as `partner` / `partnerAssetId` on the returned
+  SpaceContext. Costs one extra user setup + one createPartner call.
+  */
   withPartner?: boolean;
 };
 
 /**
- * Build a complete space context: admin + space-owner + editor + viewer + non-member,
- * a shared space owned by spaceOwner, and three uploaded assets (one for each member
- * with assets, plus one explicitly added to the space).
- *
- * With `{ withPartner: true }`, also creates a `partner` user who has shared their
- * assets with `spaceOwner` and uploaded one asset.
- *
- * Call once in `beforeAll` per spec file. Treat the returned fixtures as read-only;
- * mutating tests must restore state in try/finally (see T02 fixture lifetime contract).
- */
+Build a complete space context: admin + space-owner + editor + viewer + non-member,
+a shared space owned by spaceOwner, and three uploaded assets (one for each member
+with assets, plus one explicitly added to the space).
+
+With `{ withPartner: true }`, also creates a `partner` user who has shared their
+assets with `spaceOwner` and uploaded one asset.
+
+Call once in `beforeAll` per spec file. Treat the returned fixtures as read-only;
+mutating tests must restore state in try/finally (see T02 fixture lifetime contract).
+*/
 export const buildSpaceContext = async (options: BuildSpaceContextOptions = {}): Promise<SpaceContext> => {
   const adminLogin = await utils.adminSetup();
 
@@ -133,18 +133,18 @@ export const buildSpaceContext = async (options: BuildSpaceContextOptions = {}):
 };
 
 /**
- * Set up a partner relationship: `from` shares their assets WITH `to`. The recipient
- * can then see the sharer's assets via `?withPartners=true`.
- *
- * The default `partner.inTimeline` column is `false` (verified in
- * `server/src/schema/tables/partner.table.ts:46`), so a fresh `createPartner` call
- * is invisible to `getMyPartnerIds({ timelineEnabled: true })` which is what
- * timeline.service.ts uses. To make tests intuitive, this helper auto-enables
- * `inTimeline` after creation by having the recipient call PUT /partners/:id.
- *
- * Pinned in the backlog as an "Observed invariant" — easy to forget, painful to
- * debug because the empty timeline silently looks correct.
- */
+Set up a partner relationship: `from` shares their assets WITH `to`. The recipient
+can then see the sharer's assets via `?withPartners=true`.
+
+The default `partner.inTimeline` column is `false` (verified in
+`server/src/schema/tables/partner.table.ts:46`), so a fresh `createPartner` call
+is invisible to `getMyPartnerIds({ timelineEnabled: true })` which is what
+timeline.service.ts uses. To make tests intuitive, this helper auto-enables
+`inTimeline` after creation by having the recipient call PUT /partners/:id.
+
+Pinned in the backlog as an "Observed invariant" — easy to forget, painful to
+debug because the empty timeline silently looks correct.
+*/
 export const addPartner = async (
   from: { token: string; userId: string },
   to: { token: string; userId: string },
@@ -169,19 +169,19 @@ const actorFrom = (id: ActorId, login: LoginResponseDto): Actor => ({
 type ExpectedMap = Partial<Record<ActorId, number>>;
 
 /**
- * Run an HTTP call once per actor and assert each got the expected status code.
- *
- * The `run` callback receives an actor and returns a supertest `Response`. Call
- * sites just `return request(app).get(...).set(...)` — no need to map into a
- * `{status, body}` shape.
- *
- * Throws an `Error` (not `expect`) so the failure message can name the actor.
- * `expect(status).toBe(exp)` doesn't surface which actor failed, which makes
- * debugging the matrix painful.
- *
- * Sequential, not parallel: tests share a database; parallel actor runs would
- * race on the same fixtures. The matrix is small (≤6 in practice).
- */
+Run an HTTP call once per actor and assert each got the expected status code.
+
+The `run` callback receives an actor and returns a supertest `Response`. Call
+sites just `return request(app).get(...).set(...)` — no need to map into a
+`{status, body}` shape.
+
+Throws an `Error` (not `expect`) so the failure message can name the actor.
+`expect(status).toBe(exp)` doesn't surface which actor failed, which makes
+debugging the matrix painful.
+
+Sequential, not parallel: tests share a database; parallel actor runs would
+race on the same fixtures. The matrix is small (≤6 in practice).
+*/
 export const forEachActor = async (
   actors: Actor[],
   run: (actor: Actor) => Promise<Response>,

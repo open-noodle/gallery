@@ -297,10 +297,10 @@ export function getTimeBuckets(
 }
 
 /**
- * Return representative cover metadata for the requested buckets (mimics GET /timeline/bucket-covers).
- * Picks filteredAssets[0] per bucket as the representative, reusing the same asset-filter logic as
- * getTimeBuckets so the cover is always drawn from the filtered scope.
- */
+Return representative cover metadata for the requested buckets (mimics GET /timeline/bucket-covers).
+Picks filteredAssets[0] per bucket as the representative, reusing the same asset-filter logic as
+getTimeBuckets so the cover is always drawn from the filtered scope.
+*/
 export function getTimeBucketCovers(
   timelineData: MockTimelineData,
   changes: Changes,

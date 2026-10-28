@@ -5,32 +5,32 @@ import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * #986 — the album scope on smart search.
- *
- * An album detail page runs its page-aware search scoped to the album it is showing. Server-side
- * that made `albumIds` an ACCESS BOUNDARY on the smart path, matching what `/search/metadata` has
- * always done: check `AlbumRead` up front, then leave the owner-scoping `userIds` unset so
- * `albumConfinedToViewer` re-gates the rows. Previously smart search kept `userIds`, so searching a
- * shared album returned only your own photos beside a grid that had just shown everyone's.
- *
- * WHAT IS TESTABLE HERE, and why these assertions look indirect:
- *
- * The e2e stack sets `IMMICH_MACHINE_LEARNING_ENABLED=false`, so smart search always ends in the
- * "Smart search is not enabled" gate and never reaches SQL. But the new `AlbumRead` check runs
- * BEFORE that gate, so the two 400s carry different messages — and which one comes back tells us
- * exactly whether the check ran and whether it passed:
- *
- *   "Not found or no album.read access"  → the check ran and REFUSED
- *   "Smart search is not enabled"        → the check ran and PASSED (or never ran)
- *
- * That distinction is what makes the DTO change observable too: if `albumIds` were still stripped
- * from `SmartSearchFacetsDto` by the zod pipe, the facets endpoint could not refuse an inaccessible
- * album at all — it would fall through to the ML gate. So the refusal below is an end-to-end proof
- * that the field survives validation.
- *
- * The row-level half (a shared album returning every member's matches) needs real embeddings and is
- * covered by unit tests over the resolved options; it cannot be reached while ML is off.
- */
+#986 — the album scope on smart search.
+
+An album detail page runs its page-aware search scoped to the album it is showing. Server-side
+that made `albumIds` an ACCESS BOUNDARY on the smart path, matching what `/search/metadata` has
+always done: check `AlbumRead` up front, then leave the owner-scoping `userIds` unset so
+`albumConfinedToViewer` re-gates the rows. Previously smart search kept `userIds`, so searching a
+shared album returned only your own photos beside a grid that had just shown everyone's.
+
+WHAT IS TESTABLE HERE, and why these assertions look indirect:
+
+The e2e stack sets `IMMICH_MACHINE_LEARNING_ENABLED=false`, so smart search always ends in the
+"Smart search is not enabled" gate and never reaches SQL. But the new `AlbumRead` check runs
+BEFORE that gate, so the two 400s carry different messages — and which one comes back tells us
+exactly whether the check ran and whether it passed:
+
+  "Not found or no album.read access"  → the check ran and REFUSED
+  "Smart search is not enabled"        → the check ran and PASSED (or never ran)
+
+That distinction is what makes the DTO change observable too: if `albumIds` were still stripped
+from `SmartSearchFacetsDto` by the zod pipe, the facets endpoint could not refuse an inaccessible
+album at all — it would fall through to the ML gate. So the refusal below is an end-to-end proof
+that the field survives validation.
+
+The row-level half (a shared album returning every member's matches) needs real embeddings and is
+covered by unit tests over the resolved options; it cannot be reached while ML is off.
+*/
 
 const NO_ALBUM_ACCESS = 'Not found or no album.read access';
 const ML_DISABLED = 'Smart search is not enabled';

@@ -361,15 +361,15 @@ export const utils = {
   },
 
   /**
-   * Give the session elevated (PIN-verified) permission.
-   *
-   * Required before a SINGLE `PUT /assets/:id` that sets `visibility: locked`. That endpoint writes the
-   * visibility and then returns `this.get(auth, id)`, and `AssetAccess.checkOwnerAccess` excludes Locked
-   * assets from a non-elevated session — so the write lands but the response is a 400. The bulk endpoint
-   * (`PUT /assets`) returns void and therefore never hits the read-back, which is why most specs get away
-   * with it. Upstream's AssetService.update has the identical shape, so this is the caller's job, not a
-   * fork patch.
-   */
+  Give the session elevated (PIN-verified) permission.
+  
+  Required before a SINGLE `PUT /assets/:id` that sets `visibility: locked`. That endpoint writes the
+  visibility and then returns `this.get(auth, id)`, and `AssetAccess.checkOwnerAccess` excludes Locked
+  assets from a non-elevated session — so the write lands but the response is a 400. The bulk endpoint
+  (`PUT /assets`) returns void and therefore never hits the read-back, which is why most specs get away
+  with it. Upstream's AssetService.update has the identical shape, so this is the caller's job, not a
+  fork patch.
+  */
   elevateSession: async (accessToken: string, pinCode = '123456') => {
     // Idempotent: setupPinCode 400s with 'User already has a PIN code', so a second call for the same
     // user (another test in the same file, a retry) must not fail the suite.
@@ -416,20 +416,20 @@ export const utils = {
     sdkUnlinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
 
   /**
-   * Upload an asset.
-   *
-   * Idempotent across vitest retries. `retry` re-runs the test body but not `beforeAll`/`beforeEach`,
-   * so an upload that reached the server on a previous attempt is still there. Re-uploading the same
-   * bytes hits the per-owner checksum constraint and the server answers DUPLICATE, which turns one
-   * slow upload into a deterministic failure on every remaining attempt (the asset checksum index has
-   * no `deletedAt` predicate, so even trashing the asset would not free it).
-   *
-   * A DUPLICATE response is therefore reported as CREATED, carrying the existing asset's id — the
-   * postcondition callers actually depend on ("an asset with these bytes exists, here is its id")
-   * already holds. `waitForWebsocketEvent` replays already-seen ids, so downstream waits still settle.
-   *
-   * Pass `allowDuplicate` to observe the raw status when duplicate detection is what's under test.
-   */
+  Upload an asset.
+  
+  Idempotent across vitest retries. `retry` re-runs the test body but not `beforeAll`/`beforeEach`,
+  so an upload that reached the server on a previous attempt is still there. Re-uploading the same
+  bytes hits the per-owner checksum constraint and the server answers DUPLICATE, which turns one
+  slow upload into a deterministic failure on every remaining attempt (the asset checksum index has
+  no `deletedAt` predicate, so even trashing the asset would not free it).
+  
+  A DUPLICATE response is therefore reported as CREATED, carrying the existing asset's id — the
+  postcondition callers actually depend on ("an asset with these bytes exists, here is its id")
+  already holds. `waitForWebsocketEvent` replays already-seen ids, so downstream waits still settle.
+  
+  Pass `allowDuplicate` to observe the raw status when duplicate detection is what's under test.
+  */
   createAsset: async (
     accessToken: string,
     dto?: Partial<Omit<AssetMediaCreateDto, 'assetData' | 'sidecarData'>> & {
@@ -543,16 +543,16 @@ export const utils = {
     assetId: string;
     personGroupId: string;
     /**
-     * Defaults to the schema default, `machine-learning`, because that is what the face-repair
-     * surfaces require: getScanFlaggedFaces (and the cross-engine console) join `face_search` on
-     * `sourceType = MachineLearning`, so a face seeded any other way is invisible to them and the
-     * scan silently finds nothing — see face-cleanup / face-review-cross-engine.
-     *
-     * Pass `'manual'` from specs that upload real assets and let detection run: on a stack with
-     * facial recognition enabled, `handleDetectFaces` treats an existing MachineLearning-sourced
-     * face as a prior ML detection, re-runs detection, finds 0 real faces in these fixtures, and
-     * deletes every face whose id was not re-confirmed — wiping the seeded face.
-     */
+    Defaults to the schema default, `machine-learning`, because that is what the face-repair
+    surfaces require: getScanFlaggedFaces (and the cross-engine console) join `face_search` on
+    `sourceType = MachineLearning`, so a face seeded any other way is invisible to them and the
+    scan silently finds nothing — see face-cleanup / face-review-cross-engine.
+    
+    Pass `'manual'` from specs that upload real assets and let detection run: on a stack with
+    facial recognition enabled, `handleDetectFaces` treats an existing MachineLearning-sourced
+    face as a prior ML detection, re-runs detection, finds 0 real faces in these fixtures, and
+    deletes every face whose id was not re-confirmed — wiping the seeded face.
+    */
     sourceType?: 'machine-learning' | 'manual';
   }): Promise<string> => {
     if (!client) {
@@ -612,12 +612,12 @@ export const utils = {
   },
 
   /**
-   * Seeds a bare, UNASSIGNED asset_face (`personGroupId IS NULL`) directly via SQL — there is no HTTP
-   * path that leaves a face unassigned: `POST /faces` (owner) requires `personId`, and the space
-   * draw endpoint (`POST /shared-spaces/:id/assets/:assetId/faces`) always attaches on creation.
-   * In production an unassigned face comes from ML detection, which does not run in this stack.
-   * Used by the space-editor face-assign journey to seed the "unrecognised face" an editor names.
-   */
+  Seeds a bare, UNASSIGNED asset_face (`personGroupId IS NULL`) directly via SQL — there is no HTTP
+  path that leaves a face unassigned: `POST /faces` (owner) requires `personId`, and the space
+  draw endpoint (`POST /shared-spaces/:id/assets/:assetId/faces`) always attaches on creation.
+  In production an unassigned face comes from ML detection, which does not run in this stack.
+  Used by the space-editor face-assign journey to seed the "unrecognised face" an editor names.
+  */
   createUnassignedFace: async (assetId: string): Promise<string> => {
     if (!client) {
       throw new Error('Database client not connected');
@@ -631,12 +631,12 @@ export const utils = {
   },
 
   /**
-   * Spec §6.3.1: `face_identity_face`'s `identityId` for one face, or `undefined` if the face
-   * has no identity link yet. No SDK/HTTP surface exposes this directly (space-person reads go
-   * through `shared_space_person_face`, not the identity layer), so the space-editor face-assign
-   * journey reads it straight from the DB to prove the identity-write-vs-skip behaviour that
-   * `writeIdentity` gates -- without asserting on internal repository calls.
-   */
+  Spec §6.3.1: `face_identity_face`'s `identityId` for one face, or `undefined` if the face
+  has no identity link yet. No SDK/HTTP surface exposes this directly (space-person reads go
+  through `shared_space_person_face`, not the identity layer), so the space-editor face-assign
+  journey reads it straight from the DB to prove the identity-write-vs-skip behaviour that
+  `writeIdentity` gates -- without asserting on internal repository calls.
+  */
   getFaceIdentityId: async (assetFaceId: string): Promise<string | undefined> => {
     if (!client) {
       throw new Error('Database client not connected');
@@ -649,15 +649,15 @@ export const utils = {
   },
 
   /**
-   * Spec §6.3.1 (revised): the OWNER-side `asset_face.personGroupId` for one face, plus the owning
-   * `person`'s name when it is set.
-   *
-   * This is the column a space-editor face edit now propagates onto, and it is the column the
-   * asset-detail People row is seeded from -- so reading it directly is the sharpest available
-   * proof that an editor's attach/detach reached the owner's own layer rather than stopping at
-   * the space projection. The owner-facing `GET /assets/:id` assertion in the same spec proves the
-   * user-visible half; this proves which column moved.
-   */
+  Spec §6.3.1 (revised): the OWNER-side `asset_face.personGroupId` for one face, plus the owning
+  `person`'s name when it is set.
+  
+  This is the column a space-editor face edit now propagates onto, and it is the column the
+  asset-detail People row is seeded from -- so reading it directly is the sharpest available
+  proof that an editor's attach/detach reached the owner's own layer rather than stopping at
+  the space projection. The owner-facing `GET /assets/:id` assertion in the same spec proves the
+  user-visible half; this proves which column moved.
+  */
   getFaceOwnerPerson: async (assetFaceId: string): Promise<{ personId: string | null; name: string | null }> => {
     if (!client) {
       throw new Error('Database client not connected');
@@ -700,6 +700,7 @@ export const utils = {
     ]);
   },
 
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   createPet: async (ownerId: string, species: string, name?: string) => {
     if (!client) {
       throw new Error('Database client not connected');
@@ -1059,6 +1060,7 @@ export const utils = {
     });
   },
 
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   waitForQueuePaused: (accessToken: string, queue: keyof QueuesResponseLegacyDto, ms?: number) => {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<void>(async (resolve, reject) => {

@@ -33,9 +33,9 @@ interface SyncLine {
 }
 
 /**
- * Parses the jsonlines+json response body from POST /sync/stream into a
- * typed array of sync lines. The last line is always SyncCompleteV1.
- */
+Parses the jsonlines+json response body from POST /sync/stream into a
+typed array of sync lines. The last line is always SyncCompleteV1.
+*/
 const parseStream = (text: string): SyncLine[] => {
   return text
     .split('\n')
@@ -44,10 +44,10 @@ const parseStream = (text: string): SyncLine[] => {
 };
 
 /**
- * Sends a /sync/stream request and parses the jsonl response. `reset: true`
- * clears any prior ack state on the server side so the test starts from a
- * known baseline.
- */
+Sends a /sync/stream request and parses the jsonl response. `reset: true`
+clears any prior ack state on the server side so the test starts from a
+known baseline.
+*/
 const syncStream = async (accessToken: string, types: SyncRequestType[], reset = false): Promise<SyncLine[]> => {
   const response = await request(app)
     .post('/sync/stream')
@@ -69,12 +69,12 @@ const syncStream = async (accessToken: string, types: SyncRequestType[], reset =
 };
 
 /**
- * Acks every non-SyncCompleteV1 line in the response. Mirrors the mobile
- * client's behavior of acking each batch as it arrives. The `ack` field
- * on each line is already a fully-qualified "TYPE|updateId[|extraId]"
- * string (see server/src/utils/sync.ts toAck), so it should be sent
- * as-is.
- */
+Acks every non-SyncCompleteV1 line in the response. Mirrors the mobile
+client's behavior of acking each batch as it arrives. The `ack` field
+on each line is already a fully-qualified "TYPE|updateId[|extraId]"
+string (see server/src/utils/sync.ts toAck), so it should be sent
+as-is.
+*/
 const ackAll = async (accessToken: string, lines: SyncLine[]): Promise<void> => {
   const acks = lines.filter((line) => line.type !== 'SyncCompleteV1' && line.ack).map((line) => line.ack);
   if (acks.length === 0) {
@@ -84,10 +84,10 @@ const ackAll = async (accessToken: string, lines: SyncLine[]): Promise<void> => 
 };
 
 /**
- * Links an external library to a shared space by calling the real
- * /shared-spaces/:id/libraries PUT endpoint. The e2e utils helper doesn't
- * wrap this one, so we do it via supertest directly.
- */
+Links an external library to a shared space by calling the real
+/shared-spaces/:id/libraries PUT endpoint. The e2e utils helper doesn't
+wrap this one, so we do it via supertest directly.
+*/
 const linkLibraryToSpace = async (accessToken: string, spaceId: string, libraryId: string): Promise<void> => {
   await request(app)
     .put(`/shared-spaces/${spaceId}/libraries`)

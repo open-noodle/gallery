@@ -11,6 +11,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
     admin = await utils.adminSetup();
   });
 
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   async function createSpaceWithAssets(name: string, assetCount: number) {
     const space = await utils.createSpace(admin.accessToken, { name });
     const assets = [];

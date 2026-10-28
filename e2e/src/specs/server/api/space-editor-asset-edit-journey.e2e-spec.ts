@@ -1,23 +1,23 @@
 /**
- * End-to-end journey for #734: a Shared Space Editor edits a photo owned by a fellow space
- * member, and the member sees the edit land in the space's activity feed. This is the reporter's
- * exact path — Anna (space Editor) opens Bob's photo, rotates it, corrects its date — plus the
- * negative half that proves the widened permission has a ceiling: Anna is refused when she
- * tries to archive or delete the same asset.
- *
- * Fixture: `buildSpaceContext()` gives `spaceOwner` ("Bob") and `spaceEditor` ("Anna") as
- * members of the same space, with Bob as the space's creator/Owner. This suite uploads its own
- * asset for Bob (rather than reusing `ctx.spaceAssetId`) so it can connect a websocket and wait
- * for the upload-processing event before editing: `PUT /assets/:id/edits` (rotate) needs
- * `exifImageWidth`/`exifImageHeight` populated, or it 400s with "Asset dimensions are not
- * available for editing" — see asset-edits.e2e-spec.ts's T25 header comment for the same
- * ordering guarantee (`job.service.ts` emits `on_upload_success` after exifInfo is populated).
- *
- * Rule under test (spec §2 / access.repository.ts `checkSpaceEditAccess`, asset.service.ts
- * "rbac-3"): a space Owner/Editor may edit — but never archive or delete — an asset owned by
- * another member of that same space, once the asset is reachable through the space (here: Bob
- * direct-adds his own new photo to the space he owns).
- */
+End-to-end journey for #734: a Shared Space Editor edits a photo owned by a fellow space
+member, and the member sees the edit land in the space's activity feed. This is the reporter's
+exact path — Anna (space Editor) opens Bob's photo, rotates it, corrects its date — plus the
+negative half that proves the widened permission has a ceiling: Anna is refused when she
+tries to archive or delete the same asset.
+
+Fixture: `buildSpaceContext()` gives `spaceOwner` ("Bob") and `spaceEditor` ("Anna") as
+members of the same space, with Bob as the space's creator/Owner. This suite uploads its own
+asset for Bob (rather than reusing `ctx.spaceAssetId`) so it can connect a websocket and wait
+for the upload-processing event before editing: `PUT /assets/:id/edits` (rotate) needs
+`exifImageWidth`/`exifImageHeight` populated, or it 400s with "Asset dimensions are not
+available for editing" — see asset-edits.e2e-spec.ts's T25 header comment for the same
+ordering guarantee (`job.service.ts` emits `on_upload_success` after exifInfo is populated).
+
+Rule under test (spec §2 / access.repository.ts `checkSpaceEditAccess`, asset.service.ts
+"rbac-3"): a space Owner/Editor may edit — but never archive or delete — an asset owned by
+another member of that same space, once the asset is reachable through the space (here: Bob
+direct-adds his own new photo to the space he owns).
+*/
 import { AssetVisibility, createTag, getSpaceActivities } from '@immich/sdk';
 import { Socket } from 'socket.io-client';
 import { type Actor, authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors';
