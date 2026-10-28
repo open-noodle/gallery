@@ -29,7 +29,7 @@
     "test": "vitest",
     "test:cov": "vitest --coverage",
     "test:watch": "vitest dev",
-    "prepare": "if [ -f ../i18n/gallery/merge.mjs ]; then node ../i18n/gallery/merge.mjs; fi && svelte-kit sync"
+    "prepare": "node -e \"require('node:fs').existsSync('../i18n/gallery/merge.mjs') && import('../i18n/gallery/merge.mjs').then((m) => m.writeMergedI18n())\" && svelte-kit sync"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.10",
