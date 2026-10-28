@@ -427,6 +427,62 @@ void main() {
     });
   });
 
+  group('#1243: SharedSpaceStacksV1', () {
+    test('is requested only when the server declares it', () async {
+      const version = SemVer(major: 5, minor: 9, patch: 0);
+      expect(
+        await capturedRequestTypes(version, supportedSyncTypes: {'SharedSpaceStacksV1'}),
+        contains('SharedSpaceStacksV1'),
+      );
+      clearInteractions(mockHttpClient);
+      expect(
+        await capturedRequestTypes(version, supportedSyncTypes: {'SharedSpacesV1'}),
+        isNot(contains('SharedSpaceStacksV1')),
+      );
+      clearInteractions(mockHttpClient);
+      expect(await capturedRequestTypes(version), isNot(contains('SharedSpaceStacksV1')));
+    });
+
+    test('its lines parse into the stack payloads', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 5, minor: 9, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      final stack = {
+        'id': 'stack-1',
+        'ownerId': 'peer',
+        'primaryAssetId': 'edit-1',
+        'createdAt': DateTime(2026, 10, 24).toIso8601String(),
+        'updatedAt': DateTime(2026, 10, 24).toIso8601String(),
+      };
+      const upserts = [
+        SyncEntityType.sharedSpaceStackV1,
+        SyncEntityType.sharedSpaceStackBackfillV1,
+        SyncEntityType.sharedSpaceStackAlbumBackfillV1,
+        SyncEntityType.sharedSpaceStackLibraryBackfillV1,
+      ];
+      responseStreamController.add(
+        utf8.encode(
+          upserts.map((type) => _createJsonLine(type.toString(), stack, '$type-ack')).join() +
+              _createJsonLine(SyncEntityType.sharedSpaceStackDeleteV1.toString(), {'stackId': 'stack-1'}, 'delete-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received.map((event) => event.type), [...upserts, SyncEntityType.sharedSpaceStackDeleteV1]);
+      expect(
+        received.take(upserts.length).map((event) => (event.data as SyncStackV1).primaryAssetId),
+        everyElement('edit-1'),
+      );
+      expect((received.last.data as SyncStackDeleteV1).stackId, 'stack-1');
+    });
+  });
+
   group('fork shared-space and library request types ride the declaration-or-version gate', () {
     const forkTypes = <String>[
       'SharedSpacesV1',

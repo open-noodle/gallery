@@ -574,6 +574,17 @@ from
       )
   ) as "combined"
 
+-- AccessRepository.spaceAsset.checkSpaceStackAccess
+select
+  "asset"."id",
+  "asset"."stackId"
+from
+  "asset"
+where
+  "asset"."stackId" in ($1)
+  and "asset"."deletedAt" is null
+  and "asset"."visibility" in ('archive', 'timeline')
+
 -- AccessRepository.spaceAsset.checkSpaceAccessForSpace
 select
   "combined"."id",
