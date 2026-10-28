@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import {
     liveTypedSearchChoiceValue,
     type LiveTypedSearchChoice,
     type LiveTypedSearchKey,
     type LiveTypedSearchPersonPreview,
     type LiveTypedSearchStatus,
-  } from '$lib/utils/typed-search/typed-search-live-suggestions';
+  } from '#lib/utils/typed-search/typed-search-live-suggestions.ts';
   import { Command } from 'bits-ui';
   import { t, type Translations } from 'svelte-i18n';
 
@@ -51,7 +51,7 @@
     <Command.GroupItems>
       {#if status.status === 'ok'}
         {#each status.items as choice (choice.id)}
-          {@const personPreview = getPersonPreview(choice)}
+          {const personPreview = $derived(getPersonPreview(choice))}
           <Command.Item
             value={liveTypedSearchChoiceValue(choice)}
             onSelect={() => onSelect(choice)}

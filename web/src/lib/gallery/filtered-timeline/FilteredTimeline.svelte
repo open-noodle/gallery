@@ -1,13 +1,13 @@
 <script lang="ts">
-  import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-  import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
-  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-  import { lang } from '$lib/stores/preferences.store';
-  import { getTimelineManagerTimeBuckets } from '$lib/utils/timeline-zoom-navigation';
+  import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
+  import FilterPanel from '#lib/components/filter-panel/filter-panel.svelte';
+  import FilterToolbar from '#lib/components/filter-panel/filter-toolbar.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import SmartSearchResults from '#lib/components/search/smart-search-results.svelte';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
+  import { lang } from '#lib/stores/preferences.store.ts';
+  import { getTimelineManagerTimeBuckets } from '#lib/utils/timeline-zoom-navigation.ts';
   import type { ComponentProps, Snippet } from 'svelte';
   import type { AssetPickerFilters } from './asset-picker-filters.svelte';
   import type { FilteredTimelineController } from './filtered-timeline-controller.svelte';

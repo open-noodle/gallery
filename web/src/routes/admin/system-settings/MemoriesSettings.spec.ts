@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => ({
   saveConfig: vi.fn(),
 }));
 
-vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), () => ({
   featureFlagsManager: {
     get value() {
       return mocks.featureFlags;
@@ -50,7 +50,7 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
   } as never,
 }));
 
-vi.mock(import('$lib/queries/client'), () => ({
+vi.mock(import('#lib/queries/client.js'), () => ({
   createPreloadedQuery: ((optionsFn: () => { queryKey: readonly unknown[] }) => ({
     get data() {
       return optionsFn().queryKey.includes('defaults') ? mocks.defaultSystemConfig : mocks.systemConfig;

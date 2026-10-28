@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { shortcut } from '$lib/actions/shortcut';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
-  import PersonPickerPanel from '$lib/components/faces-page/PersonPickerPanel.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { handleError } from '$lib/utils/handle-error';
-  import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '$lib/utils/people-utils';
-  import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
-  import { normalizeSearchString } from '$lib/utils/string-utils';
+  import { shortcut } from '#lib/actions/shortcut.ts';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import { type PickerCandidate } from '#lib/components/faces-page/PersonPickerGrid.svelte';
+  import PersonPickerPanel from '#lib/components/faces-page/PersonPickerPanel.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
+  import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
+  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import {
     attachSpacePersonFace,
     createSpacePerson,
@@ -240,7 +240,7 @@
     {:else}
       <div class="mt-4 flex flex-wrap gap-2">
         {#each faces as face (face.id)}
-          {@const personName = face.spacePersonName ?? $t('face_unassigned')}
+          {const personName = $derived(face.spacePersonName ?? $t('face_unassigned'))}
           <div class="relative h-29 w-24">
             <div class="relative">
               {#await zoomImageToBase64(face, assetId, assetType, assetViewerManager.imgRef)}
@@ -315,7 +315,7 @@
 </section>
 
 {#if pickerFaceId && faces}
-  {@const activeFace = faces.find((f) => f.id === pickerFaceId)}
+  {const activeFace = $derived(faces.find((f) => f.id === pickerFaceId))}
   {#if activeFace}
     <PersonPickerPanel
       candidates={visibleCandidates}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type TagResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 

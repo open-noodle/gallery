@@ -1,3 +1,9 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import {
   SharedSpaceRole,
   type PeopleFaceStatisticsResponseDto,
@@ -11,14 +17,9 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
+import { reactivePageMock } from '#test-data/mocks/reactive-page.mock.svelte.ts';
 import SpacePeoplePage from '../../../routes/(user)/spaces/[spaceId]/people/+page.svelte';
 
 const PAGE_SIZE = 100;
@@ -38,30 +39,19 @@ class VisibleObserver {
   }
 }
 
-const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
-  let pageValue = {
-    url: new URL('http://localhost/spaces/space-1/people'),
-    route: { id: '/(user)/spaces/[spaceId]/people' },
-  };
-
+const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
   return {
     gotoMock: vi.fn(),
-    pageStore: {
-      setUrl: (url: string) => {
-        pageValue = { ...pageValue, url: new URL(url) };
-      },
-      subscribe: (run: (value: typeof pageValue) => void) => {
-        run(pageValue);
-        return () => {};
-      },
-    },
     featureFlagsMock: { value: { peopleStatistics: true } },
   };
 });
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
-vi.mock('$app/stores', () => ({ page: pageStore }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte.ts');
+  return { page: reactivePageMock, navigating: { to: null } };
+});
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: featureFlagsMock,
 }));
 
@@ -184,7 +174,7 @@ describe('Spaces people page', () => {
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     Element.prototype.animate = getAnimateMock();
     gotoMock.mockResolvedValue(undefined);
-    pageStore.setUrl('http://localhost/spaces/space-1/people');
+    reactivePageMock.reset('http://localhost/spaces/space-1/people', { routeId: '/(user)/spaces/[spaceId]/people' });
     sdkMock.getSpacePeople.mockResolvedValue([]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
     sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(makeFaceStatistics());
@@ -326,7 +316,9 @@ describe('Spaces people page', () => {
   });
 
   it('hides the face statistics details button during initial URL name search until filtered stats load', () => {
-    pageStore.setUrl('http://localhost/spaces/space-1/people?searchedPeople=Ali');
+    reactivePageMock.reset('http://localhost/spaces/space-1/people?searchedPeople=Ali', {
+      routeId: '/(user)/spaces/[spaceId]/people',
+    });
 
     renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
@@ -442,7 +434,7 @@ describe('Spaces people page', () => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
     });
 
-    pageStore.setUrl('http://localhost/spaces/space-2/people');
+    reactivePageMock.reset('http://localhost/spaces/space-2/people', { routeId: '/(user)/spaces/[spaceId]/people' });
     await view.rerender({
       component: SpacePeoplePage,
       componentProps: {
@@ -495,7 +487,7 @@ describe('Spaces people page', () => {
       );
     });
 
-    pageStore.setUrl('http://localhost/spaces/space-2/people');
+    reactivePageMock.reset('http://localhost/spaces/space-2/people', { routeId: '/(user)/spaces/[spaceId]/people' });
     await view.rerender({
       component: SpacePeoplePage,
       componentProps: {

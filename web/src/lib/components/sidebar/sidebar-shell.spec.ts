@@ -1,10 +1,10 @@
+import SidebarShell from '#lib/components/sidebar/sidebar-shell.svelte';
+import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import SidebarShell from '$lib/components/sidebar/sidebar-shell.svelte';
-import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarMedia: { isFullSidebar: true, isWideSidebar: false },
@@ -17,10 +17,10 @@ const mocks = vi.hoisted(() => ({
   menuButtonId: 'test-menu-button',
 }));
 
-vi.mock('$lib/stores/sidebar-media.svelte', () => ({ sidebarMedia: mocks.sidebarMedia }));
-vi.mock('$lib/stores/sidebar.svelte', () => ({ sidebarStore: mocks.sidebarStore }));
+vi.mock('#lib/stores/sidebar-media.svelte.js', () => ({ sidebarMedia: mocks.sidebarMedia }));
+vi.mock('#lib/stores/sidebar.svelte.js', () => ({ sidebarStore: mocks.sidebarStore }));
 vi.mock('$app/navigation', () => ({ beforeNavigate: mocks.beforeNavigate }));
-vi.mock('$lib/components/shared-components/navigation-bar/NavigationBar.svelte', () => ({
+vi.mock('#lib/components/shared-components/navigation-bar/NavigationBar.svelte', () => ({
   menuButtonId: mocks.menuButtonId,
 }));
 

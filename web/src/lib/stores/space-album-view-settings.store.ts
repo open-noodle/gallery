@@ -1,6 +1,6 @@
+import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
 import { persisted } from 'svelte-persisted-store';
-import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
-import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
 
 export enum SpaceAlbumGroupBy {
   None = 'None',

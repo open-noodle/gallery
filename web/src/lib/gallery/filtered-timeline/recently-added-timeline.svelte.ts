@@ -1,11 +1,11 @@
-import { getTimeBuckets } from '@immich/sdk';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import { buildRecentlyAddedFilterConfig } from '$lib/utils/recently-added-filter-config';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import { buildRecentlyAddedFilterConfig } from '#lib/utils/recently-added-filter-config.ts';
 import {
   buildRecentlyAddedPickerBucketOptions,
   buildRecentlyAddedTimelineOptions,
-} from '$lib/utils/recently-added-filter-options';
+} from '#lib/utils/recently-added-filter-options.ts';
+import { getTimeBuckets } from '@immich/sdk';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 
 /** `/recently-added`: own + partner assets ordered by upload date; no shared-space scope. */

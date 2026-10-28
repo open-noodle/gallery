@@ -1,17 +1,17 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import {
   SharedSpaceRole,
   type AlbumResponseDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { load } from './+page';
 
 const { authenticate } = vi.hoisted(() => ({
   authenticate: vi.fn(),
 }));
 
-vi.mock('$lib/utils/auth', () => ({ authenticate }));
+vi.mock('#lib/utils/auth.js', () => ({ authenticate }));
 
 const space: SharedSpaceResponseDto = {
   id: 'space-1',

@@ -1,4 +1,4 @@
-import { authenticate } from '$lib/utils/auth';
+import { authenticate } from '#lib/utils/auth.ts';
 import type { PageLoad } from './$types';
 
 // space + members come from the parent [spaceId] layout load.

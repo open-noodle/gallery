@@ -1,4 +1,4 @@
-import { animateRemoval, arcControl, arcPoint } from '$lib/gallery/motion/removal';
+import { animateRemoval, arcControl, arcPoint } from '#lib/gallery/motion/removal.ts';
 
 describe('arc', () => {
   const from = { x: 400, y: 300 };

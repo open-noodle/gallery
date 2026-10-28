@@ -1,5 +1,5 @@
-import { browser } from '$app/environment';
-import { authManager } from '$lib/managers/auth-manager.svelte';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { browser } from '$app/env';
 
 const STORAGE_KEY = 'gallery-face-suggestion-snooze';
 

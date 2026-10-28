@@ -1,17 +1,17 @@
+import SpaceAlbumsTable from '#lib/components/spaces/space-albums-table.svelte';
+import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+import { toggleSpaceAlbumGroupCollapsing } from '#lib/utils/space-album-grouping.ts';
+import { getSpaceAlbumSortLabels, spaceAlbumSortOptionsMetadata } from '#lib/utils/space-album-sort.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, t, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
-import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
-import { getSpaceAlbumSortLabels, spaceAlbumSortOptionsMetadata } from '$lib/utils/space-album-sort';
-import { renderWithTooltips } from '$tests/helpers';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('@test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
   return { ...original, ContextMenuButton: MockContextMenuButton };
 });
 
@@ -39,7 +39,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
 
 describe('SpaceAlbumsTable', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

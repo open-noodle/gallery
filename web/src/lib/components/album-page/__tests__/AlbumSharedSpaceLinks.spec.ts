@@ -1,15 +1,15 @@
+// The sdk mock MUST be imported before AlbumSharedSpaceLinks.svelte so `vi.mock('@immich/sdk', ...)`
+// registers before the component's own `@immich/sdk` import resolves (see SpaceLinkAlbumModal.spec.ts).
+import '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import AlbumSharedSpaceLinks from '#lib/components/album-page/AlbumSharedSpaceLinks.svelte';
+import { renderWithTooltips } from '#tests/helpers';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
-// The sdk mock MUST be imported before AlbumSharedSpaceLinks.svelte so `vi.mock('@immich/sdk', ...)`
-// registers before the component's own `@immich/sdk` import resolves (see SpaceLinkAlbumModal.spec.ts).
-import '$lib/__mocks__/sdk.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import AlbumSharedSpaceLinks from '$lib/components/album-page/AlbumSharedSpaceLinks.svelte';
-import { renderWithTooltips } from '$tests/helpers';
-import { albumFactory } from '@test-data/factories/album-factory';
+import { albumFactory } from '#test-data/factories/album-factory';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
@@ -22,7 +22,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
 describe('AlbumSharedSpaceLinks', () => {
   beforeAll(async () => {
     await init({ fallbackLocale: 'en-US' });
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await waitLocale('en-US');
   });
 

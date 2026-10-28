@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ManagedPerson } from '$lib/components/people/people-types';
+  import type { ManagedPerson } from '#lib/components/people/people-types.ts';
   import { TooltipProvider } from '@immich/ui';
   import PersonTile from './person-tile.svelte';
 

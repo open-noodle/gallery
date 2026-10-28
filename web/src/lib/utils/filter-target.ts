@@ -1,10 +1,10 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+import { Route } from '#lib/route.ts';
+import { clearFilterParams, decodeFilterParams, encodeFilterParams } from '#lib/utils/filter-url.ts';
+import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { Route } from '$lib/route';
-import { clearFilterParams, decodeFilterParams, encodeFilterParams } from '$lib/utils/filter-url';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 
 export type FilterTarget =
   | { kind: 'photos'; basePath: '/photos' }
@@ -137,7 +137,7 @@ export function buildContextualFilterUrl(url: URL, patch: Partial<FilterState>, 
  * closes the asset viewer and applies the filter.
  */
 export function applyContextualFilter(patch: Partial<FilterState>, opts?: { global?: boolean }): void {
-  void goto(buildContextualFilterUrl(page.url, patch, opts));
+  void goto(buildContextualFilterUrl(new URL(page.url.href), patch, opts));
 }
 
 /**

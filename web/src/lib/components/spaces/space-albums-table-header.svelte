@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { SortOrder } from '$lib/stores/preferences.store';
-  import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-  import { getSpaceAlbumSortLabels, type SpaceAlbumSortOptionMetadata } from '$lib/utils/space-album-sort';
+  import { SortOrder } from '#lib/stores/preferences.store.ts';
+  import { spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+  import { getSpaceAlbumSortLabels, type SpaceAlbumSortOptionMetadata } from '#lib/utils/space-album-sort.ts';
   import { t } from 'svelte-i18n';
 
   // The space table's counterpart of AlbumsTableHeader (#972): the same sort button and arrow, reading

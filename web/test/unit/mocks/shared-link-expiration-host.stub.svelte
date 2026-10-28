@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SharedLinkExpiration from '$lib/components/SharedLinkExpiration.svelte';
+  import SharedLinkExpiration from '#lib/components/SharedLinkExpiration.svelte';
 
   let expiresAt = $state<string | null>(null);
 </script>

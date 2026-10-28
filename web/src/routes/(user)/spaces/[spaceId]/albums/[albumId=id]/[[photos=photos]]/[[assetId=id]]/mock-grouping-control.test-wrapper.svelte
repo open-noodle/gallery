@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+  import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
 
   interface Props {
     grouping: TimelineGrouping;

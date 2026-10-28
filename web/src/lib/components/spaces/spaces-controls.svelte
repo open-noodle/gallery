@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SortOrder } from '$lib/stores/preferences.store';
-  import { sortOptionsMetadata, SpaceSortBy, spaceViewSettings } from '$lib/stores/space-view.store';
+  import { SortOrder } from '#lib/stores/preferences.store.ts';
+  import { sortOptionsMetadata, SpaceSortBy, spaceViewSettings } from '#lib/stores/space-view.store.ts';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiArrowDownThin, mdiArrowUpThin, mdiFormatListBulletedSquare, mdiSort, mdiViewGridOutline } from '@mdi/js';

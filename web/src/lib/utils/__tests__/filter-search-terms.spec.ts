@@ -1,7 +1,7 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
 
 describe('filterStateToSearchTerms', () => {
   it('returns empty terms for a cleared filter state', () => {

@@ -1,13 +1,13 @@
+import { Route } from '#lib/route.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import { Route } from '$lib/route';
 import ConfidentLane from './ConfidentLane.svelte';
 import { createScanTriageModel, type FaceCleanupPerson } from './scan-triage.svelte';
 
 vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return { ...mod, Icon: noop.default };
 });
 vi.mock('svelte-i18n', async (orig) => {
@@ -22,7 +22,7 @@ vi.mock('svelte-i18n', async (orig) => {
     },
   };
 });
-vi.mock('$lib/utils/people-utils', () => ({ getAdminFaceThumbnailUrl: (id: string) => `/thumb/${id}` }));
+vi.mock('#lib/utils/people-utils.js', () => ({ getAdminFaceThumbnailUrl: (id: string) => `/thumb/${id}` }));
 
 const conf = (id: string): FaceCleanupPerson => ({
   personId: id,

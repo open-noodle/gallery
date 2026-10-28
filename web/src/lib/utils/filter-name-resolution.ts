@@ -1,5 +1,5 @@
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { getAlbumInfo, getUser } from '@immich/sdk';
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 
 /**
  * Lazy, by-id resolution of the `albumId` / `ownerId` filter chips' labels.

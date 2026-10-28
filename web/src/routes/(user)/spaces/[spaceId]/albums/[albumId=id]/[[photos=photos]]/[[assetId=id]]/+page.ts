@@ -1,6 +1,6 @@
+import { authenticate } from '#lib/utils/auth.ts';
 import { getAlbumInfo } from '@immich/sdk';
 import { redirect } from '@sveltejs/kit';
-import { authenticate } from '$lib/utils/auth';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ params, url, parent }) => {

@@ -1,6 +1,6 @@
+import '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import '$lib/__mocks__/sdk.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { collectSearchResultAssetIds } from './search.service';
 
 const page = (ids: string[], nextPage: string | null) =>

@@ -1,7 +1,7 @@
+import { renderWithTooltips } from '#tests/helpers';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { renderWithTooltips } from '$tests/helpers';
 import PersonPickerGrid from './PersonPickerGrid.svelte';
 
 // Structural copy of `PickerCandidate`: the type lives in the component's module script, which
