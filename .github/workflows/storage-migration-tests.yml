@@ -201,8 +201,16 @@ jobs:
       # encoding. The spec skips itself without IMMICH_TEST_DOCKER, and
       # no other workflow sets it. Runs even when a phase failed.
       # ---------------------------------------------------------------
-      - name: S3 backend integration tests (MinIO)
+      # The spec imports src/enum.ts, which imports @immich/plugin-sdk; that package resolves only from its built
+      # dist/, and its build bundles @immich/sdk, so both are built first (pnpm builds them in dependency order).
+      - name: Build SDKs for the server unit tests
+        id: sdk-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: .
+        run: pnpm --filter @immich/sdk --filter @immich/plugin-sdk build
+
+      - name: S3 backend integration tests (MinIO)
+        if: ${{ !cancelled() && steps.sdk-build.outcome == 'success' }}
         working-directory: ./server
         env:
           IMMICH_TEST_DOCKER: 'true'
