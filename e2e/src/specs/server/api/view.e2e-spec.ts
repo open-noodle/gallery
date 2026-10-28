@@ -117,18 +117,12 @@ describe('/view', () => {
       expect(ids).not.toContain(userAAssetId);
     });
 
-    it('missing path query param returns 500 (no validation in controller — server bug)', async () => {
-      // The controller at view.controller.ts:33 declares `@Query('path') path: string`
-      // with no validation pipe and no default value. The service passes the
-      // undefined `path` directly to viewRepository.getAssetsByOriginalPath which
-      // trips with a 500. Pinning the actual behavior so a future server-side fix
-      // (e.g. adding validation or treating undefined as empty array) forces a
-      // deliberate update.
-      //
-      // Worth filing upstream as a small server bug — should be 400 with a clear
-      // validation message.
-      const { status } = await request(app).get('/view/folder').set(asBearerAuth(userA.accessToken));
-      expect(status).toBe(500);
+    it('missing path query param lists the root folder', async () => {
+      // The controller declares `@Query('path') path: string` with no validation. This used to 500; since
+      // immich-32612 the repository trims the path (`trim(undefined, '/')` is ''), so a missing path reads as the root.
+      const { status, body } = await request(app).get('/view/folder').set(asBearerAuth(userA.accessToken));
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
     });
   });
 });
