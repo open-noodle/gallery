@@ -198,15 +198,34 @@ const ALBUM_ALLOWLIST: Record<string, string> = {
     'library-path EXIF restore write-infra; no album arm applies (mirrors emitLibraryAssetVisibilityPurge)',
 };
 
+// Comment lines, by block: since eslint-plugin-unicorn v78 (no-asterisk-prefix-in-documentation-comments)
+// a doc comment's body lines no longer start with `*`, so a prefix test would read them as code.
+const commentLines = (lines: string[]): boolean[] => {
+  let inBlock = false;
+  return lines.map((raw) => {
+    const trimmed = raw.trim();
+    if (inBlock) {
+      inBlock = !trimmed.includes('*/');
+      return true;
+    }
+    if (trimmed.startsWith('/*')) {
+      inBlock = !trimmed.includes('*/', 2);
+      return true;
+    }
+    return trimmed.startsWith('//') || trimmed.startsWith('*');
+  });
+};
+
 describe('space-album scope guard: every library scoping arm has album coverage', () => {
   it.each(SCOPING_FILES)('%s', (file) => {
     const lines = readFileSync(join(SERVER_ROOT, file), 'utf8').split('\n');
+    const isComment = commentLines(lines);
     const orphans: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const raw = lines[i];
       const trimmed = raw.trim();
-      if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
+      if (isComment[i]) {
         continue;
       }
       if (!LIBRARY_REF.test(raw)) {
@@ -402,13 +421,14 @@ const VIS_WINDOW = 50;
 describe('space-visibility gate guard: every space asset read has a visibility gate', () => {
   it.each(SCOPING_FILES)('%s', (file) => {
     const lines = readFileSync(join(SERVER_ROOT, file), 'utf8').split('\n');
+    const isComment = commentLines(lines);
     const orphans: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const raw = lines[i];
       const trimmed = raw.trim();
 
-      if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
+      if (isComment[i]) {
         continue;
       }
       if (!SPACE_READ_MARKER.test(raw)) {
