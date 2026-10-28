@@ -4,7 +4,7 @@
   import { AssetMediaSize, viewAsset, type AssetResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     asset: AssetResponseDto;

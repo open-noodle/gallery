@@ -1,5 +1,5 @@
+import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
 import { MediaQuery } from 'svelte/reactivity';
-import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
 
 // Above this width `auto` mode shows the full sidebar; between here and the 850px
 // `--breakpoint-sidebar` it shows the rail. Declared here rather than in upstream

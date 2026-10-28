@@ -1,4 +1,4 @@
-import { getAppleMapsUrl, getGoogleMapsUrl, getMapProviderLinks, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
+import { getAppleMapsUrl, getGoogleMapsUrl, getMapProviderLinks, getOpenStreetMapUrl } from '#lib/utils/exif-utils.ts';
 
 describe('map provider urls', () => {
   it('builds Google Maps coordinate search urls', () => {

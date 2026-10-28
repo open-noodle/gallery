@@ -1,5 +1,5 @@
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { render, screen } from '@testing-library/svelte';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import SpaceMap from './space-map.svelte';
 
 describe('SpaceMap', () => {

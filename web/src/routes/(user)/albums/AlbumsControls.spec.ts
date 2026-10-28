@@ -1,11 +1,11 @@
+import { renderWithTooltips } from '#tests/helpers';
 import { screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { renderWithTooltips } from '$tests/helpers';
 import AlbumsControls from './AlbumsControls.svelte';
 
 describe('AlbumsControls toolbar order', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

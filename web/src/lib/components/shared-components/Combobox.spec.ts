@@ -1,6 +1,6 @@
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import { fireEvent, screen } from '@testing-library/svelte';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { renderWithTooltips } from '$tests/helpers';
 import Combobox from './Combobox.svelte';
 
 // Geometry measured on an iPad Pro 13" simulator, on the "Sidebar" setting from Account

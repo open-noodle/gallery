@@ -1,7 +1,7 @@
+import { contrastRatio } from '#lib/styles/contrast.ts';
+import { readThemeTokens } from '#lib/styles/theme-tokens.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { contrastRatio } from '$lib/styles/contrast';
-import { readThemeTokens } from '$lib/styles/theme-tokens';
 
 describe('gallery-theme.css', () => {
   const t = readThemeTokens();

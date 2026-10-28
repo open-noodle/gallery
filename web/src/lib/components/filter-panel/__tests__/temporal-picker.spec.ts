@@ -5,7 +5,7 @@ import TemporalPicker from '../temporal-picker.svelte';
 import { aggregateYears, getMonthsForYear } from '../temporal-utils';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

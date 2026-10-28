@@ -1,6 +1,6 @@
+import { Route } from '#lib/route.ts';
 import type { BreadcrumbItem } from '@immich/ui';
 import { describe, expect, it } from 'vitest';
-import { Route } from '$lib/route';
 import { faceCleanupBreadcrumbs, faceCleanupRootCrumb, guidedCrumb, manualCrumb } from './breadcrumbs';
 
 // The builder owns the console's page hierarchy. Two invariants carry the design and are asserted directly

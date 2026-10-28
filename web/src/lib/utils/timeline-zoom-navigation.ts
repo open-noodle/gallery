@@ -1,4 +1,4 @@
-import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
 
 export type ActivatableTimelineBucket = {
   grouping: TimelineGrouping;

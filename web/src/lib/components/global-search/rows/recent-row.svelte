@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { t, type Translations } from 'svelte-i18n';
-  import type { RecentEntry } from '$lib/stores/cmdk-recent';
+  import type { RecentEntry } from '#lib/stores/cmdk-recent.ts';
   import AlbumRow from './album-row.svelte';
   import PhotoRow from './photo-row.svelte';
   import PersonRow from './person-row.svelte';

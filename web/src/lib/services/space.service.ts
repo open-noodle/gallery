@@ -1,11 +1,11 @@
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { Route } from '#lib/route.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import { addAssets, updateSpace, type UserAvatarColor } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { Route } from '$lib/route';
-import { handleError } from '$lib/utils/handle-error';
 
 export const addAssetsToSpace = async (
   spaceId: string,

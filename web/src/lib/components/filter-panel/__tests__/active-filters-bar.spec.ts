@@ -4,7 +4,7 @@ import ActiveFiltersBar from '../active-filters-bar.svelte';
 import { createFilterState } from '../filter-panel';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { locale } from '$lib/stores/preferences.store';
-  import { getStorageQuery } from '$lib/queries/server.query';
-  import { getByteUnitString } from '$lib/utils/byte-units';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { locale } from '#lib/stores/preferences.store.ts';
+  import { getStorageQuery } from '#lib/queries/server-info.query.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { Icon } from '@immich/ui';
   import { mdiCloudOutline } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';

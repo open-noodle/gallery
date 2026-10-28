@@ -1,27 +1,27 @@
 <script lang="ts">
   import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
-  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
   import {
     buildSpaceAlbumGroups,
     getSelectedSpaceAlbumGroupOption,
     isSpaceAlbumGroupCollapsed,
     toggleSpaceAlbumGroupCollapsing,
-  } from '$lib/utils/space-album-grouping';
-  import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
+  } from '#lib/utils/space-album-grouping.ts';
+  import { sortSpaceAlbums } from '#lib/utils/space-album-sort.ts';
   import {
     buildFolderSummaries,
     EMPTY_FOLDER_SUMMARY,
     flattenForSearch,
     getFolderContents,
-  } from '$lib/utils/space-album-folders';
-  import type { DragPayload } from '$lib/utils/space-album-folder-dnd';
-  import LazyAlbumGrid from '$lib/gallery/components/lazy-album-grid.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import SpaceAlbumCard from '$lib/components/spaces/space-album-card.svelte';
-  import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
-  import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
+  } from '#lib/utils/space-album-folders.ts';
+  import type { DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
+  import LazyAlbumGrid from '#lib/gallery/components/lazy-album-grid.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import SpaceAlbumCard from '#lib/components/spaces/space-album-card.svelte';
+  import SpaceAlbumFolderCard from '#lib/components/spaces/space-album-folder-card.svelte';
+  import SpaceAlbumsTable from '#lib/components/spaces/space-albums-table.svelte';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -242,7 +242,7 @@
     {#if sortedFolders.length > 0}
       <div class="grid grid-auto-fill-56 gap-y-4" data-testid="space-album-folders-grid">
         {#each sortedFolders as folder (folder.id)}
-          {@const summary = folderSummaries.get(folder.id) ?? EMPTY_FOLDER_SUMMARY}
+          {const summary = $derived(folderSummaries.get(folder.id) ?? EMPTY_FOLDER_SUMMARY)}
           <SpaceAlbumFolderCard
             {folder}
             albumCount={summary.albumCount}
@@ -262,8 +262,8 @@
     {#if levelAlbums.length > 0}
       {#if isGrouped}
         {#each groups as group (group.id)}
-          {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
-          {@const iconRotation = collapsed ? 'rotate-0' : 'rotate-90'}
+          {const collapsed = $derived(isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id))}
+          {const iconRotation = $derived(collapsed ? 'rotate-0' : 'rotate-90')}
           <div class="grid">
             <button
               type="button"

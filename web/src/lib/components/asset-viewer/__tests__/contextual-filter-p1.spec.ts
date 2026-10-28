@@ -1,16 +1,16 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { buildAlbumTimelineOptions } from '#lib/utils/album-filter-options.ts';
+import { decodeFilterParams } from '#lib/utils/filter-url.ts';
+import { buildMapTimeBucketOptions } from '#lib/utils/map-filter-options.ts';
+import { buildPhotosTimelineOptions } from '#lib/utils/photos-filter-options.ts';
+import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import { AssetOrder, AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
-import { decodeFilterParams } from '$lib/utils/filter-url';
-import { buildMapTimeBucketOptions } from '$lib/utils/map-filter-options';
-import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
-import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanel from '../DetailPanel.svelte';
 
 /**
@@ -70,12 +70,12 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
 
-vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
-vi.mock('$lib/utils/people-utils', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
+vi.mock('#lib/stores/face.svelte.js', () => ({ faceManager: faceManagerMock }));
+vi.mock('#lib/utils/people-utils.js', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
 
 const authManagerMock = vi.hoisted(() => ({
   authenticated: true,
@@ -85,9 +85,9 @@ const authManagerMock = vi.hoisted(() => ({
   preferences: { tags: { enabled: true }, ratings: { enabled: true } },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: authManagerMock }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: authManagerMock }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     clearHighlightedFaces: vi.fn(),
     closeDetailPanel: vi.fn(),
@@ -105,22 +105,22 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { map: false, smartSearch: false, search: false, trash: true } },
 }));
 
-vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
+vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 

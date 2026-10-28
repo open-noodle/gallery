@@ -1,4 +1,4 @@
-import { isApplePlatform, searchHotkeyLabel } from '$lib/gallery/search/search-hotkey';
+import { isApplePlatform, searchHotkeyLabel } from '#lib/gallery/search/search-hotkey.ts';
 
 describe('search hotkey label', () => {
   it.each(['MacIntel', 'iPhone', 'iPad', 'iPod'])('uses ⌘K on %s', (platform) => {

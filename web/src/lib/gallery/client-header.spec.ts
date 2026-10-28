@@ -1,8 +1,8 @@
+import { queryClient } from '#lib/queries/client.ts';
+import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
+import '#lib/stores/websocket.ts';
+import { init } from '#lib/utils/client.ts';
 import { defaults } from '@immich/sdk';
-import { queryClient } from '$lib/queries/client';
-import { getServerConfigQuery } from '$lib/queries/server.query';
-import '$lib/stores/websocket';
-import { init } from '$lib/utils/server';
 import { version } from '../../../package.json';
 
 // captured outside vi.fn: the test setup resets mock call history before each test
@@ -16,8 +16,8 @@ vi.mock('socket.io-client', () => {
     },
   };
 });
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { load: vi.fn() } }));
-vi.mock('$lib/utils', () => ({ initLanguage: vi.fn() }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: { load: vi.fn() } }));
+vi.mock('#lib/utils.js', () => ({ initLanguage: vi.fn() }));
 
 describe('Gallery client header', () => {
   it('is sent on every SDK request', async () => {

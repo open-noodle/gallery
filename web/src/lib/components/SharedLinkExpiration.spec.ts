@@ -1,10 +1,10 @@
+import { renderWithTooltips } from '#tests/helpers';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { Settings } from 'luxon';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { renderWithTooltips } from '$tests/helpers';
-import SharedLinkExpirationHost from '@test-data/mocks/shared-link-expiration-host.stub.svelte';
+import SharedLinkExpirationHost from '#test-data/mocks/shared-link-expiration-host.stub.svelte';
 
 // The server validates `expiresAt` with Zod's `z.iso.datetime()`, which only accepts
 // UTC ("Z") timestamps and rejects any string carrying a numeric timezone offset.

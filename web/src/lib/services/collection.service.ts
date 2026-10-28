@@ -1,13 +1,13 @@
-import { toastManager } from '@immich/ui';
 import {
   isHiddenFromMyTimeline,
   type PickerCollection,
-} from '$lib/components/shared-components/collection-selection/collection-selection-utils';
-import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-import { addAssetsToAlbums } from '$lib/gallery/album/album-add';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { addAssetsToSpace } from '$lib/services/space.service';
-import { getFormatter } from '$lib/utils/i18n';
+} from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
+import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+import { addAssetsToAlbums } from '#lib/gallery/album/album-add.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { addAssetsToSpace } from '#lib/services/space.service.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
+import { toastManager } from '@immich/ui';
 
 type AddToCollectionsOptions = {
   /**

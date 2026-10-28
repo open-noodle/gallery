@@ -1,3 +1,8 @@
+import { ALL_FILTER_SECTIONS } from '#lib/components/filter-panel/filter-panel.ts';
+import type { FilterPanelConfig, FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
+import { buildRecentlyAddedSuggestionRequest } from '#lib/utils/recently-added-filter-options.ts';
+import { buildSmartSearchFacetsParams, mapSmartSearchFacetsToFilterSuggestions } from '#lib/utils/space-search.ts';
 import {
   getFilterSuggestions,
   getSearchSuggestions,
@@ -5,11 +10,6 @@ import {
   SearchSuggestionType,
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
-import { ALL_FILTER_SECTIONS } from '$lib/components/filter-panel/filter-panel';
-import type { FilterPanelConfig, FilterState } from '$lib/components/filter-panel/filter-panel';
-import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
-import { buildRecentlyAddedSuggestionRequest } from '$lib/utils/recently-added-filter-options';
-import { buildSmartSearchFacetsParams, mapSmartSearchFacetsToFilterSuggestions } from '$lib/utils/space-search';
 
 function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>) {
   return {

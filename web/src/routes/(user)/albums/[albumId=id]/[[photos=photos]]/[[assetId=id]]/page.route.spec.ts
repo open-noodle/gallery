@@ -1,23 +1,23 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { AlbumUserRole, AssetOrder } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { getAlbumInfoQuery } from '$lib/queries/album.query';
-import { queryClient } from '$lib/queries/client';
-import { getUserConfigQuery } from '$lib/queries/config-user.query';
-import { albumFactory } from '@test-data/factories/album-factory';
-import { timelineAssetFactory } from '@test-data/factories/asset-factory';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
-import { defaultUserConfig } from '@test-data/gallery-config-defaults';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { albumFactory } from '#test-data/factories/album-factory';
+import { timelineAssetFactory } from '#test-data/factories/asset-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
+import { defaultUserConfig } from '#test-data/gallery-config-defaults';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import AlbumPage from './+page.svelte';
 
 const {
@@ -42,21 +42,21 @@ vi.mock('$app/navigation', () => ({
 // The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
 // what the page's $effect sees.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
-  return { page: reactivePageMock };
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock, navigating: { to: null } };
 });
 
-vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
+vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockTimeline } = await import('./mock-timeline.test-wrapper.svelte');
   return { default: MockTimeline };
 });
 
-vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: {
     // Returns a teardown, matching the real registration the page's $effect consumes.
     registerSearchablePageFilters: vi.fn(() => vi.fn()),
@@ -64,17 +64,17 @@ vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/command-context-manager.svelte', () => ({
+vi.mock('#lib/managers/command-context-manager.svelte.js', () => ({
   registerAlbumContext: registerAlbumContextMock,
   registerSelectionContext: registerSelectionContextMock,
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: mockFeatureFlagsManager as never,
 }));
 
-vi.mock('$lib/utils/navigation', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/utils/navigation')>();
+vi.mock('#lib/utils/navigation.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/utils/navigation.ts')>();
   return {
     ...actual,
     isAlbumsRoute: () => true,
@@ -600,9 +600,8 @@ describe('album detail filter panel route', () => {
 
       await waitFor(() =>
         expect(gotoMock).toHaveBeenCalledWith('/albums/album-1?people=person-view', {
-          replaceState: true,
-          keepFocus: true,
-          noScroll: true,
+          replace: true,
+          reset: false,
         }),
       );
     });
@@ -616,9 +615,8 @@ describe('album detail filter panel route', () => {
 
       await waitFor(() =>
         expect(gotoMock).toHaveBeenCalledWith('/albums/album-1', {
-          replaceState: true,
-          keepFocus: true,
-          noScroll: true,
+          replace: true,
+          reset: false,
         }),
       );
     });

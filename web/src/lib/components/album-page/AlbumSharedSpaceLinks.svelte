@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { handleError } from '$lib/utils/handle-error';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { unlinkAlbum, type AlbumResponseDto } from '@immich/sdk';
   import { IconButton, modalManager } from '@immich/ui';
   import { mdiLinkVariantOff } from '@mdi/js';

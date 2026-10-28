@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { initInput } from '$lib/actions/focus';
-  import AlbumListItem from '$lib/components/asset-viewer/AlbumListItem.svelte';
-  import NewAlbumListItem from '$lib/components/shared-components/album-selection/NewAlbumListItem.svelte';
+  import { initInput } from '#lib/actions/focus.ts';
+  import AlbumListItem from '#lib/components/asset-viewer/AlbumListItem.svelte';
+  import NewAlbumListItem from '#lib/components/shared-components/album-selection/NewAlbumListItem.svelte';
   import {
     albumToCollection,
     CollectionModalRowConverter,
@@ -14,14 +14,14 @@
     spaceToCollection,
     type CollectionModalRow,
     type PickerCollection,
-  } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
-  import NewSpaceListItem from '$lib/components/shared-components/collection-selection/new-space-list-item.svelte';
-  import SpaceListItem from '$lib/components/shared-components/collection-selection/space-list-item.svelte';
-  import SpacePoolListItem from '$lib/components/shared-components/collection-selection/space-pool-list-item.svelte';
-  import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { eventManager } from '$lib/managers/event-manager.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
+  import NewSpaceListItem from '#lib/components/shared-components/collection-selection/new-space-list-item.svelte';
+  import SpaceListItem from '#lib/components/shared-components/collection-selection/space-list-item.svelte';
+  import SpacePoolListItem from '#lib/components/shared-components/collection-selection/space-pool-list-item.svelte';
+  import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     createAlbum,
     createSpace,
@@ -525,7 +525,7 @@
               <!-- ps-11 lines the child up with the album children's thumbnails (ps-9 wrapper + p-2). -->
               <p class={['py-1 text-sm', row.indented ? 'ps-11 pe-5' : 'px-5']}>{row.text}</p>
             {:else if row.type === CollectionModalRowType.SPACE_POOL_CHILD && row.collection}
-              {@const collection = row.collection}
+              {const collection = $derived(row.collection)}
               <SpacePoolListItem
                 spaceId={collection.id}
                 selected={row.selected || false}
@@ -534,7 +534,7 @@
                 onMultiSelect={() => toggleMultiSelect(collection)}
               />
             {:else if row.type === CollectionModalRowType.COLLECTION_ITEM && row.collection}
-              {@const collection = row.collection}
+              {const collection = $derived(row.collection)}
               <div data-testid={`row-${collection.kind}-${collection.id}`} class={{ 'ps-9': row.indented }}>
                 {#if collection.kind === 'album'}
                   <AlbumListItem

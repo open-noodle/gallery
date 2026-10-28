@@ -1,4 +1,4 @@
-import { Route } from '$lib/route';
+import { Route } from '#lib/route.ts';
 import { load } from './+page';
 
 // The declines-only manage page was replaced by the unified Resolutions page (declines + locks). This route

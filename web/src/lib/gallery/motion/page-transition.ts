@@ -1,5 +1,5 @@
-import type { OnNavigate } from '@sveltejs/kit';
-import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
+import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+import type { OnNavigate } from '$app/navigation';
 
 /**
  * Section changes (Photos → Albums → Spaces) crossfade through the View Transitions API, with the

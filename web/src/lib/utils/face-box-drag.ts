@@ -1,5 +1,5 @@
+import { getNaturalSize, scaleToFit, type ContentMetrics } from '#lib/utils/container-utils.ts';
 import { clamp } from 'lodash-es';
-import { getNaturalSize, scaleToFit, type ContentMetrics } from '$lib/utils/container-utils';
 
 /**
  * Shared face-box drag geometry -- the coordinate transform and selector-placement math used by

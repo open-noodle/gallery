@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { trimManager, TrimManager } from '$lib/managers/edit/trim-manager.svelte';
+  import { trimManager, TrimManager } from '#lib/managers/edit/trim-manager.svelte.ts';
   import { t } from 'svelte-i18n';
 
   const formatTime = TrimManager.formatTime;

@@ -1,3 +1,7 @@
+import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
+import { faceSuggestionContextExpanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
+import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+import { handleError } from '#lib/utils/handle-error.ts';
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -5,11 +9,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
-import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
-import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-import { handleError } from '$lib/utils/handle-error';
-import { reactivePageMock } from '@test-data/mocks/reactive-page.mock.svelte';
+import { reactivePageMock } from '#test-data/mocks/reactive-page.mock.svelte';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -17,15 +17,15 @@ vi.mock('svelte-i18n', () => ({
 }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
 
-vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: vi.fn() }));
 
 // The Details panel loads the asset; nothing here is about its rows (suggestion-asset-details.spec.ts is).
 const getAssetMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
+vi.mock('#lib/managers/AssetCacheManager.svelte.js', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
 
 // `MediaQuery` reads matchMedia once at mount; stub it to the screen width a test is about.
 function screenIsWide(wide: boolean) {

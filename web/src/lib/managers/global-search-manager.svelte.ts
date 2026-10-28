@@ -2,6 +2,39 @@
 // Upstream's own search UI is carried dormant alongside it (present, verbatim, never mounted):
 // see web/src/lib/components/shared-components/search-bar/DORMANT.md before touching either.
 // Do not import `$lib/managers/search-manager.svelte` — that is upstream's dormant manager.
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+import { Route } from '#lib/route.ts';
+import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '#lib/stores/cmdk-recent.ts';
+import { getPhotosPersonFilterId, type PhotosPersonFilterReference } from '#lib/utils/photos-filter-options.ts';
+import {
+  buildSearchablePageUrl,
+  getSearchablePageBasePath,
+  getSearchablePageState,
+  type SearchablePageSortOrder,
+} from '#lib/utils/searchable-page-search.ts';
+import {
+  isLiveTypedSearchToken,
+  liveTypedSearchChoiceValue,
+  resolveLiveTypedSearchSuggestions,
+  type LiveTypedSearchChoice,
+  type LiveTypedSearchStatus,
+  type LiveTypedSearchToken,
+} from '#lib/utils/typed-search/typed-search-live-suggestions.ts';
+import { getTypedSearchDisplayText, storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
+import {
+  getActiveTypedSearchToken,
+  getTypedSearchTokenIdentity,
+  parseTypedSearch,
+  rewriteTypedSearchToken,
+  type TypedSearchDisplayToken,
+  type TypedSearchIssue,
+  type TypedSearchParseResult,
+  type TypedSearchTokenSpan,
+} from '#lib/utils/typed-search/typed-search-parser.ts';
+import { resolveTypedSearchFilters, type TypedSearchChoice } from '#lib/utils/typed-search/typed-search-resolver.ts';
 import {
   AssetVisibility,
   getAlbumInfo,
@@ -27,46 +60,16 @@ import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { Route } from '$lib/route';
-import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
-import { getPhotosPersonFilterId, type PhotosPersonFilterReference } from '$lib/utils/photos-filter-options';
-import {
-  buildSearchablePageUrl,
-  getSearchablePageBasePath,
-  getSearchablePageState,
-  type SearchablePageSortOrder,
-} from '$lib/utils/searchable-page-search';
-import {
-  isLiveTypedSearchToken,
-  liveTypedSearchChoiceValue,
-  resolveLiveTypedSearchSuggestions,
-  type LiveTypedSearchChoice,
-  type LiveTypedSearchStatus,
-  type LiveTypedSearchToken,
-} from '$lib/utils/typed-search/typed-search-live-suggestions';
-import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import {
-  getActiveTypedSearchToken,
-  getTypedSearchTokenIdentity,
-  parseTypedSearch,
-  rewriteTypedSearchToken,
-  type TypedSearchDisplayToken,
-  type TypedSearchIssue,
-  type TypedSearchParseResult,
-  type TypedSearchTokenSpan,
-} from '$lib/utils/typed-search/typed-search-parser';
-import { resolveTypedSearchFilters, type TypedSearchChoice } from '$lib/utils/typed-search/typed-search-resolver';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
+
+// SvelteKit 3's page.url is read-only; the URL helpers take a URL. This is a throwaway copy, not reactive state.
+const currentPageUrl = () => new URL(page.url.href);
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
 export type SearchPresentation = 'modal' | 'dropdown';
@@ -701,7 +704,7 @@ export class GlobalSearchManager {
   open(presentation: SearchPresentation = 'modal') {
     this.isOpen = true;
     this.presentation = presentation;
-    const currentPageSearchState = getSearchablePageState(page.url);
+    const currentPageSearchState = getSearchablePageState(currentPageUrl());
     const typedDisplayText = currentPageSearchState.isSearchable
       ? getTypedSearchDisplayText(page.url.pathname + page.url.search)
       : undefined;
@@ -1636,7 +1639,7 @@ export class GlobalSearchManager {
   }
 
   private buildSearchDestination(text: string, filters?: FilterState): string {
-    const searchablePageUrl = buildSearchablePageUrl(page.url, text, this.searchSortOrder, filters);
+    const searchablePageUrl = buildSearchablePageUrl(currentPageUrl(), text, this.searchSortOrder, filters);
     if (searchablePageUrl) {
       return searchablePageUrl;
     }
@@ -1644,14 +1647,14 @@ export class GlobalSearchManager {
     if (page.url.pathname.startsWith('/map') && !hasSerializableFilters(filters)) {
       // Ephemeral serialization for navigation only; no reactive state is retained.
       // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const params = new URLSearchParams(page.url.searchParams);
+      const params = new URLSearchParams(page.url.search);
       params.set('q', text);
       return `/map?${params.toString()}`;
     }
 
     // Ephemeral URL object for destination construction only; no reactive state is retained.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    return buildSearchablePageUrl(new URL('/photos', page.url), text, this.searchSortOrder, filters) ?? '/photos';
+    return buildSearchablePageUrl(new URL('/photos', page.url.href), text, this.searchSortOrder, filters) ?? '/photos';
   }
 
   /**
@@ -1685,8 +1688,8 @@ export class GlobalSearchManager {
     const filters = options.applyFilter({ ...current });
     // Ephemeral URL object for destination construction only; no reactive state is retained.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const fallback = new URL('/photos', page.url);
-    const base = options.target ?? (getSearchablePageBasePath(page.url.pathname) ? page.url : fallback);
+    const fallback = new URL('/photos', page.url.href);
+    const base = options.target ?? (getSearchablePageBasePath(page.url.pathname) ? currentPageUrl() : fallback);
     const destination = buildSearchablePageUrl(base, '', this.searchSortOrder, filters) ?? '/photos';
     if (options.names) {
       storeTypedSearchNames(destination, {
@@ -1769,8 +1772,9 @@ export class GlobalSearchManager {
       spaceId !== undefined && profile?.type === 'space-person' && profile.spaceId === spaceId ? profile.id : undefined;
     const filterId = spaceProfileId ?? getPhotosPersonFilterId(person);
     // Ephemeral URL object for destination construction only; no reactive state is retained.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const target = spaceId !== undefined && spaceProfileId === undefined ? new URL('/photos', page.url) : undefined;
+    const target =
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
+      spaceId !== undefined && spaceProfileId === undefined ? new URL('/photos', page.url.href) : undefined;
     this.navigateToFilteredResults({
       target,
       applyFilter: (filters) => ({
@@ -1811,18 +1815,14 @@ export class GlobalSearchManager {
   async applySearchSort(sortOrder: SearchablePageSortOrder, text = this.query) {
     this.searchSortOrder = sortOrder;
 
-    const nextUrl = buildSearchablePageUrl(page.url, text, sortOrder, this.searchablePageFiltersProvider?.());
+    const nextUrl = buildSearchablePageUrl(currentPageUrl(), text, sortOrder, this.searchablePageFiltersProvider?.());
     if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
 
     this.keepOpenOnNextNavigate = this.isOpen;
     try {
-      await goto(nextUrl, {
-        replaceState: true,
-        keepFocus: true,
-        noScroll: true,
-      });
+      await goto(nextUrl, { replace: true, reset: false });
     } catch (error) {
       this.keepOpenOnNextNavigate = false;
       throw error;
@@ -1842,7 +1842,7 @@ export class GlobalSearchManager {
   async activateSearch(text: string): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) {
-      const searchablePageUrl = buildSearchablePageUrl(page.url, '');
+      const searchablePageUrl = buildSearchablePageUrl(currentPageUrl(), '');
       if (searchablePageUrl && searchablePageUrl !== page.url.pathname + page.url.search) {
         this.query = '';
         this.searchSortOrder = 'relevance';

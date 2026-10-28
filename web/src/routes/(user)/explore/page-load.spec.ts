@@ -1,4 +1,4 @@
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { load } from './+page';
 
 const { authenticate, getFormatter } = vi.hoisted(() => ({
@@ -6,10 +6,10 @@ const { authenticate, getFormatter } = vi.hoisted(() => ({
   getFormatter: vi.fn(),
 }));
 
-vi.mock('$lib/utils/auth', () => ({ authenticate }));
+vi.mock('#lib/utils/auth.js', () => ({ authenticate }));
 // Partial mock: upstream's loader pulls in the memory manager, which pulls in `$lib/utils` ->
 // `preferences.store` -> `getPreferredLocale`. Replacing the whole module would drop it.
-vi.mock(import('$lib/utils/i18n'), async (importOriginal) => ({
+vi.mock(import('#lib/utils/i18n.js'), async (importOriginal) => ({
   ...(await importOriginal()),
   getFormatter,
 }));

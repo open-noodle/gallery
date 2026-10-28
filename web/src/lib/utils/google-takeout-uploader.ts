@@ -1,3 +1,7 @@
+import { createAlbum } from '#lib/gallery/album/album-add.ts';
+import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
+import { uploadRequest } from '#lib/utils.ts';
+import type { TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
 import {
   AssetMediaStatus,
   AssetUploadAction,
@@ -7,10 +11,6 @@ import {
   updateAsset,
   type AssetMediaResponseDto,
 } from '@immich/sdk';
-import { createAlbum } from '$lib/gallery/album/album-add';
-import type { ImportOptions } from '$lib/managers/import-manager.svelte';
-import { uploadRequest } from '$lib/utils';
-import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 
 export interface UploadResult {
   assetId: string;

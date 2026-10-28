@@ -1,6 +1,6 @@
+import { AlbumSortBy, SortOrder } from '#lib/stores/preferences.store.ts';
+import { isAlbumEditor, sortAlbums } from '#lib/utils/album-utils.ts';
 import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
-import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
-import { isAlbumEditor, sortAlbums } from '$lib/utils/album-utils';
 
 const A = (o: Partial<AlbumResponseDto>): AlbumResponseDto =>
   ({

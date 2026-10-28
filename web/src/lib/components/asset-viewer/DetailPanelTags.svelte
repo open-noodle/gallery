@@ -87,7 +87,7 @@
           -->
           {#if canFilter}
             <Link
-              href={buildContextualFilterUrl(page.url, { tagIds: [tag.id] })}
+              href={buildContextualFilterUrl(new URL(page.url.href), { tagIds: [tag.id] })}
               aria-label="{$t('filter_by_tag')}: {tag.value}"
               underline={false}
               class="px-2 font-light"

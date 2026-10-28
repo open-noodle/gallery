@@ -1,6 +1,6 @@
-import { loadImage } from '$lib/actions/image-loader.svelte';
+import { loadImage } from '#lib/actions/image-loader.svelte.ts';
 
-vi.mock('$lib/utils/sw-messaging', () => ({
+vi.mock('#lib/utils/sw-messaging.js', () => ({
   cancelImageUrl: vi.fn(),
 }));
 

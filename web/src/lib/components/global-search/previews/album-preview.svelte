@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, type AlbumNameDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';

@@ -1,10 +1,10 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { type AlbumResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { Settings } from 'luxon';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import AlbumEditModal from './AlbumEditModal.svelte';
 
 // The modal saves through upstream's updateAlbumInfoMutation (immich-32668): assert on the SDK call.

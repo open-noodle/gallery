@@ -1,3 +1,13 @@
+import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+import { animateRemoval } from '#lib/gallery/motion/index.ts';
+import type { CommandContext, SelectionCommandContext } from '#lib/managers/command-context-manager.svelte.ts';
+import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
+import AssetDeleteConfirmModal from '#lib/modals/AssetDeleteConfirmModal.svelte';
+import { showDeleteModal } from '#lib/stores/preferences.store.ts';
+import type { OnUndoDelete } from '#lib/utils/actions.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import {
   AssetVisibility,
   deleteAssets as deleteBulk,
@@ -8,16 +18,6 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-import { animateRemoval } from '$lib/gallery/motion';
-import type { CommandContext, SelectionCommandContext } from '$lib/managers/command-context-manager.svelte';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
-import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
-import { showDeleteModal } from '$lib/stores/preferences.store';
-import type { OnUndoDelete } from '$lib/utils/actions';
-import { handleError } from '$lib/utils/handle-error';
 
 const getSelection = (ctx?: CommandContext): SelectionCommandContext | null => ctx?.selection ?? null;
 

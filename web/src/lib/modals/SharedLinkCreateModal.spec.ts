@@ -1,8 +1,8 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import '@testing-library/jest-dom';
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import SharedLinkCreateModal from './SharedLinkCreateModal.svelte';
 
 beforeEach(() => {

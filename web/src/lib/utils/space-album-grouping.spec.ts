@@ -1,7 +1,5 @@
-import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { get } from 'svelte/store';
-import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
-import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
+import { AlbumSortBy, SortOrder } from '#lib/stores/preferences.store.ts';
+import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import {
   buildSpaceAlbumGroups,
   getSelectedSpaceAlbumGroupOption,
@@ -11,8 +9,10 @@ import {
   expandAllSpaceAlbumGroups,
   spaceGroupOptionsMetadata,
   type SpaceAlbumGroupingCtx,
-} from '$lib/utils/space-album-grouping';
-import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
+} from '#lib/utils/space-album-grouping.ts';
+import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
+import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
+import { get } from 'svelte/store';
 
 const CTX: SpaceAlbumGroupingCtx = {
   ungrouped: 'Albums',

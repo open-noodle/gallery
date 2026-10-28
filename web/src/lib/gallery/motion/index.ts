@@ -1,12 +1,12 @@
+import { crossfadeNavigation } from '#lib/gallery/motion/page-transition.ts';
+import { installPressFeedback } from '#lib/gallery/motion/press.ts';
+import { installTilt } from '#lib/gallery/motion/tilt.ts';
 import { onMount } from 'svelte';
 import { onNavigate } from '$app/navigation';
-import { crossfadeNavigation } from '$lib/gallery/motion/page-transition';
-import { installPressFeedback } from '$lib/gallery/motion/press';
-import { installTilt } from '$lib/gallery/motion/tilt';
 
-export { celebrate, pop } from '$lib/gallery/motion/celebrate';
-export { animateRemoval, type RemovalKind, type RemovalTarget } from '$lib/gallery/motion/removal';
-export { duration, ease, spring, springEasing } from '$lib/gallery/motion/tokens';
+export { celebrate, pop } from '#lib/gallery/motion/celebrate.ts';
+export { animateRemoval, type RemovalKind, type RemovalTarget } from '#lib/gallery/motion/removal.ts';
+export { duration, ease, spring, springEasing } from '#lib/gallery/motion/tokens.ts';
 
 /**
  * Root-layout hook, called once during the layout's initialisation: installs the site-wide press

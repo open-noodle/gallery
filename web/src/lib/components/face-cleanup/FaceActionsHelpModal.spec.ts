@@ -13,7 +13,7 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  register('en', () => import('$i18n/en.json'));
+  register('en', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en', initialLocale: 'en' });
   await waitLocale('en');
 });

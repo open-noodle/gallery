@@ -1,9 +1,9 @@
+import { commandContextManager } from '#lib/managers/command-context-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { commandContextManager } from '$lib/managers/command-context-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import RegisterAlbumContextHarness from './__tests__/register-album-context-harness.svelte';
 import RegisterSelectionContextHarness from './__tests__/register-selection-context-harness.svelte';
 import RegisterSpaceContextHarness from './__tests__/register-space-context-harness.svelte';
@@ -13,7 +13,7 @@ const { mockPage, mockUser } = vi.hoisted(() => ({
   mockUser: { current: null as { id: string; isAdmin: boolean } | null },
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;

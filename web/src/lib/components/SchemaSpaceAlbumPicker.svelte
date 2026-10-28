@@ -2,7 +2,7 @@
   import { getSharedSpaceAlbums, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { Label, Text } from '@immich/ui';
   import { t } from 'svelte-i18n';
-  import Combobox, { asSelectedOption, type ComboBoxOption } from '$lib/components/shared-components/Combobox.svelte';
+  import Combobox, { asSelectedOption, type ComboBoxOption } from '#lib/components/shared-components/Combobox.svelte';
 
   type Props = {
     label: string;

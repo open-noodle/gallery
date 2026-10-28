@@ -12,7 +12,7 @@ import {
   parseGoogleTakeoutSidecar,
   stripSupplementalSuffix,
   type TakeoutMediaItem,
-} from '$lib/utils/google-takeout-parser';
+} from '#lib/utils/google-takeout-parser.ts';
 
 function makeMediaItem(path: string, overrides: Partial<TakeoutMediaItem> = {}): TakeoutMediaItem {
   const name = path.slice(path.lastIndexOf('/') + 1);

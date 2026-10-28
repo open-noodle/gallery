@@ -1,35 +1,35 @@
 <script lang="ts">
   import { goto, invalidateAll, onNavigate } from '$app/navigation';
-  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
-  import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
-  import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
-  import AlbumSummary from '$lib/components/album-page/AlbumSummary.svelte';
-  import { Route } from '$lib/route';
-  import { isSpaceAlbumRoute } from '$lib/utils/navigation';
-  import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
-  import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-  import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
-  import Timeline from '$lib/components/timeline/Timeline.svelte';
-  import ScopedSearchButton from '$lib/components/search/scoped-search-button.svelte';
-  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
-  import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-  import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-  import { buildAlbumAssetPickerOptions, buildSpaceAlbumAssetPickerOptions } from '$lib/utils/album-filter-options';
-  import { createAlbumPickerFilters, createAlbumTimeline } from '$lib/gallery/filtered-timeline/album-timeline';
-  import { getTimelineManagerTimeBuckets } from '$lib/utils/timeline-zoom-navigation';
-  import { getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
-  import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
-  import { getAlbumInfoQuery, invalidateAlbum } from '$lib/queries/album.query';
-  import { queryClient } from '$lib/queries/client';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import AlbumTitle from '#lib/components/album-page/AlbumTitle.svelte';
+  import AlbumDescription from '#lib/components/album-page/AlbumDescription.svelte';
+  import AlbumSummary from '#lib/components/album-page/AlbumSummary.svelte';
+  import { Route } from '#lib/route.ts';
+  import { isSpaceAlbumRoute } from '#lib/utils/navigation.ts';
+  import FilterPanel from '#lib/components/filter-panel/filter-panel.svelte';
+  import FilterToggleButton from '#lib/components/filter-panel/filter-toggle-button.svelte';
+  import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
+  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import SelectionToolbar from '#lib/components/timeline/SelectionToolbar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import ScopedSearchButton from '#lib/components/search/scoped-search-button.svelte';
+  import TimelineGroupingControl from '#lib/components/timeline/TimelineGroupingControl.svelte';
+  import { assetMultiSelectManager, AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+  import { buildAlbumAssetPickerOptions, buildSpaceAlbumAssetPickerOptions } from '#lib/utils/album-filter-options.ts';
+  import { createAlbumPickerFilters, createAlbumTimeline } from '#lib/gallery/filtered-timeline/album-timeline.ts';
+  import { getTimelineManagerTimeBuckets } from '#lib/utils/timeline-zoom-navigation.ts';
+  import { getAlbumAssetsActions, handleDeleteAlbum } from '#lib/services/album.service.ts';
+  import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
+  import { getAlbumInfoQuery, invalidateAlbum } from '#lib/queries/album.query.ts';
+  import { queryClient } from '#lib/queries/client.ts';
   import { createQuery } from '@tanstack/svelte-query';
-  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
-  import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
-  import { lang } from '$lib/stores/preferences.store';
+  import SmartSearchResults from '#lib/components/search/smart-search-results.svelte';
+  import SharedLinkCreateModal from '#lib/modals/SharedLinkCreateModal.svelte';
+  import { lang } from '#lib/stores/preferences.store.ts';
   import {
     AlbumUserRole,
     SharedSpaceRole,
@@ -38,9 +38,9 @@
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import HeaderActionButton from '$lib/components/HeaderActionButton.svelte';
+  import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
-  import { handleError } from '$lib/utils/handle-error';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { mdiArrowLeft, mdiImageOutline, mdiImagePlusOutline, mdiLink } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';

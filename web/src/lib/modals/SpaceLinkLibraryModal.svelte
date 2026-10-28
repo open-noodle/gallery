@@ -1,6 +1,6 @@
 <script lang="ts">
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { getAllLibraries, linkLibrary, type LibraryResponseDto } from '@immich/sdk';
   import { FormModal, Icon, Input, ListButton, Stack, Text } from '@immich/ui';
   import { mdiBookshelf, mdiLinkVariantPlus, mdiMagnify } from '@mdi/js';

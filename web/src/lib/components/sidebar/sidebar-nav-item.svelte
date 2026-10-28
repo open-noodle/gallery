@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
+  import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   // @immich/ui re-exports its types (dist/index.d.ts: `export * from './types.js'`),
   // so IconLike / IconProps come from the package rather than being redeclared here.
   import { Icon, Link, type IconLike, type IconProps } from '@immich/ui';
