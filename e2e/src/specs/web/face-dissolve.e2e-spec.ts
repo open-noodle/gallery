@@ -10,9 +10,9 @@
  * guided `/admin/face-cleanup/[personId]`, and a person made entirely of EXIF faces is exactly the case no
  * scan can ever flag, so this is the only page discovery actually lands on.
  */
-import { getPersonStatistics, type LoginResponseDto } from '@immich/sdk';
+import { type LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { utils } from 'src/utils';
 
 test.describe('dissolve a metadata-contaminated person', () => {
   let admin: LoginResponseDto;
@@ -71,9 +71,11 @@ test.describe('dissolve a metadata-contaminated person', () => {
     // dissolve button remaining on screen, is the shipped UI's actual "it worked" signal.
     await page.waitForURL('**/admin/face-cleanup/people');
 
-    const statistics = await getPersonStatistics({ id: person.id }, { headers: asBearerAuth(admin.accessToken) });
-    expect(statistics.assets).toBe(0);
-    expect(statistics.faces).toBe(0);
+    // The imported face is deleted, and with nothing left on it the person is removed too.
+    const faces = await db.query(`SELECT 1 FROM "asset_face" WHERE "assetId" = $1`, [asset.id]);
+    expect(faces.rows).toHaveLength(0);
+    const people = await db.query(`SELECT 1 FROM "person" WHERE "personGroupId" = $1`, [person.id]);
+    expect(people.rows).toHaveLength(0);
 
     const { rows } = await db.query(`SELECT "facesRecognizedAt" FROM "asset_job_status" WHERE "assetId" = $1`, [
       asset.id,
