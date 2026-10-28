@@ -4,7 +4,7 @@ import { init, register, waitLocale } from 'svelte-i18n';
 import SearchSortDropdown from '../search-sort-dropdown.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

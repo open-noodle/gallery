@@ -1,4 +1,4 @@
-import { hoverScale, installPressFeedback, lastPressPoint, pressScale } from '$lib/gallery/motion/press';
+import { hoverScale, installPressFeedback, lastPressPoint, pressScale } from '#lib/gallery/motion/press.ts';
 
 describe('pressScale', () => {
   it('dips small controls the most, capped at 0.86', () => {

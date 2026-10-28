@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import {
   buildSearchablePageUrl,
   clearSearchablePageFilterParams,
   getSearchablePageBasePath,
   getSearchablePageFilterState,
   getSearchablePageState,
-} from '$lib/utils/searchable-page-search';
+} from '#lib/utils/searchable-page-search.ts';
+import { describe, expect, it } from 'vitest';
 
 describe('searchable page URL state', () => {
   it('detects photos as a searchable page', () => {

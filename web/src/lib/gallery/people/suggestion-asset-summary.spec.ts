@@ -1,10 +1,10 @@
+import { faceSuggestionContextExpanded as expanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
+import SuggestionAssetSummary from '#lib/gallery/people/suggestion-asset-summary.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { faceSuggestionContextExpanded as expanded } from '$lib/gallery/people/face-suggestion-context.store';
-import SuggestionAssetSummary from '$lib/gallery/people/suggestion-asset-summary.svelte';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },

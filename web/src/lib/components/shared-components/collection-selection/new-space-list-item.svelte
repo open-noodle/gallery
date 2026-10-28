@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SCROLL_PROPERTIES } from '$lib/components/shared-components/album-selection/album-selection-utils';
-  import { isValidNewSpaceName } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
+  import { SCROLL_PROPERTIES } from '#lib/components/shared-components/album-selection/album-selection-utils.ts';
+  import { isValidNewSpaceName } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiPlus } from '@mdi/js';
   import type { Action } from 'svelte/action';

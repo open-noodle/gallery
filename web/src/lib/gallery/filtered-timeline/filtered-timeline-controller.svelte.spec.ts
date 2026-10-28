@@ -1,16 +1,20 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import {
+  createFilterState,
+  type FilterPanelConfig,
+  type FilterState,
+} from '#lib/components/filter-panel/filter-panel.ts';
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import type { TimelineManagerOptions } from '#lib/managers/timeline-manager/types.ts';
+import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
 import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import { flushSync } from 'svelte';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { createFilterState, type FilterPanelConfig, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import type { TimelineManagerOptions } from '$lib/managers/timeline-manager/types';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import { assetFactory, timelineAssetFactory } from '@test-data/factories/asset-factory';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { assetFactory, timelineAssetFactory } from '#test-data/factories/asset-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import { createAlbumTimeline } from './album-timeline';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
 import { createPhotosTimeline } from './photos-timeline';
@@ -25,17 +29,17 @@ const { gotoMock, registerSelectionContextMock, topVisibleAnchorMock } = vi.hois
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: { registerSearchablePageFilters: vi.fn(() => vi.fn()) },
 }));
-vi.mock('$lib/managers/command-context-manager.svelte', () => ({
+vi.mock('#lib/managers/command-context-manager.svelte.js', () => ({
   registerSelectionContext: registerSelectionContextMock,
 }));
-vi.mock('$lib/utils/filter-name-resolution', () => ({ resolveFilterNames: vi.fn(() => Promise.resolve()) }));
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('#lib/utils/filter-name-resolution.js', () => ({ resolveFilterNames: vi.fn(() => Promise.resolve()) }));
+vi.mock('#lib/managers/timeline-manager/timeline-anchor.js', () => ({
   getTimelineTopVisibleAnchor: topVisibleAnchorMock,
 }));
 
@@ -154,7 +158,7 @@ describe('FilteredTimelineController', () => {
       const [url, options] = gotoMock.mock.calls[0];
       expect(url).toContain('favorite=true');
       expect(url).not.toContain('sort=');
-      expect(options).toEqual({ replaceState: true, keepFocus: true, noScroll: true });
+      expect(options).toEqual({ replace: true, reset: false });
     });
 
     it('keeps sort=desc when a query is committed or the sort is explicit', () => {

@@ -1,15 +1,15 @@
+import StorageSpace from '#lib/components/shared-components/side-bar/StorageSpace.svelte';
+import RailStorage from '#lib/components/shared-components/side-bar/rail-storage.svelte';
+import { getByteUnitString } from '#lib/utils/byte-units.ts';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
-import StorageSpace from '$lib/components/shared-components/side-bar/StorageSpace.svelte';
-import RailStorage from '$lib/components/shared-components/side-bar/rail-storage.svelte';
-import { getByteUnitString } from '$lib/utils/byte-units';
 
 const mocks = vi.hoisted(() => ({
   authManager: { authenticated: true, user: { quotaSizeInBytes: null as number | null, quotaUsageInBytes: 0 } },
   serverInfo: { diskSizeRaw: 0, diskUseRaw: 0 } as { diskSizeRaw: number; diskUseRaw: number } | undefined,
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mocks.authManager }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: mocks.authManager }));
 // Both components read the server's storage through getStorageQuery (upstream immich-32467).
 vi.mock('@tanstack/svelte-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/svelte-query')>()),
@@ -23,8 +23,8 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => ({
 // Spied (not stubbed): both StorageSpace and rail-storage keep computing real byte-unit
 // strings, but the parity block below inspects the spy's call arguments to compare what each
 // component derived internally - without adding test-only markup to the upstream component.
-vi.mock('$lib/utils/byte-units', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/utils/byte-units')>();
+vi.mock('#lib/utils/byte-units.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/utils/byte-units.ts')>();
   return { ...actual, getByteUnitString: vi.fn(actual.getByteUnitString) };
 });
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
-  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
+  import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
   import {
     collapseAllSpaceAlbumGroups,
     expandAllSpaceAlbumGroups,
@@ -8,14 +8,14 @@
     getSelectedSpaceAlbumGroupOption,
     spaceGroupOptionsMetadata,
     type SpaceAlbumGroupOptionMetadata,
-  } from '$lib/utils/space-album-grouping';
+  } from '#lib/utils/space-album-grouping.ts';
   import {
     type SpaceAlbumSortByValue,
     type SpaceAlbumSortOptionMetadata,
     findSpaceAlbumSortOptionMetadata,
     getSpaceAlbumSortLabels,
     spaceAlbumSortOptionsMetadata,
-  } from '$lib/utils/space-album-sort';
+  } from '#lib/utils/space-album-sort.ts';
   import { Button, Icon, Text } from '@immich/ui';
   import {
     mdiArrowDownThin,

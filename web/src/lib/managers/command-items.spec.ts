@@ -1,18 +1,18 @@
+import en from '#i18n/en.json';
+import { ADMIN_VISIBLE_QUEUES, MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import * as selectionHandlers from '#lib/managers/selection-command-handlers.ts';
+import { Route } from '#lib/route.ts';
+import * as albumService from '#lib/services/album.service.ts';
+import * as albumUtils from '#lib/utils/album-utils.ts';
+import * as fileUploader from '#lib/utils/file-uploader.ts';
+import * as handleErrorModule from '#lib/utils/handle-error.ts';
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
 import { QueueCommand, QueueName, SharedSpaceRole } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
-import en from '$i18n/en.json';
-import { ADMIN_VISIBLE_QUEUES, MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import * as selectionHandlers from '$lib/managers/selection-command-handlers';
-import { Route } from '$lib/route';
-import * as albumService from '$lib/services/album.service';
-import * as albumUtils from '$lib/utils/album-utils';
-import * as fileUploader from '$lib/utils/file-uploader';
-import * as handleErrorModule from '$lib/utils/handle-error';
 import AlbumEditModal from '../modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '../modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '../modals/ShortcutsModal.svelte';
@@ -43,14 +43,14 @@ vi.mock('@immich/sdk', async (orig) => ({
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
-vi.mock('$lib/services/album.service', () => ({
+vi.mock('#lib/services/album.service.js', () => ({
   handleDeleteAlbum: vi.fn().mockResolvedValue(undefined),
   handleDownloadAlbum: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$lib/managers/selection-command-handlers', async () => {
-  const actual = await vi.importActual<typeof import('$lib/managers/selection-command-handlers')>(
-    '$lib/managers/selection-command-handlers',
+vi.mock('#lib/managers/selection-command-handlers.js', async () => {
+  const actual = await vi.importActual<typeof import('#lib/managers/selection-command-handlers.ts')>(
+    '#lib/managers/selection-command-handlers.ts',
   );
   return {
     ...actual,
@@ -66,7 +66,7 @@ vi.mock('$lib/managers/selection-command-handlers', async () => {
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user' } as { id: string } | null },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     logout: vi.fn().mockResolvedValue(undefined),
     get authenticated() {

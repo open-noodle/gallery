@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
+import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
 
 /**
  * Cards tilt a few degrees toward the mouse, as if the picture were a physical print under the

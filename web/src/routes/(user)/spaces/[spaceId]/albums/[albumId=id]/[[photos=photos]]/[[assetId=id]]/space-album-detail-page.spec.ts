@@ -1,3 +1,8 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { getAlbumAssetsActions } from '#lib/services/album.service.ts';
 import {
   AlbumUserRole,
   AssetOrder,
@@ -14,54 +19,49 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { goto } from '$app/navigation';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { getAlbumAssetsActions } from '$lib/services/album.service';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import SpaceAlbumDetailPage from './+page.svelte';
 import { mockTimelineState, resetMockTimelineState, setMockTimelineEmpty } from './mock-timeline-state';
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
+vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockComponent } = await import('./mock-timeline.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/AssetSelectControlBar.svelte', async () => {
+vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
   const { default: MockComponent } = await import('./mock-asset-select-control-bar.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/RemoveFromAlbumAction.svelte', async () => {
+vi.mock('#lib/components/timeline/actions/RemoveFromAlbumAction.svelte', async () => {
   const { default: MockComponent } = await import('./mock-remove-from-album.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/actions/DownloadAction.svelte', async () => {
+vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
   const { default: MockComponent } = await import('./mock-download-action.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/ControlAppBar.svelte', async () => {
+vi.mock('#lib/components/shared-components/ControlAppBar.svelte', async () => {
   const { default: MockComponent } =
     await import('../../../../[[photos=photos]]/[[assetId=id]]/mock-control-app-bar.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/filter-panel.svelte', async () => {
+vi.mock('#lib/components/filter-panel/filter-panel.svelte', async () => {
   const { default: MockComponent } = await import('./mock-filter-panel.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
+vi.mock('#lib/components/filter-panel/active-filters-bar.svelte', async () => {
   const { default: MockComponent } = await import('./mock-active-filters-bar.test-wrapper.svelte');
   return { default: MockComponent };
 });
@@ -72,25 +72,25 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNav
 // its re-hydrate $effect only re-runs when `page.url` is a real signal. A plain object would let a
 // broken re-hydrate pass. See reactive-page.mock.svelte.ts.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
 
-vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/TimelineGroupingControl.svelte', async () => {
+vi.mock('#lib/components/timeline/TimelineGroupingControl.svelte', async () => {
   const { default: MockComponent } = await import('./mock-grouping-control.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('#lib/managers/timeline-manager/timeline-anchor.js', () => ({
   getTimelineTopVisibleAnchor: vi.fn().mockReturnValue(undefined),
 }));
 
-vi.mock('$lib/utils/timeline-zoom-navigation', () => ({
+vi.mock('#lib/utils/timeline-zoom-navigation.js', () => ({
   getTimelineBucketZoomTarget: vi.fn(),
   getTimelineManagerTimeBuckets: vi.fn().mockReturnValue([]),
 }));
@@ -99,7 +99,7 @@ vi.mock('$lib/utils/timeline-zoom-navigation', () => ({
 // DeleteAssetsAction — its `force` derivation reads featureFlagsManager.value.trash, which
 // throws until the (real, module-singleton) manager is initialized. Mirrors the mock already
 // used by SelectionToolbar.spec.ts and the space-person-detail-page spec.
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { trash: true } },
 }));
 
@@ -126,7 +126,7 @@ const { mockAssetMultiSelectManager, pickerMultiSelectClear, pickerSelectedAsset
   }),
 );
 
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: {
     // Returns a teardown, matching the real registration the page's $effect consumes.
     registerSearchablePageFilters: vi.fn(() => vi.fn()),
@@ -134,7 +134,7 @@ vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
   assetMultiSelectManager: mockAssetMultiSelectManager,
   AssetMultiSelectManager: class {
     selectionActive = false;
@@ -162,8 +162,8 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-vi.mock('$lib/services/album.service', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/services/album.service')>();
+vi.mock('#lib/services/album.service.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/services/album.service.ts')>();
   return {
     ...actual,
     getAlbumAssetsActions: vi.fn().mockReturnValue({
@@ -182,7 +182,7 @@ vi.mock('$lib/services/album.service', async (importOriginal) => {
   };
 });
 
-vi.mock('$lib/gallery/album/album-add', () => ({
+vi.mock('#lib/gallery/album/album-add.js', () => ({
   addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
 }));
 
@@ -286,7 +286,7 @@ async function openOverflowMenu() {
 
 describe('Space album detail page', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });
@@ -1402,7 +1402,7 @@ describe('Space album detail page', () => {
       await waitFor(() =>
         expect(goto).toHaveBeenCalledWith(
           '/spaces/space-1/albums/album-1?people=person-1',
-          expect.objectContaining({ replaceState: true }),
+          expect.objectContaining({ replace: true }),
         ),
       );
     });
@@ -1417,7 +1417,7 @@ describe('Space album detail page', () => {
       await waitFor(() =>
         expect(goto).toHaveBeenCalledWith(
           expect.stringContaining('q=beach'),
-          expect.objectContaining({ replaceState: true }),
+          expect.objectContaining({ replace: true }),
         ),
       );
     });

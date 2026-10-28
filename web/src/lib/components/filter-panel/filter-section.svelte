@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown } from '@mdi/js';
   import type { Snippet } from 'svelte';

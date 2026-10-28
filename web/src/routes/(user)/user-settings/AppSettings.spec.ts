@@ -1,10 +1,10 @@
+import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import { cropFacesFromAsset } from '#lib/stores/preferences.store.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
-import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import { cropFacesFromAsset } from '$lib/stores/preferences.store';
-import { renderWithTooltips } from '$tests/helpers';
 import AppSettings from './AppSettings.svelte';
 
 describe('AppSettings — crop faces switch', () => {

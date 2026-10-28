@@ -1,3 +1,10 @@
+import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
+import AssetDeleteConfirmModal from '#lib/modals/AssetDeleteConfirmModal.svelte';
+import { showDeleteModal } from '#lib/stores/preferences.store.ts';
+import * as handleErrorModule from '#lib/utils/handle-error.ts';
 import {
   AssetVisibility,
   deleteAssets as deleteBulk,
@@ -8,13 +15,6 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
-import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
-import { showDeleteModal } from '$lib/stores/preferences.store';
-import * as handleErrorModule from '$lib/utils/handle-error';
 import type { CommandContext, SelectionCommandContext } from './command-context-manager.svelte';
 import {
   canAddSelectedToAlbum,
@@ -48,7 +48,7 @@ vi.mock('@immich/sdk', async (orig) => ({
   restoreAssets: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { trash: true } },
 }));
 

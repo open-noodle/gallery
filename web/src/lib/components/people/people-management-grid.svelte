@@ -1,9 +1,9 @@
 <script lang="ts" generics="T extends { id: string }">
-  import { shortcut } from '$lib/actions/shortcut';
-  import PeopleGrid from '$lib/components/people/people-grid.svelte';
-  import PersonTile from '$lib/components/people/person-tile.svelte';
-  import type { ManagedPerson } from '$lib/components/people/people-types';
-  import { ThumbnailLoadQueue } from '$lib/components/people/thumbnail-load-queue.svelte';
+  import { shortcut } from '#lib/actions/shortcut.ts';
+  import PeopleGrid from '#lib/components/people/people-grid.svelte';
+  import PersonTile from '#lib/components/people/person-tile.svelte';
+  import type { ManagedPerson } from '#lib/components/people/people-types.ts';
+  import { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
 
@@ -167,7 +167,7 @@
 
 <PeopleGrid items={people} class={gridClass} {hasNextPage} {loading} {loadedPages} {loadNextPage}>
   {#snippet children(person)}
-    {@const managedPerson = toManagedPerson(person)}
+    {const managedPerson = $derived(toManagedPerson(person))}
     <div class={cardClass}>
       <PersonTile
         person={managedPerson}
@@ -181,8 +181,8 @@
 
         {#snippet footer()}
           {#if isNameEditable(person)}
-            {@const listId = `${suggestionListId}-${person.id}`}
-            {@const showSuggestions = suggestionsFor === person.id && suggestions.length > 0}
+            {const listId = $derived(`${suggestionListId}-${person.id}`)}
+            {const showSuggestions = $derived(suggestionsFor === person.id && suggestions.length > 0)}
             <div class="relative">
               <input
                 type="text"
@@ -214,7 +214,7 @@
                   class="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-immich-dark-gray"
                 >
                   {#each suggestions as suggestion, index (suggestion.id)}
-                    {@const managedSuggestion = toManagedPerson(suggestion)}
+                    {const managedSuggestion = $derived(toManagedPerson(suggestion))}
                     <!-- Keyboard selection lives on the combobox input (arrows + Enter via aria-activedescendant);
                          mousedown is cancelled so a click doesn't blur the input and commit the typed name. -->
                     <!-- svelte-ignore a11y_click_events_have_key_events -->

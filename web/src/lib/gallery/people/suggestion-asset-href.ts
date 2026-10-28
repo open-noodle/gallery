@@ -1,4 +1,4 @@
-import { Route } from '$lib/route';
+import { Route } from '#lib/route.ts';
 
 /**
  * Where "Open photo" in the face suggestion review points (#1039), shared by the link and the `o` shortcut.

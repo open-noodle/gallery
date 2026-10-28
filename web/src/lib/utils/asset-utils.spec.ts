@@ -1,5 +1,5 @@
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { AssetVisibility, updateAsset, type AssetResponseDto } from '@immich/sdk';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import {
   canCopyImageToClipboard,
   getAssetFilename,

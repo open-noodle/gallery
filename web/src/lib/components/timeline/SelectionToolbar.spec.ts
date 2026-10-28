@@ -1,3 +1,8 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+import type { TimelineDateTime } from '#lib/utils/timeline-util.ts';
 import type {
   AlbumResponseDto,
   AssetVisibility as AssetVisibilityType,
@@ -7,11 +12,6 @@ import { AlbumUserRole, AssetVisibility, getEditableAssets } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import type { TimelineDateTime } from '$lib/utils/timeline-util';
 import SelectionToolbar from './SelectionToolbar.svelte';
 
 // #734: SelectionToolbar resolves `editableSelectedAssetIds` itself via `POST /assets/editable`
@@ -52,7 +52,7 @@ const { mockUser, mockPreferences } = vi.hoisted(() => ({
   mockPreferences: { current: { tags: { enabled: true } } },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;
@@ -66,7 +66,7 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: {
     value: { trash: true },
   },

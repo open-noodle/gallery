@@ -1,14 +1,18 @@
 <script lang="ts">
-  import { shortcut } from '$lib/actions/shortcut';
-  import DeferredPersonThumbnail from '$lib/components/people/deferred-person-thumbnail.svelte';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import type { VisibilityChange, VisibilityPerson, VisibilitySaveResult } from '$lib/components/people/people-types';
-  import PeopleGrid from '$lib/components/people/people-grid.svelte';
-  import { ThumbnailLoadQueue } from '$lib/components/people/thumbnail-load-queue.svelte';
-  import { ToggleVisibility } from '$lib/constants';
-  import { locale } from '$lib/stores/preferences.store';
-  import { handleError } from '$lib/utils/handle-error';
-  import { getPetBadgeLabel } from '$lib/utils/pet-species';
+  import { shortcut } from '#lib/actions/shortcut.ts';
+  import DeferredPersonThumbnail from '#lib/components/people/deferred-person-thumbnail.svelte';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import type {
+    VisibilityChange,
+    VisibilityPerson,
+    VisibilitySaveResult,
+  } from '#lib/components/people/people-types.ts';
+  import PeopleGrid from '#lib/components/people/people-grid.svelte';
+  import { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
+  import { ToggleVisibility } from '#lib/constants.ts';
+  import { locale } from '#lib/stores/preferences.store.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { getPetBadgeLabel } from '#lib/utils/pet-species.ts';
   import { Button, Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiClose, mdiEye, mdiEyeOff, mdiEyeSettings, mdiPaw, mdiRestart } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -187,7 +191,7 @@
   <div class="flex flex-wrap gap-1 p-2 pb-8 md:px-8">
     <PeopleGrid items={people} class={gridClass} hasNextPage={hasMore} {loading} {loadNextPage}>
       {#snippet children(person)}
-        {@const hidden = overrides.get(person.id) ?? person.isHidden}
+        {const hidden = $derived(overrides.get(person.id) ?? person.isHidden)}
         <button
           type="button"
           class={personButtonClass}
@@ -223,7 +227,7 @@
             />
           {/if}
           {#if person.type === 'pet'}
-            {@const petBadgeLabel = getPetBadgeLabel(person.species, $t)}
+            {const petBadgeLabel = $derived(getPetBadgeLabel(person.species, $t))}
             <div
               class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
               data-testid="pet-badge"

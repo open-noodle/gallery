@@ -16,9 +16,9 @@ const { mockPage, mockAssetViewerManager } = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/state', () => ({ page: mockPage }));
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({ assetViewerManager: mockAssetViewerManager }));
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({ assetViewerManager: mockAssetViewerManager }));
 vi.mock('./DragAndDropUploadOverlay.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 

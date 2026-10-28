@@ -1,5 +1,5 @@
 <script lang="ts" generics="T">
-  import LazyChunks from '$lib/gallery/components/lazy-chunks.svelte';
+  import LazyChunks from '#lib/gallery/components/lazy-chunks.svelte';
   import type { Snippet } from 'svelte';
 
   interface Props {

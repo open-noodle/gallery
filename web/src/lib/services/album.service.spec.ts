@@ -1,11 +1,11 @@
 // album.service.spec.ts
+import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
+import { handleLinkAlbumToSpace } from '#lib/gallery/album/link-album-to-space.ts';
+import { notifyAddToAlbum } from '#lib/gallery/album/notify-add-to-album.ts';
+import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
 import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
-import { handleLinkAlbumToSpace } from '$lib/gallery/album/link-album-to-space';
-import { notifyAddToAlbum } from '$lib/gallery/album/notify-add-to-album';
-import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
 import { getAlbumActions } from './album.service';
 
 const linkAlbum = vi.fn();
@@ -24,10 +24,10 @@ vi.mock('@immich/sdk', async (orig) => ({
   addAssetsToAlbum: (...a: unknown[]) => addAssetToAlbum(...a),
 }));
 
-vi.mock('$lib/managers/event-manager.svelte', () => ({
+vi.mock('#lib/managers/event-manager.svelte.js', () => ({
   eventManager: { emit: (...a: unknown[]) => emit(...a), on: () => () => {} },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { params: {}, user: { id: 'me' } } }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: { params: {}, user: { id: 'me' } } }));
 
 vi.mock('@immich/ui', async (orig) => ({
   ...(await orig<typeof import('@immich/ui')>()),
@@ -39,10 +39,10 @@ vi.mock('@immich/ui', async (orig) => ({
   },
 }));
 
-vi.mock('$lib/utils/handle-error', () => ({ handleError: (...a: unknown[]) => handleError(...a) }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: (...a: unknown[]) => handleError(...a) }));
 
-vi.mock('$lib/utils/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('$lib/utils/i18n')>()),
+vi.mock('#lib/utils/i18n.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/i18n.ts')>()),
   getFormatter: () =>
     Promise.resolve(
       (key: string, opts?: { values?: Record<string, unknown> }) => `${key}:${JSON.stringify(opts?.values ?? {})}`,

@@ -1,4 +1,4 @@
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { clearTimelineTemporalFilter } from '../timeline-temporal-filters';
 
 describe('timeline temporal filter helpers', () => {

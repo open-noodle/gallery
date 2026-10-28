@@ -11,8 +11,8 @@
 </script>
 
 <script lang="ts">
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   /**
    * The people-search list shared by the owner's `AssignFaceSidePanel` and the space-flavoured

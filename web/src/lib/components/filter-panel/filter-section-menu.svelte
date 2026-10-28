@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { clickOutside } from '$lib/actions/click-outside';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
+  import { clickOutside } from '#lib/actions/click-outside.ts';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiCheck, mdiCog } from '@mdi/js';
   import { t } from 'svelte-i18n';

@@ -1,3 +1,13 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import * as recentModule from '#lib/stores/cmdk-recent.ts';
+import {
+  addEntry,
+  getEntries,
+  __resetForTests as resetRecentStore,
+  type RecentEntry,
+} from '#lib/stores/cmdk-recent.ts';
+import { getTypedSearchDisplayText, storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
+import type { TypedSearchResolveContext } from '#lib/utils/typed-search/typed-search-resolver.ts';
 import {
   AssetVisibility,
   getAlbumInfo,
@@ -19,11 +29,6 @@ import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import * as recentModule from '$lib/stores/cmdk-recent';
-import { addEntry, getEntries, __resetForTests as resetRecentStore, type RecentEntry } from '$lib/stores/cmdk-recent';
-import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import type { TypedSearchResolveContext } from '$lib/utils/typed-search/typed-search-resolver';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, type CommandItem } from './command-items';
@@ -48,7 +53,7 @@ const { mockUser } = vi.hoisted(() => ({
   // flips `mockUser.current` to something else.
   mockUser: { current: { id: 'test-user', isAdmin: true } as { id: string; isAdmin: boolean } | null },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;
@@ -64,7 +69,7 @@ const { mockFlags } = vi.hoisted(() => ({
     valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
   },
 }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: mockFlags,
 }));
 
@@ -74,7 +79,7 @@ const { typedSearchMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/utils/typed-search/typed-search-resolver', () => ({
+vi.mock('#lib/utils/typed-search/typed-search-resolver.js', () => ({
   resolveTypedSearchFilters: typedSearchMock.resolveTypedSearchFilters,
 }));
 
@@ -84,9 +89,9 @@ const { liveTypedSearchMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/utils/typed-search/typed-search-live-suggestions', async () => ({
-  ...(await vi.importActual<typeof import('$lib/utils/typed-search/typed-search-live-suggestions')>(
-    '$lib/utils/typed-search/typed-search-live-suggestions',
+vi.mock('#lib/utils/typed-search/typed-search-live-suggestions.js', async () => ({
+  ...(await vi.importActual<typeof import('#lib/utils/typed-search/typed-search-live-suggestions.ts')>(
+    '#lib/utils/typed-search/typed-search-live-suggestions.ts',
   )),
   resolveLiveTypedSearchSuggestions: liveTypedSearchMock.resolveLiveTypedSearchSuggestions,
 }));
@@ -98,7 +103,7 @@ const resetLiveTypedSearchMock = () => {
 
 resetLiveTypedSearchMock();
 
-vi.mock('$lib/utils/typed-search/typed-search-name-cache', () => ({
+vi.mock('#lib/utils/typed-search/typed-search-name-cache.js', () => ({
   getTypedSearchDisplayText: vi.fn(() => undefined),
   storeTypedSearchNames: vi.fn(),
 }));
@@ -2594,9 +2599,8 @@ describe('activate("command")', () => {
     await m.applySearchSort('asc', 'beach');
 
     expect(goto).toHaveBeenCalledWith('/photos?q=beach&sort=asc', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
@@ -2609,9 +2613,8 @@ describe('activate("command")', () => {
     await m.applySearchSort('asc', 'beach');
 
     expect(goto).toHaveBeenCalledWith('/photos?q=beach&sort=asc', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
@@ -2623,9 +2626,8 @@ describe('activate("command")', () => {
     await m.applySearchSort('desc', '');
 
     expect(goto).toHaveBeenCalledWith('/spaces/space-1?sort=desc', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
@@ -2638,9 +2640,8 @@ describe('activate("command")', () => {
     await m.applySearchSort('asc', '');
 
     expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=timeline&sort=asc&rating=3', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 
@@ -6612,7 +6613,7 @@ describe('prefix scoping — announcementText', () => {
     // English copy rather than raw keys. The rest of this suite uses fallbackLocale
     // 'dev' (raw keys) — the scope-cue assertions here check the translated prefix.
     const { init, register, waitLocale } = await import('svelte-i18n');
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

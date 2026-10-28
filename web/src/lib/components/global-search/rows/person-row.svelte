@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { type PersonResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 

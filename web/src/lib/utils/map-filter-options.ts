@@ -1,5 +1,5 @@
+import { applyTextFilters, buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { AssetTypeEnum, AssetVisibility, MapMediaType } from '@immich/sdk';
-import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 function applyCommonMapFilters(base: Record<string, unknown>, filters: FilterState, includePersonIds = true) {
   if (includePersonIds && filters.personIds.length > 0) {

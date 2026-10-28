@@ -1,4 +1,4 @@
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 
 /**
  * Bounds the URL length when a long free-text value is used as a filter (E13).

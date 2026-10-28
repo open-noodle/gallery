@@ -1,5 +1,3 @@
-import { writable } from 'svelte/store';
-import type { Mock } from 'vitest';
 // Re-import to get the mocked version for test assertions
 import {
   closeWebsocketConnection,
@@ -7,34 +5,40 @@ import {
   waitForWebsocketEvent,
   websocketEvents,
   websocketStore,
-} from '$lib/stores/websocket';
+} from '#lib/stores/websocket.ts';
+import type { writable } from 'svelte/store';
+import type { Mock } from 'vitest';
 
 /**
  * Reusable mock for `$lib/stores/websocket`.
  *
  * Usage in test files:
  * ```ts
- * import { websocketMock } from '@test-data/mocks/websocket.mock';
+ * import { websocketMock } from '#test-data/mocks/websocket.mock';
  * // vi.mock is called automatically when this module is imported
  * ```
  */
 // this module exists precisely to register the websocket mock on import
 // (documented usage above)
 // eslint-disable-next-line unicorn/no-top-level-side-effects
-vi.mock('$lib/stores/websocket', () => ({
-  websocketStore: {
-    connected: writable(false),
-    serverVersion: writable(undefined),
-    serverRestarting: writable(undefined),
-  },
-  websocketEvents: {
-    on: vi.fn(() => vi.fn()),
-    off: vi.fn(),
-  },
-  openWebsocketConnection: vi.fn(),
-  closeWebsocketConnection: vi.fn(),
-  waitForWebsocketEvent: vi.fn(),
-}));
+vi.mock('#lib/stores/websocket.js', async () => {
+  // imported here: the factory is hoisted above this module's imports
+  const { writable } = await import('svelte/store');
+  return {
+    websocketStore: {
+      connected: writable(false),
+      serverVersion: writable(undefined),
+      serverRestarting: writable(undefined),
+    },
+    websocketEvents: {
+      on: vi.fn(() => vi.fn()),
+      off: vi.fn(),
+    },
+    openWebsocketConnection: vi.fn(),
+    closeWebsocketConnection: vi.fn(),
+    waitForWebsocketEvent: vi.fn(),
+  };
+});
 
 export const websocketMock = {
   websocketStore: websocketStore as {

@@ -1,18 +1,18 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+import { lang } from '#lib/stores/preferences.store.ts';
+import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
+import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { AssetTypeEnum, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
 import { SvelteURL } from 'svelte/reactivity';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import { lang } from '$lib/stores/preferences.store';
-import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import SpacesPage from './+page.svelte';
 
 const OVER_SPACE_ASSET_LIMIT = 50_001;
@@ -57,8 +57,8 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAll
 // after render (back/forward, or the `?at=` write from closing the asset viewer) would assert
 // against a page that never re-hydrated, and would pass whether or not the bug is present.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
-  return { page: reactivePageMock };
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock, navigating: { to: null } };
 });
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -78,75 +78,75 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/OnEvents.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/filter-panel.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/bindable-filter-panel.stub.svelte');
+vi.mock('#lib/components/filter-panel/filter-panel.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/bindable-filter-panel.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
+vi.mock('#lib/components/filter-panel/active-filters-bar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/active-filters-bar-actions.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/search-sort-dropdown.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/filter-panel/search-sort-dropdown.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/filter-panel/sort-toggle.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/sort-toggle.stub.svelte');
+vi.mock('#lib/components/filter-panel/sort-toggle.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/sort-toggle.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/ControlAppBar.svelte', async () => {
+vi.mock('#lib/components/shared-components/ControlAppBar.svelte', async () => {
   const { default: MockComponent } = await import('./mock-control-app-bar.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
+vi.mock('#lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
   const { default: MockComponent } = await import('./mock-button-context-menu.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
+vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockComponent } = await import('./mock-timeline.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
   assetMultiSelectManager: mockAssetMultiSelectManager,
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mockAuthManager }));
-vi.mock('$lib/managers/command-context-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: mockAuthManager }));
+vi.mock('#lib/managers/command-context-manager.svelte.js', () => ({
   registerSelectionContext: mockRegisterSelectionContext,
   registerSpaceContext: mockRegisterSpaceContext,
 }));
-vi.mock('$lib/managers/event-manager.svelte', () => ({ eventManager: mockEventManager }));
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+vi.mock('#lib/managers/event-manager.svelte.js', () => ({ eventManager: mockEventManager }));
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
     open: mockOpenSearchPalette,
   },
 }));
 
-vi.mock('$lib/utils/space-filter-options', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/utils/space-filter-options')>();
+vi.mock('#lib/utils/space-filter-options.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/utils/space-filter-options.ts')>();
   return {
     ...actual,
     buildSpaceTimelineOptions: vi.fn(actual.buildSpaceTimelineOptions),
@@ -370,9 +370,8 @@ describe('Spaces page search URL state', () => {
     await fireEvent.click(await screen.findByTestId('active-filters-remove-person'));
 
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos?q=beach&city=Berlin', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 
@@ -383,9 +382,8 @@ describe('Spaces page search URL state', () => {
     await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
 
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 
@@ -919,9 +917,8 @@ describe('Spaces page search URL state', () => {
     });
     // D2 — the year rides along in the URL now, rather than in a carry-over slot beside it.
     expect(gotoMock).toHaveBeenLastCalledWith('/spaces/space-1/photos?country=Germany&year=2015', {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   });
 

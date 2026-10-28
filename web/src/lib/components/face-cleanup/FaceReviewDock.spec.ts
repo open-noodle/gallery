@@ -10,7 +10,7 @@ import Harness from './face-review-dock.test-wrapper.svelte';
 // the key. The wrapper supplies the `summary` and `apply` snippets, which cannot be passed from a plain object.
 
 beforeAll(async () => {
-  register('en', () => import('$i18n/en.json'));
+  register('en', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en', initialLocale: 'en' });
   await waitLocale('en');
 });

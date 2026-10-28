@@ -1,5 +1,5 @@
+import { isDescendant } from '#lib/utils/space-album-folders.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { isDescendant } from '$lib/utils/space-album-folders';
 
 /**
  * A gallery-specific MIME type, not text/plain. DragAndDropUploadOverlay listens for file

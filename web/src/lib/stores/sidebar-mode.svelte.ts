@@ -1,5 +1,5 @@
+import { sidebarMedia } from '#lib/stores/sidebar-media.svelte.ts';
 import { persisted } from 'svelte-persisted-store';
-import { sidebarMedia } from '$lib/stores/sidebar-media.svelte';
 
 export const SIDEBAR_MODES = ['auto', 'expanded', 'rail'] as const;
 export type SidebarMode = (typeof SIDEBAR_MODES)[number];

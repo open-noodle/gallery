@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SpaceEditModal from './SpaceEditModal.svelte';
 
 const updateSpaceDetailsMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/services/space.service', () => ({ updateSpaceDetails: updateSpaceDetailsMock }));
+vi.mock('#lib/services/space.service.js', () => ({ updateSpaceDetails: updateSpaceDetailsMock }));
 
 const space = (o: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto =>
   ({

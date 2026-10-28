@@ -1,13 +1,13 @@
+import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { Settings } from 'luxon';
 import { SvelteSet } from 'svelte/reactivity';
 import { describe, expect, it, vi } from 'vitest';
-import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,

@@ -1,4 +1,4 @@
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 
 export function clearTimelineTemporalFilter(filters: FilterState): FilterState {
   return {

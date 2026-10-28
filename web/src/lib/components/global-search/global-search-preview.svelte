@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { ActiveItem } from '$lib/managers/global-search-manager.svelte';
+  import type { ActiveItem } from '#lib/managers/global-search-manager.svelte.ts';
   import PhotoPreview from './previews/photo-preview.svelte';
   import PersonPreview from './previews/person-preview.svelte';
   import PlacePreview from './previews/place-preview.svelte';
   import TagPreview from './previews/tag-preview.svelte';
   import AlbumPreview from './previews/album-preview.svelte';
   import SpacePreview from './previews/space-preview.svelte';
-  import Logo from '$lib/components/shared-components/Logo.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { fade } from 'svelte/transition';
   import { t } from 'svelte-i18n';
 

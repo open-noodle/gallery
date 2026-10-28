@@ -1,15 +1,15 @@
+import SpaceAlbumsList from '#lib/components/spaces/space-albums-list.svelte';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '#lib/stores/preferences.store.ts';
+import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+import { toggleSpaceAlbumGroupCollapsing } from '#lib/utils/space-album-grouping.ts';
+import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
 import { screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '$lib/stores/preferences.store';
-import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
-import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
-import { renderWithTooltips } from '$tests/helpers';
-import { userAdminFactory } from '@test-data/factories/user-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/stores', () => ({
@@ -65,7 +65,7 @@ const idsInListOrder = () =>
 
 describe('SpaceAlbumsList', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

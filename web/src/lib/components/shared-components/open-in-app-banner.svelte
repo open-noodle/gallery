@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import { ANDROID_INSTALL_URL, IOS_APP_STORE_URL } from '$lib/constants';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { isAssetViewerRoute } from '$lib/utils/navigation';
-  import { isEligible, type Eligibility, type Platform } from '$lib/utils/open-in-app';
+  import { ANDROID_INSTALL_URL, IOS_APP_STORE_URL } from '#lib/constants.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { isAssetViewerRoute } from '#lib/utils/navigation.ts';
+  import { isEligible, type Eligibility, type Platform } from '#lib/utils/open-in-app.ts';
   import { Button, IconButton } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
   import { t } from 'svelte-i18n';

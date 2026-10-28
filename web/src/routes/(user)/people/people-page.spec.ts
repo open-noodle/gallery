@@ -1,3 +1,12 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { PEOPLE_PAGE_SIZE } from '#lib/constants.ts';
+import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -14,45 +23,26 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
-import { PEOPLE_PAGE_SIZE } from '$lib/constants';
-import { spacesQueryKey } from '$lib/gallery/spaces/space.query';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { queryClient } from '$lib/queries/client';
-import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-import { personFactory } from '@test-data/factories/person-factory';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
+import { personFactory } from '#test-data/factories/person-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
+import { reactivePageMock } from '#test-data/mocks/reactive-page.mock.svelte.ts';
 import PeoplePage from './+page.svelte';
 
-const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
-  let pageValue = {
-    url: new URL('http://localhost/people'),
-    route: { id: '/(user)/people' },
-  };
-
+const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
   return {
     gotoMock: vi.fn(),
-    pageStore: {
-      setUrl: (url: string) => {
-        pageValue = { ...pageValue, url: new URL(url) };
-      },
-      subscribe: (run: (value: typeof pageValue) => void) => {
-        run(pageValue);
-        return () => {};
-      },
-    },
     featureFlagsMock: { value: { peopleStatistics: true } },
   };
 });
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
-vi.mock('$app/stores', () => ({ page: pageStore }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte.ts');
+  return { page: reactivePageMock, navigating: { to: null } };
+});
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: featureFlagsMock,
 }));
 
@@ -65,8 +55,8 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
@@ -217,7 +207,7 @@ describe('Global people page', () => {
     authManager.setPreferences(preferencesFactory.build());
     Element.prototype.animate = getAnimateMock();
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    pageStore.setUrl('http://localhost/people');
+    reactivePageMock.reset('http://localhost/people', { routeId: '/(user)/people' });
     gotoMock.mockResolvedValue(undefined);
     sdkMock.searchPerson.mockResolvedValue([]);
     sdkMock.getPeopleFaceStatistics.mockResolvedValue(makeFaceStatistics());
@@ -372,7 +362,7 @@ describe('Global people page', () => {
 
   it('sorts searched results by photo count in the default mode', async () => {
     // URL-driven search activation — the same harness the existing global-name-search tests use
-    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     sdkMock.searchPerson.mockResolvedValue([
       makePerson({ id: 'search-a', name: 'Alice', numberOfAssets: 1 }),
       makePerson({ id: 'search-b', name: 'Alicia', numberOfAssets: 99 }),
@@ -530,7 +520,7 @@ describe('Global people page', () => {
   });
 
   it('hides the face count while global name search is active because it is unsupported by overview stats', async () => {
-    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     sdkMock.searchPerson.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
 
     renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
@@ -545,7 +535,7 @@ describe('Global people page', () => {
   });
 
   it('hides the face statistics details button during unsupported global name search', async () => {
-    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     sdkMock.searchPerson.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
 
     renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
@@ -561,7 +551,7 @@ describe('Global people page', () => {
   });
 
   it('does not render the face statistics details button at any point during initial unsupported global name search', async () => {
-    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     const renderedButtonLabels: string[] = [];
     const observer = new MutationObserver((records) => {
       for (const record of records) {

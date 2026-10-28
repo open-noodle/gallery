@@ -1,5 +1,5 @@
+import { applyTextFilters, buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { AssetTypeEnum, AssetVisibility, type AssetOrder } from '@immich/sdk';
-import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 function applyCommonFilterFields(base: Record<string, unknown>, filters: FilterState): Record<string, unknown> {
   if (filters.personIds.length > 0) {

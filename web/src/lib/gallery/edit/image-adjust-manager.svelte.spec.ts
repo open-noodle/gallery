@@ -1,12 +1,12 @@
+import { ImageAdjustManager, withImageAdjust } from '#lib/gallery/edit/image-adjust-manager.svelte.ts';
+import { imageAdjustFilter } from '#lib/gallery/edit/image-adjust.ts';
+import type { EditToolManager } from '#lib/managers/edit/edit-manager.svelte.ts';
+import { waitForWebsocketEvent } from '#lib/stores/websocket.ts';
 import { editAsset, getAssetAdjust, removeAssetAdjust, removeAssetEdits, updateAssetAdjust } from '@immich/sdk';
-import { imageAdjustFilter } from '$lib/gallery/edit/image-adjust';
-import { ImageAdjustManager, withImageAdjust } from '$lib/gallery/edit/image-adjust-manager.svelte';
-import type { EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
-import { waitForWebsocketEvent } from '$lib/stores/websocket';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 
 vi.mock('@immich/sdk');
-vi.mock('$lib/stores/websocket', () => ({ waitForWebsocketEvent: vi.fn() }));
+vi.mock('#lib/stores/websocket.js', () => ({ waitForWebsocketEvent: vi.fn() }));
 
 const waitForEditReady = vi.mocked(waitForWebsocketEvent);
 

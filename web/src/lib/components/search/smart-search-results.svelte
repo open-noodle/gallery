@@ -1,8 +1,8 @@
 <script lang="ts">
-  import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
-  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-  import { dedupeAppend } from '$lib/utils/search-dedup';
-  import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
+  import SpaceSearchResults from '#lib/components/spaces/space-search-results.svelte';
+  import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+  import { dedupeAppend } from '#lib/utils/search-dedup.ts';
+  import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '#lib/utils/space-search.ts';
   import { searchSmart, type AssetResponseDto } from '@immich/sdk';
 
   interface Props {

@@ -1,12 +1,12 @@
-import { SvelteMap } from 'svelte/reactivity';
 import {
   clearFilters,
   createFilterState,
   getActiveFilterCount,
   type FilterPanelConfig,
-} from '$lib/components/filter-panel/filter-panel';
-import { withNameCapture } from '$lib/utils/filter-name-capture';
-import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
+} from '#lib/components/filter-panel/filter-panel.ts';
+import { withNameCapture } from '#lib/utils/filter-name-capture.ts';
+import { handlePhotosRemoveFilter } from '#lib/utils/photos-filter-options.ts';
+import { SvelteMap } from 'svelte/reactivity';
 
 /** Filter state of an "add photos" picker: local only, never in the URL, never searched. */
 export class AssetPickerFilters {

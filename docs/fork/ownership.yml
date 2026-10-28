@@ -435,7 +435,7 @@ features:
       - web/Dockerfile
       - web/eslint.config.js
       - web/package.json
-      - web/svelte.config.js
+      - web/tsconfig.json
     database:
       tables: [user_groups, user_group_members]
       migration_globs:

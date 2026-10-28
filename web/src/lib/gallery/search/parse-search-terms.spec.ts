@@ -1,4 +1,4 @@
-import { parseSearchTerms } from '$lib/gallery/search/parse-search-terms';
+import { parseSearchTerms } from '#lib/gallery/search/parse-search-terms.ts';
 
 describe('parseSearchTerms', () => {
   it('returns JSON-encoded search terms unchanged', () => {

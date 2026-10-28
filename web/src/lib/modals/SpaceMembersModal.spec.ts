@@ -1,9 +1,9 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import '#lib/__mocks__/sdk.mock.ts';
+import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
 import { SharedSpaceRole, type SharedSpaceMemberResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import '$lib/__mocks__/sdk.mock';
-import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
 import SpaceMembersModal from './SpaceMembersModal.svelte';
 
 // Mock svelte-persisted-store to avoid localStorage issues in test environment
@@ -15,7 +15,7 @@ vi.mock('svelte-persisted-store', async () => {
 });
 
 // Mock tunables to avoid direct localStorage access
-vi.mock('$lib/utils/tunables', () => ({
+vi.mock('#lib/utils/tunables.js', () => ({
   TUNABLES: {
     LAYOUT: { WASM: true },
     TIMELINE: { INTERSECTION_EXPAND_TOP: 500, INTERSECTION_EXPAND_BOTTOM: 500 },

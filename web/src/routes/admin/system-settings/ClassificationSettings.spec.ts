@@ -28,7 +28,7 @@ vi.mock('@immich/sdk', () => ({
 }));
 
 const mockFeatureFlags = { configFile: false, smartSearch: true, trash: true };
-vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
+vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), () => ({
   featureFlagsManager: {
     init: vi.fn(),
     loadFeatureFlags: vi.fn(),
@@ -72,7 +72,7 @@ describe('ClassificationSettings', () => {
     // resolve to English text. This spec asserts on the user-facing labels, button text, dialog
     // titles, toast copy and summary badges, so the translated output is load-bearing
     // (the global setup's `dev` locale returns raw keys).
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

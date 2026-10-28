@@ -191,9 +191,9 @@
     <!-- Month grid: 4-column CSS grid -->
     <div class="grid grid-cols-4 gap-1.5" data-testid="month-grid">
       {#each months as m (m.month)}
-        {@const maxMonthCount = Math.max(...months.map((mo) => mo.count), 1)}
-        {@const monthVolume = Math.round((m.count / maxMonthCount) * 100)}
-        {@const isSelected = selectedMonth === m.month}
+        {const maxMonthCount = $derived(Math.max(...months.map((mo) => mo.count), 1))}
+        {const monthVolume = $derived(Math.round((m.count / maxMonthCount) * 100))}
+        {const isSelected = $derived(selectedMonth === m.month)}
         <button
           type="button"
           class="flex flex-col items-center rounded-xl border p-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none

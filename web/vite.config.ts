@@ -7,7 +7,7 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import dotenv from 'dotenv';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
-import { galleryI18nVitePlugin } from '../i18n/gallery/merge.mjs';
+import { galleryI18nVitePlugin, writeMergedI18n } from '../i18n/gallery/merge.mjs';
 
 const upstream = {
   target: process.env.IMMICH_SERVER_URL || 'http://immich-server:2283/',
@@ -25,6 +25,9 @@ const proxy: Record<string, string | ProxyOptions> = {
 };
 
 dotenv.config({ quiet: true });
+
+// #i18n is upstream i18n/ plus the Gallery overlay (i18n/gallery/merged); build it for every tool that loads this config.
+writeMergedI18n();
 process.env.PUBLIC_IMMICH_BUY_HOST = process.env.PUBLIC_IMMICH_BUY_HOST || 'https://buy.immich.app';
 process.env.PUBLIC_IMMICH_PAY_HOST = process.env.PUBLIC_IMMICH_PAY_HOST || 'https://pay.futo.org';
 

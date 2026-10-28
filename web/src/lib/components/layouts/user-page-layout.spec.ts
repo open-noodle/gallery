@@ -1,24 +1,24 @@
+import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
 import UserPageLayoutDescriptionTrailingTestWrapper from './user-page-layout-description-trailing.test-wrapper.svelte';
 
 const layoutMocks = vi.hoisted(() => ({
   sidebarModeStore: { layout: 'expanded' as 'overlay' | 'rail' | 'expanded' },
 }));
 
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: layoutMocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: layoutMocks.sidebarModeStore }));
 
-vi.mock('$lib/components/shared-components/navigation-bar/NavigationBar.svelte', async () => {
-  const module = await import('@test-data/mocks/navigation-bar-rail-aware.stub.svelte');
+vi.mock('#lib/components/shared-components/navigation-bar/NavigationBar.svelte', async () => {
+  const module = await import('#test-data/mocks/navigation-bar-rail-aware.stub.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/UserSidebar.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/side-bar/UserSidebar.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 

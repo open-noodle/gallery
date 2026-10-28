@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
-  import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+  import FormatMessage from '#lib/elements/FormatMessage.svelte';
 
   interface Props {
     selectedCount: number;

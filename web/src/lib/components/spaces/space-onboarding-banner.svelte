@@ -12,7 +12,7 @@
   } from '@mdi/js';
   import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
-  import { dismissedOnboardingSpaceIds } from '$lib/stores/space-view.store';
+  import { dismissedOnboardingSpaceIds } from '#lib/stores/space-view.store.ts';
 
   interface Props {
     space: SharedSpaceResponseDto;

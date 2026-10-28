@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
-  import type { NavigationItem } from '$lib/managers/navigation-items';
+  import type { NavigationItem } from '#lib/managers/navigation-items.ts';
   import type { Translations } from 'svelte-i18n';
 
   interface Props {

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import AlbumCover from '$lib/components/album-page/AlbumCover.svelte';
-  import { Route } from '$lib/route';
-  import { setActiveDragPayload, writeDragPayload } from '$lib/utils/space-album-folder-dnd';
+  import AlbumCover from '#lib/components/album-page/AlbumCover.svelte';
+  import { Route } from '#lib/route.ts';
+  import { setActiveDragPayload, writeDragPayload } from '#lib/utils/space-album-folder-dnd.ts';
   import { type AlbumResponseDto, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { ContextMenuButton } from '@immich/ui';
   import { t } from 'svelte-i18n';

@@ -1,7 +1,7 @@
+import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 
 // Why this exists: during the v3.1.0 rebase, a conflict in zh_Hant.json was resolved by a merge that compared
 // only TOP-LEVEL keys. main had added keys under the nested `admin` object, so main's whole `admin` subtree

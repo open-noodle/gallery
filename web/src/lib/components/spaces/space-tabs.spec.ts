@@ -7,7 +7,7 @@ const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/spaces/s
 vi.mock('$app/state', () => ({ page: mockPage }));
 
 const mockFeatureFlags = vi.hoisted(() => ({ map: true }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: mockFeatureFlags },
 }));
 

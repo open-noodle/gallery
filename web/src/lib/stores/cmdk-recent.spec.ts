@@ -9,7 +9,7 @@ import { __resetForTests, addEntry, clearEntries, getEntries, makePlaceId, remov
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user' } as { id: string } | null },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;

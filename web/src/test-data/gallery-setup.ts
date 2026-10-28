@@ -1,4 +1,4 @@
-import { defaultPublicConfig, defaultUserConfig } from '@test-data/gallery-config-defaults';
+import { defaultPublicConfig, defaultUserConfig } from '#test-data/gallery-config-defaults';
 
 /**
  * Gallery test setup (loaded after upstream's setup.ts). Upstream moved the user and public config
@@ -15,10 +15,10 @@ beforeEach(async () => {
   let modules;
   try {
     modules = await Promise.all([
-      import('$lib/queries/client'),
-      import('$lib/queries/config-public.query'),
-      import('$lib/queries/config-user.query'),
-      import('$lib/queries/notification.query'),
+      import('#lib/queries/client.ts'),
+      import('#lib/queries/config-public.query.ts'),
+      import('#lib/queries/config-user.query.ts'),
+      import('#lib/queries/notification.query.ts'),
     ]);
   } catch {
     // The spec mocks one of these modules' dependencies (e.g. the event manager) out of shape: it

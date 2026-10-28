@@ -1,6 +1,6 @@
+import { lastPressPoint } from '#lib/gallery/motion/press.ts';
+import { duration, ease, prefersReducedMotion, spring, springEasing } from '#lib/gallery/motion/tokens.ts';
 import { mdiHeart } from '@mdi/js';
-import { lastPressPoint } from '$lib/gallery/motion/press';
-import { duration, ease, prefersReducedMotion, spring, springEasing } from '$lib/gallery/motion/tokens';
 
 /**
  * Small particle bursts for moments worth marking (favoriting, finishing something). Kept rare and

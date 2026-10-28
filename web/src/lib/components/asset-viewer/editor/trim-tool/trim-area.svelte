@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
-  import { getAssetPlaybackUrl } from '$lib/utils';
+  import { trimManager } from '#lib/managers/edit/trim-manager.svelte.ts';
+  import { getAssetPlaybackUrl } from '#lib/utils.ts';
   import type { AssetResponseDto } from '@immich/sdk';
   import TrimTimeline from './trim-timeline.svelte';
 

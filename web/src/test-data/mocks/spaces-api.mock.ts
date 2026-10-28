@@ -8,8 +8,8 @@ import * as sdk from '@immich/sdk';
  *
  * Usage:
  * ```ts
- * import '$lib/__mocks__/sdk.mock';
- * import { spacesApiMock } from '@test-data/mocks/spaces-api.mock';
+ * import '#lib/__mocks__/sdk.mock.ts';
+ * import { spacesApiMock } from '#test-data/mocks/spaces-api.mock';
  *
  * beforeEach(() => { vi.resetAllMocks(); });
  *

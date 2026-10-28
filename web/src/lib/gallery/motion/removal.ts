@@ -1,5 +1,5 @@
-import { lastPressPoint } from '$lib/gallery/motion/press';
-import { duration, ease, prefersReducedMotion, spring, springEasing } from '$lib/gallery/motion/tokens';
+import { lastPressPoint } from '#lib/gallery/motion/press.ts';
+import { duration, ease, prefersReducedMotion, spring, springEasing } from '#lib/gallery/motion/tokens.ts';
 
 /**
  * Photos leaving the view because the user sent them somewhere. Trashed or archived photos lift

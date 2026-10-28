@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { registerAlbumContext } from '$lib/managers/command-context-manager.svelte';
+  import { registerAlbumContext } from '#lib/managers/command-context-manager.svelte.ts';
   import type { AlbumResponseDto } from '@immich/sdk';
 
   let { thunk }: { thunk: () => AlbumResponseDto } = $props();

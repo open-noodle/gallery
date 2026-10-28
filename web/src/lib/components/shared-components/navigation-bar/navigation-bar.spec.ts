@@ -1,10 +1,10 @@
+import NavigationBar from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
+import TestWrapper from '#lib/gallery/components/query-test-wrapper.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import NavigationBar from '$lib/components/shared-components/navigation-bar/NavigationBar.svelte';
-import TestWrapper from '$lib/gallery/components/query-test-wrapper.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -19,54 +19,54 @@ const mocks = vi.hoisted(() => ({
   mediaQueryManager: { isFullSidebar: false },
 }));
 
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
-vi.mock('$lib/stores/sidebar.svelte', () => ({ sidebarStore: mocks.sidebarStore }));
-vi.mock('$lib/stores/media-query-manager.svelte', () => ({ mediaQueryManager: mocks.mediaQueryManager }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar.svelte.js', () => ({ sidebarStore: mocks.sidebarStore }));
+vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({ mediaQueryManager: mocks.mediaQueryManager }));
 
 // NavigationBar pulls in the search trigger, notification and account panels, the avatar
 // and theme button, and calls notificationManager.refresh() on mount - a network call.
 // Everything not under test is stubbed out so this spec exercises only the sidebar wiring.
-vi.mock('$lib/stores/notification-manager.svelte', () => ({
+vi.mock('#lib/stores/notification-manager.svelte', () => ({
   notificationManager: { notifications: [], refresh: vi.fn().mockResolvedValue(undefined) },
 }));
 
 // `ActionButton`'s `action` prop is required (not optional) and immediately destructures
 // it in `isEnabled`, so `Cast: undefined` crashes on mount. `$if: () => false` mirrors the
 // real cast action's own gating and keeps it hidden without touching NavigationBar's markup.
-vi.mock('$lib/services/app.service', () => ({
+vi.mock('#lib/services/app.service.js', () => ({
   getGlobalActions: () => ({ Cast: { title: 'Cast', onAction: vi.fn(), $if: () => false } }),
 }));
 
-vi.mock('$lib/managers/global-search-manager.svelte', () => ({ globalSearchManager: { open: vi.fn() } }));
+vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({ globalSearchManager: { open: vi.fn() } }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: { authenticated: true, user: { name: 'Test', email: 'test@example.com' } },
 }));
 
 // Written out one by one on purpose: vi.mock is hoisted to the top of the module and
 // needs a literal path, so a loop over an array of paths silently fails to mock anything.
-vi.mock('$lib/components/global-search/global-search-input-trigger.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/global-search/global-search-input-trigger.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/navigation-bar/NotificationPanel.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/navigation-bar/NotificationPanel.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/navigation-bar/AccountInfoPanel.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/navigation-bar/AccountInfoPanel.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/ThemeButton.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/ThemeButton.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 

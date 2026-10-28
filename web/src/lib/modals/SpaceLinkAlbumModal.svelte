@@ -1,8 +1,8 @@
 <script lang="ts">
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { handleError } from '$lib/utils/handle-error';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { AlbumUserRole, getAllAlbums, linkAlbum, type AlbumResponseDto } from '@immich/sdk';
   import { FormModal, Icon, Input, ListButton, Stack, Text } from '@immich/ui';
   import { mdiImageAlbum, mdiLinkVariantPlus, mdiMagnify } from '@mdi/js';

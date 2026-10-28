@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // Repo-invariant guard for Slice 13 (finding LOW#8).
 //
 // The fork swaps upstream `@immich/ui`'s generic `LoadingSpinner` for a
-// fork-local, branded one (`$lib/components/shared-components/LoadingSpinner.svelte`,
+// fork-local, branded one (`#lib/components/shared-components/LoadingSpinner.svelte`,
 // which renders `/gallery-loader.svg` / `/gallery-loader-dark.svg`) across the
 // themed app shell. The rebase dropped the swap in exactly 2 of the fork's 25
 // swapped call-sites: `ActivityViewer.svelte` and `DetailPanel.svelte`.
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 const WEB_SRC = path.resolve(process.cwd(), '../../web/src');
 const FORK_LOCAL_SPECIFIER =
-  '$lib/components/shared-components/LoadingSpinner.svelte';
+  '#lib/components/shared-components/LoadingSpinner.svelte';
 const GENERIC_SPECIFIER = '@immich/ui';
 
 // The fork's full swapped set — every call-site that must render the

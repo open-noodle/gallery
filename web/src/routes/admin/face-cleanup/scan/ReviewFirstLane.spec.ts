@@ -1,7 +1,7 @@
+import { Route } from '#lib/route.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route } from '$lib/route';
 import ReviewFirstLane from './ReviewFirstLane.svelte';
 import type { FaceCleanupPerson } from './scan-triage.svelte';
 
@@ -11,7 +11,7 @@ import type { FaceCleanupPerson } from './scan-triage.svelte';
 
 vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return { ...mod, Icon: noop.default };
 });
 // Every (key, options) pair the component asked to translate — the mock below still renders keys verbatim
@@ -37,7 +37,7 @@ vi.mock('svelte-i18n', async (orig) => {
     },
   };
 });
-vi.mock('$lib/utils/people-utils', () => ({
+vi.mock('#lib/utils/people-utils.js', () => ({
   getAdminFaceThumbnailUrl: (id: string) => `/thumb/${id}`,
   getPeopleThumbnailPath: (id: string) => `/people/${id}/thumbnail`,
 }));

@@ -1,6 +1,6 @@
+import { buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { buildPhotosTimelineOptions } from '#lib/utils/photos-filter-options.ts';
 import { AssetOrderBy, AssetTypeEnum } from '@immich/sdk';
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 
 /**
  * Whether the Recently Added header should display an item count.

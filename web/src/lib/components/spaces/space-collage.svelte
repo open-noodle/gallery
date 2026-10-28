@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';
 

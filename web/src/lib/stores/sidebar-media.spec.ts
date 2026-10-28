@@ -1,8 +1,8 @@
-import { sidebarMedia } from '$lib/stores/sidebar-media.svelte';
+import { sidebarMedia } from '#lib/stores/sidebar-media.svelte.ts';
 
 const mocks = vi.hoisted(() => ({ mediaQueryManager: { isFullSidebar: false } }));
 
-vi.mock('$lib/stores/media-query-manager.svelte', () => ({ mediaQueryManager: mocks.mediaQueryManager }));
+vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({ mediaQueryManager: mocks.mediaQueryManager }));
 
 describe('sidebarMedia', () => {
   beforeEach(() => {

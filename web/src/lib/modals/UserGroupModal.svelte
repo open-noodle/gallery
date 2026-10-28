@@ -1,7 +1,7 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import ColorPicker from '$lib/components/spaces/color-picker.svelte';
+  import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import ColorPicker from '#lib/components/spaces/color-picker.svelte';
   import { searchUsers, UserAvatarColor, type UserGroupResponseDto, type UserResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, ListButton, Stack, Text } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';

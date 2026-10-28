@@ -1,12 +1,12 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
-  import GlobalSearch from '$lib/components/global-search/global-search.svelte';
-  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
-  import { getSearchablePageState } from '$lib/utils/searchable-page-search';
+  import SearchSortDropdown from '#lib/components/filter-panel/search-sort-dropdown.svelte';
+  import GlobalSearch from '#lib/components/global-search/global-search.svelte';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
+  import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
 
-  const searchablePageState = $derived(getSearchablePageState(page.url));
+  const searchablePageState = $derived(getSearchablePageState(new URL(page.url.href)));
   const showSearchSortControl = $derived(searchablePageState.isSearchable);
 </script>
 

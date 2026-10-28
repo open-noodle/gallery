@@ -1,15 +1,15 @@
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
 import SidebarSettings from './sidebar-settings.svelte';
 
 const mocks = vi.hoisted(() => ({ sidebarMedia: { isFullSidebar: true, isWideSidebar: true } }));
-vi.mock('$lib/stores/sidebar-media.svelte', () => ({ sidebarMedia: mocks.sidebarMedia }));
+vi.mock('#lib/stores/sidebar-media.svelte.js', () => ({ sidebarMedia: mocks.sidebarMedia }));
 
 // SettingCombobox's Combobox always renders a "clear" IconButton (selectedOption is never
 // undefined here), and @immich/ui's IconButton unconditionally wraps in a Tooltip that needs

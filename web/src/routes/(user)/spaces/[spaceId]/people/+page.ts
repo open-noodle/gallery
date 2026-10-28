@@ -1,7 +1,7 @@
+import { authenticate } from '#lib/utils/auth.ts';
+import { getPersistedPeopleTypeParam } from '#lib/utils/people-filter.ts';
 import { getSpacePeople, getSpacePeopleStatistics } from '@immich/sdk';
 import { redirect } from '@sveltejs/kit';
-import { authenticate } from '$lib/utils/auth';
-import { getPersistedPeopleTypeParam } from '$lib/utils/people-filter';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ url, params, parent }) => {

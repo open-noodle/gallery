@@ -1,8 +1,8 @@
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '#lib/utils/album-filter-options.ts';
+import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
 import { AssetOrder } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
-import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
 
 describe('space vs album timeline options — stack collapse (#751)', () => {
   it('space timeline requests stack collapse (withStacked: true) (E24)', () => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+  import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
   import { t, type Translations } from 'svelte-i18n';
   import { twMerge } from 'tailwind-merge';
 

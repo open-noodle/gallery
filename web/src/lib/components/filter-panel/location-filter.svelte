@@ -379,7 +379,7 @@
 
     <!-- Orphaned country (selected but no longer in suggestions) -->
     {#if orphanedCountry}
-      {@const isCountryTicked = !selectedCity && !selectedState}
+      {const isCountryTicked = $derived(!selectedCity && !selectedState)}
       <button
         type="button"
         class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium opacity-50 hover:bg-subtle"
@@ -433,12 +433,12 @@
     {/if}
 
     {#each visibleCountries as country (country)}
-      {@const isCountrySelected = selectedCountry === country}
-      {@const visibleCities = getVisibleCities(country)}
+      {const isCountrySelected = $derived(selectedCountry === country)}
+      {const visibleCities = $derived(getVisibleCities(country))}
       <!-- The dot marks the DEEPEST narrowing, so a selected state takes it off the country exactly
            as a selected city does — a ticked country beside a ticked state would read as "the whole
            country", which is not what is being filtered. -->
-      {@const isCountryTicked = isCountrySelected && !selectedCity && !selectedState}
+      {const isCountryTicked = $derived(isCountrySelected && !selectedCity && !selectedState)}
       <!-- Country row -->
       <button
         type="button"
@@ -470,7 +470,7 @@
       <!-- Cities (indented when country is expanded) -->
       {#if (expandedCountry === country || (normalizedSearchQuery && visibleCities.length > 0)) && !loadingCitiesByCountry[country]}
         {#each visibleCities as city (city)}
-          {@const isCitySelected = selectedCity === city && (!selectedCountry || selectedCountry === country)}
+          {const isCitySelected = $derived(selectedCity === city && (!selectedCountry || selectedCountry === country))}
           <button
             type="button"
             class="-mx-2 ml-5 flex w-[calc(100%-1.25rem+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {isCitySelected

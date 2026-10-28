@@ -61,7 +61,7 @@
 </script>
 
 {#each chunks as chunkItems, index (index)}
-  {@const shown = !hasObserver || visible.get(index)}
+  {const shown = $derived(!hasObserver || visible.get(index))}
   <svelte:element
     this={tag}
     use:observe={index}

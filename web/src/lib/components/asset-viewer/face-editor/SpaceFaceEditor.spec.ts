@@ -1,8 +1,8 @@
+import { renderWithTooltips } from '#tests/helpers';
 import type { SharedSpacePersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { renderWithTooltips } from '$tests/helpers';
 import SpaceFaceEditor from './SpaceFaceEditor.svelte';
 
 const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoisted(() => ({
@@ -13,7 +13,7 @@ const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoist
 
 const refreshAssetPeopleMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
-vi.mock('$lib/utils/refresh-asset-people', () => ({ refreshAssetPeople: refreshAssetPeopleMock }));
+vi.mock('#lib/utils/refresh-asset-people.js', () => ({ refreshAssetPeople: refreshAssetPeopleMock }));
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;

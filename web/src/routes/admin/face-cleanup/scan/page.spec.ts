@@ -1,3 +1,4 @@
+import { Route } from '#lib/route.ts';
 import {
   declineFaceRepair,
   getFaceRepairPersonFaces,
@@ -10,7 +11,6 @@ import { ConfirmModal, modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route } from '$lib/route';
 import Page from './+page.svelte';
 
 // The post-scan console, retriaged into two lanes (design
@@ -35,7 +35,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return {
     ...mod,
     // Stub Icon to a no-op to avoid undefined-path errors in happy-dom
@@ -109,8 +109,8 @@ vi.mock('$app/stores', () => ({
 }));
 
 // Mock AdminPageLayout to a simple pass-through that renders children
-vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
+  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 

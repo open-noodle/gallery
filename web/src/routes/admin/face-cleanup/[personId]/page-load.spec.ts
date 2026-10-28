@@ -5,8 +5,8 @@ const { authenticate, getFormatter } = vi.hoisted(() => ({
   getFormatter: vi.fn(),
 }));
 
-vi.mock('$lib/utils/auth', () => ({ authenticate }));
-vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
+vi.mock('#lib/utils/auth.js', () => ({ authenticate }));
+vi.mock('#lib/utils/i18n.js', () => ({ getFormatter }));
 
 describe('face cleanup guided review page load', () => {
   beforeEach(() => {

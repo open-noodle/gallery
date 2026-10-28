@@ -1,6 +1,6 @@
+import { Route } from '#lib/route.ts';
+import { createUrl } from '#lib/utils.ts';
 import { getPeopleThumbnailPath, Type, type PersonResponseDto } from '@immich/sdk';
-import { Route } from '$lib/route';
-import { createUrl } from '$lib/utils';
 
 // Personal person vs space person, decided here once for the web app. A space person is a
 // (spaceId, id) pair, read from:

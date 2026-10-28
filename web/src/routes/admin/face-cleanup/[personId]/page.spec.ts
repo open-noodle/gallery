@@ -1,3 +1,6 @@
+import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+import { Route } from '#lib/route.ts';
 import {
   getFaceRepairClusterFaces,
   getFaceRepairPersonFaces,
@@ -11,9 +14,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
-import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
-import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
-import { Route } from '$lib/route';
 import Page from './+page.svelte';
 import type { SuspectedOwner } from './destination';
 
@@ -40,7 +40,7 @@ const httpError = (status: number, data: Record<string, unknown>) =>
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#test-data/mocks/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -115,8 +115,8 @@ vi.mock('$app/stores', () => ({
 }));
 
 // Mock AdminPageLayout to a simple pass-through that renders children
-vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
+  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -124,8 +124,8 @@ vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
 // getAdminFacePreviewUrl (via `...actual`) rather than dropping them — FacePhotoModal (imported below purely
 // for reference-identity assertions against modalManager.show) statically imports those at module-eval time,
 // so a mock object missing them would break on import even though this file never renders the modal itself.
-vi.mock('$lib/utils/people-utils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('$lib/utils/people-utils')>();
+vi.mock('#lib/utils/people-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/utils/people-utils.ts')>();
   return {
     ...actual,
     getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { spaceRoleLabelKey } from '$lib/utils/space-utils';
+  import { spaceRoleLabelKey } from '#lib/utils/space-utils.ts';
   import type { UserAvatarColor } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 

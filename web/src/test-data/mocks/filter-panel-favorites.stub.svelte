@@ -4,7 +4,7 @@
     createFilterState,
     type FilterPanelConfig,
     type FilterState,
-  } from '$lib/components/filter-panel/filter-panel';
+  } from '#lib/components/filter-panel/filter-panel.ts';
 
   interface Props {
     filters?: FilterState;

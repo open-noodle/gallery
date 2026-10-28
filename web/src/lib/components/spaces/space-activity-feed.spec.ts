@@ -1,8 +1,8 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import SpaceActivityFeed from '#lib/components/spaces/space-activity-feed.svelte';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
 
 function renderFeed(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpaceActivityFeed; componentProps: typeof props }>, {
@@ -26,7 +26,7 @@ const makeActivity = (overrides: Record<string, unknown> = {}) => ({
 
 describe('SpaceActivityFeed', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

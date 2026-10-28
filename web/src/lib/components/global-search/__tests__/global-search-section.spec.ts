@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import GlobalSearchSection from '../global-search-section.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

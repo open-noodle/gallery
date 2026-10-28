@@ -1,21 +1,21 @@
+import TimelineBucketCard from '#lib/components/timeline/TimelineBucketCard.svelte';
+import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
 import { AssetMediaSize } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
-import TimelineBucketCard from '$lib/components/timeline/TimelineBucketCard.svelte';
-import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
 
 const utilsMock = vi.hoisted(() => ({
   getAssetMediaUrl: vi.fn(({ id }: { id: string }) => `/thumbnail/${id}`),
 }));
 
-vi.mock('$lib/utils', async (importOriginal) => ({
+vi.mock('#lib/utils.js', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
   getAssetMediaUrl: utilsMock.getAssetMediaUrl,
 }));
 
-vi.mock('$lib/components/Thumbhash.svelte', async () => {
-  const module = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/Thumbhash.svelte', async () => {
+  const module = await import('#test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 

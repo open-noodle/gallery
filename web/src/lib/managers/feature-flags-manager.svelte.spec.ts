@@ -6,7 +6,7 @@ vi.mock('@immich/sdk', async () => {
   return { ...actual, getServerFeatures: vi.fn() };
 });
 
-vi.mock('$lib/managers/event-manager.svelte', () => ({
+vi.mock('#lib/managers/event-manager.svelte.js', () => ({
   eventManager: { on: vi.fn() },
 }));
 

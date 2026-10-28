@@ -3,15 +3,15 @@
   import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { locale, t } from 'svelte-i18n';
-  import { dateFormats } from '$lib/constants';
-  import { getContentMetrics, type ContentMetrics } from '$lib/utils/container-utils';
+  import { dateFormats } from '#lib/constants.ts';
+  import { getContentMetrics, type ContentMetrics } from '#lib/utils/container-utils.ts';
   import {
     clampFaceBoxToImage,
     getAdminFacePreviewUrl,
     getBoundingBox,
     isUsableFaceBox,
-  } from '$lib/utils/people-utils';
-  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
+  } from '#lib/utils/people-utils.ts';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
 
   // #1061: a 250px face crop cannot separate two similar-looking children. This shows the SOURCE PHOTO with
   // the detection boxed, through the admin-gated preview route — never /photos/{assetId}, which enforces

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiArrowRight, mdiCheckCircle, mdiChevronDown, mdiClose } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { Route } from '$lib/route';
+  import { Route } from '#lib/route.ts';
   import type { ScanTriageModel } from './scan-triage.svelte';
 
   type Props = { model: ScanTriageModel; applying: boolean; onApprove: () => void };
@@ -75,8 +75,8 @@
       >
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {#each model.confident as person (person.personId)}
-            {@const excluded = model.isExcluded(person.personId)}
-            {@const dest = person.suspectedOwners[0]}
+            {const excluded = $derived(model.isExcluded(person.personId))}
+            {const dest = $derived(person.suspectedOwners[0])}
             <!-- Whole-chip link to the same per-cluster review page the review lane uses, so an admin can see
                  exactly what the auto-fix will do to a cluster before approving it. The exclude button cannot nest
                  inside the anchor, so it overlays the anchor's reserved right padding as an absolute sibling (same

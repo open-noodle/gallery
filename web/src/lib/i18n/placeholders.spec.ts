@@ -1,7 +1,7 @@
+import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 
 // Why this exists: the Face Cleanup console shipped a German banner that rendered, literally,
 // "{moving} von {name}s {faceCount} Gesichtern…" — a translation of a REWRITTEN English string whose old

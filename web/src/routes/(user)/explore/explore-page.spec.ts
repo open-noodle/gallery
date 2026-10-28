@@ -1,14 +1,14 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { Type, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { assetFactory } from '@test-data/factories/asset-factory';
-import { personFactory } from '@test-data/factories/person-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { personFactory } from '#test-data/factories/person-factory';
 import ExplorePage from './+page.svelte';
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 

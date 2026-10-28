@@ -1,20 +1,20 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
 import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import '$lib/__mocks__/sdk.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import { albumFactory } from '@test-data/factories/album-factory';
-import { userFactory } from '@test-data/factories/user-factory';
+import { albumFactory } from '#test-data/factories/album-factory';
+import { userFactory } from '#test-data/factories/user-factory';
 import SpaceLinkAlbumModal from './SpaceLinkAlbumModal.svelte';
 
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'u-me', isAdmin: false } },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;

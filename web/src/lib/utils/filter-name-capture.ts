@@ -2,7 +2,7 @@ import type {
   FilterPanelConfig,
   FilterState,
   FilterSuggestionsResponse,
-} from '$lib/components/filter-panel/filter-panel';
+} from '#lib/components/filter-panel/filter-panel.ts';
 
 /**
  * Wraps a FilterPanelConfig so its suggestionsProvider, besides returning suggestions, records each

@@ -1,3 +1,5 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { SharedSpaceRole } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
@@ -5,12 +7,10 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import MembersPage from './+page.svelte';
 
 const { mockAuthManager } = vi.hoisted(() => ({ mockAuthManager: { user: { id: 'u1', isAdmin: false } } }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mockAuthManager }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: mockAuthManager }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn().mockResolvedValue(undefined) }));
 
 // The page drives @immich/ui's modalManager (invite modal + remove-confirm dialog). It also renders
@@ -198,7 +198,7 @@ describe('Members tab', () => {
         member({ userId: 'u2', role: SharedSpaceRole.Editor, name: 'Ann' }),
       ]);
       const { invalidateAll } = await import('$app/navigation');
-      const addMemberModalModule = await import('$lib/modals/SpaceAddMemberModal.svelte');
+      const addMemberModalModule = await import('#lib/modals/SpaceAddMemberModal.svelte');
       const SpaceAddMemberModal = addMemberModalModule.default;
 
       await fireEvent.click(screen.getByTestId('members-invite'));

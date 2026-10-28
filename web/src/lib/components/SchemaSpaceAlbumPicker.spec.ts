@@ -1,11 +1,11 @@
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import SchemaSpaceAlbumPickerWrapper from '#lib/components/SchemaSpaceAlbumPicker.test-wrapper.svelte';
+import { renderWithTooltips } from '#tests/helpers';
 import { getSharedSpaceAlbums } from '@immich/sdk';
 import { fireEvent, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import SchemaSpaceAlbumPickerWrapper from '$lib/components/SchemaSpaceAlbumPicker.test-wrapper.svelte';
-import { renderWithTooltips } from '$tests/helpers';
 
 // Module mocks, matching the pattern used across this suite. An unmocked @immich/sdk would
 // attempt a real fetch under happy-dom.
@@ -23,7 +23,7 @@ const optionLabels = () => screen.getAllByRole('option').map((option) => option.
 // This suite asserts the real "choose a space first" hint, so load actual English strings here,
 // matching the convention established by SchemaSpacePicker.spec.ts and its siblings.
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
   await waitLocale('en-US');
 });

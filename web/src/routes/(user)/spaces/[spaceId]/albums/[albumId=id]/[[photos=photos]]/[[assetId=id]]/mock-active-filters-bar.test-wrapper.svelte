@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 
   interface Props {
     filters?: FilterState;

@@ -1,9 +1,9 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { renderWithTooltips } from '$tests/helpers';
-import { albumFactory } from '@test-data/factories/album-factory';
+import { albumFactory } from '#test-data/factories/album-factory';
 import AlbumMap from '../AlbumMap.svelte';
 
 const { handleErrorMock, modalShowMock } = vi.hoisted(() => ({
@@ -11,9 +11,9 @@ const { handleErrorMock, modalShowMock } = vi.hoisted(() => ({
   modalShowMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$lib/utils/handle-error', () => ({ handleError: handleErrorMock }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: handleErrorMock }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: { isSharedLink: false, params: {} },
 }));
 
