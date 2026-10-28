@@ -4,17 +4,17 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * "Search this surface" affordance, sat beside the Years/Months/All pill (#1051).
-   *
-   * Scoped search already worked before this button existed — the nav bar's palette reads
-   * `getSearchablePageState(page.url)` and narrows to whatever album or space you are standing in.
-   * What it lacked was any sign, on the surface itself, that searching here searches HERE. This is
-   * the YouTube channel-page pattern: tabs, then a magnifier that scopes to the channel.
-   *
-   * Deliberately dumb — it takes an `onclick` rather than reaching for `globalSearchManager`, so
-   * FilterToolbar (rendered by every timeline surface, most of them not searchable) does not grow
-   * an import edge onto the palette manager and its SDK graph.
-   */
+  "Search this surface" affordance, sat beside the Years/Months/All pill (#1051).
+  
+  Scoped search already worked before this button existed — the nav bar's palette reads
+  `getSearchablePageState(page.url)` and narrows to whatever album or space you are standing in.
+  What it lacked was any sign, on the surface itself, that searching here searches HERE. This is
+  the YouTube channel-page pattern: tabs, then a magnifier that scopes to the channel.
+  
+  Deliberately dumb — it takes an `onclick` rather than reaching for `globalSearchManager`, so
+  FilterToolbar (rendered by every timeline surface, most of them not searchable) does not grow
+  an import edge onto the palette manager and its SDK graph.
+  */
   interface Props {
     onclick: () => void;
   }

@@ -46,10 +46,10 @@ vi.mock(import('@tanstack/svelte-query'), async (importOriginal) => ({
 }));
 
 /**
- * `SettingInputField` renders `aria-labelledby="<label>-label"` pointing at an id that does not exist, so its
- * inputs have no accessible name and `getByLabelText` cannot find them. They are addressed by the `name`
- * attribute the component sets from the label instead.
- */
+`SettingInputField` renders `aria-labelledby="<label>-label"` pointing at an id that does not exist, so its
+inputs have no accessible name and `getByLabelText` cannot find them. They are addressed by the `name`
+attribute the component sets from the label instead.
+*/
 const field = (container: HTMLElement, label: string) =>
   container.querySelector<HTMLInputElement>(`input[name="${CSS.escape(label)}"]`);
 

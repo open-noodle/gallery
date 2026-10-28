@@ -1,16 +1,16 @@
 import { defaultPublicConfig, defaultUserConfig } from '#test-data/gallery-config-defaults';
 
 /**
- * Gallery test setup (loaded after upstream's setup.ts). Upstream moved the user and public config
- * onto preloaded queries (immich-32498), so a component reading them throws "config/... must be
- * loaded first" unless the cache is filled. Upstream's specs fill it per test; the fork's many
- * component specs written before the move get these defaults instead. A spec that needs other
- * values still calls queryClient.setQueryData itself.
- *
- * The app modules are imported inside beforeEach, never at the top: a setup file runs before a spec's
- * hoisted vi.mock calls take effect, so a static import here would load e.g. handle-error.ts against
- * the real @immich/ui and silently bypass the spec's toast mocks.
- */
+Gallery test setup (loaded after upstream's setup.ts). Upstream moved the user and public config
+onto preloaded queries (immich-32498), so a component reading them throws "config/... must be
+loaded first" unless the cache is filled. Upstream's specs fill it per test; the fork's many
+component specs written before the move get these defaults instead. A spec that needs other
+values still calls queryClient.setQueryData itself.
+
+The app modules are imported inside beforeEach, never at the top: a setup file runs before a spec's
+hoisted vi.mock calls take effect, so a static import here would load e.g. handle-error.ts against
+the real @immich/ui and silently bypass the spec's toast mocks.
+*/
 beforeEach(async () => {
   let modules;
   try {

@@ -6,19 +6,19 @@ import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 /**
- * #989: the Explore strip and the Places grid linked to `/photos?city=…` with no `country`, and the
- * reporter saw the city "displayed at the same (first) level as the rest of the countries" instead
- * of nested beneath its country.
- *
- * The link fix (Route.photos carrying `country`) lives in route.spec.ts / explore-page.spec.ts /
- * places-card-group.spec.ts. This file pins the panel behaviour that fix depends on: the panel
- * genuinely renders the two cases at DIFFERENT levels, so a change here can't silently make the
- * country param pointless and re-open the report.
- *
- * The discriminator is the `ml-5` indent, which only the in-country city row carries — the
- * country-less fallback row (location-filter.svelte, the `selectedCity && !selectedCountry` block)
- * sits flush with the country rows by design, because it has no country block to sit inside.
- */
+#989: the Explore strip and the Places grid linked to `/photos?city=…` with no `country`, and the
+reporter saw the city "displayed at the same (first) level as the rest of the countries" instead
+of nested beneath its country.
+
+The link fix (Route.photos carrying `country`) lives in route.spec.ts / explore-page.spec.ts /
+places-card-group.spec.ts. This file pins the panel behaviour that fix depends on: the panel
+genuinely renders the two cases at DIFFERENT levels, so a change here can't silently make the
+country param pointless and re-open the report.
+
+The discriminator is the `ml-5` indent, which only the in-country city row carries — the
+country-less fallback row (location-filter.svelte, the `selectedCity && !selectedCountry` block)
+sits flush with the country rows by design, because it has no country block to sit inside.
+*/
 
 beforeAll(async () => {
   register('en-US', () => import('#i18n/en.json'));

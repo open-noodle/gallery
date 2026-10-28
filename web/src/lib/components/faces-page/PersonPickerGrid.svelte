@@ -5,7 +5,7 @@
     isHidden?: boolean;
     thumbnailUrl: string;
     /** Falls back to `name` -- callers with an owner/space-specific hidden-name format (see
-     * `getPersonNameWithHiddenValue`) can supply a pre-formatted title instead. */
+    `getPersonNameWithHiddenValue`) can supply a pre-formatted title instead. */
     title?: string;
   };
 </script>
@@ -15,15 +15,15 @@
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   /**
-   * The people-search list shared by the owner's `AssignFaceSidePanel` and the space-flavoured
-   * `SpacePersonSidePanel` / `SpaceFaceEditor` (Slice 8, Task 2) -- purely presentational, so it
-   * takes an already-resolved candidate list rather than fetching one itself.
-   *
-   * Thumbnails load lazily on purpose. A real library puts hundreds of people in here, and eager
-   * loading fires that many requests the moment the picker opens -- over HTTP/1.1 they fill the
-   * six-connection pool, so the write the next click issues queues behind them and the click
-   * reads as having done nothing.
-   */
+  The people-search list shared by the owner's `AssignFaceSidePanel` and the space-flavoured
+  `SpacePersonSidePanel` / `SpaceFaceEditor` (Slice 8, Task 2) -- purely presentational, so it
+  takes an already-resolved candidate list rather than fetching one itself.
+  
+  Thumbnails load lazily on purpose. A real library puts hundreds of people in here, and eager
+  loading fires that many requests the moment the picker opens -- over HTTP/1.1 they fill the
+  six-connection pool, so the write the next click issues queues behind them and the click
+  reads as having done nothing.
+  */
   type Props = {
     candidates: PickerCandidate[];
     isLoading?: boolean;

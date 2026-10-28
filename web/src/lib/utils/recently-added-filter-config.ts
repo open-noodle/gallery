@@ -31,10 +31,10 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
 }
 
 /**
- * The route's live search state, read at provider call time so it never goes stale.
- * `filters` must be the route's live FilterState — the dependent providers scope their facet
- * query by it, exactly as the Photos page does.
- */
+The route's live search state, read at provider call time so it never goes stale.
+`filters` must be the route's live FilterState — the dependent providers scope their facet
+query by it, exactly as the Photos page does.
+*/
 export type RecentlyAddedSearchContext = { query: string; language: string; filters: FilterState };
 
 function fetchFacets(context: RecentlyAddedSearchContext, filters: FilterState): Promise<SmartSearchFacetsResponseDto> {
@@ -50,15 +50,15 @@ function fetchFacets(context: RecentlyAddedSearchContext, filters: FilterState):
 }
 
 /**
- * Filter-panel config for the Recently Added view: own + partner scope only, so nothing here
- * carries `withSharedSpaces` / `albumId` / `spaceId`.
- *
- * `getSearchContext` is an accessor, not a plain value, because the panel's providers are called
- * later, during user interaction, and must see the query and the live filters as they are at call
- * time — values captured when the config is built would go stale the moment the user edits either.
- * It defaults to `() => undefined`, so a caller that never searches keeps the Slice-2 browse
- * behaviour unchanged.
- */
+Filter-panel config for the Recently Added view: own + partner scope only, so nothing here
+carries `withSharedSpaces` / `albumId` / `spaceId`.
+
+`getSearchContext` is an accessor, not a plain value, because the panel's providers are called
+later, during user interaction, and must see the query and the live filters as they are at call
+time — values captured when the config is built would go stale the moment the user edits either.
+It defaults to `() => undefined`, so a caller that never searches keeps the Slice-2 browse
+behaviour unchanged.
+*/
 export function buildRecentlyAddedFilterConfig(
   getSearchContext: () => RecentlyAddedSearchContext | undefined = () => undefined,
 ): FilterPanelConfig {

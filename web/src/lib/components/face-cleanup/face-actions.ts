@@ -10,23 +10,23 @@ import {
 import type { Translations } from 'svelte-i18n';
 
 /**
- * The single source of truth behind every face-cleanup action: its button label, its hover tip, its help-modal
- * explanation, its glyph, its tile colour and its severity. One registry so an explanation can never drift from
- * the button it explains (design specs/2026-07-31-face-cleanup-ux-unification-design.md §3.1).
- */
+The single source of truth behind every face-cleanup action: its button label, its hover tip, its help-modal
+explanation, its glyph, its tile colour and its severity. One registry so an explanation can never drift from
+the button it explains (design specs/2026-07-31-face-cleanup-ux-unification-design.md §3.1).
+*/
 export type FaceActionId = 'owner' | 'stay' | 'lock' | 'other' | 'unknown' | 'detach' | 'keep' | 'unmark';
 
 /** Guided review (scan-driven) and manual review (pick a person, no scan). */
 export type FaceReviewMode = 'guided' | 'manual';
 
 /**
- * A key that reads the same in both modes, or one key per mode.
- *
- * Three explanations are genuinely mode-dependent and MUST NOT be collapsed: guided's "move to a chosen
- * person" copy frames the action as overriding the scan and warns the next scan can re-flag the face, which is
- * meaningless in a mode that never scans; and guided's lock copy says "their owner" where manual says "this
- * person". Collapsing either ships copy describing the wrong mode.
- */
+A key that reads the same in both modes, or one key per mode.
+
+Three explanations are genuinely mode-dependent and MUST NOT be collapsed: guided's "move to a chosen
+person" copy frames the action as overriding the scan and warns the next scan can re-flag the face, which is
+meaningless in a mode that never scans; and guided's lock copy says "their owner" where manual says "this
+person". Collapsing either ships copy describing the wrong mode.
+*/
 type ModalKey = Translations | Readonly<Record<FaceReviewMode, Translations>>;
 
 export interface FaceActionMeta {
@@ -40,16 +40,16 @@ export interface FaceActionMeta {
   /** Help modal "On apply:", and the dock's inline hint row. */
   readonly effectKey: ModalKey;
   /**
-   * Glyph on the bulk-bar button. Present for everything that IS a button — including `unmark`, whose
-   * `mdiUndo` is easy to lose in a merge because it has no tile state. `undefined` only for `keep`, which is
-   * the default rather than a button and appears solely in the help modal.
-   */
+  Glyph on the bulk-bar button. Present for everything that IS a button — including `unmark`, whose
+  `mdiUndo` is easy to lose in a merge because it has no tile state. `undefined` only for `keep`, which is
+  the default rather than a button and appears solely in the help modal.
+  */
   readonly buttonIcon: string | undefined;
   /**
-   * The tile-state swatch — badge, ribbon, help-modal rail. `undefined` for `keep` and `unmark`: neither
-   * corresponds to a coloured tile state, and both are signalled by ABSENCE. Deliberately NOT the same
-   * absence as `buttonIcon` — `unmark` has a glyph but no swatch.
-   */
+  The tile-state swatch — badge, ribbon, help-modal rail. `undefined` for `keep` and `unmark`: neither
+  corresponds to a coloured tile state, and both are signalled by ABSENCE. Deliberately NOT the same
+  absence as `buttonIcon` — `unmark` has a glyph but no swatch.
+  */
   readonly swatchColor: string | undefined;
   /** `danger` tints the button red. Only `detach`, the one irreversible action. */
   readonly tone: 'default' | 'danger';
@@ -172,7 +172,7 @@ export const effectKeyFor = (id: FaceActionId, mode: FaceReviewMode): Translatio
   resolve(FACE_ACTIONS[id].effectKey, mode);
 
 /**
- * The six ids that are also guided tile states. `keep`/`unmark` are excluded: they have no tile state, and
- * `STATE_COLOR`/`STATE_ICON` must not widen to include them (review.spec.ts pins their key sets).
- */
+The six ids that are also guided tile states. `keep`/`unmark` are excluded: they have no tile state, and
+`STATE_COLOR`/`STATE_ICON` must not widen to include them (review.spec.ts pins their key sets).
+*/
 export const GUIDED_STATE_IDS = ['owner', 'other', 'stay', 'lock', 'detach', 'unknown'] as const;

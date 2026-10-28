@@ -112,6 +112,7 @@ vi.mock('#lib/modals/RepresentativeFacePickerModal.svelte', async () => {
   return { default: MockComponent };
 });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function makeSpace(overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto {
   return {
     id: 'space-1',

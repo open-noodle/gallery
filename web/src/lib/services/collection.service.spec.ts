@@ -21,6 +21,7 @@ vi.mock('#lib/utils/i18n.js', () => ({
 const albumCol = (id: string): PickerCollection =>
   ({ kind: 'album', id, name: id, album: { id } }) as unknown as PickerCollection;
 const MY_USER_ID = 'user-me';
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const spaceCol = (id: string): PickerCollection =>
   ({ kind: 'space', id, name: id, space: { id } }) as unknown as PickerCollection;
 /** A space the signed-in user has hidden from their own timeline (#1041). */

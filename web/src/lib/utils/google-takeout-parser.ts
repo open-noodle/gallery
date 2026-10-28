@@ -31,13 +31,13 @@ export const MEDIA_EXTENSIONS = new Set([
 ]);
 
 /**
- * Extract the trailing `(N)` duplicate-index from a filename, if present.
- * Recognises both `file(1).ext` and `file(1)` (no extension) shapes; rejects
- * `file(1)-something.ext` where `(N)` is not immediately before the extension.
- *
- * Returns `{ name, index }` where `name` is the filename with `(N)` removed
- * and `index` is the number as a string (or `''` when no index is present).
- */
+Extract the trailing `(N)` duplicate-index from a filename, if present.
+Recognises both `file(1).ext` and `file(1)` (no extension) shapes; rejects
+`file(1)-something.ext` where `(N)` is not immediately before the extension.
+
+Returns `{ name, index }` where `name` is the filename with `(N)` removed
+and `index` is the number as a string (or `''` when no index is present).
+*/
 export function extractFileIndex(filename: string): { name: string; index: string } {
   const match = filename.match(/^(.*)\((\d+)\)(\.[^.]*)?$/);
   if (!match) {
@@ -175,11 +175,11 @@ export function parseGoogleTakeoutSidecar(jsonString: string): TakeoutMetadata |
 const SUPPLEMENTAL_SUFFIX = 'supplemental-metadata';
 
 /**
- * Strip Google Takeout's `.supplemental-metadata` segment (if present) from a sidecar
- * path that has already had `.json` removed. Google introduced this suffix in mid-2024
- * and truncates it to fit a total filename budget (~51 chars), so any prefix of
- * `supplemental-metadata` is accepted — e.g. `.supplemental-me`, `.supple`, `.s`.
- */
+Strip Google Takeout's `.supplemental-metadata` segment (if present) from a sidecar
+path that has already had `.json` removed. Google introduced this suffix in mid-2024
+and truncates it to fit a total filename budget (~51 chars), so any prefix of
+`supplemental-metadata` is accepted — e.g. `.supplemental-me`, `.supple`, `.s`.
+*/
 export function stripSupplementalSuffix(pathWithoutJson: string): string {
   const lastDot = pathWithoutJson.lastIndexOf('.');
   const lastSlash = pathWithoutJson.lastIndexOf('/');
@@ -207,11 +207,11 @@ function basename(path: string): string {
 }
 
 /**
- * Sidecar-to-media matching cascade. Ported from simulot/immich-go
- * (AGPL-3.0) —
- * https://github.com/simulot/immich-go/blob/cc928edbce49216584647e5f756a2af6478bb7ea/adapters/googlePhotos/matchers.go
- * See specs/2026-04-22-google-takeout-gaps.md for gap context.
- */
+Sidecar-to-media matching cascade. Ported from simulot/immich-go
+(AGPL-3.0) —
+https://github.com/simulot/immich-go/blob/cc928edbce49216584647e5f756a2af6478bb7ea/adapters/googlePhotos/matchers.go
+See specs/2026-04-22-google-takeout-gaps.md for gap context.
+*/
 
 /** Exact-match matcher: strip `.json`, compare for equality. */
 export function matchFastTrack(jsonName: string, fileName: string): boolean {
@@ -222,16 +222,16 @@ export function matchFastTrack(jsonName: string, fileName: string): boolean {
 }
 
 /**
- * Normal matcher: handles Google's three `(N)` sidecar shapes:
- *   - `name.jpg(1).json`                          — legacy
- *   - `name.jpg(1).supplemental-metadata.json`    — (N) before supplemental
- *   - `name.jpg.supplemental-metadata(1).json`    — (N) after supplemental
- *
- * Ordering is load-bearing: strip supplemental first (so shape 2 loses its
- * `.supplemental-metadata` segment), extract `(N)`, then strip supplemental
- * again on the resulting stem (so shape 3's supplemental — which was hidden
- * behind the trailing `(N)` on the first pass — also comes off).
- */
+Normal matcher: handles Google's three `(N)` sidecar shapes:
+  - `name.jpg(1).json`                          — legacy
+  - `name.jpg(1).supplemental-metadata.json`    — (N) before supplemental
+  - `name.jpg.supplemental-metadata(1).json`    — (N) after supplemental
+
+Ordering is load-bearing: strip supplemental first (so shape 2 loses its
+`.supplemental-metadata` segment), extract `(N)`, then strip supplemental
+again on the resulting stem (so shape 3's supplemental — which was hidden
+behind the trailing `(N)` on the first pass — also comes off).
+*/
 export function matchNormal(jsonName: string, fileName: string): boolean {
   if (!jsonName.endsWith('.json')) {
     return false;
@@ -267,15 +267,15 @@ export function matchNormal(jsonName: string, fileName: string): boolean {
 }
 
 /**
- * Forgotten-duplicates matcher: handles Google's `original_<uuid>_.json`
- * sidecars whose media files gained a `_P` or `_P(N)` suffix, and sidecars
- * that omit the media extension entirely (Gap #4). Unlike immich-go
- * `cc928edbce4`, this port strips `.supplemental-metadata` before the prefix
- * check so Gap #4 keeps matching sidecars that omit the media extension; see
- * `specs/2026-04-22-google-takeout-gaps-design.md`.
- * Requires `fileName` to start with the stripped jsonStem and the code-point
- * length diff is < 10.
- */
+Forgotten-duplicates matcher: handles Google's `original_<uuid>_.json`
+sidecars whose media files gained a `_P` or `_P(N)` suffix, and sidecars
+that omit the media extension entirely (Gap #4). Unlike immich-go
+`cc928edbce4`, this port strips `.supplemental-metadata` before the prefix
+check so Gap #4 keeps matching sidecars that omit the media extension; see
+`specs/2026-04-22-google-takeout-gaps-design.md`.
+Requires `fileName` to start with the stripped jsonStem and the code-point
+length diff is < 10.
+*/
 export function matchForgottenDuplicates(jsonName: string, fileName: string): boolean {
   if (!jsonName.endsWith('.json')) {
     return false;
@@ -289,20 +289,20 @@ export function matchForgottenDuplicates(jsonName: string, fileName: string): bo
 }
 
 /**
- * Confirmed edited-copy suffixes Google Takeout appends to edited variants.
- * Only the 4 entries confirmed in immich-go's docs ship here — unconfirmed
- * variants are deliberately omitted to avoid false-match chains. See
- * specs/2026-04-22-google-takeout-gaps.md for the full candidate list
- * and the rationale for the conservative cut.
- */
+Confirmed edited-copy suffixes Google Takeout appends to edited variants.
+Only the 4 entries confirmed in immich-go's docs ship here — unconfirmed
+variants are deliberately omitted to avoid false-match chains. See
+specs/2026-04-22-google-takeout-gaps.md for the full candidate list
+and the rationale for the conservative cut.
+*/
 const EDITED_SUFFIXES = ['-edited', '-modifié', '-bearbeitet', '-modificato'] as const;
 
 /**
- * Edited-name matcher: handles `IMAG0061-edited.JPG` etc. sharing the sidecar
- * of `IMAG0061.JPG`. Requires no `(N)` on fileName, strips supplemental-metadata
- * on the sidecar side, drops trailing media extension on the stem, then checks
- * startsWith + an edited suffix immediately before the file extension.
- */
+Edited-name matcher: handles `IMAG0061-edited.JPG` etc. sharing the sidecar
+of `IMAG0061.JPG`. Requires no `(N)` on fileName, strips supplemental-metadata
+on the sidecar side, drops trailing media extension on the stem, then checks
+startsWith + an edited suffix immediately before the file extension.
+*/
 export function matchEditedName(jsonName: string, fileName: string): boolean {
   if (!jsonName.endsWith('.json')) {
     return false;
@@ -345,13 +345,13 @@ export function matchEditedName(jsonName: string, fileName: string): boolean {
 }
 
 /**
- * Match a JSON sidecar to one or more media files in the same directory.
- *
- * Returns an array of matching media paths. A single sidecar may bind to
- * multiple media files (e.g. an `IMG.jpg` original + `IMG-edited.jpg`
- * sharing one sidecar). Returns `[]` when the sidecar is not a valid
- * Takeout photo sidecar or has no matching candidates.
- */
+Match a JSON sidecar to one or more media files in the same directory.
+
+Returns an array of matching media paths. A single sidecar may bind to
+multiple media files (e.g. an `IMG.jpg` original + `IMG-edited.jpg`
+sharing one sidecar). Returns `[]` when the sidecar is not a valid
+Takeout photo sidecar or has no matching candidates.
+*/
 export function matchSidecarToMedia(sidecarPath: string, sidecarContent: string, mediaFilePaths: string[]): string[] {
   const metadata = parseGoogleTakeoutSidecar(sidecarContent);
   if (!metadata) {
@@ -436,21 +436,19 @@ export function matchSidecarToMedia(sidecarPath: string, sidecarContent: string,
 
 const AUTO_GENERATED_ALBUM_PATTERN = /^Photos from \d{4}$/;
 
-/**
- * Returns true for auto-generated album names like "Photos from 2023".
- */
+/** Returns true for auto-generated album names like "Photos from 2023". */
 export function isAutoGeneratedAlbum(name: string): boolean {
   return AUTO_GENERATED_ALBUM_PATTERN.test(name);
 }
 
 /**
- * Identify the Google Photos root folder names in a batch of scanned items.
- * A root is the segment `parts[1]` of every item whose sidecar parsed
- * successfully (proven by `metadata !== undefined`) and whose path begins
- * with `Takeout/`. A full Google Account export may include `YouTube/`,
- * `Gmail/`, etc. alongside the Photos root; only the Photos root passes
- * this shape filter.
- */
+Identify the Google Photos root folder names in a batch of scanned items.
+A root is the segment `parts[1]` of every item whose sidecar parsed
+successfully (proven by `metadata !== undefined`) and whose path begins
+with `Takeout/`. A full Google Account export may include `YouTube/`,
+`Gmail/`, etc. alongside the Photos root; only the Photos root passes
+this shape filter.
+*/
 export function derivePhotoRoots(items: TakeoutMediaItem[]): Set<string> {
   const roots = new Set<string>();
   for (const item of items) {
@@ -466,12 +464,12 @@ export function derivePhotoRoots(items: TakeoutMediaItem[]): Set<string> {
 }
 
 /**
- * Finalize `item.albumName` in place using the authoritative `photoRoots`.
- * Writes `parts[2]` when the item sits under `Takeout/<root>/<album>/...`
- * and `<root>` is a confirmed Photos root; otherwise clears albumName to
- * `undefined` (overriding any tentative value the extraction-time heuristic
- * left on the item).
- */
+Finalize `item.albumName` in place using the authoritative `photoRoots`.
+Writes `parts[2]` when the item sits under `Takeout/<root>/<album>/...`
+and `<root>` is a confirmed Photos root; otherwise clears albumName to
+`undefined` (overriding any tentative value the extraction-time heuristic
+left on the item).
+*/
 export function finalizeItemAlbumNames(items: TakeoutMediaItem[], photoRoots: Set<string>): void {
   for (const item of items) {
     const parts = item.path.split('/');
@@ -481,14 +479,14 @@ export function finalizeItemAlbumNames(items: TakeoutMediaItem[], photoRoots: Se
 }
 
 /**
- * Extract album information from the folder structure of Takeout items.
- * Uses `photoRoots` (from `derivePhotoRoots`) to distinguish Google Photos
- * content from other Takeout services (YouTube, Drive, etc.) in the same
- * export. Items whose `parts[1]` is not in `photoRoots` are ignored.
- *
- * Expected structure: `Takeout/<root>/<AlbumName>/<filename>`.
- * Nested albums flatten: `Takeout/<root>/Parent/Child/file.jpg` -> album "Child".
- */
+Extract album information from the folder structure of Takeout items.
+Uses `photoRoots` (from `derivePhotoRoots`) to distinguish Google Photos
+content from other Takeout services (YouTube, Drive, etc.) in the same
+export. Items whose `parts[1]` is not in `photoRoots` are ignored.
+
+Expected structure: `Takeout/<root>/<AlbumName>/<filename>`.
+Nested albums flatten: `Takeout/<root>/Parent/Child/file.jpg` -> album "Child".
+*/
 export function detectAlbums(items: TakeoutMediaItem[], photoRoots: Set<string>): TakeoutAlbum[] {
   const albumMap = new Map<string, string[]>();
 

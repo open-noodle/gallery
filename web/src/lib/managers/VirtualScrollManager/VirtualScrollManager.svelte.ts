@@ -22,18 +22,18 @@ export const BROWSER_MAX_SCROLL_DEVICE_PX = IS_FIREFOX ? SCROLL_CEILING_FIREFOX_
 const SCROLL_HEIGHT_SAFETY = 0.98;
 
 /**
- * CSS-pixel height budget for the scroll container on a display of the given devicePixelRatio.
- *
- * The ceiling above is a *device*-pixel limit, so on a HiDPI screen each CSS pixel spends `dpr`
- * of it. Asking for a flat CSS-pixel height gets silently clamped — the element comes back
- * ~`1/dpr` of what was requested while `domScrollMax` keeps being derived from the requested
- * value, so `domToLogical` divides by a scroll range that does not exist and the tail of the
- * list becomes unreachable. Dividing here keeps the request under the ceiling so nothing clamps.
- *
- * Firefox's ceiling is nominally in CSS pixels rather than device pixels (only measured at dpr 1
- * so far); dividing anyway is deliberately conservative — it only shrinks the DOM range, and
- * never lets the request exceed the real ceiling on either engine.
- */
+CSS-pixel height budget for the scroll container on a display of the given devicePixelRatio.
+
+The ceiling above is a *device*-pixel limit, so on a HiDPI screen each CSS pixel spends `dpr`
+of it. Asking for a flat CSS-pixel height gets silently clamped — the element comes back
+~`1/dpr` of what was requested while `domScrollMax` keeps being derived from the requested
+value, so `domToLogical` divides by a scroll range that does not exist and the tail of the
+list becomes unreachable. Dividing here keeps the request under the ceiling so nothing clamps.
+
+Firefox's ceiling is nominally in CSS pixels rather than device pixels (only measured at dpr 1
+so far); dividing anyway is deliberately conservative — it only shrinks the DOM range, and
+never lets the request exceed the real ceiling on either engine.
+*/
 export function maxScrollHeightForDevicePixelRatio(
   dpr: number,
   ceiling: number = BROWSER_MAX_SCROLL_DEVICE_PX,

@@ -204,9 +204,9 @@ describe('buildAlbumAssetPickerOptions', () => {
 });
 
 /**
- * #802 — album views were missing the "Text" filter section. Both album builders feed
- * TimeBucketDto, which already supports description/originalFileName/ocr server-side.
- */
+#802 — album views were missing the "Text" filter section. Both album builders feed
+TimeBucketDto, which already supports description/originalFileName/ocr server-side.
+*/
 describe('text filters (#802)', () => {
   const textFilters = {
     ...createFilterState(),

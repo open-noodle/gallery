@@ -78,6 +78,7 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
   };
 }
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: SharedSpacePeopleStatisticsResponseDto) {
   peopleStatistics ??= {
     total: people.length,
@@ -145,10 +146,10 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
 const PAGE_SIZE = 100;
 
 /**
- * Renders the page with a full first page loaded (so the grid offers a next page) and hands back a
- * trigger that reports the infinite-scroll sentinel as intersecting, so pagination can be driven
- * deterministically. Mirrors the global people page's helper of the same name.
- */
+Renders the page with a full first page loaded (so the grid offers a next page) and hands back a
+trigger that reports the infinite-scroll sentinel as intersecting, so pagination can be driven
+deterministically. Mirrors the global people page's helper of the same name.
+*/
 function renderPaginatedPage(people: SharedSpacePersonResponseDto[]) {
   let intersectionCallback: IntersectionObserverCallback | undefined;
   let observedSentinel: Element | undefined;
