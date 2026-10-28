@@ -49,6 +49,7 @@ describe(FaceDissolveService.name, () => {
     personRemoved: true,
     deletedThumbnailPath: '/t.jpg',
     orphanedSpacePersonIds: [],
+    keptSpacePersonIds: [],
   };
 
   const warningCodes = async (over: Partial<DissolveCounts>) => {
@@ -66,6 +67,7 @@ describe(FaceDissolveService.name, () => {
     mocks.faceDissolve.dissolve.mockResolvedValue(written);
     mocks.facePersonVerdict.drainPendingForFaces.mockResolvedValue(0);
     mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
+    mocks.sharedSpace.recountPersons.mockResolvedValue();
     mocks.job.isActive.mockResolvedValue(false);
   });
 
@@ -110,6 +112,13 @@ describe(FaceDissolveService.name, () => {
     expect(mocks.database.transaction).toHaveBeenCalledTimes(1);
     const trx = mocks.faceDissolve.dissolve.mock.calls[0][1];
     expect(mocks.facePersonVerdict.drainPendingForFaces).toHaveBeenCalledWith(['face-1', 'face-2'], trx);
+  });
+
+  it('recounts the surviving Space persons in the same transaction', async () => {
+    mocks.faceDissolve.dissolve.mockResolvedValue({ ...written, keptSpacePersonIds: ['space-person-1'] });
+    await sut.apply(auth, 'person-1', dto());
+    const trx = mocks.faceDissolve.dissolve.mock.calls[0][1];
+    expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['space-person-1'], trx);
   });
 
   it('queues a re-scan only when imported faces were deleted', async () => {
@@ -217,6 +226,12 @@ describe(FaceDissolveService.name, () => {
       mocks.faceDissolve.getDissolve.mockResolvedValue({ id: 'dissolve-1', restoredAt: new Date() });
       await expect(sut.restore('dissolve-1')).rejects.toBeInstanceOf(ConflictException);
       expect(mocks.faceDissolve.restore).not.toHaveBeenCalled();
+    });
+
+    it('refuses when a concurrent restore got there first', async () => {
+      mocks.faceDissolve.restore.mockResolvedValue('already-restored');
+      await expect(sut.restore('dissolve-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
 
     it.each([QueueName.FacialRecognition, QueueName.FaceDetection])('refuses while %s is running', async (queue) => {

@@ -68,6 +68,8 @@ export class FaceDissolveService extends BaseService {
         trx,
       );
       await this.facePersonVerdictRepository.drainPendingForFaces(written.hiddenFaceIds, trx);
+      // A Space person that lost faces but survives would otherwise keep showing, and sorting by, its old counts.
+      await this.sharedSpaceRepository.recountPersons(written.keptSpacePersonIds, trx);
       return written;
     });
 
@@ -140,6 +142,9 @@ export class FaceDissolveService extends BaseService {
     );
     if (!result) {
       throw new NotFoundException('Dissolve not found');
+    }
+    if (result === 'already-restored') {
+      throw new ConflictException('This dissolve was already restored');
     }
 
     // NOT PersonCleanup or any other unscoped job: the non-forced pass only picks up unassigned faces.

@@ -39,6 +39,8 @@ export interface DissolveWriteResult {
   personRemoved: boolean;
   deletedThumbnailPath: string | null;
   orphanedSpacePersonIds: string[];
+  /** Space persons that lost faces but survive; the caller recounts them in the same transaction. */
+  keptSpacePersonIds: string[];
 }
 
 export interface DissolveRecord {
@@ -165,9 +167,10 @@ export class FaceDissolveRepository {
       .selectFrom('asset_face')
       .select((eb) => [
         eb.fn.countAll<number>().as('faces'),
+        // Only faces this dissolve will hide, and so can restore: an already-hidden face is not recorded.
         eb.fn
           .countAll<number>()
-          .filterWhere((inner) => hideFacePredicate(inner))
+          .filterWhere((inner) => inner.and([hideFacePredicate(inner), inner('asset_face.deletedAt', 'is', null)]))
           .as('hide'),
         eb.fn
           .countAll<number>()
@@ -447,23 +450,28 @@ export class FaceDissolveRepository {
         .execute();
     }
 
-    // 5. Detected faces that were already hidden: only the person link goes. Not recorded, so a restore of this
-    //    dissolve leaves them hidden.
-    const alreadyHidden = await trx
-      .updateTable('asset_face')
-      .set({ personGroupId: null })
-      .where(and(hideFacePredicate, (eb) => eb('asset_face.deletedAt', 'is not', null)))
-      .executeTakeFirst();
+    // 5. Detected faces that were already hidden (the face editor's delete keeps the person and the Space links):
+    //    only the person link goes here, the Space links go in step 7. Not recorded, so a restore of this dissolve
+    //    leaves them hidden.
+    const alreadyHiddenIds = ids(
+      await trx
+        .updateTable('asset_face')
+        .set({ personGroupId: null })
+        .where(and(hideFacePredicate, (eb) => eb('asset_face.deletedAt', 'is not', null)))
+        .returning('asset_face.id as id')
+        .execute(),
+    );
 
     // 6. Imported faces, soft-deleted ones included: a surviving tombstone would absorb the re-scan's detection (L12).
     const deleted = await trx.deleteFrom('asset_face').where(and(deleteFacePredicate)).executeTakeFirst();
 
     // 7-9. Spaces. A hidden face's row survives, so nothing cascades: unlink it here, remove only the Space persons
     //      this left with no face (never deleteAllOrphanedPersons, L1), and repoint a survivor showing a hidden face.
-    if (hiddenFaceIds.length > 0) {
+    const unlinkedFaceIds = [...hiddenFaceIds, ...alreadyHiddenIds];
+    if (unlinkedFaceIds.length > 0) {
       await trx
         .deleteFrom('shared_space_person_face')
-        .where('assetFaceId', '=', (eb) => eb.fn.any(eb.val(hiddenFaceIds)))
+        .where('assetFaceId', '=', (eb) => eb.fn.any(eb.val(unlinkedFaceIds)))
         .execute();
     }
     let orphanedSpacePersonIds: string[] = [];
@@ -497,6 +505,9 @@ export class FaceDissolveRepository {
             .where('asset_face.deletedAt', 'is', null)
             .orderBy('link.assetFaceId')
             .limit(1),
+          // The admin's pick was a face that is now hidden; the replacement is the system's, as in
+          // repairInvalidRepresentativeFaces.
+          representativeFaceSource: 'auto' as const,
         }))
         .where('id', '=', (eb) => eb.fn.any(eb.val(spacePersonIds)))
         .where((eb) =>
@@ -535,8 +546,7 @@ export class FaceDissolveRepository {
     // 11. The restore record, written only when a face was touched.
     const unassignedCount = Number(unassigned.numUpdatedRows ?? 0);
     const deletedCount = Number(deleted.numDeletedRows ?? 0);
-    const touched =
-      hiddenFaceIds.length + unassignedCount + deletedCount + Number(alreadyHidden.numUpdatedRows ?? 0) > 0;
+    const touched = hiddenFaceIds.length + unassignedCount + deletedCount + alreadyHiddenIds.length > 0;
     let dissolveId: string | null = null;
     if (touched) {
       const record = await trx
@@ -575,6 +585,7 @@ export class FaceDissolveRepository {
       personRemoved,
       deletedThumbnailPath,
       orphanedSpacePersonIds,
+      keptSpacePersonIds: spacePersonIds.filter((id) => !orphanedSpacePersonIds.includes(id)),
     };
   }
 
@@ -630,15 +641,22 @@ export class FaceDissolveRepository {
    * dissolve left them (hidden and unassigned) come back: one re-assigned or re-hidden since is someone else's
    * decision. Returns null for an unknown dissolve. The caller owns the transaction and the restored-twice check.
    */
-  async restore(dissolveId: string, trx: Transaction<DB>): Promise<{ restored: number; skipped: number } | null> {
+  async restore(
+    dissolveId: string,
+    trx: Transaction<DB>,
+  ): Promise<'already-restored' | { restored: number; skipped: number } | null> {
+    // Locked, and re-checked under the lock: a second restore racing this one waits here and then sees restoredAt.
     const record = await trx
       .selectFrom('face_dissolve')
-      .select('id')
+      .select(['id', 'hiddenCount', 'restoredAt'])
       .where('id', '=', dissolveId)
       .forUpdate()
       .executeTakeFirst();
     if (!record) {
       return null;
+    }
+    if (record.restoredAt) {
+      return 'already-restored';
     }
 
     const recorded = trx
@@ -651,15 +669,11 @@ export class FaceDissolveRepository {
       .where('asset_face.id', 'in', recorded)
       .where((eb) => restorable(eb))
       .executeTakeFirst();
-    const total = await trx
-      .selectFrom('face_dissolve_face')
-      .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('dissolveId', '=', dissolveId)
-      .executeTakeFirstOrThrow();
-
     await trx.updateTable('face_dissolve').set({ restoredAt: new Date() }).where('id', '=', dissolveId).execute();
 
     const count = Number(restored.numUpdatedRows ?? 0);
-    return { restored: count, skipped: Number(total.count) - count };
+    // Against the record's own count: a hidden face hard-deleted since took its record row with it, and still has
+    // to be reported as one that did not come back.
+    return { restored: count, skipped: record.hiddenCount - count };
   }
 }

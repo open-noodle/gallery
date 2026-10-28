@@ -97,6 +97,7 @@ const setup = () => {
       FacePersonVerdictRepository,
       FaceRepairRepository,
       PersonRepository,
+      SharedSpaceRepository,
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });

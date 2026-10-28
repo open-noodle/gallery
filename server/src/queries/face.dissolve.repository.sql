@@ -56,17 +56,20 @@ select
   count(*) filter (
     where
       (
-        "asset_face"."sourceType" = $1
-        and not (
-          exists (
-            select
-            from
-              "asset_face_creator"
-            where
-              "asset_face_creator"."assetFaceId" = "asset_face"."id"
+        (
+          "asset_face"."sourceType" = $1
+          and not (
+            exists (
+              select
+              from
+                "asset_face_creator"
+              where
+                "asset_face_creator"."assetFaceId" = "asset_face"."id"
+            )
+            or "asset_face"."sourceType" = $2
           )
-          or "asset_face"."sourceType" = $2
         )
+        and "asset_face"."deletedAt" is null
       )
   ) as "hide",
   count(*) filter (
