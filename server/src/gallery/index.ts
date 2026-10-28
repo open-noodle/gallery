@@ -28,6 +28,7 @@ import { GalleryPeopleService } from 'src/gallery/services/gallery-people.servic
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
+import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
@@ -115,6 +116,7 @@ export const galleryServices = [
   PetRecognitionService,
   SharedSpaceService,
   StorageMigrationService,
+  StorageTemplateS3Service,
   StorageUsageService,
   UserGroupService,
 ];

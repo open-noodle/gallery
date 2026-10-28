@@ -17,6 +17,7 @@ import { UserPreferencesResponseDto, UserPreferencesUpdateDto, mapPreferences } 
 import { CreateProfileImageResponseDto } from 'src/dtos/user-profile.dto.js';
 import { UserAdminResponseDto, UserResponseDto, UserUpdateMeDto, mapUser, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { CacheControl, JobName, JobStatus, QueueName, StorageFolder, UserMetadataKey } from 'src/enum.js';
+import { getDeletableUserS3Prefixes } from 'src/gallery/utils/storage-usage.js';
 import { UserFindOptions } from 'src/repositories/user.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -307,19 +308,11 @@ export class UserService extends BaseService {
       await this.storageRepository.unlinkDir(folder, { recursive: true, force: true });
     }
 
-    // S3: clean the user-scoped relative prefixes. Library and Backups are intentionally
-    // excluded — storage-template migration is a no-op on S3 (StorageCore.moveFile guard),
-    // so S3 never writes to library/; Backups is admin/global scope.
+    // S3: clean the keys of the folders above, library/<label>/ included (storage templates and disk-to-S3
+    // migrations write there) unless another user's assets are stored under it. Backups is admin/global scope.
     const s3 = StorageService.getS3Backend();
     if (s3) {
-      const userScopedS3Folders = [
-        StorageFolder.Upload,
-        StorageFolder.Profile,
-        StorageFolder.Thumbnails,
-        StorageFolder.EncodedVideo,
-      ] as const;
-      for (const folder of userScopedS3Folders) {
-        const prefix = `${folder}/${user.id}/`;
+      for (const prefix of await getDeletableUserS3Prefixes(user, this.storageMigrationRepository, this.logger)) {
         try {
           await s3.deletePrefix(prefix);
           this.logger.log(`Cleaned S3 prefix ${prefix}`);

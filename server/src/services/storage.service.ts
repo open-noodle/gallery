@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
 import type { JobOf, SystemFlags } from 'src/types.js';
-import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { ErrorMessages } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
@@ -15,6 +15,7 @@ import {
   StorageFolder,
   SystemMetadataKey,
 } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { BaseService } from 'src/services/base.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
@@ -23,32 +24,11 @@ const docsMessage = `Please see https://docs.immich.app/administration/system-in
 
 @Injectable()
 export class StorageService extends BaseService {
-  private static diskBackend: DiskStorageBackend;
-  private static s3Backend: S3StorageBackend | undefined;
-  private static writeBackendType: 'disk' | 's3' = 'disk';
-
-  static getDiskBackend(): DiskStorageBackend {
-    return StorageService.diskBackend;
-  }
-
-  static getS3Backend(): S3StorageBackend | undefined {
-    return StorageService.s3Backend;
-  }
-
-  static getWriteBackend(): StorageBackend {
-    if (StorageService.writeBackendType === 's3' && StorageService.s3Backend) {
-      return StorageService.s3Backend;
-    }
-    return StorageService.diskBackend;
-  }
-
-  // disk path: disk file (through `absoluteDisk`); relative key: S3, or the media location when S3 is off
-  static backendFor(key: string, absoluteDisk: StorageBackend = StorageService.diskBackend): StorageBackend {
-    if (isDiskPath(key)) {
-      return absoluteDisk;
-    }
-    return StorageService.s3Backend ?? StorageService.diskBackend;
-  }
+  // the backends live in a leaf module (src/gallery/utils/storage-backends.ts) that StorageCore and utils can import
+  static getDiskBackend = (): DiskStorageBackend => storageBackends.diskBackend;
+  static getS3Backend = (): S3StorageBackend | undefined => storageBackends.s3Backend;
+  static getWriteBackend = (): StorageBackend => storageBackends.getWriteBackend();
+  static backendFor = (key: string, absoluteDisk?: StorageBackend) => storageBackends.backendFor(key, absoluteDisk);
 
   private detectMediaLocation(): string {
     const envData = this.configRepository.getEnv();
@@ -79,15 +59,15 @@ export class StorageService extends BaseService {
 
     // Initialize storage backends
     const envData = this.configRepository.getEnv();
-    StorageService.diskBackend = new DiskStorageBackend(StorageCore.getMediaLocation(), this.storageRepository);
-    StorageService.writeBackendType = envData.storage.backend;
+    storageBackends.diskBackend = new DiskStorageBackend(StorageCore.getMediaLocation(), this.storageRepository);
+    storageBackends.writeBackendType = envData.storage.backend;
 
     if (envData.storage.s3.bucket) {
-      StorageService.s3Backend = new S3StorageBackend(envData.storage.s3);
+      storageBackends.s3Backend = new S3StorageBackend(envData.storage.s3);
       this.logger.log(`S3 storage backend configured (bucket: ${envData.storage.s3.bucket})`);
     }
 
-    if (envData.storage.backend === 's3' && !StorageService.s3Backend) {
+    if (envData.storage.backend === 's3' && !storageBackends.s3Backend) {
       throw new ImmichStartupError('IMMICH_STORAGE_BACKEND is set to s3 but IMMICH_S3_BUCKET is not configured');
     }
 

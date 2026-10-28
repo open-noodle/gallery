@@ -759,6 +759,7 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
   [SystemMetadataKey.PersonSuggestionScanJobCleanupState]: { cleanedAt?: string };
   [SystemMetadataKey.ReverseGeocodingState]: { lastUpdate?: string; lastImportFileName?: string };
   [SystemMetadataKey.SharedSpaceFaceJobCleanupState]: { cleanedAt?: string };
+  [SystemMetadataKey.StorageTemplateS3State]: { pending: boolean; decidedAt: string; clearedAt?: string };
   [SystemMetadataKey.SystemConfig]: DeepPartial<SystemConfig>;
   [SystemMetadataKey.SystemFlags]: DeepPartial<SystemFlags>;
   [SystemMetadataKey.VersionCheckState]: VersionCheckMetadata;

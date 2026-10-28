@@ -8,9 +8,9 @@ import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { AuthDto, SignUpDto } from 'src/dtos/auth.dto.js';
 import { AuthType, JobName, Permission } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AuthService } from 'src/services/auth.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ApiKeyFactory } from 'test/factories/api-key.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { OAuthProfileFactory } from 'test/factories/oauth-profile.factory.js';
@@ -49,7 +49,7 @@ describe(AuthService.name, () => {
   let mocks: ServiceMocks;
 
   beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
+    (storageBackends as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
@@ -1142,13 +1142,13 @@ describe(AuthService.name, () => {
           put: vi.fn().mockResolvedValue(void 0),
           getServeStrategy: vi.fn(),
         };
-        (StorageService as any).s3Backend = mockS3Backend;
-        (StorageService as any).writeBackendType = 's3';
+        (storageBackends as any).s3Backend = mockS3Backend;
+        (storageBackends as any).writeBackendType = 's3';
       });
 
       afterEach(() => {
-        (StorageService as any).s3Backend = void 0;
-        (StorageService as any).writeBackendType = 'disk';
+        (storageBackends as any).s3Backend = void 0;
+        (storageBackends as any).writeBackendType = 'disk';
       });
 
       it('should upload OAuth profile picture to S3 and store relative path', async () => {

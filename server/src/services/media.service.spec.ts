@@ -1,5 +1,6 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { OutputInfo } from 'sharp';
+import { Mock } from 'vitest';
 import type { AudioStreamInfo, JobCounts, RawImageInfo, VideoFormat, VideoStreamInfo } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { Exif } from 'src/database.js';
@@ -22,6 +23,7 @@ import {
   TranscodePolicy,
   VideoCodec,
 } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { MediaService } from 'src/services/media.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -36,6 +38,10 @@ import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 const fullsizeBuffer = Buffer.from('embedded image data');
 const rawBuffer = Buffer.from('raw image data');
 const extractedBuffer = Buffer.from('embedded image file');
+
+/** StorageCore.getImagePath with the media location stripped: where a derivative lives as an S3 key */
+const expectedKey = (asset: { id: string; ownerId: string }, name: string) =>
+  `thumbs/${asset.ownerId}/${asset.id.slice(0, 2)}/${asset.id.slice(2, 4)}/${asset.id}_${name}`;
 
 describe(MediaService.name, () => {
   let sut: MediaService;
@@ -73,7 +79,7 @@ describe(MediaService.name, () => {
     });
 
     it('returns the local path and deletes nothing (disk mode)', async () => {
-      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
+      // storageBackends.diskBackend is undefined in this spec file, so getWriteBackend()
       // returns undefined and persistFile takes its disk branch.
       const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
 
@@ -363,21 +369,80 @@ describe(MediaService.name, () => {
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
     });
 
-    it('should leave the files of an S3 asset where they are', async () => {
-      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
-        .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
-        .build();
-      for (const file of asset.files) {
-        file.path = `thumbs/user/ab/cd/${file.type}.jpeg`;
-      }
-      mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
+    describe('with S3 files', () => {
+      let s3Backend: { exists: Mock; copy: Mock; stat: Mock; delete: Mock };
+      let previousS3Backend: unknown;
 
-      await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Success);
+      beforeEach(() => {
+        previousS3Backend = (storageBackends as any).s3Backend;
+        s3Backend = {
+          exists: vi.fn().mockResolvedValue(true),
+          copy: vi.fn().mockResolvedValue(void 0),
+          stat: vi.fn().mockResolvedValue({ size: 1024 }),
+          delete: vi.fn().mockResolvedValue(void 0),
+        };
+        (storageBackends as any).s3Backend = s3Backend;
+        mocks.move.create.mockImplementation((move) => Promise.resolve({ id: `move-${move.pathType}`, ...move }));
+      });
 
-      expect(mocks.move.create).not.toHaveBeenCalled();
-      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
-      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+      afterEach(() => {
+        (storageBackends as any).s3Backend = previousS3Backend;
+      });
+
+      it('should move the files of an S3 asset within S3 to their expected keys', async () => {
+        const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
+          .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
+          .build();
+        for (const file of asset.files) {
+          file.path = `thumbs/user/ab/cd/${file.type}.jpeg`;
+        }
+        mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
+
+        await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        const moves = [
+          [AssetFileType.FullSize, expectedKey(asset, 'fullsize.jpeg')],
+          [AssetFileType.Preview, expectedKey(asset, 'preview.jpeg')],
+          [AssetFileType.Thumbnail, expectedKey(asset, 'thumbnail.webp')],
+        ] as const;
+        for (const [type, newPath] of moves) {
+          const oldPath = `thumbs/user/ab/cd/${type}.jpeg`;
+          expect(mocks.move.create).toHaveBeenCalledWith({ entityId: asset.id, pathType: type, oldPath, newPath });
+          expect(s3Backend.copy).toHaveBeenCalledWith(oldPath, newPath);
+          expect(mocks.asset.upsertFile).toHaveBeenCalledWith({ assetId: asset.id, type, path: newPath });
+          expect(s3Backend.delete).toHaveBeenCalledWith(oldPath);
+          expect(mocks.move.delete).toHaveBeenCalledWith(`move-${type}`);
+        }
+        expect(s3Backend.copy).toHaveBeenCalledTimes(3);
+        expect(s3Backend.delete).toHaveBeenCalledTimes(3);
+        expect(mocks.storage.mkdirSync).not.toHaveBeenCalled();
+        expect(mocks.storage.rename).not.toHaveBeenCalled();
+        expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+      });
+
+      it('should make no S3 calls for files already at their expected keys', async () => {
+        const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
+          .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
+          .build();
+        const names = {
+          [AssetFileType.FullSize]: 'fullsize.jpeg',
+          [AssetFileType.Preview]: 'preview.jpeg',
+          [AssetFileType.Thumbnail]: 'thumbnail.webp',
+        } as Record<AssetFileType, string>;
+        for (const file of asset.files) {
+          file.path = expectedKey(asset, names[file.type]);
+        }
+        mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
+
+        await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+        expect(mocks.move.create).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertFile).not.toHaveBeenCalled();
+        for (const call of Object.values(s3Backend)) {
+          expect(call).not.toHaveBeenCalled();
+        }
+      });
     });
 
     it('should move asset files', async () => {
@@ -2073,7 +2138,7 @@ describe(MediaService.name, () => {
       });
 
       it('keeps disk-mode trim paths absolute and uploads nothing (regression guard)', async () => {
-        // No getWriteBackend spy: StorageService.diskBackend is undefined in this spec file,
+        // No getWriteBackend spy: storageBackends.diskBackend is undefined in this spec file,
         // so persistFile takes its disk branch. Nothing here may become a relative key.
         const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
