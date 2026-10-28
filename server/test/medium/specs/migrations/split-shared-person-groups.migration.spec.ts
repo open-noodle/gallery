@@ -3,9 +3,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { PersonUserRole } from 'src/dtos/person.dto.js';
+import { JobStatus } from 'src/enum.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import * as splitMigration from 'src/schema/migrations-gallery/1790900000000-SplitSharedPersonGroups.js';
-import { SyncTestContext } from 'test/medium.factory.js';
+import { PersonService } from 'src/services/person.service.js';
+import { SyncTestContext, newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 // Seeds the multi-owner person groups an Immich 3.3 database can hold, through upstream's own paths:
@@ -127,16 +133,25 @@ describe('1790900000000-SplitSharedPersonGroups', () => {
     expect(aliceShared.person).toMatchObject({ name: '' });
     await expect(groupOf(carol.id, soloFace)).resolves.toMatchObject({ personGroupId: soloGroup });
 
-    // Split groups stay in the cluster; shares are held aside; sync is told about each move.
+    // Carol's copy of the shared person has no face on her photos: it is parked whole, not moved to an empty
+    // group that the nightly PersonCleanup would delete.
     const splits = await db.selectFrom('person_group_split').selectAll().execute();
     expect(splits.map(({ originalGroupId, ownerId }) => ({ originalGroupId, ownerId }))).toEqual(
       expect.arrayContaining([
         { originalGroupId: group, ownerId: bob.id },
         { originalGroupId: sharedGroup, ownerId: alice.id },
-        { originalGroupId: sharedGroup, ownerId: carol.id },
       ]),
     );
-    expect(splits).toHaveLength(3);
+    expect(splits).toHaveLength(2);
+    const carolBefore = before.person.find(
+      ({ ownerId, personGroupId }) => ownerId === carol.id && personGroupId === sharedGroup,
+    )!;
+    await expect(db.selectFrom('person_group_split_person').selectAll().execute()).resolves.toEqual([
+      expect.objectContaining({ ownerId: carol.id, personGroupId: sharedGroup, name: carolBefore.name }),
+    ]);
+    await expect(
+      db.selectFrom('person').select('ownerId').where('ownerId', '=', carol.id).where('personGroupId', '=', sharedGroup).execute(),
+    ).resolves.toEqual([]);
     const clusterGroups = await db
       .selectFrom('person_group')
       .select('clusterGroupId')
@@ -156,7 +171,8 @@ describe('1790900000000-SplitSharedPersonGroups', () => {
 
     // Idempotent: nothing is left to split.
     await splitMigration.up(db);
-    await expect(db.selectFrom('person_group_split').selectAll().execute()).resolves.toHaveLength(3);
+    await expect(db.selectFrom('person_group_split').selectAll().execute()).resolves.toHaveLength(2);
+    await expect(db.selectFrom('person_group_split_person').selectAll().execute()).resolves.toHaveLength(1);
 
     await splitMigration.down(db);
 
@@ -164,6 +180,28 @@ describe('1790900000000-SplitSharedPersonGroups', () => {
     await expect(sql`SELECT to_regclass('person_group_split') AS t`.execute(db)).resolves.toMatchObject({
       rows: [{ t: null }],
     });
+  });
+
+  it("survives Gallery's nightly PersonCleanup, and down() still restores everything", async () => {
+    await seed();
+    const before = await snapshot();
+    await splitMigration.up(db);
+
+    // The nightly job deletes people with no visible face; nothing the split leaves behind may qualify.
+    const { sut } = newMediumService(PersonService, {
+      database: db,
+      real: [PersonRepository, SharedSpaceRepository],
+      mock: [JobRepository, LoggingRepository],
+    });
+    const people = await db.selectFrom('person').select(['ownerId', 'personGroupId']).execute();
+    await expect(sut.handlePersonCleanup()).resolves.toBe(JobStatus.Success);
+    await expect(db.selectFrom('person').select(['ownerId', 'personGroupId']).execute()).resolves.toEqual(
+      expect.arrayContaining(people),
+    );
+    await expect(db.selectFrom('person').select('ownerId').execute()).resolves.toHaveLength(people.length);
+
+    await splitMigration.down(db);
+    await expect(snapshot()).resolves.toEqual(before);
   });
 
   it('leaves a person deleted while on Gallery deleted, and drops the shares that named it', async () => {

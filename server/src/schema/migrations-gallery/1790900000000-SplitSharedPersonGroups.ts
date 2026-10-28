@@ -18,7 +18,33 @@ const split = [
   SELECT "personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt", "updateId" FROM "person_user"
   ON CONFLICT DO NOTHING`,
   `DELETE FROM "person_user"`,
-  // The oldest row keeps the group. A move is an UPDATE, so person_audit gets the delete sync would miss.
+  // The group is kept by its oldest row with a visible face on its owner's photos (else its oldest row). Every
+  // other row without one is parked.
+  `INSERT INTO "person_group_split_person" ("ownerId", "personGroupId", "createdAt", "name", "thumbnailPath", "isHidden", "birthDate", "faceAssetId", "isFavorite", "color")
+  SELECT "person"."ownerId", "person"."personGroupId", "person"."createdAt", "person"."name", "person"."thumbnailPath", "person"."isHidden", "person"."birthDate", "person"."faceAssetId", "person"."isFavorite", "person"."color"
+  FROM "person"
+  INNER JOIN (
+    SELECT "own"."ownerId", "own"."personGroupId", "own"."hasFaces",
+      row_number() OVER (PARTITION BY "own"."personGroupId" ORDER BY "own"."hasFaces" DESC, "own"."createdAt", "own"."ownerId") AS "rank"
+    FROM (
+      SELECT "candidate"."ownerId", "candidate"."personGroupId", "candidate"."createdAt",
+        EXISTS (
+          SELECT FROM "asset_face" INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
+          WHERE "asset_face"."personGroupId" = "candidate"."personGroupId" AND "asset"."ownerId" = "candidate"."ownerId"
+            AND "asset_face"."deletedAt" IS NULL AND ("asset_face"."isVisible" IS NULL OR "asset_face"."isVisible")
+        ) AS "hasFaces"
+      FROM "person" AS "candidate"
+      WHERE "candidate"."personGroupId" IN (SELECT "personGroupId" FROM "person" GROUP BY "personGroupId" HAVING count(*) > 1)
+    ) AS "own"
+  ) AS "ranked" ON "ranked"."ownerId" = "person"."ownerId" AND "ranked"."personGroupId" = "person"."personGroupId"
+  WHERE "ranked"."rank" > 1 AND NOT "ranked"."hasFaces"
+  ON CONFLICT DO NOTHING`,
+  // person_delete_audit records each parked row, so synced clients drop it.
+  `DELETE FROM "person"
+  USING "person_group_split_person" AS "parked"
+  WHERE "person"."ownerId" = "parked"."ownerId" AND "person"."personGroupId" = "parked"."personGroupId"`,
+  // What is left in a shared group is its keeper, the oldest, and rows with faces of their own. Each of those
+  // moves to a group of its own. A move is an UPDATE, so person_audit gets the delete sync would miss.
   `WITH "moved" AS MATERIALIZED (
     SELECT "ranked"."ownerId", "ranked"."personGroupId" AS "originalGroupId", uuid_generate_v4() AS "splitGroupId"
     FROM (
@@ -80,6 +106,13 @@ const rejoin = [
   WHERE "person_group"."id" = "person_group_split"."splitGroupId"
     AND NOT EXISTS (SELECT FROM "person" WHERE "person"."personGroupId" = "person_group"."id")
     AND NOT EXISTS (SELECT FROM "asset_face" WHERE "asset_face"."personGroupId" = "person_group"."id")`,
+  // Parked rows come back with a fresh updatedAt/updateId, so synced clients fetch them again. A group deleted on
+  // Gallery took its parked rows along (FK); a feature face deleted since is dropped.
+  `INSERT INTO "person" ("ownerId", "personGroupId", "createdAt", "name", "thumbnailPath", "isHidden", "birthDate", "faceAssetId", "isFavorite", "color")
+  SELECT "parked"."ownerId", "parked"."personGroupId", "parked"."createdAt", "parked"."name", "parked"."thumbnailPath", "parked"."isHidden", "parked"."birthDate",
+    (SELECT "asset_face"."id" FROM "asset_face" WHERE "asset_face"."id" = "parked"."faceAssetId"), "parked"."isFavorite", "parked"."color"
+  FROM "person_group_split_person" AS "parked"
+  ON CONFLICT DO NOTHING`,
   // The insert trigger would refill a recipient's empty name from the sharer; the rows go back as they were.
   `ALTER TABLE "person_user" DISABLE TRIGGER "person_user_after_insert"`,
   `INSERT INTO "person_user" ("personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt", "updateId")
@@ -94,6 +127,7 @@ const rejoin = [
   ON CONFLICT DO NOTHING`,
   `ALTER TABLE "person_user" ENABLE TRIGGER "person_user_after_insert"`,
   `DELETE FROM "person_group_split_share"`,
+  `DELETE FROM "person_group_split_person"`,
   `DELETE FROM "person_group_split"`,
 ];
 
@@ -141,6 +175,29 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS "person_group_split_share_sharedWithId_idx" ON "person_group_split_share" ("sharedWithId");`.execute(
     db,
   );
+  await sql`
+    CREATE TABLE IF NOT EXISTS "person_group_split_person" (
+      "ownerId" uuid NOT NULL,
+      "personGroupId" uuid NOT NULL,
+      "createdAt" timestamp with time zone NOT NULL,
+      "name" character varying NOT NULL,
+      "thumbnailPath" character varying NOT NULL,
+      "isHidden" boolean NOT NULL,
+      "birthDate" date,
+      "faceAssetId" uuid,
+      "isFavorite" boolean NOT NULL,
+      "color" character varying,
+      CONSTRAINT "person_group_split_person_pkey" PRIMARY KEY ("ownerId", "personGroupId"),
+      CONSTRAINT "person_group_split_person_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+      CONSTRAINT "person_group_split_person_personGroupId_fkey" FOREIGN KEY ("personGroupId") REFERENCES "person_group" ("id") ON UPDATE CASCADE ON DELETE CASCADE
+    );
+  `.execute(db);
+  await sql`CREATE INDEX IF NOT EXISTS "person_group_split_person_ownerId_idx" ON "person_group_split_person" ("ownerId");`.execute(
+    db,
+  );
+  await sql`CREATE INDEX IF NOT EXISTS "person_group_split_person_personGroupId_idx" ON "person_group_split_person" ("personGroupId");`.execute(
+    db,
+  );
   await run(db, split);
 }
 
@@ -150,7 +207,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 export async function down(db: Kysely<any>): Promise<void> {
   const { rows } = await sql<{ indexed: boolean; split: boolean }>`
     SELECT to_regclass('"person_personGroupId_key"') IS NOT NULL AS "indexed",
-           EXISTS (SELECT FROM "person_group_split") AS "split"
+           EXISTS (SELECT FROM "person_group_split") OR EXISTS (SELECT FROM "person_group_split_person") AS "split"
   `.execute(db);
   if (rows[0].indexed && rows[0].split) {
     throw new Error(
@@ -160,6 +217,7 @@ export async function down(db: Kysely<any>): Promise<void> {
     );
   }
   await run(db, rejoin);
+  await sql`DROP TABLE "person_group_split_person";`.execute(db);
   await sql`DROP TABLE "person_group_split_share";`.execute(db);
   await sql`DROP TABLE "person_group_split";`.execute(db);
 }

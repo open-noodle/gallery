@@ -65,6 +65,7 @@
         "face_repair_decline_personGroupId_fkey",
         "face_repair_decline_suspectedOwnerId_fkey",
         "person_group_split_originalGroupId_fkey",
+        "person_group_split_person_personGroupId_fkey",
         "person_group_split_splitGroupId_fkey",
         "person_identity_personGroupId_fkey",
         "person_pet_personGroupId_fkey"
@@ -94,6 +95,7 @@
         "face_repair_scan_requestedBy_fkey",
         "library_user_userId_fkey",
         "person_group_split_ownerId_fkey",
+        "person_group_split_person_ownerId_fkey",
         "person_group_split_share_sharedById_fkey",
         "person_group_split_share_sharedWithId_fkey",
         "person_identity_ownerId_fkey",

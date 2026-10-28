@@ -7,6 +7,11 @@ import { Kysely, sql } from 'kysely';
 // records each move and person_group_split_share holds the person_user rows, so the rejoin restores
 // the upstream tables as Immich left them. See specs/2026-10-28-shared-person-groups-split-design.md.
 //
+// A row with no visible face on its owner's photos (a person shared with the user, whose faces are the
+// sharer's) would land in a group of its own with nothing in it, and Gallery's nightly PersonCleanup deletes
+// people without faces, taking the record of the move with it. Such rows are parked whole in
+// person_group_split_person instead, and the group is kept by a row that has faces of its own.
+//
 // The statements are plain SQL because scripts/revert-to-immich.sql runs the rejoin too;
 // src/schema/revert-to-immich.spec.ts checks the script carries the same text.
 
@@ -17,7 +22,33 @@ export const personGroupSplitStatements = [
   SELECT "personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt", "updateId" FROM "person_user"
   ON CONFLICT DO NOTHING`,
   `DELETE FROM "person_user"`,
-  // The oldest row keeps the group. A move is an UPDATE, so person_audit gets the delete sync would miss.
+  // The group is kept by its oldest row with a visible face on its owner's photos (else its oldest row). Every
+  // other row without one is parked.
+  `INSERT INTO "person_group_split_person" ("ownerId", "personGroupId", "createdAt", "name", "thumbnailPath", "isHidden", "birthDate", "faceAssetId", "isFavorite", "color")
+  SELECT "person"."ownerId", "person"."personGroupId", "person"."createdAt", "person"."name", "person"."thumbnailPath", "person"."isHidden", "person"."birthDate", "person"."faceAssetId", "person"."isFavorite", "person"."color"
+  FROM "person"
+  INNER JOIN (
+    SELECT "own"."ownerId", "own"."personGroupId", "own"."hasFaces",
+      row_number() OVER (PARTITION BY "own"."personGroupId" ORDER BY "own"."hasFaces" DESC, "own"."createdAt", "own"."ownerId") AS "rank"
+    FROM (
+      SELECT "candidate"."ownerId", "candidate"."personGroupId", "candidate"."createdAt",
+        EXISTS (
+          SELECT FROM "asset_face" INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
+          WHERE "asset_face"."personGroupId" = "candidate"."personGroupId" AND "asset"."ownerId" = "candidate"."ownerId"
+            AND "asset_face"."deletedAt" IS NULL AND ("asset_face"."isVisible" IS NULL OR "asset_face"."isVisible")
+        ) AS "hasFaces"
+      FROM "person" AS "candidate"
+      WHERE "candidate"."personGroupId" IN (SELECT "personGroupId" FROM "person" GROUP BY "personGroupId" HAVING count(*) > 1)
+    ) AS "own"
+  ) AS "ranked" ON "ranked"."ownerId" = "person"."ownerId" AND "ranked"."personGroupId" = "person"."personGroupId"
+  WHERE "ranked"."rank" > 1 AND NOT "ranked"."hasFaces"
+  ON CONFLICT DO NOTHING`,
+  // person_delete_audit records each parked row, so synced clients drop it.
+  `DELETE FROM "person"
+  USING "person_group_split_person" AS "parked"
+  WHERE "person"."ownerId" = "parked"."ownerId" AND "person"."personGroupId" = "parked"."personGroupId"`,
+  // What is left in a shared group is its keeper, the oldest, and rows with faces of their own. Each of those
+  // moves to a group of its own. A move is an UPDATE, so person_audit gets the delete sync would miss.
   `WITH "moved" AS MATERIALIZED (
     SELECT "ranked"."ownerId", "ranked"."personGroupId" AS "originalGroupId", uuid_generate_v4() AS "splitGroupId"
     FROM (
@@ -87,6 +118,13 @@ export const personGroupRejoinStatements = [
   WHERE "person_group"."id" = "person_group_split"."splitGroupId"
     AND NOT EXISTS (SELECT FROM "person" WHERE "person"."personGroupId" = "person_group"."id")
     AND NOT EXISTS (SELECT FROM "asset_face" WHERE "asset_face"."personGroupId" = "person_group"."id")`,
+  // Parked rows come back with a fresh updatedAt/updateId, so synced clients fetch them again. A group deleted on
+  // Gallery took its parked rows along (FK); a feature face deleted since is dropped.
+  `INSERT INTO "person" ("ownerId", "personGroupId", "createdAt", "name", "thumbnailPath", "isHidden", "birthDate", "faceAssetId", "isFavorite", "color")
+  SELECT "parked"."ownerId", "parked"."personGroupId", "parked"."createdAt", "parked"."name", "parked"."thumbnailPath", "parked"."isHidden", "parked"."birthDate",
+    (SELECT "asset_face"."id" FROM "asset_face" WHERE "asset_face"."id" = "parked"."faceAssetId"), "parked"."isFavorite", "parked"."color"
+  FROM "person_group_split_person" AS "parked"
+  ON CONFLICT DO NOTHING`,
   // The insert trigger would refill a recipient's empty name from the sharer; the rows go back as they were.
   `ALTER TABLE "person_user" DISABLE TRIGGER "person_user_after_insert"`,
   `INSERT INTO "person_user" ("personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt", "updateId")
@@ -101,6 +139,7 @@ export const personGroupRejoinStatements = [
   ON CONFLICT DO NOTHING`,
   `ALTER TABLE "person_user" ENABLE TRIGGER "person_user_after_insert"`,
   `DELETE FROM "person_group_split_share"`,
+  `DELETE FROM "person_group_split_person"`,
   `DELETE FROM "person_group_split"`,
 ];
 

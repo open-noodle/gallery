@@ -112,10 +112,16 @@ person_group_split_share (                    -- verbatim copy of person_user
   PK (personGroupId, sharedById, sharedWithId)
   FK sharedById, sharedWithId -> user(id) ON DELETE CASCADE
 )
+
+person_group_split_person (                   -- parked person rows, verbatim minus updatedAt/updateId
+  ownerId, personGroupId, createdAt, name, thumbnailPath, isHidden, birthDate, faceAssetId, isFavorite, color
+  PK (ownerId, personGroupId)
+  FK ownerId -> user(id), personGroupId -> person_group(id), ON DELETE CASCADE
+)
 ```
 
 `person_group_split_share` has no FK onto `person`: it holds shares whose recipient row now lives in another group.
-The five FKs onto upstream keys are listed in `server/src/schema/gallery-upstream-fks.json`.
+The seven FKs onto upstream keys are listed in `server/src/schema/gallery-upstream-fks.json`.
 
 ### Migration `1790900000000-SplitSharedPersonGroups`
 
@@ -125,14 +131,21 @@ run in one pass: a switch from Immich, where every fork migration runs after the
 `1791000000000`, it runs last and finds nothing to split because of the unique index.
 
 `up()` is idempotent (`CREATE TABLE IF NOT EXISTS`, and it only acts on groups that still hold several rows), for the
-downgrade path below. Three statements:
+downgrade path below. Five statements:
 
 1. **Snapshot every `person_user` row** into `person_group_split_share` and empty `person_user`. Every share sits in
    a multi-row group (the trigger guarantees a recipient row). Emptying it means no `ON UPDATE CASCADE` fires in
    step 3, and it matches Gallery, where sharing is dormant and nothing writes or syncs `person_user`.
-2. (Same statement as 3.) **Keep the oldest row** per group (`person.createdAt`, ties by `ownerId`), in practice the
-   row of the user whose face created the group.
-3. **Split every other row**, in one statement:
+2. **Pick the keeper** of each shared group: its oldest row with a visible face on its owner's photos (else its
+   oldest row), in practice the row of the user whose face created the group. **Park every other row without such a
+   face**: copy it into `person_group_split_person` and delete it from `person` (`person_delete_audit` records the
+   delete for sync). These are mostly people shared with a user, whose faces are the sharer's. Moved like the
+   others, they would sit alone in an empty group, and Gallery's nightly `PersonCleanup` deletes every person whose
+   group has no visible face: the clone run below lost all 50 share copies, plus 279 keepers emptied by the split,
+   whose deleted groups took the move records of everyone split from them. Parked, they are out of the cleanup's
+   reach, and Gallery would only ever have shown them as empty people. Their own hidden faces stay in the original
+   group.
+3. **Split every other row with faces of its own**, in one statement:
    - insert a `person_group` with a new id and the same `clusterGroupId`;
    - repoint the `person` row (an UPDATE, so all per-user state stays);
    - move the faces in the old group whose `asset.ownerId` is that owner, as `reassignCluster` does;
@@ -163,11 +176,13 @@ and `user.clusterGroupId` are untouched. Gallery's recognition is owner-scoped a
    back to the original group. That includes faces merged in on Gallery, which follow the person. Write
    `person_audit (<split group>, owner)`.
 2. Delete each split group left with no person and no faces (`person_group_delete_audit` records it).
-3. Restore the shares with `person_user_after_insert` disabled. Otherwise its `ON CONFLICT DO UPDATE` refills a
+3. Put the parked rows back, with a fresh `updatedAt`/`updateId` so synced clients fetch them again. A feature face
+   deleted since is dropped; a group deleted on Gallery took its parked rows along.
+4. Restore the shares with `person_user_after_insert` disabled. Otherwise its `ON CONFLICT DO UPDATE` refills a
    recipient's emptied name from the sharer and the round trip is not exact; the medium test fails without it.
    A share is skipped unless both its sharer's and its recipient's rows are in its group: the FK forbids the first,
    and upstream's delete trigger would have pruned the second.
-4. Empty both split tables.
+5. Empty the three split tables.
 
 A person deleted or merged away on Gallery stays that way. Its faces stay in its split group.
 
@@ -208,6 +223,16 @@ must be done from a build that has the rejoin.
 On every other Gallery database the pre-step was applied last and is undone first: an empty rejoin, then the tables
 are dropped. The guide now also says to check every listed name, not only the newest, since the command undoes the
 most recently applied migration.
+
+### Gallery's nightly jobs on a split database
+
+`PersonCleanup` deletes every person whose group has no visible face, then every group left without people. After
+the split, no moved row and no parked row can qualify, so the only groups that go are those with no visible face at
+all. Immich's own `PersonCleanup` counts faces per group and deletes exactly those groups too. So a switched instance
+that runs any number of nights on Gallery and is then reverted ends where Immich would have after the same nights;
+the medium switch test asserts that equality. The other nightly people jobs (recognition, identity backfill and
+reconciliation, face suggestions, Space person metadata) ran on the clone with no cross-user face assignment and no
+change to the split.
 
 ### What users notice while on Gallery
 
@@ -296,6 +321,32 @@ the cross-user grouping is gone in Immich too, until they rejoin and run `regene
 
 **Scale, measured:** 5,000 multi-owner groups, 11,666 people, 180,000 faces and 6,666 moves split in 1.1 s and rejoin in
 1.2 s on a local Postgres.
+
+**On a clone of a real library** (2,464 people, 61,290 faces, 70,165 photos), 2026-10-28:
+
+- the RC booted on the unchanged database and the migration was a no-op;
+- the clone was turned into an Immich 3.3 cluster: a second user owns half the photos, 2,095 groups hold rows for
+  both users, plus 50 shares;
+- the real migration split it in about 1 s, and all 2,095 moved people read back correctly through the API;
+- the `down()` guard refused with the index present, and both the revert CLI and the revert script's block restored
+  the seeded digest byte for byte;
+- the first version lost 329 people to one night of `PersonCleanup` (above), which led to parking.
+
+People-page timings on that clone (median of 7, through the tailnet; a bare ping is 62 ms):
+
+| Request                                    | Before (library as is) | After the switch, settled        |
+| ------------------------------------------ | ---------------------- | -------------------------------- |
+| People page, first 150                     | 683 ms                 | 741 ms (user 1), 708 ms (user 2) |
+| People page, scrolling all pages           | 9.2 s, 13 pages        | 10.4 s, 14 pages                 |
+| People face statistics                     | 525 ms                 | 581 ms                           |
+| Explore people                             | 892 ms                 | 902 ms                           |
+| Global search people                       | 481 ms                 | 576 ms                           |
+| Person page (detail, statistics, timeline) | 84–126 ms              | 79–106 ms                        |
+
+The list requests grow with the number of people on the instance (2,464 before, 4,559 after), not with the split
+itself: they read Spaces and identities across both users. The split leaves the same shape a native two-user
+Gallery has. Until the identity backfill and the Space recount finish (minutes after the first boot; longer when
+Spaces are big), the lists are slower and can shift between pages.
 
 ## Open questions
 

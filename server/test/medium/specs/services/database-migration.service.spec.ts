@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { serverVersion } from 'src/constants.js';
+import { JobStatus } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -12,6 +13,7 @@ import { FaceIdentityRepository } from 'src/repositories/face-identity.repositor
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
@@ -610,43 +612,68 @@ const immichState = async (db: Kysely<any>) => {
 
 const key = (person: Record<string, any>) => `${person.ownerId}/${person.personGroupId}`;
 
-// Checks the split state against what Immich had, row by row.
-// Returns how many rows moved.
+// What the split must do with each shared group: the keeper is its oldest row with a visible face on the owner's
+// photos (else its oldest row); every other row with such a face moves to a group of its own, and the rest are
+// parked whole, since Gallery's PersonCleanup would delete a person left with no face.
+const splitPlan = async (db: Kysely<any>, before: Awaited<ReturnType<typeof immichState>>) => {
+  const assets = await db.selectFrom('asset').select(['id', 'ownerId']).execute();
+  const assetOwner = new Map(assets.map(({ id, ownerId }) => [id, ownerId as string]));
+  const withFaces = new Set(
+    before.faces
+      .filter((face) => face.deletedAt === null && face.isVisible !== false)
+      .map((face) => `${assetOwner.get(face.assetId)}/${face.personGroupId}`),
+  );
+  const rowsBefore = Map.groupBy(before.person, (person) => person.personGroupId);
+  const moves: (typeof before.person)[number][] = [];
+  const parked: (typeof before.person)[number][] = [];
+  for (const rows of rowsBefore.values()) {
+    const ordered = rows.toSorted(
+      (a, b) =>
+        Number(withFaces.has(key(b))) - Number(withFaces.has(key(a))) ||
+        a.createdAt - b.createdAt ||
+        a.ownerId.localeCompare(b.ownerId),
+    );
+    for (const row of ordered.slice(1)) {
+      (withFaces.has(key(row)) ? moves : parked).push(row);
+    }
+  }
+  return { assetOwner, rowsBefore, moves, parked };
+};
+
+// Checks the split state against what Immich had, row by row. Returns how many rows left their group.
 const expectSplit = async (db: Kysely<any>, before: Awaited<ReturnType<typeof immichState>>) => {
   const after = await immichState(db);
   const splits = await db.selectFrom('person_group_split').selectAll().execute();
+  const parkedRows = await db.selectFrom('person_group_split_person').selectAll().execute();
   const originalOf = (groupId: string) =>
     splits.find((split) => split.splitGroupId === groupId)?.originalGroupId ?? groupId;
+  const { assetOwner, rowsBefore, moves, parked } = await splitPlan(db, before);
 
   // One row per group, so Gallery's index holds.
   await expect(
     sql`SELECT "personGroupId" FROM "person" GROUP BY 1 HAVING count(*) > 1`.execute(db),
   ).resolves.toMatchObject({ rows: [] });
 
-  // Every person survives, with all of its own state, in a group that traces back to its original one.
-  expect(after.person).toHaveLength(before.person.length);
+  // Every person survives with all of its own state: in a group that traces back to its original one, or parked.
+  expect(after.person.length + parkedRows.length).toBe(before.person.length);
   const original = new Map(before.person.map((person) => [key(person), person]));
   for (const person of after.person) {
     const from = original.get(key({ ownerId: person.ownerId, personGroupId: originalOf(person.personGroupId) }));
     expect(from, key(person)).toBeDefined();
     expect({ ...person, personGroupId: from!.personGroupId }).toEqual(from);
   }
+  for (const row of parkedRows) {
+    expect(row, key(row)).toEqual(original.get(key(row)));
+  }
 
-  // The oldest row keeps the group; every other row is recorded once.
-  const rowsBefore = Map.groupBy(before.person, (person) => person.personGroupId);
-  const expectedMoves = rowsBefore
-    .values()
-    .flatMap((rows) =>
-      rows.toSorted((a, b) => a.createdAt - b.createdAt || a.ownerId.localeCompare(b.ownerId)).slice(1),
-    )
-    .toArray();
+  // The keeper stays; rows with faces of their own move, the others are parked; each is recorded once.
   expect(splits.map(({ ownerId, originalGroupId }) => `${ownerId}/${originalGroupId}`).toSorted()).toEqual(
-    expectedMoves.map((person) => key(person)).toSorted(),
+    moves.map((person) => key(person)).toSorted(),
   );
+  expect(parkedRows.map((row) => key(row)).toSorted()).toEqual(parked.map((person) => key(person)).toSorted());
 
-  // Every face keeps its group lineage, and sits with its asset owner's row when that owner had one.
-  const assets = await db.selectFrom('asset').select(['id', 'ownerId']).execute();
-  const assetOwner = new Map(assets.map(({ id, ownerId }) => [id, ownerId]));
+  // Every face keeps its group lineage, and sits with its asset owner's row when that row moved or stayed.
+  const parkedKeys = new Set(parked.map((person) => key(person)));
   const facesBefore = new Map(before.faces.map((face) => [face.id, face]));
   expect(after.faces).toHaveLength(before.faces.length);
   for (const face of after.faces) {
@@ -658,9 +685,10 @@ const expectSplit = async (db: Kysely<any>, before: Awaited<ReturnType<typeof im
     }
     expect(originalOf(face.personGroupId)).toBe(from.personGroupId);
     const owner = assetOwner.get(face.assetId)!;
+    const ownerRow = `${owner}/${from.personGroupId}`;
     const ownerHadRow = rowsBefore.get(from.personGroupId)!.some((person) => person.ownerId === owner);
-    const holder = after.person.find((person) => person.personGroupId === face.personGroupId);
-    if (ownerHadRow) {
+    if (ownerHadRow && !parkedKeys.has(ownerRow)) {
+      const holder = after.person.find((person) => person.personGroupId === face.personGroupId);
       expect(holder?.ownerId, face.id).toBe(owner);
     } else {
       expect(face.personGroupId, face.id).toBe(from.personGroupId);
@@ -686,11 +714,11 @@ const expectSplit = async (db: Kysely<any>, before: Awaited<ReturnType<typeof im
       .execute(),
   ).resolves.toEqual(before.shares);
 
-  // Phones are told to drop each moved row. The table keeps earlier rows (a revert adds its own), so check
-  // that every move has one, and that nothing but moves was audited.
+  // Phones are told to drop each row that left its group. The table keeps earlier rows (a revert adds its own),
+  // so check that every move and parked row has one, and that no row still in its group was audited.
   const auditRows = await db.selectFrom('person_audit').select(['personGroupId', 'ownerId']).execute();
   const audit = new Set(auditRows.map((row) => key(row)));
-  const missing = expectedMoves.map((person) => key(person)).filter((entry) => !audit.has(entry));
+  const missing = [...moves, ...parked].map((person) => key(person)).filter((entry) => !audit.has(entry));
   expect(missing).toEqual([]);
   const keptRows = after.person.filter((person) =>
     splits.every((split) => split.splitGroupId !== person.personGroupId),
@@ -698,7 +726,40 @@ const expectSplit = async (db: Kysely<any>, before: Awaited<ReturnType<typeof im
   const auditedKept = keptRows.filter((person) => audit.has(key(person)));
   expect(auditedKept.map((person) => key(person))).toEqual([]);
 
-  return expectedMoves.length;
+  return moves.length + parked.length;
+};
+
+// What Immich's own nightly PersonCleanup leaves: a group with no visible face loses its people and is deleted,
+// so its faces lose their group and its shares go. Gallery's cleanup on a split database must end the same way.
+const afterImmichCleanup = (before: Awaited<ReturnType<typeof immichState>>) => {
+  const faced = new Set(
+    before.faces
+      .filter((face) => face.deletedAt === null && face.isVisible !== false && face.personGroupId !== null)
+      .map((face) => face.personGroupId),
+  );
+  const gone = new Set(before.person.map((person) => person.personGroupId).filter((id) => !faced.has(id)));
+  return {
+    ...before,
+    person: before.person.filter((person) => !gone.has(person.personGroupId)),
+    faces: before.faces.map((face) =>
+      face.personGroupId !== null && gone.has(face.personGroupId) ? { ...face, personGroupId: null } : face,
+    ),
+    shares: before.shares.filter((share) => !gone.has(share.personGroupId)),
+    groups: before.groups.filter((group) => !gone.has(group.id)),
+  };
+};
+
+const runNightlyPersonCleanup = async (db: Kysely<any>) => {
+  clearConfigCache();
+  const { sut, ctx } = newMediumService(PersonService, {
+    database: db as Kysely<DB>,
+    real: [PersonRepository, SharedSpaceRepository],
+    mock: [JobRepository, LoggingRepository],
+  });
+  // Thumbnail deletes and the space metadata backfill it queues are not under test.
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  await expect(sut.handlePersonCleanup()).resolves.toBe(JobStatus.Success);
 };
 
 describe('Switching from Immich 3.3 with people shared between users', { timeout: 60_000 }, () => {
@@ -721,12 +782,15 @@ describe('Switching from Immich 3.3 with people shared between users', { timeout
       // Gallery's next boot has nothing left to do.
       await expect(bootGallery(db)).resolves.toBe(0);
 
+      // A night on Gallery: its PersonCleanup must not delete anything the revert needs.
+      await runNightlyPersonCleanup(db);
+
       // A trial boot of stock Immich on the Gallery database, which the switch-back guide allows: its migrator
       // finds only its own migrations, in order.
       await expect(bootStockImmich(db)).resolves.toEqual([]);
 
       await runRevertScript(db);
-      await expect(immichState(db)).resolves.toEqual(before);
+      await expect(immichState(db)).resolves.toEqual(afterImmichCleanup(before));
       await expect(
         sql`SELECT to_regclass('person_group_split') AS "split", to_regclass('gallery_migrations') AS "ledger"`.execute(
           db,
@@ -735,8 +799,9 @@ describe('Switching from Immich 3.3 with people shared between users', { timeout
       await expect(bootStockImmich(db)).resolves.toEqual([]);
 
       // And back to Gallery once more.
+      const reverted = await immichState(db);
       await bootGallery(db);
-      await expect(expectSplit(db, before)).resolves.toBeGreaterThan(100);
+      await expect(expectSplit(db, reverted)).resolves.toBeGreaterThan(100);
     }));
 
   it('round-trips the fixture the revert validation workflow seeds into stock Immich', () =>
@@ -750,9 +815,14 @@ describe('Switching from Immich 3.3 with people shared between users', { timeout
       await bootGallery(db);
       // 10 pooled groups with two or three owners, 5 shared groups with one recipient, one with a second.
       await expect(expectSplit(db, before)).resolves.toBe(15 + 6);
+      // The six people shared with a user have no face on that user's photos: they are parked, so the night
+      // keeps them. Only the fixture's faceless 'Solo' goes, as Immich's own cleanup would take it too.
+      await runNightlyPersonCleanup(db);
       await expect(bootStockImmich(db)).resolves.toEqual([]);
       await runRevertScript(db);
-      await expect(immichState(db)).resolves.toEqual(before);
+      const expected = afterImmichCleanup(before);
+      expect(before.person.length - expected.person.length).toBe(1);
+      await expect(immichState(db)).resolves.toEqual(expected);
     }));
 
   it('keeps working on Gallery after the switch, and the revert still restores Immich', () =>

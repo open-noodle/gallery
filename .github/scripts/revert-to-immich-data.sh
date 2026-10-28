@@ -107,10 +107,13 @@ shared_people_split_checks() {
   . "$SHARED_PEOPLE"
   check "$1" 'shared people: one row per group' \
     "$(psql_q "SELECT count(*) FROM (SELECT \"personGroupId\" FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS) GROUP BY 1 HAVING count(*) > 1) AS d")" 0
-  check "$1" 'shared people: every person kept' \
-    "$(psql_q "SELECT count(*) FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_ROWS"
-  check "$1" 'shared people: every move recorded' \
-    "$(psql_q "SELECT count(*) FROM person_group_split WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_MOVES"
+  # A row with no visible face on its owner's photos (a person shared with that user) is parked, not moved.
+  check "$1" 'shared people: every person kept or parked' \
+    "$(psql_q "SELECT (SELECT count(*) FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)) + (SELECT count(*) FROM person_group_split_person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS))")" "$SHARED_PEOPLE_ROWS"
+  check "$1" 'shared people: every move or parked row recorded' \
+    "$(psql_q "SELECT (SELECT count(*) FROM person_group_split WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)) + (SELECT count(*) FROM person_group_split_person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS))")" "$SHARED_PEOPLE_MOVES"
+  check "$1" 'shared people: shared copies parked' \
+    "$(psql_q "SELECT count(*) FROM person_group_split_person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_SHARES"
   check "$1" 'shared people: shares held aside' \
     "$(psql_q "SELECT count(*) FROM person_group_split_share WHERE \"sharedById\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_SHARES"
 }

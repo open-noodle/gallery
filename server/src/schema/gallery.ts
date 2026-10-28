@@ -16,6 +16,7 @@ import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
+import { PersonGroupSplitPersonTable } from 'src/schema/tables/person-group-split-person.table.js';
 import { PersonGroupSplitShareTable } from 'src/schema/tables/person-group-split-share.table.js';
 import { PersonGroupSplitTable } from 'src/schema/tables/person-group-split.table.js';
 import { PersonIdentityTable } from 'src/schema/tables/person-identity.table.js';
@@ -71,6 +72,7 @@ export const galleryTables = [
   FacePersonVerdictTable,
   PersonGroupSplitTable,
   PersonGroupSplitShareTable,
+  PersonGroupSplitPersonTable,
   PersonIdentityTable,
   PersonPetTable,
   PetSearchTable,
@@ -124,6 +126,7 @@ export interface GalleryDB {
   face_person_verdict: FacePersonVerdictTable;
   person_group_split: PersonGroupSplitTable;
   person_group_split_share: PersonGroupSplitShareTable;
+  person_group_split_person: PersonGroupSplitPersonTable;
   person_identity: PersonIdentityTable;
   person_pet: PersonPetTable;
   pet_search: PetSearchTable;
