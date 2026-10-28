@@ -29,7 +29,7 @@
     "test:watch": "vitest dev",
     "test:medium": "playwright test",
     "test:medium:ui": "playwright test --ui",
-    "prepare": "node ../i18n/gallery/merge.mjs && svelte-kit sync"
+    "prepare": "if [ -f ../i18n/gallery/merge.mjs ]; then node ../i18n/gallery/merge.mjs; fi && svelte-kit sync"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.10",
