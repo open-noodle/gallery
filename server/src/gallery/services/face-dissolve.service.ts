@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DissolveRequest, DissolveResponse, DissolveWarning, PeopleHealthQuery } from 'src/dtos/face-dissolve.dto.js';
+import { DissolveRequest, DissolveResponse, DissolveWarning, PeopleHealthQuery } from 'src/gallery/dtos/face-dissolve.dto.js';
 import { JobName, QueueName } from 'src/enum.js';
-import { DissolveCounts, PersonHealthRow } from 'src/repositories/face-dissolve.repository.js';
+import { DissolveCounts, PersonHealthRow } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 
 @Injectable()

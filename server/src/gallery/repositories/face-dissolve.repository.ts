@@ -11,7 +11,7 @@ import {
   dissolveFacePredicate,
   dissolveScopePredicate,
   handDrawnFacePredicate,
-} from 'src/utils/face-dissolve.js';
+} from 'src/gallery/utils/face-dissolve.js';
 
 export interface DissolveWriteInput {
   /**

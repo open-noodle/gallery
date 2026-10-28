@@ -1,4 +1,4 @@
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { Injectable } from '@nestjs/common';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';

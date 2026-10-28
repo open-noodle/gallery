@@ -1,4 +1,4 @@
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { Kysely } from 'kysely';
 import type { ClassConstructor } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
