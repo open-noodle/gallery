@@ -208,6 +208,23 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * fetch for a request made right after the synchronous file checks (execSync). The server closes an idle keep-alive
+ * connection after 5 s; while those checks block the event loop, fetch cannot see the close, reuses the dead
+ * connection and fails with "other side closed" before the request reaches the server. That one error is retried
+ * on a new connection. A failure after the response started (a body cut short) surfaces when the body is read.
+ */
+async function fetchAfterSyncChecks(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error: any) {
+    if (error?.cause?.code !== 'UND_ERR_SOCKET') {
+      throw error;
+    }
+    return fetch(url, init);
+  }
+}
+
 export async function waitForProcessing(token: string, timeoutMs = 60_000): Promise<void> {
   await sleep(2000);
 
@@ -680,7 +697,7 @@ async function phaseMigrateToS3(): Promise<void> {
   if (savedState.adminAssetIds) {
     console.log('  Verifying API access to assets (admin)...');
     for (const id of savedState.adminAssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res = await fetchAfterSyncChecks(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status !== 200) {
@@ -695,7 +712,7 @@ async function phaseMigrateToS3(): Promise<void> {
   if (user2Token && savedState.user2AssetIds) {
     console.log('  Verifying API access to assets (user2)...');
     for (const id of savedState.user2AssetIds as string[]) {
-      const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res: Response = await fetchAfterSyncChecks(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${user2Token as string}` },
       });
       if (res.status !== 200) {
@@ -838,7 +855,7 @@ async function phaseMigrateToDisk(): Promise<void> {
   if (savedState.adminAssetIds) {
     console.log('  Verifying API access to assets (admin)...');
     for (const id of savedState.adminAssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res = await fetchAfterSyncChecks(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status !== 200) {
@@ -853,7 +870,7 @@ async function phaseMigrateToDisk(): Promise<void> {
   if (user2Token && savedState.user2AssetIds) {
     console.log('  Verifying API access to assets (user2)...');
     for (const id of savedState.user2AssetIds as string[]) {
-      const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res: Response = await fetchAfterSyncChecks(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${user2Token as string}` },
       });
       if (res.status !== 200) {
@@ -1402,7 +1419,7 @@ async function phaseDeleteSourceFalse(): Promise<void> {
   if (savedStateLocal.adminAssetIds) {
     console.log('  Verifying API access works (admin)...');
     for (const id of savedStateLocal.adminAssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res = await fetchAfterSyncChecks(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status !== 200) {
