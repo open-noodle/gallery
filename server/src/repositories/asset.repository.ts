@@ -32,6 +32,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { withOwnArchiveOnly } from 'src/gallery/utils/favorites-scope.js';
+import { type LibraryViewOptions, withLibraryView } from 'src/gallery/utils/library-view.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { stackHasSeveralLiveAssets } from 'src/gallery/utils/stack-badge.js';
 import { DB } from 'src/schema/index.js';
@@ -159,7 +160,7 @@ interface AssetBuilderOptions {
   takenBefore?: string;
 }
 
-export interface TimeBucketOptions extends AssetBuilderOptions {
+export interface TimeBucketOptions extends AssetBuilderOptions, LibraryViewOptions {
   order?: AssetOrder;
   orderBy?: AssetOrderBy;
   bucketSize?: TimeBucketSize;
@@ -503,6 +504,7 @@ export function withTimeBucketAssetFilters<O>(
           );
         }),
       )
+      .$call((qb) => withLibraryView(qb, options))
       .$if(options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
           options.isFavorite

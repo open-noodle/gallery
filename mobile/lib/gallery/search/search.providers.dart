@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/gallery/search/search.repository.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
@@ -48,8 +49,12 @@ final searchResultsDebounceProvider = Provider<Duration>((ref) => const Duration
 /// "Today" for quick ranges.
 final searchClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// The screen's scope. Overridden per route.
-final searchScopeProvider = Provider<SearchScope>((ref) => const PhotosSearchScope(), dependencies: const []);
+/// The screen's scope. Overridden per route; the default is the Photos tab's, which browses within its library view
+/// (#1038).
+final searchScopeProvider = Provider<SearchScope>(
+  (ref) => PhotosSearchScope(libraryView: ref.watch(activeLibraryViewProvider)),
+  dependencies: const [],
+);
 
 /// The screen's name (SearchScope.name), apart from the scope: a scope keeps its first instance while its ids are
 /// unchanged, so a rename or a name that loads late reaches the placeholder through here.
@@ -108,6 +113,9 @@ void retrySearch(WidgetRef ref) {
 /// Warms the server's unfiltered Photos cache (cold, about 5.8 s at 500k photos) before search opens: availability,
 /// then every dimension, once per session. Only on a server with `searchOptions`; a failure is silent.
 final searchWarmUpProvider = FutureProvider<void>((ref) async {
+  // The view the Photos search will ask for (#1038): each view has its own cache entry on the server. Read once, as the
+  // warm-up runs once.
+  final scope = PhotosSearchScope(libraryView: ref.read(activeLibraryViewProvider));
   try {
     final capabilities = await ref.watch(searchCapabilitiesProvider.future);
     if (!capabilities.searchOptions) {
@@ -115,7 +123,7 @@ final searchWarmUpProvider = FutureProvider<void>((ref) async {
     }
     final repository = ref.read(gallerySearchRepositoryProvider);
     final params = buildSearchParams(
-      const PhotosSearchScope(),
+      scope,
       const SearchState(),
       now: ref.read(searchClockProvider)(),
       localTakenRange: capabilities.localTakenRange,

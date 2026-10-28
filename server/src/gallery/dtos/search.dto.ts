@@ -3,7 +3,7 @@ import z from 'zod';
 import { HistoryBuilder } from 'src/decorators.js';
 import { ScopedPrimaryProfileSchema } from 'src/dtos/person.dto.js';
 import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
-import { AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema } from 'src/enum.js';
+import { AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema, LibraryViewSchema } from 'src/enum.js';
 import { IsNotSiblingOf, boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
 // Fork search request fields, merged into upstream's schemas in src/dtos/search.dto.ts with one `.extend(...)` each
@@ -45,6 +45,7 @@ export const GallerySearchFilterExtension = {
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
   spacePersonIds: z.array(z.uuidv4()).optional().describe('Shared space person IDs to filter by'),
   withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+  libraryView: LibraryViewSchema.optional(),
 };
 
 /** SearchPeopleSchema */
@@ -322,6 +323,7 @@ const SearchOptionsRequestSchema = z
       .boolean()
       .optional()
       .describe('Browse mode: count only the primary asset of each stack, as on /timeline/buckets'),
+    libraryView: LibraryViewSchema.optional(),
     query: z.string().trim().optional().describe('Query mode: count over the smart-search results for this text'),
     queryAssetId: z
       .uuidv4()

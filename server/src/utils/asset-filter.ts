@@ -1,5 +1,6 @@
 import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder } from 'kysely';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
+import { withLibraryView } from 'src/gallery/utils/library-view.js';
 import { DB } from 'src/schema/index.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
@@ -96,11 +97,13 @@ export function withAssetFilter<T extends SelectQueryBuilder<DB, any, any>>(
 
 /**
  * Upstream search (`searchAssetBuilderLegacy`) with its taken range swapped for this module's, so
- * search results agree with the timeline, suggestions and facets. Everything else stays upstream.
+ * search results agree with the timeline, suggestions and facets, and narrowed to the timeline's
+ * library view (#1038). Everything else stays upstream.
  */
 export function searchAssetBuilderWithLocalTaken(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
-  return withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
+  const query = withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
     takenAfter: options.takenAfter,
     takenBefore: options.takenBefore,
   });
+  return withLibraryView(query, { ...options, callerId: options.authUserId });
 }

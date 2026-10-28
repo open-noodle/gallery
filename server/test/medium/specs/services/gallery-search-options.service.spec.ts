@@ -7,7 +7,7 @@
 import { Kysely, sql } from 'kysely';
 import { SmartSearchDto } from 'src/dtos/search.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
-import { AssetType, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { AssetType, AssetVisibility, LibraryView, SharedSpaceRole } from 'src/enum.js';
 import {
   SearchOptionsRequestDto,
   SearchOptionsResponseDto,
@@ -38,6 +38,7 @@ import { DB } from 'src/schema/index.js';
 import { SearchService } from 'src/services/search.service.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
+import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -1317,5 +1318,43 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
       expect(await total(user.id, { visibility: AssetVisibility.Archive })).toBe(0);
       expect(compute).toHaveBeenCalledTimes(5);
     });
+  });
+});
+
+describe('POST /search/options with a library view (#1038)', () => {
+  it('counts what /timeline/buckets shows under each view, each view cached on its own', async () => {
+    const { sut, ctx, timeline } = setup();
+    const { me, name } = await seedLibraryView(ctx);
+    const photosScope = { withSharedSpaces: true, withPartners: true, visibility: AssetVisibility.Timeline } as const;
+
+    // Unfiltered requests are served from the cache, so asking each view in turn also checks that the view is part of
+    // the cache key.
+    for (const [libraryView, expected] of [
+      [undefined, ['mine', 'mineInAlbum', 'mineInLibrary', 'mineInSpace', 'partner', 'peerInSpace']],
+      [LibraryView.Personal, ['mine']],
+      [LibraryView.Spaces, ['mineInAlbum', 'mineInLibrary', 'mineInSpace', 'peerInSpace']],
+      [undefined, ['mine', 'mineInAlbum', 'mineInLibrary', 'mineInSpace', 'partner', 'peerInSpace']],
+    ] as const) {
+      const dto = { ...photosScope, libraryView };
+      const results = name(await resultIds(timeline, me.id, dto));
+      const { total } = await optionsFor(sut, me.id, dto);
+      expect({ libraryView, results, total }).toEqual({ libraryView, results: expected, total: expected.length });
+    }
+  });
+
+  it('narrows a filtered request too', async () => {
+    const { sut, ctx } = setup();
+    const { me } = await seedLibraryView(ctx);
+    const dto = {
+      withSharedSpaces: true,
+      withPartners: true,
+      visibility: AssetVisibility.Timeline,
+      libraryView: LibraryView.Spaces,
+      isNotInAlbum: true,
+    } as const;
+
+    // mineInSpace, mineInLibrary and peerInSpace are in no album; mineInAlbum is.
+    const { total } = await optionsFor(sut, me.id, dto);
+    expect(total).toBe(3);
   });
 });

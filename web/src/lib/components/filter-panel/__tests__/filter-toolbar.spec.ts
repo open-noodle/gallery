@@ -15,6 +15,15 @@ const filtersSnippet = createRawSnippet(() => ({
 }));
 
 describe('FilterToolbar', () => {
+  it('shows the library view on its own, at every viewport', () => {
+    const { getByTestId } = render(FilterToolbar, {
+      props: { grouping: 'day', onGroupingChange: () => {}, showGrouping: false, showLibraryView: true },
+    });
+    expect(getByTestId('library-view-control')).toBeInTheDocument();
+    expect(getByTestId('filter-toolbar-root')).toHaveClass('flex');
+    expect(getByTestId('filter-toolbar-root')).not.toHaveClass('hidden');
+  });
+
   it('renders the grouping control (desktop wrapper) and no filters by default', () => {
     const { getByTestId, queryByTestId } = render(FilterToolbar, {
       props: { grouping: 'day', onGroupingChange: () => {} },

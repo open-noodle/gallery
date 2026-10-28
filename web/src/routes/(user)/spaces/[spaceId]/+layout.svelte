@@ -11,6 +11,7 @@
   import SpaceEditModal from '$lib/modals/SpaceEditModal.svelte';
   import SpaceHideFromTimelineConfirmModal from '$lib/modals/SpaceHideFromTimelineConfirmModal.svelte';
   import { Route } from '$lib/route';
+  import { userInteraction } from '$lib/stores/user.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import { getSearchablePageState } from '$lib/utils/searchable-page-search';
   import {
@@ -148,6 +149,8 @@
         id: space.id,
         sharedSpaceMemberTimelineDto: { showInTimeline: !showInTimeline },
       });
+      // The Photos library view follows the spaces on the timeline (#1038).
+      userInteraction.recentSpaces = undefined;
       await invalidateAll();
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_timeline_display_status'));
@@ -203,6 +206,7 @@
     }
     try {
       await removeMember({ id: space.id, userId: authManager.user.id });
+      userInteraction.recentSpaces = undefined;
       toastManager.success($t('spaces_leave_success', { values: { name: space.name } }));
       await goto(Route.spaces());
     } catch (error) {
