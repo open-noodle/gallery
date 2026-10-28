@@ -5,6 +5,7 @@ import { checkAccess, requireElevatedPermission } from 'src/utils/access.js';
 import { newAccessRepositoryMock } from 'test/repositories/access.repository.mock.js';
 import { newUuid } from 'test/small.factory.js';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const makeAuth = (userId?: string): AuthDto => ({
   user: {
     id: userId ?? newUuid(),

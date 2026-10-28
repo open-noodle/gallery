@@ -102,9 +102,9 @@ export const GalleryMetadataSearchExtension = {
 export const GalleryStatisticsSearchExtension = { description: descriptionFilter };
 
 /**
- * SmartSearchSchema. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3 replacement, and
- * neither field has one (`order` here means relevance-vs-date on smart search).
- */
+SmartSearchSchema. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3 replacement, and
+neither field has one (`order` here means relevance-vs-date on smart search).
+*/
 export const GallerySmartSearchExtension = {
   order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
   // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
@@ -250,17 +250,17 @@ export class FilterSuggestionsRequestDto extends createZodDto(FilterSuggestionsR
 export class SmartSearchFacetsResponseDto extends createZodDto(SmartSearchFacetsResponseSchema) {}
 
 /**
- * `POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1). One request shape, two modes,
- * each counting exactly what its results call returns:
- * - **Browse** (no `query` / `queryAssetId`): `GET /timeline/buckets` with the same filters (`albumIds[0]` as its
- *   `albumId`). Its rules apply: people ALL, tags ANY, rating a minimum, visibility unset = timeline + archive, the owner
- *   scope is the caller (plus timeline partners with `withPartners`) unless an album or space is given, and the same
- *   combinations are refused.
- * - **Query**: `POST /search/smart` with the same filters (`withPartners` and `withStacked` ignored; partners shown in
- *   the timeline are always searched). People ALL, tags ALL, rating a minimum, visibility unset = everything not locked.
- *
- * A POST body, so `tagIds: null` can mean "untagged" (which `/timeline/buckets` cannot express).
- */
+`POST /search/options` (specs/2026-10-23-mobile-search-redesign-design.md, Slice 1). One request shape, two modes,
+each counting exactly what its results call returns:
+- **Browse** (no `query` / `queryAssetId`): `GET /timeline/buckets` with the same filters (`albumIds[0]` as its
+  `albumId`). Its rules apply: people ALL, tags ANY, rating a minimum, visibility unset = timeline + archive, the owner
+  scope is the caller (plus timeline partners with `withPartners`) unless an album or space is given, and the same
+  combinations are refused.
+- **Query**: `POST /search/smart` with the same filters (`withPartners` and `withStacked` ignored; partners shown in
+  the timeline are always searched). People ALL, tags ALL, rating a minimum, visibility unset = everything not locked.
+
+A POST body, so `tagIds: null` can mean "untagged" (which `/timeline/buckets` cannot express).
+*/
 /** What one `POST /search/options` request computes. */
 export const searchOptionsDimensions = [
   'availability',

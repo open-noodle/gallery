@@ -3,15 +3,15 @@ import { PersonResponseDto } from 'src/dtos/person.dto.js';
 type ResolvablePerson = Pick<PersonResponseDto, 'id' | 'name' | 'birthDate'>;
 
 /**
- * Overlay the identity-wide name/birthday resolution onto already-mapped people.
- *
- * A name or birthday set inside a shared space is stored on `shared_space_person` and resolved at
- * read time against the face identity — it is never written back to `person`. Any read path that
- * maps a raw `person` row therefore has to re-apply that resolution, or it hands back the raw
- * (often empty) `person.birthDate` and the age disappears (#808).
- *
- * Each distinct identity is resolved once, regardless of how many people map onto it.
- */
+Overlay the identity-wide name/birthday resolution onto already-mapped people.
+
+A name or birthday set inside a shared space is stored on `shared_space_person` and resolved at
+read time against the face identity — it is never written back to `person`. Any read path that
+maps a raw `person` row therefore has to re-apply that resolution, or it hands back the raw
+(often empty) `person.birthDate` and the age disappears (#808).
+
+Each distinct identity is resolved once, regardless of how many people map onto it.
+*/
 export const applyResolvedIdentityMetadata = async <T extends ResolvablePerson>({
   people,
   identityByPersonId,

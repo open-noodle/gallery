@@ -2,10 +2,10 @@ import { Kysely, Transaction, sql } from 'kysely';
 import { DB } from 'src/schema/index.js';
 
 /**
- * Re-key negative/keep-here verdicts from merged-away source identities onto the surviving identity.
- * `(identityId, assetFaceId)` is non-unique, so a straight update cannot violate a constraint. Must run
- * BEFORE the source identities are deleted so the verdict never dangles.
- */
+Re-key negative/keep-here verdicts from merged-away source identities onto the surviving identity.
+`(identityId, assetFaceId)` is non-unique, so a straight update cannot violate a constraint. Must run
+BEFORE the source identities are deleted so the verdict never dangles.
+*/
 export async function rekeyVerdictIdentity(
   db: Kysely<DB> | Transaction<DB>,
   sourceIdentityIds: string[],
@@ -22,11 +22,11 @@ export async function rekeyVerdictIdentity(
 }
 
 /**
- * Survivor-wins re-target of a personal verdict onto the merge survivor. `(personGroupId, assetFaceId)` is
- * unique-partial, so first drop source rows that would collide with an existing survivor row, then move
- * the rest. Must run BEFORE the source person is deleted (its FK is SET NULL, so a delete would orphan
- * the verdict rather than move it).
- */
+Survivor-wins re-target of a personal verdict onto the merge survivor. `(personGroupId, assetFaceId)` is
+unique-partial, so first drop source rows that would collide with an existing survivor row, then move
+the rest. Must run BEFORE the source person is deleted (its FK is SET NULL, so a delete would orphan
+the verdict rather than move it).
+*/
 export async function retargetVerdictPersonId(
   db: Kysely<DB> | Transaction<DB>,
   sourcePersonId: string,

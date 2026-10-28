@@ -86,17 +86,17 @@ export function firstDateTime(tags: ImmichTags) {
 }
 
 /**
- * Recover a UTC offset for a zone-less EXIF capture time (issue #607).
- *
- * Android cameras commonly omit `OffsetTimeOriginal`, so the EXIF wall-clock
- * time has no timezone and would otherwise be assumed to be UTC. Clients upload
- * `fileCreatedAt` derived from the true capture instant, so the gap between the
- * wall clock (read as UTC) and that instant is the original offset.
- *
- * Returns a Luxon fixed-offset zone string (e.g. `UTC+2`, `UTC-4`) or null when
- * the gap is zero or does not resolve to a real-world offset — in which case
- * the caller keeps the existing UTC behaviour.
- */
+Recover a UTC offset for a zone-less EXIF capture time (issue #607).
+
+Android cameras commonly omit `OffsetTimeOriginal`, so the EXIF wall-clock
+time has no timezone and would otherwise be assumed to be UTC. Clients upload
+`fileCreatedAt` derived from the true capture instant, so the gap between the
+wall clock (read as UTC) and that instant is the original offset.
+
+Returns a Luxon fixed-offset zone string (e.g. `UTC+2`, `UTC-4`) or null when
+the gap is zero or does not resolve to a real-world offset — in which case
+the caller keeps the existing UTC behaviour.
+*/
 const deriveTimeZoneFromUploadedInstant = (exifLocalAsUtc: DateTime, fileCreatedAt: Date): string | null => {
   if (!exifLocalAsUtc.isValid || Number.isNaN(fileCreatedAt.getTime())) {
     return null;

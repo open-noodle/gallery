@@ -7,11 +7,11 @@ import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/the
 import { isSmartSearchEnabled } from 'src/utils/misc.js';
 
 /**
- * `searchSmart` now filters `takenAfter`/`takenBefore` on `localDateTime` (src/utils/asset-filter.ts),
- * the column every memory rule buckets by, so this margin is no longer needed to catch skewed
- * assets. It is kept because removing it changes which top-N results a themed memory sees; the
- * calling rule still filters the results to the exact year by `localDateTime`.
- */
+`searchSmart` now filters `takenAfter`/`takenBefore` on `localDateTime` (src/utils/asset-filter.ts),
+the column every memory rule buckets by, so this margin is no longer needed to catch skewed
+assets. It is kept because removing it changes which top-N results a themed memory sees; the
+calling rule still filters the results to the exact year by `localDateTime`.
+*/
 export const SEARCH_WINDOW_MARGIN_DAYS = 2;
 const SEARCH_WINDOW_MARGIN_MS = SEARCH_WINDOW_MARGIN_DAYS * 24 * 60 * 60 * 1000;
 
