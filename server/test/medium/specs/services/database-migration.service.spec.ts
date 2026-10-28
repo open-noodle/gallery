@@ -409,6 +409,14 @@ const bootStockImmich = async (db: Kysely<any>) => {
 
 const bootGallery = (db: Kysely<any>) => createRepo(db).runMigrations();
 
+// The stand-in for stock Immich runs this branch's upstream folder, which on a rolling branch holds migrations the
+// tagged release does not ship. The revert removes their rows (the tagged migrator would abort on them), so the
+// stand-in runs exactly those again; on a branch at the tag the list is empty.
+const postTagUpstreamNames = (upstreamNames: string[]) => {
+  const script = readFileSync(join(repoRoot, 'scripts', 'revert-to-immich.sql'), 'utf8');
+  return upstreamNames.filter((name) => script.includes(`'${name}'`));
+};
+
 const runRevertScript = async (db: Kysely<any>) => {
   const script = readFileSync(join(repoRoot, 'scripts', 'revert-to-immich.sql'), 'utf8')
     .split('\n')
@@ -796,7 +804,8 @@ describe('Switching from Immich 3.3 with people shared between users', { timeout
           db,
         ),
       ).resolves.toMatchObject({ rows: [{ split: null, ledger: null }] });
-      await expect(bootStockImmich(db)).resolves.toEqual([]);
+      const rerun = await bootStockImmich(db);
+      expect(rerun.map(({ migrationName }) => migrationName)).toEqual(postTagUpstreamNames(upstreamNames));
 
       // And back to Gallery once more.
       const reverted = await immichState(db);
