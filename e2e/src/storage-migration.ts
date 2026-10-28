@@ -204,6 +204,21 @@ export async function downloadAssetOriginal(token: string, assetId: string): Pro
   return Buffer.from(arrayBuffer);
 }
 
+// A GET after a stretch of execSync (docker exec checks) can go out on a keep-alive socket the server closed while
+// the event loop was blocked and could not notice; undici then fails with `other side closed`. GETs are idempotent,
+// so retry that one failure once on a fresh connection.
+export async function fetchGet(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    const cause = (error as { cause?: { code?: string } }).cause;
+    if (cause?.code !== 'UND_ERR_SOCKET') {
+      throw error;
+    }
+    return fetch(url, init);
+  }
+}
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -1367,7 +1382,7 @@ async function phaseDeleteSourceFalse(): Promise<void> {
   if (savedStateLocal.adminAssetIds) {
     console.log('  Verifying API access works (admin)...');
     for (const id of savedStateLocal.adminAssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
+      const res = await fetchGet(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status !== 200) {
