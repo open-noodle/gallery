@@ -59,7 +59,9 @@
     });
 </script>
 
-<div class="overflow-x-auto">
+<!-- Scrolling on x turns scrolling on y too (CSS has no visible/auto pair), so a cell scaled on hover in the
+     edge rows or columns would overflow and show a scrollbar. The padding leaves room for the scale. -->
+<div class="-m-1 overflow-x-auto p-1">
   <div class="grid min-w-[640px] grid-cols-[2.5rem_repeat(31,minmax(1rem,1fr))] gap-1" data-testid="cleanup-calendar">
     <span aria-hidden="true"></span>
     {#each DAY_NUMBERS as dayNumber (dayNumber)}
@@ -83,7 +85,7 @@
             data-state={state}
             data-today={monthDay === today ? 'true' : undefined}
             aria-label={cellLabel(monthDay, day)}
-            class="aspect-square rounded-sm transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {cellClass(
+            class="aspect-square rounded-sm transition-transform duration-(--spring-snappy-duration) ease-(--spring-snappy) hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {cellClass(
               day,
               state,
             )} {monthDay === today ? 'outline-2 outline-offset-1 outline-dark dark:outline-light' : ''}"
