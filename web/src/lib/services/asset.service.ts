@@ -44,13 +44,13 @@ import {
 import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 import { ProjectionType } from '$lib/constants';
-import { celebrate } from '$lib/gallery/motion';
 import {
   getGalleryAssetActions,
   getGalleryAssetBulkActions,
   type GalleryAssetActionOptions,
   type GalleryAssetBulkActionOptions,
 } from '$lib/gallery/asset-actions';
+import { celebrate } from '$lib/gallery/motion';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';

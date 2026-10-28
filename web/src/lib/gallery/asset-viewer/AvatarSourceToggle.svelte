@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cropFacesFromAsset } from '$lib/stores/preferences.store';
+  import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
   import { getRepresentativeThumbnailUrl } from '$lib/utils/person-avatar';
   import type { AssetResponseDto } from '@immich/sdk';
   import { IconButton } from '@immich/ui';

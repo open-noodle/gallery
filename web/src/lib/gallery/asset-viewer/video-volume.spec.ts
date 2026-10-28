@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { videoViewerMuted, videoViewerVolume } from '$lib/stores/preferences.store';
+import { videoViewerMuted, videoViewerVolume } from '$lib/gallery/stores/preferences.store';
 import { persistVideoVolume } from './video-volume';
 
 describe('persistVideoVolume', () => {

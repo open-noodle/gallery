@@ -3,7 +3,7 @@
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import { assetViewerManager, type Faces } from '$lib/managers/asset-viewer-manager.svelte';
   import { Route } from '$lib/route';
-  import { cropFacesFromAsset } from '$lib/stores/preferences.store';
+  import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
   import { getAssetUrls } from '$lib/utils';
   import {
     buildContextualFilterUrl,

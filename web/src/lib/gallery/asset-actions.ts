@@ -16,6 +16,7 @@ import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import { mdiRotateLeft, mdiRotateRight } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 import { ProjectionType } from '$lib/constants';
+import { getEditableAssetsWithWarning } from '$lib/gallery/utils/editable-assets';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -26,7 +27,6 @@ import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
 import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getSharedLink } from '$lib/utils';
 import { canEditAsset } from '$lib/utils/asset-editability';
-import { getEditableAssetsWithWarning } from '$lib/utils/asset-utils';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 

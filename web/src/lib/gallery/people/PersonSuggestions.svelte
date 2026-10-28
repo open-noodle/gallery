@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
-  import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
+  import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import {
     confirmPersonFaceSuggestion,

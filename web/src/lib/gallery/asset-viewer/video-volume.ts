@@ -1,5 +1,5 @@
 import type { Attachment } from 'svelte/attachments';
-import { videoViewerMuted, videoViewerVolume } from '$lib/stores/preferences.store';
+import { videoViewerMuted, videoViewerVolume } from '$lib/gallery/stores/preferences.store';
 
 /** Applies the persisted volume and mute state to a viewer video, and persists every change to them. */
 export const persistVideoVolume: Attachment<HTMLVideoElement> = (video) => {

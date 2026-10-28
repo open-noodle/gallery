@@ -3,7 +3,7 @@
   import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
   import SidebarNavItem from '$lib/components/sidebar/sidebar-nav-item.svelte';
   import { Route } from '$lib/route';
-  import { recentSpacesDropdown } from '$lib/stores/preferences.store';
+  import { recentSpacesDropdown } from '$lib/gallery/stores/preferences.store';
   import { mdiAccountGroup, mdiAccountGroupOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';

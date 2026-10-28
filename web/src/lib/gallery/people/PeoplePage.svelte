@@ -20,8 +20,10 @@
   import { isSpaceEditor, updatePersonName } from '$lib/gallery/people/person.service';
   import { getPersonActions } from '$lib/services/person.service';
   import Dropdown from '$lib/elements/Dropdown.svelte';
-  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
+  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
+  import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
+  import { locale } from '$lib/stores/preferences.store';
+  import { userInteraction } from '$lib/stores/user.svelte';
   import { websocketEvents } from '$lib/stores/websocket';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { handlePromiseError } from '$lib/utils';
