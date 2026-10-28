@@ -81,7 +81,8 @@ describe('FaceDissolveRepository.getCounts', () => {
     await seedFace(db, { ...on, sourceType: SourceType.Manual });
 
     const counts = await repo.getCounts(target.personGroupId, DissolveScope.All);
-    expect(counts).toMatchObject({ faces: 5, hide: 3, delete: 1, keep: 1, softDeleted: 1 });
+    // The already-hidden face is not counted as `hide`: it cannot be restored, so the dialog must not promise it.
+    expect(counts).toMatchObject({ faces: 5, hide: 2, delete: 1, keep: 1, softDeleted: 1 });
   });
 
   it('says whether the person survives, and how many faces it keeps', async () => {

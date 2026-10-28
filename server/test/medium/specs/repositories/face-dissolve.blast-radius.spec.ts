@@ -245,7 +245,11 @@ const links = (personId: string) =>
     .then((rows) => rows.map((r) => r.assetFaceId).sort());
 
 const spacePerson = (id: string) =>
-  db.selectFrom('shared_space_person').select(['id', 'representativeFaceId']).where('id', '=', id).executeTakeFirst();
+  db
+    .selectFrom('shared_space_person')
+    .select(['id', 'representativeFaceId', 'representativeFaceSource'])
+    .where('id', '=', id)
+    .executeTakeFirst();
 
 // Revision 2: a hidden face's row survives, so nothing cascades to the Space. The dissolve removes the Space links
 // itself, then only the Space persons it emptied, and repoints a survivor that was showing a hidden face.
@@ -265,6 +269,7 @@ describe('dissolve blast radius — Spaces', () => {
     const result = await runDissolve(db, repo, target.personGroupId, DissolveScope.All);
 
     expect(result.orphanedSpacePersonIds).toEqual([onlyJunk]);
+    expect(result.keptSpacePersonIds).toEqual([mixed]);
     expect(await spacePerson(onlyJunk)).toBeUndefined();
     expect(await links(mixed)).toEqual([real.id]);
     // The face itself survives, hidden: the Space link went because the dissolve removed it, not by cascade.
@@ -287,10 +292,39 @@ describe('dissolve blast radius — Spaces', () => {
     });
     const space = await seedSpace(db, user.id);
     const mixed = await seedSpacePerson(db, space, [junk.id, alsoHidden.id, real.id], junk.id);
+    await db
+      .updateTable('shared_space_person')
+      .set({ representativeFaceSource: 'manual' })
+      .where('id', '=', mixed)
+      .execute();
 
     await runDissolve(db, repo, target.personGroupId, DissolveScope.All);
 
     // Never the face this dissolve hid, never a face hidden earlier: the one visible face left.
-    expect(await spacePerson(mixed)).toMatchObject({ representativeFaceId: real.id });
+    expect(await spacePerson(mixed)).toMatchObject({ representativeFaceId: real.id, representativeFaceSource: 'auto' });
+  });
+
+  it('removes a Space person linked only to a face that was hidden before the dissolve', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const target = await seedPerson(db, { ownerId: user.id, name: 'Junk' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, withEmbedding: true });
+    // The face editor's delete: deletedAt set, person and Space links kept.
+    const earlier = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: target.personGroupId,
+      withEmbedding: true,
+      deletedAt: new Date(),
+    });
+    const space = await seedSpace(db, user.id);
+    const onlyEarlier = await seedSpacePerson(db, space, [earlier.id]);
+
+    const counts = await repo.getCounts(target.personGroupId, DissolveScope.All);
+    const result = await runDissolve(db, repo, target.personGroupId, DissolveScope.All);
+
+    expect(counts.spacePersonsRemoved).toBe(1);
+    expect(result.orphanedSpacePersonIds).toEqual([onlyEarlier]);
+    expect(await spacePerson(onlyEarlier)).toBeUndefined();
   });
 });

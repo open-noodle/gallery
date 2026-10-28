@@ -75,8 +75,8 @@ describe('FaceDissolveRepository.restore', () => {
     await db.deleteFrom('asset_face').where('id', '=', faces[0].id).execute();
     await db.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
 
-    // The record row went with the face (CASCADE), so only one face is left to restore and none to skip.
-    await expect(restore(repo, dissolveId)).resolves.toEqual({ restored: 1, skipped: 0 });
+    // The hard-deleted face's record row cascaded away, but it is still reported as skipped.
+    await expect(restore(repo, dissolveId)).resolves.toEqual({ restored: 1, skipped: 1 });
     expect(await faceRow(faces[1].id)).toMatchObject({ deletedAt: null });
   });
 
@@ -92,6 +92,13 @@ describe('FaceDissolveRepository.restore', () => {
 
     await expect(restore(repo, dissolveId)).resolves.toEqual({ restored: 1, skipped: 1 });
     expect(await faceRow(faces[0].id)).toMatchObject({ personGroupId: other.personGroupId });
+  });
+
+  it('refuses a second restore of the same dissolve', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const { dissolveId } = await seedDissolved(repo, 1);
+    await restore(repo, dissolveId);
+    await expect(restore(repo, dissolveId)).resolves.toBe('already-restored');
   });
 
   it('returns null for an unknown dissolve', async () => {
