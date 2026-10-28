@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SourceType } from 'src/enum.js';
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { DB } from 'src/schema/index.js';
 import { seedAsset, seedFace, seedPerson, seedUser } from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
 import { mediumFactory } from 'test/medium.factory.js';

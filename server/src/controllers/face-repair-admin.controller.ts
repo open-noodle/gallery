@@ -20,7 +20,7 @@ import {
   DissolveResponseDto,
   PeopleHealthQueryDto,
   PeopleHealthResponseDto,
-} from 'src/dtos/face-dissolve.dto.js';
+} from 'src/gallery/dtos/face-dissolve.dto.js';
 import {
   FaceRepairClusterFacesRequestDto,
   FaceRepairClusterFacesResponseDto,
@@ -52,7 +52,7 @@ import {
 import { ApiTag } from 'src/enum.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { FaceDissolveService } from 'src/services/face-dissolve.service.js';
+import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { sendFile } from 'src/utils/file.js';
 

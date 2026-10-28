@@ -15,7 +15,7 @@ import {
   dissolveDeletableFacePredicate,
   dissolveFacePredicate,
   handDrawnFacePredicate,
-} from 'src/utils/face-dissolve.js';
+} from 'src/gallery/utils/face-dissolve.js';
 
 // Offline Kysely — compiles SQL without executing it. The medium specs prove the behaviour against a real
 // database; this pins the shape of the rule so a refactor cannot quietly drop the hand-drawn exclusion.

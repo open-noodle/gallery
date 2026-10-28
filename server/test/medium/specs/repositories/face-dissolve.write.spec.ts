@@ -2,9 +2,9 @@ import { Kysely, sql } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SourceType } from 'src/enum.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { DB } from 'src/schema/index.js';
-import { DissolveScope } from 'src/utils/face-dissolve.js';
+import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
 import {
   seedAsset,
   seedFace,
