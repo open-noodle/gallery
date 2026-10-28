@@ -39,7 +39,7 @@
   {#if !isCollapsed}
     <div class="flex flex-row flex-wrap gap-4">
       {#each places as item (item.id)}
-        {@const city = item.exifInfo?.city}
+        {const city = item.exifInfo?.city}
         <a
           class="relative"
           href={Route.photos({ city: city ?? undefined, country: item.exifInfo?.country ?? undefined })}
