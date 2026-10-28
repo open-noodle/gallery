@@ -18,11 +18,11 @@ type AssetResponseOverlayDependencies = {
 };
 
 /**
- * Fork overlay on GET /assets/:id (AssetService.get), applied after upstream maps the asset: space-scoped people
- * (named in `spaceId`, or the space the server finds for the viewer), the owner's identity-resolved names and
- * birthdays, hidden-people filtering for album and partner viewers, and `canEdit`. Shared-link sessions are left as
- * upstream returns them.
- */
+Fork overlay on GET /assets/:id (AssetService.get), applied after upstream maps the asset: space-scoped people
+(named in `spaceId`, or the space the server finds for the viewer), the owner's identity-resolved names and
+birthdays, hidden-people filtering for album and partner viewers, and `canEdit`. Shared-link sessions are left as
+upstream returns them.
+*/
 export const applyAssetResponseOverlay = async (
   deps: AssetResponseOverlayDependencies,
   {

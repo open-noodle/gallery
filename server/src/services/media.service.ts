@@ -76,9 +76,9 @@ export class MediaService extends BaseService {
   }
 
   /**
-   * After generating a file locally, uploads it to S3 if the write backend is S3.
-   * Returns the key to store in the DB.
-   */
+  After generating a file locally, uploads it to S3 if the write backend is S3.
+  Returns the key to store in the DB.
+  */
   private async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
     const writeBackend = StorageService.getWriteBackend();
     if (!writeBackend || writeBackend instanceof DiskStorageBackend) {
@@ -96,10 +96,10 @@ export class MediaService extends BaseService {
   }
 
   /**
-   * Persists every generated image file and rewrites its path to the stored location.
-   * Every ffmpeg/sharp output path must go through this — forgetting it is how the
-   * trim thumbnails ended up unpersisted on S3 (gh#671).
-   */
+  Persists every generated image file and rewrites its path to the stored location.
+  Every ffmpeg/sharp output path must go through this — forgetting it is how the
+  trim thumbnails ended up unpersisted on S3 (gh#671).
+  */
   private async persistImageFiles(asset: ThumbnailAsset, files: UpsertFileOptions[]): Promise<void> {
     for (const file of files) {
       const relativeKey = StorageCore.getRelativeImagePath(asset, {

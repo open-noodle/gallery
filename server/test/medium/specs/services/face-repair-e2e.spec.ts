@@ -111,11 +111,12 @@ const buildLinkedCluster = async (
   ctx: ReturnType<typeof setupRepair>['ctx'],
   ownerId: string,
   embedding: string,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   faceCount: number,
-  name?: string,
+  name = '',
 ) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-  const { person } = await ctx.newPerson({ ownerId, name: name ?? '' });
+  const { person } = await ctx.newPerson({ ownerId, name });
   const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
   const faceIds: string[] = [];
   for (let index = 0; index < faceCount; index++) {

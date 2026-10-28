@@ -11,15 +11,15 @@ export class SpaceAlbumRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * Lightweight projection for the command palette: returns only the fields
-   * needed to render an album entry (name, thumbnail, asset count, date range)
-   * without the full MapAlbumDto shape or the updateThumbnails write side-effect.
-   *
-   * Uses a single grouped LEFT JOIN (mirroring `getMetadataForIds`) so one
-   * subquery produces count + date range in a single plan, rather than three
-   * correlated subqueries per row. Empty albums still appear with
-   * `assetCount = 0` and null date range via COALESCE on the count.
-   */
+  Lightweight projection for the command palette: returns only the fields
+  needed to render an album entry (name, thumbnail, asset count, date range)
+  without the full MapAlbumDto shape or the updateThumbnails write side-effect.
+  
+  Uses a single grouped LEFT JOIN (mirroring `getMetadataForIds`) so one
+  subquery produces count + date range in a single plan, rather than three
+  correlated subqueries per row. Empty albums still appear with
+  `assetCount = 0` and null date range via COALESCE on the count.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async getOwnedNames(ownerId: string) {
     return this.db
@@ -86,14 +86,14 @@ export class SpaceAlbumRepository {
   }
 
   /**
-   * Lightweight projection for the command palette: returns only the fields
-   * needed to render an album entry (name, thumbnail, asset count, date range)
-   * for albums shared with or shared by the user. Mirrors `getOwnedNames`
-   * (single grouped LEFT JOIN, date-only cast, coalesce'd count, no ORDER BY).
-   *
-   * Includes albums owned-and-shared-out by the user; dedup against
-   * `getOwnedNames` is a downstream responsibility.
-   */
+  Lightweight projection for the command palette: returns only the fields
+  needed to render an album entry (name, thumbnail, asset count, date range)
+  for albums shared with or shared by the user. Mirrors `getOwnedNames`
+  (single grouped LEFT JOIN, date-only cast, coalesce'd count, no ORDER BY).
+  
+  Includes albums owned-and-shared-out by the user; dedup against
+  `getOwnedNames` is a downstream responsibility.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async getSharedNames(userId: string) {
     return this.db
@@ -162,9 +162,9 @@ export class SpaceAlbumRepository {
   }
 
   /**
-   * The ids among `assetIds` that are in the album as `viewerId` sees it: its own rows plus the contributions
-   * made through a space the viewer is a member of. Used to accept a contributed photo as the album cover (#1153).
-   */
+  The ids among `assetIds` that are in the album as `viewerId` sees it: its own rows plus the contributions
+  made through a space the viewer is a member of. Used to accept a contributed photo as the album cover (#1153).
+  */
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], DummyValue.UUID] })
   @ChunkedSet({ paramIndex: 1 })
   async getAlbumAssetIdsForViewer(albumId: string, assetIds: string[], viewerId: string): Promise<Set<string>> {

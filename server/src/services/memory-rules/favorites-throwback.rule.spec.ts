@@ -5,6 +5,7 @@ import { FavoritesThrowbackMemoryRule } from 'src/services/memory-rules/favorite
 
 const target = DateTime.fromISO('2026-07-15', { zone: 'utc' });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const favoritesForYear = (year: number, count: number, month = 7): MemoryPeriodAsset[] =>
   Array.from({ length: count }, (_, index) => ({
     id: `f-${year}-${index}`,

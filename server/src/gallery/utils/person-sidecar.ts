@@ -35,10 +35,10 @@ export const personSidecarColumns = (alias = 'person') => [
 ];
 
 /**
- * A person deleted ahead of its group leaves its person_identity row behind until the group is
- * swept. Readers never see it because they join through person, but it still holds the
- * (ownerId, identityId) unique key, so writers clear it first.
- */
+A person deleted ahead of its group leaves its person_identity row behind until the group is
+swept. Readers never see it because they join through person, but it still holds the
+(ownerId, identityId) unique key, so writers clear it first.
+*/
 export const clearOrphanPersonIdentity = (db: Kysely<DB> | Transaction<DB>, ownerId: string, identityId: string) =>
   db
     .deleteFrom('person_identity')
@@ -88,9 +88,9 @@ export const setPersonIdentity = async (
 };
 
 /**
- * Writes the given sidecar fields for the person in group `personGroupId`. `type: 'pet'` adds the
- * person_pet row and any other type removes it; `species` alone only updates an existing pet.
- */
+Writes the given sidecar fields for the person in group `personGroupId`. `type: 'pet'` adds the
+person_pet row and any other type removes it; `species` alone only updates an existing pet.
+*/
 export const writePersonSidecars = async (
   db: Kysely<DB> | Transaction<DB>,
   personGroupId: string,

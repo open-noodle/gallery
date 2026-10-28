@@ -138,9 +138,9 @@ export class SpaceAssetAccess {
   }
 
   /**
-   * A stack is readable when every photo StackRepository.getById returns for it (live, default visibilities)
-   * is readable through a space, so the stack never hands out a photo the member cannot see.
-   */
+  A stack is readable when every photo StackRepository.getById returns for it (live, default visibilities)
+  is readable through a space, so the stack never hands out a photo the member cannot see.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
   async checkSpaceStackAccess(userId: string, stackIds: Set<string>) {
@@ -376,11 +376,11 @@ export class GalleryPersonAccess {
   }
 
   /**
-   * Fork (#869 follow-up): read access to a PERSON is granted off any one reachable face, but the person
-   * thumbnail is a crop of one specific photo — the representative face `person.faceAssetId` points at.
-   * Returns the subset whose representative face does NOT sit in the Locked Folder; a person with no
-   * representative face at all has no locked source to leak and stays in the set.
-   */
+  Fork (#869 follow-up): read access to a PERSON is granted off any one reachable face, but the person
+  thumbnail is a crop of one specific photo — the representative face `person.faceAssetId` points at.
+  Returns the subset whose representative face does NOT sit in the Locked Folder; a person with no
+  representative face at all has no locked source to leak and stays in the set.
+  */
   @GenerateSql({ params: [DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 0 })
   async checkUnlockedThumbnailAccess(personIds: Set<string>) {

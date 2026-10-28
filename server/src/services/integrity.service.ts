@@ -67,12 +67,12 @@ export class IntegrityService extends BaseService {
   private integrityLock = false;
 
   /**
-   * Integrity checks read the filesystem directly (stat/walk/read streams) and are not yet
-   * S3-aware — on instances with an S3 storage backend they would report every S3-stored
-   * file as missing or corrupt, and "resolving" those false reports trashes healthy assets.
-   * Skip all integrity scan jobs whenever an S3 backend is configured, including mixed
-   * disk+S3 setups mid-migration. Tracked in https://github.com/open-noodle/gallery/issues/685.
-   */
+  Integrity checks read the filesystem directly (stat/walk/read streams) and are not yet
+  S3-aware — on instances with an S3 storage backend they would report every S3-stored
+  file as missing or corrupt, and "resolving" those false reports trashes healthy assets.
+  Skip all integrity scan jobs whenever an S3 backend is configured, including mixed
+  disk+S3 setups mid-migration. Tracked in https://github.com/open-noodle/gallery/issues/685.
+  */
   private skipIfS3Configured(): boolean {
     if (StorageService.getS3Backend()) {
       this.logger.warn(

@@ -743,7 +743,7 @@ export class FaceRepairService extends BaseService {
     // flatMap, not map: a survivor with no context row is dropped rather than emitted half-populated.
     const flaggedFaces = (byPerson.get(personGroupId) ?? []).flatMap((f) => {
       const context = contextByFace.get(f.assetFaceId);
-      return context ? [{ assetFaceId: f.assetFaceId, suspectedOwnerId: f.suspectedOwnerId, ...context }] : [];
+      return context ? { assetFaceId: f.assetFaceId, suspectedOwnerId: f.suspectedOwnerId, ...context } : [];
     });
     return { personId: personGroupId, flaggedFaces };
   }

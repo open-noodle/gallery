@@ -26,13 +26,13 @@ export class DownloadRepository {
   }
 
   /**
-   * #1048: `albumSpaceIds` are the live member-spaces the SERVICE resolved for this caller
-   * (`getAlbumSpaceIds`) — the viewer's spaces linking the album, or the single tethered space of a
-   * share link. When set, the archive unions the cross-owner `album_space_asset` contributions
-   * (#764) the album grid already shows; a personal album, an `album_user` share and a spaceless
-   * link all resolve none and read `album_asset` alone, exactly as before. Same contract as
-   * `AssetRepository`'s album arm, so browse and download can't disagree.
-   */
+  #1048: `albumSpaceIds` are the live member-spaces the SERVICE resolved for this caller
+  (`getAlbumSpaceIds`) — the viewer's spaces linking the album, or the single tethered space of a
+  share link. When set, the archive unions the cross-owner `album_space_asset` contributions
+  (#764) the album grid already shows; a personal album, an `album_user` share and a spaceless
+  link all resolve none and read `album_asset` alone, exactly as before. Same contract as
+  `AssetRepository`'s album arm, so browse and download can't disagree.
+  */
   downloadAlbumId(albumId: string, albumSpaceIds?: string[]) {
     return (
       builder(this.db)

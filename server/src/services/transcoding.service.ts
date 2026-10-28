@@ -119,10 +119,10 @@ export class TranscodingService extends BaseService {
   }
 
   /**
-   * Release the session's materialized local input file. Null-safe (a session that never
-   * transcoded has nothing to clean), idempotent (nulls the handle so repeat teardown
-   * paths are no-ops), and rejection-safe (a failed download left no temp file to remove).
-   */
+  Release the session's materialized local input file. Null-safe (a session that never
+  transcoded has nothing to clean), idempotent (nulls the handle so repeat teardown
+  paths are no-ops), and rejection-safe (a failed download left no temp file to remove).
+  */
   private async cleanupSessionInput(session: Session) {
     const input = session.input;
     session.input = null;

@@ -177,14 +177,14 @@ export class StackRepository {
   }
 
   /**
-   * Expand a set of asset ids to include every other (non-deleted) asset that
-   * shares a stack with any of them. Assets with no stack map to themselves.
-   * Used to keep shared-space membership stack-atomic: adding/removing any
-   * member of a stack must add/remove the whole stack, otherwise a stack child
-   * can end up contributed to a space while its collapse-primary is not — the
-   * asset then counts toward the space but never renders in the (stack-collapsed)
-   * timeline. See discussion #751.
-   */
+  Expand a set of asset ids to include every other (non-deleted) asset that
+  shares a stack with any of them. Assets with no stack map to themselves.
+  Used to keep shared-space membership stack-atomic: adding/removing any
+  member of a stack must add/remove the whole stack, otherwise a stack child
+  can end up contributed to a space while its collapse-primary is not — the
+  asset then counts toward the space but never renders in the (stack-collapsed)
+  timeline. See discussion #751.
+  */
   async getStackedAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
     if (assetIds.length === 0) {
       return [];

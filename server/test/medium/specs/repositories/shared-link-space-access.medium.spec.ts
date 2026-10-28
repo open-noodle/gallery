@@ -1,13 +1,13 @@
 /**
- * Medium tests for `AccessRepository.asset.checkSharedLinkAccess` — the #1018 space tether.
- *
- * A share link created from inside a space (`shared_link.spaceId`) may serve assets its creator
- * does not own. Those are NOT granted by the `shared_link_asset` row alone: on every read they are
- * re-derived from live space state, so withdrawing a photo from the space, unlinking the album, or
- * the link creator leaving the space all revoke public access immediately.
- *
- * Assets the link creator DOES own are unaffected by any of that — they were always theirs to share.
- */
+Medium tests for `AccessRepository.asset.checkSharedLinkAccess` — the #1018 space tether.
+
+A share link created from inside a space (`shared_link.spaceId`) may serve assets its creator
+does not own. Those are NOT granted by the `shared_link_asset` row alone: on every read they are
+re-derived from live space state, so withdrawing a photo from the space, unlinking the album, or
+the link creator leaving the space all revoke public access immediately.
+
+Assets the link creator DOES own are unaffected by any of that — they were always theirs to share.
+*/
 import { Kysely, sql } from 'kysely';
 import { randomBytes } from 'node:crypto';
 import { AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
@@ -44,9 +44,9 @@ beforeAll(async () => {
 });
 
 /**
- * A space with a sharer (Editor, who makes the link) and a contributor (Editor, who owns the
- * photo). `contributedAsset` is owned by the contributor, never by the sharer.
- */
+A space with a sharer (Editor, who makes the link) and a contributor (Editor, who owns the
+photo). `contributedAsset` is owned by the contributor, never by the sharer.
+*/
 const seedSpace = async () => {
   const { ctx, accessRepo, albumRepo, sharedLinkRepo } = setup();
   const { user: sharer } = await ctx.newUser();
@@ -276,9 +276,9 @@ describe('checkSharedLinkAccess — album link from a space', () => {
 });
 
 /**
- * The count behind the link has to agree with the grid the link renders, so it counts the same
- * contributions — and only the ones belonging to the link's own space.
- */
+The count behind the link has to agree with the grid the link renders, so it counts the same
+contributions — and only the ones belonging to the link's own space.
+*/
 describe('getMetadataForIds — space-scoped contributed arm (#1018)', () => {
   it('counts a contribution made to the given space', async () => {
     const { ctx, albumRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
@@ -318,9 +318,9 @@ describe('getMetadataForIds — space-scoped contributed arm (#1018)', () => {
 });
 
 /**
- * The payload the visitor's page is built from (`GET /shared-links/me`) has to list the same assets
- * the access gate serves, or the grid renders holes.
- */
+The payload the visitor's page is built from (`GET /shared-links/me`) has to list the same assets
+the access gate serves, or the grid renders holes.
+*/
 describe('SharedLinkRepository.get — payload (#1018)', () => {
   it('lists an asset contributed by another member on an individual link', async () => {
     const { ctx, sharedLinkRepo, sharer, space, contributedAsset } = await seedSpace();

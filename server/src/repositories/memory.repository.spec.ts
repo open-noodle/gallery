@@ -21,11 +21,11 @@ const offlineDialect = () => ({
 const offlineKysely = () => new Kysely<DB>({ dialect: offlineDialect() });
 
 /**
- * `searchAccessible` ends in `.execute()`, so its SQL cannot be reached through `.compile()`
- * the way the builders can. The DummyDriver still runs the query (returning no rows) and Kysely
- * still emits the compiled statement to `log`, so recording it there is the only way to assert
- * on the query the fork's served path actually sends.
- */
+`searchAccessible` ends in `.execute()`, so its SQL cannot be reached through `.compile()`
+the way the builders can. The DummyDriver still runs the query (returning no rows) and Kysely
+still emits the compiled statement to `log`, so recording it there is the only way to assert
+on the query the fork's served path actually sends.
+*/
 const recordingRepository = () => {
   const queries: CompiledQuery[] = [];
   const db = new Kysely<DB>({

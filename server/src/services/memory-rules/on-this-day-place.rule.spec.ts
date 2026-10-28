@@ -37,6 +37,7 @@ const cityAssets = (
   }));
 
 /** The rule needs a place in two years; most tests only care about what happens in one of them. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const otherYear = (city: string, count = 5, year = 2021, country = 'France') => cityAssets(year, city, count, country);
 
 const ruleWith = (assets: MemoryPeriodAsset[]) => {

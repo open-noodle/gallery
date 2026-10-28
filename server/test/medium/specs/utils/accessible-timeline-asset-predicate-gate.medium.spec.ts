@@ -29,6 +29,7 @@ const setup = () => {
   return { ctx };
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const selectAccessible = async (userId: string, hasTimelineSpaces: boolean): Promise<Set<string>> => {
   const predicate = accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces });
   const result = await sql<{ id: string }>`

@@ -43,13 +43,13 @@ const insertFolder = async (
 };
 
 /**
- * Fixture helper: creates a folder through the repository and unwraps the capped result.
- *
- * `createAlbumFolder` enforces the per-space cap inside its own locked transaction, so it returns
- * a discriminated result rather than a row. Fixtures are never trying to exercise the cap — they
- * pass NO_FIXTURE_CAP and treat anything but 'ok' as a broken fixture, loudly. The cap's own
- * behaviour is covered by the P-06 tests, which pass a deliberately small cap.
- */
+Fixture helper: creates a folder through the repository and unwraps the capped result.
+
+`createAlbumFolder` enforces the per-space cap inside its own locked transaction, so it returns
+a discriminated result rather than a row. Fixtures are never trying to exercise the cap — they
+pass NO_FIXTURE_CAP and treat anything but 'ok' as a broken fixture, loudly. The cap's own
+behaviour is covered by the P-06 tests, which pass a deliberately small cap.
+*/
 const NO_FIXTURE_CAP = 10_000;
 
 const createFolder = async (
@@ -64,6 +64,7 @@ const createFolder = async (
 };
 
 /** Fails loudly instead of hanging the run if a guard is ever removed. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const withinTimeout = async <T>(label: string, work: Promise<T>, ms = 15_000): Promise<T> => {
   let timer: NodeJS.Timeout | undefined;
   const bomb = new Promise<never>((_, reject) => {

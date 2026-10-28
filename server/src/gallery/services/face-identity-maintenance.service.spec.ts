@@ -19,6 +19,7 @@ const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
     ...overrides,
   });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const configValidateTestConfig = (enabled: boolean, maxDistance: number, suggestionMaxDistance: number) =>
   ({
     machineLearning: {
@@ -30,6 +31,7 @@ const onConfigUpdateTestConfig = (
   suggestionsEnabled: boolean,
   machineLearningEnabled: boolean = true,
   facialRecognitionEnabled: boolean = true,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   recognitionMaxDistance: number = 0.5,
   suggestionsMaxDistance: number = 0.7,
 ) =>
@@ -91,6 +93,7 @@ describe(FaceIdentityMaintenanceService.name, () => {
   // `mocks.systemMetadata.get` is one mock shared by every key, so a bare `mockResolvedValue` would answer the
   // one-shot suggestion-sweep marker AND the system config with the same object. These two helpers key on the
   // metadata key so a test can pin one without disturbing the other.
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const useSuggestionSweepAlreadyRun = (config?: unknown) =>
     mocks.systemMetadata.get.mockImplementation(
       (key: SystemMetadataKey) =>

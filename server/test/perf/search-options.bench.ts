@@ -1,11 +1,11 @@
 /**
- * `POST /search/options` on a 500,000-asset library, against what the mobile app triggers today on every filter change
- * (`GET /search/suggestions/filters`). Opt-in: see test/perf/README.md. Results and conclusions:
- * specs/research/2026-10-23-search-options-500k-benchmark.md.
- *
- * Everything is timed at the service level, so each number covers the same scope resolution and SQL the endpoint runs
- * (no HTTP). The library is seeded set-based (`generate_series`) into a dedicated container and ANALYZEd.
- */
+`POST /search/options` on a 500,000-asset library, against what the mobile app triggers today on every filter change
+(`GET /search/suggestions/filters`). Opt-in: see test/perf/README.md. Results and conclusions:
+specs/research/2026-10-23-search-options-500k-benchmark.md.
+
+Everything is timed at the service level, so each number covers the same scope resolution and SQL the endpoint runs
+(no HTTP). The library is seeded set-based (`generate_series`) into a dedicated container and ANALYZEd.
+*/
 import { CompiledQuery, Kysely, sql } from 'kysely';
 import { writeFileSync } from 'node:fs';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
@@ -70,9 +70,9 @@ let container: StartedTestContainer;
 let db: Kysely<DB>;
 
 /**
- * `BENCH_DB_URL` reuses a database (seeded on first use, kept afterwards), so the 500k seed is paid once while
- * iterating; otherwise a throwaway container is started and stopped.
- */
+`BENCH_DB_URL` reuses a database (seeded on first use, kept afterwards), so the 500k seed is paid once while
+iterating; otherwise a throwaway container is started and stopped.
+*/
 const startDatabase = async () => {
   if (process.env.BENCH_DB_URL) {
     db = new Kysely<DB>(getKyselyConfig({ connectionType: 'url', url: process.env.BENCH_DB_URL }));
@@ -340,11 +340,11 @@ const seed = async (): Promise<World> => {
 };
 
 /**
- * Photos reach a viewer from many spaces: 8 more spaces of skewed sizes (~345k assets), 2–5 contributing members each,
- * shown in the owner's timeline for 5 and hidden for 3; ~15% of the owner's own assets also linked into 1–2 spaces and
- * ~10% of each space's assets also in a second space (dedup must hold); 50–300 space people per space, Zipf-skewed,
- * identity-linked like production's backfill. Seeded once on top of the base library (`bench_space` marks it).
- */
+Photos reach a viewer from many spaces: 8 more spaces of skewed sizes (~345k assets), 2–5 contributing members each,
+shown in the owner's timeline for 5 and hidden for 3; ~15% of the owner's own assets also linked into 1–2 spaces and
+~10% of each space's assets also in a second space (dedup must hold); 50–300 space people per space, Zipf-skewed,
+identity-linked like production's backfill. Seeded once on top of the base library (`bench_space` marks it).
+*/
 type BenchSpace = { idx: number; id: string; size: number; shown: boolean; topPerson: string };
 
 const spaceShapes = [
@@ -502,9 +502,9 @@ type State = {
 };
 
 /**
- * Runs `fn` against a database handle that records every statement with its duration, then EXPLAINs (ANALYZE,
- * BUFFERS) each one with its parameters: the slowest statements of a case, plan included.
- */
+Runs `fn` against a database handle that records every statement with its duration, then EXPLAINs (ANALYZE,
+BUFFERS) each one with its parameters: the slowest statements of a case, plan included.
+*/
 const explainStatements = async (fn: (traced: Kysely<DB>) => Promise<unknown>) => {
   const statements: Array<{ sql: string; parameters: readonly unknown[]; ms: number }> = [];
   const url =

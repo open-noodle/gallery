@@ -74,11 +74,11 @@ export type MergeIdentitiesResult = {
 };
 
 /**
- * A pair of `shared_space_person` rows in the SAME space that both hold one side of an identity
- * merge — one row on the target identity, one on a source identity. Merging would collide with the
- * `(spaceId, identityId)` unique partial index, so these pairs are collapsed (loser folded into the
- * survivor) before the identity merge runs.
- */
+A pair of `shared_space_person` rows in the SAME space that both hold one side of an identity
+merge — one row on the target identity, one on a source identity. Merging would collide with the
+`(spaceId, identityId)` unique partial index, so these pairs are collapsed (loser folded into the
+survivor) before the identity merge runs.
+*/
 export type SpaceMergeConflictPair = {
   spaceId: string;
   sourceId: string;
@@ -198,10 +198,10 @@ type RepairProfile = {
 };
 
 /**
- * An origin profile of a scoped merge, resolved with the merge RBAC: the actor's own `person`, or a
- * `shared_space_person` in a space where they are Owner/Editor. `identityId` may be null — a profile that
- * predates the identity model gets one minted by the planner rather than being refused.
- */
+An origin profile of a scoped merge, resolved with the merge RBAC: the actor's own `person`, or a
+`shared_space_person` in a space where they are Owner/Editor. `identityId` may be null — a profile that
+predates the identity model gets one minted by the planner rather than being refused.
+*/
 export type ScopedMergeOrigin = {
   kind: ProfileKind;
   id: string;
@@ -217,10 +217,10 @@ type AccessiblePeopleIdentityPageRow = {
 };
 
 /**
- * What the page query actually returns before the repository tidies it. `identityId` is null only
- * on the placeholder row a `withTotals` query emits when the requested page is past the end — the
- * row that still carries the header figures. Kept private so no consumer has to think about it.
- */
+What the page query actually returns before the repository tidies it. `identityId` is null only
+on the placeholder row a `withTotals` query emits when the requested page is past the end — the
+row that still carries the header figures. Kept private so no consumer has to think about it.
+*/
 type AccessiblePeoplePageRawRow = {
   identityId: string | null;
   visibleAssetCount: string | number;
@@ -229,10 +229,10 @@ type AccessiblePeoplePageRawRow = {
 };
 
 /**
- * Reshape the page query's rows into the map {@link FaceIdentityRepository.hydrateAccessiblePeople}
- * takes, so hydrate does not recompute a count the page query already produced. `visibleAssetCount`
- * arrives as a string when postgres returns the bigint aggregate.
- */
+Reshape the page query's rows into the map {@link FaceIdentityRepository.hydrateAccessiblePeople}
+takes, so hydrate does not recompute a count the page query already produced. `visibleAssetCount`
+arrives as a string when postgres returns the bigint aggregate.
+*/
 const toAssetCounts = (rows: AccessiblePeopleIdentityPageRow[]): ReadonlyMap<string, number> =>
   new Map(rows.map((row) => [row.identityId, Number(row.visibleAssetCount)]));
 
@@ -935,13 +935,13 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * Does this viewer belong to any space whose assets appear on their timeline surfaces?
-   *
-   * When they do not, every space arm of {@link accessibleTimelineAssetPredicate} is dead and the
-   * People-page aggregates can run a far cheaper predicate. This is a single indexed lookup, and
-   * it is resolved per request rather than cached so that joining or leaving a space takes effect
-   * on the next page load.
-   */
+  Does this viewer belong to any space whose assets appear on their timeline surfaces?
+  
+  When they do not, every space arm of {@link accessibleTimelineAssetPredicate} is dead and the
+  People-page aggregates can run a far cheaper predicate. This is a single indexed lookup, and
+  it is resolved per request rather than cached so that joining or leaving a space takes effect
+  on the next page load.
+  */
   private async hasTimelineSpaces(userId: string): Promise<boolean> {
     const row = await this.db
       .selectFrom('shared_space_member')
@@ -1324,13 +1324,13 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * Resolve the identity-wide person view for a viewer who already holds a person row for that
-   * identity (typically the library owner accessing their own person). Mirrors the read-time
-   * name/birthday resolution used by {@link getAccessiblePersonByProfileId}, so an owner viewing a
-   * single person sees a birthday set on a sibling shared-space profile of the same identity rather
-   * than the raw (often empty) `person.birthDate`. Not decorated with `@GenerateSql`: it issues the
-   * exact `hydrateAccessiblePeople` query already documented under that method.
-   */
+  Resolve the identity-wide person view for a viewer who already holds a person row for that
+  identity (typically the library owner accessing their own person). Mirrors the read-time
+  name/birthday resolution used by {@link getAccessiblePersonByProfileId}, so an owner viewing a
+  single person sees a birthday set on a sibling shared-space profile of the same identity rather
+  than the raw (often empty) `person.birthDate`. Not decorated with `@GenerateSql`: it issues the
+  exact `hydrateAccessiblePeople` query already documented under that method.
+  */
   async getResolvedPersonByIdentityId(userId: string, identityId: string): Promise<PersonResponseDto | undefined> {
     const people = await this.hydrateAccessiblePeople({ userId, identityIds: [identityId], withHidden: false });
     return people[0];
@@ -1413,12 +1413,12 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * Resolve the origin profiles a scoped merge names, applying the merge RBAC to each: a `person` ref must
-   * be the actor's own, a `space-person` ref must sit in a space where the actor is Owner/Editor. Returns
-   * null if any ref fails to resolve, so the caller refuses the whole merge rather than silently dropping a
-   * source. Unlike the profiles the planner later fans out to, these are the ones the actor explicitly named
-   * — the fan-out is deliberately not RBAC-filtered (see IdentityMergePropagationService).
-   */
+  Resolve the origin profiles a scoped merge names, applying the merge RBAC to each: a `person` ref must
+  be the actor's own, a `space-person` ref must sit in a space where the actor is Owner/Editor. Returns
+  null if any ref fails to resolve, so the caller refuses the whole merge rather than silently dropping a
+  source. Unlike the profiles the planner later fans out to, these are the ones the actor explicitly named
+  — the fan-out is deliberately not RBAC-filtered (see IdentityMergePropagationService).
+  */
   async resolveScopedMergeOrigins(
     actorUserId: string,
     refs: ScopedPersonProfileRefDto[],
@@ -1685,9 +1685,9 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * The page plus the library-wide header figures, from one query. See {@link withTotals} on
-   * {@link queryAccessiblePeoplePage} for why the totals are not simply the page's own numbers.
-   */
+  The page plus the library-wide header figures, from one query. See {@link withTotals} on
+  {@link queryAccessiblePeoplePage} for why the totals are not simply the page's own numbers.
+  */
   @GenerateSql({
     params: [
       { userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3, hasTimelineSpaces: true },
@@ -1725,11 +1725,11 @@ export class FaceIdentityRepository {
     /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
     hasTimelineSpaces?: boolean;
     /**
-     * Also derive the library-wide total/hidden header figures from the CTEs this query already
-     * builds, instead of a third query that rebuilt them from scratch. Every
-     * returned row carries them; a page past the end returns a single row whose `identityId` is
-     * null and which carries only the totals.
-     */
+    Also derive the library-wide total/hidden header figures from the CTEs this query already
+    builds, instead of a third query that rebuilt them from scratch. Every
+    returned row carries them; a page past the end returns a single row whose `identityId` is
+    null and which carries only the totals.
+    */
     withTotals?: boolean;
   }): Promise<AccessiblePeoplePageRawRow[]> {
     const searchName = input.searchName ?? '';
@@ -1958,21 +1958,21 @@ export class FaceIdentityRepository {
     identityIds: string[];
     withHidden: boolean;
     /**
-     * Per-identity `COUNT(DISTINCT assetId)` the caller has already computed, keyed by identity id.
-     *
-     * `getAccessiblePeopleIdentityPage` produces exactly this number (its `visibleAssetCount`) for
-     * every identity it returns, so the two callers that page first — {@link getAccessiblePeople}
-     * and {@link searchAccessiblePeople} — can hand it over instead of making this query rebuild
-     * the `accessible_faces` CTE to recompute the identical value. On a large library that
-     * recomputation dominated `GET /api/people`.
-     *
-     * Supplying it must not change the result. Two invariants make that hold, and both are pinned
-     * by tests: the counts are the same aggregate over the same CTE definition, and an identity
-     * only reaches this method because the page query already established it is accessible — which
-     * is what the dropped `EXISTS (accessible_faces)` guard was re-checking. Identities absent from
-     * the map (or counted zero, which the page query never emits) are dropped, matching the
-     * uncounted path where they fall out of `ranked_profiles`.
-     */
+    Per-identity `COUNT(DISTINCT assetId)` the caller has already computed, keyed by identity id.
+    
+    `getAccessiblePeopleIdentityPage` produces exactly this number (its `visibleAssetCount`) for
+    every identity it returns, so the two callers that page first — {@link getAccessiblePeople}
+    and {@link searchAccessiblePeople} — can hand it over instead of making this query rebuild
+    the `accessible_faces` CTE to recompute the identical value. On a large library that
+    recomputation dominated `GET /api/people`.
+    
+    Supplying it must not change the result. Two invariants make that hold, and both are pinned
+    by tests: the counts are the same aggregate over the same CTE definition, and an identity
+    only reaches this method because the page query already established it is accessible — which
+    is what the dropped `EXISTS (accessible_faces)` guard was re-checking. Identities absent from
+    the map (or counted zero, which the page query never emits) are dropped, matching the
+    uncounted path where they fall out of `ranked_profiles`.
+    */
     assetCounts?: ReadonlyMap<string, number>;
     /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
     hasTimelineSpaces?: boolean;
@@ -2348,14 +2348,14 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * The space person's identity, minting one if it has none.
-   *
-   * `adoptIdentityId`: when the space person has no identity yet, take this existing one instead of
-   * minting a new one. The caller passes it when the space person is the same human as an existing
-   * owner person (§6.3.1), so the owner layer reuses that person rather than gaining a duplicate.
-   * Skipped when another space person in the same space already holds the identity, because
-   * `(spaceId, identityId)` is unique; the person then gets a fresh identity as before.
-   */
+  The space person's identity, minting one if it has none.
+  
+  `adoptIdentityId`: when the space person has no identity yet, take this existing one instead of
+  minting a new one. The caller passes it when the space person is the same human as an existing
+  owner person (§6.3.1), so the owner layer reuses that person rather than gaining a duplicate.
+  Skipped when another space person in the same space already holds the identity, because
+  `(spaceId, identityId)` is unique; the person then gets a fresh identity as before.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async ensureSpacePersonIdentity(
     spacePersonId: string,
@@ -2565,12 +2565,12 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * Returns the asset-face ids actually written. With `requirePersonId` set, only faces still assigned to
-   * that person are written (H5): the caller's eligibility read happens outside the transaction, so a
-   * concurrent reassign would otherwise leave the face on one person while this re-points its identity to
-   * another — the torn state `reattributeFaces` and `detachFaces` both guard against at write time, and
-   * which a later FaceIdentityBackfill resolves in the wrong direction.
-   */
+  Returns the asset-face ids actually written. With `requirePersonId` set, only faces still assigned to
+  that person are written (H5): the caller's eligibility read happens outside the transaction, so a
+  concurrent reassign would otherwise leave the face on one person while this re-points its identity to
+  another — the torn state `reattributeFaces` and `detachFaces` both guard against at write time, and
+  which a later FaceIdentityBackfill resolves in the wrong direction.
+  */
   async replaceFaceIdentities(
     input: {
       assetFaceIds: string[];
@@ -3703,12 +3703,12 @@ export class FaceIdentityRepository {
   }
 
   /**
-   * Returns the same-space `shared_space_person` conflict pairs that block this identity merge:
-   * for every space holding both a target-identity row and a source-identity row, the two rows with
-   * the fields needed to choose a collapse survivor (id, name, nameSource, faceCount). Spans all
-   * spaces because {@link mergeIdentities} checks conflicts globally — collapsing only the current
-   * space would still leave the merge blocked by another space's pair.
-   */
+  Returns the same-space `shared_space_person` conflict pairs that block this identity merge:
+  for every space holding both a target-identity row and a source-identity row, the two rows with
+  the fields needed to choose a collapse survivor (id, name, nameSource, faceCount). Spans all
+  spaces because {@link mergeIdentities} checks conflicts globally — collapsing only the current
+  space would still leave the merge blocked by another space's pair.
+  */
   async getSpaceMergeConflictPairs(input: {
     targetIdentityId: string;
     sourceIdentityIds: string[];

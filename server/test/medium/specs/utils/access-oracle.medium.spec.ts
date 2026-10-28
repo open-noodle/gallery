@@ -1,9 +1,9 @@
 /**
- * Access oracle: runs checkAccess for every Permission, for a fixed cast of actors, over every fixture id, and
- * snapshots the granted ids by label. Any change to who can reach what shows up as a snapshot diff, so a refactor of
- * the grant code (upstream switch plus src/gallery/utils/access-grants.ts) must leave this file's snapshot untouched.
- * A new upstream Permission adds a snapshot entry: review it, then update with `-u`.
- */
+Access oracle: runs checkAccess for every Permission, for a fixed cast of actors, over every fixture id, and
+snapshots the granted ids by label. Any change to who can reach what shows up as a snapshot diff, so a refactor of
+the grant code (upstream switch plus src/gallery/utils/access-grants.ts) must leave this file's snapshot untouched.
+A new upstream Permission adds a snapshot entry: review it, then update with `-u`.
+*/
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, Permission, SharedLinkType } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';

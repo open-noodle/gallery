@@ -17,6 +17,7 @@ import { getKyselyDB } from 'test/utils.js';
 // it, and check the payload follows the owner's row and ignores another user's.
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(JobService, {
     database: db || defaultDatabase,

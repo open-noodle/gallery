@@ -10,6 +10,7 @@ import { PersonFactory } from 'test/factories/person.factory.js';
 import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const prefsMetadata = (minimumFaces: number) =>
   [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
 

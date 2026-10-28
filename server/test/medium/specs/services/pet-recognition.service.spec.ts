@@ -45,6 +45,7 @@ const axisEmbedding = (axis: 'first' | 'second') => {
 // A small perturbation of axisEmbedding('first'): flips a handful of the 256 "on" dimensions off.
 // Cosine distance from the pure axis is small (a near-identical pet, e.g. a second photo of the
 // same dog), unlike axisEmbedding('second') which is maximally far.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const nearAxisEmbedding = (axis: 'first' | 'second', flips: number) => {
   const values = Array.from({ length: 512 }, (_, index) => {
     const inFirstHalf = index < 256;
@@ -56,6 +57,7 @@ const nearAxisEmbedding = (axis: 'first' | 'second', flips: number) => {
   return '[' + values.join(',') + ']';
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   clearConfigCache();
   const { sut, ctx } = newMediumService(PetRecognitionService, {

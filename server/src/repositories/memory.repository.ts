@@ -60,20 +60,20 @@ export class MemoryRepository implements IBulkAsset {
   }
 
   /**
-   * #486 hides memories that are scheduled but not yet shown, for callers that say nothing about
-   * `showAt`. immich-28675 turned that into an explicit, three-state request:
-   *
-   * - `isUpcoming: true`  — only the memories #486 hides. Applying #486 too makes the query
-   *   provably empty.
-   * - `isUpcoming: false` — the same thing #486 implies, stated by the caller.
-   * - omitted             — no `showAt` scoping at all.
-   *
-   * The omitted case is why `hideUnshownByDefault` exists rather than a check on `dto`: upstream's
-   * index says "show upcoming memories" by *leaving the parameter out*, which at this level is
-   * indistinguishable from a legacy caller relying on #486. So the default is kept on the fork's
-   * internal owner-scoped path and dropped on `GET /memories`, whose contract is upstream's. A
-   * `for` window (the memory lane) still carries its own `showAt <= for` bound on both paths.
-   */
+  #486 hides memories that are scheduled but not yet shown, for callers that say nothing about
+  `showAt`. immich-28675 turned that into an explicit, three-state request:
+  
+  - `isUpcoming: true`  — only the memories #486 hides. Applying #486 too makes the query
+    provably empty.
+  - `isUpcoming: false` — the same thing #486 implies, stated by the caller.
+  - omitted             — no `showAt` scoping at all.
+  
+  The omitted case is why `hideUnshownByDefault` exists rather than a check on `dto`: upstream's
+  index says "show upcoming memories" by *leaving the parameter out*, which at this level is
+  indistinguishable from a legacy caller relying on #486. So the default is kept on the fork's
+  internal owner-scoped path and dropped on `GET /memories`, whose contract is upstream's. A
+  `for` window (the memory lane) still carries its own `showAt <= for` bound on both paths.
+  */
   private baseSearchBuilder(dto: MemorySearchDto, { hideUnshownByDefault }: { hideUnshownByDefault: boolean }) {
     // immich-32166: showAt holds a calendar date as UTC midnight, so "now" is the wall clock read as UTC.
     const visibleAt = dto.for ?? asLocalTime(DateTime.now());

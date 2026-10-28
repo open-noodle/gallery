@@ -19,6 +19,7 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const result = newMediumService(SharedSpaceService, {
     database: db || defaultDatabase,
@@ -52,24 +53,24 @@ const authFromUser = (actor: { id: string; email: string }) =>
 
 describe('SharedSpaceService — space-album permission matrix', () => {
   /**
-   * Fixture world (created once in beforeAll, shared across all Grid tests):
-   *
-   *  Space S  — links album A
-   *  Space S2 — links album C
-   *  Album B  — not linked to any space
-   *
-   *  Actors:
-   *    spaceOwner  — owner member of S (non-admin user)
-   *    spaceEditor — editor member of S
-   *    spaceViewer — viewer member of S
-   *    nonMember   — no membership anywhere
-   *    albumOwner  — album_user owner on A, NOT in S
-   *    albumEditor — album_user editor on A, NOT in S
-   *    albumViewer — album_user viewer on A, NOT in S
-   *    crossEditor — editor of S2, NOT in S
-   *
-   *  assetInA — an asset inside album A (owned by albumOwner)
-   */
+  Fixture world (created once in beforeAll, shared across all Grid tests):
+  
+   Space S  — links album A
+   Space S2 — links album C
+   Album B  — not linked to any space
+  
+   Actors:
+     spaceOwner  — owner member of S (non-admin user)
+     spaceEditor — editor member of S
+     spaceViewer — viewer member of S
+     nonMember   — no membership anywhere
+     albumOwner  — album_user owner on A, NOT in S
+     albumEditor — album_user editor on A, NOT in S
+     albumViewer — album_user viewer on A, NOT in S
+     crossEditor — editor of S2, NOT in S
+  
+   assetInA — an asset inside album A (owned by albumOwner)
+  */
 
   let world: {
     spaceS: string;

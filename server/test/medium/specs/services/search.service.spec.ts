@@ -1970,26 +1970,26 @@ describe(SearchService.name, () => {
   });
 
   /**
-   * The `ownerId` (contributor) filter on the SEARCH/MAP query builder.
-   *
-   * `ownerId` lives on BaseSearchSchema (search.dto.ts), so metadata/random/smart/statistics all
-   * inherit it, and `GET /gallery/map/markers` forwards it too — five endpoints whose ONLY
-   * implementation of the filter is a single clause in searchAssetBuilder (database.ts):
-   *
-   *     .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
-   *
-   * That is a DIFFERENT builder from the timeline's withTimeBucketAssetFilters (asset.repository.ts),
-   * whose equivalent contract is pinned by E20/E21/E21b/E21c in timeline.service.spec.ts. Until these
-   * tests existed, the whole 4,799-test unit suite stayed green with the clause above mutated to
-   * `.$if(false, …)`, and the only guards against merging ownerId into the `userIds` SCOPING
-   * predicate — a cross-owner widening leak — were service-level MOCK assertions, which a
-   * repository-level change bypasses entirely.
-   *
-   * Two mutations must break something here:
-   *   1. drop the AND  → a stranger's ownerId returns the caller's whole visible scope, not [].
-   *   2. anyUuid([...userIds, ownerId]) → the stranger's OWN assets come back. A real leak.
-   * Every assertion below is paired with a NON-EMPTY BASELINE, or "returns []" would prove nothing.
-   */
+  The `ownerId` (contributor) filter on the SEARCH/MAP query builder.
+  
+  `ownerId` lives on BaseSearchSchema (search.dto.ts), so metadata/random/smart/statistics all
+  inherit it, and `GET /gallery/map/markers` forwards it too — five endpoints whose ONLY
+  implementation of the filter is a single clause in searchAssetBuilder (database.ts):
+  
+      .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
+  
+  That is a DIFFERENT builder from the timeline's withTimeBucketAssetFilters (asset.repository.ts),
+  whose equivalent contract is pinned by E20/E21/E21b/E21c in timeline.service.spec.ts. Until these
+  tests existed, the whole 4,799-test unit suite stayed green with the clause above mutated to
+  `.$if(false, …)`, and the only guards against merging ownerId into the `userIds` SCOPING
+  predicate — a cross-owner widening leak — were service-level MOCK assertions, which a
+  repository-level change bypasses entirely.
+  
+  Two mutations must break something here:
+    1. drop the AND  → a stranger's ownerId returns the caller's whole visible scope, not [].
+    2. anyUuid([...userIds, ownerId]) → the stranger's OWN assets come back. A real leak.
+  Every assertion below is paired with a NON-EMPTY BASELINE, or "returns []" would prove nothing.
+  */
   describe('contextual filters — ownerId (searchAssetBuilder)', () => {
     it('narrows a Space search to one contributor', async () => {
       const { sut, ctx } = setup();
@@ -2065,12 +2065,12 @@ describe(SearchService.name, () => {
     });
 
     /**
-     * THE OTHER WIDENING VECTOR. The userIds clause that ANDs on the personal path
-     * (`!!options.userIds && !options.spaceId && !options.timelineSpaceIds`) is switched OFF once
-     * `withSharedSpaces` populates timelineSpaceIds — a different OR-group takes over. An
-     * implementer who merged ownerId into userIds inside THAT group would still pass every test
-     * above. These two are the E21b/E21c twins for the search path. Do not delete them.
-     */
+    THE OTHER WIDENING VECTOR. The userIds clause that ANDs on the personal path
+    (`!!options.userIds && !options.spaceId && !options.timelineSpaceIds`) is switched OFF once
+    `withSharedSpaces` populates timelineSpaceIds — a different OR-group takes over. An
+    implementer who merged ownerId into userIds inside THAT group would still pass every test
+    above. These two are the E21b/E21c twins for the search path. Do not delete them.
+    */
     it('E21b twin: ownerId of a stranger under withSharedSpaces returns EMPTY (the real leak vector)', async () => {
       const { sut, ctx } = setup();
       const { viewer, annaAsset, benAsset } = await createTwoOwnerSpace(ctx);

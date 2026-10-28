@@ -35,6 +35,7 @@ const setup = () => {
 
 type Ctx = ReturnType<typeof setup>['ctx'];
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const timelineAsset = async (ctx: Ctx, ownerId: string, when: Date, options: Record<string, unknown> = {}) => {
   const { asset } = await ctx.newAsset({
     ownerId,

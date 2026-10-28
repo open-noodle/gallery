@@ -4,9 +4,9 @@ import { DateTime, IANAZone } from 'luxon';
 const canonicalZone = (zone: string) => new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
 
 /**
- * The zone the server runs in (the `TZ` env var, else the system zone), or null
- * when that is UTC under any alias, so a UTC server stores no zone as before.
- */
+The zone the server runs in (the `TZ` env var, else the system zone), or null
+when that is UTC under any alias, so a UTC server stores no zone as before.
+*/
 export const getServerTimeZone = (): string | null => {
   const zone = DateTime.local().zoneName;
   if (!zone) {
@@ -31,13 +31,13 @@ export const getServerTimeZone = (): string | null => {
 };
 
 /**
- * exiftool assumes UTC only to parse a zone-less QuickTime timestamp: the instant is right but the
- * zone is unknown, so use the server's TZ, as the docs describe (#1147). exiftool reports the same
- * source when the date says +00:00 or Z outright (e.g. an iPhone video recorded in Lisbon); that UTC
- * came from the file, so it stays. Reads zoneSource only: exiftool-vendored 39 sets it alongside the
- * deprecated tzSource, and MetadataService clears zone/tz/zoneSource (not tzSource) when a sidecar
- * date replaces the file's, so a stale tzSource must not count.
- */
+exiftool assumes UTC only to parse a zone-less QuickTime timestamp: the instant is right but the
+zone is unknown, so use the server's TZ, as the docs describe (#1147). exiftool reports the same
+source when the date says +00:00 or Z outright (e.g. an iPhone video recorded in Lisbon); that UTC
+came from the file, so it stays. Reads zoneSource only: exiftool-vendored 39 sets it alongside the
+deprecated tzSource, and MetadataService clears zone/tz/zoneSource (not tzSource) when a sidecar
+date replaces the file's, so a stale tzSource must not count.
+*/
 export const resolveAssumedUtcVideoZone = (
   tags: Pick<Tags, 'zoneSource'>,
   rawDateTime: string | undefined,
@@ -52,9 +52,9 @@ export const resolveAssumedUtcVideoZone = (
 };
 
 /**
- * A file with no date in its metadata falls back to its earliest file timestamp. Keep that time's
- * local wall clock in whatever zone is known, else the server's TZ (#1147), instead of storing it as UTC.
- */
+A file with no date in its metadata falls back to its earliest file timestamp. Keep that time's
+local wall clock in whatever zone is known, else the server's TZ (#1147), instead of storing it as UTC.
+*/
 export const resolveDatelessFileDates = (earliestDate: DateTime, timeZone: string | null) => {
   const zone = timeZone ?? getServerTimeZone();
   const dateTimeOriginal = earliestDate.setZone(zone ?? 'UTC');

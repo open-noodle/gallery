@@ -17,6 +17,7 @@ const newMockLogger = () =>
 const newMockRequest = (overrides: Partial<Request> = {}) =>
   ({ destroyed: false, complete: true, ...overrides }) as unknown as Request;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const newMockResponse = (overrides: Partial<Response> = {}) =>
   ({ headersSent: false, ...overrides }) as unknown as Response;
 

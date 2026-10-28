@@ -1,33 +1,33 @@
 /**
- * Medium tests for `AccessRepository.spaceAsset.checkSpaceEditAccess` — the space-editor
- * write rule (#734, spec §2).
- *
- * Rule: you may edit an asset if you own it, or if you are Owner/Editor of a space
- * that shows it AND its owner is a member of that space.
- *
- * These tests are the only place S-7/S-8 (Hidden/Locked), S-9 (trashed), S-10/S-10b
- * (offline), S-11 (showInTimeline), S-12 (live-photo motion) and S-13/S-13b/S-13c
- * (wrong-space membership) can fail. A refactor that swaps the bespoke arms for
- * `spaceAssetPathBranches` drops those gates and still compiles — this file is what
- * catches it.
- *
- * The role × reach-path × owner-membership rule itself is covered below by a full
- * `describe.each`/`it.each` cross-product (`checkSpaceEditAccess — the full grant
- * matrix`), not by hand-written cases: reach path ∈ {direct, library, album,
- * contribution} × actor role ∈ {owner, editor, viewer, non-member} × asset-owner
- * membership ∈ {member, not-member}. `contribution` is the #764 cross-owner arm
- * (`album_space_asset`, folded into the album path via `spaceAlbumAssetExists` —
- * see `src/utils/shared-space-album-scope.ts`) and previously had zero coverage at
- * this rule level.
- *
- * Discipline: every deny cell must be non-vacuous. Each reach path's fixture
- * builder is reused, unchanged, by at least one GRANT cell (role ∈ {owner, editor}
- * with a member owner) in the same describe block — so a deny cell can never pass
- * merely because the asset was unreachable in the first place; it can only pass
- * because the specific gate (role, or owner membership) under test denied it. This
- * is exactly the bug item 1 of the #992 audit found in the sibling service spec:
- * a VIEWER-denial fixture that never made the asset editor-reachable at all.
- */
+Medium tests for `AccessRepository.spaceAsset.checkSpaceEditAccess` — the space-editor
+write rule (#734, spec §2).
+
+Rule: you may edit an asset if you own it, or if you are Owner/Editor of a space
+that shows it AND its owner is a member of that space.
+
+These tests are the only place S-7/S-8 (Hidden/Locked), S-9 (trashed), S-10/S-10b
+(offline), S-11 (showInTimeline), S-12 (live-photo motion) and S-13/S-13b/S-13c
+(wrong-space membership) can fail. A refactor that swaps the bespoke arms for
+`spaceAssetPathBranches` drops those gates and still compiles — this file is what
+catches it.
+
+The role × reach-path × owner-membership rule itself is covered below by a full
+`describe.each`/`it.each` cross-product (`checkSpaceEditAccess — the full grant
+matrix`), not by hand-written cases: reach path ∈ {direct, library, album,
+contribution} × actor role ∈ {owner, editor, viewer, non-member} × asset-owner
+membership ∈ {member, not-member}. `contribution` is the #764 cross-owner arm
+(`album_space_asset`, folded into the album path via `spaceAlbumAssetExists` —
+see `src/utils/shared-space-album-scope.ts`) and previously had zero coverage at
+this rule level.
+
+Discipline: every deny cell must be non-vacuous. Each reach path's fixture
+builder is reused, unchanged, by at least one GRANT cell (role ∈ {owner, editor}
+with a member owner) in the same describe block — so a deny cell can never pass
+merely because the asset was unreachable in the first place; it can only pass
+because the specific gate (role, or owner membership) under test denied it. This
+is exactly the bug item 1 of the #992 audit found in the sibling service spec:
+a VIEWER-denial fixture that never made the asset editor-reachable at all.
+*/
 import { Kysely } from 'kysely';
 import { AssetVisibility } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -78,11 +78,11 @@ type ActorRole = 'owner' | 'editor' | 'viewer' | 'non-member';
 type OwnerMembership = 'member' | 'not-member';
 
 /**
- * Builds the asset and its single reach path into `spaceId`, owned by `ownerId`.
- * Each builder inserts exactly the rows that path needs — nothing shared with the
- * other paths — so a deny result can only be explained by the role/membership gate
- * under test, never by an unrelated missing row.
- */
+Builds the asset and its single reach path into `spaceId`, owned by `ownerId`.
+Each builder inserts exactly the rows that path needs — nothing shared with the
+other paths — so a deny result can only be explained by the role/membership gate
+under test, never by an unrelated missing row.
+*/
 const reachPathBuilders: Record<
   ReachPath,
   (ctx: ReturnType<typeof setup>['ctx'], args: { spaceId: string; ownerId: string }) => Promise<{ assetId: string }>
