@@ -3,7 +3,6 @@ import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { withDefaultVisibility } from 'src/utils/database.js';
-import { setDifference } from 'src/utils/set.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
@@ -165,7 +164,7 @@ export class SpaceAssetAccess {
         (readable.has(id) ? allowed : denied).add(stackId);
       }
     }
-    return setDifference(allowed, denied);
+    return allowed.difference(denied);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID_SET] })
