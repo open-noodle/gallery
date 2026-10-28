@@ -40,6 +40,8 @@ Object? defaultResponse(String method, String path) => switch (path) {
     'hasAssetsInAlbum': false,
     'hasAssetsNotInAlbum': false,
     'hasFavorites': false,
+    'hasNoGpsAssets': false,
+    'hasNoPlaceNameAssets': false,
     'hasUnnamedPeople': false,
     'mediaTypes': <Object>[],
     'people': <Object>[],
