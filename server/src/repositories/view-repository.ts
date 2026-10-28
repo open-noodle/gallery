@@ -2,6 +2,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility } from 'src/enum.js';
+import { folderPathMatch } from 'src/gallery/utils/folder-path.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid, withExif } from 'src/utils/database.js';
@@ -49,7 +50,6 @@ export class ViewRepository {
     hiddenScope?: TimelineHiddenScope,
     visibleSpaceIds?: string[],
   ) {
-    const normalizedPath = partialPath.replaceAll(/\/$/g, '');
 
     return (
       this.db
@@ -69,8 +69,7 @@ export class ViewRepository {
         .where('fileCreatedAt', 'is not', null)
         .where('fileModifiedAt', 'is not', null)
         .where('localDateTime', 'is not', null)
-        .where('originalPath', 'like', `%${normalizedPath}/%`)
-        .where('originalPath', 'not like', `%${normalizedPath}/%/%`)
+        .where((eb) => folderPathMatch(eb, partialPath))
         .orderBy(
           (eb) => eb.fn('regexp_replace', ['asset.originalPath', eb.val('.*/(.+)'), eb.val(String.raw`\1`)]),
           'asc',

@@ -16,10 +16,10 @@ import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
 
 /**
- * -------------------------
- * Albums General Management
- * -------------------------
- */
+-------------------------
+Albums General Management
+-------------------------
+*/
 export const createAlbumAndRedirect = (name?: string, assetIds?: string[]) =>
   executeMutation(createAlbumMutation, [{ createAlbumDto: { albumName: name ?? '', assetIds } }], {
     onSuccess: (album) => void goto(Route.viewAlbum(album)),
@@ -41,10 +41,10 @@ export const isAlbumEditor = (album: AlbumResponseDto, userId: string) =>
   );
 
 /**
- * -------------
- * Album Sorting
- * -------------
- */
+-------------
+Album Sorting
+-------------
+*/
 export interface AlbumSortOptionMetadata {
   id: AlbumSortBy;
   defaultOrder: SortOrder;
@@ -97,10 +97,10 @@ export const findFilterOption = (filter: string) => {
 };
 
 /**
- * --------------
- * Album Grouping
- * --------------
- */
+--------------
+Album Grouping
+--------------
+*/
 export interface AlbumGroup {
   id: string;
   name: string;
@@ -151,10 +151,10 @@ export const getSelectedAlbumGroupOption = (settings: AlbumViewSettings) => {
 };
 
 /**
- * ----------------------------
- * Album Groups Collapse/Expand
- * ----------------------------
- */
+----------------------------
+Album Groups Collapse/Expand
+----------------------------
+*/
 const getCollapsedAlbumGroups = (settings: AlbumViewSettings) => {
   settings.collapsedGroups ??= {};
   const { collapsedGroups, groupBy } = settings;
