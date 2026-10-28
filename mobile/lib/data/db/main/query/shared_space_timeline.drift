@@ -158,6 +158,8 @@ WHERE
 	AND (
 		rae.stack_id IS NULL
 		OR rae.id = se.primary_asset_id
+		-- a cover that is not on the device shows its stack flat instead of hiding it
+		OR NOT EXISTS (SELECT 1 FROM remote_asset_entity cover WHERE cover.id = se.primary_asset_id)
 	)
 
 UNION ALL
@@ -305,6 +307,7 @@ FROM
 		AND (
 			rae.stack_id IS NULL
 			OR rae.id = se.primary_asset_id
+			OR NOT EXISTS (SELECT 1 FROM remote_asset_entity cover WHERE cover.id = se.primary_asset_id)
 		)
 	UNION ALL
 	SELECT
