@@ -1292,6 +1292,10 @@ void main() {
       await linkAssetToSpace('s1', 'a2');
     });
 
+    test('is a space timeline: every photo is in the space, so tiles carry no space badge', () {
+      expect(sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).origin, TimelineOrigin.remoteSpace);
+    });
+
     test('renders the resolved asset ids even though the viewer does not own them', () async {
       final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
       expect(assets.map((a) => (a as RemoteAsset).id), ['a1']);
