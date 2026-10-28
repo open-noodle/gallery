@@ -67,6 +67,17 @@ An earlier Gallery release refuses to start on a database that has Gallery migra
 
    This command does not go through the image's start script, so it does not read `*_FILE` secrets. If your compose file passes the database password or URL that way, add `-e DB_PASSWORD=<password>` (or `-e DB_URL=<url>`) to the `run` command.
 
+   The command undoes the most recently applied migration, which is not always the one with the newest name. Before moving on, check that every name the list shows is one the earlier release ships, not only the newest.
+
+   `1790900000000-SplitSharedPersonGroups` is the exception. It splits people that several users share one per user, and while any are split it can only be undone after every Gallery migration applied after it; the command refuses otherwise. If the list still shows it, the earlier release does not ship it, and this query returns a number above 0, delete only its record instead:
+
+   ```bash
+   docker compose exec database psql -U postgres -d immich -c 'SELECT count(*) FROM "person_group_split";'
+   docker compose exec database psql -U postgres -d immich -c "DELETE FROM \"gallery_migrations\" WHERE \"name\" = '1790900000000-SplitSharedPersonGroups';"
+   ```
+
+   The earlier release works with the split people. To run `revert-to-immich.sql` later, upgrade to this release again first: the earlier release's copy of the script does not put shared people back together.
+
 6. Releases before the separate `gallery_migrations` table (all of 5.7 and the 5.8 release candidates) look for their migration records in `kysely_migrations`. For those, copy the records back:
 
    ```bash

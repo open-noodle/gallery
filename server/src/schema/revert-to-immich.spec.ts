@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { personGroupRejoinStatements } from 'src/gallery/utils/person-group-split.js';
 
 // Note: co-located under src/schema/ (not server/test/) so it runs under the server:unit vitest
 // config, which only globs `src/**/*.spec.ts` — mirrors sync-gallery-migrations.spec.ts.
@@ -65,6 +66,7 @@ for (const file of migrationFiles) {
 // upstream schema again, so the revert keeps them: asset.isFavorite carries the owner's favorites.
 const restoredUpstreamColumns = new Set(['asset.isFavorite']);
 const onUpstreamTable = (entry: string) => !createdTables.has(entry.split('.', 1)[0]);
+const flat = (text: string) => text.replaceAll(/\s+/g, ' ');
 
 // Every table migrations-gallery CREATEs is a fork table and needs a revert entry.
 // (Was previously narrowed to shared_space* / *_audit, which silently excluded
@@ -185,5 +187,19 @@ describe('revert-to-immich.sql', () => {
     // run before the table is dropped
     expect(addColumn).toBeLessThan(backfill);
     expect(backfill).toBeLessThan(dropTable);
+  });
+
+  it('rejoins split person groups with the migration statements, after dropping the index and before section 2', () => {
+    const script = flat(sql);
+    const dropIndex = script.indexOf('DROP INDEX IF EXISTS "person_personGroupId_key"');
+    const section2 = script.indexOf('DROP TABLE IF EXISTS');
+    let previous = dropIndex;
+    expect(dropIndex).toBeGreaterThan(-1);
+    for (const statement of personGroupRejoinStatements) {
+      const at = script.indexOf(flat(statement), previous);
+      expect(at, statement).toBeGreaterThan(previous);
+      previous = at;
+    }
+    expect(previous).toBeLessThan(section2);
   });
 });
