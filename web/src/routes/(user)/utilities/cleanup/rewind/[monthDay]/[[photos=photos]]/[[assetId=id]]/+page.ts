@@ -1,7 +1,7 @@
 import { getCleanupRewindAssets, getCleanupRewindYears, type CleanupAssetDto } from '@immich/sdk';
 import { error } from '@sveltejs/kit';
+import { parseMonthDay } from '$lib/gallery/cleanup/cleanup';
 import { authenticate } from '$lib/utils/auth';
-import { parseMonthDay } from '$lib/utils/cleanup';
 import { getFormatter } from '$lib/utils/i18n';
 import type { PageLoad } from './$types';
 

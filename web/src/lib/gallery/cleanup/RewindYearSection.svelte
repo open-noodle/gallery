@@ -1,8 +1,8 @@
 <script lang="ts">
   import { flipMotion, pop } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
-  import type { RewindMark } from '$lib/managers/rewind-session.svelte';
+  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
+  import type { RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
   import type { CleanupAssetDto } from '@immich/sdk';
   import { Button, Heading, Icon } from '@immich/ui';
   import { mdiCheck, mdiHeart } from '@mdi/js';

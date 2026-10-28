@@ -2,7 +2,7 @@
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
-  import { monthDayLabel } from '$lib/utils/cleanup';
+  import { monthDayLabel } from '$lib/gallery/cleanup/cleanup';
   import { AssetMediaSize, type CleanupAssetDto } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
   import { mdiCheck, mdiClose, mdiHeart } from '@mdi/js';

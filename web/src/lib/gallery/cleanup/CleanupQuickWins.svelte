@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import CleanupQuickWinCard from '$lib/gallery/cleanup/CleanupQuickWinCard.svelte';
   import { staggerDelay } from '$lib/gallery/motion';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
-  import { queueToSlug } from '$lib/utils/cleanup';
+  import { queueToSlug } from '$lib/gallery/cleanup/cleanup';
   import {
     CleanupCountQueue,
     type CleanupAssetDto,
@@ -37,7 +38,7 @@
   const hrefFor = (queue: CleanupCountQueue) =>
     queue === CleanupCountQueue.Duplicates
       ? Route.duplicatesUtility()
-      : Route.cleanupQueue({ queue: queueToSlug(queue) });
+      : CleanupRoute.queue({ queue: queueToSlug(queue) });
 
   const formatBytes = (bytes: number) => getByteUnitString(bytes, $locale ?? undefined);
   const formatCount = (count: number) => count.toLocaleString($locale ?? undefined);

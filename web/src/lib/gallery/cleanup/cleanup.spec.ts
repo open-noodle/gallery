@@ -17,7 +17,7 @@ import {
   shiftMonthDay,
   slugToQueue,
   todayMonthDay,
-} from '$lib/utils/cleanup';
+} from '$lib/gallery/cleanup/cleanup';
 
 describe('cleanup utils', () => {
   it('computes today as month*100+day in local time', () => {

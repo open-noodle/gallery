@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import { Route } from '$lib/route';
   import { Breadcrumbs, Heading, Text } from '@immich/ui';
   import { mdiSlashForward } from '@mdi/js';
@@ -19,7 +20,7 @@
     <Breadcrumbs
       items={[
         { title: $t('utilities'), href: Route.utilities() },
-        { title: $t('cleanup'), href: Route.cleanupUtility() },
+        { title: $t('cleanup'), href: CleanupRoute.utility() },
         { title },
       ]}
       separator={mdiSlashForward}

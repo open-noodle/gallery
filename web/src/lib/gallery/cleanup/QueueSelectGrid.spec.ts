@@ -1,7 +1,7 @@
 import { AssetTypeEnum, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { SvelteSet } from 'svelte/reactivity';
-import QueueSelectGrid from '$lib/components/cleanup/QueueSelectGrid.svelte';
+import QueueSelectGrid from '$lib/gallery/cleanup/QueueSelectGrid.svelte';
 
 const asset = (id: string, reason?: CleanupBlurReason): CleanupAssetDto => ({
   id,

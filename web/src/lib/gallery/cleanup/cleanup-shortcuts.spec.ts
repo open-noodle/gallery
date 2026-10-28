@@ -4,7 +4,7 @@ import {
   queueShortcuts,
   type CleanupShortcutHandlers,
   type QueueShortcutHandlers,
-} from '$lib/components/cleanup/cleanup-shortcuts';
+} from '$lib/gallery/cleanup/cleanup-shortcuts';
 
 const makeHandlers = (): CleanupShortcutHandlers => ({
   keep: vi.fn(),

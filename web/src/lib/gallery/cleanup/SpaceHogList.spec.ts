@@ -1,6 +1,6 @@
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import SpaceHogList from '$lib/components/cleanup/SpaceHogList.svelte';
+import SpaceHogList from '$lib/gallery/cleanup/SpaceHogList.svelte';
 
 const asset = (id: string, fileSize: number, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,

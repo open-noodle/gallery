@@ -1,6 +1,6 @@
 <script lang="ts">
   import { pop } from '$lib/gallery/motion';
-  import { monthDayLabel, shadeLevel, shadeScale } from '$lib/utils/cleanup';
+  import { monthDayLabel, shadeLevel, shadeScale } from '$lib/gallery/cleanup/cleanup';
   import type { CleanupCalendarDayDto } from '@immich/sdk';
   import { Text } from '@immich/ui';
   import { locale, t } from 'svelte-i18n';

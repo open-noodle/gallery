@@ -1,7 +1,7 @@
 import { AssetTypeEnum, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/svelte';
-import RewindOneAtATime from '$lib/components/cleanup/RewindOneAtATime.svelte';
+import RewindOneAtATime from '$lib/gallery/cleanup/RewindOneAtATime.svelte';
 
 const asset = (overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id: 'a',

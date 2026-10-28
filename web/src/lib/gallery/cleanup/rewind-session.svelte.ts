@@ -1,6 +1,6 @@
 import { CleanupQueue, type CleanupCommitDto, type CleanupCommitResponseDto } from '@immich/sdk';
 import { SvelteMap } from 'svelte/reactivity';
-import { chunk } from '$lib/utils/cleanup';
+import { chunk } from '$lib/gallery/cleanup/cleanup';
 
 export type RewindMark = 'keep' | 'fav' | 'trash';
 export type RewindCommitResult = { trashed: string[]; skipped: number };

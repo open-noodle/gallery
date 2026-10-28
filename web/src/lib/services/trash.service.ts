@@ -25,7 +25,7 @@ export const getTrashActions = ($t: MessageFormatter, assetCount: number) => {
 };
 
 // gallery-fork: exported for the Library Cleanup hub's "empty trash" footer
-// (web/src/routes/(user)/utilities/cleanup/+page.svelte).
+// (web/src/lib/gallery/cleanup/pages/CleanupHubPage.svelte).
 export const handleEmptyTrash = async () => {
   const $t = await getFormatter();
 

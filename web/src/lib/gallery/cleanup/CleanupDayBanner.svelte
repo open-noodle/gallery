@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import type { DayPeek } from '$lib/gallery/cleanup/day-peek';
   import { countMotion, duration, ease, slideFrom } from '$lib/gallery/motion';
-  import { Route } from '$lib/route';
   import { getAssetMediaUrl } from '$lib/utils';
-  import { monthDayLabel, rewindMinutes } from '$lib/utils/cleanup';
+  import { monthDayLabel, rewindMinutes } from '$lib/gallery/cleanup/cleanup';
   import { AssetMediaSize, type CleanupAssetDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiPlay } from '@mdi/js';
@@ -45,7 +45,7 @@
     peek ? peek.assets.slice(0, peek.photos > COLLAGE ? COLLAGE - 1 : COLLAGE) : ([] as CleanupAssetDto[]),
   );
   const more = $derived(peek && peek.photos > COLLAGE ? peek.photos - (COLLAGE - 1) : 0);
-  const href = $derived(Route.cleanupRewind({ monthDay }));
+  const href = $derived(CleanupRoute.rewind({ monthDay }));
   const startLabel = $derived(isToday ? $t('cleanup_start_todays_rewind') : $t('cleanup_rewind_this_day'));
   const countsLabel = $derived(
     $t('cleanup_banner_photos_years', {

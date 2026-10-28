@@ -1,13 +1,14 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { shortcuts } from '$lib/actions/shortcut';
   import OnEvents from '$lib/components/OnEvents.svelte';
-  import { cleanupShortcuts } from '$lib/components/cleanup/cleanup-shortcuts';
-  import RewindOneAtATime from '$lib/components/cleanup/RewindOneAtATime.svelte';
-  import RewindYearSection from '$lib/components/cleanup/RewindYearSection.svelte';
+  import { cleanupShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
+  import RewindOneAtATime from '$lib/gallery/cleanup/RewindOneAtATime.svelte';
+  import RewindYearSection from '$lib/gallery/cleanup/RewindYearSection.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { RewindSession, type RewindMark } from '$lib/managers/rewind-session.svelte';
+  import { RewindSession, type RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { slideMotion } from '$lib/components/filter-panel/motion';
   import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
@@ -20,7 +21,7 @@
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
-  import { animateCleanupRemoval, confirmCleanupTrash, showRemovedToast } from '$lib/utils/cleanup-actions';
+  import { animateCleanupRemoval, confirmCleanupTrash, showRemovedToast } from '$lib/gallery/cleanup/cleanup-actions';
   import {
     browserTimeZone,
     burstMemberIds,
@@ -29,7 +30,7 @@
     monthDayShortLabel,
     nextUnreviewedDay,
     shiftMonthDay,
-  } from '$lib/utils/cleanup';
+  } from '$lib/gallery/cleanup/cleanup';
   import { handleError } from '$lib/utils/handle-error';
   import { navigate } from '$lib/utils/navigation';
   import {
@@ -394,7 +395,7 @@
     } catch {
       // Falling back to the hub is fine; the day itself is already saved.
     }
-    await goto(next === undefined ? Route.cleanupUtility() : Route.cleanupRewind({ monthDay: next }));
+    await goto(next === undefined ? CleanupRoute.utility() : CleanupRoute.rewind({ monthDay: next }));
   };
 
   const onAssetsDelete = (ids: string[]) => {
@@ -532,7 +533,7 @@
       <Breadcrumbs
         items={[
           { title: $t('utilities'), href: Route.utilities() },
-          { title: $t('cleanup'), href: Route.cleanupUtility() },
+          { title: $t('cleanup'), href: CleanupRoute.utility() },
           { title },
         ]}
         separator={mdiSlashForward}
@@ -597,7 +598,7 @@
         {/each}
       </div>
       <Button
-        href={Route.cleanupRewind({ monthDay: previousDay })}
+        href={CleanupRoute.rewind({ monthDay: previousDay })}
         size="small"
         variant="ghost"
         color="secondary"
@@ -609,7 +610,7 @@
         ‹ {monthDayShortLabel(previousDay, lang)}
       </Button>
       <Button
-        href={Route.cleanupRewind({ monthDay: nextDay })}
+        href={CleanupRoute.rewind({ monthDay: nextDay })}
         size="small"
         variant="ghost"
         color="secondary"

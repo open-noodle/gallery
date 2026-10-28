@@ -1,6 +1,6 @@
 import type { CleanupCalendarDayDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import CleanupCalendar from '$lib/components/cleanup/CleanupCalendar.svelte';
+import CleanupCalendar from '$lib/gallery/cleanup/CleanupCalendar.svelte';
 import { pop } from '$lib/gallery/motion';
 
 vi.mock('$lib/gallery/motion', async (importOriginal) => ({

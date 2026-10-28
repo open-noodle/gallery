@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { utils } from 'src/utils.js';
 
 // The smallest selectable "min size" filter on the Space Hogs page (see
-// CLEANUP_SPACE_HOG_MIN_SIZES in web/src/lib/utils/cleanup.ts). Real e2e test uploads are a 1x1
+// CLEANUP_SPACE_HOG_MIN_SIZES in web/src/lib/gallery/cleanup/cleanup.ts). Real e2e test uploads are a 1x1
 // PNG, well under a kilobyte, so `fileSizeInByte` is written directly via the DB (as the task brief
 // suggests) rather than uploading 50MB+ fixtures.
 const SPACE_HOG_MIN_SIZE = 52_428_800;
@@ -57,7 +57,7 @@ test.describe('Cleanup Utility', () => {
     const day = monthDay % 100;
 
     // A year other than this one, same month/day, mid-day UTC — the calendar's month/day index is
-    // computed at time zone UTC (server/src/schema/cleanup-sql.ts), so this reproduces exactly the
+    // computed at time zone UTC (server/src/gallery/utils/cleanup-sql.ts), so this reproduces exactly the
     // month/day the cell reported.
     const pastYear = new Date().getUTCFullYear() - 3;
     const fileCreatedAt = new Date(Date.UTC(pastYear, month - 1, day, 12, 0, 0)).toISOString();

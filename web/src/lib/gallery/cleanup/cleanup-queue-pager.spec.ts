@@ -1,5 +1,5 @@
 import { AssetTypeEnum, CleanupListQueue, type CleanupAssetDto, type CleanupQueuePageDto } from '@immich/sdk';
-import { CleanupQueuePager } from '$lib/managers/cleanup-queue-pager.svelte';
+import { CleanupQueuePager } from '$lib/gallery/cleanup/cleanup-queue-pager.svelte';
 
 const asset = (id: string): CleanupAssetDto => ({
   id,

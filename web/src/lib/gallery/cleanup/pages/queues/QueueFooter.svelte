@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CleanupQueuePager } from '$lib/managers/cleanup-queue-pager.svelte';
+  import type { CleanupQueuePager } from '$lib/gallery/cleanup/cleanup-queue-pager.svelte';
   import { Button } from '@immich/ui';
   import { t } from 'svelte-i18n';
 

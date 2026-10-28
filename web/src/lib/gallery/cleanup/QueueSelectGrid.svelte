@@ -1,7 +1,7 @@
 <script lang="ts">
   import { flipMotion } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
+  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
   import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
   import { TILE_MIN_WIDTH, type TileSize } from '$lib/gallery/cleanup/tile-size';
   import { CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';

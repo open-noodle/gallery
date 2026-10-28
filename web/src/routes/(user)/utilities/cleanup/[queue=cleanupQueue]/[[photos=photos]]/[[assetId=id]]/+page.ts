@@ -1,5 +1,5 @@
+import { slugToQueue, type CleanupQueueSlug } from '$lib/gallery/cleanup/cleanup';
 import { authenticate } from '$lib/utils/auth';
-import { slugToQueue, type CleanupQueueSlug } from '$lib/utils/cleanup';
 import { getFormatter } from '$lib/utils/i18n';
 import type { PageLoad } from './$types';
 

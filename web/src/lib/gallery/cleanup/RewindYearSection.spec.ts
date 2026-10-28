@@ -1,8 +1,8 @@
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import RewindYearSection from '$lib/components/cleanup/RewindYearSection.svelte';
+import RewindYearSection from '$lib/gallery/cleanup/RewindYearSection.svelte';
+import type { RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
 import { pop } from '$lib/gallery/motion';
-import type { RewindMark } from '$lib/managers/rewind-session.svelte';
 
 vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pop: vi.fn() }));
 

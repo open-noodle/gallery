@@ -1,5 +1,11 @@
 import { CleanupQueue, CleanupSkipReason } from '@immich/sdk';
-import { commitWithUndo, confirmCleanupTrash, keep, stackGroup, trashWithUndo } from '$lib/utils/cleanup-actions';
+import {
+  commitWithUndo,
+  confirmCleanupTrash,
+  keep,
+  stackGroup,
+  trashWithUndo,
+} from '$lib/gallery/cleanup/cleanup-actions';
 
 const mocks = vi.hoisted(() => ({
   sdk: {

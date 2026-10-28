@@ -1,10 +1,10 @@
 <script lang="ts">
-  import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
+  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
   import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
   import { duration as motionDuration, pop } from '$lib/gallery/motion';
   import { getAssetMediaUrl } from '$lib/utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
-  import { burstMarkOf, burstTimeRange, dominantCity, type BurstMark } from '$lib/utils/cleanup';
+  import { burstMarkOf, burstTimeRange, dominantCity, type BurstMark } from '$lib/gallery/cleanup/cleanup';
   import { AssetMediaSize, CleanupBurstSource, type CleanupBurstGroupDto } from '@immich/sdk';
   import { Button, Card, Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';

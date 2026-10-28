@@ -312,7 +312,9 @@ assets.
 
 ### Web
 
-- **Components** live in `web/src/lib/components/cleanup/`:
+- **Components** live in `web/src/lib/gallery/cleanup/` (moved there on 2026-10-28 with the rest of the
+  feature: page bodies in `pages/`, the server side in `server/src/gallery/`; the routes under
+  `web/src/routes/(user)/utilities/cleanup/` only load data and render those pages):
   - `CleanupCalendar`: the 12 × 31 grid with shading, reviewed and today states, and the hover peek.
   - `CleanupQueueRail`.
   - `RewindYearSection` and `RewindGrid`.

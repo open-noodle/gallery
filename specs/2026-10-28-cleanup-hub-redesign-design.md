@@ -1,8 +1,8 @@
 # Library Cleanup: hub and rewind redesign
 
 Revises the visual design of two pages from `specs/2026-09-23-library-cleanup-design.md`: the Cleanup hub
-(`web/src/routes/(user)/utilities/cleanup/+page.svelte`) and the rewind day page
-(`.../cleanup/rewind/[monthDay]/.../RewindDay.svelte`). Behaviour, endpoints and data stay as that design
+(`web/src/lib/gallery/cleanup/pages/CleanupHubPage.svelte`) and the rewind day page
+(`web/src/lib/gallery/cleanup/pages/rewind/RewindDay.svelte`). Behaviour, endpoints and data stay as that design
 describes unless this document says otherwise.
 
 Mockups:

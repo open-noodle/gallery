@@ -9,9 +9,9 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { chunk } from '$lib/gallery/cleanup/cleanup';
 import { animateRemoval, type RemovalKind } from '$lib/gallery/motion';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { chunk } from '$lib/utils/cleanup';
 import { handleError } from '$lib/utils/handle-error';
 
 /** The server rejects a commit or in-spaces list longer than this. */

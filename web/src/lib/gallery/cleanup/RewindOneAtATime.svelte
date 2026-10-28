@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import { flipMotion } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
-  import type { RewindMark } from '$lib/managers/rewind-session.svelte';
-  import { Route } from '$lib/route';
+  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
+  import type { RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { AssetMediaSize, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
   import { Card, Icon, Text } from '@immich/ui';
@@ -73,7 +73,7 @@
         icon: mdiImageMultipleOutline,
         label: 'cleanup_hint_burst',
         queue: 'cleanup_queue_bursts',
-        href: Route.cleanupQueue({ queue: 'bursts' }),
+        href: CleanupRoute.queue({ queue: 'bursts' }),
       });
     }
     const quality = asset.reason ? QUALITY_HINTS[asset.reason] : undefined;
@@ -83,7 +83,7 @@
         icon: mdiBlur,
         label: quality,
         queue: 'cleanup_queue_blurry',
-        href: Route.cleanupQueue({ queue: 'blurry' }),
+        href: CleanupRoute.queue({ queue: 'blurry' }),
       });
     }
     return list;

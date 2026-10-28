@@ -1,7 +1,7 @@
 <script lang="ts">
   import { flipMotion } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
+  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
   import { Button, Card } from '@immich/ui';

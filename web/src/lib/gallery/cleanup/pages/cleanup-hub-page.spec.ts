@@ -3,10 +3,10 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { todayMonthDay } from '$lib/gallery/cleanup/cleanup';
 import { finishedDay } from '$lib/gallery/cleanup/finished-day';
 import { pop } from '$lib/gallery/motion';
-import { todayMonthDay } from '$lib/utils/cleanup';
-import CleanupPage from './+page.svelte';
+import CleanupPage from './CleanupHubPage.svelte';
 
 const sdk = vi.hoisted(() => ({
   getCleanupCalendar: vi.fn(),
