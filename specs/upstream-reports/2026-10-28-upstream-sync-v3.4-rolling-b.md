@@ -7,7 +7,7 @@
 - **Fork sync**: `d9ea8866515` → `387d598598a` (#1251, #1244)
 - **Fork commits replayed**: 1,765; 16 files kept on the fork side during the replay, upstream's diff re-applied after
 - **Risk level**: MEDIUM (one zero-conflict break of the S3 folder view, one duplicate-resolve behaviour change taken
-  from upstream); **Recommendation**: PROCEED, pending remote CI
+  from upstream); **Recommendation**: PROCEED — remote CI green, iOS build unverified (no runner)
 - **Base for branding**: unchanged (`upstream.version` stays 3.3.5)
 - **Pre-cycle tip**: `ebd3d44388f` (backup `backup/rolling-v34-pre-162-1028`; pre-fork-sync `backup/rolling-v34-pre-forksync-1028b`)
 
@@ -167,19 +167,19 @@ blocks. `favorite-grep-gate.spec.ts` uses the same prefix test and still passes;
 Round 1 on `694742eb138` (dispatched in two waves; revert gate with `gallery_image=…:rolling-v34-rc5` and
 `upstream_image=immich-server:commit-e51de38c40a…`):
 
-| Workflow                        | Result  | Notes                                                                                                                                                   |
-| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Static Code Analysis            | GREEN   |                                                                                                                                                         |
-| Gallery ML Smoke                | GREEN   |                                                                                                                                                         |
-| Gallery Rebase Smoke            | GREEN   |                                                                                                                                                         |
-| Gallery Mobile Smoke            | GREEN   |                                                                                                                                                         |
-| Storage Migration E2E           | GREEN   |                                                                                                                                                         |
-| Release Candidate Build         | GREEN   | `gallery-server:rolling-v34-rc5` (+ ML)                                                                                                                 |
-| Gallery Revert-to-Immich Valid. | GREEN   | on the branch's RC, stock round trip on upstream `e51de38c40a`                                                                                          |
-| Test                            | RED     | search-contract fixtures (#1244, also red on `main`); fork e2e pinning the old folder-view 500; `sync-partner` order flake (upstream spec, 5/5 locally) |
-| Storage Migration Tests         | RED ×2  | `delete-source-false`: `fetch failed / other side closed` on the first GET after ~6 s of `execSync` docker checks                                       |
-| Gallery Build Mobile            | RED     | iOS job never got a macOS runner ("not acquired … capacity"); Android green. Re-run                                                                     |
-| Docker                          | pending |                                                                                                                                                         |
+| Workflow                        | Result | Notes                                                                                                                                                   |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Static Code Analysis            | GREEN  |                                                                                                                                                         |
+| Gallery ML Smoke                | GREEN  |                                                                                                                                                         |
+| Gallery Rebase Smoke            | GREEN  |                                                                                                                                                         |
+| Gallery Mobile Smoke            | GREEN  |                                                                                                                                                         |
+| Storage Migration E2E           | GREEN  |                                                                                                                                                         |
+| Release Candidate Build         | GREEN  | `gallery-server:rolling-v34-rc5` (+ ML)                                                                                                                 |
+| Gallery Revert-to-Immich Valid. | GREEN  | on the branch's RC, stock round trip on upstream `e51de38c40a`                                                                                          |
+| Test                            | RED    | search-contract fixtures (#1244, also red on `main`); fork e2e pinning the old folder-view 500; `sync-partner` order flake (upstream spec, 5/5 locally) |
+| Storage Migration Tests         | RED ×2 | `delete-source-false`: `fetch failed / other side closed` on the first GET after ~6 s of `execSync` docker checks                                       |
+| Gallery Build Mobile            | RED    | iOS job never got a macOS runner ("not acquired … capacity"); Android green. Re-run                                                                     |
+| Docker                          | GREEN  |                                                                                                                                                         |
 
 Storage: the server log shows no error; the full CI phase sequence passes locally. The phase verifies disk files
 through `docker compose exec` (`execSync`) for ~6 s, past the server's 5 s keep-alive, with the event loop blocked,
@@ -193,4 +193,12 @@ so the fixtures were re-recorded against an e2e stack built from this branch (`S
 the three server-version fixtures changed (`bd500d562fa`); the hand-written server-features edit matched the
 recording. iOS: no macOS runner on two attempts (GitHub capacity), re-dispatched.
 
-Round 3: _pending_
+Round 3 on `10cdfc6a4a3`: e2e (server, CLI, web) GREEN, search contract included. Medium RED twice: the RBAC
+oracle's stacks/duplicates case timed out at 5 s (1.5 s locally; `server/` identical to round 2's green tree).
+Fixed with an `ANALYZE` after the oracle's seed, as `face-repair.resolve.spec.ts` does (`e501ab3c5a7`).
+
+Round 4 on `e501ab3c5a7`: **Test GREEN**.
+
+**Final state**: every workflow green (Test on `e501ab3c5a7`; Storage Migration Tests on `85044be5f0e`; the rest on
+`694742eb138`; later commits touch only tests and docs). **iOS not verified**: Gallery Build Mobile's iOS job never
+got a macOS arm64 runner in three attempts (GitHub capacity); Android built each time.
