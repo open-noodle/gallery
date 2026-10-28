@@ -1,6 +1,12 @@
 import type { CleanupCalendarDayDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import CleanupCalendar from '$lib/components/cleanup/CleanupCalendar.svelte';
+import { pop } from '$lib/gallery/motion';
+
+vi.mock('$lib/gallery/motion', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  pop: vi.fn(),
+}));
 
 const days: CleanupCalendarDayDto[] = [
   { monthDay: 101, assetCount: 0, reviewedAt: null },
@@ -11,23 +17,59 @@ const days: CleanupCalendarDayDto[] = [
   { monthDay: 923, assetCount: 12, reviewedAt: null },
 ];
 
-const renderCalendar = () => {
+const renderCalendar = (props: { justReviewed?: number } = {}) => {
   const onPeek = vi.fn();
+  const onLeave = vi.fn();
   const onOpen = vi.fn();
-  render(CleanupCalendar, { days, today: 923, onPeek, onOpen });
-  return { onPeek, onOpen };
+  render(CleanupCalendar, { days, today: 923, onPeek, onLeave, onOpen, ...props });
+  return { onPeek, onLeave, onOpen };
 };
 
 describe('CleanupCalendar', () => {
-  it('renders one button per calendar day plus spacers for days that do not exist', () => {
+  it('renders one button per calendar day, in twelve months of seven columns from the 1st', () => {
     renderCalendar();
 
     expect(screen.getAllByRole('button')).toHaveLength(366);
-    // 30 + 31 February, 31 April, June, September and November
-    expect(screen.getAllByTestId('cleanup-cal-spacer')).toHaveLength(6);
-    expect(screen.getByTestId('cleanup-cal-229')).toBeInTheDocument();
+    expect(screen.queryByTestId('cleanup-cal-spacer')).not.toBeInTheDocument();
+    for (let month = 1; month <= 12; month++) {
+      const grid = screen.getByTestId(`cleanup-month-${month}`).querySelector('[data-testid="cleanup-month-days"]');
+      // No blank cells before the 1st: a cell is a date across every year, not a weekday.
+      expect(grid?.firstElementChild).toHaveAttribute('data-testid', `cleanup-cal-${month * 100 + 1}`);
+    }
+  });
+
+  it('gives February its 29th and no 30th', () => {
+    renderCalendar();
+
+    expect(screen.getByTestId('cleanup-month-2').querySelectorAll('button')).toHaveLength(29);
     expect(screen.queryByTestId('cleanup-cal-230')).not.toBeInTheDocument();
     expect(screen.queryByTestId('cleanup-cal-431')).not.toBeInTheDocument();
+  });
+
+  it("emphasises today's month", () => {
+    renderCalendar();
+
+    expect(screen.getByTestId('cleanup-month-9')).toHaveAttribute('data-current', 'true');
+    expect(screen.getByTestId('cleanup-month-8')).not.toHaveAttribute('data-current');
+  });
+
+  it('returns the preview to today when the pointer or focus leaves the calendar', async () => {
+    const { onLeave } = renderCalendar();
+
+    await fireEvent.pointerLeave(screen.getByTestId('cleanup-calendar'));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it('pops the day that was just reviewed', () => {
+    renderCalendar({ justReviewed: 103 });
+
+    expect(pop).toHaveBeenCalledWith(screen.getByTestId('cleanup-cal-103'));
+  });
+
+  it('keeps cells out of the site-wide hover scale', () => {
+    renderCalendar();
+
+    expect(screen.getByTestId('cleanup-cal-923')).toHaveAttribute('data-no-press');
   });
 
   it('derives the cell state from the count and review', () => {

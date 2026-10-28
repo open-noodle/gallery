@@ -538,6 +538,8 @@
   "cleanup_up_to_count": "最多 {count}",
   "cleanup_year_reviewed": "本年已检查",
   "cleanup_years_ago": "{count, plural, other {# 年前}}",
+  "cleanup_your_year": "你的一年",
+  "cleanup_your_year_hint": "选一天来回顾",
   "cmdk_announce_scoped_collections": "已限定在相簿和 Spaces 中搜索。",
   "cmdk_announce_scoped_nav": "已限定在页面中搜索。",
   "cmdk_announce_scoped_people": "已限定在人物中搜索。",

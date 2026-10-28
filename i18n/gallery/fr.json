@@ -534,6 +534,8 @@
   "cleanup_up_to_count": "jusqu'à {count}",
   "cleanup_year_reviewed": "Année vérifiée",
   "cleanup_years_ago": "{count, plural, one {il y a # an} other {il y a # ans}}",
+  "cleanup_your_year": "Votre année",
+  "cleanup_your_year_hint": "Choisissez un jour pour le revoir",
   "cmdk_announce_scoped_collections": "Limité aux albums et aux espaces.",
   "cmdk_announce_scoped_nav": "Limité aux pages.",
   "cmdk_announce_scoped_people": "Limité aux personnes.",

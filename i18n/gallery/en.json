@@ -533,6 +533,8 @@
   "cleanup_up_to_count": "up to {count}",
   "cleanup_year_reviewed": "Year reviewed",
   "cleanup_years_ago": "{count, plural, one {# year ago} other {# years ago}}",
+  "cleanup_your_year": "Your year",
+  "cleanup_your_year_hint": "Pick any day to rewind it",
   "cmdk_announce_scoped_collections": "Scoped to albums and spaces.",
   "cmdk_announce_scoped_nav": "Scoped to pages.",
   "cmdk_announce_scoped_people": "Scoped to people.",

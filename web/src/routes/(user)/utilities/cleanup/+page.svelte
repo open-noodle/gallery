@@ -236,6 +236,7 @@
               days={calendar.days}
               {today}
               onPeek={(monthDay) => schedulePeek(monthDay)}
+              onLeave={() => schedulePeek(today)}
               onOpen={(monthDay) => void goto(Route.cleanupRewind({ monthDay }))}
             />
           {:else}

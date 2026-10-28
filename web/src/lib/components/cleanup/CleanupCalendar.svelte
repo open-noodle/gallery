@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pop } from '$lib/gallery/motion';
   import { monthDayLabel, shadeLevel, shadeScale } from '$lib/utils/cleanup';
   import type { CleanupCalendarDayDto } from '@immich/sdk';
   import { Text } from '@immich/ui';
@@ -7,21 +8,39 @@
   type Props = {
     days: CleanupCalendarDayDto[];
     today: number;
+    /** A day the user just finished in rewind: its cell turns green with a pop. */
+    justReviewed?: number;
     onPeek: (monthDay: number) => void;
+    /** The pointer or keyboard focus left the calendar. */
+    onLeave: () => void;
     onOpen: (monthDay: number) => void;
   };
 
-  let { days, today, onPeek, onOpen }: Props = $props();
+  let { days, today, justReviewed, onPeek, onLeave, onOpen }: Props = $props();
+  let container = $state<HTMLElement>();
 
   type CellState = 'none' | 'l1' | 'l2' | 'l3' | 'l4' | 'reviewed';
 
-  const DAY_NUMBERS = Array.from({ length: 31 }, (_, i) => i + 1);
-  const LABELLED_DAY_NUMBERS = new Set([1, 5, 10, 15, 20, 25, 30]);
   // 2000 is a leap year, so February has its 29th.
   const MONTHS = Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
-    length: new Date(2000, i + 1, 0).getDate(),
+    days: Array.from({ length: new Date(2000, i + 1, 0).getDate() }, (_, day) => day + 1),
   }));
+  const currentMonth = $derived(Math.floor(today / 100));
+
+  $effect(() => {
+    const cell =
+      justReviewed && container?.querySelector(`[data-testid="cleanup-cal-${CSS.escape(String(justReviewed))}"]`);
+    if (cell) {
+      pop(cell);
+    }
+  });
+
+  const onFocusOut = (event: FocusEvent) => {
+    if (!(event.relatedTarget instanceof Node && container?.contains(event.relatedTarget))) {
+      onLeave();
+    }
+  };
 
   const stateClasses: Record<CellState, string> = {
     none: 'bg-gray-200 dark:bg-gray-700',
@@ -59,25 +78,28 @@
     });
 </script>
 
-<!-- Cells grow on hover with their own CSS scale, so they opt out of the site-wide press/hover scale
-     (data-no-press): two animations on one `scale` left smeared traces behind the cursor.
-     Scrolling on x turns scrolling on y too (CSS has no visible/auto pair), so a cell scaled on hover in the
-     edge rows or columns would overflow and show a scrollbar. The padding leaves room for the scale. -->
-<div class="-m-1 overflow-x-auto p-1">
-  <div class="grid min-w-[640px] grid-cols-[2.5rem_repeat(31,minmax(1rem,1fr))] gap-1" data-testid="cleanup-calendar">
-    <span aria-hidden="true"></span>
-    {#each DAY_NUMBERS as dayNumber (dayNumber)}
-      <span class="text-center text-[9px] text-gray-400 tabular-nums dark:text-gray-500" aria-hidden="true">
-        {LABELLED_DAY_NUMBERS.has(dayNumber) ? dayNumber : ''}
-      </span>
-    {/each}
-
-    {#each MONTHS as { month, length } (month)}
-      <Text size="tiny" color="muted" class="self-center">
+<!-- A cell is a date across every year, so the days run from the 1st in rows of seven and never line up
+     under weekdays. Cells keep out of the site-wide press/hover scale (data-no-press): hover brightens them
+     and rings them instead, since the scale fought their own and left smeared traces. -->
+<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+  <Text fontWeight="semi-bold">{$t('cleanup_your_year')}</Text>
+  <Text size="tiny" color="muted">{$t('cleanup_your_year_hint')}</Text>
+</div>
+<div
+  bind:this={container}
+  class="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-6 lg:grid-cols-12"
+  data-testid="cleanup-calendar"
+  onpointerleave={() => onLeave()}
+  onfocusout={onFocusOut}
+>
+  {#each MONTHS as { month, days: monthDays } (month)}
+    {@const isCurrent = month === currentMonth}
+    <div data-testid="cleanup-month-{month}" data-current={isCurrent ? 'true' : undefined}>
+      <Text size="tiny" class="mb-1.5 {isCurrent ? 'font-semibold text-dark' : 'text-muted'}">
         {monthFormatter.format(new Date(2000, month - 1, 1))}
       </Text>
-      {#each DAY_NUMBERS as dayNumber (dayNumber)}
-        {#if dayNumber <= length}
+      <div class="grid grid-cols-7 gap-0.5" data-testid="cleanup-month-days">
+        {#each monthDays as dayNumber (dayNumber)}
           {@const monthDay = month * 100 + dayNumber}
           {@const day = byMonthDay.get(monthDay)}
           {@const state = cellState(day)}
@@ -88,20 +110,20 @@
             data-today={monthDay === today ? 'true' : undefined}
             data-no-press
             aria-label={cellLabel(monthDay, day)}
-            class="aspect-square rounded-sm transition-transform duration-(--spring-snappy-duration) ease-(--spring-snappy) hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {cellClass(
+            class="aspect-square rounded-[3px] transition-[filter,box-shadow] duration-(--motion-quick) ease-(--ease-standard) hover:ring-2 hover:ring-primary/60 hover:brightness-125 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none {cellClass(
               day,
               state,
-            )} {monthDay === today ? 'outline-2 outline-offset-1 outline-dark dark:outline-light' : ''}"
+            )} {monthDay === today
+              ? 'animate-[gallery-pop_var(--spring-bouncy-duration)_var(--spring-bouncy)] outline-2 outline-offset-1 outline-dark dark:outline-light'
+              : ''}"
             onmouseenter={() => onPeek(monthDay)}
             onfocus={() => onPeek(monthDay)}
             onclick={() => onOpen(monthDay)}
           ></button>
-        {:else}
-          <span class="aspect-square" data-testid="cleanup-cal-spacer" aria-hidden="true"></span>
-        {/if}
-      {/each}
-    {/each}
-  </div>
+        {/each}
+      </div>
+    </div>
+  {/each}
 </div>
 
 <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">

@@ -534,6 +534,8 @@
   "cleanup_up_to_count": "до {count}",
   "cleanup_year_reviewed": "Год просмотрен",
   "cleanup_years_ago": "{count, plural, one {# год назад} few {# года назад} many {# лет назад} other {# года назад}}",
+  "cleanup_your_year": "Ваш год",
+  "cleanup_your_year_hint": "Выберите день, чтобы пересмотреть его",
   "cmdk_announce_scoped_collections": "Поиск ограничен альбомами и Spaces.",
   "cmdk_announce_scoped_nav": "Поиск ограничен страницами.",
   "cmdk_announce_scoped_people": "Поиск ограничен людьми.",

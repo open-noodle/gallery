@@ -534,6 +534,8 @@
   "cleanup_up_to_count": "tot {count}",
   "cleanup_year_reviewed": "Jaar beoordeeld",
   "cleanup_years_ago": "{count, plural, one {# jaar geleden} other {# jaar geleden}}",
+  "cleanup_your_year": "Jouw jaar",
+  "cleanup_your_year_hint": "Kies een dag om terug te kijken",
   "cmdk_announce_scoped_collections": "Beperkt tot albums en Spaces.",
   "cmdk_announce_scoped_nav": "Beperkt tot pagina's.",
   "cmdk_announce_scoped_people": "Beperkt tot mensen.",
