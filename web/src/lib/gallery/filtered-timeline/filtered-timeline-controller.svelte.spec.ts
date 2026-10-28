@@ -1,4 +1,4 @@
-import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
+import { LibraryView, type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
@@ -549,5 +549,41 @@ describe('FilteredTimelineController', () => {
         expect(dto[key as keyof typeof dto]).toEqual(value);
       }
     });
+  });
+
+  it('hides the library view during a text search, which spans every photo', () => {
+    const sut = createController({ showLibraryView: () => true });
+    expect(sut.showLibraryView).toBe(true);
+
+    sut.query = 'beach';
+    flushSync();
+
+    expect(sut.showLibraryView).toBe(false);
+    expect(createController().showLibraryView).toBe(false);
+  });
+
+  it('counts a library view as active only while it is offered and applied', () => {
+    const personal = () => ({ libraryView: LibraryView.Personal }) as TimelineManagerOptions;
+    const sut = createController({ showLibraryView: () => true, timelineOptions: personal });
+    expect(sut.libraryViewActive).toBe(true);
+    expect(sut.activeFilterCount).toBe(0);
+
+    sut.query = 'beach';
+    flushSync();
+    expect(sut.libraryViewActive).toBe(false);
+
+    expect(createController({ showLibraryView: () => true }).libraryViewActive).toBe(false);
+    expect(createController({ showLibraryView: () => false, timelineOptions: personal }).libraryViewActive).toBe(false);
+  });
+
+  it('treats a library view as narrowing, and reloads on a space add under it', () => {
+    const sut = createController({
+      timelineOptions: () => ({ libraryView: LibraryView.Personal }) as TimelineManagerOptions,
+    });
+    expect(sut.isNarrowed).toBe(true);
+    expect(createController().isNarrowed).toBe(false);
+
+    sut.onSpaceAddAssets({});
+    expect(sut.timelineReloadToken).toBe(1);
   });
 });

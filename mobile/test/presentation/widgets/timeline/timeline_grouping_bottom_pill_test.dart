@@ -61,11 +61,10 @@ void main() {
 
       expect(find.byKey(const Key('timeline-grouping-bottom-pill')), findsOneWidget);
       expect(find.byType(TimelineGroupingSelector), findsOneWidget);
-      // Full selector, not the compact chip: all three segments are present.
+      // All three segments are present.
       expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-compact-selector')), findsNothing);
       // The pill surface hugs the selector (218 self-cap + 2×8 padding) instead of
       // spanning the screen — keeps the scrubber's right-edge margin clear.
       expect(tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill'))).width, lessThanOrEqualTo(234));

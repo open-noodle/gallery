@@ -1,4 +1,5 @@
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 
 // Search on every timeline (specs/2026-10-23-mobile-search-redesign-design.md, "Search on every timeline" and "Scope
@@ -67,21 +68,27 @@ enum SearchMode { browse, query }
 
 /// Photos: own + timeline partners + the spaces shown in the timeline, timeline visibility. Smart search always
 /// searches timeline partners and takes no `withPartners`.
+///
+/// [libraryView] (#1038) narrows browsing as it narrows the timeline. A text or similar-photo search spans every photo,
+/// so query mode does not send it.
 class PhotosSearchScope extends SearchScope {
-  const PhotosSearchScope();
+  final LibraryViewMode libraryView;
+
+  const PhotosSearchScope({this.libraryView = LibraryViewMode.both});
 
   @override
   SearchParams baseParams(SearchMode mode) => SearchParams(
     visibility: SearchVisibility.timeline,
     withSharedSpaces: true,
     withPartners: mode == SearchMode.browse ? true : null,
+    libraryView: mode == SearchMode.browse && libraryView != LibraryViewMode.both ? libraryView : null,
   );
 
   @override
-  bool operator ==(Object other) => other is PhotosSearchScope;
+  bool operator ==(Object other) => other is PhotosSearchScope && other.libraryView == libraryView;
 
   @override
-  int get hashCode => (PhotosSearchScope).hashCode;
+  int get hashCode => Object.hash(PhotosSearchScope, libraryView);
 }
 
 /// An album page: the album only.
@@ -374,6 +381,9 @@ class SearchParams {
   final String? spaceId;
   final bool? withSharedSpaces;
   final bool? withPartners;
+
+  /// The Photos library view (#1038), null for both; only the Photos scope sets it, and only when browsing.
+  final LibraryViewMode? libraryView;
   final String? query;
   final String? queryAssetId;
 
@@ -403,6 +413,7 @@ class SearchParams {
     this.spaceId,
     this.withSharedSpaces,
     this.withPartners,
+    this.libraryView,
     this.query,
     this.queryAssetId,
   });
@@ -457,6 +468,7 @@ class SearchParams {
     spaceId: spaceId,
     withSharedSpaces: withSharedSpaces,
     withPartners: withPartners,
+    libraryView: libraryView,
     query: query ?? this.query,
     queryAssetId: queryAssetId ?? this.queryAssetId,
   );

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
@@ -19,6 +21,14 @@ class _Steps {
   Future<void> goToTimeline() async => calls.add('timeline');
 }
 
+class _LibraryView extends LibraryViewNotifier {
+  @override
+  LibraryViewMode build() => LibraryViewMode.personal;
+
+  @override
+  Future<void> set(LibraryViewMode view) async => state = view;
+}
+
 void main() {
   // Leaving search mode drops its options and results on the next frame.
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +36,7 @@ void main() {
   late _Steps steps;
 
   setUp(() {
-    container = ProviderContainer();
+    container = ProviderContainer(overrides: [libraryViewProvider.overrideWith(_LibraryView.new)]);
     steps = _Steps();
     // The notifier is a process-wide singleton; drop anything a previous test left.
     scrollToAssetNotifierProvider.consume();
@@ -66,6 +76,12 @@ void main() {
     expect(container.read(searchModeProvider), isFalse);
     expect(container.read(searchStateProvider).isEmpty, isTrue);
     expect(container.read(searchFieldControllerProvider).text, isEmpty);
+  });
+
+  test('#1038: goes back to both library views, which can hide the photo too', () async {
+    await run();
+
+    expect(container.read(libraryViewProvider), LibraryViewMode.both);
   });
 
   test('closes the viewer before search mode closes under it', () async {

@@ -99,6 +99,8 @@ export type FilteredTimelineConfig = {
   ownerNameSeed?: () => Iterable<{ id: string; name: string }>;
   /** Resolve album/owner chip names by id. */
   resolveNames?: boolean;
+  /** Whether the library view control (#1038) applies; its view must reach the query through `timelineOptions`. */
+  showLibraryView?: () => boolean;
   /** Search terms replayed by "add all to collection"; omit to hide the action. */
   collectTerms?: (filters: FilterState, query: string) => SearchTerms;
   /** Panel temporal-picker buckets in browse mode; defaults to the timeline's own buckets. */
@@ -247,6 +249,21 @@ export class FilteredTimelineController {
       : undefined;
   }
 
+  /** Filters, a search or a library view (#1038) narrow the timeline: empty then means no results, not an empty library. */
+  get isNarrowed() {
+    return this.hasActiveFilters || !!this.timelineQuery.libraryView;
+  }
+
+  /** A text search spans every photo, so the library view (#1038) is hidden while one runs. */
+  get showLibraryView() {
+    return !!this.config.showLibraryView?.() && this.isBrowse && !this.showSearchResults;
+  }
+
+  /** A library view (#1038) other than Both narrows the timeline: its chip shows and the filter button is marked. */
+  get libraryViewActive() {
+    return this.showLibraryView && !!this.timelineQuery.libraryView;
+  }
+
   get onAddAllToCollection() {
     return this.config.collectTerms ? this.#addAllToCollection : undefined;
   }
@@ -387,7 +404,7 @@ export class FilteredTimelineController {
    * client-side is the simulation the hide-from-timeline design abandoned.
    */
   onSpaceAddAssets = ({ hiddenFromMyTimeline }: { hiddenFromMyTimeline?: boolean }) => {
-    if (hiddenFromMyTimeline && !this.showSearchResults) {
+    if ((hiddenFromMyTimeline || this.timelineQuery.libraryView) && !this.showSearchResults) {
       this.timelineReloadToken++;
     }
   };
@@ -415,7 +432,7 @@ export class FilteredTimelineController {
 
   #isTimelineEmpty() {
     const custom = this.config.isTimelineEmpty;
-    return custom ? custom(this) : !!this.#timeline()?.isEmptyForOptions(this.options) && !this.hasActiveFilters;
+    return custom ? custom(this) : !!this.#timeline()?.isEmptyForOptions(this.options) && !this.isNarrowed;
   }
 
   #isBrowse() {

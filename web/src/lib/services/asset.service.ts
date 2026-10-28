@@ -50,6 +50,7 @@ import {
   type GalleryAssetActionOptions,
   type GalleryAssetBulkActionOptions,
 } from '$lib/gallery/asset-actions';
+import { resetLibraryView } from '$lib/gallery/library-view/library-view.svelte';
 import { celebrate } from '$lib/gallery/motion';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -335,7 +336,10 @@ export const getAssetActions = (
     title: $t('view_in_timeline'),
     icon: mdiImageSearch,
     $if: () => isOwner && asset.visibility !== AssetVisibility.Locked && !asset.isArchived && !asset.isTrashed,
-    onAction: () => goto(Route.photos({ at: asset.stackPrimaryAssetId ?? asset.id })),
+    onAction: () => {
+      resetLibraryView();
+      return goto(Route.photos({ at: asset.stackPrimaryAssetId ?? asset.id }));
+    },
   };
 
   const ViewSimilar: ActionItem = {
