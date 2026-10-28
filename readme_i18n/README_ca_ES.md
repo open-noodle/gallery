@@ -1,22 +1,23 @@
 <p align="center"> 
-  <br/>  
-  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=Llicència&logoColor=000000&labelColor=ececec" alt="Llicència: AGPL-3.0"></a>
+  <br/>
+  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=Llic%C3%A8ncia&logoColor=000000&labelColor=ececec" alt="Llicència: AGPLv3"></a>
   <a href="https://discord.gg/cxBfbuxyG4">
-    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
-  <br/>  
-  <br/>   
+  <br/>
+  <br/>
 </p>
 
 <p align="center">
-<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Iniciar sessió amb URL personalitzada">
+<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Inicia la sessió amb un URL personalitzat">
 </p>
-<h3 align="center">Noodle Gallery - Solució de còpia de seguretat d'alta rendiment per a fotos i vídeos auto-allotjada</h3>
+<h3 align="center">Solució de gestió de fotos i vídeos autoallotjada i d’alt rendiment </h3>
 <br/>
 <a href="https://opennoodle.de">
 <img src="../design/gallery-screenshot.webp" title="Captura de pantalla principal">
 </a>
 <br/>
+
 <p align="center">
   <a href="../README.md">English</a>
   <a href="README_es_ES.md">Español</a>
@@ -32,9 +33,11 @@
   <a href="README_uk_UA.md">Українська</a>
   <a href="README_ru_RU.md">Русский</a>
   <a href="README_bg_BG.md">Български</a>
+  <a href="README_pl_PL.md">Polski</a>
   <a href="README_pt_BR.md">Português Brasileiro</a>
   <a href="README_sv_SE.md">Svenska</a>
   <a href="README_ar_JO.md">العربية</a>
+  <a href="README_vi_VN.md">Tiếng Việt</a>
   <a href="README_th_TH.md">ภาษาไทย</a>
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
@@ -43,19 +46,19 @@
 > Aquesta és una **bifurcació comunitària** d'[Immich](https://github.com/immich-app/immich) amb funcionalitats addicionals. Per a les imatges Docker, instruccions de canvi i la llista completa de canvis, consulteu el [README principal](../README.md).
 
 > [!WARNING]
-> ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
+> ⚠️ Seguiu sempre un pla de còpies de seguretat [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) per a les vostres valuoses fotos i vídeos!
 >
 
 > [!NOTE]
-> Podeu trobar la documentació principal, incloent les guies d'instal·lació, a https://opennoodle.de/.
+> Podeu trobar la documentació principal, incloent-hi les guies d’instal·lació, a https://opennoodle.de/.
 
-## Contingut
+## Enllaços
 
 - [Documentació](https://docs.opennoodle.de/)
-- [Introducció](https://docs.opennoodle.de/overview/quick-start)
+- [Quant a](https://docs.opennoodle.de/overview/quick-start)
 - [Instal·lació](https://docs.opennoodle.de/install/requirements)
-- [Mapa de ruta](https://opennoodle.de/roadmap)
-- [Demo](#demo)
+- [Full de ruta](https://opennoodle.de/roadmap)
+- [Demostració](#demostració)
 - [Funcionalitats](#funcionalitats)
 - [Traduccions](https://docs.opennoodle.de/developer/translations)
-- [Directrius de contribució](https://docs.opennoodle.de/overview/support-the-project)
+- [Contribucions](https://docs.opennoodle.de/overview/support-the-project)

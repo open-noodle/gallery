@@ -144,7 +144,7 @@ describe('ClassificationSettings', () => {
 
   it('should show rescan dialog when similarity is increased', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
     render(ClassificationSettings);
     await waitFor(() => {
@@ -169,7 +169,7 @@ describe('ClassificationSettings', () => {
 
   it('should trigger scan when rescan dialog is confirmed', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
 
     render(ClassificationSettings);
     await waitFor(() => {
@@ -280,7 +280,7 @@ describe('ClassificationSettings', () => {
   });
 
   it('should call scanClassification when Scan All Libraries is confirmed', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
 
     render(ClassificationSettings);
     await waitFor(() => {
@@ -295,7 +295,7 @@ describe('ClassificationSettings', () => {
   });
 
   it('should NOT scan when Scan All Libraries dialog is cancelled', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
     render(ClassificationSettings);
     await waitFor(() => {
