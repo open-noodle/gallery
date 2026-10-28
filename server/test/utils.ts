@@ -15,7 +15,6 @@ import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
-import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
@@ -296,7 +295,6 @@ export type ServiceOverrides = GalleryServiceOverrides & {
   view: ViewRepository;
   websocket: WebsocketRepository;
   workflow: WorkflowRepository;
-  imageAdjust: ImageAdjustRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -393,7 +391,6 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     websocket: automock(WebsocketRepository, { args: [, loggerMock], strict: false }),
     workflow: automock(WorkflowRepository, { strict: true }),
-    imageAdjust: automock(ImageAdjustRepository, { strict: false }),
     ...getGalleryMocks(loggerMock),
   };
 
@@ -466,7 +463,6 @@ export const newTestService = <T extends BaseService>(
     overrides.view || (mocks.view as As<ViewRepository>),
     overrides.websocket || (mocks.websocket as As<WebsocketRepository>),
     overrides.workflow || (mocks.workflow as As<WorkflowRepository>),
-    overrides.imageAdjust || (mocks.imageAdjust as As<ImageAdjustRepository>),
     newGalleryRepositories(mocks, overrides),
   );
 

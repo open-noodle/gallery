@@ -25,6 +25,7 @@ import {
   addAlbumAssetContributions,
   emitAlbumAssetsAdd,
   removeAlbumAssetContributions,
+  tryContributeDeniedAssets,
 } from 'src/gallery/utils/space-album-contribution.js';
 import { AlbumAssetCount, AlbumInfoOptions } from 'src/repositories/album.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -288,7 +289,17 @@ export class AlbumService extends BaseService {
         const attempts: BulkIdResponseDto[] = deniedAssetIds
           .filter((assetId) => !presentIds.has(assetId))
           .map((assetId) => ({ id: assetId, success: false, error: BulkIdErrorReason.NO_PERMISSION }));
-        const contributedIds = await this.tryContributeDeniedAssets(auth, albumId, attempts);
+        const contributedIds = await tryContributeDeniedAssets(
+          {
+            event: this.eventRepository,
+            job: this.jobRepository,
+            sharedSpace: this.sharedSpaceRepository,
+            spaceAlbum: this.spaceAlbumRepository,
+          },
+          auth,
+          albumId,
+          attempts,
+        );
         if (contributedIds.size > 0) {
           results.error = undefined;
           results.success = true;

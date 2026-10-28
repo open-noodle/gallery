@@ -8,7 +8,6 @@ import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { GalleryBaseService } from 'src/gallery/services/gallery-base.service.js';
-import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -133,7 +132,6 @@ export const BASE_SERVICE_DEPENDENCIES = [
   ViewRepository,
   WebsocketRepository,
   WorkflowRepository,
-  ImageAdjustRepository,
   GalleryRepositories,
 ] as const;
 
@@ -198,7 +196,6 @@ export class BaseService extends GalleryBaseService {
     protected viewRepository: ViewRepository,
     protected websocketRepository: WebsocketRepository,
     protected workflowRepository: WorkflowRepository,
-    protected imageAdjustRepository: ImageAdjustRepository,
     protected galleryRepositories: GalleryRepositories,
   ) {
     super();
@@ -274,7 +271,6 @@ export class BaseService extends GalleryBaseService {
       ctx.viewRepository,
       ctx.websocketRepository,
       ctx.workflowRepository,
-      ctx.imageAdjustRepository,
       ctx.galleryRepositories,
     );
 

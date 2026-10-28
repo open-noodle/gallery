@@ -37,19 +37,21 @@ export const addAlbumAssetContributions = async (
 
 /**
  * Upgrade `no_permission` results to cross-owner contributions where eligible. Mutates `results` in place (denied →
- * success, or → duplicate if already contributed).
+ * success, or → duplicate if already contributed) and returns the ids it contributed. AlbumService's bulk
+ * addAssetsToAlbums calls it per album too.
  */
-const tryContributeDeniedAssets = async (
+export const tryContributeDeniedAssets = async (
   deps: SpaceAlbumContributionDependencies,
   auth: AuthDto,
   albumId: string,
   results: BulkIdResponseDto[],
-): Promise<void> => {
+): Promise<Set<string>> => {
+  const contributedIds = new Set<string>();
   const deniedIds = results
     .filter(({ success, error }) => !success && error === BulkIdErrorReason.NO_PERMISSION)
     .map(({ id }) => id);
   if (deniedIds.length === 0) {
-    return;
+    return contributedIds;
   }
 
   const [contributable, alreadyContributed] = await Promise.all([
@@ -73,12 +75,13 @@ const tryContributeDeniedAssets = async (
     }
 
     toInsert.push({ albumId, assetId: result.id, spaceId, addedById: auth.user.id });
+    contributedIds.add(result.id);
     result.success = true;
     delete result.error;
   }
 
   if (toInsert.length === 0) {
-    return;
+    return contributedIds;
   }
 
   await deps.spaceAlbum.addContributedAssets(toInsert);
@@ -94,6 +97,7 @@ const tryContributeDeniedAssets = async (
   if (jobs.length > 0) {
     await deps.job.queueAll(jobs);
   }
+  return contributedIds;
 };
 
 /**

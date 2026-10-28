@@ -4,6 +4,7 @@ import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-sugg
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
+import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -52,6 +53,7 @@ export const GALLERY_REPOSITORY_DEPENDENCIES = [
   GalleryAssetRepository,
   GalleryPersonRepository,
   MachineLearningRepository,
+  ImageAdjustRepository,
 ] as const;
 
 // Every fork repository a service needs, injected into upstream's BaseService as one constructor parameter.
@@ -83,5 +85,6 @@ export class GalleryRepositories {
     public galleryAssetRepository: GalleryAssetRepository,
     public galleryPersonRepository: GalleryPersonRepository,
     public galleryMachineLearningRepository: GalleryMachineLearningRepository,
+    public imageAdjustRepository: ImageAdjustRepository,
   ) {}
 }

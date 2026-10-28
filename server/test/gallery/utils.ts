@@ -14,6 +14,7 @@ import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maint
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
+import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -58,6 +59,7 @@ export type GalleryServiceOverrides = {
   galleryPerson: GalleryPersonRepository;
   // narrows upstream's `machineLearning` entry: the mock is the GalleryMachineLearningRepository instance
   machineLearning: GalleryMachineLearningRepository;
+  imageAdjust: ImageAdjustRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -83,6 +85,7 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
     faceSearch: automock(FaceSearchRepository, { strict: false }),
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { args: [undefined, loggerMock], strict: false }),
+    imageAdjust: automock(ImageAdjustRepository, { strict: false }),
     storageUsage: automock(StorageUsageRepository, { strict: false }),
     galleryDuplicate: automock(GalleryDuplicateRepository, { strict: false }),
     galleryAsset: automock(GalleryAssetRepository, { strict: false }),
@@ -124,4 +127,5 @@ export const newGalleryRepositories = (
     overrides.galleryAsset || (mocks.galleryAsset as As<GalleryAssetRepository>),
     overrides.galleryPerson || (mocks.galleryPerson as As<GalleryPersonRepository>),
     overrides.machineLearning || (mocks.machineLearning as As<GalleryMachineLearningRepository>),
+    overrides.imageAdjust || (mocks.imageAdjust as As<ImageAdjustRepository>),
   );
