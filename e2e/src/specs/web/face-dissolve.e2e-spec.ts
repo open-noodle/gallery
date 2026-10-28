@@ -64,10 +64,9 @@ test.describe('dissolve a metadata-contaminated person', () => {
     await expect(page.getByRole('button', { name: /from metadata/i })).toHaveAttribute('aria-pressed', 'true');
 
     await page.getByRole('textbox').fill('Contaminated');
-    await page.getByRole('button', { name: /delete the detections/i }).click();
+    await page.getByRole('button', { name: /^dissolve$/i }).click();
 
-    // delete-faces (the default outcome) against a person with exactly one, all-in-scope face empties it
-    // entirely. The manual-review page's own post-dissolve contract (people/[personId]/+page.svelte
+    // Imported faces are deleted; a person with exactly one, all-in-scope face is left empty and removed. The manual-review page's own post-dissolve contract (people/[personId]/+page.svelte
     // handleDissolve) then navigates back to the health/browse listing — so that navigation, not the
     // dissolve button remaining on screen, is the shipped UI's actual "it worked" signal.
     await page.waitForURL('**/admin/face-cleanup/people');
@@ -80,5 +79,61 @@ test.describe('dissolve a metadata-contaminated person', () => {
       asset.id,
     ]);
     expect(rows[0].facesRecognizedAt).toBeNull();
+  });
+
+  // Revision 2 (issue #1228): a junk person made of detected faces. Its faces are hidden rather than unassigned or
+  // deleted, so recognition and re-detection cannot bring them back, and the Dissolved page can restore them.
+  test('hides a junk person made of detected faces, then restores them', async ({ page, context }) => {
+    await utils.setAuthCookies(context, admin.accessToken);
+    const db = await utils.connectDatabase();
+
+    const person = await utils.createPerson(admin.accessToken, { name: 'Junk cluster' });
+    const faceIds: string[] = [];
+    for (let index = 0; index < 2; index++) {
+      const asset = await utils.createAsset(admin.accessToken);
+      faceIds.push(
+        await utils.createFace({
+          assetId: asset.id,
+          personGroupId: person.id,
+          sourceType: 'machine-learning',
+          withEmbedding: true,
+        }),
+      );
+    }
+
+    await page.goto(`/admin/face-cleanup/people/${person.id}`);
+    await page.getByTestId('manual-review-dissolve').click();
+    await page.getByRole('button', { name: /all faces/i }).click();
+    await expect(page.getByTestId('dissolve-treatment-hide')).toBeVisible();
+    await page.getByRole('textbox').fill('Junk cluster');
+    await page.getByRole('button', { name: /^dissolve$/i }).click();
+    await page.waitForURL('**/admin/face-cleanup/people');
+
+    const hidden = await db.query(
+      `SELECT "deletedAt", "personGroupId" FROM "asset_face" WHERE "id" = ANY($1::uuid[])`,
+      [faceIds],
+    );
+    expect(hidden.rows).toHaveLength(2);
+    for (const row of hidden.rows) {
+      expect(row.deletedAt).not.toBeNull();
+      expect(row.personGroupId).toBeNull();
+    }
+    const people = await db.query(`SELECT 1 FROM "person" WHERE "personGroupId" = $1`, [person.id]);
+    expect(people.rows).toHaveLength(0);
+
+    await page.goto('/admin/face-cleanup/dissolved');
+    const row = page.getByTestId('dissolve-row').filter({ hasText: 'Junk cluster' });
+    await row.getByRole('button', { name: 'Restore' }).click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect(row).toContainText('Restored');
+
+    const restored = await db.query(
+      `SELECT "deletedAt", "personGroupId" FROM "asset_face" WHERE "id" = ANY($1::uuid[])`,
+      [faceIds],
+    );
+    for (const face of restored.rows) {
+      expect(face.deletedAt).toBeNull();
+      expect(face.personGroupId).toBeNull();
+    }
   });
 });
