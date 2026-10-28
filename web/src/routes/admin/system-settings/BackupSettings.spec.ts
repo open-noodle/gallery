@@ -3,7 +3,6 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import BackupSettings from './BackupSettings.svelte';
 
 const makeConfig = (s3: { enabled: boolean }) =>
@@ -22,8 +21,7 @@ const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false, s3Storage: false },
   systemConfig: {} as AdminConfigDto,
   defaultSystemConfig: {} as AdminConfigDto,
-  cloneValue: vi.fn(),
-  cloneDefaultValue: vi.fn(),
+  saveConfig: vi.fn(),
 }));
 
 vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
@@ -34,21 +32,17 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
   } as never,
 }));
 
-vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
-  systemConfigManager: {
-    get value() {
-      return mocks.systemConfig;
+vi.mock(import('$lib/queries/client'), () => ({
+  createPreloadedQuery: ((optionsFn: () => { queryKey: readonly unknown[] }) => ({
+    get data() {
+      return optionsFn().queryKey.includes('defaults') ? mocks.defaultSystemConfig : mocks.systemConfig;
     },
-    get defaultValue() {
-      return mocks.defaultSystemConfig;
-    },
-    cloneValue: mocks.cloneValue,
-    cloneDefaultValue: mocks.cloneDefaultValue,
-  } as never,
+  })) as never,
 }));
 
-vi.mock(import('$lib/services/system-config.service'), () => ({
-  handleSystemConfigSave: vi.fn(),
+vi.mock(import('@tanstack/svelte-query'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  createMutation: (() => ({ mutate: mocks.saveConfig, isPending: false })) as never,
 }));
 
 /**
@@ -66,8 +60,6 @@ describe('BackupSettings', () => {
     mocks.featureFlags.s3Storage = false;
     mocks.systemConfig = makeConfig({ enabled: false });
     mocks.defaultSystemConfig = makeConfig({ enabled: false });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
-    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
   });
 
   // The gate: the feature reuses the media backend's bucket and credentials, so it cannot apply at all on a
@@ -116,7 +108,7 @@ describe('BackupSettings', () => {
       await user.click(screen.getByRole('switch', { name: 'admin.backup_s3_enabled' }));
       await user.click(screen.getByRole('button', { name: 'save' }));
 
-      expect(handleSystemConfigSave).toHaveBeenCalledWith({
+      expect(mocks.saveConfig).toHaveBeenCalledWith({
         backup: {
           database: {
             enabled: true,
@@ -130,7 +122,6 @@ describe('BackupSettings', () => {
 
     it('reflects a config that already has it on', () => {
       mocks.systemConfig = makeConfig({ enabled: true });
-      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       render(BackupSettings);
 
@@ -141,7 +132,6 @@ describe('BackupSettings', () => {
     it('keeps the toggle disabled in config-file mode', () => {
       mocks.featureFlags.configFile = true;
       mocks.systemConfig = makeConfig({ enabled: true });
-      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       render(BackupSettings);
 
