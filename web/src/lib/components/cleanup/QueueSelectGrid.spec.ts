@@ -26,12 +26,16 @@ const items = [
   asset('c', CleanupBlurReason.Bright),
 ];
 
-const renderGrid = (variant: 'blurry' | 'screenshots') => {
+const renderGrid = (
+  variant: 'blurry' | 'screenshots',
+  props: Partial<{ items: CleanupAssetDto[]; size: 'small' | 'medium' | 'large' }> = {},
+) => {
   const selected = new SvelteSet<string>();
   const onToggle = vi.fn((id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id)));
   const onOpen = vi.fn();
-  render(QueueSelectGrid, { items, variant, selected, onToggle, onOpen });
-  return { onToggle, onOpen };
+  const onExpand = vi.fn();
+  render(QueueSelectGrid, { items, variant, selected, onToggle, onOpen, onExpand, size: 'medium', ...props });
+  return { onToggle, onOpen, onExpand };
 };
 
 const tile = (id: string) => screen.getByTestId(`cleanup-item-${id}`);
@@ -79,5 +83,42 @@ describe('QueueSelectGrid', () => {
     renderGrid('screenshots');
 
     expect(screen.queryByText(/cleanup_reason_/)).toBeNull();
+  });
+
+  it('shows screenshots whole, at their own shape', () => {
+    renderGrid('screenshots', { items: [{ ...asset('s'), width: 1080, height: 2340 }] });
+
+    const frame = within(tile('s')).getByTestId('cleanup-tile');
+    expect(frame.style.aspectRatio).toBe('1080 / 2340');
+    expect(within(frame).getByRole('img')).toHaveClass('object-contain');
+  });
+
+  it('falls back to portrait when dimensions are missing', () => {
+    renderGrid('screenshots', { items: [{ ...asset('s'), width: null, height: null }] });
+
+    expect(within(tile('s')).getByTestId('cleanup-tile').style.aspectRatio).toBe('9 / 19.5');
+  });
+
+  it('keeps blurry tiles square and cropped', () => {
+    renderGrid('blurry');
+
+    const frame = within(tile('a')).getByTestId('cleanup-tile');
+    expect(frame).toHaveClass('aspect-square');
+    expect(within(frame).getByRole('img')).toHaveClass('object-cover');
+  });
+
+  it('sizes the tiles from the size control', () => {
+    renderGrid('screenshots', { size: 'large' });
+
+    expect(screen.getByTestId('cleanup-select-grid').style.columnWidth).toBe('340px');
+  });
+
+  it('opens the photo window from the expand button without toggling the tile', async () => {
+    const { onExpand, onToggle } = renderGrid('blurry');
+
+    await fireEvent.click(screen.getByTestId('cleanup-expand-b'));
+
+    expect(onExpand).toHaveBeenCalledWith('b', expect.any(DOMRect));
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

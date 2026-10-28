@@ -3,6 +3,8 @@
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { queueShortcuts } from '$lib/components/cleanup/cleanup-shortcuts';
   import QueueSelectGrid from '$lib/components/cleanup/QueueSelectGrid.svelte';
+  import CleanupPhotoWindow from '$lib/gallery/cleanup/CleanupPhotoWindow.svelte';
+  import { TILE_SIZES, tileSize, type TileSize } from '$lib/gallery/cleanup/tile-size';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { CleanupQueuePager, type Removed } from '$lib/managers/cleanup-queue-pager.svelte';
   import { keep, trashWithUndo } from '$lib/utils/cleanup-actions';
@@ -56,6 +58,18 @@
   let focusedId = $state<string | null>(null);
   let acting = $state(false);
   const selected = new SvelteSet<string>();
+  // svelte-ignore state_referenced_locally
+  const sizeStore = tileSize(queue);
+  let size = $state<TileSize>(sizeStore.get());
+  /** The photo window, open on one photo; null while closed. */
+  let photoWindow = $state<{ id: string; rect?: DOMRect } | null>(null);
+
+  const REASON_SIGNALS = {
+    [CleanupBlurReason.All]: undefined,
+    [CleanupBlurReason.Blurry]: 'cleanup_reason_blurry',
+    [CleanupBlurReason.Dark]: 'cleanup_reason_dark',
+    [CleanupBlurReason.Bright]: 'cleanup_reason_bright',
+  } as const;
 
   const filters = () =>
     isBlurry ? { reason, strictness: STRICTNESS[strictness], hideFaces } : ({} as Record<string, never>);
@@ -187,6 +201,26 @@
     void openAsset(id);
   };
 
+  const setSize = (next: TileSize) => {
+    size = next;
+    sizeStore.set(next);
+  };
+
+  const openWindow = (id: string | null, rect?: DOMRect) => {
+    if (id) {
+      focusedId = id;
+      photoWindow = { id, rect };
+    }
+  };
+
+  const isGone = (id: string) => pager.items.every((item) => item.id !== id);
+
+  const loadMoreForWindow = async () => {
+    const before = pager.items.length;
+    await load();
+    return pager.items.length > before;
+  };
+
   const onAssetsDelete = (ids: string[]) => {
     removeLocally(ids);
     void loadCounts();
@@ -212,9 +246,9 @@
         }
       },
       clear: () => selected.clear(),
-      open: () => void openAsset(focusedId ?? pager.items[0]?.id ?? null),
+      open: () => openWindow(focusedId ?? pager.items[0]?.id ?? null),
     },
-    () => assetViewerManager.isViewing || isModalOpen(),
+    () => assetViewerManager.isViewing || isModalOpen() || photoWindow !== null,
   )}
 />
 
@@ -305,14 +339,61 @@
   </Card>
 {/if}
 
+<div class="mb-2.5 flex justify-end">
+  <div
+    class="inline-flex rounded-full border bg-light p-0.5"
+    role="group"
+    aria-label={$t('cleanup_tile_size')}
+    data-testid="cleanup-tile-size"
+  >
+    {#each TILE_SIZES as option (option)}
+      <button
+        type="button"
+        class="rounded-full px-3 py-1 text-xs font-semibold transition-colors {size === option
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted hover:text-dark'}"
+        aria-pressed={size === option}
+        data-testid="cleanup-tile-size-{option}"
+        onclick={() => setSize(option)}
+      >
+        {$t(`cleanup_tile_size_${option}`)}
+      </button>
+    {/each}
+  </div>
+</div>
+
 <QueueSelectGrid
   items={pager.items}
   variant={queue}
   {selected}
   {focusedId}
+  {size}
   onToggle={toggle}
   onOpen={onTileOpen}
   onFocus={(id) => (focusedId = id)}
+  onExpand={(id, rect) => openWindow(id, rect)}
 />
+
+{#if photoWindow}
+  <CleanupPhotoWindow
+    items={() => pager.items}
+    startId={photoWindow.id}
+    originRect={photoWindow.rect}
+    signal={isBlurry ? (asset) => ({ label: asset.reason ? REASON_SIGNALS[asset.reason] : undefined }) : undefined}
+    selection={{ has: (id) => selected.has(id), toggle }}
+    onKeep={async (id) => {
+      await onKeep([id]);
+      return isGone(id);
+    }}
+    onTrash={async (id) => {
+      await onTrash([id]);
+      return isGone(id);
+    }}
+    advanceOnAction
+    loadMore={loadMoreForWindow}
+    openViewer={(id) => void openAsset(id)}
+    onClose={() => (photoWindow = null)}
+  />
+{/if}
 
 <QueueFooter {pager} empty={pager.items.length === 0} onLoadMore={() => void load()} />

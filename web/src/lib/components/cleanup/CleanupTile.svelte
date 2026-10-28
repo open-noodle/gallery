@@ -16,6 +16,10 @@
     aspect?: string;
     /** Corner radius class; `rounded-md` by default. */
     radius?: string;
+    /** An exact aspect ratio (`'1080 / 2340'`), used instead of the `aspect` class. */
+    ratio?: string;
+    /** `contain` shows the whole photo (screenshots); `cover` crops it to the tile. */
+    fit?: 'cover' | 'contain';
     /** Bottom-left badge, e.g. a ▶ video tag. */
     badge?: Snippet;
     /** Top-left corner, e.g. a selection circle or ★ SHARPEST. */
@@ -33,6 +37,8 @@
     alt = '',
     aspect = 'aspect-square',
     radius = 'rounded-md',
+    ratio,
+    fit = 'cover',
     class: className = '',
     badge,
     topLeft,
@@ -52,8 +58,9 @@
 </script>
 
 <div
-  class="relative {aspect} overflow-hidden {radius} bg-gray-200 dark:bg-gray-700 {className}"
+  class="relative {ratio ? '' : aspect} overflow-hidden {radius} bg-gray-200 dark:bg-gray-700 {className}"
   data-testid="cleanup-tile"
+  style:aspect-ratio={ratio}
 >
   {#if thumbhash && !loaded}
     <Thumbhash base64ThumbHash={thumbhash} class="absolute inset-0 size-full" />
@@ -63,7 +70,9 @@
     {alt}
     loading="lazy"
     draggable="false"
-    class="absolute inset-0 size-full object-cover transition-opacity {loaded ? 'opacity-100' : 'opacity-0'}"
+    class="absolute inset-0 size-full {fit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity {loaded
+      ? 'opacity-100'
+      : 'opacity-0'}"
     onload={() => (loaded = true)}
   />
   {#if durationLabel}

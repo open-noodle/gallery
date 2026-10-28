@@ -47,6 +47,9 @@ vi.mock('$lib/utils/navigation', async (importOriginal) => ({
 }));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mocks.auth }));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
+vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({
+  assetCacheManager: { getAsset: () => Promise.resolve(undefined) },
+}));
 
 const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,
@@ -208,7 +211,7 @@ describe('blurry queue', () => {
     expect(item('a')).toHaveAttribute('data-selected', 'false');
   });
 
-  it('opens the focused photo in the viewer with Space', async () => {
+  it('opens the focused photo in the photo window with Space, and in the viewer on double-click', async () => {
     mocks.sdk.getCleanupQueue.mockResolvedValue(page([asset('a'), asset('b')]));
     renderBlurry();
     await waitFor(() => expect(item('b')).toBeInTheDocument());
@@ -216,7 +219,36 @@ describe('blurry queue', () => {
 
     await fireEvent.keyDown(document, { key: ' ' });
 
-    expect(mocks.navigate).toHaveBeenCalledWith({ targetRoute: 'current', assetId: 'b' });
+    expect(await screen.findByTestId('cleanup-photo-window')).toBeInTheDocument();
+    expect(screen.getByTestId('cleanup-photo-window-photo').dataset.assetId).toBe('b');
+    expect(mocks.navigate).not.toHaveBeenCalled();
+
+    await fireEvent.dblClick(item('a'));
+    expect(mocks.navigate).toHaveBeenCalledWith({ targetRoute: 'current', assetId: 'a' });
+  });
+
+  it('keeps the page shortcuts off while the photo window is open', async () => {
+    mocks.sdk.getCleanupQueue.mockResolvedValue(page([asset('a'), asset('b')]));
+    renderBlurry();
+    await waitFor(() => expect(item('b')).toBeInTheDocument());
+    await fireEvent.click(screen.getByTestId('cleanup-expand-b'));
+    await screen.findByTestId('cleanup-photo-window');
+
+    await fireEvent.keyDown(document, { key: 'a' });
+
+    expect(item('a')).toHaveAttribute('data-selected', 'false');
+  });
+
+  it('remembers the tile size per queue', async () => {
+    localStorage.clear();
+    mocks.sdk.getCleanupQueue.mockResolvedValue(page([asset('a')]));
+    renderBlurry();
+    await waitFor(() => expect(item('a')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByTestId('cleanup-tile-size-large'));
+
+    expect(screen.getByTestId('cleanup-tile-size-large')).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('cleanup.queue.blurry.tile-size')).toBe('large');
   });
 });
 

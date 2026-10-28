@@ -491,10 +491,12 @@ describe('RewindDay', () => {
     });
 
     it('works when storage throws', async () => {
-      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      // Seen in storage that then becomes unreadable: the explainer must still show, not crash.
+      localStorage.setItem('cleanup.rewind.explainer-seen', 'true');
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
         throw new Error('blocked');
       });
-      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw new Error('blocked');
       });
       renderDay();
