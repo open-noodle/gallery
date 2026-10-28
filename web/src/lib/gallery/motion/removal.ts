@@ -2,15 +2,15 @@ import { lastPressPoint } from '#lib/gallery/motion/press.ts';
 import { duration, ease, prefersReducedMotion, spring, springEasing } from '#lib/gallery/motion/tokens.ts';
 
 /**
- * Photos leaving the view because the user sent them somewhere. Trashed or archived photos lift
- * slightly, then arc into the sidebar link for where they went (Trash, Archive), which gulps them.
- * With that link hidden (the asset viewer covers it, or the sidebar is collapsed), they arc into the
- * button the user pressed instead, and with neither they drop off the page under gravity.
- * A permanent delete has no destination, so the photos dissolve in place.
- *
- * Call it after the server confirmed the delete and before the photos leave the DOM: it copies what
- * is on screen into a fixed overlay, so the timeline can remove and reflow at once underneath.
- */
+Photos leaving the view because the user sent them somewhere. Trashed or archived photos lift
+slightly, then arc into the sidebar link for where they went (Trash, Archive), which gulps them.
+With that link hidden (the asset viewer covers it, or the sidebar is collapsed), they arc into the
+button the user pressed instead, and with neither they drop off the page under gravity.
+A permanent delete has no destination, so the photos dissolve in place.
+
+Call it after the server confirmed the delete and before the photos leave the DOM: it copies what
+is on screen into a fixed overlay, so the timeline can remove and reflow at once underneath.
+*/
 export type RemovalKind = 'trash' | 'archive' | 'restore' | 'delete';
 
 /** The sidebar link each kind of removal flies into. */
@@ -21,10 +21,10 @@ const DESTINATION: Record<Exclude<RemovalKind, 'delete'>, string> = {
 };
 
 /**
- * `'visible'` animates every photo on screen, for actions that clear a whole page (empty trash,
- * restore all) and remove the photos later from a server event. Those originals are hidden at once
- * and stay hidden, so they do not reappear under their own animation.
- */
+`'visible'` animates every photo on screen, for actions that clear a whole page (empty trash,
+restore all) and remove the photos later from a server event. Those originals are hidden at once
+and stay hidden, so they do not reappear under their own animation.
+*/
 export type RemovalTarget = string[] | 'visible';
 
 interface Point {
@@ -255,7 +255,7 @@ export const animateRemoval = (target: RemovalTarget, kind: RemovalKind): void =
   document.body.append(layer);
 
   const link = kind === 'delete' ? undefined : findDestinationLink(DESTINATION[kind]);
-  const pressed = kind !== 'delete' && !link ? lastPressPoint(1500) : undefined;
+  const pressed = kind === 'delete' || link ? undefined : lastPressPoint(1500);
   const destination = link ? center(link.getBoundingClientRect()) : pressed;
 
   const flights = sources.map((source, index) => {

@@ -34,20 +34,20 @@
     asset: AssetResponseDto;
     isOwner: boolean;
     /**
-     * #734-style sibling of `isOwner`, never a widening of it (see DetailPanelTags' `canEdit`).
-     * True iff the viewer is Owner/Editor of the space this asset is being viewed through AND is
-     * not the asset's owner. The owner path keeps rendering the owner's own people through the
-     * owner components regardless of this prop — these are two different code paths that merely
-     * look similar. The hidden-people toggle inside the affordance block stays gated on `isOwner`
-     * alone: a space editor has no business toggling the owner's hidden people, and the server
-     * refuses it.
-     */
+    #734-style sibling of `isOwner`, never a widening of it (see DetailPanelTags' `canEdit`).
+    True iff the viewer is Owner/Editor of the space this asset is being viewed through AND is
+    not the asset's owner. The owner path keeps rendering the owner's own people through the
+    owner components regardless of this prop — these are two different code paths that merely
+    look similar. The hidden-people toggle inside the affordance block stays gated on `isOwner`
+    alone: a space editor has no business toggling the owner's hidden people, and the server
+    refuses it.
+    */
     canEditSpacePeople?: boolean;
     previousRoute: string;
     /**
-     * R4/E2 — false on a shared link. (People are already shared-link-suppressed by the section gate
-     * below; this is belt-and-braces, and keeps the row's gate identical to every other row's.)
-     */
+    R4/E2 — false on a shared link. (People are already shared-link-suppressed by the section gate
+    below; this is belt-and-braces, and keeps the row's gate identical to every other row's.)
+    */
     canFilter?: boolean;
     spaceId?: string;
   };
@@ -69,10 +69,10 @@
   };
 
   /**
-   * R8 — the person patch is TARGET-DEPENDENT, and getting it wrong 400s the Space timeline. All of
-   * that lives in buildPersonFilterPatch; null means "there is nothing honest to filter by here", so
-   * the chip falls back to being the person-page link it is today.
-   */
+  R8 — the person patch is TARGET-DEPENDENT, and getting it wrong 400s the Space timeline. All of
+  that lives in buildPersonFilterPatch; null means "there is nothing honest to filter by here", so
+  the chip falls back to being the person-page link it is today.
+  */
   const getPersonFilterHref = (person: AssetPerson) => {
     if (!canFilter) {
       return undefined;
@@ -83,11 +83,11 @@
   };
 
   /**
-   * The destination's chip and filter panel resolve a person id to a name through the
-   * filter-suggestions response, which is a round-trip late and does not always carry THIS token
-   * (see rememberContextualPersonName). Bank the name we already have on the way out, so the chip
-   * never renders a raw id.
-   */
+  The destination's chip and filter panel resolve a person id to a name through the
+  filter-suggestions response, which is a round-trip late and does not always carry THIS token
+  (see rememberContextualPersonName). Bank the name we already have on the way out, so the chip
+  never renders a raw id.
+  */
   const rememberPersonName = (person: AssetPerson, href: string) => {
     const patch = buildPersonFilterPatch(new URL(page.url.href), person);
     const personId = patch?.personIds?.[0];

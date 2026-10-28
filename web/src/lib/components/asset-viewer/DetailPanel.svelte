@@ -97,14 +97,14 @@
   let isOnPhotos = $derived(filterTarget?.kind === 'photos');
 
   /**
-   * E9 — an album surface offers NO `albumId` filter affordance at all, for any album.
-   *
-   * buildAlbumTimelineOptions never forwards `albumId` (the route already scopes the query), while
-   * getActiveFilterCount counts it and a chip renders. So on /albums/A, filtering by album B would
-   * show a "1 filter" badge and a removable B chip over a grid that is still the whole of A — a
-   * filter the UI claims is active but the server never sees. Filtering album A by album B is not
-   * a query the album timeline can express, so we do not offer it.
-   */
+  E9 — an album surface offers NO `albumId` filter affordance at all, for any album.
+  
+  buildAlbumTimelineOptions never forwards `albumId` (the route already scopes the query), while
+  getActiveFilterCount counts it and a chip renders. So on /albums/A, filtering by album B would
+  show a "1 filter" badge and a removable B chip over a grid that is still the whole of A — a
+  filter the UI claims is active but the server never sees. Filtering album A by album B is not
+  a query the album timeline can express, so we do not offer it.
+  */
   let isOnAlbum = $derived(filterTarget?.kind === 'album');
   // A space-scoped map cannot represent an album filter — space ∩ album is unsatisfiable and the
   // server 400s it (hydrateMapFilters drops albumId there). Treat it like the album surface and
@@ -129,12 +129,12 @@
   const lensFilterPatch = () => ({ lensModel: asset.exifInfo?.lensModel ?? undefined });
 
   /**
-   * The filename WITHOUT its extension — that is what surfaces a RAW/JPEG pair (IMG_1234.CR3 +
-   * IMG_1234.jpg) and edited variants of the same shot, which is the whole point of the filter.
-   *
-   * Only the LAST dot is an extension separator (`my.photo.v2.jpg` → `my.photo.v2`), and a
-   * leading-dot name (`.jpg`) has an EMPTY basename — R9: no affordance is rendered for it.
-   */
+  The filename WITHOUT its extension — that is what surfaces a RAW/JPEG pair (IMG_1234.CR3 +
+  IMG_1234.jpg) and edited variants of the same shot, which is the whole point of the filter.
+  
+  Only the LAST dot is an extension separator (`my.photo.v2.jpg` → `my.photo.v2`), and a
+  leading-dot name (`.jpg`) has an EMPTY basename — R9: no affordance is rendered for it.
+  */
   const getFilenameBasename = (filename: string) => {
     const lastDot = filename.lastIndexOf('.');
     return (lastDot === -1 ? filename : filename.slice(0, lastDot)).trim();
@@ -153,11 +153,11 @@
     })(),
   );
   /**
-   * #767 class — the embedded map's "open in map view" control used to call Route.map({...latlng})
-   * directly, dropping the Space scope AND every active filter (and it would have landed an album
-   * viewer on the global map). It reuses buildContextualMapUrl now, exactly like the location row's
-   * pin: null (→ no control at all) on an album, which has no map URL to be honest with.
-   */
+  #767 class — the embedded map's "open in map view" control used to call Route.map({...latlng})
+  directly, dropping the Space scope AND every active filter (and it would have landed an album
+  viewer on the global map). It reuses buildContextualMapUrl now, exactly like the location row's
+  pin: null (→ no control at all) on an album, which has no map URL to be honest with.
+  */
   let mapViewUrl = $derived(
     latlng && canFilter ? buildContextualMapUrl(new URL(page.url.href), { ...latlng, zoom: 12.5 }) : null,
   );

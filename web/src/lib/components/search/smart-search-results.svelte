@@ -10,9 +10,9 @@
     filters: FilterState;
     spaceId?: string;
     /**
-     * Album scope imposed by the host route — how an album detail page narrows a page-aware search
-     * to the album it is showing. Unioned with any `filters.albumId`; see `buildSmartSearchParams`.
-     */
+    Album scope imposed by the host route — how an album detail page narrows a page-aware search
+    to the album it is showing. Unioned with any `filters.albumId`; see `buildSmartSearchParams`.
+    */
     albumIds?: string[];
     /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
     space?: { id: string; canWrite: boolean };
@@ -22,14 +22,14 @@
     isLoading?: boolean;
     total?: number;
     /**
-     * Loaded results, exposed so the host page's multi-select toolbar can act on them
-     * (select-all, and removing/updating assets after a bulk action).
-     */
+    Loaded results, exposed so the host page's multi-select toolbar can act on them
+    (select-all, and removing/updating assets after a bulk action).
+    */
     results?: AssetResponseDto[];
     /**
-     * Bump to force a re-run of the current search — how a host page restores results after an
-     * undone delete, since undo hands back TimelineAssets rather than full AssetResponseDtos.
-     */
+    Bump to force a re-run of the current search — how a host page restores results after an
+    undone delete, since undo hands back TimelineAssets rather than full AssetResponseDtos.
+    */
     reloadToken?: number;
     /** Reports the results grid's scroll offset — see `SpaceSearchResults` (#1028). */
     onScroll?: (scrollTop: number) => void;
@@ -52,14 +52,14 @@
   }: Props = $props();
 
   /**
-   * Content key for the album scope. Hosts pass `$derived([album.id])`, and Svelte's derived
-   * compares with `===`, so every unrelated `album` reassignment — a rename, the `refreshAlbum()`
-   * that follows a delete — mints a fresh array. Tracking the ARRAY in the re-search effect below
-   * would discard every loaded page and re-run the whole vector search on each of those. Reading it
-   * through a `$derived` string collapses that to value equality: the effect only re-fires when the
-   * scope genuinely changes. (Calling `.join()` inside the effect would not help — reading the prop
-   * at all is what registers the dependency.)
-   */
+  Content key for the album scope. Hosts pass `$derived([album.id])`, and Svelte's derived
+  compares with `===`, so every unrelated `album` reassignment — a rename, the `refreshAlbum()`
+  that follows a delete — mints a fresh array. Tracking the ARRAY in the re-search effect below
+  would discard every loaded page and re-run the whole vector search on each of those. Reading it
+  through a `$derived` string collapses that to value equality: the effect only re-fires when the
+  scope genuinely changes. (Calling `.join()` inside the effect would not help — reading the prop
+  at all is what registers the dependency.)
+  */
   const albumScopeKey = $derived(albumIds?.join(',') ?? '');
 
   let hasMoreResults = $state(false);
@@ -67,11 +67,11 @@
   let searchAbortController: AbortController | undefined;
 
   /**
-   * Identity of the search whose assets are currently in `searchResults`, so a genuinely new search
-   * can blank them (#1052). Undefined until the first search runs, which is what makes a re-mount
-   * clear too: the HOST owns `results`, so mounting this component for a new query starts out
-   * rendering the *previous* query's assets.
-   */
+  Identity of the search whose assets are currently in `searchResults`, so a genuinely new search
+  can blank them (#1052). Undefined until the first search runs, which is what makes a re-mount
+  clear too: the HOST owns `results`, so mounting this component for a new query starts out
+  rendering the *previous* query's assets.
+  */
   let renderedSearchKey: string | undefined;
 
   const executeSearch = async (page: number, append: boolean) => {

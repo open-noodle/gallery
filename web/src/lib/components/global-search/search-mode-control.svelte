@@ -9,11 +9,11 @@
     mode: SearchMode;
     onSelect: (mode: SearchMode) => void;
     /**
-     * True while a prefix scope (@person, #tag, …) is active. `setMode` is a no-op then,
-     * so the control dims — but the inputs stay operable on purpose, so a keyboard user
-     * can still queue a mode up for when the prefix is cleared. Deliberately no
-     * `aria-disabled`; this mirrors the segmented control it replaces.
-     */
+    True while a prefix scope (@person, #tag, …) is active. `setMode` is a no-op then,
+    so the control dims — but the inputs stay operable on purpose, so a keyboard user
+    can still queue a mode up for when the prefix is cleared. Deliberately no
+    `aria-disabled`; this mirrors the segmented control it replaces.
+    */
     scoped?: boolean;
     /** True when the ML service is down, which makes smart search return nothing. */
     smartUnavailable?: boolean;

@@ -99,9 +99,9 @@ export const Route = {
     }
 
     const point =
-      params?.zoom !== undefined && params?.lat !== undefined && params?.lng !== undefined
-        ? `#${params.zoom}/${params.lat}/${params.lng}`
-        : '';
+      params?.zoom === undefined || params?.lat === undefined || params?.lng === undefined
+        ? ''
+        : `#${params.zoom}/${params.lat}/${params.lng}`;
 
     const searchString = search.toString();
     return '/map' + (searchString ? `?${searchString}` : '') + point;

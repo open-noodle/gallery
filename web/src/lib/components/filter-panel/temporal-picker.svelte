@@ -19,7 +19,9 @@
 
   let {
     timeBuckets,
+    // eslint-disable-next-line unicorn/prefer-default-parameters
     dateAfter,
+    // eslint-disable-next-line unicorn/prefer-default-parameters
     dateBefore,
     selectedYear,
     selectedMonth,

@@ -16,22 +16,22 @@
     asset: AssetResponseDto;
     isOwner: boolean;
     /**
-     * #734: widens the ADD-tag affordance to a space editor. Per-tag REMOVE stays gated on the
-     * real `isOwner` below — not because removal always 403s for an editor (it doesn't:
-     * `TagService.removeAssets` passes `canAlwaysRemove: Permission.TagDelete`, and
-     * `asset.util.ts:81-85` short-circuits the per-asset check for the caller's OWN tags, so an
-     * editor removing a tag they added themselves succeeds today). The real reason is that
-     * `TagResponseDto` carries no `userId`, so the client cannot tell which tags on this asset are
-     * the caller's own versus the owner's, and offering remove on all of them would fail on the
-     * owner's. Defaults to `isOwner` so every call site keeps today's behavior unless it
-     * explicitly widens editability.
-     */
+    #734: widens the ADD-tag affordance to a space editor. Per-tag REMOVE stays gated on the
+    real `isOwner` below — not because removal always 403s for an editor (it doesn't:
+    `TagService.removeAssets` passes `canAlwaysRemove: Permission.TagDelete`, and
+    `asset.util.ts:81-85` short-circuits the per-asset check for the caller's OWN tags, so an
+    editor removing a tag they added themselves succeeds today). The real reason is that
+    `TagResponseDto` carries no `userId`, so the client cannot tell which tags on this asset are
+    the caller's own versus the owner's, and offering remove on all of them would fail on the
+    owner's. Defaults to `isOwner` so every call site keeps today's behavior unless it
+    explicitly widens editability.
+    */
     canEdit?: boolean;
     /**
-     * R4/E2 — false on a shared link, where there is no timeline to filter. Threaded from
-     * DetailPanel exactly like `isOwner`. (Tags are already shared-link-suppressed by the section
-     * gate below; this is belt-and-braces.)
-     */
+    R4/E2 — false on a shared link, where there is no timeline to filter. Threaded from
+    DetailPanel exactly like `isOwner`. (Tags are already shared-link-suppressed by the section
+    gate below; this is belt-and-braces.)
+    */
     canFilter?: boolean;
     spaceId?: string;
   }

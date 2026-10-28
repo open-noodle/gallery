@@ -426,6 +426,7 @@ describe('FilteredTimelineController', () => {
   // 9: a persistent route switching entity must keep the typed-search names for the new URL,
   // whichever of its entity effect and the controller's URL effect runs first.
   describe('entity switch', () => {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const switchTo = (url: string, setEntity: (id: string) => void, id: string) => {
       storeTypedSearchNames(url, { personNames: new Map([['p1', 'Ann']]), tagNames: new Map() });
       mockPage.url = new URL(url, 'https://gallery.test');

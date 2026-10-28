@@ -171,6 +171,7 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
   };
 }
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function makeMember(userId: string, role: SharedSpaceRole): SharedSpaceMemberResponseDto {
   return {
     userId,

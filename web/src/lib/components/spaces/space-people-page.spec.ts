@@ -133,6 +133,7 @@ function renderPage({
     hidden: people.filter((person) => person.isHidden).length,
     detectedFaceCount: 0,
   },
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   userId = 'current-user-id',
   hasSpacePeople,
 }: {

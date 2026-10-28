@@ -2,23 +2,23 @@ import type { SharedSpaceResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
 
 /**
- * Reusable mock helpers for shared space SDK functions.
- *
- * Requires `$lib/__mocks__/sdk.mock` to be imported first (auto-mocks @immich/sdk).
- *
- * Usage:
- * ```ts
- * import '#lib/__mocks__/sdk.mock.ts';
- * import { spacesApiMock } from '#test-data/mocks/spaces-api.mock';
- *
- * beforeEach(() => { vi.resetAllMocks(); });
- *
- * it('lists spaces', async () => {
- *   spacesApiMock.getAllSpaces([space1, space2]);
- *   // ... test code that calls getAllSpaces
- * });
- * ```
- */
+Reusable mock helpers for shared space SDK functions.
+
+Requires `$lib/__mocks__/sdk.mock` to be imported first (auto-mocks @immich/sdk).
+
+Usage:
+```ts
+import '#lib/__mocks__/sdk.mock.ts';
+import { spacesApiMock } from '#test-data/mocks/spaces-api.mock';
+
+beforeEach(() => { vi.resetAllMocks(); });
+
+it('lists spaces', async () => {
+  spacesApiMock.getAllSpaces([space1, space2]);
+  // ... test code that calls getAllSpaces
+});
+```
+*/
 export const spacesApiMock = {
   /** Mock `getAllSpaces` to resolve with the given spaces. */
   getAllSpaces(spaces: SharedSpaceResponseDto[]) {

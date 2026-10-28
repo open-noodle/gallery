@@ -17,9 +17,9 @@ import {
 } from '@immich/sdk';
 
 /**
- * The Adjust panel's state: exposure, contrast, saturation and invert, saved through `PUT /assets/{id}/adjust`
- * (stored beside asset_edit, not in it, so stock Immich clients never see an action they cannot decode).
- */
+The Adjust panel's state: exposure, contrast, saturation and invert, saved through `PUT /assets/{id}/adjust`
+(stored beside asset_edit, not in it, so stock Immich clients never see an action they cannot decode).
+*/
 export class ImageAdjustManager {
   /** Which half of the transform panel shows: the Adjust sliders or Immich's crop grid. */
   mode = $state<'edit' | 'crop'>('edit');
@@ -102,11 +102,11 @@ const editsKey = (edits: EditActions) =>
   );
 
 /**
- * The transform tool with the Adjust panel folded in, as EditManager sees it: changes, reset and save cover both.
- * Saving writes the adjustment first and, when crop/rotate/mirror changed too, waits for its edit job before saving
- * those, so the two jobs never render the same asset at once. EditManager waits for the first edit-ready event, so
- * this resolves only after the last job is done.
- */
+The transform tool with the Adjust panel folded in, as EditManager sees it: changes, reset and save cover both.
+Saving writes the adjustment first and, when crop/rotate/mirror changed too, waits for its edit job before saving
+those, so the two jobs never render the same asset at once. EditManager waits for the first edit-ready event, so
+this resolves only after the last job is done.
+*/
 export const withImageAdjust = (transform: EditToolManager, adjust = imageAdjustManager): EditToolManager => {
   // `hasChanges` alone misses "Reset changes", which reverts the tool without counting as a change.
   let opened = editsKey([]);

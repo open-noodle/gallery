@@ -46,6 +46,7 @@ const space = (id: string, name: string): SharedSpaceResponseDto =>
     recentAssetIds: [],
   }) as unknown as SharedSpaceResponseDto;
 /** An album owned by someone else that the caller is a member of — `getAllAlbums` returns these too. */
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const albumSharedWithMe = (id: string, name: string): AlbumResponseDto =>
   ({ ...album(id, name), ownerId: 'someone-else', shared: true }) as unknown as AlbumResponseDto;
 /** A space created by someone else, with the caller holding `role` (or not a member at all). */
@@ -476,6 +477,7 @@ describe('CollectionPickerModal — expanding a space into its albums', () => {
 // ---------------------------------------------------------------------------
 
 describe('CollectionPickerModal — restricted to a space', () => {
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const linkedAlbum = (id: string, name: string) =>
     ({
       id,

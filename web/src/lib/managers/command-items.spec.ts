@@ -546,6 +546,7 @@ describe('album-context commands', () => {
     ownerId: 'u-owner',
   } as unknown as AlbumResponseDto;
 
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const makeCtx = (overrides?: Partial<CommandContext>): CommandContext => ({
     routeId: '/(user)/albums/[albumId=id]',
     params: { albumId: 'a1' },

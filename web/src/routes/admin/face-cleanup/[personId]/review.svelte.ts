@@ -71,17 +71,17 @@ export interface ReviewModel {
   /** Returns every face to `owner` (clearing any chosen destination) and clears the selection. */
   reset(): void;
   /** Applies `state` (+ optional destination for `other`) to every currently-selected face, then clears the
-   *  selection — mirrors the mockup's `apply(s)` bulk-bar action. `destination.lock` (Slice 3, move-and-lock)
-   *  is the PersonPicker's "Lock so it won't re-flag" toggle; it defaults to false and only ever applies to
-   *  `other`-state (chosen-person) destinations — a suggested-owner move never auto-locks. */
+  selection — mirrors the mockup's `apply(s)` bulk-bar action. `destination.lock` (Slice 3, move-and-lock)
+  is the PersonPicker's "Lock so it won't re-flag" toggle; it defaults to false and only ever applies to
+  `other`-state (chosen-person) destinations — a suggested-owner move never auto-locks. */
   applyToSelection(state: FaceState, destination?: { personId: string; name?: string | null; lock?: boolean }): void;
   /** Pure builder: groups `owner`/`other` faces by destination (owner destination = each face's own
-   *  suspectedOwnerId) and emits `stay`/`lock`/`detach` id lists. Never touches the network.
-   *
-   *  `added` carries the rest-of-cluster faces the admin ticked — faces the scan never flagged, which they want
-   *  moved to the same destination anyway. They join the SAME resolve as the flagged faces (one terminal Apply):
-   *  a separate resolve for them alone would settle none of the flagged snapshot, and the server would (rightly)
-   *  refuse to drain the person — leaving the review half-done. */
+  suspectedOwnerId) and emits `stay`/`lock`/`detach` id lists. Never touches the network.
+
+  `added` carries the rest-of-cluster faces the admin ticked — faces the scan never flagged, which they want
+  moved to the same destination anyway. They join the SAME resolve as the flagged faces (one terminal Apply):
+  a separate resolve for them alone would settle none of the flagged snapshot, and the server would (rightly)
+  refuse to drain the person — leaving the review half-done. */
   buildResolveRequest(
     personId: string,
     added?: { destinationPersonId: string; faceIds: string[] },

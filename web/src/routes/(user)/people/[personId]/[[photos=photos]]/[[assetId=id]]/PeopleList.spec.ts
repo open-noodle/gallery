@@ -38,17 +38,17 @@ describe('PeopleList', () => {
   });
 
   /**
-   * The candidate grid used to declare no unprefixed column count at all — its smallest-screen
-   * class was the singular of `grid-cols-2`, which Tailwind does not recognise and so compiles to
-   * nothing, and below `md` the grid fell back to a single column and rendered one enormous face
-   * per row on a phone (#1082). Dropping the base `grid-cols-*` again, or making the smallest one
-   * breakpoint-prefixed, brings that straight back, and neither the dead-utility guard (the
-   * remaining names would all still compile) nor happy-dom (it resolves no stylesheets) would
-   * notice.
-   *
-   * The dead spelling is deliberately not written out here: the dead-utility guard scans comments
-   * too, so naming it would fail that guard from this file.
-   */
+  The candidate grid used to declare no unprefixed column count at all — its smallest-screen
+  class was the singular of `grid-cols-2`, which Tailwind does not recognise and so compiles to
+  nothing, and below `md` the grid fell back to a single column and rendered one enormous face
+  per row on a phone (#1082). Dropping the base `grid-cols-*` again, or making the smallest one
+  breakpoint-prefixed, brings that straight back, and neither the dead-utility guard (the
+  remaining names would all still compile) nor happy-dom (it resolves no stylesheets) would
+  notice.
+  
+  The dead spelling is deliberately not written out here: the dead-utility guard scans comments
+  too, so naming it would fail that guard from this file.
+  */
   it('declares a column count for the smallest screens, not only from a breakpoint up', () => {
     renderList({ people: [person('p1', 'Alice')] });
 

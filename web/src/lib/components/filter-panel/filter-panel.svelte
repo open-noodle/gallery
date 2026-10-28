@@ -399,12 +399,12 @@
   type StoredSectionSet = string[] | { selected?: string[]; known?: string[] };
 
   /**
-   * The stored record behind a section set. It is scoped to the browser, not to the surface:
-   * album detail and the album asset picker share a storage key but offer different section
-   * lists, so entries this surface does not render are carried through untouched rather than
-   * intersected away — otherwise the shorter surface forgets them and the longer one keeps
-   * treating them as brand new (#797).
-   */
+  The stored record behind a section set. It is scoped to the browser, not to the surface:
+  album detail and the album asset picker share a storage key but offer different section
+  lists, so entries this surface does not render are carried through untouched rather than
+  intersected away — otherwise the shorter surface forgets them and the longer one keeps
+  treating them as brand new (#797).
+  */
   interface SectionLedger {
     selected: FilterSectionType[];
     known: FilterSectionType[];

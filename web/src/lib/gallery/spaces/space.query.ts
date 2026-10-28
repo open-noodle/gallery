@@ -6,10 +6,10 @@ import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
 import { queryOptions } from '@tanstack/svelte-query';
 
 /**
- * The viewer's spaces list, shared by the sidebar's recent spaces and the People pages (which read the
- * viewer's role from `members`). Replaces the fork's `userInteraction.recentSpaces` store, the same move
- * upstream made for its recent albums (album.query.ts). While a refetch runs, the last list stays up.
- */
+The viewer's spaces list, shared by the sidebar's recent spaces and the People pages (which read the
+viewer's role from `members`). Replaces the fork's `userInteraction.recentSpaces` store, the same move
+upstream made for its recent albums (album.query.ts). While a refetch runs, the last list stays up.
+*/
 export const spacesQueryKey = ['spaces'];
 
 export const getAllSpacesQuery = () =>

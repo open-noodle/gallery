@@ -283,6 +283,7 @@
   const isSharedSpacePerson = (person: ScopedMergeCandidate): person is SharedSpacePersonResponseDto =>
     'assetCount' in person;
 
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const toScopedPersonRef = (person: ScopedMergeCandidate, fallbackSpaceId = space.id): ScopedPersonProfileRefDto => {
     if (!isSharedSpacePerson(person)) {
       return toPersonScopedRef(person);

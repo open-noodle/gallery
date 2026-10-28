@@ -14,13 +14,13 @@ const { refreshAssetPeople } = await import('./refresh-asset-people');
 
 describe('refreshAssetPeople', () => {
   /**
-   * The People row and the face boxes over the photo are two DIFFERENT stale surfaces after a face
-   * edit, refreshed by two different means. The on-photo SpaceFaceEditor originally did neither and
-   * simply closed itself, so a newly tagged person stayed invisible until a full page reload.
-   *
-   * Asserting all three calls is the point: covering only the emit would still let the photo's face
-   * boxes go stale, and covering only faceManager would still let the People row go stale.
-   */
+  The People row and the face boxes over the photo are two DIFFERENT stale surfaces after a face
+  edit, refreshed by two different means. The on-photo SpaceFaceEditor originally did neither and
+  simply closed itself, so a newly tagged person stayed invisible until a full page reload.
+  
+  Asserting all three calls is the point: covering only the emit would still let the photo's face
+  boxes go stale, and covering only faceManager would still let the People row go stale.
+  */
   it('re-reads the asset in its space, republishes it, and reloads the face boxes', async () => {
     const refreshed = { id: 'asset-1', people: [{ id: 'p-1', name: 'Dana' }] };
     getAssetInfoMock.mockResolvedValue(refreshed);

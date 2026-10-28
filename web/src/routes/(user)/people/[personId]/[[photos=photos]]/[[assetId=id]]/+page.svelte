@@ -444,12 +444,12 @@
   type SuggestionTarget = { type: 'person'; personId: string } | { type: 'space'; spaceId: string; personId: string };
 
   /**
-   * A space member who holds no person row for this identity reaches the shared person through this
-   * (global) route from the main People list — their primary profile IS the space profile, and the
-   * owner-only person endpoints do not know that id. Route those reads and verdicts at the shared
-   * space endpoints instead, so suggestions are not a /spaces-only affordance. The server returns an
-   * empty page to members below editor, which keeps the banner hidden for viewers.
-   */
+  A space member who holds no person row for this identity reaches the shared person through this
+  (global) route from the main People list — their primary profile IS the space profile, and the
+  owner-only person endpoints do not know that id. Route those reads and verdicts at the shared
+  space endpoints instead, so suggestions are not a /spaces-only affordance. The server returns an
+  empty page to members below editor, which keeps the banner hidden for viewers.
+  */
   const getSuggestionTarget = (target: PersonResponseDto): SuggestionTarget => {
     const profile = target.primaryProfile;
     return profile?.type === 'space-person' && profile.spaceId

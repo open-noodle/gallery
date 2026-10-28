@@ -32,7 +32,7 @@
     albums: SharedSpaceLinkedAlbumDto[];
     folders?: SharedSpaceAlbumFolderDto[];
     /** The most recent folders fetch failed — fall back to a flat, unscoped album list rather
-     * than hiding every album that lives in a folder we have no metadata for. */
+    than hiding every album that lives in a folder we have no metadata for. */
     foldersUnavailable?: boolean;
     currentFolderId?: string | null;
     canManage: boolean;

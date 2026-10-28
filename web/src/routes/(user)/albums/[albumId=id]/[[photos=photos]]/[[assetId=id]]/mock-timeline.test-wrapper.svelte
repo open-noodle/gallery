@@ -34,11 +34,11 @@
   const mountId = nextTimelineMountId();
 
   /**
-   * Opt-in empty rendering, keyed on the same `__timelineStubAssetCount` global the sibling
-   * bindable-timeline stub uses. Gated on the global being EXPLICITLY 0 rather than on this mock's
-   * own `empty` computation, so every spec that does not set it keeps rendering exactly what it
-   * rendered before this snippet existed.
-   */
+  Opt-in empty rendering, keyed on the same `__timelineStubAssetCount` global the sibling
+  bindable-timeline stub uses. Gated on the global being EXPLICITLY 0 rather than on this mock's
+  own `empty` computation, so every spec that does not set it keeps rendering exactly what it
+  rendered before this snippet existed.
+  */
   const emptyStubGlobals = globalThis as typeof globalThis & { __timelineStubAssetCount?: number };
   const renderEmptySnippet = $derived(emptyStubGlobals.__timelineStubAssetCount === 0);
 

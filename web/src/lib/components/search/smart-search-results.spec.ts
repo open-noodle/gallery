@@ -31,10 +31,10 @@ const baseProps = {
 const mockEmptyResult = { assets: { items: [], nextPage: null } };
 
 /**
- * The shared mock never invokes its callback, so the infinite-scroll sentinel can't be driven from a
- * test. Capture the callbacks instead — the newest belongs to the live sentinel — so paging can be
- * exercised alongside the search-clearing behaviour it shares state with.
- */
+The shared mock never invokes its callback, so the infinite-scroll sentinel can't be driven from a
+test. Capture the callbacks instead — the newest belongs to the live sentinel — so paging can be
+exercised alongside the search-clearing behaviour it shares state with.
+*/
 let intersectionCallbacks: IntersectionObserverCallback[] = [];
 
 const getCapturingIntersectionObserverMock = () =>

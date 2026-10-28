@@ -17,14 +17,15 @@
     /** Invoked when the sentinel enters the viewport (or is already visible) and another page is available. */
     onLoadMore: () => void;
     /**
-     * Count of items currently loaded. Drives the post-append visibility re-check: after the list grows, if the
-     * sentinel is still on-screen (a page that didn't fill the viewport), load the next one too.
-     */
+    Count of items currently loaded. Drives the post-append visibility re-check: after the list grows, if the
+    sentinel is still on-screen (a page that didn't fill the viewport), load the next one too.
+    */
     itemCount?: number;
     /** Overrides the sentinel's own layout/spacing so callers can match their surrounding container. */
     class?: string;
   }
 
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   let { hasMore = false, loading = false, onLoadMore, itemCount = 0, class: className }: Props = $props();
 
   let sentinel: HTMLElement | undefined = $state();

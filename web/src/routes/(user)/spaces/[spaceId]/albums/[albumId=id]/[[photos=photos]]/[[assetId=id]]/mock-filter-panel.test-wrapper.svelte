@@ -36,11 +36,11 @@
   }
 
   /**
-   * The real panel calls `config.suggestionsProvider` on mount and on every filter change
-   * (filter-panel.svelte). Without that call here, a page's ENTIRE query-mode provider — the branch
-   * that swaps album suggestions for search facets — is never exercised, and deleting it leaves the
-   * suite green. The rendered people list below is what lets a test observe which branch ran.
-   */
+  The real panel calls `config.suggestionsProvider` on mount and on every filter change
+  (filter-panel.svelte). Without that call here, a page's ENTIRE query-mode provider — the branch
+  that swaps album suggestions for search facets — is never exercised, and deleting it leaves the
+  suite green. The rendered people list below is what lets a test observe which branch ran.
+  */
   let suggestedPeople = $state<Array<{ id: string; name: string }>>([]);
   let suggestionError = $state('');
 

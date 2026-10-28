@@ -25,13 +25,13 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 });
 
 /**
- * Regression guard for #802 — "Filter panel options differ between views".
- *
- * Every surface renders the same filter sections in the same order, derived from the single
- * `ALL_FILTER_SECTIONS` source of truth. A surface may only drop a section when the server
- * physically cannot honour it there; each such exclusion is listed below with its reason, so a
- * new divergence has to be argued for in code review rather than appearing by omission.
- */
+Regression guard for #802 — "Filter panel options differ between views".
+
+Every surface renders the same filter sections in the same order, derived from the single
+`ALL_FILTER_SECTIONS` source of truth. A surface may only drop a section when the server
+physically cannot honour it there; each such exclusion is listed below with its reason, so a
+new divergence has to be argued for in code review rather than appearing by omission.
+*/
 const DOCUMENTED_EXCLUSIONS: Record<string, { sections: FilterSection[]; reason: string }> = {
   'album detail': {
     sections: ['albums'],

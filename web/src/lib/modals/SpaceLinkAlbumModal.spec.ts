@@ -28,6 +28,7 @@ vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
 const makeAlbum = (
   overrides: Partial<AlbumResponseDto> = {},
   role: AlbumUserRole = AlbumUserRole.Owner,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   userId = 'u-me',
 ): AlbumResponseDto =>
   albumFactory.build({

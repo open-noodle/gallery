@@ -9,6 +9,7 @@
     spaceColor: string;
   }
 
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   let { newAssetCount, lastViewedAt, spaceColor }: Props = $props();
 
   const bgClasses: Record<string, string> = {

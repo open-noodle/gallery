@@ -15,17 +15,17 @@ import { getSelectionCapabilities, type SelectionCapabilities } from './selectio
 // ---------------------------------------------------------------------------
 
 /**
- * `ownedSelectedAssetIds` defaults to whatever `isAllUserOwned` implies — all of
- * the selection, or none of it — so a fixture can never claim "all mine" while
- * reporting an empty owned set. A genuinely MIXED selection is expressed by
- * passing both explicitly (see `makeMixedSelection`).
- */
+`ownedSelectedAssetIds` defaults to whatever `isAllUserOwned` implies — all of
+the selection, or none of it — so a fixture can never claim "all mine" while
+reporting an empty owned set. A genuinely MIXED selection is expressed by
+passing both explicitly (see `makeMixedSelection`).
+*/
 /**
- * `editableSelectedAssetIds` defaults to whatever `isAllUserOwned` implies — the whole
- * selection when it's synchronously resolved (all-owned), `undefined` (unresolved) otherwise
- * — mirroring `ownedSelectedAssetIds`'s own default above. A test exercising the #734
- * editable-subset behavior passes it explicitly (see `makeSelection` overrides below).
- */
+`editableSelectedAssetIds` defaults to whatever `isAllUserOwned` implies — the whole
+selection when it's synchronously resolved (all-owned), `undefined` (unresolved) otherwise
+— mirroring `ownedSelectedAssetIds`'s own default above. A test exercising the #734
+editable-subset behavior passes it explicitly (see `makeSelection` overrides below).
+*/
 const makeSelection = (overrides: Partial<SelectionCommandContext> = {}): SelectionCommandContext => {
   const selectedAssetIds = overrides.selectedAssetIds ?? ['asset-1'];
   const isAllUserOwned = overrides.isAllUserOwned ?? true;

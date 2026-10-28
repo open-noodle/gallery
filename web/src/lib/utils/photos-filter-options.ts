@@ -15,23 +15,23 @@ export type PhotosPersonFilterReference = {
 };
 
 /**
- * The `/photos` timeline query.
- *
- * `userId` is REQUIRED and always sent — it is the personal timeline's owner gate, and it is what
- * makes every other chip a NARROWING of my own timeline rather than a redefinition of its scope.
- *
- * The server only defaults `userId` to the caller when neither `albumId` nor `spaceId` is present
- * (`timeline.service.ts` `timeBucketChecks`); under an `albumId` it deliberately leaves the owner
- * scope unset, because for the ALBUM page album ACCESS *is* the scope — a viewer of a shared album
- * must see the owner's assets (medium test E22). `/photos` is the opposite surface, so it has to
- * state its scope itself: without `userId`, an album chip would collapse the personal timeline to
- * "everything in that album", and `?albumId=A&ownerId=<co-member>` would list a co-member's assets
- * on MY timeline. The server query already ANDs the two gates; it just has to be told about both.
- *
- * (#763: the Favorites chip is no longer part of that hazard — a favourite is a per-user overlay
- * row resolved for the CALLER, not the asset owner's flag, so it narrows to MY favourites whoever
- * owns the asset.)
- */
+The `/photos` timeline query.
+
+`userId` is REQUIRED and always sent — it is the personal timeline's owner gate, and it is what
+makes every other chip a NARROWING of my own timeline rather than a redefinition of its scope.
+
+The server only defaults `userId` to the caller when neither `albumId` nor `spaceId` is present
+(`timeline.service.ts` `timeBucketChecks`); under an `albumId` it deliberately leaves the owner
+scope unset, because for the ALBUM page album ACCESS *is* the scope — a viewer of a shared album
+must see the owner's assets (medium test E22). `/photos` is the opposite surface, so it has to
+state its scope itself: without `userId`, an album chip would collapse the personal timeline to
+"everything in that album", and `?albumId=A&ownerId=<co-member>` would list a co-member's assets
+on MY timeline. The server query already ANDs the two gates; it just has to be told about both.
+
+(#763: the Favorites chip is no longer part of that hazard — a favourite is a per-user overlay
+row resolved for the CALLER, not the asset owner's flag, so it narrows to MY favourites whoever
+owns the asset.)
+*/
 export function buildPhotosTimelineOptions(filters: FilterState, userId: string): Record<string, unknown> {
   const base: Record<string, unknown> = {
     userId,

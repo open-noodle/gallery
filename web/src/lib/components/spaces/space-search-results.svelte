@@ -28,10 +28,10 @@
     /** Re-runs the current search — used to restore results after an undone delete. */
     onReload?: () => void;
     /**
-     * Reports the scroll offset of the results grid. This section is the only scrolling element on
-     * the surface, so a host that shrinks its chrome as the reader scrolls — the space shell
-     * collapsing its cover — has no other way to hear about it (#1028). Mirrors `Timeline`'s prop.
-     */
+    Reports the scroll offset of the results grid. This section is the only scrolling element on
+    the surface, so a host that shrinks its chrome as the reader scrolls — the space shell
+    collapsing its cover — has no other way to hear about it (#1028). Mirrors `Timeline`'s prop.
+    */
     onScroll?: (scrollTop: number) => void;
   }
 

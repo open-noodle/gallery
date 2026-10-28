@@ -12,10 +12,10 @@ import { AssetPickerFilters } from './asset-picker-filters.svelte';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 
 /**
- * E9: the route already scopes the timeline to this album, and the server's `albumId` is a SCALAR
- * driving one inner join, so album ∩ album is impossible. A stray `?albumId=` is IGNORED: dropping
- * it here keeps it out of the active-filter count, the chip bar and the next URL write.
- */
+E9: the route already scopes the timeline to this album, and the server's `albumId` is a SCALAR
+driving one inner join, so album ∩ album is impossible. A stray `?albumId=` is IGNORED: dropping
+it here keeps it out of the active-filter count, the chip bar and the next URL write.
+*/
 export const hydrateAlbumFilters = (url: URL): FilterState => ({
   ...createFilterState(),
   ...decodeFilterParams(url),
@@ -24,9 +24,9 @@ export const hydrateAlbumFilters = (url: URL): FilterState => ({
 });
 
 /**
- * Browse order. An album carries its own `order`, but the navbar sort dropdown renders on every
- * searchable page, so an EXPLICIT `?sort=` has to win or the control would do nothing here.
- */
+Browse order. An album carries its own `order`, but the navbar sort dropdown renders on every
+searchable page, so an EXPLICIT `?sort=` has to win or the control would do nothing here.
+*/
 const albumOrder = (album: AlbumResponseDto, filters: FilterState) => {
   if (!getSearchablePageState(new URL(page.url.href)).hasExplicitSort) {
     return album.order ?? authManager.preferences.albums.defaultAssetOrder;
@@ -44,11 +44,11 @@ type AlbumTimelineOptions = {
 };
 
 /**
- * An album detail route (`/albums/<id>`, `/spaces/<sid>/albums/<id>`). Search is scoped to the
- * album alone, never the space: the browse timeline is album-scoped and its panel speaks the
- * personal person tokens, and an added `spaceId` would widen server-side (`albumIds` resolves
- * `timelineSpaceIds`, which skips the space predicate).
- */
+An album detail route (`/albums/<id>`, `/spaces/<sid>/albums/<id>`). Search is scoped to the
+album alone, never the space: the browse timeline is album-scoped and its panel speaks the
+personal person tokens, and an added `spaceId` would widen server-side (`albumIds` resolves
+`timelineSpaceIds`, which skips the space predicate).
+*/
 export const createAlbumTimeline = ({
   name,
   getAlbum,

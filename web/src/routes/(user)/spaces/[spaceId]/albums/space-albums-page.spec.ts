@@ -133,12 +133,12 @@ function renderPage(
     /** Simulates a failed folders fetch instead of resolving `options.folders`. */
     foldersRejects?: boolean;
     /** Leaves the mount reload's folders fetch pending forever, so the test observes FIRST PAINT
-     * only — what the page renders from its LOAD data, before any refetch lands. That window is
-     * where the unscoped-flash bug lived, and there is otherwise no way to assert on it. */
+    only — what the page renders from its LOAD data, before any refetch lands. That window is
+    where the unscoped-flash bug lived, and there is otherwise no way to assert on it. */
     foldersPending?: boolean;
     /** What the layout's initial (pre-mount-reload) linkedAlbums prop reports — defaults to
-     * `albums`. Set this to something different from `albums` to prove that the mount reload
-     * actually replaces it, rather than the assertion passing on the initial prop alone. */
+    `albums`. Set this to something different from `albums` to prove that the mount reload
+    actually replaces it, rather than the assertion passing on the initial prop alone. */
     linkedAlbums?: SharedSpaceLinkedAlbumDto[];
   } = {},
 ) {
@@ -186,21 +186,21 @@ const makeFakeDataTransfer = () => {
 };
 
 /**
- * Builds a fake DataTransfer carrying `payload`, then fires dragover followed by drop on the
- * folder card for `targetFolderId`. space-album-folder-card's data-testid is shared across every
- * rendered card, so the target is matched via its data-folder-id attribute instead.
- *
- * `setActiveDragPayload` is called first, matching what a real `dragstart` does — without it,
- * the card's `canAccept()` reads a permanently-empty active-drag slot, `ondragover` always
- * early-returns, and `drop` becomes the only handler doing anything (jsdom's fireEvent.drop
- * doesn't require a prior preventDefault()'d dragover the way a real browser does), meaning the
- * dragover gate — and the `folders`/`albums` props it depends on — go completely untested.
- *
- * `drop` only fires if dragover accepted (preventDefault() ran), exactly matching a real
- * browser: no accepted dragover means no `drop` event at all, not merely a `drop` that some
- * other guard happens to reject. Returns whether dragover accepted, so a caller can assert on it
- * directly (see the breadcrumb variant below and the dedicated dragover-gate test).
- */
+Builds a fake DataTransfer carrying `payload`, then fires dragover followed by drop on the
+folder card for `targetFolderId`. space-album-folder-card's data-testid is shared across every
+rendered card, so the target is matched via its data-folder-id attribute instead.
+
+`setActiveDragPayload` is called first, matching what a real `dragstart` does — without it,
+the card's `canAccept()` reads a permanently-empty active-drag slot, `ondragover` always
+early-returns, and `drop` becomes the only handler doing anything (jsdom's fireEvent.drop
+doesn't require a prior preventDefault()'d dragover the way a real browser does), meaning the
+dragover gate — and the `folders`/`albums` props it depends on — go completely untested.
+
+`drop` only fires if dragover accepted (preventDefault() ran), exactly matching a real
+browser: no accepted dragover means no `drop` event at all, not merely a `drop` that some
+other guard happens to reject. Returns whether dragover accepted, so a caller can assert on it
+directly (see the breadcrumb variant below and the dedicated dragover-gate test).
+*/
 async function dropOnFolder(payload: DragPayload, targetFolderId: string): Promise<boolean> {
   setActiveDragPayload(payload);
   const dataTransfer = makeFakeDataTransfer();
@@ -221,9 +221,9 @@ async function dropOnFolder(payload: DragPayload, targetFolderId: string): Promi
 }
 
 /**
- * Same idea as `dropOnFolder`, but for a breadcrumb crumb: `targetFolderId: null` targets the
- * root crumb (`breadcrumb-root`), anything else targets `breadcrumb-{id}`.
- */
+Same idea as `dropOnFolder`, but for a breadcrumb crumb: `targetFolderId: null` targets the
+root crumb (`breadcrumb-root`), anything else targets `breadcrumb-{id}`.
+*/
 async function dropOnCrumb(payload: DragPayload, targetFolderId: string | null): Promise<boolean> {
   setActiveDragPayload(payload);
   const dataTransfer = makeFakeDataTransfer();

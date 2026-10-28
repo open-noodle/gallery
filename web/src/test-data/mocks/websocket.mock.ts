@@ -10,14 +10,14 @@ import type { writable } from 'svelte/store';
 import type { Mock } from 'vitest';
 
 /**
- * Reusable mock for `$lib/stores/websocket`.
- *
- * Usage in test files:
- * ```ts
- * import { websocketMock } from '#test-data/mocks/websocket.mock';
- * // vi.mock is called automatically when this module is imported
- * ```
- */
+Reusable mock for `$lib/stores/websocket`.
+
+Usage in test files:
+```ts
+import { websocketMock } from '#test-data/mocks/websocket.mock';
+// vi.mock is called automatically when this module is imported
+```
+*/
 // this module exists precisely to register the websocket mock on import
 // (documented usage above)
 // eslint-disable-next-line unicorn/no-top-level-side-effects
