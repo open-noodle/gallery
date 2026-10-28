@@ -5,7 +5,7 @@
     readDragPayload,
     setActiveDragPayload,
     type DragPayload,
-  } from '$lib/utils/space-album-folder-dnd';
+  } from '#lib/utils/space-album-folder-dnd.ts';
   import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';

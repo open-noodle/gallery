@@ -13,7 +13,7 @@ describe('space-row', () => {
     // Load the real en bundle so `$t('cmdk_preview_member_count', { values: { count } })`
     // resolves to English ICU output ("1 member" / "3 members") instead of the raw key
     // (global test setup uses `fallbackLocale: 'dev'` which returns keys).
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

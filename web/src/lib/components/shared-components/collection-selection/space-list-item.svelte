@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { longPress } from '$lib/actions/long-press';
-  import { SCROLL_PROPERTIES } from '$lib/components/shared-components/album-selection/album-selection-utils';
-  import SpaceCollage from '$lib/components/spaces/space-collage.svelte';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
-  import { normalizeSearchString } from '$lib/utils/string-utils';
+  import { longPress } from '#lib/actions/long-press.ts';
+  import { SCROLL_PROPERTIES } from '#lib/components/shared-components/album-selection/album-selection-utils.ts';
+  import SpaceCollage from '#lib/components/spaces/space-collage.svelte';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
+  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAccountMultipleOutline, mdiCheckCircle, mdiChevronDown, mdiChevronUp } from '@mdi/js';

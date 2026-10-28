@@ -1,12 +1,12 @@
 <script lang="ts">
-  import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
-  import { Route } from '$lib/route';
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { Route } from '#lib/route.ts';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { getFaceRepairResolutions, getPeopleThumbnailPath, removeFaceRepairResolutions } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
-  import { handleError } from '$lib/utils/handle-error';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { faceCleanupBreadcrumbs } from '../breadcrumbs';
 
   // A single negative-verdict row: "this face is NOT that person", from either engine. Human PLACEMENTS are

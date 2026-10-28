@@ -1,13 +1,13 @@
+import CreateSharedLinkAction from '#lib/components/timeline/actions/create-shared-link-action.test-wrapper.svelte';
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { modalManager, toastManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import CreateSharedLinkAction from '$lib/components/timeline/actions/create-shared-link-action.test-wrapper.svelte';
-import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 
 const { mockUser } = vi.hoisted(() => ({ mockUser: { current: { id: 'me', isAdmin: false } } }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;

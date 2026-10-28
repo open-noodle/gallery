@@ -1,13 +1,13 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '#lib/utils/album-filter-config.ts';
+import { buildAlbumTimelineOptions } from '#lib/utils/album-filter-options.ts';
+import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
+import { decodeFilterParams } from '#lib/utils/filter-url.ts';
+import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
 import { AssetOrder, type AlbumResponseDto } from '@immich/sdk';
 import { page } from '$app/state';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
-import { buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
-import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
-import { decodeFilterParams } from '$lib/utils/filter-url';
-import { getSearchablePageState } from '$lib/utils/searchable-page-search';
 import { AssetPickerFilters } from './asset-picker-filters.svelte';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 
@@ -28,7 +28,7 @@ export const hydrateAlbumFilters = (url: URL): FilterState => ({
  * searchable page, so an EXPLICIT `?sort=` has to win or the control would do nothing here.
  */
 const albumOrder = (album: AlbumResponseDto, filters: FilterState) => {
-  if (!getSearchablePageState(page.url).hasExplicitSort) {
+  if (!getSearchablePageState(new URL(page.url.href)).hasExplicitSort) {
     return album.order ?? authManager.preferences.albums.defaultAssetOrder;
   }
   return filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;

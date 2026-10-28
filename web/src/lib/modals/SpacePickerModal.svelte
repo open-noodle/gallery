@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { initInput } from '$lib/actions/focus';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import { initInput } from '#lib/actions/focus.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { getAllSpaces, SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Modal, ModalBody } from '@immich/ui';
   import { onMount } from 'svelte';

@@ -1,8 +1,8 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { fromISODateTimeUTCToObject } from '#lib/utils/timeline-util.ts';
 import { AssetOrder, TimeBucketSize } from '@immich/sdk';
 import { tick } from 'svelte';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { fromISODateTimeUTCToObject } from '$lib/utils/timeline-util';
-import { timelineAssetFactory, toResponseDto } from '@test-data/factories/asset-factory';
+import { timelineAssetFactory, toResponseDto } from '#test-data/factories/asset-factory';
 import { mergeTimeBuckets } from './internal/album-picker-support';
 import { toTimeBucketRequest, toTimeBucketsRequest } from './internal/request-options';
 import {

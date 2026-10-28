@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cleanClass } from '$lib';
+  import { cleanClass } from '#lib';
 
   interface Props {
     /** The key as printed on the cap, e.g. `s` or `→`. */

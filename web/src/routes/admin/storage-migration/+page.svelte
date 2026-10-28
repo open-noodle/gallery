@@ -1,6 +1,6 @@
 <script lang="ts">
-  import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     StorageMigrationDirection,
     getEstimate as getEstimateRaw,

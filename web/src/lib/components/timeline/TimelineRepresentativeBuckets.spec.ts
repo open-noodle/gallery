@@ -1,9 +1,9 @@
+import TimelineRepresentativeBuckets from '#lib/components/timeline/TimelineRepresentativeBuckets.svelte';
+import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
+import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
-import TimelineRepresentativeBuckets from '$lib/components/timeline/TimelineRepresentativeBuckets.svelte';
-import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
-import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
 
 type RepresentativeTimelineBucket = ActivatableTimelineBucket & {
   viewId: string;

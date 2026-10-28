@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
+  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
   import { Icon, modalManager } from '@immich/ui';
   import { mdiHelpCircleOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
-  import { Route } from '$lib/route';
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { Route } from '#lib/route.ts';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     getFaceRepairClusterFaces,
     getFaceRepairPersonFaces,
@@ -17,13 +17,13 @@
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { t, type Translations } from 'svelte-i18n';
-  import { getServerErrorMessage, handleError } from '$lib/utils/handle-error';
-  import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
-  import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
-  import FaceReviewDock from '$lib/components/face-cleanup/FaceReviewDock.svelte';
-  import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
-  import type { FaceActionId } from '$lib/components/face-cleanup/face-actions';
-  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
+  import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
+  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
+  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import { faceCleanupBreadcrumbs, guidedCrumb } from '../breadcrumbs';
   import type { PageData } from './$types';
   import { selectableDestinations, sortDestinations, type SuspectedOwner } from './destination';
@@ -707,7 +707,7 @@
           data-testid="flagged-grid"
         >
           {#each visibleFaces as face, tileIndex (face.assetFaceId)}
-            {@const selected = vm.isSelected(face.assetFaceId)}
+            {const selected = $derived(vm.isSelected(face.assetFaceId))}
             <div class="relative aspect-square">
               <button
                 type="button"
@@ -860,8 +860,8 @@
         {:else}
           <div class="grid grid-cols-4 gap-3 bg-gray-50 p-4 sm:grid-cols-6 lg:grid-cols-8 dark:bg-gray-800/50">
             {#each restFaces as face, tileIndex (face.assetFaceId)}
-              {@const selected = restSelected.has(face.assetFaceId)}
-              {@const blocked = !canBulkMove && !selected}
+              {const selected = $derived(restSelected.has(face.assetFaceId))}
+              {const blocked = $derived(!canBulkMove && !selected)}
               <div class="relative aspect-square">
                 <button
                   type="button"
@@ -942,7 +942,7 @@
         {#snippet summary()}
           <div class="flex flex-1 flex-wrap items-center gap-3.5" data-testid="tally">
             {#each ['owner', 'stay', 'lock', 'other', 'unknown', 'detach'] as FaceState[] as state (state)}
-              {@const count = vm.tally[state]}
+              {const count = $derived(vm.tally[state])}
               <span
                 class={[
                   'inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold dark:border-gray-700 dark:bg-gray-800',

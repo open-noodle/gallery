@@ -1,10 +1,10 @@
+import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
+import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
+import '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
 import type { AlbumResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import '$lib/__mocks__/sdk.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
 import SearchAddAllToCollectionModal from './SearchAddAllToCollectionModal.svelte';
 
 const { mockUser, mockAdd, mockCollect, mockHandleError } = vi.hoisted(() => ({
@@ -13,10 +13,10 @@ const { mockUser, mockAdd, mockCollect, mockHandleError } = vi.hoisted(() => ({
   mockCollect: vi.fn(),
   mockHandleError: vi.fn(),
 }));
-vi.mock('$lib/services/collection.service', () => ({ addAssetsToCollections: mockAdd }));
-vi.mock('$lib/services/search.service', () => ({ collectSearchResultAssetIds: mockCollect }));
-vi.mock('$lib/utils/handle-error', () => ({ handleError: mockHandleError }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/services/collection.service.js', () => ({ addAssetsToCollections: mockAdd }));
+vi.mock('#lib/services/search.service.js', () => ({ collectSearchResultAssetIds: mockCollect }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: mockHandleError }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     get authenticated() {
       return mockUser.current !== null;

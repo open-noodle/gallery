@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
+  import type { SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiCreation, mdiFormatTitle, mdiOcr, mdiTextBoxOutline } from '@mdi/js';
   import { t, type Translations } from 'svelte-i18n';

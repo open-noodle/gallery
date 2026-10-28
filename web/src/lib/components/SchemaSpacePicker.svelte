@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
+  import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
   import { getAllSpaces, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Button, Label, modalManager, Text } from '@immich/ui';
   import { t } from 'svelte-i18n';

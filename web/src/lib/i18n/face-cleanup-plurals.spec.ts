@@ -1,23 +1,23 @@
+import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
+import { convertBCP47 } from '#lib/utils/i18n.ts';
 import { IntlMessageFormat } from 'intl-messageformat';
 import { init, locale, register, waitLocale, _, type Translations } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FORK_LOCALES } from '$lib/i18n/fork-locales';
-import { convertBCP47 } from '$lib/utils/i18n';
 
 // S12.9/F31: 17 count-bearing `admin.face_cleanup_*` keys used bare `{count}` with no ICU plural clause, so
 // they rendered "1 clusters" / "1 faces" for an admin whose review queue happened to be down to one.
 beforeAll(async () => {
-  register('en', () => import('$i18n/en.json'));
+  register('en', () => import('#i18n/en.json'));
   for (const code of FORK_LOCALES) {
     // H9: zh_Hans / zh_Hant are not valid BCP47 tags. IntlMessageFormat throws when constructed under the
     // underscore code, and svelte-i18n silently swallows that and falls back to the RAW, unparsed message —
     // so a render assertion registered under 'zh_Hans' would pass no matter what the translated content is.
     // Register under the same hyphenated form the app itself uses (initLanguage in $lib/utils.ts →
     // convertBCP47) while still reading the underscore-named source file; see the non-inertness proof below.
-    register(convertBCP47(code), () => import(`$i18n/${code}.json`));
+    register(convertBCP47(code), () => import(`#i18n/${code}.json`));
   }
   await init({ fallbackLocale: 'en', initialLocale: 'en' });
   await waitLocale('en');
