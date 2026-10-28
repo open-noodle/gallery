@@ -164,14 +164,14 @@ export class PetDetectionService extends BaseService {
   }
 
   /**
-   * Species-bucket pipeline: put each detected pet under a per-(owner, species) person, exactly as
-   * before individual pet recognition existed. This must stay byte-for-byte identical to the
-   * pre-recognition pipeline — upgrading users with recognition off see no change (Slice 5 test 5.1
-   * is the regression guard for that).
-   *
-   * Receives every detected pet when recognition is disabled, and only the species the re-ID model
-   * cannot identify (everything outside RECOGNIZABLE_PET_SPECIES) when it is enabled.
-   */
+  Species-bucket pipeline: put each detected pet under a per-(owner, species) person, exactly as
+  before individual pet recognition existed. This must stay byte-for-byte identical to the
+  pre-recognition pipeline — upgrading users with recognition off see no change (Slice 5 test 5.1
+  is the regression guard for that).
+  
+  Receives every detected pet when recognition is disabled, and only the species the re-ID model
+  cannot identify (everything outside RECOGNIZABLE_PET_SPECIES) when it is enabled.
+  */
   private async writeDetectedPetsAsSpeciesBuckets({
     assetId,
     ownerId,
@@ -234,16 +234,16 @@ export class PetDetectionService extends BaseService {
   }
 
   /**
-   * Individual-pet pipeline (pet recognition enabled): write faces + embeddings, and queue one
-   * PetRecognition job per detected pet that has an embedding. No species-bucket person is
-   * created here — clustering into individuals happens in
-   * PetRecognitionService.handlePetRecognition (Slice 5 Part B).
-   *
-   * Only receives recognizable species that actually carry an embedding; the caller routes
-   * everything else to writeDetectedPetsAsSpeciesBuckets. The ML service still embeds every
-   * detected pet in the same request, so the discarded embeddings are wasted work — cheap next to
-   * detection, and not worth teaching the ML pipeline a species allow-list to avoid.
-   */
+  Individual-pet pipeline (pet recognition enabled): write faces + embeddings, and queue one
+  PetRecognition job per detected pet that has an embedding. No species-bucket person is
+  created here — clustering into individuals happens in
+  PetRecognitionService.handlePetRecognition (Slice 5 Part B).
+  
+  Only receives recognizable species that actually carry an embedding; the caller routes
+  everything else to writeDetectedPetsAsSpeciesBuckets. The ML service still embeds every
+  detected pet in the same request, so the discarded embeddings are wasted work — cheap next to
+  detection, and not worth teaching the ML pipeline a species allow-list to avoid.
+  */
   private async writeDetectedPetsForRecognition({
     assetId,
     imageHeight,

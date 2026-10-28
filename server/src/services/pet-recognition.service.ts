@@ -233,16 +233,16 @@ export class PetRecognitionService extends BaseService {
   }
 
   /**
-   * The model-switch hook shared by {@link onConfigInit} and {@link onConfigUpdate}. `oldConfig` is
-   * only available from ConfigUpdate — ConfigInit fires at bootstrap with no prior config.
-   *
-   * Runs entirely under `DatabaseLock.PetRecognitionModelSwitch`: `withLock` only serializes
-   * concurrent callers, it does not dedupe, so the FIRST thing done under the lock is a re-read of
-   * the stored state to check idempotency — two ConfigUpdate deliveries (e.g. multiple
-   * non-API workers reacting to the same save) both carry the same stale `oldConfig`, and without
-   * this re-read they would each purge + requeue, double-detecting every asset (both pet writers
-   * are additive).
-   */
+  The model-switch hook shared by {@link onConfigInit} and {@link onConfigUpdate}. `oldConfig` is
+  only available from ConfigUpdate — ConfigInit fires at bootstrap with no prior config.
+  
+  Runs entirely under `DatabaseLock.PetRecognitionModelSwitch`: `withLock` only serializes
+  concurrent callers, it does not dedupe, so the FIRST thing done under the lock is a re-read of
+  the stored state to check idempotency — two ConfigUpdate deliveries (e.g. multiple
+  non-API workers reacting to the same save) both carry the same stale `oldConfig`, and without
+  this re-read they would each purge + requeue, double-detecting every asset (both pet writers
+  are additive).
+  */
   private async handleModelSwitch(newConfig: SystemConfig, oldConfig?: SystemConfig): Promise<void> {
     await this.databaseRepository.withLock(DatabaseLock.PetRecognitionModelSwitch, async () => {
       const state = await this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState);
@@ -317,11 +317,11 @@ export class PetRecognitionService extends BaseService {
   }
 
   /**
-   * `ensurePersonIdentity` derives `face_identity.type` from `person.type` (see
-   * FaceIdentityRepository.ensurePersonIdentity), so calling this on a `type: 'pet'` person
-   * stamps the identity `type: 'pet'` — this is what activates the existing shared-space pet
-   * propagation path in shared-space.service.ts (`getPetFacesForAsset` + `processSpaceFaceMatch`).
-   */
+  `ensurePersonIdentity` derives `face_identity.type` from `person.type` (see
+  FaceIdentityRepository.ensurePersonIdentity), so calling this on a `type: 'pet'` person
+  stamps the identity `type: 'pet'` — this is what activates the existing shared-space pet
+  propagation path in shared-space.service.ts (`getPetFacesForAsset` + `processSpaceFaceMatch`).
+  */
   private async linkFaceIdentity(personId: string, assetFaceId: string): Promise<void> {
     const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId);
     await this.faceIdentityRepository.replaceFaceIdentity({

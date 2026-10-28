@@ -23,6 +23,7 @@ const EMBEDDING = '[' + Array.from({ length: 512 }, () => 1).join(',') + ']';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,

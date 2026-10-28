@@ -60,9 +60,9 @@ export interface PersonSearchOptions {
 export interface PersonNameSearchOptions {
   withHidden?: boolean;
   /**
-   * Fork (#869 follow-up): mirrors `AccessRepository.asset.checkOwnerAccess` — without an elevated
-   * session the caller must not see anything that only exists inside their Locked Folder.
-   */
+  Fork (#869 follow-up): mirrors `AccessRepository.asset.checkOwnerAccess` — without an elevated
+  session the caller must not see anything that only exists inside their Locked Folder.
+  */
   hasElevatedPermission?: boolean;
 }
 
@@ -118,10 +118,10 @@ const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
 const isBlank = (value: string | null | undefined) => !value || value.trim().length === 0;
 
 /**
- * Correlated "does this `person` row have a live, visible face on a locked (or non-locked) asset?"
- * subquery. Only counts faces that are themselves live and visible, so a person left behind by a
- * deleted or hidden face is not treated as backed by that face's asset.
- */
+Correlated "does this `person` row have a live, visible face on a locked (or non-locked) asset?"
+subquery. Only counts faces that are themselves live and visible, so a person left behind by a
+deleted or hidden face is not treated as backed by that face's asset.
+*/
 const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { locked: boolean }) =>
   eb
     .selectFrom('asset_face')
@@ -135,10 +135,10 @@ const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { l
 export interface DeleteFacesOptions {
   sourceType: SourceType;
   /**
-   * Human-pipeline callers set this so pet faces survive their resets. Pet faces share
-   * `sourceType: 'machine-learning'` with human faces, so a plain sourceType filter reaches them
-   * (F1/F3) — {@link petFacePredicate} is the only thing that tells the two apart.
-   */
+  Human-pipeline callers set this so pet faces survive their resets. Pet faces share
+  `sourceType: 'machine-learning'` with human faces, so a plain sourceType filter reaches them
+  (F1/F3) — {@link petFacePredicate} is the only thing that tells the two apart.
+  */
   excludePetFaces?: boolean;
 }
 
@@ -155,13 +155,13 @@ export interface GetAllFacesOptions {
   sourceType?: SourceType;
   clusterGroupId?: string;
   /**
-   * Slice 5 (F9): recognition must never re-claim a face a human has already placed. Space-person
-   * confirms never write `asset_face.personId` (space people are a projection over personal people),
-   * so the `personId: null` filter alone does not exclude a confirmed-but-still-unassigned face — the
-   * durable record is the `face_identity_face` row with `source='manual'` instead. When set, excludes
-   * any face carrying one. Default off, so the force-recognition branch (which has already wiped every
-   * `face_identity_face` row via `unassignFaces` before this runs) and every other caller are unchanged.
-   */
+  Slice 5 (F9): recognition must never re-claim a face a human has already placed. Space-person
+  confirms never write `asset_face.personId` (space people are a projection over personal people),
+  so the `personId: null` filter alone does not exclude a confirmed-but-still-unassigned face — the
+  durable record is the `face_identity_face` row with `source='manual'` instead. When set, excludes
+  any face carrying one. Default off, so the force-recognition branch (which has already wiped every
+  `face_identity_face` row via `unassignFaces` before this runs) and every other caller are unchanged.
+  */
   excludeManuallyPlaced?: boolean;
   /** See {@link DeleteFacesOptions.excludePetFaces} — keeps pet faces out of human fan-outs (F2). */
   excludePetFaces?: boolean;
@@ -172,17 +172,17 @@ export interface RepresentativeFaceListOptions {
   take: number;
   skip: number;
   /**
-   * Fork RBAC (Slice 2 / M1): when set, restricts results to faces on assets that `memberUserId`
-   * can reach through a shared space AND that pass the shareable-visibility gate. Omit for the
-   * owner's own unscoped picker view.
-   */
+  Fork RBAC (Slice 2 / M1): when set, restricts results to faces on assets that `memberUserId`
+  can reach through a shared space AND that pass the shareable-visibility gate. Omit for the
+  owner's own unscoped picker view.
+  */
   scope?: { memberUserId: string };
   /**
-   * Fork (#869 follow-up): the owner's unscoped view above has no visibility gate of its own, so
-   * without this the picker enumerates the owner's Locked Folder faces to a session that never
-   * entered the PIN. Scoped (non-owner) callers are already Timeline+Archive-only via
-   * `spaceVisibilityGate`, so their own elevation can never reach the owner's locked assets.
-   */
+  Fork (#869 follow-up): the owner's unscoped view above has no visibility gate of its own, so
+  without this the picker enumerates the owner's Locked Folder faces to a session that never
+  entered the PIN. Scoped (non-owner) callers are already Timeline+Archive-only via
+  `spaceVisibilityGate`, so their own elevation can never reach the owner's locked assets.
+  */
   hasElevatedPermission?: boolean;
 }
 
@@ -206,15 +206,15 @@ export type WithPersonOptions = {
 };
 
 /**
- * Upstream filters this join to `person.ownerId = viewingUserId` — with cluster groups on, every member
- * of a group has their own person row and the viewer wants theirs. Option M keeps groups 1:1, so the
- * only row is the OWNER's, and that filter returns nothing for every non-owner: a shared-album
- * recipient or Space member would see `person: null` on a face they are allowed to see, and a hidden
- * person would stop being filtered out because there is no person row left to read `isHidden` from.
- *
- * So prefer the viewer's own row and fall back to the group's. Under M that always resolves to the
- * owner's single row; if cluster groups are ever turned on it degrades back to upstream's behaviour.
- */
+Upstream filters this join to `person.ownerId = viewingUserId` — with cluster groups on, every member
+of a group has their own person row and the viewer wants theirs. Option M keeps groups 1:1, so the
+only row is the OWNER's, and that filter returns nothing for every non-owner: a shared-album
+recipient or Space member would see `person: null` on a face they are allowed to see, and a hidden
+person would stop being filtered out because there is no person row left to read `isHidden` from.
+
+So prefer the viewer's own row and fall back to the group's. Under M that always resolves to the
+owner's single row; if cluster groups are ever turned on it degrades back to upstream's behaviour.
+*/
 const withPerson = ({ viewingUserId }: WithPersonOptions) => {
   return (eb: ExpressionBuilder<DB, 'asset_face'>) =>
     jsonObjectFrom(
@@ -229,13 +229,13 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
 };
 
 /**
- * Option M: owner-agnostic variant of `withPerson`.
- *
- * `withPerson` selects the viewer's OWN person row in the face's group — correct for user-facing
- * reads. The face-repair admin console reads faces belonging to people the admin does not own and
- * has no viewer to key on, so this resolves the single person row in the group instead. Sound only
- * under M's 1:1 person_group-to-person invariant; see `getByGroupIdOnly`.
- */
+Option M: owner-agnostic variant of `withPerson`.
+
+`withPerson` selects the viewer's OWN person row in the face's group — correct for user-facing
+reads. The face-repair admin console reads faces belonging to people the admin does not own and
+has no viewer to key on, so this resolves the single person row in the group instead. Sound only
+under M's 1:1 person_group-to-person invariant; see `getByGroupIdOnly`.
+*/
 const withPersonAnyOwner = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   jsonObjectFrom(
     eb
@@ -415,24 +415,24 @@ export class PersonRepository {
   }
 
   /**
-   * Spec §6.3.1 (revised): resolve the ASSET OWNER's own `person` for a face identity, creating it
-   * when the owner has never named this human themselves.
-   *
-   * Space-editor face edits propagate to `asset_face.personGroupId`, which lives in the owner's
-   * layer, so the editor's space person has to be mapped onto a person row the OWNER owns.
-   * `shared_space_person.identityId` and `person.identityId` hold the same value for the same human,
-   * and that is the join used here.
-   *
-   * Option M keeps `person_group` 1:1 with `person`, so a brand-new owner person needs its own group
-   * first (`createGroup`) — the same rule `createWithGroup` enforces for every other person-insert
-   * path. A person is addressed by `personGroupId`; there is no standalone `person.id` any more.
-   *
-   * The insert races `person_identity_ownerId_identityId_key`: two
-   * editors attaching two faces of the same not-yet-named human concurrently would both miss the
-   * initial select. `doNothing` plus a re-select makes the loser adopt the winner's row rather than
-   * fail on the duplicate key. The loser's freshly minted `person_group` row is then unreferenced,
-   * and the nightly orphan-group sweep collects it.
-   */
+  Spec §6.3.1 (revised): resolve the ASSET OWNER's own `person` for a face identity, creating it
+  when the owner has never named this human themselves.
+  
+  Space-editor face edits propagate to `asset_face.personGroupId`, which lives in the owner's
+  layer, so the editor's space person has to be mapped onto a person row the OWNER owns.
+  `shared_space_person.identityId` and `person.identityId` hold the same value for the same human,
+  and that is the join used here.
+  
+  Option M keeps `person_group` 1:1 with `person`, so a brand-new owner person needs its own group
+  first (`createGroup`) — the same rule `createWithGroup` enforces for every other person-insert
+  path. A person is addressed by `personGroupId`; there is no standalone `person.id` any more.
+  
+  The insert races `person_identity_ownerId_identityId_key`: two
+  editors attaching two faces of the same not-yet-named human concurrently would both miss the
+  initial select. `doNothing` plus a re-select makes the loser adopt the winner's row rather than
+  fail on the duplicate key. The loser's freshly minted `person_group` row is then unreferenced,
+  and the nightly orphan-group sweep collects it.
+  */
   async getOrCreateOwnerPersonForIdentity(
     input: { ownerId: string; identityId: string; name: string; type: string },
     db: Kysely<DB> | Transaction<DB> = this.db,
@@ -485,14 +485,14 @@ export class PersonRepository {
   }
 
   /**
-   * Spec §6.3.1 (revised): the owner-layer half of a space-editor face edit. `personGroupId` is the
-   * owner's person (addressed by its group id) on attach, or `null` on detach.
-   *
-   * The `expectedPersonGroupId` guard is what keeps a detach from clearing a tag that was never
-   * about this human: an editor detaching space person "Uncle Tom" must not null out the owner's
-   * unrelated "Dad" tag on the same face. The caller passes the owner person it resolved from the
-   * space person's identity, and the update is a no-op if the face has since moved.
-   */
+  Spec §6.3.1 (revised): the owner-layer half of a space-editor face edit. `personGroupId` is the
+  owner's person (addressed by its group id) on attach, or `null` on detach.
+  
+  The `expectedPersonGroupId` guard is what keeps a detach from clearing a tag that was never
+  about this human: an editor detaching space person "Uncle Tom" must not null out the owner's
+  unrelated "Dad" tag on the same face. The caller passes the owner person it resolved from the
+  space person's identity, and the update is a no-op if the face has since moved.
+  */
   async setFaceOwnerPerson(
     input: { assetFaceId: string; personGroupId: string | null; expectedPersonGroupId?: string | null },
     db: Kysely<DB> | Transaction<DB> = this.db,
@@ -708,11 +708,11 @@ export class PersonRepository {
   }
 
   /**
-   * Dormant people: named, non-hidden, non-pet persons whose most recent Timeline-visible,
-   * previewable asset predates `lastSeenBefore`, with at least `minAssets` such assets ever.
-   * The asset-side predicates mirror `MemoryRuleAssetRepository.getMemoryFacesForPeriod` exactly — a
-   * missing `Preview` file or an archived asset must not make a still-active person look dormant.
-   */
+  Dormant people: named, non-hidden, non-pet persons whose most recent Timeline-visible,
+  previewable asset predates `lastSeenBefore`, with at least `minAssets` such assets ever.
+  The asset-side predicates mirror `MemoryRuleAssetRepository.getMemoryFacesForPeriod` exactly — a
+  missing `Preview` file or an archived asset must not make a still-active person look dormant.
+  */
   @GenerateSql({
     params: [DummyValue.UUID, { lastSeenBefore: DummyValue.DATE, minAssets: 10, limit: 10 }],
   })
@@ -1130,17 +1130,17 @@ export class PersonRepository {
   }
 
   /**
-   * Option M: resolve a person by group id ALONE.
-   *
-   * Upstream deleted `person.id`; the primary key is now composite `(ownerId, personGroupId)`. Most
-   * fork call sites only ever carry the person's public id — which `mapPerson` emits as
-   * `personGroupId` — and have no owner in hand. This is sound ONLY because Gallery never creates
-   * multi-user cluster groups, so `person_group` stays 1:1 with `person`.
-   *
-   * That invariant is enforced by the unique index `person_personGroupId_key`
-   * (`1791000000000-RepointFaceReviewToPersonGroup`). Keeping the assumption in this single accessor
-   * is deliberate: it is the one place M's 1:1 bet is load-bearing.
-   */
+  Option M: resolve a person by group id ALONE.
+  
+  Upstream deleted `person.id`; the primary key is now composite `(ownerId, personGroupId)`. Most
+  fork call sites only ever carry the person's public id — which `mapPerson` emits as
+  `personGroupId` — and have no owner in hand. This is sound ONLY because Gallery never creates
+  multi-user cluster groups, so `person_group` stays 1:1 with `person`.
+  
+  That invariant is enforced by the unique index `person_personGroupId_key`
+  (`1791000000000-RepointFaceReviewToPersonGroup`). Keeping the assumption in this single accessor
+  is deliberate: it is the one place M's 1:1 bet is load-bearing.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getByGroupIdOnly(personGroupId: string) {
     return this.db //
@@ -1199,11 +1199,11 @@ export class PersonRepository {
   }
 
   /**
-   * L3: `memberUserId` scopes the count to a space-only reader's reachable assets (own assets are
-   * never included here — a legacy person's assets all belong to `person.ownerId` — so this is a
-   * pure narrowing of the owner's Timeline assets down to the ones the member can actually reach
-   * via a shared space). Omit it for the owner's own unrestricted count.
-   */
+  L3: `memberUserId` scopes the count to a space-only reader's reachable assets (own assets are
+  never included here — a legacy person's assets all belong to `person.ownerId` — so this is a
+  pure narrowing of the owner's Timeline assets down to the ones the member can actually reach
+  via a shared space). Omit it for the owner's own unrestricted count.
+  */
   @GenerateSql(
     { params: [DummyValue.UUID, DummyValue.UUID] },
     { params: [DummyValue.UUID, DummyValue.UUID, { memberUserId: DummyValue.UUID }] },
@@ -1432,13 +1432,13 @@ export class PersonRepository {
   }
 
   /**
-   * Option M: create a person together with its own person_group.
-   *
-   * Under M a person is never shared across users, so every new person gets a fresh 1:1 group. This
-   * is the fork's replacement for the old `create({ ownerId, ... })` — which worked when `person.id`
-   * was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
-   * invariant cannot be broken by accident at a call site.
-   */
+  Option M: create a person together with its own person_group.
+  
+  Under M a person is never shared across users, so every new person gets a fresh 1:1 group. This
+  is the fork's replacement for the old `create({ ownerId, ... })` — which worked when `person.id`
+  was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
+  invariant cannot be broken by accident at a call site.
+  */
   async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'> & PersonSidecarFields) {
     const group = await this.createGroup(person.ownerId);
     return this.create({ ...person, personGroupId: group.id });
@@ -1687,24 +1687,24 @@ export class PersonRepository {
   }
 
   /**
-   * Slice 9 (F17): a person is only "scannable" — worth queueing `PersonSuggestionScan` for — when
-   * BOTH cheap `EXISTS` checks below hold. Neither is the KNN the scan job itself performs, so
-   * together they cannot tell whether any candidate actually falls within the configured distance
-   * band for this specific person — that would need a per-person embedding search, which this
-   * pre-check deliberately avoids (`handlePersonSuggestionScan` still does that work). A person who
-   * passes both checks but whose real candidates all sit outside the band still gets a job that
-   * finds nothing and returns early; that residual waste is not what this narrows.
-   *
-   * What it does remove: the previous predicate only correlated on `asset.ownerId = person.ownerId`,
-   * so a single unassigned face anywhere in the owner's library queued a scan for every named,
-   * visible, non-pet person that owner has — regardless of whether that person has ever been seen
-   * in a photo. That is fixed by requiring the person to have at least one of their own assigned,
-   * live, visible faces with an embedding (the exact precondition `getAssignedFaceEmbeddings` needs
-   * before `handlePersonSuggestionScan` will do any work — a person with none is always Skipped
-   * immediately, so queueing them can never do anything). The owner-side `EXISTS` keeps the
-   * ownership correlation but is narrowed to `reviewableAssetVisibility` (Slice 1) so a Locked or
-   * Hidden stray face no longer counts as a candidate the scan would never actually search against.
-   */
+  Slice 9 (F17): a person is only "scannable" — worth queueing `PersonSuggestionScan` for — when
+  BOTH cheap `EXISTS` checks below hold. Neither is the KNN the scan job itself performs, so
+  together they cannot tell whether any candidate actually falls within the configured distance
+  band for this specific person — that would need a per-person embedding search, which this
+  pre-check deliberately avoids (`handlePersonSuggestionScan` still does that work). A person who
+  passes both checks but whose real candidates all sit outside the band still gets a job that
+  finds nothing and returns early; that residual waste is not what this narrows.
+  
+  What it does remove: the previous predicate only correlated on `asset.ownerId = person.ownerId`,
+  so a single unassigned face anywhere in the owner's library queued a scan for every named,
+  visible, non-pet person that owner has — regardless of whether that person has ever been seen
+  in a photo. That is fixed by requiring the person to have at least one of their own assigned,
+  live, visible faces with an embedding (the exact precondition `getAssignedFaceEmbeddings` needs
+  before `handlePersonSuggestionScan` will do any work — a person with none is always Skipped
+  immediately, so queueing them can never do anything). The owner-side `EXISTS` keeps the
+  ownership correlation but is narrowed to `reviewableAssetVisibility` (Slice 1) so a Locked or
+  Hidden stray face no longer counts as a candidate the scan would never actually search against.
+  */
   getScannablePeopleWithUnassignedFaces() {
     return this.db
       .selectFrom('person')

@@ -20,11 +20,11 @@ export interface ScopedFaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 
   maxDistance: number;
   minBirthDate?: Date | null;
   /**
-   * Restricts candidate faces to assets whose visibility is in this set (Slice 1, F1/F2). Defaults to
-   * undefined — no predicate — so the two recognition callers (person.service.ts:1436, :1485) and the
-   * space-face-match caller (shared-space.service.ts:2063) emit byte-identical SQL to before this option
-   * existed. Only the suggestion scans and the cleanup scan's KNN pass pass this.
-   */
+  Restricts candidate faces to assets whose visibility is in this set (Slice 1, F1/F2). Defaults to
+  undefined — no predicate — so the two recognition callers (person.service.ts:1436, :1485) and the
+  space-face-match caller (shared-space.service.ts:2063) emit byte-identical SQL to before this option
+  existed. Only the suggestion scans and the cleanup scan's KNN pass pass this.
+  */
   visibility?: AssetVisibility[];
 }
 

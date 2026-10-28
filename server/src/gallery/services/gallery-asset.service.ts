@@ -19,11 +19,11 @@ import { requireAccess } from 'src/utils/access.js';
 import { isPanorama } from 'src/utils/asset.util.js';
 
 /**
- * #763 canonical write surface for per-user favorites (PUT /assets/favorites), also called by
- * the deprecated `isFavorite` alias on AssetService `update`/`updateAll` (§8.1) — the alias keeps its own,
- * STRICTER Permission.AssetUpdate route guard, so it can only ever be narrower than this function,
- * never wider. See specs/2026-07-20-per-user-favorites-design.md §5.1.
- */
+#763 canonical write surface for per-user favorites (PUT /assets/favorites), also called by
+the deprecated `isFavorite` alias on AssetService `update`/`updateAll` (§8.1) — the alias keeps its own,
+STRICTER Permission.AssetUpdate route guard, so it can only ever be narrower than this function,
+never wider. See specs/2026-07-20-per-user-favorites-design.md §5.1.
+*/
 export const updateAssetFavorites = async (
   accessRepository: AccessRepository,
   assetFavoriteRepository: AssetFavoriteRepository,
