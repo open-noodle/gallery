@@ -63,6 +63,8 @@ on:
       - 'packages/plugin-gallery/**'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
       - '.github/scripts/revert-to-immich-data.sh'
+      - '.github/scripts/revert-to-immich-shared-people.sql'
+      - 'server/src/gallery/utils/person-group-split.ts'
 
 concurrency:
   group: gallery-revert-to-immich-validation
@@ -407,6 +409,10 @@ jobs:
           echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
           cat /tmp/drift-baseline.txt || true
           stop_server
+
+          # People Immich 3.3 shares between users (cluster groups, person sharing). Gallery splits them one
+          # per owner on its first boot; the checks below follow them through every phase to the revert.
+          .github/scripts/revert-to-immich-data.sh shared-people-seed .github/scripts/revert-to-immich-shared-people.sql
 
           ############################################################
           # Step 9: boot Gallery (applies the fork migrations)
