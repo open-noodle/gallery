@@ -38,6 +38,7 @@ const renderCard = (overrides: Partial<CleanupBurstGroupDto> = {}) => {
     onStack: vi.fn(),
     onResolve: vi.fn(),
     onOpen: vi.fn(),
+    onExpand: vi.fn(),
   };
   render(BurstGroupCard, { group: { ...group, ...overrides }, marks, ...handlers });
   return handlers;
@@ -108,5 +109,73 @@ describe('BurstGroupCard', () => {
     const source = screen.getByTestId('cleanup-burst-source');
     expect(source).toHaveTextContent('cleanup_source_time_window');
     expect(source).toHaveAttribute('data-tone', 'warning');
+  });
+
+  describe('big frame and filmstrip', () => {
+    const frame = () => screen.getByTestId('cleanup-burst-frame-g1');
+
+    it('starts on the suggested frame', () => {
+      renderCard();
+
+      expect(frame().dataset.shownId).toBe('c');
+      expect(frame()).toHaveTextContent('cleanup_frame_position');
+    });
+
+    it('shows a filmstrip frame large on hover', async () => {
+      renderCard();
+
+      await fireEvent.mouseEnter(tile('a'));
+
+      expect(frame().dataset.shownId).toBe('a');
+    });
+
+    it('moves the shown frame with the arrow keys while the card has focus', async () => {
+      renderCard();
+
+      await fireEvent.keyDown(tile('c'), { key: 'ArrowRight' });
+      expect(frame().dataset.shownId).toBe('d');
+      await fireEvent.keyDown(tile('d'), { key: 'ArrowLeft' });
+      await fireEvent.keyDown(tile('c'), { key: 'ArrowLeft' });
+      expect(frame().dataset.shownId).toBe('b');
+    });
+
+    it("toggles the shown frame's mark when the big frame is clicked", async () => {
+      const { onToggle } = renderCard();
+
+      await fireEvent.click(screen.getByTestId('cleanup-burst-frame-toggle-g1'));
+
+      expect(onToggle).toHaveBeenCalledWith('c');
+    });
+
+    it('opens the shown frame in the photo window', async () => {
+      const { onExpand } = renderCard();
+
+      await fireEvent.click(screen.getByTestId('cleanup-expand-c'));
+
+      expect(onExpand).toHaveBeenCalledWith('c', expect.any(DOMRect));
+    });
+
+    it('ranks the frames by sharpness, best first, and frames without a score show no bar', () => {
+      renderCard({
+        assets: [
+          { ...asset('a', 21), sharpness: 40 },
+          { ...asset('b', 22), sharpness: null },
+          { ...asset('c', 23), sharpness: 90 },
+          { ...asset('d', 24), sharpness: 70 },
+        ],
+      });
+
+      const rows = within(screen.getByTestId('cleanup-burst-sharpness')).getAllByTestId(
+        /^cleanup-burst-sharpness-row-/,
+      );
+      expect(rows.map((row) => row.dataset.testid)).toEqual([
+        'cleanup-burst-sharpness-row-c',
+        'cleanup-burst-sharpness-row-d',
+        'cleanup-burst-sharpness-row-a',
+        'cleanup-burst-sharpness-row-b',
+      ]);
+      expect(screen.queryByTestId('cleanup-burst-sharpness-bar-b')).not.toBeInTheDocument();
+      expect(screen.getByTestId('cleanup-burst-sharpness-bar-c')).toBeInTheDocument();
+    });
   });
 });

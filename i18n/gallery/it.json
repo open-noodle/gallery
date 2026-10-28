@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Ogni {date}, tutto in un unico posto",
   "cleanup_finish_day": "Completa la giornata",
   "cleanup_finish_day_failed": "Impossibile completare la giornata. I tuoi contrassegni sono stati mantenuti.",
+  "cleanup_frame_position": "Fotogramma {index} di {total}",
   "cleanup_hide_faces": "Nascondi le foto con volti",
   "cleanup_hide_reviewed": "Nascondi revisionate",
   "cleanup_hint_blurry": "Questa foto sembra sfocata",

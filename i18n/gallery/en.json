@@ -469,6 +469,7 @@
   "cleanup_explainer_title": "Every {date}, all in one place",
   "cleanup_finish_day": "Finish day",
   "cleanup_finish_day_failed": "Could not finish the day. Your marks are kept.",
+  "cleanup_frame_position": "Frame {index} of {total}",
   "cleanup_hide_faces": "Hide photos with faces",
   "cleanup_hide_reviewed": "Hide reviewed",
   "cleanup_hint_blurry": "This photo looks blurry",

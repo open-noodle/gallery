@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Каждое {date} — в одном месте",
   "cleanup_finish_day": "Завершить день",
   "cleanup_finish_day_failed": "Не удалось завершить день. Ваши отметки сохранены.",
+  "cleanup_frame_position": "Кадр {index} из {total}",
   "cleanup_hide_faces": "Скрыть фото с лицами",
   "cleanup_hide_reviewed": "Скрыть просмотренные",
   "cleanup_hint_blurry": "Это фото выглядит размытым",

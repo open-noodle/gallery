@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Cada {date}, todo en un mismo lugar",
   "cleanup_finish_day": "Terminar el día",
   "cleanup_finish_day_failed": "No se pudo terminar el día. Tus marcas se conservan.",
+  "cleanup_frame_position": "Fotograma {index} de {total}",
   "cleanup_hide_faces": "Ocultar fotos con caras",
   "cleanup_hide_reviewed": "Ocultar revisadas",
   "cleanup_hint_blurry": "Esta foto parece borrosa",

@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Elke {date}, alles op één plek",
   "cleanup_finish_day": "Dag afronden",
   "cleanup_finish_day_failed": "Kan de dag niet afronden. Je markeringen blijven bewaard.",
+  "cleanup_frame_position": "Beeld {index} van {total}",
   "cleanup_hide_faces": "Foto's met gezichten verbergen",
   "cleanup_hide_reviewed": "Beoordeelde verbergen",
   "cleanup_hint_blurry": "Deze foto lijkt wazig",

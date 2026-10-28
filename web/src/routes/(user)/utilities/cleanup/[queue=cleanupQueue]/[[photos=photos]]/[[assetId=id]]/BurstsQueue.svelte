@@ -4,6 +4,7 @@
   import { shortcuts } from '$lib/actions/shortcut';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import BurstGroupCard from '$lib/components/cleanup/BurstGroupCard.svelte';
+  import CleanupPhotoWindow from '$lib/gallery/cleanup/CleanupPhotoWindow.svelte';
   import { queueShortcuts } from '$lib/components/cleanup/cleanup-shortcuts';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -194,6 +195,23 @@
   const onAcceptSuggestions = () =>
     withPageBusy(() => resolveGroups([...pager.groups], (group) => burstDecision(group, marks)));
 
+  /** The photo window, open on one frame of a series; null while closed. */
+  let photoWindow = $state<{ id: string; rect?: DOMRect } | null>(null);
+  const windowGroup = $derived(photoWindow ? groupOf.get(photoWindow.id) : undefined);
+
+  /** Where a frame ranks by sharpness within its series, for the window's signal. */
+  const sharpnessOf = (id: string) => {
+    const group = groupOf.get(id);
+    const frame = group?.assets.find((asset) => asset.id === id);
+    if (!group || frame?.sharpness === null || frame?.sharpness === undefined) {
+      return;
+    }
+    const scored = group.assets.filter((asset) => asset.sharpness !== null && asset.sharpness !== undefined);
+    const best = Math.max(1, ...scored.map((asset) => asset.sharpness ?? 0));
+    const rank = scored.filter((asset) => (asset.sharpness ?? 0) > (frame.sharpness ?? 0)).length + 1;
+    return { value: (frame.sharpness / best) * 100, rank, of: group.assets.length };
+  };
+
   const setMark = (id: string, mark?: BurstMark) => {
     const group = groupOf.get(id);
     if (!group) {
@@ -265,9 +283,14 @@
       // Bursts are resolved a group at a time, so there is no selection to fill or clear.
       selectAll: () => {},
       clear: () => {},
-      open: () => void openAsset(focusedId ?? pager.groups[0]?.assets[0]?.id ?? null),
+      open: () => {
+        const id = focusedId ?? pager.groups[0]?.assets[0]?.id;
+        if (id) {
+          photoWindow = { id };
+        }
+      },
     },
-    () => assetViewerManager.isViewing || isModalOpen(),
+    () => assetViewerManager.isViewing || isModalOpen() || photoWindow !== null,
   )}
 />
 
@@ -324,8 +347,31 @@
       onResolve={() => void onResolve(group)}
       onOpen={onTileOpen}
       onFocus={(id) => (focusedId = id)}
+      onExpand={(id, rect) => (photoWindow = { id, rect })}
     />
   </div>
 {/each}
+
+{#if photoWindow && windowGroup}
+  {@const series = windowGroup}
+  <CleanupPhotoWindow
+    items={() => series.assets}
+    startId={photoWindow.id}
+    originRect={photoWindow.rect}
+    signal={(asset) => ({ sharpness: sharpnessOf(asset.id) })}
+    markOf={(id) => burstMarkOf(series, marks, id)}
+    onKeep={(id) => {
+      setMark(id, 'keep');
+      return Promise.resolve(false);
+    }}
+    onTrash={(id) => {
+      setMark(id, 'trash');
+      return Promise.resolve(false);
+    }}
+    advanceOnAction={false}
+    openViewer={(id) => void openAsset(id)}
+    onClose={() => (photoWindow = null)}
+  />
+{/if}
 
 <QueueFooter {pager} empty={pager.groups.length === 0} onLoadMore={() => void load()} />

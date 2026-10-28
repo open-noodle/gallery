@@ -483,6 +483,7 @@
   "cleanup_explainer_title": "每年的{date}，匯集一處",
   "cleanup_finish_day": "完成這一天",
   "cleanup_finish_day_failed": "無法完成這一天。你的標記已保留。",
+  "cleanup_frame_position": "第 {index} 幀，共 {total} 幀",
   "cleanup_hide_faces": "隱藏有人臉的相片",
   "cleanup_hide_reviewed": "隱藏已檢查",
   "cleanup_hint_blurry": "這張相片看起來模糊",

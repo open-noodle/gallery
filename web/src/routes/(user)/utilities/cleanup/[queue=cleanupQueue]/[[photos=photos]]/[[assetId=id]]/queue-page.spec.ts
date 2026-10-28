@@ -492,6 +492,20 @@ describe('bursts queue', () => {
     });
   });
 
+  it('marks a frame from the photo window without committing anything', async () => {
+    mocks.sdk.getCleanupQueue.mockResolvedValue(page([], [group('g1', ['a', 'b'], 'a')]));
+    renderWrapped(BurstsQueue, { title: 'cleanup_queue_bursts' });
+    await waitFor(() => expect(item('a')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByTestId('cleanup-expand-a'));
+    await screen.findByTestId('cleanup-photo-window');
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await waitFor(() => expect(item('a')).toHaveAttribute('data-mark', 'trash'));
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    expect(screen.getByTestId('cleanup-photo-window-photo').dataset.assetId).toBe('a');
+  });
+
   it('marks the focused photo with the keyboard', async () => {
     renderBursts([group('g1', ['a', 'b'], 'a')]);
     await waitFor(() => expect(item('b')).toBeInTheDocument());

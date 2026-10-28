@@ -474,6 +474,7 @@
   "cleanup_explainer_title": "每年的{date}，汇集一处",
   "cleanup_finish_day": "完成这一天",
   "cleanup_finish_day_failed": "无法完成这一天。你的标记已保留。",
+  "cleanup_frame_position": "第 {index} 帧，共 {total} 帧",
   "cleanup_hide_faces": "隐藏有人脸的照片",
   "cleanup_hide_reviewed": "隐藏已检查",
   "cleanup_hint_blurry": "这张照片看起来模糊",

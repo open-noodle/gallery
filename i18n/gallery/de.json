@@ -472,6 +472,7 @@
   "cleanup_explainer_title": "Jeder {date}, alles an einem Ort",
   "cleanup_finish_day": "Tag abschließen",
   "cleanup_finish_day_failed": "Der Tag konnte nicht abgeschlossen werden. Deine Markierungen bleiben erhalten.",
+  "cleanup_frame_position": "Bild {index} von {total}",
   "cleanup_hide_faces": "Fotos mit Gesichtern ausblenden",
   "cleanup_hide_reviewed": "Überprüfte ausblenden",
   "cleanup_hint_blurry": "Dieses Foto wirkt unscharf",

@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Każdy {date} w jednym miejscu",
   "cleanup_finish_day": "Zakończ dzień",
   "cleanup_finish_day_failed": "Nie udało się zakończyć dnia. Twoje oznaczenia zostały zachowane.",
+  "cleanup_frame_position": "Klatka {index} z {total}",
   "cleanup_hide_faces": "Ukryj zdjęcia z twarzami",
   "cleanup_hide_reviewed": "Ukryj przejrzane",
   "cleanup_hint_blurry": "To zdjęcie wygląda na rozmyte",

@@ -470,6 +470,7 @@
   "cleanup_explainer_title": "Chaque {date}, au même endroit",
   "cleanup_finish_day": "Terminer la journée",
   "cleanup_finish_day_failed": "Impossible de terminer la journée. Vos marques sont conservées.",
+  "cleanup_frame_position": "Image {index} sur {total}",
   "cleanup_hide_faces": "Masquer les photos avec des visages",
   "cleanup_hide_reviewed": "Masquer les photos vérifiées",
   "cleanup_hint_blurry": "Cette photo semble floue",
