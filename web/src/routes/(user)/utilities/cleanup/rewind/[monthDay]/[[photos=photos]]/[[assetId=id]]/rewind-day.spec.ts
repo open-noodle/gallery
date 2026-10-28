@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { finishedDay } from '$lib/gallery/cleanup/finished-day';
 import RewindDay from './RewindDay.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -451,5 +452,81 @@ describe('RewindDay', () => {
     expect(localStorage.getItem('cleanup.rewind.mode')).toBe('one');
     expect(screen.getByTestId('cleanup-rewind-one')).toBeVisible();
     expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull();
+  });
+
+  describe('explainer', () => {
+    // resetAllMocks above clears the setup file's Element.animate stub, which the slide-out needs.
+    beforeEach(() => {
+      vi.mocked(Element.prototype.animate).mockImplementation(() => {
+        // Svelte ends a transition from the animation's onfinish, so the stub finishes on the next tick.
+        const animation = { cancel: () => {}, finished: Promise.resolve(), onfinish: null as (() => void) | null };
+        setTimeout(() => animation.onfinish?.(), 0);
+        return animation as unknown as Animation;
+      });
+    });
+
+    it('shows on the first rewind and not on the second', () => {
+      const first = renderDay();
+      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      expect(screen.getByTestId('cleanup-rewind-explainer')).toHaveTextContent('cleanup_explainer_title');
+      first.unmount();
+
+      renderDay();
+      expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
+    });
+
+    it('reopens from the info button and closes with ×', async () => {
+      localStorage.setItem('cleanup.rewind.explainer-seen', 'true');
+      renderDay();
+      expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
+
+      await fireEvent.click(screen.getByTestId('cleanup-rewind-info'));
+      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+
+      await fireEvent.click(screen.getByTestId('cleanup-rewind-explainer-close'));
+      await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument());
+    });
+
+    it('works when storage throws', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      renderDay();
+
+      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      await fireEvent.click(screen.getByTestId('cleanup-rewind-explainer-close'));
+      await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument());
+      vi.restoreAllMocks();
+    });
+
+    it('appears in one-at-a-time mode too', () => {
+      localStorage.setItem('cleanup.rewind.mode', 'one');
+      renderDay();
+
+      expect(screen.getByTestId('cleanup-rewind-one')).toBeVisible();
+      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+    });
+  });
+
+  it('titles the page with the date and says how many photos and years it holds', () => {
+    renderDay();
+
+    expect(screen.getByTestId('cleanup-rewind-heading')).toHaveTextContent('September 23');
+    expect(screen.getByTestId('cleanup-rewind-heading')).toHaveAttribute('data-shared-element', 'cleanup-day-title');
+    expect(screen.getByTestId('cleanup-rewind-subtitle')).toHaveTextContent('cleanup_rewind_subtitle');
+  });
+
+  it('records the finished date for the hub', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
+    finishedDay.take();
+    renderDay();
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalled());
+    expect(finishedDay.take()).toBe(923);
   });
 });

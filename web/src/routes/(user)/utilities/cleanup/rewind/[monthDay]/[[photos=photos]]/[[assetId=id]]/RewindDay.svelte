@@ -9,6 +9,12 @@
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { RewindSession, type RewindMark } from '$lib/managers/rewind-session.svelte';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import { slideMotion } from '$lib/components/filter-panel/motion';
+  import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
+  import { explainerSeen } from '$lib/gallery/cleanup/explainer-seen';
+  import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
+  import { getAssetMediaUrl } from '$lib/utils';
   import { celebrate, countMotion } from '$lib/gallery/motion';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
@@ -26,6 +32,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { navigate } from '$lib/utils/navigation';
   import {
+    AssetMediaSize,
     AssetTypeEnum,
     commitCleanup,
     getCleanupCalendar,
@@ -34,10 +41,11 @@
     type CleanupRewindYearDto,
   } from '@immich/sdk';
   import { Breadcrumbs, Button, Heading, IconButton, isModalOpen, modalManager, toastManager } from '@immich/ui';
-  import { mdiCheck, mdiKeyboard, mdiSlashForward } from '@mdi/js';
+  import { mdiCheck, mdiInformationOutline, mdiKeyboard, mdiSlashForward } from '@mdi/js';
   import { onMount, tick } from 'svelte';
   import { locale, t } from 'svelte-i18n';
   import { Tween } from 'svelte/motion';
+  import { fade, slide } from 'svelte/transition';
 
   type Props = {
     monthDay: number;
@@ -76,6 +84,8 @@
   let hideReviewed = $state(true);
   let mode = $state<Mode>(readMode());
   let bypassGuard = false;
+  // The explainer opens by itself on this browser's first rewind only; the info button reopens it.
+  let explainerOpen = $state(!explainerSeen.get());
   // True while the Space check for a trash commit is in flight, so a second press cannot start another.
   let checkingSpaces = $state(false);
 
@@ -365,6 +375,7 @@
     }
     try {
       const { trashed, skipped } = await session.finishDay();
+      finishedDay.set(monthDay);
       animateCleanupRemoval(trashed);
       celebrate('success');
       toastManager.success($t('cleanup_day_complete'));
@@ -457,6 +468,12 @@
     });
 
   onMount(() => {
+    if (explainerOpen) {
+      explainerSeen.set();
+    }
+  });
+
+  onMount(() => {
     if (mode === 'grid' && session.focusedId) {
       tileFor(session.focusedId)?.focus({ preventScroll: true });
     }
@@ -486,7 +503,7 @@
 <OnEvents {onAssetsDelete} />
 
 <div class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4" data-testid="cleanup-rewind">
-  <header class="mb-2 flex flex-wrap items-center gap-3">
+  <header class="mb-4 flex flex-wrap items-end gap-3">
     <div class="min-w-0">
       <Breadcrumbs
         items={[
@@ -495,10 +512,48 @@
           { title },
         ]}
         separator={mdiSlashForward}
+        class="text-muted"
       />
-      <Heading size="medium" tag="h2" class="mt-1">
-        {$t('cleanup_rewind_title', { values: { date: monthDayLabel(monthDay, lang), count: years.length } })}
-      </Heading>
+      <div class="mt-1.5 flex items-center gap-3">
+        {#if flat.length > 0}
+          <div class="relative h-11 w-14 shrink-0" data-shared-element="cleanup-day-photos" aria-hidden="true">
+            {#each flat.slice(0, 3).reverse() as photo, index (photo.id)}
+              <img
+                src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail, cacheKey: photo.thumbhash })}
+                alt=""
+                draggable="false"
+                class="absolute size-10 rounded-lg border-2 border-light object-cover shadow-sm"
+                style:left="{index * 7}px"
+                style:rotate="{(index - 2) * 5}deg"
+              />
+            {/each}
+          </div>
+        {/if}
+        <Heading
+          size="large"
+          tag="h2"
+          class="tracking-tight"
+          data-testid="cleanup-rewind-heading"
+          data-shared-element="cleanup-day-title"
+        >
+          {monthDayLabel(monthDay, lang)}
+        </Heading>
+        <IconButton
+          icon={mdiInformationOutline}
+          shape="round"
+          variant="ghost"
+          color="secondary"
+          size="small"
+          class="transition-[rotate] duration-(--motion-base) ease-(--ease-settle) {explainerOpen ? 'rotate-15' : ''}"
+          aria-label={$t('cleanup_explainer_open')}
+          aria-expanded={explainerOpen}
+          data-testid="cleanup-rewind-info"
+          onclick={() => (explainerOpen = !explainerOpen)}
+        />
+      </div>
+      <p class="mt-1 text-sm text-muted tabular-nums" data-testid="cleanup-rewind-subtitle">
+        {$t('cleanup_rewind_subtitle', { values: { count: total, years: years.length } })}
+      </p>
     </div>
 
     <div class="ms-auto flex flex-wrap items-center gap-2">
@@ -541,6 +596,14 @@
       </Button>
     </div>
   </header>
+
+  {#if explainerOpen}
+    <div class="mb-4" in:slide={slideMotion(prefersReducedMotion())} out:slide={slideMotion(prefersReducedMotion())}>
+      <div transition:fade={{ duration: prefersReducedMotion() ? 0 : 160 }}>
+        <RewindExplainer {monthDay} assets={flat} onClose={() => (explainerOpen = false)} />
+      </div>
+    </div>
+  {/if}
 
   <div class="mb-1.5 flex flex-wrap items-center gap-3">
     <div class="min-w-50 flex-1">
