@@ -2,9 +2,9 @@
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
-  import { mergeRotation } from '$lib/services/asset.service';
+  import { mergeRotation } from '$lib/gallery/asset-actions';
   import { waitForWebsocketEvent } from '$lib/stores/websocket';
-  import { getEditableAssetsWithWarning } from '$lib/utils/asset-utils';
+  import { getEditableAssetsWithWarning } from '$lib/gallery/utils/editable-assets';
   import { handleError } from '$lib/utils/handle-error';
   import { editAsset, getAssetEdits, getAssetInfo, removeAssetEdits } from '@immich/sdk';
   import { toastManager } from '@immich/ui';

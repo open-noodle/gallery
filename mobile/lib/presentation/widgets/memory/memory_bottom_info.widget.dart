@@ -47,7 +47,7 @@ class MemoryBottomInfo extends ConsumerWidget {
                 read: ref.read,
                 popViewer: () => context.maybePop(),
                 // Activate the existing timeline tab without rebuilding it (a fresh
-                // TabShellRoute would reload the timeline to the top and discard the scroll).
+                // GalleryTabShellRoute would reload the timeline to the top and discard the scroll).
                 goToMainTimeline: () => context.navigateTo(const MainTimelineRoute()),
                 // #1047: a photo the viewer only reaches through a Space is not in their
                 // personal timeline, so open the Space's own timeline instead. Pushed, not

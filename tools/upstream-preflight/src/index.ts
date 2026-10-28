@@ -32,6 +32,7 @@ import {
 } from './coverage';
 import {
   collectGitRange,
+  findWhitespaceHeavyFiles,
   getGitPath,
   getMergeBase,
   revParse,
@@ -87,6 +88,11 @@ function buildPreflightContext(manifestPath: string) {
     `${mergeBase}..${upstreamRef}`,
   );
   const forkRange = collectGitRange(process.cwd(), `${mergeBase}..${forkRef}`);
+  const whitespaceHeavyFiles = findWhitespaceHeavyFiles(
+    process.cwd(),
+    mergeBase,
+    forkRef,
+  );
   const classifiedCommits = upstreamRange.commits.map((commit) =>
     classifyCommit(commit, manifest, forkRange.files),
   );
@@ -136,6 +142,7 @@ function buildPreflightContext(manifestPath: string) {
     headValidation,
     broadOptionalOnly,
     forkSurfaceSignals,
+    whitespaceHeavyFiles,
   };
 }
 
@@ -227,6 +234,7 @@ function renderPreflightForContext(
       '.github/workflows/**',
     ]),
     broadRefactorHints: collectBroadRefactorHints(context.classifiedCommits),
+    whitespaceHeavyFiles: context.whitespaceHeavyFiles,
     batchMarkdown: context.batchMarkdown,
     auditResults: [
       runMobileDriftAudit(

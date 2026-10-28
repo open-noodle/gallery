@@ -4,8 +4,10 @@ part of 'timeline.repository.dart';
 /// the viewer-visibility scopes (partners and Spaces on video, place, map and favorites), the
 /// fork's main timeline (shared_space_timeline.drift) and the temporal scope applied to every
 /// route. Upstream routes this file reuses keep their bodies in [TimelineRepository]; the fork
-/// hunks there are an optional `extraWhere` on the four album builders, the `GroupAssetsBy.none`
-/// counts rewritten as asset joins (the remote one carries `deletedAt IS NULL`) and the year arms.
+/// hunks there are an optional `extraWhere` on the four album, the place and the person builders,
+/// an optional `extraJoins` on the remote and place buckets and the joinLocal remote asset list
+/// (a joined bucket counts distinct assets), the `GroupAssetsBy.none` counts rewritten as joined
+/// counts (the remote album one carries `deletedAt IS NULL`) and the year arms.
 class SharedSpaceTimelineRepository {
   final TimelineRepository _timeline;
 
@@ -217,218 +219,108 @@ class SharedSpaceTimelineRepository {
 
   // Mirrors remoteAlbum() but scopes via shared_space_asset. Always orders DESC
   // (shared spaces have no per-space order setting in PR1).
+  //
+  // Assets belong to a space if they are directly added via shared_space_asset, owned by a
+  // library linked via shared_space_library, or in an album linked into the space with
+  // showInTimeline. The bucket LEFT JOINs the association tables and requires one match: Drift's
+  // `.watch()` only subscribes to tables referenced via a real FROM/JOIN, so a previous
+  // `IN (...) OR IN (...)` formulation produced a stale stream that never re-emitted when photos
+  // were added/removed or a library link changed (timeline_repository_test.dart covers both). A
+  // joined bucket counts DISTINCT remote_asset.id, so an asset matching several branches counts
+  // once. The asset list (.get(), no reactivity concern) uses isInQuery, which deduplicates.
+  //
+  // Stack collapse: we LEFT JOIN stack_entity and keep an asset when it has no stack, when it IS
+  // the stack's primary (cover), OR when the stack row is not present locally
+  // (stack_entity.id IS NULL). That last arm matters for shared spaces: stack_entity only syncs
+  // for the viewer's own and partners' stacks (there is no shared-space stack sync), yet a
+  // non-owned space asset still carries its stack_id. Without the `IS NULL` fallback such a stack
+  // would collapse against a missing primary and vanish entirely; instead we show its frames flat.
   TimelineQuery sharedSpace(
     String spaceId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => (
-    bucketSource: () => _watchSharedSpaceBucket(spaceId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) =>
-        _getSharedSpaceBucketAssets(spaceId, offset: offset, count: count, temporalScope: temporalScope),
-    origin: TimelineOrigin.remoteSpace,
-  );
-
-  Stream<List<Bucket>> _watchSharedSpaceBucket(
-    String spaceId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
-    // Assets belong to a space if they are either:
-    //   1. directly added via shared_space_asset, OR
-    //   2. owned by a library that is linked via shared_space_library.
-    //
-    // We LEFT JOIN both association tables and require at least one match in
-    // the WHERE clause. The join structure matters for reactivity: Drift's
-    // `.watch()` only subscribes to tables referenced via a real FROM/JOIN in
-    // the query builder — tables reached via `.isInQuery()` subqueries are
-    // invisible to the reactive layer, so a previous `IN (...) OR IN (...)`
-    // formulation produced a stale stream that never re-emitted when photos
-    // were added/removed or a library link changed. See
-    // timeline_repository_test.dart for the regression covering both cases.
-    //
-    // An asset matching both branches is counted once because we COUNT
-    // DISTINCT remote_asset.id.
-    //
-    // Stack collapse: we LEFT JOIN stack_entity and keep an asset when it has
-    // no stack, when it IS the stack's primary (cover), OR when the stack row
-    // is not present locally (stack_entity.id IS NULL). That last arm matters
-    // for shared spaces: stack_entity only syncs for the viewer's own and
-    // partners' stacks (there is no shared-space stack sync), yet a non-owned
-    // space asset still carries its stack_id. Without the `IS NULL` fallback
-    // such a stack would collapse against a missing primary and vanish
-    // entirely; instead we show its frames flat (as before collapse existed).
+    final rae = _db.remoteAssetEntity;
+    final stack = _db.stackEntity;
+    Expression<bool> inSpace(Expression<bool> membership) =>
+        rae.deletedAt.isNull() &
+        (rae.visibility.equalsValue(AssetVisibility.timeline) | rae.visibility.equalsValue(AssetVisibility.archive)) &
+        _remoteWithinTemporalScope(rae, temporalScope) &
+        membership &
+        (rae.stackId.isNull() | stack.id.isNull() | rae.id.equalsExp(stack.primaryAssetId));
+    Join stackJoin() => leftOuterJoin(stack, stack.id.equalsExp(rae.stackId), useColumns: false);
 
-    if (groupBy == GroupAssetsBy.none) {
-      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
-      final countQuery = _db.remoteAssetEntity.selectOnly()
-        ..addColumns([countExp])
-        ..join([
-          leftOuterJoin(
-            _db.sharedSpaceAssetEntity,
-            _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
-                _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
-            useColumns: false,
-          ),
-          leftOuterJoin(
-            _db.sharedSpaceLibraryEntity,
-            _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
-                _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
-            useColumns: false,
-          ),
-          leftOuterJoin(
-            _db.sharedSpaceAlbumAssetEntity,
-            _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-            useColumns: false,
-          ),
-          leftOuterJoin(
-            _db.sharedSpaceAlbumLinkEntity,
-            _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId) &
-                _db.sharedSpaceAlbumLinkEntity.spaceId.equals(spaceId) &
-                _db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
-            useColumns: false,
-          ),
-          leftOuterJoin(
-            _db.stackEntity,
-            _db.stackEntity.id.equalsExp(_db.remoteAssetEntity.stackId),
-            useColumns: false,
-          ),
-        ])
-        ..where(
-          _db.remoteAssetEntity.deletedAt.isNull() &
-              (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                  _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-              _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-              (_db.sharedSpaceAssetEntity.assetId.isNotNull() |
+    return (
+      bucketSource: () => _timeline
+          ._watchRemoteBucket(
+            filter: (_) => inSpace(
+              _db.sharedSpaceAssetEntity.assetId.isNotNull() |
                   _db.sharedSpaceLibraryEntity.libraryId.isNotNull() |
-                  _db.sharedSpaceAlbumLinkEntity.albumId.isNotNull()) &
-              (_db.remoteAssetEntity.stackId.isNull() |
-                  _db.stackEntity.id.isNull() |
-                  _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
-        );
-      return countQuery
-          .map((row) => row.read(countExp) ?? 0)
-          .watchSingle()
-          .map(_generateBuckets)
-          .handleError((error) => const <Bucket>[]);
-    }
-
-    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..join([
-        leftOuterJoin(
-          _db.sharedSpaceAssetEntity,
-          _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
-              _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
-          useColumns: false,
-        ),
-        leftOuterJoin(
-          _db.sharedSpaceLibraryEntity,
-          _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
-              _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
-          useColumns: false,
-        ),
-        leftOuterJoin(
-          _db.sharedSpaceAlbumAssetEntity,
-          _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-          useColumns: false,
-        ),
-        leftOuterJoin(
-          _db.sharedSpaceAlbumLinkEntity,
-          _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId) &
-              _db.sharedSpaceAlbumLinkEntity.spaceId.equals(spaceId) &
-              _db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
-          useColumns: false,
-        ),
-        leftOuterJoin(_db.stackEntity, _db.stackEntity.id.equalsExp(_db.remoteAssetEntity.stackId), useColumns: false),
-      ])
-      ..where(
-        _db.remoteAssetEntity.deletedAt.isNull() &
-            (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-            (_db.sharedSpaceAssetEntity.assetId.isNotNull() |
-                _db.sharedSpaceLibraryEntity.libraryId.isNotNull() |
-                _db.sharedSpaceAlbumLinkEntity.albumId.isNotNull()) &
-            (_db.remoteAssetEntity.stackId.isNull() |
-                _db.stackEntity.id.isNull() |
-                _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
-      )
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-
-    return query
-        .map((row) {
-          final timeline = row.read(dateExp)!.truncateDate(groupBy);
-          final assetCount = row.read(assetCountExp)!;
-          return TimeBucket(date: timeline, assetCount: assetCount);
-        })
-        .watch()
-        .handleError((error) => const <Bucket>[]);
-  }
-
-  Future<List<BaseAsset>> _getSharedSpaceBucketAssets(
-    String spaceId, {
-    required int offset,
-    required int count,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) async {
-    final membership =
-        _db.remoteAssetEntity.id.isInQuery(
-          _db.sharedSpaceAssetEntity.selectOnly()
-            ..addColumns([_db.sharedSpaceAssetEntity.assetId])
-            ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
-        ) |
-        _db.remoteAssetEntity.libraryId.isInQuery(
-          _db.sharedSpaceLibraryEntity.selectOnly()
-            ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
-            ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
-        ) |
-        _db.remoteAssetEntity.id.isInQuery(
-          _db.sharedSpaceAlbumAssetEntity.selectOnly()
-            ..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId])
-            ..join([
-              innerJoin(
+                  _db.sharedSpaceAlbumLinkEntity.albumId.isNotNull(),
+            ),
+            groupBy: groupBy,
+            extraJoins: [
+              leftOuterJoin(
+                _db.sharedSpaceAssetEntity,
+                _db.sharedSpaceAssetEntity.assetId.equalsExp(rae.id) &
+                    _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
+                useColumns: false,
+              ),
+              leftOuterJoin(
+                _db.sharedSpaceLibraryEntity,
+                _db.sharedSpaceLibraryEntity.libraryId.equalsExp(rae.libraryId) &
+                    _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
+                useColumns: false,
+              ),
+              leftOuterJoin(
+                _db.sharedSpaceAlbumAssetEntity,
+                _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(rae.id),
+                useColumns: false,
+              ),
+              leftOuterJoin(
                 _db.sharedSpaceAlbumLinkEntity,
                 _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId) &
                     _db.sharedSpaceAlbumLinkEntity.spaceId.equals(spaceId) &
                     _db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
                 useColumns: false,
               ),
-            ]),
-        );
-
-    final query =
-        _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
-            leftOuterJoin(
-              _db.localAssetEntity,
-              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
-              useColumns: false,
-            ),
-            leftOuterJoin(
-              _db.stackEntity,
-              _db.stackEntity.id.equalsExp(_db.remoteAssetEntity.stackId),
-              useColumns: false,
-            ),
-          ])
-          ..where(
-            _db.remoteAssetEntity.deletedAt.isNull() &
-                (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                    _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-                _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-                membership &
-                (_db.remoteAssetEntity.stackId.isNull() |
-                    _db.stackEntity.id.isNull() |
-                    _db.remoteAssetEntity.id.equalsExp(_db.stackEntity.primaryAssetId)),
+              stackJoin(),
+            ],
           )
-          ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
-          ..limit(count, offset: offset);
-
-    return query
-        .map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(_db.localAssetEntity.id)))
-        .get();
+          .handleError((error) => const <Bucket>[]),
+      assetSource: (offset, count) => _timeline._getRemoteAssets(
+        filter: (_) => inSpace(
+          rae.id.isInQuery(
+                _db.sharedSpaceAssetEntity.selectOnly()
+                  ..addColumns([_db.sharedSpaceAssetEntity.assetId])
+                  ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
+              ) |
+              rae.libraryId.isInQuery(
+                _db.sharedSpaceLibraryEntity.selectOnly()
+                  ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
+                  ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
+              ) |
+              rae.id.isInQuery(
+                _db.sharedSpaceAlbumAssetEntity.selectOnly()
+                  ..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId])
+                  ..join([
+                    innerJoin(
+                      _db.sharedSpaceAlbumLinkEntity,
+                      _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId) &
+                          _db.sharedSpaceAlbumLinkEntity.spaceId.equals(spaceId) &
+                          _db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
+                      useColumns: false,
+                    ),
+                  ]),
+              ),
+        ),
+        offset: offset,
+        count: count,
+        joinLocal: true,
+        extraJoins: [stackJoin()],
+      ),
+      origin: TimelineOrigin.remoteSpace,
+    );
   }
 
   // Detail query for one linked album inside a space. Scopes by album membership
@@ -439,106 +331,43 @@ class SharedSpaceTimelineRepository {
     String albumId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => (
-    bucketSource: () => _watchSpaceAlbumBucket(albumId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) =>
-        _getSpaceAlbumBucketAssets(albumId, offset: offset, count: count, temporalScope: temporalScope),
-    origin: TimelineOrigin.remoteSpace,
-  );
-
-  Stream<List<Bucket>> _watchSpaceAlbumBucket(
-    String albumId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
-    if (groupBy == GroupAssetsBy.none) {
-      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
-      final countQuery = _db.remoteAssetEntity.selectOnly()
-        ..addColumns([countExp])
-        ..join([
-          leftOuterJoin(
-            _db.sharedSpaceAlbumAssetEntity,
-            _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
-                _db.sharedSpaceAlbumAssetEntity.albumId.equals(albumId),
-            useColumns: false,
-          ),
-        ])
-        ..where(
-          _db.remoteAssetEntity.deletedAt.isNull() &
-              (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                  _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-              _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-              _db.sharedSpaceAlbumAssetEntity.assetId.isNotNull(),
-        );
-      return countQuery
-          .map((row) => row.read(countExp) ?? 0)
-          .watchSingle()
-          .map(_generateBuckets)
-          .handleError((error) => const <Bucket>[]);
-    }
+    final rae = _db.remoteAssetEntity;
+    final albumAsset = _db.sharedSpaceAlbumAssetEntity;
+    Expression<bool> inAlbum(Expression<bool> membership) =>
+        rae.deletedAt.isNull() &
+        (rae.visibility.equalsValue(AssetVisibility.timeline) | rae.visibility.equalsValue(AssetVisibility.archive)) &
+        _remoteWithinTemporalScope(rae, temporalScope) &
+        membership;
 
-    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..join([
-        leftOuterJoin(
-          _db.sharedSpaceAlbumAssetEntity,
-          _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
-              _db.sharedSpaceAlbumAssetEntity.albumId.equals(albumId),
-          useColumns: false,
-        ),
-      ])
-      ..where(
-        _db.remoteAssetEntity.deletedAt.isNull() &
-            (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-            _db.sharedSpaceAlbumAssetEntity.assetId.isNotNull(),
-      )
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-    return query
-        .map((row) {
-          final timeline = row.read(dateExp)!.truncateDate(groupBy);
-          final assetCount = row.read(assetCountExp)!;
-          return TimeBucket(date: timeline, assetCount: assetCount);
-        })
-        .watch()
-        .handleError((error) => const <Bucket>[]);
-  }
-
-  Future<List<BaseAsset>> _getSpaceAlbumBucketAssets(
-    String albumId, {
-    required int offset,
-    required int count,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) async {
-    final membership = _db.remoteAssetEntity.id.isInQuery(
-      _db.sharedSpaceAlbumAssetEntity.selectOnly()
-        ..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId])
-        ..where(_db.sharedSpaceAlbumAssetEntity.albumId.equals(albumId)),
-    );
-    final query =
-        _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
-            leftOuterJoin(
-              _db.localAssetEntity,
-              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
-              useColumns: false,
-            ),
-          ])
-          ..where(
-            _db.remoteAssetEntity.deletedAt.isNull() &
-                (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-                    _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-                _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-                membership,
+    return (
+      bucketSource: () => _timeline
+          ._watchRemoteBucket(
+            filter: (_) => inAlbum(albumAsset.assetId.isNotNull()),
+            groupBy: groupBy,
+            extraJoins: [
+              leftOuterJoin(
+                albumAsset,
+                albumAsset.assetId.equalsExp(rae.id) & albumAsset.albumId.equals(albumId),
+                useColumns: false,
+              ),
+            ],
           )
-          ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
-          ..limit(count, offset: offset);
-    return query
-        .map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(_db.localAssetEntity.id)))
-        .get();
+          .handleError((error) => const <Bucket>[]),
+      assetSource: (offset, count) => _timeline._getRemoteAssets(
+        filter: (_) => inAlbum(
+          rae.id.isInQuery(
+            albumAsset.selectOnly()
+              ..addColumns([albumAsset.assetId])
+              ..where(albumAsset.albumId.equals(albumId)),
+          ),
+        ),
+        offset: offset,
+        count: count,
+        joinLocal: true,
+      ),
+      origin: TimelineOrigin.remoteSpace,
+    );
   }
 
   TimelineQuery fromAssets(List<BaseAsset> assets, TimelineOrigin origin) => _timeline.fromAssets(assets, origin);
@@ -591,19 +420,38 @@ class SharedSpaceTimelineRepository {
   //     still theirs (server getAllMemberSpaceIds, "Favorites ignores the timeline hide"). The
   //     album arm keeps the server's 'personal' gate — the viewer's own
   //     shared_space_album_hidden row — not the shared link showInTimeline flag.
-  // Can't reuse `_remoteQueryBuilder` (no join support) or the viewer_visibility helpers (they
-  // apply the timeline hide), so the scope lives in [_favoriteScopeJoins] (bucket .watch(), real
-  // joins for reactivity) and [_favoriteScopePredicate] (asset list .get()), kept in lockstep.
+  // The bucket runs `_watchRemoteBucket` with [_favoriteScopeJoins] (real joins for reactivity)
+  // and the asset list `_getRemoteAssets` with [_favoriteScopePredicate], kept in lockstep. Not
+  // the viewer_visibility helpers: they apply the timeline hide.
   TimelineQuery favorite(
     String userId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => (
-    bucketSource: () => _watchFavoriteBucket(userId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) =>
-        _getFavoriteAssets(userId, offset: offset, count: count, temporalScope: temporalScope),
-    origin: TimelineOrigin.favorite,
-  );
+  }) {
+    Expression<bool> favoriteInScope($RemoteAssetEntityTable row, Expression<bool> inScope) =>
+        row.deletedAt.isNull() &
+        row.isFavorite.equals(true) &
+        (row.visibility.equalsValue(AssetVisibility.timeline) | row.visibility.equalsValue(AssetVisibility.archive)) &
+        _remoteWithinTemporalScope(row, temporalScope) &
+        inScope;
+
+    return (
+      bucketSource: () {
+        final scope = _favoriteScopeJoins(userId);
+        return _timeline._watchRemoteBucket(
+          filter: (row) => favoriteInScope(row, scope.inScope),
+          groupBy: groupBy,
+          extraJoins: scope.joins,
+        );
+      },
+      assetSource: (offset, count) => _timeline._getRemoteAssets(
+        filter: (row) => favoriteInScope(row, _favoriteScopePredicate(userId)),
+        offset: offset,
+        count: count,
+      ),
+      origin: TimelineOrigin.favorite,
+    );
+  }
 
   /// LEFT OUTER JOINs + WHERE term for the Favorites scope (see [favorite]). Real joins rather than
   /// isInQuery so Drift's readsFrom tracks every table and the bucket stream stays reactive.
@@ -743,71 +591,6 @@ class SharedSpaceTimelineRepository {
     return rae.ownerId.equals(userId) | ownedByPartner | inSpaceAsset | inSpaceLibrary | inSpaceAlbum;
   }
 
-  Stream<List<Bucket>> _watchFavoriteBucket(
-    String userId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final scope = _favoriteScopeJoins(userId);
-    final visible =
-        _db.remoteAssetEntity.deletedAt.isNull() &
-        _db.remoteAssetEntity.isFavorite.equals(true) &
-        (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
-        _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-        scope.inScope;
-
-    if (groupBy == GroupAssetsBy.none) {
-      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
-      final query = _db.remoteAssetEntity.selectOnly()
-        ..addColumns([countExp])
-        ..join(scope.joins)
-        ..where(visible);
-
-      return query.map((row) => row.read(countExp) ?? 0).map(_generateBuckets).watchSingle();
-    }
-
-    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..join(scope.joins)
-      ..where(visible)
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-
-    return query.map((row) {
-      final timeline = row.read(dateExp)!.truncateDate(groupBy);
-      final assetCount = row.read(assetCountExp)!;
-      return TimeBucket(date: timeline, assetCount: assetCount);
-    }).watch();
-  }
-
-  Future<List<BaseAsset>> _getFavoriteAssets(
-    String userId, {
-    required int offset,
-    required int count,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final scopePredicate = _favoriteScopePredicate(userId);
-
-    final query = _db.remoteAssetEntity.select()
-      ..where(
-        (row) =>
-            row.deletedAt.isNull() &
-            row.isFavorite.equals(true) &
-            (row.visibility.equalsValue(AssetVisibility.timeline) |
-                row.visibility.equalsValue(AssetVisibility.archive)) &
-            _remoteWithinTemporalScope(row, temporalScope) &
-            scopePredicate,
-      )
-      ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
-      ..limit(count, offset: offset);
-
-    return query.map((row) => row.toDto()).get();
-  }
-
   TimelineQuery trash(
     String userId,
     GroupAssetsBy groupBy, {
@@ -854,72 +637,39 @@ class SharedSpaceTimelineRepository {
     String currentUserId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => (
-    bucketSource: () => _watchVideoBucket(userIds, currentUserId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) =>
-        _getVideoBucketAssets(userIds, currentUserId, offset: offset, count: count, temporalScope: temporalScope),
-    origin: TimelineOrigin.video,
-  );
-
-  Stream<List<Bucket>> _watchVideoBucket(
-    List<String> userIds,
-    String currentUserId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
-    if (groupBy == GroupAssetsBy.none) {
-      throw UnsupportedError('GroupAssetsBy.none is not supported for _watchVideoBucket');
-    }
+    Expression<bool> visibleVideo($RemoteAssetEntityTable row, Expression<bool> visibleToViewer) =>
+        row.deletedAt.isNull() &
+        row.type.equalsValue(AssetType.video) &
+        row.visibility.equalsValue(AssetVisibility.timeline) &
+        _remoteWithinTemporalScope(row, temporalScope) &
+        visibleToViewer;
 
-    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
-    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..join(viz.joins)
-      ..where(
-        _db.remoteAssetEntity.deletedAt.isNull() &
-            _db.remoteAssetEntity.type.equalsValue(AssetType.video) &
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
+    return (
+      bucketSource: () {
+        if (groupBy == GroupAssetsBy.none) {
+          throw UnsupportedError('GroupAssetsBy.none is not supported for _watchVideoBucket');
+        }
+        final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
+        return _timeline._watchRemoteBucket(
+          filter: (row) => visibleVideo(
+            row,
+            row.ownerId.isIn(userIds) |
                 viz.assetMember.userId.isNotNull() |
                 viz.libraryMember.userId.isNotNull() |
-                viz.albumMember.userId.isNotNull()),
-      )
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-
-    return query.map((row) {
-      final timeline = row.read(dateExp)!.truncateDate(groupBy);
-      final assetCount = row.read(assetCountExp)!;
-      return TimeBucket(date: timeline, assetCount: assetCount);
-    }).watch();
-  }
-
-  Future<List<BaseAsset>> _getVideoBucketAssets(
-    List<String> userIds,
-    String currentUserId, {
-    required int offset,
-    required int count,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId);
-
-    final query = _db.remoteAssetEntity.select()
-      ..where(
-        (row) =>
-            row.deletedAt.isNull() &
-            row.type.equalsValue(AssetType.video) &
-            row.visibility.equalsValue(AssetVisibility.timeline) &
-            _remoteWithinTemporalScope(row, temporalScope) &
-            visibilityPredicate,
-      )
-      ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
-      ..limit(count, offset: offset);
-
-    return query.map((row) => row.toDto()).get();
+                viz.albumMember.userId.isNotNull(),
+          ),
+          groupBy: groupBy,
+          extraJoins: viz.joins,
+        );
+      },
+      assetSource: (offset, count) => _timeline._getRemoteAssets(
+        filter: (row) => visibleVideo(row, viewerVisibilityPredicate(_db, row, userIds, currentUserId)),
+        offset: offset,
+        count: count,
+      ),
+      origin: TimelineOrigin.video,
+    );
   }
 
   TimelineQuery place(
@@ -929,37 +679,55 @@ class SharedSpaceTimelineRepository {
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) => (
-    bucketSource: () =>
-        _watchPlaceBucket(place, userIds, currentUserId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) => _getPlaceBucketAssets(
+    bucketSource: () {
+      final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
+      return _timeline._watchPlaceBucket(
+        place,
+        groupBy: groupBy,
+        extraJoins: viz.joins,
+        extraWhere:
+            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
+            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
+                viz.assetMember.userId.isNotNull() |
+                viz.libraryMember.userId.isNotNull() |
+                viz.albumMember.userId.isNotNull()),
+      );
+    },
+    assetSource: (offset, count) => _timeline._getPlaceBucketAssets(
       place,
-      userIds,
-      currentUserId,
       groupBy: groupBy,
       offset: offset,
       count: count,
-      temporalScope: temporalScope,
+      extraWhere:
+          _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
+          viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId),
     ),
     origin: TimelineOrigin.place,
   );
 
+  // Owner-scoped like the person/asset_face sync it reads. Upstream's person filter also admits
+  // partner and album assets; the owner term keeps this route exactly as it was.
   TimelineQuery person(
     String userId,
     String personId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => (
-    bucketSource: () => _watchPersonBucket(userId, personId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) => _getPersonBucketAssets(
-      userId,
-      personId,
-      groupBy: groupBy,
-      offset: offset,
-      count: count,
-      temporalScope: temporalScope,
-    ),
-    origin: TimelineOrigin.person,
-  );
+  }) {
+    final ownedInScope =
+        _db.remoteAssetEntity.ownerId.equals(userId) & _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope);
+    return (
+      bucketSource: () => _timeline._watchPersonBucket([userId], personId, groupBy: groupBy, extraWhere: ownedInScope),
+      assetSource: (offset, count) => _timeline._getPersonBucketAssets(
+        [userId],
+        personId,
+        groupBy: groupBy,
+        offset: offset,
+        count: count,
+        extraWhere: ownedInScope,
+      ),
+      origin: TimelineOrigin.person,
+    );
+  }
 
   /// Timeline for a Space-shared person, restricted to the [assetIds] the server resolved for
   /// that person (GET /shared-spaces/{id}/people/{id}/assets). Unlike [person], this does NOT
@@ -982,167 +750,6 @@ class SharedSpaceTimelineRepository {
     groupBy: groupBy,
     origin: TimelineOrigin.person,
   );
-
-  Stream<List<Bucket>> _watchPlaceBucket(
-    String place,
-    List<String> userIds,
-    String currentUserId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    if (groupBy == GroupAssetsBy.none) {
-      throw UnsupportedError('GroupAssetsBy.none is not supported for _watchPlaceBucket');
-    }
-
-    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
-    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..join([
-        innerJoin(
-          _db.remoteExifEntity,
-          _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-          useColumns: false,
-        ),
-        ...viz.joins,
-      ])
-      ..where(
-        _db.remoteExifEntity.city.equals(place) &
-            _db.remoteAssetEntity.deletedAt.isNull() &
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
-                viz.assetMember.userId.isNotNull() |
-                viz.libraryMember.userId.isNotNull() |
-                viz.albumMember.userId.isNotNull()),
-      )
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-
-    return query.map((row) {
-      final timeline = row.read(dateExp)!.truncateDate(groupBy);
-      final assetCount = row.read(assetCountExp)!;
-      return TimeBucket(date: timeline, assetCount: assetCount);
-    }).watch();
-  }
-
-  Future<List<BaseAsset>> _getPlaceBucketAssets(
-    String place,
-    List<String> userIds,
-    String currentUserId, {
-    required int offset,
-    required int count,
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId);
-
-    final query =
-        _db.remoteAssetEntity.select().join([
-            innerJoin(
-              _db.remoteExifEntity,
-              _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-              useColumns: false,
-            ),
-          ])
-          ..where(
-            _db.remoteAssetEntity.deletedAt.isNull() &
-                _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-                _db.remoteExifEntity.city.equals(place) &
-                _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-                visibilityPredicate,
-          )
-          ..orderBy(_assetDateOrder(groupBy).map((order) => order(_db.remoteAssetEntity)).toList())
-          ..limit(count, offset: offset);
-
-    return query.map((row) => row.readTable(_db.remoteAssetEntity).toDto()).get();
-  }
-
-  Stream<List<Bucket>> _watchPersonBucket(
-    String userId,
-    String personId, {
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final idQuery = _db.assetFaceEntity.selectOnly()
-      ..addColumns([_db.assetFaceEntity.assetId])
-      ..where(
-        _db.assetFaceEntity.personId.equals(personId) &
-            _db.assetFaceEntity.isVisible.equals(true) &
-            _db.assetFaceEntity.deletedAt.isNull(),
-      );
-
-    if (groupBy == GroupAssetsBy.none) {
-      final query = _db.remoteAssetEntity.selectOnly()
-        ..addColumns([_db.remoteAssetEntity.id.count()])
-        ..where(
-          _db.remoteAssetEntity.id.isInQuery(idQuery) &
-              _db.remoteAssetEntity.deletedAt.isNull() &
-              _db.remoteAssetEntity.ownerId.equals(userId) &
-              _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-              _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
-        );
-
-      return query.map((row) {
-        final count = row.read(_db.remoteAssetEntity.id.count())!;
-        return _generateBuckets(count);
-      }).watchSingle();
-    }
-
-    final assetCountExp = _db.remoteAssetEntity.id.count();
-    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
-
-    final query = _db.remoteAssetEntity.selectOnly()
-      ..addColumns([assetCountExp, dateExp])
-      ..where(
-        _db.remoteAssetEntity.id.isInQuery(idQuery) &
-            _db.remoteAssetEntity.ownerId.equals(userId) &
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-            _db.remoteAssetEntity.deletedAt.isNull(),
-      )
-      ..groupBy([dateExp])
-      ..orderBy([OrderingTerm.desc(dateExp)]);
-
-    return query.map((row) {
-      final timeline = row.read(dateExp)!.truncateDate(groupBy);
-      final assetCount = row.read(assetCountExp)!;
-      return TimeBucket(date: timeline, assetCount: assetCount);
-    }).watch();
-  }
-
-  Future<List<BaseAsset>> _getPersonBucketAssets(
-    String userId,
-    String personId, {
-    required int offset,
-    required int count,
-    GroupAssetsBy groupBy = GroupAssetsBy.day,
-    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) {
-    final idQuery = _db.assetFaceEntity.selectOnly()
-      ..addColumns([_db.assetFaceEntity.assetId])
-      ..where(
-        _db.assetFaceEntity.personId.equals(personId) &
-            _db.assetFaceEntity.isVisible.equals(true) &
-            _db.assetFaceEntity.deletedAt.isNull(),
-      );
-
-    final query = _db.remoteAssetEntity.select()
-      ..where(
-        (row) =>
-            row.id.isInQuery(idQuery) &
-            row.deletedAt.isNull() &
-            row.ownerId.equals(userId) &
-            row.visibility.equalsValue(AssetVisibility.timeline) &
-            _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
-      )
-      ..orderBy(_assetDateOrder(groupBy))
-      ..limit(count, offset: offset);
-
-    return query.map((row) => row.toDto()).get();
-  }
 
   /// Creates a geographic map query that can dynamically filter on changing [TimelineMapOptions]
   /// (most notably the active map bounds)

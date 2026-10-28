@@ -22,7 +22,8 @@
   import { buildAlbumAssetPickerOptions, buildSpaceAlbumAssetPickerOptions } from '$lib/utils/album-filter-options';
   import { createAlbumPickerFilters, createAlbumTimeline } from '$lib/gallery/filtered-timeline/album-timeline';
   import { getTimelineManagerTimeBuckets } from '$lib/utils/timeline-zoom-navigation';
-  import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
+  import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album-actions';
+  import { getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
   import { lang } from '$lib/stores/preferences.store';
@@ -132,8 +133,8 @@
     album = await getAlbumInfo({ id: album.id });
   };
 
-  // RemoveFromAlbumAction already re-fetches the album via bind:album and clears the selection
-  // before firing onRemove, so this only prunes the view and defensively clears.
+  // The remove-from-album action clears the selection after firing onRemove, so this only prunes
+  // the view and defensively clears.
   const handleRemoveAssets = (assetIds: string[]) => {
     filtered.onAssetDelete(assetIds);
     assetMultiSelectManager.clear();

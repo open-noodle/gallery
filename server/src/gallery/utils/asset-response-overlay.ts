@@ -4,10 +4,9 @@ import type { AssetFace } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { LinkedSpacePerson, SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
-import { Permission } from 'src/enum.js';
+import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import { checkAccess } from 'src/utils/access.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 
@@ -94,7 +93,7 @@ export const applyAssetResponseOverlay = async (
 
   // #734: resolve editability once, here, where the space context already is. Never in
   // mapAsset — it has no AuthDto and feeds list endpoints, where this would be N+1.
-  const editable = await checkAccess(deps.access, { auth, permission: Permission.AssetUpdate, ids: [id] });
+  const editable = await checkAssetEditAccess(deps.access, { auth, ids: [id] });
   data.canEdit = editable.has(id);
 };
 

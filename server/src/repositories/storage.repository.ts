@@ -269,39 +269,6 @@ export class StorageRepository {
     };
   }
 
-  async getFolderSize(folder: string, shouldCount?: (filename: string) => boolean): Promise<number> {
-    let total = 0;
-    let dir;
-    try {
-      dir = await fs.opendir(folder);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        return 0;
-      }
-      throw error;
-    }
-
-    for await (const entry of dir) {
-      const entryPath = path.join(folder, entry.name);
-      if (entry.isDirectory()) {
-        total += await this.getFolderSize(entryPath, shouldCount);
-      } else if (entry.isFile() && (!shouldCount || shouldCount(entry.name))) {
-        try {
-          const entryStat = await fs.stat(entryPath);
-          total += entryStat.size;
-        } catch (error: any) {
-          // The nightly scan walks a live tree that delete jobs are writing to; a file that
-          // disappears mid-walk must not abort the whole user's sync.
-          if (error.code !== 'ENOENT') {
-            throw error;
-          }
-        }
-      }
-    }
-
-    return total;
-  }
-
   crawl(crawlOptions: CrawlOptionsDto): Promise<string[]> {
     const { pathsToCrawl, exclusionPatterns, includeHidden } = crawlOptions;
     if (pathsToCrawl.length === 0) {

@@ -8,7 +8,7 @@ import {
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 /**
- * Album *detail* is scoped to a single album, and asset.repository.ts guards both `isInAlbum` and
+ * Album *detail* is scoped to a single album, and gallery/utils/time-bucket-filter.ts guards both `isInAlbum` and
  * `isNotInAlbum` with `&& !options.albumId` — inside an album the former is a tautology and the
  * latter an always-empty set, so the server drops them. Rendering the section would give the user
  * two controls that do nothing. Every other section is shared with the rest of the app (#802).

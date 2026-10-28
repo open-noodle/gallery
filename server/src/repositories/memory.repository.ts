@@ -14,6 +14,7 @@ import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
 import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
+import { memoryAccessibleTo } from 'src/gallery/utils/memory-access.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -24,7 +25,6 @@ import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
   type TimelineHiddenScope,
   hiddenFromOwnTimeline,
-  spaceAlbumAssetExists,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 
@@ -100,61 +100,7 @@ export class MemoryRepository implements IBulkAsset {
 
   /** Serves `GET /memories`. Follows upstream's contract: `isUpcoming` alone scopes `showAt`. */
   private accessibleSearchBuilder(userId: string, dto: MemorySearchDto) {
-    return (
-      this.baseSearchBuilder(dto, { hideUnshownByDefault: false })
-        // Gallery generates birthday memories as rules; a MemoryType.Birthday row (an Immich 3.3+
-        // import, or an API create) would abort an installed app's decode. See
-        // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
-        .where('memory.type', '!=', MemoryType.Birthday)
-        .where((eb) =>
-          eb.or([
-            eb('memory.ownerId', '=', userId),
-            eb.exists(
-              eb
-                .selectFrom('memory_asset')
-                .innerJoin('asset', 'asset.id', 'memory_asset.assetId')
-                .select('memory_asset.assetId')
-                .whereRef('memory_asset.memoriesId', '=', 'memory.id')
-                .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-                .where('asset.deletedAt', 'is', null)
-                .where((eb) =>
-                  eb.or([
-                    eb('asset.ownerId', '=', userId),
-                    eb.exists(
-                      eb
-                        .selectFrom('partner')
-                        .select('partner.sharedById')
-                        .where('partner.sharedWithId', '=', userId)
-                        .whereRef('partner.sharedById', '=', 'asset.ownerId'),
-                    ),
-                    eb.exists(
-                      eb
-                        .selectFrom('shared_space_asset')
-                        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
-                        .select('shared_space_asset.assetId')
-                        .where('shared_space_member.userId', '=', userId)
-                        .whereRef('shared_space_asset.assetId', '=', 'asset.id'),
-                    ),
-                    eb.exists(
-                      eb
-                        .selectFrom('shared_space_library')
-                        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-                        .select('shared_space_library.libraryId')
-                        .where('shared_space_member.userId', '=', userId)
-                        .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                        .where('asset.isOffline', '=', false),
-                    ),
-                    spaceAlbumAssetExists(eb, {
-                      correlateAssetId: 'asset.id',
-                      scope: { memberUserId: userId },
-                      albumTimelineGate: 'space-tab',
-                    }),
-                  ]),
-                ),
-            ),
-          ]),
-        )
-    );
+    return this.baseSearchBuilder(dto, { hideUnshownByDefault: false }).where((eb) => memoryAccessibleTo(eb, userId));
   }
 
   @GenerateSql(

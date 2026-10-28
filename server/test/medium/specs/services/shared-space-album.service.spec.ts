@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AlbumUserRole, AssetVisibility, JobName, JobStatus, TimeBucketSize } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -42,6 +43,7 @@ const setup = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      GalleryAssetRepository,
       // L7: removeMember wraps the membership delete + owned-album unlink in
       // this.databaseRepository.transaction() — needs a real connection to the test DB.
       DatabaseRepository,
@@ -64,6 +66,7 @@ const setupWithFaceMatch = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      GalleryAssetRepository,
       SharedSpaceRepository,
       StackRepository,
       UserRepository,
@@ -496,7 +499,7 @@ describe('SharedSpaceService — handleSharedSpaceAlbumFaceSync', () => {
 const setupTimeline = () =>
   newMediumService(TimelineService, {
     database: defaultDatabase,
-    real: [AccessRepository, AssetRepository, PartnerRepository, SharedSpaceRepository],
+    real: [AccessRepository, AssetRepository, GalleryAssetRepository, PartnerRepository, SharedSpaceRepository],
     mock: [LoggingRepository],
   });
 
@@ -1182,6 +1185,7 @@ const setupWithAlbumDelete = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      GalleryAssetRepository,
       SharedSpaceRepository,
       UserRepository,
     ],
@@ -1445,6 +1449,7 @@ const setupWithUserDelete = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      GalleryAssetRepository,
       SharedSpaceRepository,
       UserRepository,
     ],
@@ -1628,6 +1633,7 @@ const setupWithUserAdminDelete = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      GalleryAssetRepository,
       SharedSpaceRepository,
       UserRepository,
     ],

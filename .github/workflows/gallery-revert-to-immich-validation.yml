@@ -5,7 +5,9 @@ name: Gallery Revert-to-Immich Validation
 # where upstream Immich boots cleanly, with no schema drift warnings and no
 # stale kysely_migration rows. Before the revert, the same database goes
 # through a trial boot of stock Immich without the script and back to
-# Gallery, as the switch-back guide describes.
+# Gallery, as the switch-back guide describes. A copy of the database goes
+# through the revert with the guide's optional space conversion, and stock
+# Immich must then serve each space as a shared album.
 #
 # See specs/2026-04-14-revert-to-immich-validation-design.md for the
 # full design, the pass-criterion rationale, and the review history.
@@ -44,6 +46,7 @@ on:
       # Gallery's plugin when Gallery comes back.
       - 'server/src/schema/tables/**'
       - 'server/src/schema/functions.ts'
+      - 'server/src/schema/gallery-functions.ts'
       - 'server/src/database.ts'
       - 'server/src/services/asset.service.ts'
       - 'server/src/repositories/asset.repository.ts'
@@ -176,15 +179,17 @@ jobs:
           github_token: ${{ github.token }}
 
       # The seed phase checks the PR's own sync gating, so a PR must not be tested against :main.
+      # The PR's gallery-core plugin goes in too, because the stock phase loads it from the database.
       # shortcut: overlays the PR's server dist on :main, so a PR that changes server dependencies
-      # or plugins is not covered; build the full server/Dockerfile here if that starts to matter.
+      # or plugin-core is not covered; build the full server/Dockerfile here if that starts to matter.
       - name: Build the PR's server
         if: github.event_name == 'pull_request'
         run: |
           pnpm install --frozen-lockfile
           mise //:plugins
           mise //server:build
-          printf 'FROM ghcr.io/open-noodle/immich-server:main\nRUN rm -rf /usr/src/app/server/dist\nCOPY dist /usr/src/app/server/dist\n' |
+          mkdir -p server/gallery-core && cp -r packages/plugin-gallery/dist packages/plugin-gallery/manifest.json server/gallery-core/
+          printf 'FROM ghcr.io/open-noodle/immich-server:main\nRUN rm -rf /usr/src/app/server/dist\nCOPY dist /usr/src/app/server/dist\nCOPY gallery-core /build/plugins/gallery-core\n' |
             docker build -t "$GALLERY_IMAGE" -f - server
 
       - name: Log in to GitHub Container Registry
@@ -278,7 +283,8 @@ jobs:
             local phase=$1
             local deadline=$(( $(date +%s) + 60 ))
             while [ "$(date +%s)" -lt "$deadline" ]; do
-              if docker logs server 2>&1 | grep -qF 'Geodata import completed'; then
+              # Not grep -q: under pipefail its early exit SIGPIPEs docker logs and fails the match.
+              if docker logs server 2>&1 | grep -F 'Geodata import completed' >/dev/null; then
                 echo "::notice::${phase}: geodata import completed"
                 return 0
               fi
@@ -448,7 +454,7 @@ jobs:
           # Step 9.5: stock Immich on the live Gallery database, then back
           #
           # No revert script: the trial boot the switch-back guide allows.
-          # Stock must boot with Gallery's plugin disabled and Redis
+          # Stock must boot with Gallery's plugin enabled and Redis
           # flushed, serve the owner, and leave Gallery intact.
           ############################################################
 
@@ -493,6 +499,25 @@ jobs:
             exit 1
           fi
           echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in ${ledger}"
+
+          ############################################################
+          # Step 10.5: the managed rollback, on a copy of the database
+          #
+          # The guide's optional conversion turns each space into a
+          # shared album. Step 15 boots stock Immich on the copy.
+          ############################################################
+
+          CONVERT_DB=${DB_DATABASE_NAME}_convert
+          docker exec database psql -U "$DB_USERNAME" -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE \"${CONVERT_DB}\" TEMPLATE \"${DB_DATABASE_NAME}\""
+          DB_DATABASE_NAME=$CONVERT_DB .github/scripts/revert-to-immich-data.sh convert-seed
+          { echo "SET gallery.revert_token = 'i_accept_data_loss';"; \
+            echo "SET gallery.convert_spaces = 'on';"; \
+            echo "SET gallery.convert_favorites = 'on';"; \
+            cat scripts/revert-to-immich.sql; } | \
+            docker exec -i database psql \
+              -U "$DB_USERNAME" -d "$CONVERT_DB" \
+              -v ON_ERROR_STOP=1
 
           ############################################################
           # Step 11: run revert-to-immich.sql
@@ -556,6 +581,15 @@ jobs:
           ############################################################
 
           .github/scripts/revert-to-immich-data.sh assert
+          stop_server
+
+          ############################################################
+          # Step 15: stock Immich on the converted copy
+          ############################################################
+
+          docker exec redis valkey-cli FLUSHALL >/dev/null
+          DB_DATABASE_NAME=$CONVERT_DB boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" convert
+          DB_DATABASE_NAME=$CONVERT_DB .github/scripts/revert-to-immich-data.sh convert-assert
 
           if [ "$roundtrip" != 0 ]; then
             echo "::error::The stock round trip (step 9.5) failed; its errors are above."

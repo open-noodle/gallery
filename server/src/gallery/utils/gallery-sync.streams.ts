@@ -99,16 +99,20 @@ const forkSyncRequestTypes = new Set<SyncRequestType>(GALLERY_SYNC_ORDER);
 const isForkAwareClient = (dto: SyncStreamDto) => dto.types.some((type) => forkSyncRequestTypes.has(type));
 
 /**
- * Gallery's memory sync policy, shared by every memory stream version and by the memory photo
- * links (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md):
- * - `birthday` rows (immich-30831) reach no client: Gallery's birthday memory is a rule, and an
- *   installed Gallery app cannot decode the type;
+ * Gallery's memory type policy, shared by every memory stream version, the memory photo links and
+ * `GET /memories`:
+ * - `birthday` rows (immich-30831) go where upstream sends them: MemoriesV2 / MemoryToAssetsV2 and the
+ *   list, never V1 (upstream narrowed V1 to `on_this_day` for clients that cannot decode the type).
+ *   `withBirthday` is false on V1 and, for the list, for a Gallery app before 5.8.0 (`legacyGalleryApp`).
  * - `rule` rows reach fork-aware clients only (#1013): a stock Immich app cannot decode the type
  *   and would abort its whole sync. That holds on MemoriesV2 too: a stock app at 3.3+ requests it
  *   from a Gallery server, whose 5.x version clears upstream's 3.3.0 gate.
  */
-const syncedMemoryTypes = (isForkAwareClient: boolean): MemoryType[] =>
-  isForkAwareClient ? [MemoryType.OnThisDay, MemoryType.Rule] : [MemoryType.OnThisDay];
+const syncedMemoryTypes = (isForkAwareClient?: boolean, withBirthday?: boolean): MemoryType[] => [
+  MemoryType.OnThisDay,
+  ...(isForkAwareClient ? [MemoryType.Rule] : []),
+  ...(withBirthday ? [MemoryType.Birthday] : []),
+];
 
 type BackfillCheckpoint = { type: SyncEntityType; sessionId: string; createId: string };
 

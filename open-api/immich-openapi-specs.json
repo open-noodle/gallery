@@ -33707,7 +33707,9 @@
           "SharedSpaceAlbumGrantReconcileSweep",
           "SharedSpaceIdentityReconciliationSweep",
           "AssetClassifyQueueAll",
-          "AssetClassify"
+          "AssetClassify",
+          "MemoryRuleGenerate",
+          "AssetVideoTrimGenerate"
         ],
         "type": "string"
       },

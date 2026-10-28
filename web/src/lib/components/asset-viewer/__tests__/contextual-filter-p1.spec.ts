@@ -34,7 +34,7 @@ import DetailPanel from '../DetailPanel.svelte';
  *     → the surface's REAL options builder                (buildPhotos/Space/Album/MapTimeBucketOptions)
  *     → expectOptionsToMatchSubject                       (a mirror of withTimeBucketAssetFilters)
  *
- * The matcher mirrors `server/src/repositories/asset.repository.ts` `withTimeBucketAssetFilters`,
+ * The matcher mirrors `server/src/gallery/utils/time-bucket-filter.ts` `withTimeBucketAssetFilters`,
  * which is the ONE query behind all four surfaces' timelines:
  *   - make / model / lensModel / city / state / country / ownerId → `=`      (exact)
  *   - description / originalFileName                              → ILIKE %…% (substring)

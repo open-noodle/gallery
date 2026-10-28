@@ -437,6 +437,69 @@ patch_app_download_modal() {
 }
 
 #
+# --- Loading spinner ---
+#
+# Source keeps upstream's `import { LoadingSpinner } from '@immich/ui'` so these files stay
+# byte-identical to upstream on that line; the branded build swaps it for the Gallery spinner
+# (`/gallery-loader.svg`). Fork-only files import the branded spinner directly and are not listed.
+# A listed file that no longer has the import fails the build: upstream moved or rewrote it.
+BRANDED_SPINNER_FILES=(
+  'lib/components/asset-viewer/ActivityViewer.svelte'
+  'lib/components/asset-viewer/DetailPanel.svelte'
+  'lib/components/asset-viewer/ImagePanoramaViewer.svelte'
+  'lib/components/asset-viewer/VideoNativeViewer.svelte'
+  'lib/components/asset-viewer/VideoPanoramaViewer.svelte'
+  'lib/components/asset-viewer/VideoRemoteViewer.svelte'
+  'lib/components/assets/thumbnail/VideoThumbnail.svelte'
+  'lib/components/faces-page/AssignFaceSidePanel.svelte'
+  'lib/components/faces-page/PersonSidePanel.svelte'
+  'lib/elements/SearchBar.svelte'
+  'lib/modals/AddUsersModal.svelte'
+  'lib/modals/MapModal.svelte'
+  'lib/modals/PartnerSelectionModal.svelte'
+  'lib/modals/PeoplePickerModal.svelte'
+  'routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte'
+  'routes/(user)/memories/+page.svelte'
+  'routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte'
+  'routes/(user)/user-settings/OauthSettings.svelte'
+  'routes/(user)/utilities/geolocation/+page.svelte'
+  'routes/admin/queues/[name]/QueueGraph.svelte'
+  'routes/admin/system-settings/TemplateSettings.svelte'
+)
+
+patch_loading_spinner() {
+  echo "--- Patching loading spinner ---"
+  local ui_import="^[[:space:]]*import \{[^}]*[{ ,]LoadingSpinner[ ,}][^}]*\} from '@immich/ui';$"
+  local branded="import LoadingSpinner from '\$lib/components/shared-components/LoadingSpinner.svelte';"
+  local rel file
+  for rel in "${BRANDED_SPINNER_FILES[@]}"; do
+    file="$REPO_ROOT/web/src/$rel"
+    # Already swapped by an earlier run: nothing to do.
+    if [[ -f "$file" ]] && ! grep -qE "$ui_import" "$file" && grep -qF "$branded" "$file"; then
+      continue
+    fi
+    if [[ ! -f "$file" ]] || ! grep -qE "$ui_import" "$file"; then
+      echo "  ERROR: web/src/$rel no longer imports LoadingSpinner from @immich/ui." >&2
+      echo "  Upstream moved or rewrote it: update BRANDED_SPINNER_FILES in apply-branding.sh." >&2
+      return 1
+    fi
+    # `{ LoadingSpinner }` alone becomes the branded import; otherwise drop the name and add the import below.
+    sed -i -E "\#$ui_import#{
+      s#^([[:space:]]*)import \{ LoadingSpinner \} from '@immich/ui';\$#\1$branded#
+      t
+      s#([{ ])LoadingSpinner, #\1#
+      s#, LoadingSpinner \}# }#
+      a\\  $branded
+    }" "$file"
+    if grep -qE "$ui_import" "$file"; then
+      echo "  ERROR: could not rewrite the LoadingSpinner import in web/src/$rel" >&2
+      return 1
+    fi
+  done
+  echo "  Swapped LoadingSpinner in ${#BRANDED_SPINNER_FILES[@]} files"
+}
+
+#
 # --- Emails ---
 #
 # The notification/email templates (server/src/emails) hardcode upstream Immich
@@ -864,15 +927,29 @@ patch_ios() {
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
 
-  # Info.plist — register branded URL scheme alongside immich:// (additive, idempotent)
-  # The CFBundleURLSchemes <string>immich</string> entry sits at 4-tab indent inside
-  # CFBundleURLTypes; CFBundleName (also <string>${NAME_SLUG}</string>) is at 1-tab indent,
-  # so we anchor the idempotency check to the 4-tab prefix to avoid a false-positive when
-  # NAME_SLUG happens to equal DEEP_LINK_SCHEME. Use $'\t' ANSI-C quoting for literal
-  # tabs — BSD grep (macOS) lacks -P.
-  local indent=$'\t\t\t\t'
-  if ! grep -q "^${indent}<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
-    sed -i $'/\t\t\t\t<string>immich<\\/string>/a\\\n\t\t\t\t<string>'"${DEEP_LINK_SCHEME}"$'<\\/string>' "$info_plist"
+  # Info.plist stays byte-identical to upstream in source. Every edit below matches on content,
+  # never on indentation, so upstream re-serializing the file (tabs or spaces) cannot break it.
+
+  # Info.plist — register branded URL scheme alongside immich:// (additive, idempotent).
+  # Inserted on the line after the CFBundleURLSchemes <string>immich</string>, with its indent,
+  # unless that next line already is the branded scheme. Checking the neighbour rather than
+  # "the scheme appears anywhere" matters: CFBundleName becomes <string>${NAME_SLUG}</string>,
+  # which equals the scheme when NAME_SLUG == DEEP_LINK_SCHEME.
+  sed -i -E "/^[[:space:]]*<string>immich<\/string>\$/{N;/\n[[:space:]]*<string>${DEEP_LINK_SCHEME}<\/string>\$/!s|^([[:space:]]*)<string>immich</string>\n|&\1<string>${DEEP_LINK_SCHEME}</string>\n|}" "$info_plist"
+
+  # Info.plist — permission prompts (config.json mobile.ios_usage_descriptions). Replaces the
+  # <string> after each <key>; upstream wraps some over several lines, which the N loop joins
+  # (GNU sed's `.` spans the joined newlines).
+  local usage_key usage_text
+  while IFS=$'\t' read -r usage_key usage_text; do
+    usage_text=$(printf '%s' "$usage_text" | sed 's/[\\&|]/\\&/g')
+    sed -i "/<key>${usage_key}<\/key>/{n;:a;/<\/string>/!{N;ba};s|<string>.*</string>|<string>${usage_text}</string>|}" "$info_plist"
+  done < <(jq -r '.mobile.ios_usage_descriptions | to_entries[] | "\(.key)\t\(.value)"' "$CONFIG")
+
+  # Info.plist — version. Upstream hardcodes its own; the release lanes restamp it via fastlane.
+  if [[ -n "${FORK_VERSION:-}" ]]; then
+    sed -i "/<key>CFBundleShortVersionString<\/key>/{n;s|<string>[^<]*</string>|<string>${FORK_VERSION}</string>|}" "$info_plist"
+    sed -i "/<key>CFBundleVersion<\/key>/{n;s|<string>[^<]*</string>|<string>${BUILD_NUMBER:-1}</string>|}" "$info_plist"
   fi
 
   # Info.plist — background task identifiers
@@ -1048,6 +1125,7 @@ main() {
   patch_i18n
   patch_web
   patch_app_download_modal
+  patch_loading_spinner
   patch_emails
   patch_help_modal
   patch_assets

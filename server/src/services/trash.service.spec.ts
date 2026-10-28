@@ -21,8 +21,8 @@ describe(TrashService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(TrashService));
-    mocks.duplicateRepository.deleteConflictingTombstones.mockResolvedValue(void 0 as any);
-    mocks.duplicateRepository.deleteConflictingTombstonesForUser.mockResolvedValue(void 0 as any);
+    mocks.galleryDuplicate.deleteConflictingTombstones.mockResolvedValue(void 0 as any);
+    mocks.galleryDuplicate.deleteConflictingTombstonesForUser.mockResolvedValue(void 0 as any);
   });
 
   describe('restoreAssets', () => {
@@ -55,10 +55,7 @@ describe(TrashService.name, () => {
 
       await sut.restoreAssets(authStub.user1, { ids: ['asset1', 'asset2'] });
 
-      expect(mocks.duplicateRepository.deleteConflictingTombstones).toHaveBeenCalledWith('user-id', [
-        'asset1',
-        'asset2',
-      ]);
+      expect(mocks.galleryDuplicate.deleteConflictingTombstones).toHaveBeenCalledWith('user-id', ['asset1', 'asset2']);
     });
   });
 
@@ -80,13 +77,13 @@ describe(TrashService.name, () => {
     it('should clean up conflicting tombstones for user on restore', async () => {
       mocks.trash.restore.mockResolvedValue(3);
       await sut.restore(authStub.user1);
-      expect(mocks.duplicateRepository.deleteConflictingTombstonesForUser).toHaveBeenCalledWith('user-id');
+      expect(mocks.galleryDuplicate.deleteConflictingTombstonesForUser).toHaveBeenCalledWith('user-id');
     });
 
     it('should skip tombstone cleanup when nothing restored', async () => {
       mocks.trash.restore.mockResolvedValue(0);
       await sut.restore(authStub.user1);
-      expect(mocks.duplicateRepository.deleteConflictingTombstonesForUser).not.toHaveBeenCalled();
+      expect(mocks.galleryDuplicate.deleteConflictingTombstonesForUser).not.toHaveBeenCalled();
     });
   });
 

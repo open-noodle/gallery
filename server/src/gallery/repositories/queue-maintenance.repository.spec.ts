@@ -1,7 +1,10 @@
 import { ModuleRef } from '@nestjs/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JobName, QueueName } from 'src/enum.js';
-import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import {
+  QueueMaintenanceRepository,
+  buildWorkerOptions,
+} from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 
 const setup = () => {
@@ -19,8 +22,10 @@ const setup = () => {
 
 const stubActiveList = (queue: ReturnType<typeof setup>['queue'], activeIds: string[]) => {
   const client = {
+    exists: vi.fn().mockResolvedValue(0),
     lrange: vi.fn().mockResolvedValue(activeIds),
     lrem: vi.fn().mockResolvedValue(1),
+    srem: vi.fn().mockResolvedValue(1),
   };
   (queue as any).client = Promise.resolve(client);
   (queue as any).toKey = vi.fn((type: string) => `immich_bull:facialRecognition:${type}`);
@@ -32,6 +37,28 @@ const failedJob = (id: string) => ({ id, remove: vi.fn().mockResolvedValue(void 
 describe(QueueMaintenanceRepository.name, () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('buildWorkerOptions', () => {
+    it('gives the FacialRecognition queue a lock and stalled interval well above the 30s default', () => {
+      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.FacialRecognition);
+
+      expect(options.concurrency).toBe(1);
+      expect(options.prefix).toBe('immich_bull');
+      // Long handlers (face-match-all, identity reconciliation, a dedup pass on a huge space) must
+      // not be declared stalled and orphaned while still healthy.
+      expect(options.lockDuration ?? 0).toBeGreaterThanOrEqual(120_000);
+      expect(options.stalledInterval ?? 0).toBeGreaterThanOrEqual(120_000);
+    });
+
+    it('leaves other queues on BullMQ lock defaults', () => {
+      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.ThumbnailGeneration);
+
+      expect(options.concurrency).toBe(1);
+      expect(options.prefix).toBe('immich_bull');
+      expect(options.lockDuration).toBeUndefined();
+      expect(options.stalledInterval).toBeUndefined();
+    });
   });
 
   describe('hasInFlightDedupChain', () => {
@@ -57,40 +84,63 @@ describe(QueueMaintenanceRepository.name, () => {
     });
   });
 
-  describe('removeOrphanedActiveJobs', () => {
-    it('removes active job ids whose hash is gone (orphans) and leaves real active jobs untouched', async () => {
-      const { sut, queue } = setup();
+  // The bootstrap reconcile (QueueService.onBootstrap) runs the same removeDanglingActiveJobs that
+  // waitForQueueCompletion and searchJobs use, but ignores the lock: no worker runs yet, so a lock left
+  // by a crashed process (up to 5 min on FacialRecognition) must not keep the dangling id.
+  describe('reconcileOrphanedActiveJobs', () => {
+    it('removes active ids whose job hash and lock are both gone, from the active list and the stalled set', async () => {
+      const { sut, queue, logger } = setup();
       const client = stubActiveList(queue, ['orphan-1', 'real-1']);
       // A real active job still has its hash; an orphan's hash was removed (e.g. removeOnComplete
       // racing stalled-recovery) leaving a dangling id that wedges the concurrency-1 queue.
-      queue.getJob = vi.fn((id: string) => Promise.resolve(id === 'real-1' ? ({ id } as any) : undefined));
+      client.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'immich_bull:facialRecognition:real-1' ? 1 : 0),
+      );
 
-      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
+      await sut.reconcileOrphanedActiveJobs();
 
-      expect(removed).toEqual(['orphan-1']);
       expect(client.lrem).toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'orphan-1');
       expect(client.lrem).not.toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'real-1');
+      expect(client.srem).toHaveBeenCalledWith('immich_bull:facialRecognition:stalled', 'orphan-1');
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Removed 1 dangling active job id from '));
     });
 
-    it('does nothing when the active list is empty', async () => {
+    it('removes an active id whose hash is gone even when its lock is still held', async () => {
       const { sut, queue } = setup();
+      const client = stubActiveList(queue, ['locked-1']);
+      client.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'immich_bull:facialRecognition:locked-1:lock' ? 1 : 0),
+      );
+
+      await sut.reconcileOrphanedActiveJobs();
+
+      expect(client.lrem).toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'locked-1');
+      expect(client.srem).toHaveBeenCalledWith('immich_bull:facialRecognition:stalled', 'locked-1');
+    });
+
+    it('keeps that id on the runtime repair, where a running worker may hold the lock', async () => {
+      const { sut, queue } = setup();
+      const client = stubActiveList(queue, ['locked-1']);
+      client.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'immich_bull:facialRecognition:locked-1:lock' ? 1 : 0),
+      );
+      queue.getJobCounts.mockResolvedValue({ active: 1 });
+
+      await sut.getJobCountsWithRepair(QueueName.FacialRecognition);
+
+      expect(client.lrem).not.toHaveBeenCalled();
+      expect(client.srem).not.toHaveBeenCalled();
+    });
+
+    it('checks every queue and does nothing when the active lists are empty', async () => {
+      const { sut, queue, logger } = setup();
       const client = stubActiveList(queue, []);
 
-      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
+      await sut.reconcileOrphanedActiveJobs();
 
-      expect(removed).toEqual([]);
+      expect(client.lrange).toHaveBeenCalledTimes(Object.values(QueueName).length);
       expect(client.lrem).not.toHaveBeenCalled();
-    });
-
-    it('does not remove anything when every active id still has a backing job', async () => {
-      const { sut, queue } = setup();
-      const client = stubActiveList(queue, ['real-1', 'real-2']);
-      queue.getJob = vi.fn((id: string) => Promise.resolve({ id }) as any);
-
-      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
-
-      expect(removed).toEqual([]);
-      expect(client.lrem).not.toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
     });
   });
 

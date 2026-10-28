@@ -31,26 +31,9 @@
     onReady?: () => void;
     onError?: () => void;
     onSwipe?: (event: SwipeCustomEvent) => void;
-    /**
-     * Slice 8 gap closure: `spaceId`/`canEditSpacePeople` come from AssetViewer.svelte
-     * (`resolveCanEditSpacePeople`, the same rule DetailPanel.svelte uses for the People row on
-     * this SAME asset), and are forwarded to `FaceEditorPanel` below, which decides between the
-     * owner `FaceEditor` and the space-flavoured `SpaceFaceEditor`.
-     */
-    spaceId?: string;
-    canEditSpacePeople?: boolean;
   };
 
-  let {
-    cursor,
-    element = $bindable(),
-    sharedLink,
-    onReady,
-    onError,
-    onSwipe,
-    spaceId,
-    canEditSpacePeople = false,
-  }: Props = $props();
+  let { cursor, element = $bindable(), sharedLink, onReady, onError, onSwipe }: Props = $props();
 
   const { slideshowState, slideshowLook } = slideshowStore;
   const asset = $derived(cursor.current);
@@ -322,9 +305,7 @@
       {containerWidth}
       {containerHeight}
       assetId={asset.id}
-      {spaceId}
-      {canEditSpacePeople}
-      onClose={() => assetViewerManager.closeFaceEditMode()}
+      {asset}
     />
   {/if}
 </div>

@@ -16,10 +16,13 @@ import {
   UsageByUserDto,
 } from 'src/dtos/server.dto.js';
 import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum.js';
-import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
+import {
+  MEMORY_TYPE_KEYS,
+  getAdminAvailableMemoryTypeKeys,
+} from 'src/gallery/services/memory-rules/memory-type.metadata.js';
+import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { MEMORY_TYPE_KEYS, getAdminAvailableMemoryTypeKeys } from 'src/services/memory-rules/memory-type.metadata.js';
 import { asHumanReadable } from 'src/utils/bytes.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import {
@@ -55,7 +58,7 @@ export class ServerService extends BaseService {
     }
     this.mlHealthInFlight = (async () => {
       try {
-        const { ok } = await this.machineLearningRepository.ping();
+        const { ok } = await this.galleryMachineLearningRepository.ping();
         const value: ServerMlHealthResponseDto = { smartSearchHealthy: ok };
         this.mlHealthCache = { value, expiresAt: Date.now() + 30_000 };
         return value;

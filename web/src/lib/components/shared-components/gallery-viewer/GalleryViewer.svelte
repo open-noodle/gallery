@@ -9,6 +9,7 @@
   import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { AssetAction } from '$lib/constants';
   import Portal from '$lib/elements/Portal.svelte';
+  import { retryOnAnimationFrames } from '$lib/gallery/timeline/timeline-anchor';
   import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
@@ -441,36 +442,24 @@
       return;
     }
 
-    requestAnimationFrame(() => {
+    // A day anchor whose card is not rendered yet scrolls the virtual list to its first asset,
+    // then scrolls the card into view one frame later.
+    return retryOnAnimationFrames((frame) => {
       if (!isCurrentGalleryAnchor(anchor, grouping)) {
-        return;
+        return true;
       }
 
       const target = container.querySelector<HTMLElement>(selector);
-      if (target) {
-        target.scrollIntoView({ block: 'start', inline: 'nearest' });
-        galleryTemporalAnchor = undefined;
-        return;
+      const index = !target && frame === 0 && grouping === 'day' ? getFirstGalleryAssetIndexForAnchor(anchor) : -1;
+      if (index !== -1) {
+        scrollToGalleryAssetIndex(index);
+        return false;
       }
 
-      if (grouping === 'day' && anchor.month !== undefined) {
-        const targetIndex = getFirstGalleryAssetIndexForAnchor(anchor);
-        if (targetIndex !== -1) {
-          scrollToGalleryAssetIndex(targetIndex);
-          requestAnimationFrame(() => {
-            if (!isCurrentGalleryAnchor(anchor, grouping)) {
-              return;
-            }
-
-            container.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: 'start', inline: 'nearest' });
-            galleryTemporalAnchor = undefined;
-          });
-          return;
-        }
-      }
-
+      target?.scrollIntoView({ block: 'start', inline: 'nearest' });
       galleryTemporalAnchor = undefined;
-    });
+      return true;
+    }, 1);
   });
 
   $effect(() => {

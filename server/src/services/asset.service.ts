@@ -39,9 +39,9 @@ import {
   Permission,
   QueueName,
 } from 'src/enum.js';
-import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
-import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
+import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-overlay.js';
+import { afterAssetUpdate, beforeAssetUpdate, beforeAssetUpdateAll } from 'src/gallery/utils/asset-update-hooks.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -120,10 +120,10 @@ export class AssetService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: UpdateAssetDto): Promise<AssetResponseDto> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
 
     // rbac-3: visibility AND livePhotoVideoId are owner-only structural writes (see updateAll). A space editor
-    // holds AssetUpdate over other members' assets via checkSpaceEditAccess, but must not flip their visibility
+    // holds edit access over other members' assets via checkSpaceEditAccess, but must not flip their visibility
     // (fleet-wide tombstone) or re-link their motion video. Reject if either is set on an asset the caller does
     // not own; other metadata (description/rating/…) stays editor-allowed. Runs BEFORE the livePhotoVideoId
     // link/unlink side-effects and the visibility transition helper below.
@@ -137,7 +137,7 @@ export class AssetService extends BaseService {
       }
     }
 
-    const { description, dateTimeOriginal, latitude, longitude, rating, isFavorite, ...rest } = dto;
+    const { description, dateTimeOriginal, latitude, longitude, rating, isFavorite: _isFavorite, ...rest } = dto;
     const repos = { asset: this.assetRepository, event: this.eventRepository };
 
     let previousMotion: { id: string } | null = null;
@@ -152,21 +152,7 @@ export class AssetService extends BaseService {
 
     const wroteMetadata = await this.updateExif({ id, description, dateTimeOriginal, latitude, longitude, rating });
 
-    // correctness-8: capture the PRIOR visibility before the write so the transition helper can tell a
-    // genuine boundary crossing from a no-op re-affirm (e.g. Hidden -> Hidden).
-    let priorVisibility: AssetVisibility | undefined;
-    if (dto.visibility !== undefined) {
-      const priorAsset = await this.assetRepository.getById(id);
-      priorVisibility = priorAsset?.visibility;
-    }
-
-    // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — route it through
-    // the SAME updateFavorites logic so the alias can never be more permissive than the canonical
-    // endpoint. Written BEFORE the repository read below so the isFavoriteForUser it projects for
-    // the response reflects the caller's own just-written state, not the pre-write value.
-    if (isFavorite !== undefined) {
-      await updateAssetFavorites(this.accessRepository, this.assetFavoriteRepository, auth, { ids: [id], isFavorite });
-    }
+    const priorVisibilities = await beforeAssetUpdate(this.assetUpdateRepositories, auth, id, dto);
 
     // #763: auth.user.id is the CALLER — this endpoint requires Permission.AssetUpdate (never
     // sharedLink: true, see asset.controller.ts), so auth.user.id is always a genuine caller here.
@@ -184,36 +170,10 @@ export class AssetService extends BaseService {
       throw new BadRequestException('Asset not found');
     }
 
-    // security-4: the single-asset PUT previously wrote `visibility` straight through, skipping every
-    // #757 transition side-effect the bulk path runs — member devices kept hidden/locked bytes forever and
-    // Locked assets stayed in the owner's albums. Route it through the same helper so a single PUT is
-    // byte-for-byte equivalent to a one-id bulk update. No-op for non-space assets (the emits match nothing).
-    if (dto.visibility !== undefined) {
-      await applyVisibilityTransitionSideEffects(
-        { albumRepository: this.albumRepository, sharedSpaceRepository: this.sharedSpaceRepository },
-        [id],
-        dto.visibility,
-        new Map([[id, priorVisibility]]),
-      );
-    }
+    await afterAssetUpdate(this.assetUpdateRepositories, auth, [id], dto, priorVisibilities);
 
     if (!wroteMetadata) {
       this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
-    }
-
-    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
-    // visibility is set: the rbac-3 guard above already required the caller to OWN this id to get
-    // here, but checkOwnerAccess filters on hasElevatedPermission — a Locked row (this write may
-    // have just produced) reads back as not-owned for an API-key session, so logCrossOwnerEdit
-    // would misclassify the owner's own lock as a cross-owner edit. A visibility write can never
-    // legitimately be cross-owner (the guard above is total for it), so skip rather than rely on
-    // logCrossOwnerEdit's own owner check to get this right post-write.
-    //
-    // #763: a favorite-only write is the caller's private state, not an edit of the asset — logging it would
-    // tell the space that someone favorited a member's photo.
-    const { isFavorite: _isFavorite, ...edits } = dto;
-    if (dto.visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
 
     return this.get(auth, id) as Promise<AssetResponseDto>;
@@ -222,7 +182,6 @@ export class AssetService extends BaseService {
   async updateAll(auth: AuthDto, dto: AssetBulkUpdateDto): Promise<void> {
     const {
       ids,
-      isFavorite,
       visibility,
       dateTimeOriginal,
       latitude,
@@ -233,10 +192,10 @@ export class AssetService extends BaseService {
       dateTimeRelative,
       timeZone,
     } = dto;
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids });
 
     // rbac-3: `visibility` is destructive — flipping an asset to Locked/Hidden strips it from the owner's
-    // albums (removeAssetsFromAll) and #757-tombstones it off every member device. AssetUpdate grants a space
+    // albums (removeAssetsFromAll) and #757-tombstones it off every member device. Edit access grants a space
     // EDITOR that power over OTHER members' direct+library+album assets (checkSpaceEditAccess), which would let
     // an editor wipe another member's asset fleet-wide. Restrict visibility to OWNED ids: reject the whole request
     // if visibility is set on any id the caller does not own. This guard MUST run before the write and the
@@ -254,18 +213,7 @@ export class AssetService extends BaseService {
       }
     }
 
-    // A duplicateId is visible on any asset the caller can read. Joining another owner's group would block that owner's
-    // resolve (their list never shows our asset) and let ours reach their keeper.
-    if (duplicateId && (await this.duplicateRepository.hasOtherOwner(duplicateId, auth.user.id))) {
-      throw new ForbiddenException('Duplicate grouping can only join a group of assets you own');
-    }
-
-    // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — it no longer goes
-    // into the plain column write (assetDto below). Routed through the SAME updateFavorites logic
-    // as the canonical endpoint, so the alias can never be more permissive.
-    if (isFavorite !== undefined) {
-      await updateAssetFavorites(this.accessRepository, this.assetFavoriteRepository, auth, { ids, isFavorite });
-    }
+    const priorVisibilities = await beforeAssetUpdateAll(this.assetUpdateRepositories, auth, dto);
 
     const assetDto = omitBy({ visibility, duplicateId }, isUndefined);
 
@@ -305,28 +253,11 @@ export class AssetService extends BaseService {
       shouldWriteSidecar = true;
     }
 
-    // correctness-8: capture PRIOR visibilities before the write so the transition helper can tell a
-    // genuine boundary crossing from a no-op re-affirm (e.g. Hidden -> Hidden, Timeline -> Archive).
-    const priorVisibilities = new Map<string, AssetVisibility>();
-    if (visibility !== undefined) {
-      const priorAssets = await this.assetRepository.getByIds(ids);
-      for (const priorAsset of priorAssets) {
-        priorVisibilities.set(priorAsset.id, priorAsset.visibility);
-      }
-    }
-
     if (Object.keys(assetDto).length > 0) {
       await this.assetRepository.updateAll(ids, assetDto);
     }
 
-    if (visibility !== undefined) {
-      await applyVisibilityTransitionSideEffects(
-        { albumRepository: this.albumRepository, sharedSpaceRepository: this.sharedSpaceRepository },
-        ids,
-        visibility,
-        priorVisibilities,
-      );
-    }
+    await afterAssetUpdate(this.assetUpdateRepositories, auth, ids, dto, priorVisibilities);
 
     if (shouldWriteSidecar) {
       await this.jobRepository.queueAll(ids.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
@@ -335,18 +266,6 @@ export class AssetService extends BaseService {
       for (const asset of assets) {
         this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
       }
-    }
-
-    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
-    // visibility is set: see the matching comment in update() — the ownership guard above already
-    // requires the caller to own every id when visibility is set, so a visibility write can never
-    // legitimately be cross-owner, and logCrossOwnerEdit's own owner check would misclassify a
-    // just-Locked asset (checkOwnerAccess reads it back as not-owned for a non-elevated session).
-    //
-    // #763: a favorite-only write is the caller's private state, not an edit — see update().
-    const { ids: _ids, isFavorite: _isFavorite, ...edits } = dto;
-    if (visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, ids);
     }
   }
 
@@ -603,7 +522,7 @@ export class AssetService extends BaseService {
   }
 
   async upsertBulkMetadata(auth: AuthDto, dto: AssetMetadataBulkUpsertDto): Promise<AssetMetadataBulkResponseDto[]> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.items.map((item) => item.assetId) });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.items.map((item) => item.assetId) });
 
     const uniqueKeys = new Set<string>();
     for (const item of dto.items) {
@@ -619,7 +538,7 @@ export class AssetService extends BaseService {
   }
 
   async upsertMetadata(auth: AuthDto, id: string, dto: AssetMetadataUpsertDto): Promise<AssetMetadataResponseDto[]> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
 
     const uniqueKeys = new Set<string>();
     for (const { key } of dto.items) {
@@ -644,17 +563,17 @@ export class AssetService extends BaseService {
   }
 
   async deleteMetadataByKey(auth: AuthDto, id: string, key: string): Promise<void> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
     return this.assetRepository.deleteMetadataByKey(id, key);
   }
 
   async deleteBulkMetadata(auth: AuthDto, dto: AssetMetadataBulkDeleteDto) {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.items.map((item) => item.assetId) });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.items.map((item) => item.assetId) });
     await this.assetRepository.deleteBulkMetadata(dto.items);
   }
 
   async run(auth: AuthDto, dto: AssetJobsDto) {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.assetIds });
 
     const jobs: JobItem[] = [];
 

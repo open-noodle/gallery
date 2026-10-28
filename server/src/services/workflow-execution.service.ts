@@ -75,7 +75,6 @@ export class WorkflowExecutionService extends BaseService {
 
     const albumService = BaseService.create(AlbumService, this);
     const tagService = BaseService.create(TagService, this);
-    const galleryHost = BaseService.create(GalleryWorkflowHostService, this);
 
     const searchAlbums = this.wrap<[dto: GetAlbumsDto]>((authDto, ctx, args) => albumService.getAll(authDto, ...args));
     const createAlbum = this.wrap<[dto: CreateAlbumDto]>((authDto, ctx, args) => albumService.create(authDto, ...args));
@@ -117,11 +116,6 @@ export class WorkflowExecutionService extends BaseService {
       tagService.bulkTagAssets(authDto, ...args),
     );
 
-    // Gallery fork: one generic dispatcher, so fork actions and filters never add lines here again.
-    const gallery = this.wrap<[method: string, args: unknown]>((authDto, ctx, args) =>
-      galleryHost.dispatch(authDto, ...args),
-    );
-
     const functions = {
       searchAlbums,
       createAlbum,
@@ -129,7 +123,6 @@ export class WorkflowExecutionService extends BaseService {
       addAssetsToAlbums,
       httpRequest,
       bulkTagAssets,
-      gallery,
     };
 
     const stubs: typeof functions = {
@@ -139,7 +132,6 @@ export class WorkflowExecutionService extends BaseService {
       addAssetsToAlbums: dummy,
       httpRequest: dummy,
       bulkTagAssets: dummy,
-      gallery: dummy,
     };
 
     const plugins = await this.pluginRepository.getForLoad();
@@ -430,6 +422,7 @@ export class WorkflowExecutionService extends BaseService {
     const readResult = await read(type);
     let data = readResult.data;
     const runId = crypto.randomUUID();
+    const galleryHost = BaseService.create(GalleryWorkflowHostService, this);
 
     for (const step of workflow.steps) {
       try {
@@ -450,6 +443,11 @@ export class WorkflowExecutionService extends BaseService {
         };
 
         if (step.methodName.startsWith('noop')) {
+          continue;
+        }
+
+        // Gallery fork: gallery-core steps run in TypeScript; the plugin's WASM exports are no-ops.
+        if (await galleryHost.runStep(step, readResult.authUserId, data)) {
           continue;
         }
 

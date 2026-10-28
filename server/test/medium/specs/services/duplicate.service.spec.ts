@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AssetStatus, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -29,6 +30,7 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AlbumRepository,
       AssetRepository,
+      GalleryAssetRepository,
       // Gallery: AssetFavoriteRepository.mergeOnto carries other users' favorites of the trashed copies to the keeper.
       AssetFavoriteRepository,
       ConfigRepository,

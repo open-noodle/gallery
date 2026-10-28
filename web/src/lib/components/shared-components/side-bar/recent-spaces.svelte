@@ -5,10 +5,11 @@
     isSpaceAlbumsExpanded,
     recentSpaceAlbumsExpanded,
     setSpaceAlbumsExpanded,
-  } from '$lib/stores/preferences.store';
+  } from '$lib/gallery/stores/preferences.store';
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
+  import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
+  import { userInteraction } from '$lib/stores/user.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { splitPinnedSpaces } from '$lib/utils/space-utils';
   import { handleError } from '$lib/utils/handle-error';

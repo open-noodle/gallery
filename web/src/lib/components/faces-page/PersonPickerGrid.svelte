@@ -16,7 +16,7 @@
 
   /**
    * The people-search list shared by the owner's `AssignFaceSidePanel` and the space-flavoured
-   * `SpacePersonSidePanel` / `SpaceFaceEditor` (Slice 8, Task 2) -- purely presentational, so it
+   * `SpacePersonSidePanel` (Slice 8, Task 2) -- purely presentational, so it
    * takes an already-resolved candidate list rather than fetching one itself.
    *
    * Thumbnails load lazily on purpose. A real library puts hundreds of people in here, and eager

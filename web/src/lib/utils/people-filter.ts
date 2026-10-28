@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { PeopleFilterBy, peopleViewSettings } from '$lib/stores/preferences.store';
+import { PeopleFilterBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
 
 /**
  * The People/Pets type filter, shared by the global People page, the space People tab, and both of

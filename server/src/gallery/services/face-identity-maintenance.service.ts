@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { SharedSpaceFaceMatchBackfillTarget } from 'src/repositories/face-identity.repository.js';
+import type {
+  AccessibleIdentityFaceMatch,
+  SharedSpaceFaceMatchBackfillTarget,
+} from 'src/repositories/face-identity.repository.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
+import {
+  buildAutomaticReconciliationClaim,
+  chooseAutomaticTargetIdentity,
+} from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
 
@@ -21,6 +28,13 @@ export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
 @Injectable()
 export class FaceIdentityMaintenanceService extends BaseService {
+  /** An instance for `ctx` that logs under ctx's context, as these helpers did inside PersonService. */
+  static createFor(ctx: BaseService) {
+    const service = BaseService.create(FaceIdentityMaintenanceService, ctx);
+    service.logger.setContext(ctx.constructor.name);
+    return service;
+  }
+
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
     await this.queueInitialFaceSuggestionSweep();
@@ -288,5 +302,128 @@ export class FaceIdentityMaintenanceService extends BaseService {
 
     await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
     return JobStatus.Success;
+  }
+
+  async queueSharedSpaceFaceMatchesForAsset(assetId: string): Promise<void> {
+    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(assetId);
+    const queuedSpaceIds = new Set<string>();
+    for (const { spaceId } of spaceIds) {
+      if (queuedSpaceIds.has(spaceId)) {
+        continue;
+      }
+      queuedSpaceIds.add(spaceId);
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    }
+  }
+
+  async replaceFaceIdentity(personId: string, assetFaceId: string, source: 'owner-person' | 'manual'): Promise<string> {
+    const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId);
+    await this.faceIdentityRepository.replaceFaceIdentity({ assetFaceId, identityId: identity.id, source });
+    return identity.id;
+  }
+
+  async mergeWithAccessibleSharedIdentity(input: {
+    userId: string;
+    embedding: string;
+    maxDistance: number;
+    sourceIdentityId: string;
+    match?: AccessibleIdentityFaceMatch;
+  }): Promise<void> {
+    const match =
+      input.match ??
+      (await this.findClosestAccessibleSharedIdentity({
+        userId: input.userId,
+        embedding: input.embedding,
+        maxDistance: input.maxDistance,
+        excludeIdentityId: input.sourceIdentityId,
+      }));
+    if (!match || match.identityId === input.sourceIdentityId) {
+      return;
+    }
+
+    const target = chooseAutomaticTargetIdentity({
+      bridge: 'personal-upload',
+      localIdentityId: input.sourceIdentityId,
+      spaceIdentityId: match.identityId,
+    });
+    const claim = buildAutomaticReconciliationClaim({
+      bridge: 'personal-upload',
+      localIdentityId: input.sourceIdentityId,
+      spaceIdentityId: match.identityId,
+      sourceIdentityId: target.sourceIdentityId,
+      targetIdentityId: target.targetIdentityId,
+      distance: match.distance,
+      hasAccessBridge: true,
+      compatibleType: true,
+      hasEmbedding: true,
+      hiddenOrIgnored: false,
+      alreadySameIdentity: match.identityId === input.sourceIdentityId,
+      sameOwnerConflict: false,
+      sameSpaceConflict: false,
+    });
+    if (!claim) {
+      return;
+    }
+
+    const conflicts = await this.faceIdentityRepository.getMergeConflicts({
+      targetIdentityId: claim.targetIdentityId,
+      sourceIdentityIds: [claim.sourceIdentityId],
+    });
+    if (conflicts.personalProfileConflictCount > 0 || conflicts.spaceProfileConflictCount > 0) {
+      this.logger.warn(
+        `Skipping accessible identity merge due to conflicts: ${conflicts.personalProfileConflictCount} personal, ${conflicts.spaceProfileConflictCount} space`,
+      );
+      return;
+    }
+
+    await this.faceIdentityRepository.mergeIdentities({
+      targetIdentityId: claim.targetIdentityId,
+      sourceIdentityIds: [claim.sourceIdentityId],
+      source: 'shared-space-evidence',
+    });
+
+    await this.queueSpacePersonMetadataBackfill(claim.targetIdentityId);
+  }
+
+  findClosestAccessibleSharedIdentity(input: {
+    userId: string;
+    embedding: string;
+    maxDistance: number;
+    excludeIdentityId?: string | null;
+  }): Promise<AccessibleIdentityFaceMatch | undefined> {
+    return this.faceIdentityRepository.findClosestAccessibleIdentityForFace({
+      userId: input.userId,
+      embedding: input.embedding,
+      maxDistance: input.maxDistance,
+      type: 'person',
+      excludeIdentityId: input.excludeIdentityId ?? null,
+    });
+  }
+
+  async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonMetadataBackfill,
+      data: identityId ? { identityId } : {},
+    });
+  }
+
+  /** The shared-space half of a forced facial recognition reset (`PersonService.handleQueueRecognizeFaces`). */
+  async resetSharedSpacePeople(): Promise<void> {
+    // Wipe shared-space person state so the new strict clustering algorithm can
+    // rebuild from scratch. Aliases cascade via the FK on personId; named
+    // space-persons are lost by design (Force already clears named native persons).
+    await this.sharedSpaceRepository.deleteAllPersonFaces({ excludePets: true });
+    await this.sharedSpaceRepository.deleteAllPersons({ excludePets: true });
+    await this.faceIdentityRepository.deleteUnreferencedIdentities();
+    // Slice 8 (F16): the reaper for face_person_verdict rows deleteUnreferencedIdentities is what nulls a
+    // row's LAST remaining key (personId/spacePersonId are already NULL by this point, via the person and
+    // space-person wipes above) — a row is only fully orphaned once this line has run, so the reaper must
+    // run strictly after it, not from inside handlePersonCleanup, which the caller runs earlier (BEFORE the
+    // space-person wipe and before this identity GC — see the ordering test in
+    // face-review-cross-flow.spec.ts for the discriminating case).
+    await this.facePersonVerdictRepository.deleteOrphanedVerdicts();
   }
 }

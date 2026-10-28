@@ -237,7 +237,7 @@ describe('/assets/:id/trim', () => {
       expect(status).toBe(200);
       expect(body).toEqual(expect.objectContaining({ startTime: 1, endTime: 3 }));
 
-      // Wait for the editor job (handleVideoTrim) to finish re-probing/writing the trimmed
+      // Wait for the editor-queue trim job (VideoTrimService) to finish re-probing/writing the trimmed
       // duration.
       await utils.waitForQueueFinish(admin.accessToken, 'editor', 60_000);
 

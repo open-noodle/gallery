@@ -117,6 +117,18 @@ dart_code_metrics:
       - 'lib/data/db/**/table/**'
       - 'lib/widgets/photo_view/**'
       - 'test/drift/**/generated/**'
+      # Gallery: upstream files whose code the fork leaves unused. The check covers fork code;
+      # these stay upstream text instead of carrying `// ignore: unused-code` lines.
+      - 'lib/constants/constants.dart'
+      - 'lib/constants/enums.dart'
+      - 'lib/data/store/person.dart'
+      - 'lib/domain/models/memory.model.dart'
+      - 'lib/extensions/string_extensions.dart'
+      - 'lib/presentation/widgets/search/quick_date_picker.dart'
+      - 'lib/providers/tab.provider.dart'
+      - 'lib/services/search.service.dart'
+      - 'lib/utils/option.dart'
+      - 'lib/widgets/common/feature_check.dart'
   rules:
     - banned-usage:
         entries:

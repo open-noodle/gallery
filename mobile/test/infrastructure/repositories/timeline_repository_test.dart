@@ -1026,6 +1026,78 @@ void main() {
     await sub.cancel();
   });
 
+  // The favorite and space-album buckets reach their scope tables only through the joins they
+  // hand upstream's `_watchRemoteBucket`, in both the grouped and the ungrouped (none) count.
+  group('joined bucket streams re-emit when a joined table changes', () {
+    int total(List<Bucket> buckets) => buckets.fold<int>(0, (sum, b) => sum + b.assetCount);
+
+    Future<void> expectReemits(Stream<List<Bucket>> stream, Future<void> Function() mutate) async {
+      final emissions = <int>[];
+      final sub = stream.listen((buckets) => emissions.add(total(buckets)));
+      await _waitFor(() => emissions.isNotEmpty);
+      expect(emissions.last, 1);
+      await mutate();
+      await _waitFor(() => emissions.length >= 2);
+      expect(emissions.last, 0);
+      await sub.cancel();
+    }
+
+    Future<void> seedSharedFavorite() async {
+      await insertUser('owner');
+      await insertUser('viewer');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await (db.update(
+        db.remoteAssetEntity,
+      )..where((t) => t.id.equals('a1'))).write(const RemoteAssetEntityCompanion(isFavorite: Value(true)));
+      await insertSpace('s1', 'owner');
+      await insertMember('s1', 'viewer');
+      await linkAssetToSpace('s1', 'a1');
+    }
+
+    Future<void> removeViewerFromSpace() =>
+        (db.delete(db.sharedSpaceMemberEntity)..where((t) => t.userId.equals('viewer'))).go();
+
+    test('favorite() day buckets re-emit when the viewer leaves the space', () async {
+      await seedSharedFavorite();
+      await expectReemits(sut.favorite('viewer', GroupAssetsBy.day).bucketSource(), removeViewerFromSpace);
+    });
+
+    test('favorite() none count re-emits when the viewer leaves the space', () async {
+      await seedSharedFavorite();
+      await expectReemits(sut.favorite('viewer', GroupAssetsBy.none).bucketSource(), removeViewerFromSpace);
+    });
+
+    Future<void> seedSpaceAlbum() async {
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertSpace('s1', 'owner');
+      await linkAlbumToSpace('s1', 'album-1', 'a1');
+    }
+
+    Future<void> removeFromAlbum() =>
+        (db.delete(db.sharedSpaceAlbumAssetEntity)..where((t) => t.assetId.equals('a1'))).go();
+
+    test('spaceAlbum() day buckets re-emit when the asset leaves the album', () async {
+      await seedSpaceAlbum();
+      await expectReemits(sut.spaceAlbum('s1', 'album-1', GroupAssetsBy.day).bucketSource(), removeFromAlbum);
+    });
+
+    test('spaceAlbum() none count re-emits when the asset leaves the album', () async {
+      await seedSpaceAlbum();
+      await expectReemits(sut.spaceAlbum('s1', 'album-1', GroupAssetsBy.none).bucketSource(), removeFromAlbum);
+    });
+
+    test('sharedSpace() none count re-emits when the album link hides the album', () async {
+      await seedSpaceAlbum();
+      await expectReemits(
+        sut.sharedSpace('s1', GroupAssetsBy.none).bucketSource(),
+        () => (db.update(db.sharedSpaceAlbumLinkEntity)..where((t) => t.albumId.equals('album-1'))).write(
+          const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(false)),
+        ),
+      );
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // fromAssetStream grouped buckets (Slice 1 — data layer)
   // ---------------------------------------------------------------------------

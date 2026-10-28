@@ -105,7 +105,7 @@ describe(FaceSuggestionService.name, () => {
       } as any);
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
 
-      expect(mocks.person.getAssignedFaceEmbeddings).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getAssignedFaceEmbeddings).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.upsertPending).not.toHaveBeenCalled();
     });
 
@@ -118,7 +118,7 @@ describe(FaceSuggestionService.name, () => {
         isHidden: false,
         type: 'person',
       } as any);
-      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([]);
+      mocks.galleryPerson.getAssignedFaceEmbeddings.mockResolvedValue([]);
 
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.faceSearch.searchFaces).not.toHaveBeenCalled();
@@ -134,7 +134,10 @@ describe(FaceSuggestionService.name, () => {
         isHidden: false,
         type: 'person',
       } as any);
-      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }, { embedding: 'e2' }] as any);
+      mocks.galleryPerson.getAssignedFaceEmbeddings.mockResolvedValue([
+        { embedding: 'e1' },
+        { embedding: 'e2' },
+      ] as any);
       mocks.faceSearch.searchFaces
         .mockResolvedValueOnce([
           { id: 'f-low', personGroupId: null, distance: 0.45 }, // <= maxDistance → excluded (auto-assign band)
@@ -178,12 +181,12 @@ describe(FaceSuggestionService.name, () => {
         isHidden: false,
         type: 'person',
       } as any);
-      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
+      mocks.galleryPerson.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
       mocks.faceSearch.searchFaces.mockResolvedValue([]);
 
       await sut.handlePersonSuggestionScan({ id: 'p' });
 
-      expect(mocks.person.getAssignedFaceEmbeddings).toHaveBeenCalledWith('p', 20);
+      expect(mocks.galleryPerson.getAssignedFaceEmbeddings).toHaveBeenCalledWith('p', 20);
       expect(mocks.faceSearch.searchFaces).toHaveBeenCalledWith(expect.objectContaining({ numResults: 100 }));
     });
 
@@ -206,7 +209,7 @@ describe(FaceSuggestionService.name, () => {
         isHidden: false,
         type: 'person',
       } as any);
-      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
+      mocks.galleryPerson.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
       mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'f-dismissed', personGroupId: null, distance: 0.7 },
       ] as any);
@@ -231,7 +234,7 @@ describe(FaceSuggestionService.name, () => {
         type: 'person',
         identityId: 'identity-p',
       } as any);
-      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
+      mocks.galleryPerson.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
       mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'f-manual', personGroupId: null, distance: 0.7 },
         { id: 'f-negative-person', personGroupId: null, distance: 0.7 },
@@ -365,13 +368,13 @@ describe(FaceSuggestionService.name, () => {
       });
 
       await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Skipped);
-      expect((mocks.person as any).getScannablePeopleWithUnassignedFaces).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getScannablePeopleWithUnassignedFaces).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('queues one PersonSuggestionScan per scannable person', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      (mocks.person as any).getScannablePeopleWithUnassignedFaces.mockReturnValue(
+      mocks.galleryPerson.getScannablePeopleWithUnassignedFaces.mockReturnValue(
         makeStream([
           { personGroupId: 'p1', ownerId: 'u' },
           { personGroupId: 'p2', ownerId: 'u' },
@@ -388,7 +391,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('empty library → success, no scan jobs queued except empty flush', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      (mocks.person as any).getScannablePeopleWithUnassignedFaces.mockReturnValue(makeStream([]));
+      mocks.galleryPerson.getScannablePeopleWithUnassignedFaces.mockReturnValue(makeStream([]));
 
       await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);

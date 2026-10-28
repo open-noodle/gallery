@@ -2,11 +2,11 @@
   import { invalidateAll } from '$app/navigation';
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import RoleBadge from '$lib/components/spaces/role-badge.svelte';
-  import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { formatTimeAgo } from '$lib/utils/timesince';
+  import { showAddSpaceMembersModal } from '$lib/gallery/spaces/add-space-members';
+  import { formatTimeAgo } from '$lib/gallery/utils/time-ago';
   import {
     removeMember,
     SharedSpaceRole,
@@ -35,11 +35,11 @@
   });
 
   async function handleAddMember() {
-    const result = await modalManager.show(SpaceAddMemberModal, {
-      spaceId: space.id,
-      existingMemberIds: members.map((m) => m.userId),
-    });
-    if (result) {
+    const added = await showAddSpaceMembersModal(
+      space.id,
+      members.map((m) => m.userId),
+    );
+    if (added.length > 0) {
       await invalidateAll();
     }
   }

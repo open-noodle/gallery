@@ -13,9 +13,6 @@ class LocalTimelinePage extends StatelessWidget {
 
   const LocalTimelinePage({super.key, required this.album});
 
-  // ignore: unused-code
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   Widget build(BuildContext context) {
     return TimelineRouteScope(
