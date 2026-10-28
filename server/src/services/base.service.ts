@@ -44,6 +44,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -176,6 +177,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  GameRepository,
 ] as const;
 
 @Injectable()
@@ -263,6 +265,7 @@ export class BaseService {
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
     protected imageAdjustRepository: ImageAdjustRepository,
+    protected gameRepository: GameRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -378,6 +381,7 @@ export class BaseService {
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
       ctx.imageAdjustRepository,
+      ctx.gameRepository,
     );
 
     service.logger.setContext(BaseService.name);
