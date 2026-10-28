@@ -1,4 +1,6 @@
 import {
+  busiestYear,
+  rewindMinutes,
   burstDecision,
   burstMemberIds,
   burstMarkOf,
@@ -115,5 +117,31 @@ describe('cleanup utils', () => {
 
     expect([...ids].sort()).toEqual(['b1', 'b2', 'b3']);
     expect(burstMemberIds([at('only', '10:00:00.000')]).size).toBe(0);
+  });
+});
+
+describe('rewindMinutes', () => {
+  it('estimates 4 seconds a photo, rounded to whole minutes', () => {
+    expect(rewindMinutes(42)).toBe(3);
+  });
+
+  it('omits estimates below one minute', () => {
+    expect(rewindMinutes(7)).toBeUndefined();
+    expect(rewindMinutes(0)).toBeUndefined();
+  });
+});
+
+describe('busiestYear', () => {
+  it('picks the year with the most photos, the most recent on a tie', () => {
+    const years = [
+      { year: 2024, count: 9 },
+      { year: 2019, count: 18 },
+      { year: 2016, count: 18 },
+    ];
+    expect(busiestYear(years)?.year).toBe(2019);
+  });
+
+  it('has none for a date without photos', () => {
+    expect(busiestYear([])).toBeUndefined();
   });
 });

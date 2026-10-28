@@ -193,3 +193,23 @@ export const burstTimeRange = (from: string, to: string, locale: string) => {
   });
   return `${date.format(new Date(from))} · ${time.format(new Date(from))} → ${time.format(new Date(to))}`;
 };
+
+/** The pace the hub's "About N minutes" assumes for one photo in rewind. */
+export const REWIND_SECONDS_PER_PHOTO = 4;
+
+/** Whole minutes a date's rewind takes at that pace, or undefined below one minute. */
+export const rewindMinutes = (photos: number): number | undefined => {
+  const minutes = Math.round((photos * REWIND_SECONDS_PER_PHOTO) / 60);
+  return minutes >= 1 ? minutes : undefined;
+};
+
+/** The year with the most photos on a date; on a tie the most recent one. */
+export const busiestYear = <T extends { year: number; count: number }>(years: T[]): T | undefined => {
+  let best: T | undefined;
+  for (const year of years) {
+    if (!best || year.count > best.count || (year.count === best.count && year.year > best.year)) {
+      best = year;
+    }
+  }
+  return best;
+};
