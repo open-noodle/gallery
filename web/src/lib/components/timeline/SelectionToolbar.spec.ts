@@ -105,9 +105,9 @@ type FakeAssetInteraction = Pick<
 > & { clear: () => void };
 
 /**
- * `ownedAssets` defaults to the real manager's rule — the assets whose `ownerId` is the
- * logged-in user — so a fixture cannot accidentally disagree with its own `assets` list.
- */
+`ownedAssets` defaults to the real manager's rule — the assets whose `ownerId` is the
+logged-in user — so a fixture cannot accidentally disagree with its own `assets` list.
+*/
 function makeAssetInteraction(overrides: Partial<FakeAssetInteraction> = {}): AssetMultiSelectManager {
   const assets = overrides.assets ?? [makeAsset()];
   const base: FakeAssetInteraction = {

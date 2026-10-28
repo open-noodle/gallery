@@ -26,10 +26,10 @@
     /** Current selection state of a face. Omit (with onToggleSelect) to render no selection control at all. */
     isSelected?: (assetFaceId: string) => boolean;
     /**
-     * Whether a face may be ADDED to the selection. Defaults to always. The rest-of-cluster grid's gate is
-     * asymmetric — a staged face can always be removed, but a new one can only be added once a valid
-     * destination is chosen — so this governs adding only; removing is never blocked.
-     */
+    Whether a face may be ADDED to the selection. Defaults to always. The rest-of-cluster grid's gate is
+    asymmetric — a staged face can always be removed, but a new one can only be added once a valid
+    destination is chosen — so this governs adding only; removing is never blocked.
+    */
     canSelect?: (assetFaceId: string) => boolean;
     onToggleSelect?: (assetFaceId: string) => void;
   }

@@ -110,11 +110,11 @@ function installPhotoStub(m: GlobalSearchManager, items: Array<{ id: string; ori
 }
 
 /**
- * Stub every entity provider (photos + albums + spaces + people + places + tags) to
- * return exactly one ok item. Used by the section-ordering test to ensure every
- * section actually renders — otherwise `GlobalSearchSection` elides its heading for
- * idle/empty/loading statuses and the DOM ordering assertion becomes meaningless.
- */
+Stub every entity provider (photos + albums + spaces + people + places + tags) to
+return exactly one ok item. Used by the section-ordering test to ensure every
+section actually renders — otherwise `GlobalSearchSection` elides its heading for
+idle/empty/loading statuses and the DOM ordering assertion becomes meaningless.
+*/
 function stubAllEntitySections(m: GlobalSearchManager) {
   const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
   // Albums / spaces providers normally write `sections.albums` / `sections.spaces`

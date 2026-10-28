@@ -19,9 +19,9 @@
     onGroupingChange: (grouping: TimelineGrouping) => void;
     onClearTemporalFilter?: () => void;
     /**
-     * These surfaces (favorites, archive, a person's photos) are themselves an implicit filter, so
-     * when a handler is supplied the "Add all N to…" action shows whenever there are results.
-     */
+    These surfaces (favorites, archive, a person's photos) are themselves an implicit filter, so
+    when a handler is supplied the "Add all N to…" action shows whenever there are results.
+    */
     onAddAllToCollection?: () => void;
   }
 

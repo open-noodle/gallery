@@ -17,11 +17,11 @@ const PET_SPECIES_I18N_KEYS: Record<string, Translations> = {
 };
 
 /**
- * Returns the i18n key for a known species (case-insensitive), or `undefined` when the species
- * isn't in the map. Callers render the raw species value in that case — `$t()` takes a typed key,
- * not an arbitrary string, so the fallback has to happen at the call site rather than by passing
- * the raw value through as if it were a key.
- */
+Returns the i18n key for a known species (case-insensitive), or `undefined` when the species
+isn't in the map. Callers render the raw species value in that case — `$t()` takes a typed key,
+not an arbitrary string, so the fallback has to happen at the call site rather than by passing
+the raw value through as if it were a key.
+*/
 export const getPetSpeciesI18nKey = (species: string): Translations | undefined => {
   const normalized = species.toLowerCase();
   // `Object.hasOwn` rather than a bare lookup: a species literally named `constructor` or
@@ -45,11 +45,11 @@ export const getPetSpeciesLabel = (
 };
 
 /**
- * Label for the paw badge, which must always be named: `role="img"` with no accessible name is a
- * WCAG 1.1.1 failure. Species is the best label when we have one, but not every surface carries it —
- * a shared space projects its own person rows (`SharedSpacePersonResponseDto` has `type`, no
- * `species`), and a pet person can predate the species column — so fall back to a generic "Pet".
- */
+Label for the paw badge, which must always be named: `role="img"` with no accessible name is a
+WCAG 1.1.1 failure. Species is the best label when we have one, but not every surface carries it —
+a shared space projects its own person rows (`SharedSpacePersonResponseDto` has `type`, no
+`species`), and a pet person can predate the species column — so fall back to a generic "Pet".
+*/
 export const getPetBadgeLabel = (
   species: string | null | undefined,
   translate: (key: Translations) => string,

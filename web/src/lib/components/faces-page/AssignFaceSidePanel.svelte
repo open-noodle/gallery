@@ -36,19 +36,19 @@
   let isShowLoadingPeople = $state(false);
 
   /**
-   * Deliberately WITHOUT upstream's `closestAssetId`.
-   *
-   * That parameter orders the whole list by how much each person's face resembles the one you
-   * tapped. It is a name suggestion, and a good one for the first handful of rows -- but past those
-   * it is indistinguishable from random, and a library with several hundred named people is then
-   * several hundred rows nobody can scan or scroll to (#992). Dropping it takes `getAllForUser`'s
-   * other branch, which sorts named people alphabetically and puts the unnamed clusters after them
-   * by face count -- the same order `getPersonsBySpaceId` serves the space picker, and the same one
-   * every other people list in the fork already uses. This picker was the sole exception.
-   *
-   * The resemblance ordering itself stays on the server for the person page's "sort faces" toggle
-   * (`closestPersonId`), which opts into it explicitly.
-   */
+  Deliberately WITHOUT upstream's `closestAssetId`.
+  
+  That parameter orders the whole list by how much each person's face resembles the one you
+  tapped. It is a name suggestion, and a good one for the first handful of rows -- but past those
+  it is indistinguishable from random, and a library with several hundred named people is then
+  several hundred rows nobody can scan or scroll to (#992). Dropping it takes `getAllForUser`'s
+  other branch, which sorts named people alphabetically and puts the unnamed clusters after them
+  by face count -- the same order `getPersonsBySpaceId` serves the space picker, and the same one
+  every other people list in the fork already uses. This picker was the sole exception.
+  
+  The resemblance ordering itself stays on the server for the person page's "sort faces" toggle
+  (`closestPersonId`), which opts into it explicitly.
+  */
   async function loadPeople() {
     const timeout = setTimeout(() => (isShowLoadingPeople = true), timeBeforeShowLoadingSpinner);
     try {
@@ -75,19 +75,19 @@
   let searchWord = '';
 
   /**
-   * The search used to sit behind a magnifier icon, in a `PeopleSearch` that swapped out the whole
-   * header. `PersonPickerPanel` shows the field outright, as the space-flavoured picker always has,
-   * so the request is issued from here instead.
-   *
-   * It goes to the SERVER on purpose: `getAllPeople` above serves one page, so narrowing the loaded
-   * list would quietly stop finding anyone past it on a large library.
-   *
-   * The rest mirrors what `PeopleSearch` did with the response, because dropping any of it would be
-   * a silent regression on a path that used to have it: `searchNameLocal` applies the same
-   * prefix-and-slice narrowing; the abort stops a slow earlier keystroke landing on top of a later
-   * one; and an unsaturated result set is narrowed in place when the query merely grows, so typing a
-   * name costs one request rather than one per letter.
-   */
+  The search used to sit behind a magnifier icon, in a `PeopleSearch` that swapped out the whole
+  header. `PersonPickerPanel` shows the field outright, as the space-flavoured picker always has,
+  so the request is issued from here instead.
+  
+  It goes to the SERVER on purpose: `getAllPeople` above serves one page, so narrowing the loaded
+  list would quietly stop finding anyone past it on a large library.
+  
+  The rest mirrors what `PeopleSearch` did with the response, because dropping any of it would be
+  a silent regression on a path that used to have it: `searchNameLocal` applies the same
+  prefix-and-slice narrowing; the abort stops a slow earlier keystroke landing on top of a later
+  one; and an unsaturated result set is narrowed in place when the query merely grows, so typing a
+  name costs one request rather than one per letter.
+  */
   const runSearch = async (query: string) => {
     if (query === '') {
       searchAbortController?.abort();

@@ -5,24 +5,24 @@ import { orderBy } from 'lodash-es';
 import type { Translations } from 'svelte-i18n';
 
 /**
- * Space album lists offer everything the regular album list offers, plus
- * `RecentlyLinked` — when the album was linked into *this* space. That option
- * lives here rather than in upstream's `AlbumSortBy` on purpose: the regular
- * /albums page iterates upstream's `sortOptionsMetadata`, and `linkedAt` does
- * not exist on `AlbumResponseDto`, so adding it upstream would surface a dead
- * option there (and dirty a file we keep byte-clean for rebases).
- */
+Space album lists offer everything the regular album list offers, plus
+`RecentlyLinked` — when the album was linked into *this* space. That option
+lives here rather than in upstream's `AlbumSortBy` on purpose: the regular
+/albums page iterates upstream's `sortOptionsMetadata`, and `linkedAt` does
+not exist on `AlbumResponseDto`, so adding it upstream would surface a dead
+option there (and dirty a file we keep byte-clean for rebases).
+*/
 export const SpaceAlbumSortBy = {
   ...AlbumSortBy,
   RecentlyLinked: 'RecentlyLinked',
 } as const;
 
 /**
- * The union of every value `SpaceAlbumSortBy` can hold. Used to key the
- * label records that back the sort dropdown, so adding a new option to
- * `SpaceAlbumSortBy` without adding its label is a compile error instead of
- * a blank menu row (Svelte stringifies `undefined` to `''`).
- */
+The union of every value `SpaceAlbumSortBy` can hold. Used to key the
+label records that back the sort dropdown, so adding a new option to
+`SpaceAlbumSortBy` without adding its label is a compile error instead of
+a blank menu row (Svelte stringifies `undefined` to `''`).
+*/
 export type SpaceAlbumSortByValue = (typeof SpaceAlbumSortBy)[keyof typeof SpaceAlbumSortBy];
 
 export interface SpaceAlbumSortOptionMetadata {
@@ -32,10 +32,10 @@ export interface SpaceAlbumSortOptionMetadata {
 }
 
 /**
- * Column widths for the space album table (#972). Upstream's `sortOptionsMetadata` sizes six columns with no
- * action column; the space table has seven sort columns plus the manage menu, so it carries its own set:
- * title, items and the menu everywhere, the two album dates from `sm`, the photo and link dates from `xl`.
- */
+Column widths for the space album table (#972). Upstream's `sortOptionsMetadata` sizes six columns with no
+action column; the space table has seven sort columns plus the manage menu, so it carries its own set:
+title, items and the menu everywhere, the two album dates from `sm`, the photo and link dates from `xl`.
+*/
 const spaceAlbumColumnStyles: Record<SpaceAlbumSortByValue, string> = {
   [SpaceAlbumSortBy.Title]: 'text-start w-7/12 sm:w-[35%] xl:w-[22%]',
   [SpaceAlbumSortBy.ItemCount]: 'text-center w-4/12 sm:w-[15%] xl:w-[10%]',
@@ -80,12 +80,12 @@ export const findSpaceAlbumSortOptionMetadata = (sortBy: string): SpaceAlbumSort
   spaceAlbumSortOptionsMetadata.find(({ id }) => id === sortBy) ?? defaultSortOption;
 
 /**
- * Resolve `sortBy` through the finder *before* delegating. Upstream's
- * `sortAlbums` falls back to `DateModified` for an unknown key while upstream's
- * `findSortOptionMetadata` falls back to `MostRecentPhoto` — passing an unknown
- * key straight through would show one option's label while applying another's
- * order.
- */
+Resolve `sortBy` through the finder *before* delegating. Upstream's
+`sortAlbums` falls back to `DateModified` for an unknown key while upstream's
+`findSortOptionMetadata` falls back to `MostRecentPhoto` — passing an unknown
+key straight through would show one option's label while applying another's
+order.
+*/
 export const sortSpaceAlbums = (
   albums: SharedSpaceLinkedAlbumDto[],
   { sortBy, orderBy: order }: { sortBy: string; orderBy: string },
