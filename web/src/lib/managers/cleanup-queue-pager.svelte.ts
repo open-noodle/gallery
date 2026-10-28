@@ -51,6 +51,7 @@ export class CleanupQueuePager {
   failed = $state(false);
   #cursor: string | undefined;
   #generation = 0;
+  #inFlight: Promise<void> | undefined;
 
   constructor(
     private readonly queue: CleanupListQueue,
@@ -60,6 +61,7 @@ export class CleanupQueuePager {
 
   reset() {
     this.#generation++;
+    this.#inFlight = undefined;
     this.#cursor = undefined;
     this.items = [];
     this.groups = [];
@@ -68,11 +70,27 @@ export class CleanupQueuePager {
     this.failed = false;
   }
 
-  /** Loads the next page. Throws on failure, after setting `failed`. */
-  async loadMore() {
-    if (this.loading || this.done) {
-      return;
+  /**
+   * Loads the next page. Throws on failure, after setting `failed`. A call made while a page is already
+   * loading waits for that page rather than returning at once, so a caller can tell whether more arrived.
+   */
+  loadMore(): Promise<void> {
+    if (this.loading && this.#inFlight) {
+      return this.#inFlight;
     }
+    if (this.done) {
+      return Promise.resolve();
+    }
+    const request = this.#loadNext().finally(() => {
+      if (this.#inFlight === request) {
+        this.#inFlight = undefined;
+      }
+    });
+    this.#inFlight = request;
+    return request;
+  }
+
+  async #loadNext() {
     const generation = this.#generation;
     this.loading = true;
     this.failed = false;

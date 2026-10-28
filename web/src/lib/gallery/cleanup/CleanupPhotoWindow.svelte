@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { shortcuts } from '$lib/actions/shortcut';
+  import { shortcuts, type ShortcutOptions } from '$lib/actions/shortcut';
   import Thumbhash from '$lib/components/Thumbhash.svelte';
   import AssetContextDetails from '$lib/gallery/asset-context/asset-context-details.svelte';
   import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
@@ -89,6 +89,9 @@
   };
 
   const step = async (delta: -1 | 1) => {
+    if (busy) {
+      return;
+    }
     const next = items()[index + delta];
     if (next) {
       show(next.id, delta);
@@ -158,6 +161,32 @@
     ];
   };
 
+  // Space toggles the selection only where there is one, and never when a button has focus: there it
+  // presses the button, as everywhere else.
+  const onSpace = (event: KeyboardEvent) => {
+    if (busy || event.target instanceof HTMLButtonElement) {
+      return;
+    }
+    event.preventDefault();
+    toggleSelection();
+  };
+
+  // While an action waits (on a confirmation dialog above the window, say), the window's keys are off,
+  // so nothing moves or toggles behind that dialog.
+  const windowShortcuts = $derived<ShortcutOptions[]>(
+    busy
+      ? []
+      : [
+          { shortcut: { key: 'ArrowRight' }, onShortcut: () => void step(1) },
+          { shortcut: { key: 'ArrowLeft' }, onShortcut: () => void step(-1) },
+          { shortcut: { key: 'k' }, onShortcut: () => void act(onKeep) },
+          { shortcut: { key: 'Delete' }, onShortcut: () => void act(onTrash) },
+          { shortcut: { key: 'Backspace' }, onShortcut: () => void act(onTrash) },
+          ...(selection ? [{ shortcut: { key: ' ' }, onShortcut: onSpace, preventDefault: false }] : []),
+          { shortcut: { key: 'o' }, onShortcut: openInNewTab },
+        ],
+  );
+
   // The photo grows out of the tile it was opened from.
   onMount(() => {
     const frames = toOrigin();
@@ -203,17 +232,7 @@
   });
 </script>
 
-<svelte:document
-  use:shortcuts={[
-    { shortcut: { key: 'ArrowRight' }, onShortcut: () => void step(1) },
-    { shortcut: { key: 'ArrowLeft' }, onShortcut: () => void step(-1) },
-    { shortcut: { key: 'k' }, onShortcut: () => void act(onKeep) },
-    { shortcut: { key: 'Delete' }, onShortcut: () => void act(onTrash) },
-    { shortcut: { key: 'Backspace' }, onShortcut: () => void act(onTrash) },
-    { shortcut: { key: ' ' }, onShortcut: toggleSelection, preventDefault: true },
-    { shortcut: { key: 'o' }, onShortcut: openInNewTab },
-  ]}
-/>
+<svelte:document use:shortcuts={windowShortcuts} />
 
 <Modal title={$t('cleanup_photo_details')} size="giant" onClose={close}>
   <ModalBody>

@@ -107,10 +107,25 @@ describe('QueueSelectGrid', () => {
     expect(within(frame).getByRole('img')).toHaveClass('object-cover');
   });
 
-  it('sizes the tiles from the size control', () => {
-    renderGrid('screenshots', { size: 'large' });
+  it('lays screenshots out in rows, wide ones wider, in reading order', () => {
+    renderGrid('screenshots', {
+      size: 'large',
+      items: [
+        { ...asset('tall'), width: 1080, height: 2340 },
+        { ...asset('wide'), width: 2340, height: 1080 },
+      ],
+    });
 
-    expect(screen.getByTestId('cleanup-select-grid').style.columnWidth).toBe('340px');
+    const grid = screen.getByTestId('cleanup-select-grid');
+    expect(grid).toHaveClass('flex', 'flex-wrap');
+    expect(grid.style.columnWidth).toBe('');
+    const [tall, wide] = [...grid.children] as HTMLElement[];
+    expect(tall.dataset.asset).toBe('tall');
+    expect(Number(wide.style.flexBasis.replace('px', ''))).toBeGreaterThan(
+      Number(tall.style.flexBasis.replace('px', '')),
+    );
+    // The size control sets the row height: a portrait screenshot at "large" is 340px wide.
+    expect(tall.style.flexBasis).toBe('340px');
   });
 
   it('opens the photo window from the expand button without toggling the tile', async () => {

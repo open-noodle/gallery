@@ -153,6 +153,36 @@ describe('CleanupPhotoWindow', () => {
     expect(selection.toggle).toHaveBeenCalledWith('b');
   });
 
+  it('ignores its keys while an action is waiting on a confirmation', async () => {
+    const selection = { has: vi.fn(() => false), toggle: vi.fn() };
+    setup({ selection, onTrash: vi.fn(() => new Promise<boolean>(() => {})) });
+
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    await fireEvent.keyDown(document, { key: 'ArrowRight' });
+    await fireEvent.keyDown(document, { key: ' ' });
+
+    expect(shownId()).toBe('b');
+    expect(selection.toggle).not.toHaveBeenCalled();
+  });
+
+  it('leaves Space to a focused button', async () => {
+    const selection = { has: vi.fn(() => false), toggle: vi.fn() };
+    setup({ selection });
+    const keep = screen.getByRole('button', { name: 'keep' });
+    keep.focus();
+
+    const space = await fireEvent.keyDown(keep, { key: ' ' });
+
+    expect(selection.toggle).not.toHaveBeenCalled();
+    expect(space).toBe(true);
+  });
+
+  it('does not claim Space in a queue without a selection', async () => {
+    setup();
+
+    expect(await fireEvent.keyDown(document.body, { key: ' ' })).toBe(true);
+  });
+
   it('opens the full viewer from the link', async () => {
     const { props } = setup();
 

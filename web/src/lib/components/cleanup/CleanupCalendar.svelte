@@ -114,7 +114,7 @@
               day,
               state,
             )} {monthDay === today
-              ? 'animate-[gallery-pop_var(--spring-bouncy-duration)_var(--spring-bouncy)] outline-2 outline-offset-1 outline-dark dark:outline-light'
+              ? 'outline-2 outline-offset-1 outline-dark motion-safe:animate-[gallery-pop_var(--spring-bouncy-duration)_var(--spring-bouncy)] dark:outline-light'
               : ''}"
             onmouseenter={() => onPeek(monthDay)}
             onfocus={() => onPeek(monthDay)}

@@ -262,7 +262,7 @@
             <li
               class="cursor-default text-xs {asset.id === shown.id ? 'font-semibold' : ''}"
               data-testid="cleanup-burst-sharpness-row-{asset.id}"
-              onmouseenter={() => (shownId = asset.id)}
+              onmouseenter={() => show(asset.id)}
             >
               <span class="tabular-nums"
                 >{$t('cleanup_frame_position', { values: { index, total: group.assets.length } })}</span
@@ -301,7 +301,7 @@
           onclick={(event) => onTileClick(event, asset.id)}
           ondblclick={() => onOpen?.(asset.id)}
           onfocus={() => show(asset.id)}
-          onmouseenter={() => (shownId = asset.id)}
+          onmouseenter={() => show(asset.id)}
           onkeydown={onFilmstripKey}
         >
           <CleanupTile

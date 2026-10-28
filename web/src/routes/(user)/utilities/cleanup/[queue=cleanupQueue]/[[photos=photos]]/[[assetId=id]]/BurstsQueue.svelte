@@ -347,7 +347,10 @@
       onResolve={() => void onResolve(group)}
       onOpen={onTileOpen}
       onFocus={(id) => (focusedId = id)}
-      onExpand={(id, rect) => (photoWindow = { id, rect })}
+      onExpand={(id, rect) => {
+        focusedId = id;
+        photoWindow = { id, rect };
+      }}
     />
   </div>
 {/each}

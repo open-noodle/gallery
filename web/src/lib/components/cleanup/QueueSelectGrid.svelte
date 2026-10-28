@@ -28,9 +28,15 @@
   const minWidth = $derived(TILE_MIN_WIDTH[variant][size]);
   // Screenshots are mostly tall phone screens: shown whole at their own shape, in columns.
   const isScreenshots = $derived(variant === 'screenshots');
+  const PORTRAIT = 9 / 19.5;
+  const PORTRAIT_FALLBACK = '9 / 19.5';
   const ratioOf = (item: CleanupAssetDto) =>
     item.width && item.height ? `${item.width} / ${item.height}` : PORTRAIT_FALLBACK;
-  const PORTRAIT_FALLBACK = '9 / 19.5';
+  const widthOverHeight = (item: CleanupAssetDto) => (item.width && item.height ? item.width / item.height : PORTRAIT);
+  // Screenshots sit in rows of one height, in reading order, so loading another page only adds rows at the
+  // end. A portrait screenshot gets the size control's width; wider shots take proportionally more.
+  const rowHeight = $derived(minWidth / PORTRAIT);
+  const basisOf = (item: CleanupAssetDto) => Math.round(widthOverHeight(item) * rowHeight);
 
   const REASON_LABELS = {
     [CleanupBlurReason.All]: undefined,
@@ -49,8 +55,7 @@
 </script>
 
 <div
-  class={isScreenshots ? 'gap-2.5' : 'grid gap-2'}
-  style:column-width={isScreenshots ? `${minWidth}px` : undefined}
+  class={isScreenshots ? 'flex flex-wrap gap-2.5' : 'grid gap-2'}
   style:grid-template-columns={isScreenshots ? undefined : `repeat(auto-fill, minmax(${minWidth}px, 1fr))`}
   data-testid="cleanup-select-grid"
 >
@@ -59,8 +64,11 @@
     {@const reason = variant === 'blurry' && item.reason ? REASON_LABELS[item.reason] : undefined}
     <div
       animate:flip={flipMotion()}
-      class="group relative {isScreenshots ? 'mb-2.5 break-inside-avoid' : ''}"
+      class="group relative"
       data-asset={item.id}
+      style:flex-basis={isScreenshots ? `${basisOf(item)}px` : undefined}
+      style:flex-grow={isScreenshots ? widthOverHeight(item) : undefined}
+      style:max-width={isScreenshots ? `${basisOf(item) * 1.6}px` : undefined}
     >
       <button
         type="button"

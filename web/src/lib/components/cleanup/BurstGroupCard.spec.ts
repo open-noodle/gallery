@@ -39,6 +39,7 @@ const renderCard = (overrides: Partial<CleanupBurstGroupDto> = {}) => {
     onResolve: vi.fn(),
     onOpen: vi.fn(),
     onExpand: vi.fn(),
+    onFocus: vi.fn(),
   };
   render(BurstGroupCard, { group: { ...group, ...overrides }, marks, ...handlers });
   return handlers;
@@ -127,6 +128,17 @@ describe('BurstGroupCard', () => {
       await fireEvent.mouseEnter(tile('a'));
 
       expect(frame().dataset.shownId).toBe('a');
+    });
+
+    it('makes the hovered frame the focused one, so K and Delete act on the frame shown', async () => {
+      const { onFocus } = renderCard();
+
+      await fireEvent.mouseEnter(tile('a'));
+      expect(onFocus).toHaveBeenLastCalledWith('a');
+
+      await fireEvent.mouseEnter(screen.getByTestId('cleanup-burst-sharpness-row-d'));
+      expect(onFocus).toHaveBeenLastCalledWith('d');
+      expect(frame().dataset.shownId).toBe('d');
     });
 
     it('moves the shown frame with the arrow keys while the card has focus', async () => {

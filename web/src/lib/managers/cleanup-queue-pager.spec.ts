@@ -81,4 +81,22 @@ describe('CleanupQueuePager', () => {
     expect(pager.failed).toBe(true);
     expect(pager.loading).toBe(false);
   });
+
+  it('lets a second caller wait for the page already loading instead of returning empty-handed', async () => {
+    let resolve!: (value: CleanupQueuePageDto) => void;
+    const fetch = vi.fn(() => new Promise<CleanupQueuePageDto>((r) => (resolve = r)));
+    const pager = new CleanupQueuePager(CleanupListQueue.Blurry, () => ({}), fetch);
+
+    const first = pager.loadMore();
+    let secondDone = false;
+    const second = pager.loadMore().then(() => (secondDone = true));
+    await Promise.resolve();
+    expect(secondDone).toBe(false);
+
+    resolve(page(['a', 'b'], null));
+    await Promise.all([first, second]);
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(pager.items.map(({ id }) => id)).toEqual(['a', 'b']);
+  });
 });

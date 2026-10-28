@@ -127,4 +127,12 @@ describe('CleanupCalendar', () => {
     await fireEvent.click(cell);
     expect(onOpen).toHaveBeenCalledWith(923);
   });
+
+  it("pops today's cell only when motion is allowed", () => {
+    renderCalendar();
+
+    const classes = [...screen.getByTestId('cleanup-cal-923').classList];
+    expect(classes.some((name) => name.startsWith('motion-safe:animate-'))).toBe(true);
+    expect(classes.some((name) => name.startsWith('animate-'))).toBe(false);
+  });
 });
