@@ -5,7 +5,7 @@ by label. An asset label ends in `*` when that surface reports it as a favourite
 throws is recorded as `error:<class>`. A refactor of the scope, favourite or album-membership code must leave the
 snapshot untouched; a deliberate behaviour change updates it with `-u` and says so in its commit.
 */
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { DownloadInfoDto } from 'src/dtos/download.dto.js';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
 import { MapMarkerDto } from 'src/dtos/map.dto.js';
@@ -373,6 +373,10 @@ const matrix = async <V>(
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
   world = await seed();
+  // Indexes created on the template's empty tables record them as known-empty (reltuples = 0), so plans cached
+  // while seeding can keep treating them as empty; on CI the slowest case went past 5 s. ANALYZE refreshes the
+  // statistics and invalidates those plans (same fix as face-repair.resolve.spec.ts).
+  await sql`analyze`.execute(defaultDatabase);
 });
 
 describe('viewer-scope RBAC oracle', () => {
