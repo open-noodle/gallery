@@ -578,6 +578,8 @@ exports[`checkAccess oracle > backup.list 1`] = `{}`;
 
 exports[`checkAccess oracle > backup.upload 1`] = `{}`;
 
+exports[`checkAccess oracle > clusterGroup.admin 1`] = `{}`;
+
 exports[`checkAccess oracle > clusterGroup.leave 1`] = `{}`;
 
 exports[`checkAccess oracle > clusterGroup.read 1`] = `{}`;
