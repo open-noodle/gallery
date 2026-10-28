@@ -59,7 +59,9 @@
     });
 </script>
 
-<!-- Scrolling on x turns scrolling on y too (CSS has no visible/auto pair), so a cell scaled on hover in the
+<!-- Cells grow on hover with their own CSS scale, so they opt out of the site-wide press/hover scale
+     (data-no-press): two animations on one `scale` left smeared traces behind the cursor.
+     Scrolling on x turns scrolling on y too (CSS has no visible/auto pair), so a cell scaled on hover in the
      edge rows or columns would overflow and show a scrollbar. The padding leaves room for the scale. -->
 <div class="-m-1 overflow-x-auto p-1">
   <div class="grid min-w-[640px] grid-cols-[2.5rem_repeat(31,minmax(1rem,1fr))] gap-1" data-testid="cleanup-calendar">
@@ -84,6 +86,7 @@
             data-testid="cleanup-cal-{monthDay}"
             data-state={state}
             data-today={monthDay === today ? 'true' : undefined}
+            data-no-press
             aria-label={cellLabel(monthDay, day)}
             class="aspect-square rounded-sm transition-transform duration-(--spring-snappy-duration) ease-(--spring-snappy) hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {cellClass(
               day,
