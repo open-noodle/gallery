@@ -771,6 +771,11 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceToAssetV1]: SyncSharedSpaceToAssetV1;
   [SyncEntityType.SharedSpaceToAssetBackfillV1]: SyncSharedSpaceToAssetV1;
   [SyncEntityType.SharedSpaceToAssetDeleteV1]: SyncSharedSpaceToAssetDeleteV1;
+  [SyncEntityType.SharedSpaceStackV1]: SyncStackV1;
+  [SyncEntityType.SharedSpaceStackBackfillV1]: SyncStackV1;
+  [SyncEntityType.SharedSpaceStackAlbumBackfillV1]: SyncStackV1;
+  [SyncEntityType.SharedSpaceStackLibraryBackfillV1]: SyncStackV1;
+  [SyncEntityType.SharedSpaceStackDeleteV1]: SyncStackDeleteV1;
   // Library sync — wired in Task 27 (DTOs added alongside the dispatch change).
   [SyncEntityType.LibraryV1]: SyncLibraryV1;
   [SyncEntityType.LibraryDeleteV1]: SyncLibraryDeleteV1;
