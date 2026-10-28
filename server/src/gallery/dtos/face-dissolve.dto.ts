@@ -96,3 +96,37 @@ export const PeopleHealthResponseSchema = z
   .meta({ id: 'PeopleHealthResponseDto' });
 export class PeopleHealthResponseDto extends createZodDto(PeopleHealthResponseSchema) {}
 export type PeopleHealthResponse = z.infer<typeof PeopleHealthResponseSchema>;
+
+export const DissolveListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1).describe('Page number'),
+    size: z.coerce.number().int().min(1).max(200).default(50).describe('Number of dissolves per page'),
+  })
+  .meta({ id: 'DissolveListQueryDto' });
+export class DissolveListQueryDto extends createZodDto(DissolveListQuerySchema) {}
+export type DissolveListQuery = z.infer<typeof DissolveListQuerySchema>;
+
+const DissolveRecordSchema = z.object({
+  id: z.string(),
+  ownerId: z.string(),
+  ownerName: z.string(),
+  personName: z.string(),
+  scope: z.string(),
+  hiddenCount: z.number().int(),
+  deletedCount: z.number().int(),
+  unassignedCount: z.number().int(),
+  restorableCount: z.number().int().describe('Hidden faces a restore would still bring back'),
+  createdAt: z.string().meta({ format: 'date-time' }),
+  restoredAt: z.string().meta({ format: 'date-time' }).nullable(),
+});
+
+export const DissolveListResponseSchema = z
+  .object({ items: z.array(DissolveRecordSchema), hasMore: z.boolean() })
+  .meta({ id: 'DissolveListResponseDto' });
+export class DissolveListResponseDto extends createZodDto(DissolveListResponseSchema) {}
+
+export const DissolveRestoreResponseSchema = z
+  .object({ restored: z.number().int(), skipped: z.number().int() })
+  .meta({ id: 'DissolveRestoreResponseDto' });
+export class DissolveRestoreResponseDto extends createZodDto(DissolveRestoreResponseSchema) {}
+export type DissolveListResponse = z.infer<typeof DissolveListResponseSchema>;

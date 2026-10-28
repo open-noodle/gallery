@@ -540,3 +540,48 @@ where
       "person_pet"."personGroupId" = "person"."personGroupId"
   )
   and "person"."ownerId" = $1
+
+-- FaceDissolveRepository.getDissolve
+select
+  "id",
+  "restoredAt"
+from
+  "face_dissolve"
+where
+  "id" = $1
+
+-- FaceDissolveRepository.listDissolves
+select
+  "face_dissolve"."id",
+  "face_dissolve"."ownerId",
+  "user"."name" as "ownerName",
+  "face_dissolve"."personName",
+  "face_dissolve"."scope",
+  "face_dissolve"."hiddenCount",
+  "face_dissolve"."deletedCount",
+  "face_dissolve"."unassignedCount",
+  "face_dissolve"."createdAt",
+  "face_dissolve"."restoredAt",
+  (
+    select
+      count(*) as "count"
+    from
+      "face_dissolve_face"
+      inner join "asset_face" on "asset_face"."id" = "face_dissolve_face"."assetFaceId"
+    where
+      "face_dissolve_face"."dissolveId" = "face_dissolve"."id"
+      and (
+        "asset_face"."deletedAt" is not null
+        and "asset_face"."personGroupId" is null
+      )
+  ) as "restorableCount"
+from
+  "face_dissolve"
+  inner join "user" on "user"."id" = "face_dissolve"."ownerId"
+order by
+  "face_dissolve"."createdAt" desc,
+  "face_dissolve"."id" desc
+limit
+  $1
+offset
+  $2

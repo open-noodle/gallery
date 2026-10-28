@@ -899,6 +899,120 @@
         ]
       }
     },
+    "/admin/face-repair/dissolves": {
+      "get": {
+        "operationId": "getFaceDissolves",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of dissolves per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveListResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List dissolved people, newest first, with how many hidden faces can still be restored",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/admin/face-repair/dissolves/{id}/restore": {
+      "post": {
+        "operationId": "restoreFaceDissolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveRestoreResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Restore the faces a dissolve hid, as unnamed faces",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/admin/face-repair/faces/{assetFaceId}/preview": {
       "get": {
         "operationId": "getFaceRepairFacePreview",
@@ -31738,6 +31852,84 @@
         ],
         "type": "object"
       },
+      "DissolveListResponseDto": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "deletedCount": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                },
+                "hiddenCount": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                },
+                "ownerName": {
+                  "type": "string"
+                },
+                "personName": {
+                  "type": "string"
+                },
+                "restorableCount": {
+                  "description": "Hidden faces a restore would still bring back",
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                },
+                "restoredAt": {
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "unassignedCount": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "ownerId",
+                "ownerName",
+                "personName",
+                "scope",
+                "hiddenCount",
+                "deletedCount",
+                "unassignedCount",
+                "restorableCount",
+                "createdAt",
+                "restoredAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "hasMore",
+          "items"
+        ],
+        "type": "object"
+      },
       "DissolveRequestDto": {
         "properties": {
           "expectedFaceCount": {
@@ -31891,6 +32083,25 @@
           "expectedFaceCount",
           "personId",
           "warnings"
+        ],
+        "type": "object"
+      },
+      "DissolveRestoreResponseDto": {
+        "properties": {
+          "restored": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "skipped": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "restored",
+          "skipped"
         ],
         "type": "object"
       },

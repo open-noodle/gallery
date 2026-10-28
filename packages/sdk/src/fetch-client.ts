@@ -615,6 +615,27 @@ export type FaceRepairDeclineRequestDto = {
 export type FaceRepairDeclineCreatedDto = {
     created: number;
 };
+export type DissolveListResponseDto = {
+    hasMore: boolean;
+    items: {
+        createdAt: string;
+        deletedCount: number;
+        hiddenCount: number;
+        id: string;
+        ownerId: string;
+        ownerName: string;
+        personName: string;
+        /** Hidden faces a restore would still bring back */
+        restorableCount: number;
+        restoredAt: string | null;
+        scope: string;
+        unassignedCount: number;
+    }[];
+};
+export type DissolveRestoreResponseDto = {
+    restored: number;
+    skipped: number;
+};
 export type FaceRepairOwnerPeopleResponseDto = {
     hasMore: boolean;
     people: {
@@ -5708,6 +5729,37 @@ export function declineFaceRepair({ faceRepairDeclineRequestDto }: {
         method: "POST",
         body: faceRepairDeclineRequestDto
     })));
+}
+/**
+ * List dissolved people, newest first, with how many hidden faces can still be restored
+ */
+export function getFaceDissolves({ page, size }: {
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: DissolveListResponseDto;
+    }>(`/admin/face-repair/dissolves${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Restore the faces a dissolve hid, as unnamed faces
+ */
+export function restoreFaceDissolve({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveRestoreResponseDto;
+    }>(`/admin/face-repair/dissolves/${encodeURIComponent(id)}/restore`, {
+        ...opts,
+        method: "POST"
+    }));
 }
 /**
  * Get an admin face-repair source photo
