@@ -1068,6 +1068,15 @@ class SharedSpaceTimelineRepository {
     return query.map((row) => row.readTable(_db.remoteAssetEntity).toDto()).get();
   }
 
+  /// The person timeline shows the viewer's own photos and their partners' (immich-32675: partners count even when
+  /// they are not shown in the viewer's timeline).
+  Expression<bool> _personOwnerFilter($RemoteAssetEntityTable asset, String userId) {
+    final partnerIds = _db.partnerEntity.selectOnly()
+      ..addColumns([_db.partnerEntity.sharedById])
+      ..where(_db.partnerEntity.sharedWithId.equals(userId));
+    return asset.ownerId.equals(userId) | asset.ownerId.isInQuery(partnerIds);
+  }
+
   Stream<List<Bucket>> _watchPersonBucket(
     String userId,
     String personId, {
@@ -1088,7 +1097,7 @@ class SharedSpaceTimelineRepository {
         ..where(
           _db.remoteAssetEntity.id.isInQuery(idQuery) &
               _db.remoteAssetEntity.deletedAt.isNull() &
-              _db.remoteAssetEntity.ownerId.equals(userId) &
+              _personOwnerFilter(_db.remoteAssetEntity, userId) &
               _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
               _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
         );
@@ -1106,7 +1115,7 @@ class SharedSpaceTimelineRepository {
       ..addColumns([assetCountExp, dateExp])
       ..where(
         _db.remoteAssetEntity.id.isInQuery(idQuery) &
-            _db.remoteAssetEntity.ownerId.equals(userId) &
+            _personOwnerFilter(_db.remoteAssetEntity, userId) &
             _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
             _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
             _db.remoteAssetEntity.deletedAt.isNull(),
@@ -1142,7 +1151,7 @@ class SharedSpaceTimelineRepository {
         (row) =>
             row.id.isInQuery(idQuery) &
             row.deletedAt.isNull() &
-            row.ownerId.equals(userId) &
+            _personOwnerFilter(row, userId) &
             row.visibility.equalsValue(AssetVisibility.timeline) &
             _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
       )
