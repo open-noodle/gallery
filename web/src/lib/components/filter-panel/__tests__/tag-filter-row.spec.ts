@@ -17,17 +17,17 @@ const LONG_NAME = 'Events/2024/Italy Summer Trip Rome Colosseum And Vatican Muse
 const OPEN_STATES = ['delayed-open', 'instant-open'];
 
 /**
- * happy-dom reports 0 for both metrics, so overflow is simulated on the prototype — the action reads
- * them during mount, before a test could reach the individual element.
- *
- * Defining on HTMLElement.prototype only *shadows* happy-dom, which defines both as getters on
- * Element.prototype (verified in happy-dom's Element.d.ts). The afterEach delete therefore removes
- * only this shadow and restores happy-dom's own behaviour — it does not clobber it process-wide.
- *
- * The getters read through a mutable `heightMetrics` object rather than closing over the values
- * passed to stubHeights directly, so a test can change the reported heights mid-test (R17) without
- * re-running Object.defineProperties or losing the shadow already installed for the current test.
- */
+happy-dom reports 0 for both metrics, so overflow is simulated on the prototype — the action reads
+them during mount, before a test could reach the individual element.
+
+Defining on HTMLElement.prototype only *shadows* happy-dom, which defines both as getters on
+Element.prototype (verified in happy-dom's Element.d.ts). The afterEach delete therefore removes
+only this shadow and restores happy-dom's own behaviour — it does not clobber it process-wide.
+
+The getters read through a mutable `heightMetrics` object rather than closing over the values
+passed to stubHeights directly, so a test can change the reported heights mid-test (R17) without
+re-running Object.defineProperties or losing the shadow already installed for the current test.
+*/
 const heightMetrics = { scrollHeight: 0, clientHeight: 0 };
 
 function stubHeights(scrollHeight: number, clientHeight: number) {

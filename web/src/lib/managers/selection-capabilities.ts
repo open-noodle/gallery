@@ -1,39 +1,39 @@
 import type { CommandContext } from '#lib/managers/command-context-manager.svelte.ts';
 
 /**
- * One struct of booleans deciding which bulk-selection actions the current
- * `CommandContext` allows. Pure and side-effect free: no `authManager`
- * reads, no `$state`. See
- * `specs/2026-07-24-selection-toolbar-consistency-design.md`
- * for the rule derivation ("the regular shared album is the reference model").
- */
+One struct of booleans deciding which bulk-selection actions the current
+`CommandContext` allows. Pure and side-effect free: no `authManager`
+reads, no `$state`. See
+`specs/2026-07-24-selection-toolbar-consistency-design.md`
+for the rule derivation ("the regular shared album is the reference model").
+*/
 export interface SelectionCapabilities {
   canSelectAll: boolean;
   canDownload: boolean;
   /**
-   * CreateSharedLink. True when *any* of the selection is the user's own — the action shares the
-   * owned subset, because `Permission.AssetShare` rejects the whole request if it names one asset
-   * the caller does not own. A space Owner/Editor is the exception (#1018): they can share the
-   * whole selection through the space, so the action is offered even when they own none of it.
-   */
+  CreateSharedLink. True when *any* of the selection is the user's own — the action shares the
+  owned subset, because `Permission.AssetShare` rejects the whole request if it names one asset
+  the caller does not own. A space Owner/Editor is the exception (#1018): they can share the
+  whole selection through the space, so the action is offered even when they own none of it.
+  */
   canShare: boolean;
   /**
-   * #1018: the link must be created against the space rather than against asset ownership, because
-   * the selection contains photos other members contributed. The modal warns before publishing, and
-   * the resulting link stays tethered to the space. Only ever set for a space Owner/Editor.
-   */
+  #1018: the link must be created against the space rather than against asset ownership, because
+  the selection contains photos other members contributed. The modal warns before publishing, and
+  the resulting link stays tethered to the space. Only ever set for a space Owner/Editor.
+  */
   shareScopedToSpace: boolean;
   canAddToAlbum: boolean;
   canFavorite: boolean;
   /**
-   * Rotate, ChangeDate, ChangeDescription, ChangeLocation. True on the editable *subset* of
-   * the selection (#734) — the same shape `canShare` already uses for the owned subset — not
-   * all-or-nothing ownership.
-   *
-   * Does NOT cover Archive/SetVisibility: those need `canSetVisibility` instead, because
-   * rbac-3 restricts visibility changes to owned assets, so riding along on the editable
-   * subset would produce guaranteed 403s for a space editor's non-owned assets.
-   */
+  Rotate, ChangeDate, ChangeDescription, ChangeLocation. True on the editable *subset* of
+  the selection (#734) — the same shape `canShare` already uses for the owned subset — not
+  all-or-nothing ownership.
+  
+  Does NOT cover Archive/SetVisibility: those need `canSetVisibility` instead, because
+  rbac-3 restricts visibility changes to owned assets, so riding along on the editable
+  subset would produce guaranteed 403s for a space editor's non-owned assets.
+  */
   canEditMetadata: boolean;
   /** Archive, SetVisibility. Owner-only — see `canEditMetadata`'s doc comment for why. */
   canSetVisibility: boolean;

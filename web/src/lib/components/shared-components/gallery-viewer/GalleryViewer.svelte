@@ -58,18 +58,18 @@
     allowDeletion?: boolean;
     enableGrouping?: boolean;
     /**
-     * Element this gallery scrolls inside. Defaults to the document, which is what the
-     * full-page callers (search, folders, memory, shared link) use. Surfaces embedded in
-     * an inner `overflow-y-auto` pane — e.g. the smart search results inside
-     * `UserPageLayout` — must pass their scroll container, otherwise `document`'s
-     * scrollTop never moves and virtualization freezes on the first viewport.
-     */
+    Element this gallery scrolls inside. Defaults to the document, which is what the
+    full-page callers (search, folders, memory, shared link) use. Surfaces embedded in
+    an inner `overflow-y-auto` pane — e.g. the smart search results inside
+    `UserPageLayout` — must pass their scroll container, otherwise `document`'s
+    scrollTop never moves and virtualization freezes on the first viewport.
+    */
     scrollElement?: HTMLElement;
     /**
-     * Overrides click-to-open. Defaults to route navigation (`navigateToAsset`). Callers
-     * that own their own asset viewer (and so need extra context such as `spaceId`) pass
-     * their own opener together with `withAssetViewer={false}`.
-     */
+    Overrides click-to-open. Defaults to route navigation (`navigateToAsset`). Callers
+    that own their own asset viewer (and so need extra context such as `spaceId`) pass
+    their own opener together with `withAssetViewer={false}`.
+    */
     onAssetOpen?: (asset: AssetResponseDto) => void;
     /** Set to `false` when the caller mounts its own `AssetViewer`. */
     withAssetViewer?: boolean;

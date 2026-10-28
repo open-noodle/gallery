@@ -153,6 +153,7 @@ vi.mock('#lib/utils/space-filter-options.js', async (importOriginal) => {
   };
 });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function makeSpace(overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto {
   return {
     id: 'space-1',

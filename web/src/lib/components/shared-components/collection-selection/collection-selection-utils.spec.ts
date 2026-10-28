@@ -219,6 +219,7 @@ describe('CollectionModalRowConverter', () => {
   // album, mirroring mobile's SpaceCollectionSection. A linked album is an ordinary `album`
   // collection, so the dispatch (POST /albums/:id/assets) is unchanged.
   describe('space expansion (#965)', () => {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const withAlbums = (id: string, name: string, albumCount: number) => s(id, name, { albumCount });
     const items = (rows: ReturnType<typeof conv.toModalRows>) =>
       rows.filter((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);

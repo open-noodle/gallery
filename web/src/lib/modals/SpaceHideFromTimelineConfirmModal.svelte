@@ -7,11 +7,11 @@
     spaceName: string;
     count: number;
     /**
-     * #1041: photos in this space that stay on the caller's timeline because another space they
-     * still show also holds them (§3, "another visible path wins"). Without this the dialog can say
-     * "removes 3 photos" about a 58,977-photo space and read as broken. Appended only when > 0 —
-     * with no overlap there is nothing to explain.
-     */
+    #1041: photos in this space that stay on the caller's timeline because another space they
+    still show also holds them (§3, "another visible path wins"). Without this the dialog can say
+    "removes 3 photos" about a 58,977-photo space and read as broken. Appended only when > 0 —
+    with no overlap there is nothing to explain.
+    */
     retainedCount?: number;
     onClose: (confirmed: boolean) => void;
   }

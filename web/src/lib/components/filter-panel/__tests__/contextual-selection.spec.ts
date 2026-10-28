@@ -8,14 +8,14 @@ import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 /**
- * The panel is the OTHER half of a contextual filter: clicking a metadata value in the asset viewer
- * has to leave the panel showing the same thing the chip shows. Every case here was reported against
- * PR #778 as "the results are right but the panel disagrees".
- *
- * These are deliberately whole-panel tests rather than per-section ones: the bugs all live in the
- * seam between the id/level a contextual patch produces and the id/level the section renders, and a
- * section test that hand-feeds `selectedMake` cannot see that seam.
- */
+The panel is the OTHER half of a contextual filter: clicking a metadata value in the asset viewer
+has to leave the panel showing the same thing the chip shows. Every case here was reported against
+PR #778 as "the results are right but the panel disagrees".
+
+These are deliberately whole-panel tests rather than per-section ones: the bugs all live in the
+seam between the id/level a contextual patch produces and the id/level the section renders, and a
+section test that hand-feeds `selectedMake` cannot see that seam.
+*/
 
 beforeAll(async () => {
   register('en-US', () => import('#i18n/en.json'));
@@ -170,16 +170,16 @@ describe('the panel reflects a contextual CAMERA filter', () => {
 });
 
 /**
- * Reported as "the city chip is right but the panel only checks the country". The city path is
- * actually fine (see the ticked-city cases below); what was reported is the STATE path.
- *
- * The viewer's location row renders city / state / country as three buttons, and plenty of places
- * carry the same word at two levels — Prague's EXIF is city "Prague", state "Prague", country "Czech
- * Republic" — so the middle button looks identical to the top one. It emits `{state, country}`,
- * which the chip renders correctly as "Prague, Czech Republic" and the server filters correctly,
- * but which the panel has no level for at all: it showed a lone ticked country. The filter was
- * invisible there, unremovable there, and silently AND-ed onto the next country or city clicked.
- */
+Reported as "the city chip is right but the panel only checks the country". The city path is
+actually fine (see the ticked-city cases below); what was reported is the STATE path.
+
+The viewer's location row renders city / state / country as three buttons, and plenty of places
+carry the same word at two levels — Prague's EXIF is city "Prague", state "Prague", country "Czech
+Republic" — so the middle button looks identical to the top one. It emits `{state, country}`,
+which the chip renders correctly as "Prague, Czech Republic" and the server filters correctly,
+but which the panel has no level for at all: it showed a lone ticked country. The filter was
+invisible there, unremovable there, and silently AND-ed onto the next country or city clicked.
+*/
 describe('the panel reflects a contextual STATE filter', () => {
   beforeEach(() => localStorage.clear());
 
@@ -300,14 +300,14 @@ describe('the panel reflects a contextual STATE filter', () => {
 });
 
 /**
- * Reported as a nice-to-have: after a contextual TAG filter the list "does not scroll to or visually
- * highlight the selected tag — with thousands of tags the active tag is effectively invisible".
- *
- * The cause is truncation, not scrolling: both lists render a short head (10 tags, 5 people) until
- * "show more" is pressed, and neither reserves a slot for what is actually selected. Hoisting the
- * selection is better than scrolling to it — it needs no measurement, survives a re-fetch, and puts
- * selected-and-listed entries next to the already-top-pinned orphans rather than in two places.
- */
+Reported as a nice-to-have: after a contextual TAG filter the list "does not scroll to or visually
+highlight the selected tag — with thousands of tags the active tag is effectively invisible".
+
+The cause is truncation, not scrolling: both lists render a short head (10 tags, 5 people) until
+"show more" is pressed, and neither reserves a slot for what is actually selected. Hoisting the
+selection is better than scrolling to it — it needs no measurement, survives a re-fetch, and puts
+selected-and-listed entries next to the already-top-pinned orphans rather than in two places.
+*/
 describe('the panel keeps a selected entry visible in a long list', () => {
   beforeEach(() => localStorage.clear());
 

@@ -35,6 +35,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 });
 
 // An API failure shaped the way the server actually returns one, tagged for the `isHttpError` stand-in above.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const httpError = (status: number, data: Record<string, unknown>) =>
   Object.assign(new Error(`HTTP ${status}`), { __http: true, status, data });
 
@@ -210,6 +211,7 @@ const makeCompletedScan = (persons = [makeScanPerson()]) => ({
   createdAt: new Date().toISOString(),
 });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const makePageData = (personId = PERSON_ID) => ({
   personId,
   meta: { title: 'Review person' },
