@@ -17,6 +17,8 @@ const EMPTY_SUGGESTIONS: FilterSuggestionsResponse = {
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 };
 
 function makeConfig(suggestions: FilterSuggestionsResponse, hasProvider = true): FilterPanelConfig {

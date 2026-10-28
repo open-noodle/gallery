@@ -148,6 +148,12 @@ describe('buildSpaceTimelineOptions', () => {
       ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
     });
   });
+
+  it('forwards locationPresence to the space timeline query', () => {
+    const filters = { ...createFilterState(), locationPresence: 'noGps' as const };
+
+    expect(buildSpaceTimelineOptions('space-1', filters).locationPresence).toBe('noGps');
+  });
 });
 
 describe('handleSpaceRemoveFilter', () => {
