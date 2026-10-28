@@ -179,4 +179,43 @@ describe('PersonDissolveModal', () => {
       'admin.face_cleanup_dissolve_real_faces_note',
     );
   });
+
+  // The admin must see, before confirming, exactly which parts of this dissolve a restore can undo and which it
+  // cannot. Default fixture: 3000 detected faces hidden, 180 imported faces deleted, the person removed, one Space
+  // person removed.
+  it('separates what can be undone from what cannot', async () => {
+    open();
+    const undoable = await screen.findByTestId('dissolve-undoable');
+    const permanent = screen.getByTestId('dissolve-permanent');
+
+    expect(within(undoable).getByTestId('dissolve-treatment-hide')).toBeVisible();
+    expect(within(permanent).getByTestId('dissolve-treatment-delete')).toBeVisible();
+    expect(within(permanent).getByTestId('dissolve-person-outcome')).toHaveTextContent(
+      'admin.face_cleanup_dissolve_person_removed',
+    );
+    expect(within(permanent).getByTestId('dissolve-space-persons-removed')).toHaveTextContent(
+      'admin.face_cleanup_dissolve_space_persons_removed',
+    );
+  });
+
+  it('shows no "cannot be undone" section when a restore undoes everything', async () => {
+    withCounts({ delete: 0, personRemoved: false, remainingFaces: 4, spacePersonsRemoved: 0 });
+    open();
+    expect(await screen.findByTestId('dissolve-undoable')).toBeVisible();
+    expect(screen.queryByTestId('dissolve-permanent')).not.toBeInTheDocument();
+  });
+
+  it('shows no "can be undone" section when nothing will be hidden', async () => {
+    withCounts({ hide: 0 });
+    open();
+    expect(await screen.findByTestId('dissolve-permanent')).toBeVisible();
+    expect(screen.queryByTestId('dissolve-undoable')).not.toBeInTheDocument();
+  });
+
+  it('only warns about hiding real faces when faces will be hidden', async () => {
+    withCounts({ hide: 0 });
+    open();
+    await screen.findByTestId('dissolve-permanent');
+    expect(screen.queryByTestId('dissolve-real-faces-note')).not.toBeInTheDocument();
+  });
 });
