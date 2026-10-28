@@ -76,7 +76,7 @@ An earlier Gallery release refuses to start on a database that has Gallery migra
    docker compose exec database psql -U postgres -d immich -c "DELETE FROM \"gallery_migrations\" WHERE \"name\" = '1790900000000-SplitSharedPersonGroups';"
    ```
 
-   The earlier release works with the split people. To switch back to Immich later, upgrade to this release again first: the earlier release's `revert-to-immich.sql` does not put shared people back together.
+   The earlier release works with the split people. To run `revert-to-immich.sql` later, upgrade to this release again first: the earlier release's copy of the script does not put shared people back together.
 
 6. Releases before the separate `gallery_migrations` table (all of 5.7 and the 5.8 release candidates) look for their migration records in `kysely_migrations`. For those, copy the records back:
 
