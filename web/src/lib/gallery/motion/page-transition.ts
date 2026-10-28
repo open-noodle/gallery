@@ -39,7 +39,7 @@ export const SHARED_ELEMENT_ATTR = 'data-shared-element';
 
 /** Names every opted-in element under `root` after its attribute; returns a function that clears them. */
 export const nameSharedElements = (root: ParentNode): (() => void) => {
-  const elements = [...root.querySelectorAll<HTMLElement>(`[${SHARED_ELEMENT_ATTR}]`)];
+  const elements = [...root.querySelectorAll<HTMLElement>('[data-shared-element]')];
   for (const element of elements) {
     element.style.viewTransitionName = element.getAttribute(SHARED_ELEMENT_ATTR) ?? '';
   }

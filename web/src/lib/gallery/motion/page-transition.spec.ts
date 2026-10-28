@@ -37,7 +37,7 @@ describe('shouldCrossfade', () => {
 
 describe('shared elements', () => {
   afterEach(() => {
-    document.body.innerHTML = '';
+    document.body.replaceChildren();
     vi.unstubAllGlobals();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (document as any).startViewTransition;
