@@ -70,11 +70,11 @@
     onVideoStarted?: () => void;
     onClose?: () => void;
     /**
-     * Slice 8 gap closure — the same rule DetailPanel.svelte's People row and PhotoViewer.svelte's
-     * FaceEditorPanel use for THIS same asset (`resolveCanEditSpacePeople`). See
-     * `FaceEditorPanel.svelte` for how these two decide between the owner `FaceEditor` and the
-     * space-flavoured `SpaceFaceEditor`.
-     */
+    Slice 8 gap closure — the same rule DetailPanel.svelte's People row and PhotoViewer.svelte's
+    FaceEditorPanel use for THIS same asset (`resolveCanEditSpacePeople`). See
+    `FaceEditorPanel.svelte` for how these two decide between the owner `FaceEditor` and the
+    space-flavoured `SpaceFaceEditor`.
+    */
     spaceId?: string;
     canEditSpacePeople?: boolean;
   }

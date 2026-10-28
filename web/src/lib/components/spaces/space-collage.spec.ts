@@ -1,6 +1,7 @@
 import SpaceCollage from '#lib/components/spaces/space-collage.svelte';
 import { render, screen } from '@testing-library/svelte';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const makeAsset = (id: string, thumbhash: string | null = null) => ({ id, thumbhash });
 
 describe('SpaceCollage component', () => {

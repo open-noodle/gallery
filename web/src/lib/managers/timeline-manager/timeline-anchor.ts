@@ -51,11 +51,11 @@ export function getTimelineTemporalAnchorTarget(
 }
 
 /**
- * The date currently at the top of the viewport, expressed as a temporal anchor
- * for the active grouping. Used to preserve the visible position when the user
- * changes the grouping granularity, so the rebuilt timeline can scroll back to it
- * instead of jumping to the most recent content.
- */
+The date currently at the top of the viewport, expressed as a temporal anchor
+for the active grouping. Used to preserve the visible position when the user
+changes the grouping granularity, so the rebuilt timeline can scroll back to it
+instead of jumping to the most recent content.
+*/
 export function getTimelineTopVisibleAnchor(timelineManager: TimelineManager): TimelineTemporalAnchor | undefined {
   if (!timelineManager?.isInitialized) {
     return undefined;

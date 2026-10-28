@@ -11,10 +11,10 @@ import { groupBy } from 'lodash-es';
 import { get } from 'svelte/store';
 
 /**
- * ----------------------
- * Space Album Grouping
- * ----------------------
- */
+----------------------
+Space Album Grouping
+----------------------
+*/
 
 export interface SpaceAlbumGroup {
   id: string;
@@ -77,10 +77,10 @@ export const getSelectedSpaceAlbumGroupOption = (settings: SpaceAlbumViewSetting
 };
 
 /**
- * --------------------------------
- * Space Album Groups Collapse/Expand
- * --------------------------------
- */
+--------------------------------
+Space Album Groups Collapse/Expand
+--------------------------------
+*/
 
 const getCollapsedSpaceAlbumGroups = (settings: SpaceAlbumViewSettings) => {
   settings.collapsedGroups ??= {};
@@ -127,10 +127,10 @@ export const expandAllSpaceAlbumGroups = () => {
 };
 
 /**
- * -----------------------------------------------
- * Build Space Album Groups (pure — no store reads)
- * -----------------------------------------------
- */
+-----------------------------------------------
+Build Space Album Groups (pure — no store reads)
+-----------------------------------------------
+*/
 
 export interface SpaceAlbumGroupingCtx {
   ungrouped: string;

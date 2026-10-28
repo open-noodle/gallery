@@ -1,9 +1,9 @@
 import type { ScanProgress, ScanResult } from '#lib/utils/google-takeout-scanner.ts';
 
 /**
- * Helper to create a zip blob in memory using zip.js.
- * Each entry is { path: string, content: string }.
- */
+Helper to create a zip blob in memory using zip.js.
+Each entry is { path: string, content: string }.
+*/
 async function createZipBlob(entries: { path: string; content: string }[]): Promise<Blob> {
   const { BlobWriter, ZipWriter, TextReader } = await import('@zip.js/zip.js');
   const blobWriter = new BlobWriter('application/zip');
@@ -284,6 +284,7 @@ describe('scanTakeoutFiles', () => {
   });
 });
 
+// eslint-disable-next-line unicorn/prefer-default-parameters
 function createFileWithPath(content: string, name: string, relativePath: string, type?: string): File {
   const file = new File([content], name, { type: type ?? 'application/octet-stream' });
   Object.defineProperty(file, 'webkitRelativePath', { value: relativePath });

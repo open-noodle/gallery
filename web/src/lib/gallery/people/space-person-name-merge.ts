@@ -13,9 +13,9 @@ import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 
 /**
- * The space person already carrying `name` (case- and accent-insensitive), other than `excludeId`.
- * Naming a second person with an existing name is almost always a duplicate of the same identity (#1100).
- */
+The space person already carrying `name` (case- and accent-insensitive), other than `excludeId`.
+Naming a second person with an existing name is almost always a duplicate of the same identity (#1100).
+*/
 export const findSpacePersonNamed = async (
   spaceId: string,
   name: string,
@@ -29,18 +29,18 @@ export const findSpacePersonNamed = async (
 };
 
 /**
- * - `merged`: the merge committed.
- * - `declined`: the user answered no to "are these the same person?". A rename may go ahead.
- * - `failed`: the user said yes but nothing merged: the server blocked it (cross-owner merges are
- *   off), the user backed out of the cross-owner confirmation, or a known terminal error. The user has
- *   seen why, so the caller must not rename: that would create the duplicate the merge was for (#1100).
- */
+- `merged`: the merge committed.
+- `declined`: the user answered no to "are these the same person?". A rename may go ahead.
+- `failed`: the user said yes but nothing merged: the server blocked it (cross-owner merges are
+  off), the user backed out of the cross-owner confirmation, or a known terminal error. The user has
+  seen why, so the caller must not rename: that would create the duplicate the merge was for (#1100).
+*/
 export type SpacePersonMergeOutcome = 'merged' | 'declined' | 'failed';
 
 /**
- * Asks before merging `sourceId` into `targetId` within a space, then runs the space merge with the
- * cross-owner confirmation. Request errors other than the known merge refusals propagate.
- */
+Asks before merging `sourceId` into `targetId` within a space, then runs the space merge with the
+cross-owner confirmation. Request errors other than the known merge refusals propagate.
+*/
 export const confirmAndMergeSpacePerson = async ({
   spaceId,
   sourceId,
@@ -75,9 +75,9 @@ export const confirmAndMergeSpacePerson = async ({
 };
 
 /**
- * Name suggestions for the global People grid: the viewer's own people and the shared-space people
- * they can see. An editor naming a space person owns none of the existing ones (#1099).
- */
+Name suggestions for the global People grid: the viewer's own people and the shared-space people
+they can see. An editor naming a space person owns none of the existing ones (#1099).
+*/
 export const searchPeopleWithSharedSpaces = async (name: string): Promise<PersonResponseDto[]> => {
   try {
     return await searchPerson({ name, withSharedSpaces: true });

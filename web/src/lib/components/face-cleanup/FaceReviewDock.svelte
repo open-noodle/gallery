@@ -26,8 +26,8 @@
     onHelp: () => void;
     onClear: () => void;
     /** Everything left of Apply while nothing is selected. Guided renders a tally, a rest-of-cluster chip and a
-     *  blocked reason; manual renders four tally chips. One snippet, not a tally/apply pair, because guided's
-     *  blocked reason sits BETWEEN the tally and the button and would have nowhere to live in a two-way split. */
+    blocked reason; manual renders four tally chips. One snippet, not a tally/apply pair, because guided's
+    blocked reason sits BETWEEN the tally and the button and would have nowhere to live in a two-way split. */
     summary: Snippet;
     apply: Snippet;
   }

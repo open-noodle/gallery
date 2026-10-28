@@ -11,9 +11,9 @@
   type Props = {
     isOwner: boolean;
     /**
-     * R4/E2 — false on a shared link, where there is no timeline to filter. Threaded from
-     * DetailPanel exactly like `isOwner`.
-     */
+    R4/E2 — false on a shared link, where there is no timeline to filter. Threaded from
+    DetailPanel exactly like `isOwner`.
+    */
     canFilter?: boolean;
     asset: AssetResponseDto;
   };

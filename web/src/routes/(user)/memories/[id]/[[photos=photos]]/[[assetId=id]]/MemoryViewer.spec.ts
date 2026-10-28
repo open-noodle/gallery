@@ -182,10 +182,10 @@ function memory(id: string, assetIds: string[]): MemoryResponseDto {
 }
 
 /**
- * A memory whose assets span several years, as an `on_this_day_place` card does. The plain
- * `memory()` helper above dates every asset the same day, which cannot distinguish "the memory's
- * first asset" from "the asset being viewed".
- */
+A memory whose assets span several years, as an `on_this_day_place` card does. The plain
+`memory()` helper above dates every asset the same day, which cannot distinguish "the memory's
+first asset" from "the asset being viewed".
+*/
 function multiYearMemory(id: string, assets: { id: string; localDateTime: string }[]): MemoryResponseDto {
   return {
     ...memory(

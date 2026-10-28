@@ -8,19 +8,19 @@ export type PersonAvatar =
   | { kind: 'fallback'; url: string };
 
 /**
- * The URL of the person's representative (feature-photo) face, or `undefined` when this viewer
- * has no representative thumbnail they can reach.
- *
- * The space arm is checked first: inside a space, a person's profile may carry its own name and
- * face that differ from the underlying `person` row, so the space thumbnail wins whenever there
- * is one.
- *
- * The `undefined` arm is NOT "non-owner". `/people/{id}/thumbnail` is guarded by
- * Permission.PersonRead, which server/src/utils/access.ts resolves as owner ∪ shared-space member
- * — a space member may legitimately read it. It returns undefined only for a viewer who is
- * neither, i.e. someone reaching the asset through an album or partner share. Such a viewer has
- * no profile face to show, which is why the crop-vs-profile setting cannot apply to them.
- */
+The URL of the person's representative (feature-photo) face, or `undefined` when this viewer
+has no representative thumbnail they can reach.
+
+The space arm is checked first: inside a space, a person's profile may carry its own name and
+face that differ from the underlying `person` row, so the space thumbnail wins whenever there
+is one.
+
+The `undefined` arm is NOT "non-owner". `/people/{id}/thumbnail` is guarded by
+Permission.PersonRead, which server/src/utils/access.ts resolves as owner ∪ shared-space member
+— a space member may legitimately read it. It returns undefined only for a viewer who is
+neither, i.e. someone reaching the asset through an album or partner share. Such a viewer has
+no profile face to show, which is why the crop-vs-profile setting cannot apply to them.
+*/
 export const getRepresentativeThumbnailUrl = (
   person: PersonResponseDto,
   { isOwner, spaceId }: { isOwner: boolean; spaceId?: string },

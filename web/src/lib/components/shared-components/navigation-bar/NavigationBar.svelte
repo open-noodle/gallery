@@ -30,12 +30,12 @@
     // TODO: remove once this is only used in <AppShellHeader>
     noBorder?: boolean;
     /**
-     * Opt-in: size the hamburger/column/logo from `sidebarModeStore.layout` (adds the rail
-     * state). Defaults to false so callers with no rail-width sidebar of their own - namely
-     * AdminPageLayout, whose sidebar is bound only to `sidebarStore.isOpen` and pinned open
-     * above 850px regardless of `railOverlayOpen` - keep today's viewport-only behaviour
-     * (hamburger hidden, logo inline, wide column) untouched above 850px.
-     */
+    Opt-in: size the hamburger/column/logo from `sidebarModeStore.layout` (adds the rail
+    state). Defaults to false so callers with no rail-width sidebar of their own - namely
+    AdminPageLayout, whose sidebar is bound only to `sidebarStore.isOpen` and pinned open
+    above 850px regardless of `railOverlayOpen` - keep today's viewport-only behaviour
+    (hamburger hidden, logo inline, wide column) untouched above 850px.
+    */
     railAware?: boolean;
   };
 

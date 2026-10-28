@@ -42,19 +42,19 @@
     assetCount: number;
     onClose: (collections?: PickerCollection[]) => void;
     /**
-     * Restrict the picker to albums linked to this space. Set when the selection contains
-     * assets the user does not own: those can only land as #764 space contributions
-     * (`album_space_asset`), which the server accepts solely for albums linked to a space
-     * where the caller is Owner/Editor. Personal albums, brand-new albums and space pools
-     * would all silently drop them, so none are offered.
-     */
+    Restrict the picker to albums linked to this space. Set when the selection contains
+    assets the user does not own: those can only land as #764 space contributions
+    (`album_space_asset`), which the server accepts solely for albums linked to a space
+    where the caller is Owner/Editor. Personal albums, brand-new albums and space pools
+    would all silently drop them, so none are offered.
+    */
     restrictToSpaceId?: string;
     /**
-     * The selection itself, when the caller knows it. The picker then asks the server which albums
-     * accept it (`POST /albums/add-targets`) and offers only those. A selection with photos the
-     * caller cannot share (another member's space photos) also hides spaces, gains the albums
-     * linked to the caller's writable spaces, and shows a hint explaining the narrower list.
-     */
+    The selection itself, when the caller knows it. The picker then asks the server which albums
+    accept it (`POST /albums/add-targets`) and offers only those. A selection with photos the
+    caller cannot share (another member's space photos) also hides spaces, gains the albums
+    linked to the caller's writable spaces, and shows a hint explaining the narrower list.
+    */
     assetIds?: string[];
   }
 
@@ -157,11 +157,11 @@
   });
 
   /**
-   * Ask the server which albums accept the selection. When part of it is not shareable, the only
-   * other valid targets are albums linked to a space where the caller is Owner/Editor — including
-   * ones owned by other members, which `getAllAlbums` never returns — so those are fetched and
-   * resolved too.
-   */
+  Ask the server which albums accept the selection. When part of it is not shareable, the only
+  other valid targets are albums linked to a space where the caller is Owner/Editor — including
+  ones owned by other members, which `getAllAlbums` never returns — so those are fetched and
+  resolved too.
+  */
   const resolveAddTargets = async (ids: string[]) => {
     const own = await getAlbumAddTargets({
       albumAddTargetsDto: { albumIds: albums.map(({ id }) => id), assetIds: ids },
@@ -198,11 +198,11 @@
   };
 
   /**
-   * Fetch the linked albums of every space the caller can write to, once, the first time they search.
-   * Without it a shareable selection only reaches another member's space-linked album by expanding its
-   * space, and search does not look inside spaces (#1114). Resolved against the selection like the other
-   * targets, so an album that would accept nothing stays hidden.
-   */
+  Fetch the linked albums of every space the caller can write to, once, the first time they search.
+  Without it a shareable selection only reaches another member's space-linked album by expanding its
+  space, and search does not look inside spaces (#1114). Resolved against the selection like the other
+  targets, so an album that would accept nothing stays hidden.
+  */
   const loadSearchLinkedAlbums = async () => {
     const writable = spaces.filter((space) => isWritableSpace(space, currentUserId));
     const perSpace = await Promise.all(writable.map((space) => fetchSpaceAlbums(space.id)));
@@ -235,15 +235,15 @@
   });
 
   /**
-   * Every album the user can add to: one request, no filters.
-   *
-   * This used to fetch `isOwned: true` and `isShared: true` and concatenate them, which double-
-   * listed any album the user owns *and* has shared — both queries match it (#1043). The
-   * original pair was `shared: false` + `shared: true`, a real partition; the rename to
-   * `isOwned`/`isShared` turned it into two overlapping sets. Omitting both filters returns
-   * exactly the union the picker wants — every album the user owns or is a member of — and
-   * halves the requests. Row order does not depend on it: the converter sorts by name.
-   */
+  Every album the user can add to: one request, no filters.
+  
+  This used to fetch `isOwned: true` and `isShared: true` and concatenate them, which double-
+  listed any album the user owns *and* has shared — both queries match it (#1043). The
+  original pair was `shared: false` + `shared: true`, a real partition; the rename to
+  `isOwned`/`isShared` turned it into two overlapping sets. Omitting both filters returns
+  exactly the union the picker wants — every album the user owns or is a member of — and
+  halves the requests. Row order does not depend on it: the converter sorts by name.
+  */
   const loadAlbums = async () => {
     albums = await getAllAlbums({});
   };
@@ -260,12 +260,12 @@
   };
 
   /**
-   * Open a space's linked albums, or close them again.
-   *
-   * Accordion, like mobile: at most one space is open, so the row list stays short and only
-   * one space's albums are ever in memory. A failed fetch collapses the row rather than
-   * leaving it stuck open on a spinner that will never resolve.
-   */
+  Open a space's linked albums, or close them again.
+  
+  Accordion, like mobile: at most one space is open, so the row list stays short and only
+  one space's albums are ever in memory. A failed fetch collapses the row rather than
+  leaving it stuck open on a spinner that will never resolve.
+  */
   const toggleSpaceExpansion = async (collection: PickerCollection) => {
     if (collection.kind !== 'space') {
       return;
@@ -297,12 +297,12 @@
   };
 
   /**
-   * Put the arrow-key caret back on a space row after its children appeared or disappeared.
-   *
-   * Only when the caret was already in use — a mouse user who clicks a row should not suddenly
-   * acquire a keyboard selection highlight. `rows` is `$derived`, so reading it here sees the
-   * post-toggle list.
-   */
+  Put the arrow-key caret back on a space row after its children appeared or disappeared.
+  
+  Only when the caret was already in use — a mouse user who clicks a row should not suddenly
+  acquire a keyboard selection highlight. `rows` is `$derived`, so reading it here sees the
+  post-toggle list.
+  */
   const reanchorCaretOnSpace = (spaceId: string) => {
     if (selectedRowIndex === -1) {
       return;
@@ -326,13 +326,13 @@
   };
 
   /**
-   * Resolve a multi-select key back to its collection.
-   *
-   * Must search the fetched space albums too, not just `allCollections`: a space-linked album
-   * owned by another member has no `album_user` row for the caller, so `getAllAlbums` never
-   * returns it — which is precisely the #965 case. Missing it here made `submitMulti` resolve
-   * the key to `undefined`, drop it, and close the modal as if the user had cancelled.
-   */
+  Resolve a multi-select key back to its collection.
+  
+  Must search the fetched space albums too, not just `allCollections`: a space-linked album
+  owned by another member has no `album_user` row for the caller, so `getAllAlbums` never
+  returns it — which is precisely the #965 case. Missing it here made `submitMulti` resolve
+  the key to `undefined`, drop it, and close the modal as if the user had cancelled.
+  */
   const findByKey = (key: string) =>
     [...allCollections, ...Object.values(spaceAlbumCache).flat()].find(
       (collection) => collectionKey(collection) === key,
@@ -361,9 +361,9 @@
   };
 
   /**
-   * What clicking a space row's body does. An expandable one opens instead of picking — its
-   * pool stays reachable as the "Add to space" child, and via the row's own checkbox.
-   */
+  What clicking a space row's body does. An expandable one opens instead of picking — its
+  pool stays reachable as the "Add to space" child, and via the row's own checkbox.
+  */
   const handleSpaceClick = (row: CollectionModalRow, collection: PickerCollection) =>
     row.expandable ? void toggleSpaceExpansion(collection) : handleCollectionClick(collection);
 

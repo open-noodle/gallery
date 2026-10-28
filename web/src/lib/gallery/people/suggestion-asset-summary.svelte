@@ -12,10 +12,10 @@
     /** Straight off the suggestion payload — no request needed to show the date. */
     fileCreatedAt?: string;
     /**
-     * Set only when the review is running inside a Space. Not derived in here: the caller knows which
-     * surface it is on, and a space viewer's link target is not a variation of the personal one — it is a
-     * different route with different access (see `getSuggestionAssetHref`).
-     */
+    Set only when the review is running inside a Space. Not derived in here: the caller knows which
+    surface it is on, and a space viewer's link target is not a variation of the personal one — it is a
+    different route with different access (see `getSuggestionAssetHref`).
+    */
     spaceId?: string;
   }
 

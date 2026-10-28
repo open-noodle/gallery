@@ -336,10 +336,10 @@ export const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6761776289';
 export const ANDROID_INSTALL_URL = '/install';
 
 /**
- * Queues rendered by the admin Jobs page and driven from the command palette's
- * bulk verbs. Omits system queues (BackgroundTask, Search, Notifications,
- * BackupDatabase, Workflow, Editor, StorageBackendMigration).
- */
+Queues rendered by the admin Jobs page and driven from the command palette's
+bulk verbs. Omits system queues (BackgroundTask, Search, Notifications,
+BackupDatabase, Workflow, Editor, StorageBackendMigration).
+*/
 export const ADMIN_VISIBLE_QUEUES = [
   QueueName.ThumbnailGeneration,
   QueueName.MetadataExtraction,

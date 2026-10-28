@@ -11,18 +11,18 @@ import { toastManager } from '@immich/ui';
 
 type AddToCollectionsOptions = {
   /**
-   * The selection contains assets the caller does not own, so they can only land as #764
-   * space contributions. Two consequences:
-   *
-   * - every album is dispatched on its own, because only the single-album endpoint
-   *   (`POST /albums/:id/assets`) runs `tryContributeDeniedAssets`; the batched
-   *   `PUT /albums/assets` would silently drop every non-owned asset;
-   * - spaces are dropped, because `POST /shared-spaces/:id/assets` requires
-   *   `Permission.AssetShare` on every id and rejects the whole request otherwise.
-   *
-   * The picker already hides spaces in this mode; dropping them here keeps the guarantee
-   * even if a caller passes some anyway.
-   */
+  The selection contains assets the caller does not own, so they can only land as #764
+  space contributions. Two consequences:
+  
+  - every album is dispatched on its own, because only the single-album endpoint
+    (`POST /albums/:id/assets`) runs `tryContributeDeniedAssets`; the batched
+    `PUT /albums/assets` would silently drop every non-owned asset;
+  - spaces are dropped, because `POST /shared-spaces/:id/assets` requires
+    `Permission.AssetShare` on every id and rejects the whole request otherwise.
+  
+  The picker already hides spaces in this mode; dropping them here keeps the guarantee
+  even if a caller passes some anyway.
+  */
   contributionMode?: boolean;
 };
 

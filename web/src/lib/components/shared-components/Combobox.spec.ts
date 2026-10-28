@@ -37,10 +37,10 @@ const options = [
 ];
 
 /**
- * `position: fixed` does not always resolve against the viewport - Bits UI dialogs and
- * iPadOS-with-keyboard both shift the frame. `frameTop` is where a fixed `top: 0` actually
- * lands, in client coordinates.
- */
+`position: fixed` does not always resolve against the viewport - Bits UI dialogs and
+iPadOS-with-keyboard both shift the frame. `frameTop` is where a fixed `top: 0` actually
+lands, in client coordinates.
+*/
 const openDropdown = async ({
   input,
   visibleHeight = LAYOUT_HEIGHT,

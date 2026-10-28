@@ -40,17 +40,17 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * Reusable multi-select action bar, gated by the pure `getSelectionCapabilities`
-   * rule engine (see `$lib/managers/selection-capabilities.ts`). Unlike the
-   * personal/album/space pages, this component does NOT depend on
-   * `registerSelectionContext` / `registerAlbumContext` / `registerSpaceContext`
-   * being called — it derives its own minimal `CommandContext` from explicit
-   * props + the `assetInteraction` (assetMultiSelectManager) singleton, so it
-   * also works on surfaces (space-person, space-album) that register none of
-   * those contexts.
-   *
-   * See `specs/2026-07-24-selection-toolbar-consistency-design.md`.
-   */
+  Reusable multi-select action bar, gated by the pure `getSelectionCapabilities`
+  rule engine (see `$lib/managers/selection-capabilities.ts`). Unlike the
+  personal/album/space pages, this component does NOT depend on
+  `registerSelectionContext` / `registerAlbumContext` / `registerSpaceContext`
+  being called — it derives its own minimal `CommandContext` from explicit
+  props + the `assetInteraction` (assetMultiSelectManager) singleton, so it
+  also works on surfaces (space-person, space-album) that register none of
+  those contexts.
+  
+  See `specs/2026-07-24-selection-toolbar-consistency-design.md`.
+  */
   interface Props {
     /** Absent on surfaces with no timeline behind them — e.g. smart search results. */
     timelineManager?: TimelineManager;
@@ -60,10 +60,10 @@
     /** Present on album surfaces (regular album OR space album). */
     album?: AlbumResponseDto;
     /**
-     * Present on space surfaces (direct space OR space album). `members` drives the #734
-     * editable-subset fallback (`canEditAsset`'s space derivation) when `POST /assets/editable`
-     * is unreachable — absent it, the fallback narrows to the owned subset, same as pre-#734.
-     */
+    Present on space surfaces (direct space OR space album). `members` drives the #734
+    editable-subset fallback (`canEditAsset`'s space derivation) when `POST /assets/editable`
+    is unreachable — absent it, the fallback narrows to the owned subset, same as pre-#734.
+    */
     space?: { id: string; canWrite: boolean; members?: SharedSpaceMemberResponseDto[] };
     downloadFilename?: string;
     /** Remove-from-album / remove-from-space result handler. */

@@ -5,6 +5,7 @@ import type { Component } from 'svelte';
 import { assetFactory } from '#test-data/factories/asset-factory';
 import PlacesCardGroup from './PlacesCardGroup.svelte';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function renderGroup(city: string, country?: string | null) {
   const props = { places: [assetFactory.build({ id: 'asset-1', exifInfo: { city, country } })] };
 

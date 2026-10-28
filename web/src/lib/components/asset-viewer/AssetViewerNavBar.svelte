@@ -43,10 +43,10 @@
     isPlayingOriginalVideo: boolean;
     setPlayOriginalVideo: (value: boolean) => void;
     /**
-     * Present on shared-space surfaces (direct space, space album, space person). Gates and
-     * narrows the add-to-album action for assets the caller does not own — see
-     * `getAssetActions` (#889).
-     */
+    Present on shared-space surfaces (direct space, space album, space person). Gates and
+    narrows the add-to-album action for assets the caller does not own — see
+    `getAssetActions` (#889).
+    */
     space?: { id: string; canWrite: boolean };
   }
 

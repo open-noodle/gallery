@@ -29,12 +29,12 @@
   };
 
   /**
-   * R6 — the stars ARE the editing control (a star click already means "set the rating to N"), so
-   * the filter cannot live on the value. It gets its own icon.
-   *
-   * R9 — and only when there is a rating to filter BY: parseRating (filter-url.ts) rejects anything
-   * outside 1..5, so an unrated asset's icon would close the asset viewer and apply nothing at all.
-   */
+  R6 — the stars ARE the editing control (a star click already means "set the rating to N"), so
+  the filter cannot live on the value. It gets its own icon.
+  
+  R9 — and only when there is a rating to filter BY: parseRating (filter-url.ts) rejects anything
+  outside 1..5, so an unrated asset's icon would close the asset viewer and apply nothing at all.
+  */
   let filterableRating = $derived(rating !== null && rating >= 1 && rating <= 5 ? rating : undefined);
 </script>
 

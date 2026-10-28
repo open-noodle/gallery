@@ -7,6 +7,7 @@ import {
 // A minimal stand-in for HTMLImageElement -- getNaturalSize (container-utils.ts) only ever reads
 // naturalWidth/naturalHeight off it, and `instanceof HTMLVideoElement` is false for this shape in
 // happy-dom, which is exactly the branch we want for these tests.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const image = (naturalWidth: number, naturalHeight: number) =>
   ({ naturalWidth, naturalHeight }) as unknown as HTMLImageElement;
 

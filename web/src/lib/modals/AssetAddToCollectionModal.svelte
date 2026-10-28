@@ -7,9 +7,9 @@
     assetIds: string[];
     onClose: () => void;
     /**
-     * Set when the selection contains assets the user does not own: the picker then offers only
-     * albums linked to this space, and the dispatch runs in contribution mode (#764).
-     */
+    Set when the selection contains assets the user does not own: the picker then offers only
+    albums linked to this space, and the dispatch runs in contribution mode (#764).
+    */
     restrictToSpaceId?: string;
   };
 

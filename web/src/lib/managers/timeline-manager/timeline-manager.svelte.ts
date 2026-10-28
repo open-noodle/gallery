@@ -388,13 +388,13 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   /**
-   * True only when the timeline has finished loading results for exactly `options` (not a
-   * stale prior query) AND that result set is empty. Pages use this instead of reading
-   * `assetCount` directly: right after a filter changes, `assetCount` still reflects the
-   * previous query for a tick (the reload is async), so a naive `assetCount === 0` check can
-   * momentarily look "empty" and unmount the filter panel — stealing focus from an input the
-   * user is typing in. Gating on the loaded options closing that window.
-   */
+  True only when the timeline has finished loading results for exactly `options` (not a
+  stale prior query) AND that result set is empty. Pages use this instead of reading
+  `assetCount` directly: right after a filter changes, `assetCount` still reflects the
+  previous query for a tick (the reload is async), so a naive `assetCount === 0` check can
+  momentarily look "empty" and unmount the filter panel — stealing focus from an input the
+  user is typing in. Gating on the loaded options closing that window.
+  */
   isEmptyForOptions(options: TimelineManagerOptions): boolean {
     return (
       this.isInitialized &&

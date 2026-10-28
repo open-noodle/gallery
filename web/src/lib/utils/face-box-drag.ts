@@ -2,12 +2,12 @@ import { getNaturalSize, scaleToFit, type ContentMetrics } from '#lib/utils/cont
 import { clamp } from 'lodash-es';
 
 /**
- * Shared face-box drag geometry -- the coordinate transform and selector-placement math used by
- * BOTH the owner's `FaceEditor.svelte` and the space-flavoured `SpaceFaceEditor.svelte` when a
- * user drags/resizes a face box over the asset. Kept as pure functions in one place because two
- * independently maintained copies of this transform would drift and silently misplace boxes
- * (Slice 8, Task 2).
- */
+Shared face-box drag geometry -- the coordinate transform and selector-placement math used by
+BOTH the owner's `FaceEditor.svelte` and the space-flavoured `SpaceFaceEditor.svelte` when a
+user drags/resizes a face box over the asset. Kept as pure functions in one place because two
+independently maintained copies of this transform would drift and silently misplace boxes
+(Slice 8, Task 2).
+*/
 
 export type BoundingRect = { left: number; top: number; width: number; height: number };
 
@@ -38,11 +38,11 @@ export const computeImageContentMetrics = (
 };
 
 /**
- * Converts a face rectangle's bounding box from CONTENT pixel space (the canvas overlay, scaled
- * to fit the container) into NATURAL pixel space (the original image/video) -- what every
- * face-box write endpoint (owner and space) expects. `undefined` when the container has
- * collapsed to zero size and the transform cannot be expressed.
- */
+Converts a face rectangle's bounding box from CONTENT pixel space (the canvas overlay, scaled
+to fit the container) into NATURAL pixel space (the original image/video) -- what every
+face-box write endpoint (owner and space) expects. `undefined` when the container has
+collapsed to zero size and the transform cannot be expressed.
+*/
 export const computeFaceCroppedCoordinates = (
   boundingRect: BoundingRect,
   htmlElement: HTMLImageElement | HTMLVideoElement,
@@ -79,10 +79,10 @@ export const computeFaceCroppedCoordinates = (
 export type SelectorPosition = { top: number; left: number };
 
 /**
- * Picks the corner of the face box the picker flyout should anchor to (below, above, right,
- * left), preferring whichever position overlaps the face box the least once clamped to stay
- * inside the container.
- */
+Picks the corner of the face box the picker flyout should anchor to (below, above, right,
+left), preferring whichever position overlaps the face box the least once clamped to stay
+inside the container.
+*/
 export const computeSelectorPosition = (params: {
   faceBox: BoundingRect;
   selectorWidth: number;

@@ -84,14 +84,14 @@ export type FilteredTimelineConfig = {
   /** Browse-mode timeline query for the current filters; the controller adds `grouping`. */
   timelineOptions: (filters: FilterState) => TimelineManagerOptions;
   /**
-   * Browse-mode panel config. In query mode the controller answers suggestions, baseline and the
-   * city/camera-model providers from the smart-search facets instead.
-   */
+  Browse-mode panel config. In query mode the controller answers suggestions, baseline and the
+  city/camera-model providers from the smart-search facets instead.
+  */
   browseConfig: () => FilterPanelConfig;
   /**
-   * `searchable` (photos style) writes `q`/`sort` with the filters and re-hydrates on any URL
-   * change. `filter-state` (album style) writes only filter params and ignores `?at=` churn.
-   */
+  `searchable` (photos style) writes `q`/`sort` with the filters and re-hydrates on any URL
+  change. `filter-state` (album style) writes only filter params and ignores `?at=` churn.
+  */
   urlMode?: 'searchable' | 'filter-state';
   /** `filter-state` only: URL to FilterState (e.g. dropping a route-implied `albumId`). */
   hydrate?: (url: URL) => FilterState;
@@ -141,12 +141,12 @@ const emptyFilterSuggestions = (): FilterSuggestionsResponse => ({
 const replaceUrl = (url: string) => void goto(url, { replace: true, reset: false });
 
 /**
- * Fork-only state behind every filtered timeline route: filter state and its URL round trip, the
- * committed smart-search query and its facets, grouping/zoom, chip names and the bulk-action
- * handlers that must act on search results while the timeline is unmounted (#908).
- *
- * Construct it during component init (it registers effects). Render it with `FilteredTimeline`.
- */
+Fork-only state behind every filtered timeline route: filter state and its URL round trip, the
+committed smart-search query and its facets, grouping/zoom, chip names and the bulk-action
+handlers that must act on search results while the timeline is unmounted (#908).
+
+Construct it during component init (it registers effects). Render it with `FilteredTimeline`.
+*/
 export class FilteredTimelineController {
   readonly config: FilteredTimelineConfig;
 
@@ -382,11 +382,11 @@ export class FilteredTimelineController {
   };
 
   /**
-   * #1041: adding photos to a space the caller hides from their own timeline changes what the
-   * server returns, but the mounted manager has cached its buckets. Remount rather than
-   * `removeAssets`: an asset that also reaches a still-visible space must stay, and deciding that
-   * client-side is the simulation the hide-from-timeline design abandoned.
-   */
+  #1041: adding photos to a space the caller hides from their own timeline changes what the
+  server returns, but the mounted manager has cached its buckets. Remount rather than
+  `removeAssets`: an asset that also reaches a still-visible space must stay, and deciding that
+  client-side is the simulation the hide-from-timeline design abandoned.
+  */
   onSpaceAddAssets = ({ hiddenFromMyTimeline }: { hiddenFromMyTimeline?: boolean }) => {
     if (hiddenFromMyTimeline && !this.showSearchResults) {
       this.timelineReloadToken++;

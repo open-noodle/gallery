@@ -2,16 +2,16 @@ import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
 
 /**
- * Titles and subtitles for generated memory cards.
- *
- * Memory rules deliberately persist no prose: a memory is generated once by the server and then
- * read for days by clients in whatever language each viewer picked, so any English baked in at
- * generation time is stuck (#1045). Each rule instead stores structured facts in `data.context`,
- * and the card text is assembled here, in the viewer's language, every render.
- *
- * Memories generated before that change still carry `title`/`subtitle`, so those win when present
- * — an old card keeps reading as it did rather than falling back to "Unknown".
- */
+Titles and subtitles for generated memory cards.
+
+Memory rules deliberately persist no prose: a memory is generated once by the server and then
+read for days by clients in whatever language each viewer picked, so any English baked in at
+generation time is stuck (#1045). Each rule instead stores structured facts in `data.context`,
+and the card text is assembled here, in the viewer's language, every render.
+
+Memories generated before that change still carry `title`/`subtitle`, so those win when present
+— an old card keeps reading as it did rather than falling back to "Unknown".
+*/
 
 type RuleContext = Record<string, unknown>;
 
@@ -47,9 +47,9 @@ const asYears = (context: RuleContext): number[] | undefined =>
     : undefined;
 
 /**
- * "September 2025" / "septembre 2025". Built with `Intl` rather than an i18n message, so month
- * names come from the locale data instead of needing twelve translated strings.
- */
+"September 2025" / "septembre 2025". Built with `Intl` rather than an i18n message, so month
+names come from the locale data instead of needing twelve translated strings.
+*/
 const formatMonthYear = (locale: string | undefined, year: number, month: number) =>
   new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
     new Date(Date.UTC(year, month - 1, 1)),

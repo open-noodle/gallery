@@ -26,6 +26,7 @@ const person = (
 });
 
 const conf = (id: string) => person({ personId: id, recommendation: 'confident' });
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const rev = (id: string) => person({ personId: id, recommendation: 'review-first' });
 
 describe('createScanTriageModel', () => {

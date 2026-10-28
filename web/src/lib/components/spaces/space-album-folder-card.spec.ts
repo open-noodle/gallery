@@ -21,6 +21,7 @@ const folder = {
 
 const otherFolder = { ...folder, id: 'family', name: 'Family' };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const album = (id: string, folderId: string | null = null) =>
   ({ id, albumName: id, folderId }) as SharedSpaceLinkedAlbumDto;
 

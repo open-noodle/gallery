@@ -58,10 +58,10 @@
     person?: PersonResponseDto;
     spaceId?: string;
     /**
-     * The shared space this timeline belongs to, mirroring what the surface hands
-     * `SelectionToolbar`. Forwarded to the asset viewer so single-photo actions can be gated the
-     * same way the multi-select bar gates them (#889).
-     */
+    The shared space this timeline belongs to, mirroring what the surface hands
+    `SelectionToolbar`. Forwarded to the asset viewer so single-photo actions can be gated the
+    same way the multi-select bar gates them (#889).
+    */
     space?: { id: string; canWrite: boolean };
     onSelect?: (asset: TimelineAsset) => void;
     onEscape?: () => void;

@@ -11,10 +11,10 @@
   type Props = {
     menuItem?: boolean;
     /**
-     * #734: which of the current selection the caller may edit — send only these. Omitted on
-     * surfaces that don't resolve it (every render site outside `SelectionToolbar.svelte`),
-     * where it falls back to the pre-#734 ownership-only filter.
-     */
+    #734: which of the current selection the caller may edit — send only these. Omitted on
+    surfaces that don't resolve it (every render site outside `SelectionToolbar.svelte`),
+    where it falls back to the pre-#734 ownership-only filter.
+    */
     editableSelectedAssetIds?: string[];
   };
 

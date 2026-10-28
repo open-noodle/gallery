@@ -34,15 +34,15 @@ const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto
   assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', ...overrides });
 
 /**
- * E14's load-bearing fixture. The asset was taken at 01:00 on 1 Jan 2026 in Auckland (UTC+13) —
- * i.e. 12:00 on 31 Dec 2025 UTC. The row DISPLAYS 1 Jan 2026 (it prefers exifInfo.dateTimeOriginal
- * + timeZone), so the filter must say 2026-01-01.
- *
- * Note `localDateTime` is deliberately the UTC instant here rather than the naive local wall clock:
- * that is what makes this fixture bite. Any implementation that filters off `localDateTime` — or
- * that re-buckets the displayed DateTime through UTC — yields 2025-12-31 and fails this test. A
- * "straddles midnight" fixture with a naive-local `localDateTime` would pass vacuously.
- */
+E14's load-bearing fixture. The asset was taken at 01:00 on 1 Jan 2026 in Auckland (UTC+13) —
+i.e. 12:00 on 31 Dec 2025 UTC. The row DISPLAYS 1 Jan 2026 (it prefers exifInfo.dateTimeOriginal
++ timeZone), so the filter must say 2026-01-01.
+
+Note `localDateTime` is deliberately the UTC instant here rather than the naive local wall clock:
+that is what makes this fixture bite. Any implementation that filters off `localDateTime` — or
+that re-buckets the displayed DateTime through UTC — yields 2025-12-31 and fails this test. A
+"straddles midnight" fixture with a naive-local `localDateTime` would pass vacuously.
+*/
 const AUCKLAND_NEW_YEAR = {
   exifInfo: { dateTimeOriginal: '2026-01-01T01:00:00+13:00', timeZone: 'Pacific/Auckland' },
   fileCreatedAt: '2025-12-31T12:00:00Z',

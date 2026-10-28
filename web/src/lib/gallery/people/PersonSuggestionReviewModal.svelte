@@ -78,7 +78,7 @@
   let imgReady = $state(false);
 
   const current = $derived(items[index]);
-  const currentActed = $derived(current ? actedFaceIds.has(current.assetFaceId) : false);
+  const currentActed = $derived(!!current && actedFaceIds.has(current.assetFaceId));
   const photoUrl = $derived(current ? getAssetMediaUrl({ id: current.assetId, size: AssetMediaSize.Preview }) : '');
   // S11.6: the queue is empty — either it started that way or reviewing drained it — and the initial load has
   // settled. `onClose` still fires (unchanged, see advance()/onMount below); this only controls what renders

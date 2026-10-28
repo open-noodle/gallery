@@ -1,21 +1,21 @@
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 
 /**
- * Bounds the URL length when a long free-text value is used as a filter (E13).
- *
- * Applies to ALL THREE free-text filters — description, filename and OCR — symmetrically on encode
- * and decode. A pasted 10KB value would otherwise go straight into the URL, and reverse proxies
- * commonly cap request headers at ~8KB. `text-filter.svelte` mirrors it as the inputs' `maxlength`.
- */
+Bounds the URL length when a long free-text value is used as a filter (E13).
+
+Applies to ALL THREE free-text filters — description, filename and OCR — symmetrically on encode
+and decode. A pasted 10KB value would otherwise go straight into the URL, and reverse proxies
+commonly cap request headers at ~8KB. `text-filter.svelte` mirrors it as the inputs' `maxlength`.
+*/
 export const TEXT_FILTER_PARAM_MAX_LENGTH = 200;
 
 /**
- * Clamp a free-text filter value to TEXT_FILTER_PARAM_MAX_LENGTH **code points**.
- *
- * NOT `.slice(0, n)`: that cuts UTF-16 code units, so an emoji (or any astral character) straddling
- * the boundary is split into a lone surrogate — which is not serializable, so URLSearchParams emits
- * U+FFFD in its place. That is a silent, irreversible corruption of the user's last character.
- */
+Clamp a free-text filter value to TEXT_FILTER_PARAM_MAX_LENGTH **code points**.
+
+NOT `.slice(0, n)`: that cuts UTF-16 code units, so an emoji (or any astral character) straddling
+the boundary is split into a lone surrogate — which is not serializable, so URLSearchParams emits
+U+FFFD in its place. That is a silent, irreversible corruption of the user's last character.
+*/
 function clampTextFilterParam(value: string | undefined): string | undefined {
   if (value === undefined) {
     return undefined;
@@ -258,10 +258,10 @@ function parseRating(value: string | null): number | undefined {
 }
 
 /**
- * A 4-digit calendar year. Bounded rather than "any integer" so a hand-typed or fuzzed `?year=0` /
- * `?year=99999` can't reach `new Date(Date.UTC(year, …))` in buildFilterContext and produce a
- * nonsense takenAfter/takenBefore that quietly matches nothing.
- */
+A 4-digit calendar year. Bounded rather than "any integer" so a hand-typed or fuzzed `?year=0` /
+`?year=99999` can't reach `new Date(Date.UTC(year, …))` in buildFilterContext and produce a
+nonsense takenAfter/takenBefore that quietly matches nothing.
+*/
 function parseYearParam(value: string | null): number | undefined {
   return parseBoundedInteger(value, 1000, 9999);
 }

@@ -136,16 +136,16 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
   });
 
   /**
-   * The stale-panel bug: `asset` is a plain prop and AssetViewer derives it from `cursor.current`,
-   * so DetailPanel assigning `asset = await getAssetInfo(...)` only updated its OWN copy. Closing
-   * and reopening the info panel re-read the parent's untouched asset and showed the pre-edit
-   * people again, until a full page reload.
-   *
-   * Emitting `AssetUpdate` is the existing route back to the parent (AssetViewer's `onAssetUpdate`
-   * replaces `cursor.current`). Asserting the emit -- rather than anything rendered inside
-   * DetailPanel -- is the point: a local-only assignment renders identically here and would pass a
-   * DOM assertion while leaving the parent stale.
-   */
+  The stale-panel bug: `asset` is a plain prop and AssetViewer derives it from `cursor.current`,
+  so DetailPanel assigning `asset = await getAssetInfo(...)` only updated its OWN copy. Closing
+  and reopening the info panel re-read the parent's untouched asset and showed the pre-edit
+  people again, until a full page reload.
+  
+  Emitting `AssetUpdate` is the existing route back to the parent (AssetViewer's `onAssetUpdate`
+  replaces `cursor.current`). Asserting the emit -- rather than anything rendered inside
+  DetailPanel -- is the point: a local-only assignment renders identically here and would pass a
+  DOM assertion while leaving the parent stale.
+  */
   it('emits AssetUpdate with the refetched asset after a space face edit', async () => {
     const asset = assetFactory.build({
       id: 'asset-1',
