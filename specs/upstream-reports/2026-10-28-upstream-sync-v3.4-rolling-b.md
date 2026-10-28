@@ -87,7 +87,10 @@ Both were cherry-picked by hand; `integratedForkHead` advanced with an `appendHi
 | #1251 | Clean. Its migration `1790900000000-SplitSharedPersonGroups` was missing from `docs/fork/ownership.yml` (the post-rebase audit's migration count, 80 vs 79); added. Its medium spec's stock-Immich stand-in runs this branch's upstream folder, so after the revert it re-runs the post-tag migrations the script removes: the assertion now expects exactly those (an empty list at a tag, so `main` is unaffected). unicorn v78 flagged one destructuring in its new spec. |
 | #1244 | One conflict: its Drift test went into `merged_asset_drift_test.dart`, which on rolling is upstream's file; the fork's Space timeline tests live in `mobile/test/gallery/shared_space_timeline_drift_test.dart` (#1182), so the test moved there verbatim. Its `checkSpaceStackAccess` imported `src/utils/set.js`, gone on rolling (native `Set` methods): `allowed.difference(denied)`. Found by `pnpm build`, not by the earlier tsc run, which predated the sync.        |
 
-Neither needs a fix on `main`: both breaks are rolling-only (toolchain or layout ahead of `main`).
+Those two breaks are rolling-only. A third is **already on `main`** (Test red at `387d598598a`): #1244 added the
+`SharedSpaceStacksV1` sync type without re-recording the search-contract fixtures
+(`mobile/test/fixtures/search_contract/*server-features.json`), so the e2e contract check fails. Fixed here in its own
+commit (`44ba44657a4`); `main` needs the same one-line-per-file change.
 
 ## Pattern propagation — eslint-plugin-unicorn v78
 
@@ -161,4 +164,33 @@ blocks. `favorite-grep-gate.spec.ts` uses the same prefix test and still passes;
 
 ## Remote CI
 
-_pending_
+Round 1 on `694742eb138` (dispatched in two waves; revert gate with `gallery_image=…:rolling-v34-rc5` and
+`upstream_image=immich-server:commit-e51de38c40a…`):
+
+| Workflow                        | Result  | Notes                                                                                                                                                   |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Static Code Analysis            | GREEN   |                                                                                                                                                         |
+| Gallery ML Smoke                | GREEN   |                                                                                                                                                         |
+| Gallery Rebase Smoke            | GREEN   |                                                                                                                                                         |
+| Gallery Mobile Smoke            | GREEN   |                                                                                                                                                         |
+| Storage Migration E2E           | GREEN   |                                                                                                                                                         |
+| Release Candidate Build         | GREEN   | `gallery-server:rolling-v34-rc5` (+ ML)                                                                                                                 |
+| Gallery Revert-to-Immich Valid. | GREEN   | on the branch's RC, stock round trip on upstream `e51de38c40a`                                                                                          |
+| Test                            | RED     | search-contract fixtures (#1244, also red on `main`); fork e2e pinning the old folder-view 500; `sync-partner` order flake (upstream spec, 5/5 locally) |
+| Storage Migration Tests         | RED ×2  | `delete-source-false`: `fetch failed / other side closed` on the first GET after ~6 s of `execSync` docker checks                                       |
+| Gallery Build Mobile            | RED     | iOS job never got a macOS runner ("not acquired … capacity"); Android green. Re-run                                                                     |
+| Docker                          | pending |                                                                                                                                                         |
+
+Storage: the server log shows no error; the full CI phase sequence passes locally. The phase verifies disk files
+through `docker compose exec` (`execSync`) for ~6 s, past the server's 5 s keep-alive, with the event loop blocked,
+so the next `fetch` reuses a socket the server already closed. `main`'s passing run had a 5.47 s gap. The test now
+retries a GET once on `UND_ERR_SOCKET` (`85044be5f0e`).
+
+Round 2 on `85044be5f0e`: Storage Migration Tests GREEN, Docker GREEN (`694742eb138`, the round-2 commits only
+touch tests). Test: Medium GREEN (the `sync-partner` flake did not recur), folder-view e2e GREEN; the search
+contract still failed on `featureLevel` (immich-32791). The contract check stops at the first mismatching fixture,
+so the fixtures were re-recorded against an e2e stack built from this branch (`SEARCH_CONTRACT_RECORD=1`): only
+the three server-version fixtures changed (`bd500d562fa`); the hand-written server-features edit matched the
+recording. iOS: no macOS runner on two attempts (GitHub capacity), re-dispatched.
+
+Round 3: _pending_
