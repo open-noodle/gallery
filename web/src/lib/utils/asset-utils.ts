@@ -1,4 +1,3 @@
-import { animateRemoval } from '#lib/gallery/motion/index.ts';
 import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { downloadManager } from '#lib/managers/download-manager.svelte.ts';
@@ -20,7 +19,6 @@ import {
   updateAsset,
   updateAssets,
   type AssetResponseDto,
-  type AssetTypeEnum,
   type DownloadInfoDto,
   type ExifResponseDto,
   type UserResponseDto,
@@ -125,7 +123,7 @@ function isRotated270CW(orientation: number) {
   return [7, 8, -90].includes(orientation);
 }
 
-export function isFlipped(orientation?: string | null) {
+function isFlipped(orientation?: string | null) {
   const value = Number(orientation);
   return value && (isRotated270CW(value) || isRotated90CW(value));
 }
@@ -149,7 +147,7 @@ export function getAssetResolution(asset: AssetResponseDto): string {
     return 'Invalid Data';
   }
 
-  return `${asset.width} x ${asset.height}`;
+  return `${asset.width} × ${asset.height}`;
 }
 
 /** Returns aspect ratio for the asset */
@@ -228,20 +226,6 @@ export function isWebCompatibleImage(asset: AssetResponseDto): boolean {
 
   return supportedImageMimeTypes.has(asset.originalMimeType);
 }
-
-export const getAssetType = (type: AssetTypeEnum) => {
-  switch (type) {
-    case 'IMAGE': {
-      return 'Photo';
-    }
-    case 'VIDEO': {
-      return 'Video';
-    }
-    default: {
-      return 'Asset';
-    }
-  }
-};
 
 export const getOwnedAssetsWithWarning = (assets: TimelineAsset[], user: UserResponseDto | null): string[] => {
   const ids = [...assets].filter((a) => user && a.ownerId === user.id).map((a) => a.id);
@@ -327,7 +311,7 @@ export const toggleArchive = async (asset: AssetResponseDto) => {
   return asset;
 };
 
-const showUndoArchiveToast = (description: string, assets: TimelineAsset[]) => {
+export const showUndoArchiveToast = (description: string, assets: TimelineAsset[]) => {
   const $t = get(t);
   toastManager.primary({
     description,
@@ -363,33 +347,6 @@ const undoArchiveAssets = async (assets: TimelineAsset[]) => {
   } catch (error) {
     handleError(error, $t('errors.unable_to_archive_unarchive', { values: { archived: false } }));
   }
-};
-
-export const archiveAssets = async (assets: TimelineAsset[], visibility: AssetVisibility) => {
-  const ids = assets.map(({ id }) => id);
-  const $t = get(t);
-
-  try {
-    if (ids.length > 0) {
-      await updateAssets({
-        assetBulkUpdateDto: { ids, visibility },
-      });
-    }
-
-    if (visibility === AssetVisibility.Archive) {
-      animateRemoval(ids, 'archive');
-      showUndoArchiveToast($t('archived_count', { values: { count: ids.length } }), assets);
-    } else {
-      toastManager.primary($t('unarchived_count', { values: { count: ids.length } }));
-    }
-  } catch (error) {
-    handleError(
-      error,
-      $t('errors.unable_to_archive_unarchive', { values: { archived: visibility === AssetVisibility.Archive } }),
-    );
-  }
-
-  return ids;
 };
 
 export const delay = async (ms: number) => {

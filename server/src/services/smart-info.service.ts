@@ -95,7 +95,8 @@ export class SmartInfoService extends BaseService {
     }
 
     const asset = await this.assetJobRepository.getForClipEncoding(id);
-    if (!asset || asset.files.length !== 1) {
+    const previewFile = asset?.files.find((file) => file.isEdited) ?? asset?.files[0];
+    if (!asset || !previewFile) {
       return JobStatus.Failed;
     }
 
@@ -111,7 +112,7 @@ export class SmartInfoService extends BaseService {
       }
       embedding = result;
     } else {
-      embedding = await this.machineLearningRepository.encodeImage(asset.files[0].path, machineLearning.clip);
+      embedding = await this.machineLearningRepository.encodeImage(previewFile.path, machineLearning.clip);
     }
 
     if (this.databaseRepository.isBusy(DatabaseLock.CLIPDimSize)) {

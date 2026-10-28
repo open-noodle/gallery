@@ -33,6 +33,7 @@ import {
 import {
   AssetOrder,
   AssetOrderBy,
+  AssetVisibility,
   getAssetInfo,
   getTimeBucketCovers,
   getTimeBuckets,
@@ -166,7 +167,14 @@ export class TimelineManager extends VirtualScrollManager {
             this.upsertAssets([timelineAsset]);
           }
         },
-        AssetsUnarchive: (assets) => this.upsertAssets(assets),
+        AssetsArchive: (assetIds) => this.update(assetIds, (asset) => (asset.visibility = AssetVisibility.Archive)),
+        AssetsUnarchive: (assets) => {
+          if (this.#options.visibility === AssetVisibility.Archive) {
+            this.removeAssets(assets.map((asset) => asset.id));
+          } else {
+            this.upsertAssets(assets);
+          }
+        },
         AlbumRemoveAssets: ({ assetIds, albumIds }) => {
           if (this.#options.albumId && albumIds.includes(this.#options.albumId)) {
             this.removeAssets(assetIds);
