@@ -2,6 +2,8 @@
 # Seeds a Gallery database with the data scripts/revert-to-immich.sql has to clean up, then checks
 # the result through a stock Immich server. Used by gallery-revert-to-immich-validation.yml.
 #
+#   revert-to-immich-data.sh shared-people-seed FIXTURE
+#                                            no server running, stock Immich's database; before Gallery's first boot
 #   revert-to-immich-data.sh seed            Gallery server running on :2283
 #   revert-to-immich-data.sh stock-prepare   no server running; the switch-back guide's steps for a trial boot
 #   revert-to-immich-data.sh stock-assert DRIFT BASELINE REVERT_SQL
@@ -54,6 +56,63 @@ upload() {
     -F "assetData=@$file" \
     -F "fileCreatedAt=2024-01-01T00:00:00.000Z" \
     -F "fileModifiedAt=2024-01-01T00:00:00.000Z" | jq -r .id
+}
+
+psql_stdin() {
+  docker exec -i database psql -U "${DB_USERNAME:-postgres}" -d "${DB_DATABASE_NAME:-immich}" -v ON_ERROR_STOP=1 -At
+}
+
+# The Immich 3.3 shared-people fixture (revert-to-immich-shared-people.sql), seeded before Gallery's first
+# boot. Its own state file, since seed rewrites $STATE.
+SHARED_PEOPLE=$STATE_DIR/shared-people.env
+SHARED_PEOPLE_USERS="SELECT id FROM \"user\" WHERE email LIKE 'shared-people-%@example.com'"
+
+# A digest of what Immich owns for the fixture's users. updatedAt/updateId are left out: moving a row bumps them.
+shared_people_digest() {
+  psql_stdin <<'SQL'
+WITH u AS (SELECT "id" FROM "user" WHERE "email" LIKE 'shared-people-%@example.com')
+SELECT md5(concat_ws('|',
+  (SELECT string_agg(concat_ws(',', "ownerId", "personGroupId", "name", "isHidden", "isFavorite", "birthDate", "color",
+                               "thumbnailPath", "faceAssetId", "createdAt"), ';' ORDER BY "personGroupId", "ownerId")
+     FROM "person" WHERE "ownerId" IN (SELECT "id" FROM u)),
+  (SELECT string_agg(concat_ws(',', f."id", f."personGroupId", f."deletedAt", f."isVisible"), ';' ORDER BY f."id")
+     FROM "asset_face" f JOIN "asset" a ON a."id" = f."assetId" WHERE a."ownerId" IN (SELECT "id" FROM u)),
+  (SELECT string_agg(concat_ws(',', "personGroupId", "sharedById", "sharedWithId", "role", "createdAt", "updatedAt",
+                               "updateId"), ';' ORDER BY "personGroupId", "sharedById", "sharedWithId")
+     FROM "person_user" WHERE "sharedById" IN (SELECT "id" FROM u)),
+  (SELECT string_agg(concat_ws(',', g."id", g."clusterGroupId"), ';' ORDER BY g."id")
+     FROM "person_group" g WHERE g."id" IN (SELECT "personGroupId" FROM "person" WHERE "ownerId" IN (SELECT "id" FROM u))),
+  (SELECT string_agg(concat_ws(',', "id", "clusterGroupId"), ';' ORDER BY "id") FROM "user" WHERE "id" IN (SELECT "id" FROM u))
+));
+SQL
+}
+
+shared_people_seed() {
+  psql_stdin <"${1:?}" >/dev/null
+  cat >"$SHARED_PEOPLE" <<EOF
+SHARED_PEOPLE_DIGEST=$(shared_people_digest)
+SHARED_PEOPLE_ROWS=$(psql_q "SELECT count(*) FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")
+SHARED_PEOPLE_MOVES=$(psql_q "SELECT count(*) - count(DISTINCT \"personGroupId\") FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")
+SHARED_PEOPLE_SHARES=$(psql_q "SELECT count(*) FROM person_user WHERE \"sharedById\" IN ($SHARED_PEOPLE_USERS)")
+EOF
+  # shellcheck source=/dev/null
+  . "$SHARED_PEOPLE"
+  [ "$SHARED_PEOPLE_MOVES" -gt 0 ] || fail "shared-people: the fixture made no multi-owner group"
+  echo "::notice::shared-people: $SHARED_PEOPLE_ROWS people in groups shared by several owners seeded on stock Immich"
+}
+
+# shared_people_split_checks PHASE: Gallery split the fixture one row per group, keeping every row and share.
+shared_people_split_checks() {
+  # shellcheck source=/dev/null
+  . "$SHARED_PEOPLE"
+  check "$1" 'shared people: one row per group' \
+    "$(psql_q "SELECT count(*) FROM (SELECT \"personGroupId\" FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS) GROUP BY 1 HAVING count(*) > 1) AS d")" 0
+  check "$1" 'shared people: every person kept' \
+    "$(psql_q "SELECT count(*) FROM person WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_ROWS"
+  check "$1" 'shared people: every move recorded' \
+    "$(psql_q "SELECT count(*) FROM person_group_split WHERE \"ownerId\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_MOVES"
+  check "$1" 'shared people: shares held aside' \
+    "$(psql_q "SELECT count(*) FROM person_group_split_share WHERE \"sharedById\" IN ($SHARED_PEOPLE_USERS)")" "$SHARED_PEOPLE_SHARES"
 }
 
 # poll SECONDS SQL EXPECTED-REGEX
@@ -314,6 +373,8 @@ stock_assert() {
   done
   check stock 'a job in a Gallery-only queue stays queued' "$(docker exec redis valkey-cli LLEN immich_bull:classification:wait)" 1
 
+  shared_people_split_checks stock
+
   [ "$failed" = 0 ] || exit 1
   echo "::notice::stock: Immich serves the owner on the Gallery database"
 }
@@ -353,6 +414,8 @@ gallery_assert() {
   local uploaded
   uploaded=$(upload "$owner" "$STATE_DIR/media/144x108.jpg")
   poll 120 "SELECT count(*) FROM shared_space_asset WHERE \"spaceId\" = '$SPACE' AND \"assetId\" = '$uploaded'" '^1$' >/dev/null
+
+  shared_people_split_checks gallery
 
   [ "$failed" = 0 ] || exit 1
   echo "::notice::gallery: everything seeded survived the stock Immich boot"
@@ -441,11 +504,17 @@ assert() {
 
   stock_sync_checks assert "$owner"
 
+  # shellcheck source=/dev/null
+  . "$SHARED_PEOPLE"
+  check assert 'shared people restored as Immich had them' "$(shared_people_digest)" "$SHARED_PEOPLE_DIGEST"
+  check assert 'shared people split tables removed' "$(psql_q "SELECT to_regclass('public.person_group_split') IS NULL")" t
+
   [ "$failed" = 0 ] || exit 1
   echo "::notice::assert: reverted data checks passed on stock Immich"
 }
 
 case ${1:-} in
+  shared-people-seed) shared_people_seed "${2:?path to revert-to-immich-shared-people.sql}" ;;
   seed) seed ;;
   stock-prepare) stock_prepare ;;
   stock-assert) stock_assert "${2:?stock drift file}" "${3:?baseline drift file}" "${4:?path to revert-to-immich.sql}" ;;
@@ -453,5 +522,5 @@ case ${1:-} in
   gallery-assert) gallery_assert ;;
   s3-guard) s3_guard "${2:?path to revert-to-immich.sql}" ;;
   assert) assert ;;
-  *) fail "usage: $0 seed | stock-prepare | stock-assert <drift> <baseline> <revert-to-immich.sql> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert" ;;
+  *) fail "usage: $0 shared-people-seed <revert-to-immich-shared-people.sql> | seed | stock-prepare | stock-assert <drift> <baseline> <revert-to-immich.sql> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert" ;;
 esac

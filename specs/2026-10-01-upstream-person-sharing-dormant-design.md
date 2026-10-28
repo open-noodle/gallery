@@ -39,7 +39,8 @@ Upstream's model cannot function in Gallery as built:
 Converging means undoing Option M and rebuilding Space people on `person_user` — a multi-week data-model change that
 reverses a settled decision. Not now.
 
-**Revisit when** upstream makes sharing work without multi-row groups, or Gallery decides to adopt cluster groups.
+**Revisit when** upstream makes sharing work without multi-row groups, or Gallery decides to adopt cluster groups. Databases that already hold shared groups are split on the way in and rejoined on the way out:
+see `specs/2026-10-28-shared-person-groups-split-design.md`, which also defines the first step of adoption.
 
 ## Design
 
