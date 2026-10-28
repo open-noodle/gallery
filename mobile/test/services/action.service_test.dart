@@ -6,21 +6,17 @@ import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/services/action.service.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../infrastructure/repository.mock.dart';
 import '../repository.mocks.dart';
 
-class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
-
 void main() {
   late ActionService sut;
 
   late MockAssetApiRepository assetApiRepository;
   late MockRemoteAssetRepository remoteAssetRepository;
-  late MockSharedSpaceApiRepository sharedSpaceApiRepository;
   late MockAlbumApiRepository albumApiRepository;
   late MockRemoteAlbumRepository remoteAlbumRepository;
 
@@ -43,17 +39,10 @@ void main() {
   setUp(() {
     assetApiRepository = MockAssetApiRepository();
     remoteAssetRepository = MockRemoteAssetRepository();
-    sharedSpaceApiRepository = MockSharedSpaceApiRepository();
     albumApiRepository = MockAlbumApiRepository();
     remoteAlbumRepository = MockRemoteAlbumRepository();
 
-    sut = ActionService(
-      assetApiRepository,
-      remoteAssetRepository,
-      sharedSpaceApiRepository,
-      albumApiRepository,
-      remoteAlbumRepository,
-    );
+    sut = ActionService(assetApiRepository, remoteAssetRepository, albumApiRepository, remoteAlbumRepository);
   });
 
   tearDown(() async {

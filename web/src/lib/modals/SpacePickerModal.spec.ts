@@ -99,6 +99,44 @@ describe('SpacePickerModal', () => {
     expect(await screen.findByRole('button', { name: /Created Space/ })).toBeInTheDocument();
   });
 
+  it('lists the spaces it is given with their counts and title, without asking the server', async () => {
+    render(SpacePickerModal, {
+      onClose,
+      title: 'Remove from space',
+      spaces: [
+        makeSpace({ id: 'family', name: 'Family' }),
+        makeSpace({ id: 'trips', name: 'Trips' }),
+        makeSpace({ id: 'viewed', name: 'Viewed', role: SharedSpaceRole.Viewer }),
+      ],
+      counts: { family: 2, trips: 1 },
+    });
+
+    expect(await screen.findByRole('button', { name: /Family/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Trips/ })).toBeInTheDocument();
+    expect(screen.queryByText('Viewed')).not.toBeInTheDocument();
+    expect(screen.getByText('Remove from space')).toBeInTheDocument();
+    // The test locale shows keys: a count per row, in place of the role.
+    expect(screen.getAllByText('items_count')).toHaveLength(2);
+    expect(screen.queryByText('role_editor')).not.toBeInTheDocument();
+    expect(sdkMock.getAllSpaces).not.toHaveBeenCalled();
+  });
+
+  it("shows each space's colour next to its count", async () => {
+    render(SpacePickerModal, {
+      onClose,
+      spaces: [
+        makeSpace({ id: 'family', name: 'Family', color: UserAvatarColor.Pink }),
+        makeSpace({ id: 'trips', name: 'Trips', color: UserAvatarColor.Blue }),
+      ],
+      counts: { family: 2, trips: 1 },
+    });
+
+    const family = await screen.findByRole('button', { name: /Family/ });
+    expect(family.querySelector(':scope [data-space-color] svg')?.getAttribute('class')).toContain('text-pink-500');
+    const trips = screen.getByRole('button', { name: /Trips/ });
+    expect(trips.querySelector(':scope [data-space-color] svg')?.getAttribute('class')).toContain('text-blue-600');
+  });
+
   it('filters writable spaces by search text', async () => {
     sdkMock.getAllSpaces.mockResolvedValue([
       makeSpace({ id: 'family-space', name: 'Family Space' }),

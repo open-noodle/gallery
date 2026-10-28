@@ -2,19 +2,25 @@
   import { initInput } from '$lib/actions/focus';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import { getAllSpaces, SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
-  import { Modal, ModalBody } from '@immich/ui';
+  import { getAllSpaces, SharedSpaceRole, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
+  import { Icon, Modal, ModalBody } from '@immich/ui';
+  import { mdiAccountGroup } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
   type Props = {
     onClose: (space?: SharedSpaceResponseDto) => void;
+    /** The spaces to offer; without them, every space the user can write to, from the server. */
+    spaces?: SharedSpaceResponseDto[];
+    /** A count to show on each space's row, in place of the user's role. */
+    counts?: Record<string, number>;
+    title?: string;
   };
 
-  const { onClose }: Props = $props();
+  const { onClose, spaces: givenSpaces, counts, title }: Props = $props();
 
-  let spaces = $state<SharedSpaceResponseDto[]>([]);
-  let loading = $state(true);
+  let spaces = $state<SharedSpaceResponseDto[]>(givenSpaces ?? []);
+  let loading = $state(!givenSpaces);
   let search = $state('');
   let selectedRowIndex = $state(0);
 
@@ -25,6 +31,9 @@
   );
 
   onMount(async () => {
+    if (givenSpaces) {
+      return;
+    }
     try {
       spaces = await getAllSpaces();
     } catch (error) {
@@ -44,6 +53,20 @@
       selectedRowIndex = filteredSpaces.length - 1;
     }
   });
+
+  // The dark end of each space card's gradient (space-card.svelte), which reads on the modal's background.
+  const colorClasses: Record<string, string> = {
+    [UserAvatarColor.Primary]: 'text-immich-primary dark:text-immich-dark-primary',
+    [UserAvatarColor.Pink]: 'text-pink-500',
+    [UserAvatarColor.Red]: 'text-red-600',
+    [UserAvatarColor.Yellow]: 'text-yellow-500',
+    [UserAvatarColor.Blue]: 'text-blue-600',
+    [UserAvatarColor.Green]: 'text-green-700',
+    [UserAvatarColor.Purple]: 'text-purple-700',
+    [UserAvatarColor.Orange]: 'text-orange-600',
+    [UserAvatarColor.Gray]: 'text-gray-600',
+    [UserAvatarColor.Amber]: 'text-amber-600',
+  };
 
   const getCurrentUserRole = (space: SharedSpaceResponseDto) => {
     if (space.createdById === currentUserId) {
@@ -86,7 +109,7 @@
   };
 </script>
 
-<Modal title={$t('add_to_space')} {onClose} size="small">
+<Modal title={title ?? $t('add_to_space')} {onClose} size="small">
   <ModalBody>
     <div class="mb-2 flex max-h-100 flex-col">
       {#if loading}
@@ -118,8 +141,22 @@
                 onclick={() => onClose(space)}
                 onmouseenter={() => (selectedRowIndex = index)}
               >
-                <span class="min-w-0 truncate font-medium text-black dark:text-white">{space.name}</span>
-                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{getRoleLabel(space)}</span>
+                <span class="flex min-w-0 items-center gap-3">
+                  {#if counts}
+                    <span class="shrink-0" data-space-color>
+                      <Icon
+                        icon={mdiAccountGroup}
+                        size="20"
+                        class={colorClasses[space.color ?? UserAvatarColor.Primary] ??
+                          colorClasses[UserAvatarColor.Primary]}
+                      />
+                    </span>
+                  {/if}
+                  <span class="truncate font-medium text-black dark:text-white">{space.name}</span>
+                </span>
+                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                  {counts ? $t('items_count', { values: { count: counts[space.id] ?? 0 } }) : getRoleLabel(space)}
+                </span>
               </button>
             {/each}
           {/if}

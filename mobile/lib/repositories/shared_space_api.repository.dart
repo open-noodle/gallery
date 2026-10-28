@@ -223,10 +223,20 @@ class SharedSpaceApiRepository extends ApiRepository {
     _onSpaceChanged?.call();
   }
 
-  Future<void> removeAssets(String spaceId, List<String> assetIds) async {
+  /// The server removes only the assets added to the space directly (with their stacks) and returns those.
+  Future<List<String>> removeAssets(String spaceId, List<String> assetIds) async {
     final dto = SharedSpaceAssetRemoveDto(assetIds: assetIds);
-    await _api.removeAssets(spaceId, dto);
+    final removed = await _api.removeAssets(spaceId, dto) ?? const <String>[];
     _onSpaceChanged?.call();
+    return removed;
+  }
+
+  /// The names of the albums linked to the space that hold [assetIds], once each.
+  Future<List<String>> linkedAlbumNames(String spaceId, List<String> assetIds) async {
+    final albums = await _api.getSharedSpaceAssetLinkedAlbums(spaceId, SharedSpaceAssetRemoveDto(assetIds: assetIds));
+    return [
+      ...{for (final album in albums ?? const <SharedSpaceAssetLinkedAlbumDto>[]) album.albumName},
+    ];
   }
 
   /// Link an album to a shared space (PUT /shared-spaces/{id}/albums/{albumId}).
