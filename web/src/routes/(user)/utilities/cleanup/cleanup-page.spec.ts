@@ -3,6 +3,8 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+import { pop } from '$lib/gallery/motion';
 import { todayMonthDay } from '$lib/utils/cleanup';
 import CleanupPage from './+page.svelte';
 
@@ -18,6 +20,10 @@ const flags = vi.hoisted(() => ({ value: { trash: true } }));
 
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: flags }));
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...sdk }));
+vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pop: vi.fn() }));
+
+// The hub pins a slim banner once the full one has scrolled away; tests drive the observer by hand.
+const observers = vi.hoisted(() => ({ callbacks: [] as IntersectionObserverCallback[] }));
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
@@ -51,10 +57,22 @@ const asset = (id: string) => ({ id, thumbhash: null, originalFileName: `${id}.j
 describe('Cleanup hub page', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
     vi.resetAllMocks();
+    observers.callbacks = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          observers.callbacks.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
     sdk.getCleanupCalendar.mockResolvedValue({
       days: [{ monthDay: 101, assetCount: 3, reviewedAt: '2026-01-01T00:00:00.000Z' }],
       daysReviewed: 1,
@@ -96,25 +114,70 @@ describe('Cleanup hub page', () => {
     expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
   });
 
-  it('links "Rewind today" to today\'s rewind', () => {
+  it("starts today's rewind from the banner", () => {
     renderPage();
 
-    expect(screen.getByRole('link', { name: 'cleanup_rewind_today' })).toHaveAttribute(
+    expect(screen.getByTestId('cleanup-banner-start')).toHaveAttribute(
       'href',
       `/utilities/cleanup/rewind/${todayMonthDay()}`,
     );
   });
 
-  it('peeks today by default, reading the most recent year first', async () => {
+  it('shows today in the banner, loading its busiest year once', async () => {
+    sdk.getCleanupRewindYears.mockResolvedValue({
+      years: [
+        { year: 2024, count: 4 },
+        { year: 2019, count: 9 },
+      ],
+    });
     renderPage();
 
-    const peek = screen.getByTestId('cleanup-day-peek');
-    await waitFor(() => expect(within(peek).getByText('cleanup_day_peek_summary')).toBeInTheDocument());
+    const banner = screen.getByTestId('cleanup-day-banner');
+    await waitFor(() => expect(within(banner).getByText('cleanup_banner_photos_years')).toBeInTheDocument());
+    expect(within(banner).getByText('cleanup_banner_today')).toBeInTheDocument();
     expect(sdk.getCleanupRewindYears).toHaveBeenCalledWith({ monthDay: todayMonthDay() }, expect.anything());
+    expect(sdk.getCleanupRewindAssets).toHaveBeenCalledTimes(1);
     expect(sdk.getCleanupRewindAssets).toHaveBeenCalledWith(
-      { monthDay: todayMonthDay(), year: 2024 },
+      { monthDay: todayMonthDay(), year: 2019 },
       expect.anything(),
     );
+  });
+
+  it('swaps the banner to a hovered day and back to today when the pointer leaves the calendar', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-102'));
+    await vi.advanceTimersByTimeAsync(150);
+    expect(screen.getByTestId('cleanup-day-banner')).toHaveTextContent('January 2');
+    expect(screen.getByTestId('cleanup-banner-start')).toHaveAttribute('href', '/utilities/cleanup/rewind/102');
+
+    await fireEvent.pointerLeave(screen.getByTestId('cleanup-calendar'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(within(screen.getByTestId('cleanup-day-banner')).getByText('cleanup_banner_today')).toBeInTheDocument();
+  });
+
+  it('pins a slim banner once the full one has scrolled away', async () => {
+    renderPage();
+    await waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('cleanup-banner-slim')).not.toBeInTheDocument();
+
+    const scrolledAway = { isIntersecting: false, boundingClientRect: { top: -200 } } as IntersectionObserverEntry;
+    observers.callbacks.at(-1)!([scrolledAway], {} as IntersectionObserver);
+    await waitFor(() => expect(screen.getByTestId('cleanup-banner-slim')).toBeInTheDocument());
+
+    const back = { isIntersecting: true, boundingClientRect: { top: 80 } } as IntersectionObserverEntry;
+    observers.callbacks.at(-1)!([back], {} as IntersectionObserver);
+    await waitFor(() => expect(screen.queryByTestId('cleanup-banner-slim')).not.toBeInTheDocument());
+  });
+
+  it('pops the day just finished in rewind', async () => {
+    finishedDay.set(101);
+    renderPage();
+
+    await waitFor(() => expect(pop).toHaveBeenCalledWith(screen.getByTestId('cleanup-cal-101')));
+    expect(finishedDay.take()).toBeUndefined();
   });
 
   it('holds the "Could still free" figure until every count has settled', async () => {

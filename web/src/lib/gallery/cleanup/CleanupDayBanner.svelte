@@ -114,7 +114,7 @@
           {#each shown as asset, index (asset.id)}
             <img
               src={thumbnail(asset, index === 0 ? AssetMediaSize.Preview : AssetMediaSize.Thumbnail)}
-              alt=""
+              alt={asset.originalFileName}
               draggable="false"
               data-motion-reveal
               class="size-full rounded-xl bg-subtle object-cover {index === 0 ? 'row-span-2 rounded-2xl' : ''}"
