@@ -30,6 +30,26 @@ export const shouldCrossfade = (navigation: {
 
 const TRANSITION_CLASS = 'gallery-page-transition';
 
+/**
+ * Elements that morph from one page to the next opt in with `data-shared-element="<name>"`: a hub photo
+ * collage becoming the rewind header's photo stack, say. They are named only while a transition runs, since a
+ * `view-transition-name` makes its element a stacking context (rule 6 in the motion design).
+ */
+export const SHARED_ELEMENT_ATTR = 'data-shared-element';
+
+/** Names every opted-in element under `root` after its attribute; returns a function that clears them. */
+export const nameSharedElements = (root: ParentNode): (() => void) => {
+  const elements = [...root.querySelectorAll<HTMLElement>(`[${SHARED_ELEMENT_ATTR}]`)];
+  for (const element of elements) {
+    element.style.viewTransitionName = element.getAttribute(SHARED_ELEMENT_ATTR) ?? '';
+  }
+  return () => {
+    for (const element of elements) {
+      element.style.viewTransitionName = '';
+    }
+  };
+};
+
 /** `onNavigate` callback: SvelteKit waits for the returned promise before swapping the page. */
 export const crossfadeNavigation = (navigation: OnNavigate): Promise<void> | void => {
   // Older browsers without View Transitions just swap pages.
@@ -43,13 +63,22 @@ export const crossfadeNavigation = (navigation: OnNavigate): Promise<void> | voi
   // The sidebar and top bar are named only for the transition's lifetime (see motion.css).
   const root = document.documentElement;
   root.classList.add(TRANSITION_CLASS);
+  // The old page's shared elements are captured when the transition starts, the new page's once it rendered.
+  const clearOld = nameSharedElements(document);
+  let clearNew = () => {};
   return new Promise((resolve) => {
     // eslint-disable-next-line tscompat/tscompat
     const transition = document.startViewTransition(async () => {
       resolve();
       await navigation.complete;
+      clearOld();
+      clearNew = nameSharedElements(document);
     });
     // eslint-disable-next-line tscompat/tscompat
-    void transition.finished.finally(() => root.classList.remove(TRANSITION_CLASS));
+    void transition.finished.finally(() => {
+      root.classList.remove(TRANSITION_CLASS);
+      clearOld();
+      clearNew();
+    });
   });
 };

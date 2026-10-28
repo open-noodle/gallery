@@ -1,4 +1,4 @@
-import { countMotion, flipMotion } from '$lib/gallery/motion/list';
+import { countMotion, flipMotion, slideFrom, staggerDelay } from '$lib/gallery/motion/list';
 import { duration } from '$lib/gallery/motion/tokens';
 
 const stubReducedMotion = (reduce: boolean) =>
@@ -24,5 +24,24 @@ describe('list motion', () => {
     stubReducedMotion(true);
     expect(flipMotion()).toEqual({ duration: 0 });
     expect(countMotion()).toEqual({ duration: 0 });
+  });
+
+  it('caps the stagger', () => {
+    stubReducedMotion(false);
+    expect(staggerDelay(2)).toBe('80ms');
+    expect(staggerDelay(20)).toBe('360ms');
+  });
+
+  it('slides in from the direction of travel', () => {
+    stubReducedMotion(false);
+    expect(slideFrom(1)[0]).toEqual({ translate: '12px 0', opacity: 0 });
+    expect(slideFrom(-1)[0].translate).toBe('-12px 0');
+    expect(slideFrom(0)).toEqual([]);
+  });
+
+  it('has no stagger or slide under reduced motion', () => {
+    stubReducedMotion(true);
+    expect(staggerDelay(3)).toBe('0ms');
+    expect(slideFrom(1)).toEqual([]);
   });
 });
