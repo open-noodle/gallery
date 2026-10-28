@@ -55,6 +55,7 @@ import {
   unlinkAlbum as sdkUnlinkAlbum,
   searchAssets,
   setBaseUrl,
+  setHeaders,
   setMaintenanceMode,
   setupPinCode,
   signUpAdmin,
@@ -85,6 +86,7 @@ import { createGzip } from 'node:zlib';
 import pg from 'pg';
 import { io, type Socket } from 'socket.io-client';
 import { loginDto, signupDto } from 'src/fixtures.js';
+import { GALLERY_APP_HEADER } from 'src/gallery-client.js';
 import { makeRandomImage } from 'src/generators.js';
 import request from 'supertest';
 import { playwrightDbHost, playwrightDbPort, playwrightHost, playwriteBaseUrl } from '../playwright.config.js';
@@ -336,6 +338,7 @@ export const utils = {
 
   initSdk: () => {
     setBaseUrl(app);
+    setHeaders({ [GALLERY_APP_HEADER]: 'e2e' });
   },
 
   adminSetup: async (options?: AdminSetupOptions) => {

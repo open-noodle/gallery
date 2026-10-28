@@ -55,6 +55,9 @@ export interface PersonSearchOptions {
   closestFaceAssetId?: string;
   /** People-page type filter: 'person' or 'pet'. Undefined returns both. */
   type?: string;
+  isFavorite?: boolean;
+  isHidden?: boolean;
+  name?: string;
 }
 
 export interface PersonNameSearchOptions {
@@ -692,21 +695,6 @@ export class PersonRepository {
     }));
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, { month: 4, day: 23 }] })
-  getBirthdaysForDay(ownerId: string, { month, day }: { month: number; day: number }) {
-    return this.db
-      .selectFrom('person')
-      .select(['personGroupId', 'name', 'birthDate'])
-      .where('ownerId', '=', ownerId)
-      .where('isHidden', '=', false)
-      .where((eb) => eb.not(personIsPet()))
-      .where('name', '!=', '')
-      .where('birthDate', 'is not', null)
-      .where(sql`extract(month from "birthDate")`, '=', month)
-      .where(sql`extract(day from "birthDate")`, '=', day)
-      .execute();
-  }
-
   /**
    * Dormant people: named, non-hidden, non-pet persons whose most recent Timeline-visible,
    * previewable asset predates `lastSeenBefore`, with at least `minAssets` such assets ever.
@@ -845,12 +833,22 @@ export class PersonRepository {
           )
           .orderBy('person.personGroupId'),
       )
-      .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
+      // an explicit isHidden filter takes precedence over withHidden
+      .$if(!options?.withHidden && options?.isHidden === undefined, (qb) => qb.where('person.isHidden', '=', false))
       .$if(!!options?.type, (qb) => qb.where(personType(), '=', options!.type!))
-      // "Pets" means the individuals pet recognition identified, not the per-species buckets the
-      // detector alone produces. A bucket has no pet_search row on any of its faces.
-      .$if(options?.type === 'pet', (qb) =>
-        qb.where((eb) =>
+      .$if(options?.isFavorite !== undefined, (qb) => qb.where('person.isFavorite', '=', options!.isFavorite!))
+      .$if(options?.isHidden !== undefined, (qb) => qb.where('person.isHidden', '=', options!.isHidden!))
+      // Upstream's `f_unaccent(name) %> f_unaccent(:name)` at its 0.5 word-similarity threshold, without the
+      // set_config CTE upstream needs to set that threshold for the operator.
+      .$if(options?.name !== undefined, (qb) =>
+        qb.where(sql<boolean>`word_similarity(f_unaccent(${options!.name!}), f_unaccent("person"."name")) >= 0.5`),
+      )
+      // A pet is listed only as an individual pet recognition identified, never as the per-species
+      // bucket the detector alone produces, on every view: the bucket's species name would otherwise
+      // pass the named-person arm above. A bucket has no pet_search row on any of its faces.
+      .where((eb) =>
+        eb.or([
+          eb.not(personIsPet()),
           eb.exists(
             eb
               .selectFrom('asset_face as pet_face')
@@ -858,7 +856,7 @@ export class PersonRepository {
               .select(sql`1`.as('one'))
               .whereRef('pet_face.personGroupId', '=', 'person.personGroupId'),
           ),
-        ),
+        ]),
       )
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
@@ -1268,7 +1266,7 @@ export class PersonRepository {
           AND "asset_face"."isVisible" = true
           AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
           AND (
-            ${typeFilter} <> 'pet'
+            NOT ${personIsPet()}
             OR EXISTS (
               SELECT 1 FROM "asset_face" "pet_face"
               INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"

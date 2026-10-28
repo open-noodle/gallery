@@ -27,6 +27,8 @@ export type ServeOptions = {
    * it because the client replays the header to S3 on the presigned URL.
    */
   range?: string;
+  /** Stream through the API even when the backend would redirect: set for clients a redirect would leak a credential from. */
+  proxy?: boolean;
   /**
    * Aborted when the response this read is for closes. A backend that holds resources for the
    * read (the S3 proxy's read slot and socket) ties them to it, so a client that leaves at any

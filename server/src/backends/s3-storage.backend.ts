@@ -302,7 +302,7 @@ export class S3StorageBackend implements StorageBackend {
   }
 
   async getServeStrategy(key: string, options: ServeOptions): Promise<ServeStrategy> {
-    if (this.serveMode === 'proxy') {
+    if (this.serveMode === 'proxy' || options.proxy) {
       const { signal } = options;
       // a client that already left takes no place in the queue
       signal?.throwIfAborted();

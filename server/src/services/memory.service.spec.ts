@@ -47,6 +47,8 @@ const overlapRow = (overrides: {
   assets: overrides.assets.map((id) => ({ id })),
 });
 
+const stockAuth = (userId: string) => ({ ...factory.auth({ user: { id: userId } }), stockClient: true as const });
+
 describe(MemoryService.name, () => {
   let sut: MemoryService;
   let mocks: ServiceMocks;
@@ -106,6 +108,7 @@ describe(MemoryService.name, () => {
     mocks.memoryRuleAsset.getMemoryFacesForPeriod.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryPersonDailyCounts.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryAssetsForPersonWindow.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getPetPersonGroupIds.mockResolvedValue(new Set());
     mocks.user.getMetadata.mockResolvedValue([]);
     // Without these, every `onMemoriesCreate` test outside the `reconcileMemoryOverlap` /
     // `overlap backfill` describe blocks hits an unstubbed mock, `rows.length` throws a
@@ -202,8 +205,8 @@ describe(MemoryService.name, () => {
       mocks.user.getList.mockResolvedValue([user]);
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([
-        { personGroupId: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
+      mocks.person.forBirthdayMemories.mockResolvedValue([
+        { personGroupId: 'person-1', name: 'Alice', birthDate: { year: 1990, month: 4, day: 23 } },
       ]);
       mocks.memoryRuleAsset.getMemoryAssetsForPerson.mockResolvedValue([
         { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
@@ -228,7 +231,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
       expect(mocks.memory.create).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerId: user.id,
@@ -269,7 +272,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -292,11 +295,11 @@ describe(MemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -322,7 +325,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
       expect(mocks.memory.create).not.toHaveBeenCalled();
 
@@ -697,14 +700,14 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
       mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       // birthday rule runs only for userA; recent-trip runs for both
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledWith(userA.id, expect.anything());
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledWith(userA.id, expect.anything());
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
 
@@ -725,12 +728,12 @@ describe(MemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -748,11 +751,11 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -1601,7 +1604,56 @@ describe(MemoryService.name, () => {
       const result = await sut.statistics(auth, dto);
 
       expect(result).toEqual(stats);
-      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, dto);
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, dto, [
+        MemoryType.OnThisDay,
+        MemoryType.Rule,
+      ]);
+    });
+
+    it('should count only on-this-day memories for a stock client', async () => {
+      const auth = { ...factory.auth(), stockClient: true as const };
+      mocks.memory.statisticsAccessible.mockResolvedValue({ total: 1 });
+
+      await sut.statistics(auth, {});
+
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, {}, [MemoryType.OnThisDay]);
+    });
+  });
+
+  describe('stock clients', () => {
+    it('should not list rule memories to a stock client', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const onThisDay = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
+      const rule = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(onThisDay), getForMemory(rule)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+
+      const stock = await sut.search(stockAuth(userId), {});
+      expect(stock.map(({ id }) => id)).toEqual([onThisDay.id]);
+
+      const gallery = await sut.search(factory.auth({ user: { id: userId } }), {});
+      expect(gallery.map(({ id }) => id)).toEqual([onThisDay.id, rule.id]);
+    });
+
+    it('should not return a rule memory by id to a stock client', async () => {
+      const userId = newUuid();
+      const rule = MemoryFactory.create({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
+      });
+      mocks.memory.get.mockResolvedValue(getForMemory(rule));
+      mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([rule.id]));
+
+      await expect(sut.get(stockAuth(userId), rule.id)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(sut.get(factory.auth({ user: { id: userId } }), rule.id)).resolves.toMatchObject({ id: rule.id });
     });
   });
 
