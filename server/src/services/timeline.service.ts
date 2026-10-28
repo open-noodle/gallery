@@ -163,10 +163,14 @@ export class TimelineService extends BaseService {
     rejectSharedLinkFavoriteFilter(auth, dto.isFavorite);
     const includesOtherUsers = dto.withPartners || (dto.userId && dto.userId !== auth.user.id);
     if (includesOtherUsers) {
-      dto.visibility ??= AssetVisibility.Timeline;
+      // Gallery: the Favorites screen keeps visibility unset; withOwnArchiveOnly then admits only the caller's own archive.
+      const ownArchiveGated = dto.withPartners && dto.userId === auth.user.id && isFavoritesAcrossScope(dto);
+      if (!ownArchiveGated) {
+        dto.visibility ??= AssetVisibility.Timeline;
+      }
       // #763 slice 4: isFavorite is deliberately not rejected here — favorites are a per-user overlay
       // (asset_favorite) resolved for the CALLER, so they compose with cross-user scopes.
-      if (dto.visibility !== AssetVisibility.Timeline || dto.isTrashed) {
+      if ((dto.visibility ?? AssetVisibility.Timeline) !== AssetVisibility.Timeline || dto.isTrashed) {
         throw new BadRequestException(
           'Only non-archived, non-trashed, non-favorited, non-locked assets can be requested for other users',
         );
