@@ -1,8 +1,8 @@
+import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { modalManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import GlobalSearchFooter from '../global-search-footer.svelte';
 
 describe('global-search-footer', () => {
@@ -24,7 +24,7 @@ describe('global-search-footer', () => {
 describe('prefix scoping — footer chrome', () => {
   // Load en so `$t('cmdk_scope_hint_footer')` resolves to "@ # / >" rather than the raw key.
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

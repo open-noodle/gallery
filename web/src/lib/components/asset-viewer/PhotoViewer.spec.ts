@@ -1,9 +1,9 @@
+import { renderWithTooltips } from '#tests/helpers';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 import PhotoViewer from './PhotoViewer.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -26,39 +26,39 @@ const assetViewerManagerMock = vi.hoisted(() => ({
   closeFaceEditMode: vi.fn(),
 }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({ assetViewerManager: assetViewerManagerMock }));
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({ assetViewerManager: assetViewerManagerMock }));
 
-vi.mock('$lib/managers/cast-manager.svelte', () => ({
+vi.mock('#lib/managers/cast-manager.svelte.js', () => ({
   castManager: { isCasting: false, loadMedia: vi.fn() },
 }));
 
-vi.mock('$lib/stores/face.svelte', () => ({
+vi.mock('#lib/stores/face.svelte.js', () => ({
   faceManager: { data: [] as unknown[], facesByPersonId: new Map(), people: [] as unknown[] },
 }));
 
-vi.mock('$lib/stores/ocr.svelte', () => ({
+vi.mock('#lib/stores/ocr.svelte.js', () => ({
   ocrManager: { showOverlay: false, data: [] as unknown[] },
 }));
 
-vi.mock('$lib/actions/zoom-image', () => ({ zoomImageAction: () => ({}) }));
+vi.mock('#lib/actions/zoom-image.js', () => ({ zoomImageAction: () => ({}) }));
 
-vi.mock('$lib/components/AssetViewerEvents.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/AssetViewerEvents.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/AdaptiveImage.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/AdaptiveImage.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/face-editor.stub.svelte');
+vi.mock('#lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/face-editor.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/space-face-editor.stub.svelte');
+vi.mock('#lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/space-face-editor.stub.svelte');
   return { default: MockComponent };
 });
 

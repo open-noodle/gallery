@@ -1,18 +1,18 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { Route } from '$lib/route';
+  import { Route } from '#lib/route.ts';
   import {
     isSpaceAlbumsExpanded,
     recentSpaceAlbumsExpanded,
     setSpaceAlbumsExpanded,
-  } from '$lib/stores/preferences.store';
-  import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
-  import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-  import { getAllSpacesQuery, getSpaceAlbumsQuery } from '$lib/gallery/spaces/space.query';
-  import { queryClient } from '$lib/queries/client';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { splitPinnedSpaces } from '$lib/utils/space-utils';
-  import { handleError } from '$lib/utils/handle-error';
+  } from '#lib/stores/preferences.store.ts';
+  import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
+  import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
+  import { getAllSpacesQuery, getSpaceAlbumsQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { splitPinnedSpaces } from '#lib/utils/space-utils.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiChevronRight, mdiDotsHorizontal } from '@mdi/js';
   import { createQueries, createQuery } from '@tanstack/svelte-query';
@@ -82,17 +82,18 @@
 </script>
 
 {#each spaces as space (space.id)}
-  {@const spacePath = `/spaces/${space.id}`}
-  {@const openAlbumPath = `${spacePath}/albums/`}
+  {const spacePath = $derived(`/spaces/${space.id}`)}
+  {const openAlbumPath = $derived(`${spacePath}/albums/`)}
   <!-- Opening one of the albums below hands the selection down to that album's own row, so only a
        single row ever reads as selected. The space keeps it everywhere else — including its albums
        *list* page (`/albums`, no trailing id), which has no row of its own to hand it to. -->
-  {@const active = page.url.pathname.startsWith(spacePath) && !page.url.pathname.startsWith(openAlbumPath)}
-  {@const hasAlbums = (space.albumCount ?? 0) > 0}
-  {@const cachedAlbums = spaceAlbums[space.id]}
-  {@const expanded =
+  {const active = $derived(page.url.pathname.startsWith(spacePath) && !page.url.pathname.startsWith(openAlbumPath))}
+  {const hasAlbums = $derived((space.albumCount ?? 0) > 0)}
+  {const cachedAlbums = $derived(spaceAlbums[space.id])}
+  {const expanded = $derived(
     isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, space.id) &&
-    (cachedAlbums === undefined || cachedAlbums.length > 0)}
+      (cachedAlbums === undefined || cachedAlbums.length > 0),
+  )}
   <div>
     <!-- The chevron is absolutely positioned against this wrapper, so it must enclose the space row
          alone: with the expanded album rows inside it, `top-1/2` would centre the chevron on the
@@ -158,7 +159,7 @@
     </div>
     {#if expanded}
       {#each (cachedAlbums ?? []).slice(0, 3) as album (album.id)}
-        {@const albumActive = page.url.pathname.startsWith(`${openAlbumPath}${album.id}`)}
+        {const albumActive = $derived(page.url.pathname.startsWith(`${openAlbumPath}${album.id}`))}
         <a
           href={Route.viewSpaceAlbum({ spaceId: space.id, albumId: album.id })}
           title={album.albumName}

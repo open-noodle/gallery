@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { registerSpaceContext, type RegisterSpaceContextOptions } from '$lib/managers/command-context-manager.svelte';
+  import {
+    registerSpaceContext,
+    type RegisterSpaceContextOptions,
+  } from '#lib/managers/command-context-manager.svelte.ts';
   import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 
   let {

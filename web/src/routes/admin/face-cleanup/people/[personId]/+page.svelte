@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
-  import InfiniteScrollSentinel from '$lib/components/shared-components/infinite-scroll-sentinel.svelte';
-  import { Route } from '$lib/route';
-  import { handleError } from '$lib/utils/handle-error';
-  import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import InfiniteScrollSentinel from '#lib/components/shared-components/infinite-scroll-sentinel.svelte';
+  import { Route } from '#lib/route.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     getFaceRepairClusterFaces,
     getFaceRepairPersonMetadata,
@@ -17,12 +17,12 @@
   import { mdiArrowLeft, mdiArrowRight, mdiClose, mdiInformationOutline } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
-  import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
-  import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
-  import FaceReviewDock from '$lib/components/face-cleanup/FaceReviewDock.svelte';
-  import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
-  import type { FaceActionId } from '$lib/components/face-cleanup/face-actions';
-  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
+  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
+  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import { faceCleanupBreadcrumbs, manualCrumb } from '../../breadcrumbs';
   import PersonPicker from '../../[personId]/PersonPicker.svelte';
   import type { PageData } from './$types';
@@ -583,8 +583,8 @@
           data-testid="manual-review-face-grid"
         >
           {#each vm.faces as face, tileIndex (face.assetFaceId)}
-            {@const selected = vm.isSelected(face.assetFaceId)}
-            {@const state = vm.stateOf(face.assetFaceId)}
+            {const selected = $derived(vm.isSelected(face.assetFaceId))}
+            {const state = $derived(vm.stateOf(face.assetFaceId))}
             <div class="relative aspect-square">
               <button
                 type="button"
@@ -614,7 +614,7 @@
                      guided's exact STATE_COLOR/STATE_ICON tokens via MANUAL_STATE_COLOR/MANUAL_STATE_ICON, so
                      one glyph means one thing across both pages. -->
                 {#if state !== 'keep'}
-                  {@const nonKeepState = state as Exclude<ManualFaceState, 'keep'>}
+                  {const nonKeepState = $derived(state as Exclude<ManualFaceState, 'keep'>)}
                   <div
                     class="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-md border-2 border-white shadow-sm"
                     style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
@@ -673,7 +673,7 @@
         {#snippet summary()}
           <div class="flex flex-1 flex-wrap items-center gap-3.5" data-testid="manual-review-tally">
             {#each ['move', 'lock', 'unknown', 'detach'] as const as state (state)}
-              {@const count = vm.tally[state]}
+              {const count = $derived(vm.tally[state])}
               <span
                 class={[
                   'inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold dark:border-gray-700 dark:bg-gray-800',

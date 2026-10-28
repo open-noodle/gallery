@@ -1,4 +1,4 @@
-import { clampOverflow } from '$lib/actions/clamp-overflow';
+import { clampOverflow } from '#lib/actions/clamp-overflow.ts';
 
 /**
  * happy-dom has no layout engine, so heights are supplied by the test.

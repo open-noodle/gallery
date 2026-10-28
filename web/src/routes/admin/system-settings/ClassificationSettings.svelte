@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     Action,
     ClassificationFaceExclusion,

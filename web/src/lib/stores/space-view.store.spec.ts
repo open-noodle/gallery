@@ -1,6 +1,6 @@
+import { SortOrder } from '#lib/stores/preferences.store.ts';
+import { SpaceSortBy, pinnedSpaceIds, spaceViewSettings } from '#lib/stores/space-view.store.ts';
 import { get } from 'svelte/store';
-import { SortOrder } from '$lib/stores/preferences.store';
-import { SpaceSortBy, pinnedSpaceIds, spaceViewSettings } from '$lib/stores/space-view.store';
 
 describe('space-view store', () => {
   beforeEach(() => {

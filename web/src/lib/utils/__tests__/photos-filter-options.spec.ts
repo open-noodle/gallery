@@ -1,11 +1,11 @@
-import { AssetOrder, AssetTypeEnum, AssetVisibility, Type } from '@immich/sdk';
-import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import {
   buildPhotosTimelineOptions,
   getPhotosPersonFilterId,
   handlePhotosRemoveFilter,
-} from '$lib/utils/photos-filter-options';
+} from '#lib/utils/photos-filter-options.ts';
+import { AssetOrder, AssetTypeEnum, AssetVisibility, Type } from '@immich/sdk';
+import { describe, expect, it } from 'vitest';
 
 /** The signed-in user whose personal timeline /photos is. */
 const MY_USER_ID = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';

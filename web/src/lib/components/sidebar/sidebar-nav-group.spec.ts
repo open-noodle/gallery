@@ -1,7 +1,7 @@
+import SidebarNavGroup from '#lib/components/sidebar/sidebar-nav-group.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import SidebarNavGroup from '$lib/components/sidebar/sidebar-nav-group.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -11,9 +11,9 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
 vi.mock('@immich/ui', async () => {
-  const navbarGroup = await import('@test-data/mocks/navbar-group.stub.svelte');
+  const navbarGroup = await import('#test-data/mocks/navbar-group.stub.svelte');
   return { NavbarGroup: navbarGroup.default };
 });
 

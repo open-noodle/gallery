@@ -1,9 +1,9 @@
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
 import { queryOptions } from '@tanstack/svelte-query';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { queryClient } from '$lib/queries/client';
-import { handleError } from '$lib/utils/handle-error';
-import { getFormatter } from '$lib/utils/i18n';
 
 /**
  * The viewer's spaces list, shared by the sidebar's recent spaces and the People pages (which read the

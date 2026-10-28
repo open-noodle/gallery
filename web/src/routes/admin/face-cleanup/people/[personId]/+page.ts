@@ -1,5 +1,5 @@
-import { authenticate } from '$lib/utils/auth';
-import { getFormatter } from '$lib/utils/i18n';
+import { authenticate } from '#lib/utils/auth.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import type { PageLoad } from './$types';
 
 // Manual review page (design §6.4): person name/ownerId/faceCount are fetched CLIENT-SIDE from the URL param

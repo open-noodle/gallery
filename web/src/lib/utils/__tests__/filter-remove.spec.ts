@@ -1,6 +1,6 @@
+import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { handleRemoveFilter } from '#lib/utils/filter-remove.ts';
 import { describe, expect, it } from 'vitest';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { handleRemoveFilter } from '$lib/utils/filter-remove';
 
 describe('handleRemoveFilter', () => {
   it('clears lensModel for the lens chip', () => {

@@ -1,6 +1,6 @@
 import * as gcast from './gcast-destination.svelte';
 
-vi.mock('$lib/managers/cast-manager.svelte', () => ({
+vi.mock('#lib/managers/cast-manager.svelte.js', () => ({
   CastDestinationType: { GCAST: 'gcast' },
   CastState: { IDLE: 'IDLE', PLAYING: 'PLAYING' },
 }));

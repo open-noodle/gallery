@@ -1,8 +1,8 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 import PlacesCardGroup from './PlacesCardGroup.svelte';
 
 function renderGroup(city: string, country?: string | null) {

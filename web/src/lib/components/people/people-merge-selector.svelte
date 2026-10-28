@@ -1,8 +1,8 @@
 <script lang="ts" generics="T extends { id: string }">
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import SearchBar from '$lib/elements/SearchBar.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import SearchBar from '#lib/elements/SearchBar.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import { mdiCallMerge, mdiMerge, mdiSwapHorizontal, mdiSwapVertical } from '@mdi/js';
   import { onMount } from 'svelte';

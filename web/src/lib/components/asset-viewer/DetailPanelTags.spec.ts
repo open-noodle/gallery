@@ -1,7 +1,7 @@
+import { renderWithTooltips } from '#tests/helpers';
 import '@testing-library/jest-dom';
 import { screen, within } from '@testing-library/svelte';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanelTags from './DetailPanelTags.svelte';
 
 const { authManagerMock } = vi.hoisted(() => ({
@@ -16,9 +16,9 @@ const { authManagerMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: authManagerMock }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: authManagerMock }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: {
     value: {
       map: true,

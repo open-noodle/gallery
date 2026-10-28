@@ -1,16 +1,16 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import RecentSpaces from '#lib/components/shared-components/side-bar/recent-spaces.svelte';
+import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { recentSpaceAlbumsExpanded } from '#lib/stores/preferences.store.ts';
+import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import { UserAvatarColor } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
-import { spacesQueryKey } from '$lib/gallery/spaces/space.query';
-import { queryClient } from '$lib/queries/client';
-import { recentSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
-import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-import { handleError } from '$lib/utils/handle-error';
-import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
-import { sharedSpaceLinkedAlbumFactory } from '@test-data/factories/shared-space-linked-album-factory';
+import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
+import { sharedSpaceLinkedAlbumFactory } from '#test-data/factories/shared-space-linked-album-factory';
 
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/photos') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -22,20 +22,20 @@ const sidebarMocks = vi.hoisted(() => ({
     railExpanded: false,
   },
 }));
-vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: sidebarMocks.sidebarModeStore }));
+vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: sidebarMocks.sidebarModeStore }));
 
-vi.mock('$lib/utils/handle-error', () => ({
+vi.mock('#lib/utils/handle-error.js', () => ({
   handleError: vi.fn(),
 }));
 
-vi.mock('$lib/utils', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('$lib/utils')>()),
+vi.mock('#lib/utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils.ts')>()),
   getAssetMediaUrl: vi.fn(({ id }: { id: string }) => `/api/assets/${id}/thumbnail?edited=true`),
 }));
 
 describe('RecentSpaces component', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

@@ -1,6 +1,6 @@
+import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
-import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
 import Timeline from './Timeline.svelte';
 
 const testState = vi.hoisted(() => ({
@@ -59,27 +59,27 @@ vi.mock('$app/state', () => ({
   },
 }));
 
-vi.mock('$lib/components/timeline/actions/TimelineKeyboardActions.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/actions/TimelineKeyboardActions.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/timeline/Scrubber.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/timeline/Scrubber.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/elements/HotModuleReload.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/elements/HotModuleReload.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/elements/Portal.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/elements/Portal.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     get asset() {
       return undefined;
@@ -91,7 +91,7 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/stores/media-query-manager.svelte', () => ({
+vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
   mediaQueryManager: {
     get maxMd() {
       return testState.maxMd;
@@ -102,7 +102,7 @@ vi.mock('$lib/stores/media-query-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/stores/preferences.store', async () => {
+vi.mock('#lib/stores/preferences.store.js', async () => {
   const { readable } = await import('svelte/store');
   return {
     lang: readable('en-US'),
@@ -111,7 +111,7 @@ vi.mock('$lib/stores/preferences.store', async () => {
   };
 });
 
-vi.mock('$lib/managers/timeline-manager/timeline-manager.svelte', () => ({
+vi.mock('#lib/managers/timeline-manager/timeline-manager.svelte.js', () => ({
   TimelineManager: class TimelineManagerMock {
     grouping = testState.grouping;
     months = testState.months;

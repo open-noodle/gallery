@@ -1,7 +1,7 @@
+import { renderWithTooltips } from '#tests/helpers';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
-import { renderWithTooltips } from '$tests/helpers';
 import DetailPanel from './DetailPanel.svelte';
 
 // Regression probe for "file storage path no longer displayed below the filename in rc4".
@@ -36,7 +36,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
     authenticated: true,
     user: { id: 'owner-1' },
@@ -46,11 +46,11 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: assetViewerManagerMock,
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { map: false, smartSearch: false } },
 }));
 

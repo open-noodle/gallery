@@ -1,29 +1,29 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
-  import { QueryParameter, timeBeforeShowLoadingSpinner } from '$lib/constants';
-  import Dropdown from '$lib/elements/Dropdown.svelte';
-  import SearchBar from '$lib/elements/SearchBar.svelte';
-  import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
-  import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
-  import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
-  import type { ManagedPerson } from '$lib/components/people/people-types';
-  import ManageSpacePeopleVisibility from '$lib/components/spaces/manage-space-people-visibility.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
-  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-  import { handlePromiseError } from '$lib/utils';
-  import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
-  import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
-  import { handleError } from '$lib/utils/handle-error';
-  import { clearQueryParam } from '$lib/utils/navigation';
-  import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
-  import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
-  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/gallery/people/space-person-name-merge';
-  import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
+  import { page } from '$app/state';
+  import { QueryParameter, timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
+  import Dropdown from '#lib/elements/Dropdown.svelte';
+  import SearchBar from '#lib/elements/SearchBar.svelte';
+  import PeopleFaceStatisticsInfo from '#lib/components/people/people-face-statistics-info.svelte';
+  import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
+  import PeopleMergeSelector from '#lib/components/people/people-merge-selector.svelte';
+  import type { ManagedPerson } from '#lib/components/people/people-types.ts';
+  import ManageSpacePeopleVisibility from '#lib/components/spaces/manage-space-people-visibility.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import PersonEditBirthDateModal from '#lib/modals/PersonEditBirthDateModal.svelte';
+  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+  import { handlePromiseError } from '#lib/utils.ts';
+  import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '#lib/utils/cross-owner-merge.ts';
+  import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { clearQueryParam } from '#lib/utils/navigation.ts';
+  import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '#lib/utils/people-filter.ts';
+  import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '#lib/gallery/people/space-person-name-merge.ts';
+  import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
   import {
     getSpacePeople,
     getSpacePeopleFaceStatistics,
@@ -132,7 +132,7 @@
     countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim() || peopleFilterBy !== PeopleFilterBy.All,
   );
   const activeSearchFilterName = $derived(
-    searchName.trim() || ($page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '').trim(),
+    searchName.trim() || (page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '').trim(),
   );
   const activeStatisticsSearchName = $derived(activeSearchFilterName || null);
   const peopleStatisticsEnabled = $derived(featureFlagsManager.value.peopleStatistics);
@@ -189,7 +189,7 @@
   const canManageVisibility = $derived(isEditor && hasSpacePeople);
 
   onMount(() => {
-    const searchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
+    const searchedPeople = page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
     if (searchedPeople) {
       searchName = searchedPeople;
       handlePromiseError(searchPeople(searchedPeople));
@@ -243,18 +243,19 @@
   };
 
   async function updateSearchQueryParam() {
-    const currentSearch = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '';
+    const currentSearch = page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '';
     if (currentSearch === searchName) {
       return;
     }
 
+    const url = new URL(page.url.href);
     if (searchName) {
-      $page.url.searchParams.set(QueryParameter.SEARCHED_PEOPLE, searchName);
+      url.searchParams.set(QueryParameter.SEARCHED_PEOPLE, searchName);
     } else {
-      $page.url.searchParams.delete(QueryParameter.SEARCHED_PEOPLE);
+      url.searchParams.delete(QueryParameter.SEARCHED_PEOPLE);
     }
 
-    await goto($page.url, { keepFocus: true });
+    await goto(url, { reset: false });
   }
 
   async function refreshPeople() {
@@ -354,7 +355,7 @@
   async function onResetSearchBar() {
     searchName = '';
     cancelSearchRequest();
-    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, $page.url);
+    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, new URL(page.url.href));
     await refreshPeople();
   }
 

@@ -1,5 +1,5 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { canEditAsset, canEditSpacePeople, resolveEditableAssetIds } from './asset-editability';
 
 const space = (canWrite: boolean, memberIds: string[]) => ({

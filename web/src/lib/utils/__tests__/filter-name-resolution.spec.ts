@@ -1,13 +1,13 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { resolveFilterNames } from '#lib/utils/filter-name-resolution.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
 
 // The "fails soft" test below is only non-vacuous if the error-handling module is a NAMED mock we
 // can assert against: without this, "shows no toast" would pass against any implementation that
 // simply never imports handleError.
 const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
-vi.mock('$lib/utils/handle-error', () => ({
+vi.mock('#lib/utils/handle-error.js', () => ({
   handleError: handleErrorMock,
   handleErrorAsync: vi.fn(),
   getServerErrorMessage: vi.fn(),

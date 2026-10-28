@@ -1,6 +1,6 @@
 <script lang="ts">
-  import RepresentativeFaceTile from '$lib/components/people/representative-face-tile.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import RepresentativeFaceTile from '#lib/components/people/representative-face-tile.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import type { PersonFacePageResponseDto, PersonFaceResponseDto } from '@immich/sdk';
   import { Button, HStack, Modal, ModalBody, ModalFooter, toastManager } from '@immich/ui';
   import { onMount } from 'svelte';

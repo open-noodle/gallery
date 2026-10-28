@@ -1,5 +1,5 @@
+import { adminSettingsSearch, extractTranslationKeys } from '#lib/gallery/admin-settings-search.svelte.ts';
 import type { Translations } from 'svelte-i18n';
-import { adminSettingsSearch, extractTranslationKeys } from '$lib/gallery/admin-settings-search.svelte';
 
 const server = { key: 'server', title: 'Server Settings', subtitle: 'Manage server settings' };
 const english: Record<string, string> = {

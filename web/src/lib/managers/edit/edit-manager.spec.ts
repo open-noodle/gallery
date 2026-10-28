@@ -1,15 +1,15 @@
+import { EditManager, EditToolType } from '#lib/managers/edit/edit-manager.svelte.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
-import { EditManager, EditToolType } from '$lib/managers/edit/edit-manager.svelte';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { getFormatter } from '$lib/utils/i18n';
-import { assetFactory } from '@test-data/factories/asset-factory';
-import { websocketMock } from '@test-data/mocks/websocket.mock';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { websocketMock } from '#test-data/mocks/websocket.mock';
 
 vi.mock('@immich/sdk');
-vi.mock('$lib/stores/websocket');
-vi.mock('$lib/utils/i18n', () => ({
+vi.mock('#lib/stores/websocket.js');
+vi.mock('#lib/utils/i18n.js', () => ({
   getFormatter: vi.fn(),
   getPreferredLocale: vi.fn(),
 }));
@@ -18,10 +18,10 @@ vi.mock('@immich/ui', () => ({
   modalManager: { show: vi.fn() },
   ConfirmModal: {},
 }));
-vi.mock('$lib/managers/event-manager.svelte', () => ({
+vi.mock('#lib/managers/event-manager.svelte.js', () => ({
   eventManager: { emit: vi.fn(), on: vi.fn() },
 }));
-vi.mock('$lib/managers/edit/transform-manager.svelte', () => ({
+vi.mock('#lib/managers/edit/transform-manager.svelte.js', () => ({
   transformManager: {
     onActivate: vi.fn(),
     onDeactivate: vi.fn(),
@@ -31,10 +31,10 @@ vi.mock('$lib/managers/edit/transform-manager.svelte', () => ({
     edits: [],
   },
 }));
-vi.mock('$lib/components/asset-viewer/editor/transform-tool/transform-tool.svelte', () => ({
+vi.mock('#lib/components/asset-viewer/editor/transform-tool/transform-tool.svelte', () => ({
   default: {},
 }));
-vi.mock('$lib/managers/edit/trim-manager.svelte', () => ({
+vi.mock('#lib/managers/edit/trim-manager.svelte.js', () => ({
   trimManager: {
     onActivate: vi.fn(),
     onDeactivate: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock('$lib/managers/edit/trim-manager.svelte', () => ({
     edits: [],
   },
 }));
-vi.mock('$lib/components/asset-viewer/editor/trim-tool/trim-tool.svelte', () => ({
+vi.mock('#lib/components/asset-viewer/editor/trim-tool/trim-tool.svelte', () => ({
   default: {},
 }));
 

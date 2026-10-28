@@ -1,4 +1,3 @@
-import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import {
   canDrop,
   getActiveDragPayload,
@@ -6,7 +5,8 @@ import {
   setActiveDragPayload,
   SPACE_ITEM_MIME,
   writeDragPayload,
-} from '$lib/utils/space-album-folder-dnd';
+} from '#lib/utils/space-album-folder-dnd.ts';
+import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 
 const folder = (id: string, name: string, parentId: string | null = null) =>
   ({ id, spaceId: 's', parentId, name, createdById: null, createdAt: '', updatedAt: '' }) as SharedSpaceAlbumFolderDto;

@@ -1,5 +1,5 @@
+import { authenticate } from '#lib/utils/auth.ts';
 import { getSpaceActivities } from '@immich/sdk';
-import { authenticate } from '$lib/utils/auth';
 import type { PageLoad } from './$types';
 
 const ACTIVITY_PAGE_SIZE = 20;

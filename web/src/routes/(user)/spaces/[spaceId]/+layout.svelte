@@ -1,18 +1,18 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
-  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import SpaceHero from '$lib/components/spaces/space-hero.svelte';
-  import SpaceTabs from '$lib/components/spaces/space-tabs.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
-  import SpaceEditModal from '$lib/modals/SpaceEditModal.svelte';
-  import SpaceHideFromTimelineConfirmModal from '$lib/modals/SpaceHideFromTimelineConfirmModal.svelte';
-  import { Route } from '$lib/route';
-  import { handleError } from '$lib/utils/handle-error';
-  import { getSearchablePageState } from '$lib/utils/searchable-page-search';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import SpaceHero from '#lib/components/spaces/space-hero.svelte';
+  import SpaceTabs from '#lib/components/spaces/space-tabs.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
+  import SpaceEditModal from '#lib/modals/SpaceEditModal.svelte';
+  import SpaceHideFromTimelineConfirmModal from '#lib/modals/SpaceHideFromTimelineConfirmModal.svelte';
+  import { Route } from '#lib/route.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
   import {
     bulkAddAssets,
     getTimelineHidePreview,
@@ -79,7 +79,7 @@
   // with the results. A phone leaves the space ~520 CSS px of page height, and a tall cover stacked
   // with the app bar, tabs and search header left the grid a sliver of it (#1028). The query is read
   // from the URL (`?q=`), the same source the Photos page commits it from.
-  const searchActive = $derived(onPhotosTab && getSearchablePageState(page.url).query.length > 0);
+  const searchActive = $derived(onPhotosTab && getSearchablePageState(new URL(page.url.href)).query.length > 0);
 
   // No-cover spaces fall back to a per-space colored gradient derived from space.color.
   const gradientClasses: Record<string, string> = {

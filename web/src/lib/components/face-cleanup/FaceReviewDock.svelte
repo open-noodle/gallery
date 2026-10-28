@@ -96,7 +96,7 @@
           <span class="h-6 w-px bg-white/15"></span>
 
           {#each actions as action (action.id)}
-            {@const meta = FACE_ACTIONS[action.id]}
+            {const meta = $derived(FACE_ACTIONS[action.id])}
             <button
               type="button"
               class={`${actionBtn} ${toneClass(meta.tone)}`}

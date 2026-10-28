@@ -1,7 +1,7 @@
+import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 
 // Three things the existing i18n guards cannot see, all of which this feature can get wrong:
 //

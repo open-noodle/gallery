@@ -1,4 +1,4 @@
-import type { ShortcutOptions } from '$lib/actions/shortcut';
+import type { ShortcutOptions } from '#lib/actions/shortcut.ts';
 
 const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 

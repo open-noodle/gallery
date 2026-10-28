@@ -115,7 +115,7 @@
     {/if}
 
     {#each makes as make (make)}
-      {@const isMakeSelected = selectedMake === make}
+      {const isMakeSelected = $derived(selectedMake === make)}
       <!-- Make row -->
       <button
         type="button"
@@ -144,7 +144,7 @@
       <!-- Models (indented when make is expanded) -->
       {#if expandedMake === make && !loadingModels}
         {#each visibleModels as model (model)}
-          {@const isModelSelected = selectedModel === model && selectedMake === make}
+          {const isModelSelected = $derived(selectedModel === model && selectedMake === make)}
           <button
             type="button"
             class="-mx-2 ml-5 flex w-[calc(100%-1.25rem+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {orphanedModel ===

@@ -1,6 +1,6 @@
+import { buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import type { SearchTerms } from '#lib/services/search.service.ts';
 import { AssetTypeEnum } from '@immich/sdk';
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import type { SearchTerms } from '$lib/services/search.service';
 
 /**
  * Maps the shared filter-panel state to metadata-search terms, so the exact filters that drive a

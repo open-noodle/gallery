@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TypedSearchDisplayToken } from '$lib/utils/typed-search/typed-search-parser';
+  import type { TypedSearchDisplayToken } from '#lib/utils/typed-search/typed-search-parser.ts';
 
   interface Props {
     tokens: TypedSearchDisplayToken[];

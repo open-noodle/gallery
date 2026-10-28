@@ -1,18 +1,18 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import FaceCrop from '$lib/components/faces-page/face-crop.svelte';
-  import { shortcuts } from '$lib/actions/shortcut';
-  import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
-  import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
-  import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
-  import SuggestionAssetSummary from '$lib/gallery/people/suggestion-asset-summary.svelte';
-  import { getSuggestionAssetHref } from '$lib/gallery/people/suggestion-asset-href';
-  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { getContentMetrics } from '$lib/utils/container-utils';
-  import { handleError } from '$lib/utils/handle-error';
-  import { getBoundingBox } from '$lib/utils/people-utils';
-  import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
+  import FaceCrop from '#lib/components/faces-page/face-crop.svelte';
+  import { shortcuts } from '#lib/actions/shortcut.ts';
+  import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
+  import { faceSuggestionContextExpanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
+  import SuggestionAssetDetails from '#lib/gallery/people/suggestion-asset-details.svelte';
+  import SuggestionAssetSummary from '#lib/gallery/people/suggestion-asset-summary.svelte';
+  import { getSuggestionAssetHref } from '#lib/gallery/people/suggestion-asset-href.ts';
+  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getContentMetrics } from '#lib/utils/container-utils.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { getBoundingBox } from '#lib/utils/people-utils.ts';
+  import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import {
     AssetMediaSize,
     type PersonFaceSuggestionPageResponseDto,

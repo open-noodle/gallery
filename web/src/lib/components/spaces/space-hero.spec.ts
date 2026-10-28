@@ -1,9 +1,9 @@
+// The hover edit control mounts a ButtonContextMenu → IconButton → Tooltip, which needs a
+// TooltipProvider in context. The wrapper supplies it and forwards SpaceHero's props verbatim.
+import SpaceHero from '#lib/components/spaces/space-hero.test-wrapper.svelte';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-// The hover edit control mounts a ButtonContextMenu → IconButton → Tooltip, which needs a
-// TooltipProvider in context. The wrapper supplies it and forwards SpaceHero's props verbatim.
-import SpaceHero from '$lib/components/spaces/space-hero.test-wrapper.svelte';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',

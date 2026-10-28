@@ -10,12 +10,12 @@ import FaceEditorPanel from './FaceEditorPanel.svelte';
 // sites, so proving it here, plus proving each call site threads the right props, covers the gap.
 
 vi.mock('./FaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#test-data/mocks/face-editor.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('./SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/space-face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#test-data/mocks/space-face-editor.stub.svelte');
   return { default: MockComponent };
 });
 

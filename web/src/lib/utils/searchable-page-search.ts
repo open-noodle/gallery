@@ -1,10 +1,10 @@
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import {
   clearFilterParams,
   decodeFilterParams,
   encodeFilterParams,
   type DecodedFilterState,
-} from '$lib/utils/filter-url';
+} from '#lib/utils/filter-url.ts';
 
 export type SearchablePageSortOrder = 'relevance' | 'asc' | 'desc';
 

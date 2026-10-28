@@ -1,5 +1,5 @@
+import { getGlobalPersonThumbnailUrl, getSpaceProfile } from '#lib/utils/global-person-route.ts';
 import type { PersonResponseDto } from '@immich/sdk';
-import { getGlobalPersonThumbnailUrl, getSpaceProfile } from '$lib/utils/global-person-route';
 
 /** Which of the three renderings the Info-panel People grid should use for one person. */
 export type PersonAvatar =

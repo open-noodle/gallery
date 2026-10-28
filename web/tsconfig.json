@@ -3,7 +3,7 @@
     "module": "esnext",
     "noImplicitOverride": true,
     "paths": {
-      "#i18n/*": ["../i18n/*"],
+      "#i18n/*": ["../i18n/gallery/merged/*"],
       "#test/*": ["./test/*"]
     },
     "rootDir": ".",

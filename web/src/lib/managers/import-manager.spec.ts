@@ -1,5 +1,5 @@
-import { ImportManager, ImportStep } from '$lib/managers/import-manager.svelte';
-import type { TakeoutAlbum } from '$lib/utils/google-takeout-parser';
+import { ImportManager, ImportStep } from '#lib/managers/import-manager.svelte.ts';
+import type { TakeoutAlbum } from '#lib/utils/google-takeout-parser.ts';
 
 function makeFile(name: string, size: number): File {
   return new File([new ArrayBuffer(size)], name);

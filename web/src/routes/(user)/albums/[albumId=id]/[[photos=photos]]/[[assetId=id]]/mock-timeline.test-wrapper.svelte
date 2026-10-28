@@ -1,9 +1,9 @@
 <script lang="ts">
   import { nextTimelineMountId } from './mock-timeline-mount';
   import type { Snippet } from 'svelte';
-  import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
-  import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
+  import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
+  import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
 
   interface Props {
     timelineManager?: TimelineManager | Record<string, unknown>;

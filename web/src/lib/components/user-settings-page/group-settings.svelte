@@ -1,7 +1,7 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
-  import UserGroupModal from '$lib/modals/UserGroupModal.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import UserGroupModal from '#lib/modals/UserGroupModal.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     createGroup,
     getAllGroups,

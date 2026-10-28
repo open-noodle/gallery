@@ -1,7 +1,7 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import SpaceCollage from '$lib/components/spaces/space-collage.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import SpaceCollage from '#lib/components/spaces/space-collage.svelte';
   import {
     canDrop,
     getActiveDragPayload,
@@ -10,7 +10,7 @@
     setDragLabel,
     writeDragPayload,
     type DragPayload,
-  } from '$lib/utils/space-album-folder-dnd';
+  } from '#lib/utils/space-album-folder-dnd.ts';
   import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiFolder } from '@mdi/js';

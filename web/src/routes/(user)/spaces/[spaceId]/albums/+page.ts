@@ -1,5 +1,5 @@
+import { authenticate } from '#lib/utils/auth.ts';
 import { getSharedSpaceAlbumFolders } from '@immich/sdk';
-import { authenticate } from '$lib/utils/auth';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ url, params, parent }) => {

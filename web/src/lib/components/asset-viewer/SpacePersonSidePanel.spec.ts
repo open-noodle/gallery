@@ -1,8 +1,8 @@
+import { renderWithTooltips } from '#tests/helpers';
 import { AssetTypeEnum, type SharedSpacePersonResponseDto, type SpaceAssetFaceResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { renderWithTooltips } from '$tests/helpers';
 import SpacePersonSidePanel from './SpacePersonSidePanel.svelte';
 
 const {
@@ -38,12 +38,12 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 // The crop render is not under test here (DetailPanelPeople.spec.ts already pins that behaviour);
 // stubbed so every row resolves to a deterministic fallback without needing a real <img>.
-vi.mock('$lib/utils/people-utils', async (importOriginal) => {
+vi.mock('#lib/utils/people-utils.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, zoomImageToBase64: zoomImageToBase64Mock };
 });
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     imgRef: undefined,
     highlightedFaces: [],

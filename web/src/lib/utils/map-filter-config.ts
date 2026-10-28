@@ -1,17 +1,17 @@
 import {
+  ALL_FILTER_SECTIONS,
+  buildFilterContext,
+  type FilterPanelConfig,
+  type FilterState,
+} from '#lib/components/filter-panel/filter-panel.ts';
+import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
+import {
   AssetTypeEnum,
   getFilterSuggestions,
   getSearchSuggestions,
   SearchSuggestionType,
   type FilterSuggestionsPersonDto,
 } from '@immich/sdk';
-import {
-  ALL_FILTER_SECTIONS,
-  buildFilterContext,
-  type FilterPanelConfig,
-  type FilterState,
-} from '$lib/components/filter-panel/filter-panel';
-import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>, spaceId?: string) {
   return {

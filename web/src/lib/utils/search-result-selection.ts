@@ -1,6 +1,6 @@
+import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
 import type { AssetResponseDto } from '@immich/sdk';
-import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import { toTimelineAsset } from '$lib/utils/timeline-util';
 
 /**
  * Bulk-action helpers for the smart search results grid (discussion #908).

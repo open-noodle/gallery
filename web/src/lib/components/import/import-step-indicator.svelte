@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ImportStep } from '$lib/managers/import-manager.svelte';
+  import { ImportStep } from '#lib/managers/import-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';
   import { t, type Translations } from 'svelte-i18n';

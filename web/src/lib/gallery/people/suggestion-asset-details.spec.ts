@@ -1,10 +1,10 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import SuggestionAssetDetails from '#lib/gallery/people/suggestion-asset-details.svelte';
 import type { AlbumResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -12,7 +12,7 @@ vi.mock('svelte-i18n', () => ({
 }));
 
 const getAssetMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
+vi.mock('#lib/managers/AssetCacheManager.svelte.js', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
 
 const ASSET_ID = 'aaaaaaaa-0000-4000-8000-000000000001';
 const SPACE_ID = 'bbbbbbbb-0000-4000-8000-000000000002';

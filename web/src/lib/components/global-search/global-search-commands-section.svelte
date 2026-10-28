@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { CommandItem } from '$lib/managers/command-items';
-  import { globalSearchManager as manager, type ProviderStatus } from '$lib/managers/global-search-manager.svelte';
+  import type { CommandItem } from '#lib/managers/command-items.ts';
+  import { globalSearchManager as manager, type ProviderStatus } from '#lib/managers/global-search-manager.svelte.ts';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';

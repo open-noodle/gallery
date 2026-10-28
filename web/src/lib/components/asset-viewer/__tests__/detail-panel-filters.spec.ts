@@ -1,11 +1,11 @@
+import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import { AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildContextualFilterUrl } from '$lib/utils/filter-target';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Task 2 of Slice 7 (asset-viewer-contextual-filters). Per the plan's R5, this is a NEW, dedicated
@@ -35,7 +35,7 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 // different URL per test the way driving four different FilterTarget surfaces requires. See
 // reactive-page.mock.svelte.ts's own docs for why this needs to be the shared $state stand-in.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
   return { page: reactivePageMock };
 });
 
@@ -47,11 +47,11 @@ const authManagerMock = vi.hoisted(() => ({
   preferences: { tags: { enabled: false }, ratings: { enabled: false } },
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: authManagerMock,
 }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     closeDetailPanel: vi.fn(),
     closeEditFacesPanel: vi.fn(),
@@ -65,23 +65,23 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
 
 const featureFlagsMock = vi.hoisted(() => ({ value: { map: false, smartSearch: false } }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: featureFlagsMock,
 }));
 
 // The embedded map is a dynamic import; the stub exposes its "open in map view" control as a button.
-vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
+vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 

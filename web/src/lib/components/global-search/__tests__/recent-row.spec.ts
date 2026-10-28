@@ -13,7 +13,7 @@ describe('recent-row', () => {
     // Load the real en bundle so SpaceRow's `$t('cmdk_preview_member_count', ...)` and
     // AlbumRow's `$t('items_count', ...)` resolve to English ICU output instead of the
     // raw key (global test setup uses `fallbackLocale: 'dev'` which returns keys).
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

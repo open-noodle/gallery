@@ -1,10 +1,10 @@
 <script lang="ts">
   import { beforeNavigate } from '$app/navigation';
-  import { clickOutside } from '$lib/actions/click-outside';
-  import { focusTrap } from '$lib/actions/focus-trap';
-  import { menuButtonId } from '$lib/components/shared-components/navigation-bar/NavigationBar.svelte';
-  import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
-  import { sidebarStore } from '$lib/stores/sidebar.svelte';
+  import { clickOutside } from '#lib/actions/click-outside.ts';
+  import { focusTrap } from '#lib/actions/focus-trap.ts';
+  import { menuButtonId } from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
+  import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
+  import { sidebarStore } from '#lib/stores/sidebar.svelte.ts';
   import type { Snippet } from 'svelte';
 
   interface Props {

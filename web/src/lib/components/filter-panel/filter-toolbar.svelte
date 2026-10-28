@@ -1,8 +1,8 @@
 <script lang="ts">
-  import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
-  import ScopedSearchButton from '$lib/components/search/scoped-search-button.svelte';
-  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
-  import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+  import FilterToggleButton from '#lib/components/filter-panel/filter-toggle-button.svelte';
+  import ScopedSearchButton from '#lib/components/search/scoped-search-button.svelte';
+  import TimelineGroupingControl from '#lib/components/timeline/TimelineGroupingControl.svelte';
+  import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
   import type { Snippet } from 'svelte';
   import { twMerge } from 'tailwind-merge';
 

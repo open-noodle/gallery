@@ -1,4 +1,4 @@
-import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
+import type { CommandContext } from '#lib/managers/command-context-manager.svelte.ts';
 
 /**
  * One struct of booleans deciding which bulk-selection actions the current

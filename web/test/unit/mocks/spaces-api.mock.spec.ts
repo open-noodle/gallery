@@ -1,5 +1,5 @@
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 import { spacesApiMock } from './spaces-api.mock';
 
 describe('spaces API mock', () => {

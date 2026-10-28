@@ -1,10 +1,10 @@
-import { mergeScopedPeople, type MergeScopedPeopleDto } from '@immich/sdk';
 import {
   CrossOwnerMergeErrorCode,
   getCrossOwnerMergeErrorCode,
   runMergeWithCrossOwnerConfirmation,
   runScopedMergeWithCrossOwnerConfirmation,
-} from '$lib/utils/cross-owner-merge';
+} from '#lib/utils/cross-owner-merge.ts';
+import { mergeScopedPeople, type MergeScopedPeopleDto } from '@immich/sdk';
 
 vi.mock('@immich/sdk', () => ({
   isHttpError: (error: unknown) => !!(error as { __http?: boolean })?.__http,

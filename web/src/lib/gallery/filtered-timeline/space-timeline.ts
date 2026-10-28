@@ -1,9 +1,9 @@
+import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import type { SearchTerms } from '#lib/services/search.service.ts';
+import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
+import { buildMapFilterConfig } from '#lib/utils/map-filter-config.ts';
+import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '#lib/utils/space-filter-options.ts';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import type { SearchTerms } from '$lib/services/search.service';
-import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
-import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
-import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 
 type SpaceTimelineOptions = {

@@ -1,10 +1,10 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { SharedSpaceRole, UserAvatarColor } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import SpaceLayout from './+layout.svelte';
 
 const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(() => ({
@@ -15,9 +15,9 @@ const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(()
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mockAuthManager }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: mockAuthManager }));
 // SpaceTabs gates its Map tab on the `map` feature flag (#1046); the root layout inits it in the app.
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: { value: { map: true } } }));
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: { value: { map: true } } }));
 
 // The overflow handlers call into @immich/ui's modalManager (confirm dialogs, link-libraries modal)
 // and toastManager — mock those while keeping the real Button/IconButton/Icon/TooltipProvider so the
@@ -34,8 +34,8 @@ vi.mock('@immich/ui', async (importOriginal) => {
 // The real UserPageLayout mounts the NavigationBar (which needs a Tooltip provider); the shared
 // mock renders the leading/buttons/children snippets inside a TooltipProvider — matching the other
 // space page specs — so the app-bar testids are reachable.
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
@@ -105,7 +105,7 @@ describe('space [spaceId] +layout.svelte', () => {
     invalidateAllMock.mockResolvedValue(undefined);
     gotoMock.mockResolvedValue(undefined);
     mockPage.url = new URL('https://gallery.test/spaces/s1');
-    const { spaceUiManager } = await import('$lib/managers/space-ui-manager.svelte');
+    const { spaceUiManager } = await import('#lib/managers/space-ui-manager.svelte.ts');
     spaceUiManager.reset();
   });
 
@@ -121,7 +121,7 @@ describe('space [spaceId] +layout.svelte', () => {
   });
 
   it('records an add-photos intent and navigates to the Photos route when ＋ is clicked', async () => {
-    const { spaceUiManager } = await import('$lib/managers/space-ui-manager.svelte');
+    const { spaceUiManager } = await import('#lib/managers/space-ui-manager.svelte.ts');
     mockPage.url = new URL('https://gallery.test/spaces/s1/members');
     renderLayout(SharedSpaceRole.Editor);
     screen.getByTestId('space-add-photos').click();
@@ -130,7 +130,7 @@ describe('space [spaceId] +layout.svelte', () => {
   });
 
   it('records an add-photos intent but does NOT navigate when already on the Photos base route', async () => {
-    const { spaceUiManager } = await import('$lib/managers/space-ui-manager.svelte');
+    const { spaceUiManager } = await import('#lib/managers/space-ui-manager.svelte.ts');
     mockPage.url = new URL('https://gallery.test/spaces/s1');
     renderLayout(SharedSpaceRole.Editor);
     screen.getByTestId('space-add-photos').click();
@@ -425,7 +425,7 @@ describe('space [spaceId] +layout.svelte', () => {
   });
 
   it('suppresses the app bar, tabs and cover when chrome is hidden (full-screen selection mode)', async () => {
-    const { spaceUiManager } = await import('$lib/managers/space-ui-manager.svelte');
+    const { spaceUiManager } = await import('#lib/managers/space-ui-manager.svelte.ts');
     spaceUiManager.setChromeHidden(true);
     renderLayout(SharedSpaceRole.Owner);
     expect(screen.queryByTestId('space-tabs')).not.toBeInTheDocument();

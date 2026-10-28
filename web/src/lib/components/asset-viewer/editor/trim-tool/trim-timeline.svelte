@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TrimManager } from '$lib/managers/edit/trim-manager.svelte';
+  import { TrimManager } from '#lib/managers/edit/trim-manager.svelte.ts';
   import { t } from 'svelte-i18n';
 
   interface Props {

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { longPress } from '$lib/actions/long-press';
-  import { SCROLL_PROPERTIES } from '$lib/components/shared-components/album-selection/album-selection-utils';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
+  import { longPress } from '#lib/actions/long-press.ts';
+  import { SCROLL_PROPERTIES } from '#lib/components/shared-components/album-selection/album-selection-utils.ts';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiCheckCircle, mdiImageMultipleOutline } from '@mdi/js';
   import type { Action } from 'svelte/action';

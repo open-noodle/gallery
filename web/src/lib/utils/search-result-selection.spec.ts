@@ -1,6 +1,10 @@
+import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import {
+  removeSearchResults,
+  selectAllSearchResults,
+  updateSearchResults,
+} from '#lib/utils/search-result-selection.ts';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
-import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
 
 const asset = (id: string, overrides: Partial<AssetResponseDto> = {}): AssetResponseDto =>
   ({

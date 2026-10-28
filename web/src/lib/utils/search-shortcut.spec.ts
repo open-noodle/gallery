@@ -1,5 +1,5 @@
+import { matchesShortcut, shortcuts } from '#lib/actions/shortcut.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { matchesShortcut, shortcuts } from '$lib/actions/shortcut';
 import { isEditableTarget, searchShortcuts } from './search-shortcut';
 
 const keydown = (init: KeyboardEventInit) => new KeyboardEvent('keydown', init);

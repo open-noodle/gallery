@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Command } from 'bits-ui';
-  import type { NavigationItem } from '$lib/managers/navigation-items';
-  import type { ProviderStatus } from '$lib/managers/global-search-manager.svelte';
+  import type { NavigationItem } from '#lib/managers/navigation-items.ts';
+  import type { ProviderStatus } from '#lib/managers/global-search-manager.svelte.ts';
   import GlobalSearchNavigationSections from '../../global-search-navigation-sections.svelte';
 
   interface Props {

@@ -1,5 +1,5 @@
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { clearTimelineTemporalFilter } from '#lib/utils/timeline-temporal-filters.ts';
 
 /**
  * The single shared "remove one active filter chip" reducer, used by every surface that renders

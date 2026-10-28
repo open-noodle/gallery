@@ -1,11 +1,11 @@
+import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
 import { fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
 import type { TagOption } from '../filter-panel';
 import TagsFilter from '../tags-filter.svelte';
 
 beforeAll(async () => {
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

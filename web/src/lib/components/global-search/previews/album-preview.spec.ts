@@ -12,7 +12,7 @@ describe('AlbumPreview', () => {
   beforeAll(async () => {
     // Load the real en bundle so `$t('cmdk_preview_item_count', { values: { count } })`
     // resolves to English ICU output ("1 item" / "2 items") instead of the raw key.
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US' });
     await waitLocale('en-US');
   });

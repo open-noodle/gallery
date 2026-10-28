@@ -1,7 +1,7 @@
+import { QueryParameter } from '#lib/constants.ts';
+import { Route } from '#lib/route.ts';
+import { authenticate } from '#lib/utils/auth.ts';
 import { getMembers, getSpace, getSpacePerson, getSpacePersonStatistics } from '@immich/sdk';
-import { QueryParameter } from '$lib/constants';
-import { Route } from '$lib/route';
-import { authenticate } from '$lib/utils/auth';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ url, params }) => {

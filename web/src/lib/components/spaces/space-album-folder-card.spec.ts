@@ -1,13 +1,13 @@
-import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { fireEvent, screen } from '@testing-library/svelte';
-import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
+import SpaceAlbumFolderCard from '#lib/components/spaces/space-album-folder-card.svelte';
 import {
   getActiveDragPayload,
   readDragPayload,
   setActiveDragPayload,
   writeDragPayload,
-} from '$lib/utils/space-album-folder-dnd';
-import { renderWithTooltips } from '$tests/helpers';
+} from '#lib/utils/space-album-folder-dnd.ts';
+import { renderWithTooltips } from '#tests/helpers';
+import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
+import { fireEvent, screen } from '@testing-library/svelte';
 
 const folder = {
   id: 'trips',

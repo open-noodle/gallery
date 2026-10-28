@@ -1,8 +1,8 @@
+import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
+import { handleError } from '#lib/utils/handle-error.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import { linkAlbum, type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
-import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
-import { handleError } from '$lib/utils/handle-error';
-import { getFormatter } from '$lib/utils/i18n';
 
 // L15: "Link to space" entry point from the album itself (mirrors the existing "link an album"
 // flow already available from inside a space — see SpaceLinkAlbumModal / the space albums page).

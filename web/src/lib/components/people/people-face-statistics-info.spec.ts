@@ -1,12 +1,12 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { locale } from '#lib/stores/preferences.store.ts';
 import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
-import { locale } from '$lib/stores/preferences.store';
 import PeopleFaceStatisticsInfo from './people-face-statistics-info.svelte';
 
 function deferred<T>() {
@@ -58,7 +58,7 @@ const renderInfo = (
 
 describe('PeopleFaceStatisticsInfo', () => {
   beforeAll(async () => {
-    register('en-US', () => import('$i18n/en.json'));
+    register('en-US', () => import('#i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
   });

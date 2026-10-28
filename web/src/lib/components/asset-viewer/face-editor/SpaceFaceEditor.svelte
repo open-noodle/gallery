@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { shortcut } from '$lib/actions/shortcut';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import { shortcut } from '#lib/actions/shortcut.ts';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import {
     computeFaceCroppedCoordinates,
     computeImageContentMetrics,
     computeSelectorPosition,
-  } from '$lib/utils/face-box-drag';
-  import { handleError } from '$lib/utils/handle-error';
-  import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
-  import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
-  import { normalizeSearchString } from '$lib/utils/string-utils';
-  import CreateSpaceFaceModal from '$lib/modals/CreateSpaceFaceModal.svelte';
+  } from '#lib/utils/face-box-drag.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { refreshAssetPeople } from '#lib/utils/refresh-asset-people.ts';
+  import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
+  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
+  import CreateSpaceFaceModal from '#lib/modals/CreateSpaceFaceModal.svelte';
   import { createSpaceAssetFace, getSpacePeople, type SharedSpacePersonResponseDto } from '@immich/sdk';
   import { Button, Input, modalManager, toastManager } from '@immich/ui';
   import { Canvas, InteractiveFabricObject, Rect } from 'fabric';

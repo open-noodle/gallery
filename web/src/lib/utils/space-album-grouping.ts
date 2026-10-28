@@ -1,14 +1,14 @@
-import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { groupBy } from 'lodash-es';
-import { get } from 'svelte/store';
-import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
+import { AlbumSortBy, SortOrder } from '#lib/stores/preferences.store.ts';
 import {
   SpaceAlbumGroupBy,
   spaceAlbumViewSettings,
   type SpaceAlbumViewSettings,
-} from '$lib/stores/space-album-view-settings.store';
-import { stringToSortOrder } from '$lib/utils/album-utils';
-import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
+} from '#lib/stores/space-album-view-settings.store.ts';
+import { stringToSortOrder } from '#lib/utils/album-utils.ts';
+import { sortSpaceAlbums } from '#lib/utils/space-album-sort.ts';
+import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
+import { groupBy } from 'lodash-es';
+import { get } from 'svelte/store';
 
 /**
  * ----------------------

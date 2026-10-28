@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SelectionBBox } from '$lib/components/shared-components/map/types';
+  import type { SelectionBBox } from '#lib/components/shared-components/map/types.ts';
   import type { Snippet } from 'svelte';
 
   type Marker = {

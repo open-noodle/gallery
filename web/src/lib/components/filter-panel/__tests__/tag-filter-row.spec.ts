@@ -1,9 +1,9 @@
+import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { tick } from 'svelte';
-import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { compileUtilities } from '@test-data/tailwind';
+import { compileUtilities } from '#test-data/tailwind';
 import TagFilterRowNonDefaultProvider from '../tag-filter-row-non-default-provider.test-wrapper.svelte';
 import TagFilterRowToggleChecked from '../tag-filter-row-toggle-checked.test-wrapper.svelte';
 import TagFilterRow from '../tag-filter-row.svelte';

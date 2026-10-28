@@ -1,3 +1,34 @@
+import { ADMIN_VISIBLE_QUEUES } from '#lib/constants.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { isAlmostExactWordMatch } from '#lib/managers/cmdk-match.ts';
+import type { CommandContext } from '#lib/managers/command-context-manager.svelte.ts';
+import {
+  canAddSelectedToAlbum,
+  canAddSelectedToCurrentSpace,
+  canAddSelectedToSpace,
+  canArchiveSelected,
+  canDeleteSelected,
+  canFavoriteSelected,
+  handleAddSelectedToAlbum,
+  handleAddSelectedToCurrentSpace,
+  handleAddSelectedToSpace,
+  handleArchiveSelected,
+  handleDeleteSelected,
+  handleFavoriteSelected,
+} from '#lib/managers/selection-command-handlers.ts';
+import AlbumEditModal from '#lib/modals/AlbumEditModal.svelte';
+import AlbumOptionsModal from '#lib/modals/AlbumOptionsModal.svelte';
+import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+import SpaceAddMemberModal from '#lib/modals/SpaceAddMemberModal.svelte';
+import SpaceCreateModal from '#lib/modals/SpaceCreateModal.svelte';
+import SpaceMembersModal from '#lib/modals/SpaceMembersModal.svelte';
+import { Route } from '#lib/route.ts';
+import { handleDeleteAlbum, handleDownloadAlbum } from '#lib/services/album.service.ts';
+import { asQueueItem } from '#lib/services/queue.service.ts';
+import { clearEntries } from '#lib/stores/cmdk-recent.ts';
+import { createAlbumAndRedirect } from '#lib/utils/album-utils.ts';
+import { openFileUploadDialog } from '#lib/utils/file-uploader.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import {
   bulkAddAssets,
   emptyQueue,
@@ -41,37 +72,6 @@ import {
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
-import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
-import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
-import {
-  canAddSelectedToAlbum,
-  canAddSelectedToCurrentSpace,
-  canAddSelectedToSpace,
-  canArchiveSelected,
-  canDeleteSelected,
-  canFavoriteSelected,
-  handleAddSelectedToAlbum,
-  handleAddSelectedToCurrentSpace,
-  handleAddSelectedToSpace,
-  handleArchiveSelected,
-  handleDeleteSelected,
-  handleFavoriteSelected,
-} from '$lib/managers/selection-command-handlers';
-import AlbumEditModal from '$lib/modals/AlbumEditModal.svelte';
-import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
-import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
-import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
-import SpaceMembersModal from '$lib/modals/SpaceMembersModal.svelte';
-import { Route } from '$lib/route';
-import { handleDeleteAlbum, handleDownloadAlbum } from '$lib/services/album.service';
-import { asQueueItem } from '$lib/services/queue.service';
-import { clearEntries } from '$lib/stores/cmdk-recent';
-import { createAlbumAndRedirect } from '$lib/utils/album-utils';
-import { openFileUploadDialog } from '$lib/utils/file-uploader';
-import { handleError } from '$lib/utils/handle-error';
 
 const MIN_MATCH_LENGTH = 3;
 

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { spaceRoleLabelKey } from '$lib/utils/space-utils';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { spaceRoleLabelKey } from '#lib/utils/space-utils.ts';
   import { AssetMediaSize, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCameraOutline, mdiCursorMove, mdiImageEditOutline, mdiPencilOutline } from '@mdi/js';

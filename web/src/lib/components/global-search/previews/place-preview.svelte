@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type PlacesResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiMapMarker } from '@mdi/js';

@@ -6,7 +6,7 @@
   "imports": {
     "#lib": "./src/lib/index.js",
     "#lib/*": "./src/lib/*",
-    "#i18n/*": "../i18n/*",
+    "#i18n/*": "../i18n/gallery/merged/*",
     "#test/*": "./test/*"
   },
   "scripts": {
@@ -29,7 +29,7 @@
     "test:watch": "vitest dev",
     "test:medium": "playwright test",
     "test:medium:ui": "playwright test --ui",
-    "prepare": "svelte-kit sync"
+    "prepare": "node ../i18n/gallery/merge.mjs && svelte-kit sync"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.10",

@@ -1,19 +1,19 @@
 // collection.service.spec.ts
+import type { PickerCollection } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PickerCollection } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
 import { addAssetsToCollections } from './collection.service';
 
 const addAssetsToAlbums = vi.fn();
 const addAssetsToSpace = vi.fn();
 const primary = vi.fn();
 
-vi.mock('$lib/gallery/album/album-add', () => ({ addAssetsToAlbums: (...a: unknown[]) => addAssetsToAlbums(...a) }));
-vi.mock('$lib/services/space.service', () => ({ addAssetsToSpace: (...a: unknown[]) => addAssetsToSpace(...a) }));
+vi.mock('#lib/gallery/album/album-add.js', () => ({ addAssetsToAlbums: (...a: unknown[]) => addAssetsToAlbums(...a) }));
+vi.mock('#lib/services/space.service.js', () => ({ addAssetsToSpace: (...a: unknown[]) => addAssetsToSpace(...a) }));
 // #1041: the service resolves the caller's own member row to decide hiddenFromMyTimeline. Literal
 // rather than MY_USER_ID — vi.mock factories are hoisted above const declarations.
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { user: { id: 'user-me' } } }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: { user: { id: 'user-me' } } }));
 vi.mock('@immich/ui', () => ({ toastManager: { primary: (...a: unknown[]) => primary(...a) } }));
-vi.mock('$lib/utils/i18n', () => ({
+vi.mock('#lib/utils/i18n.js', () => ({
   getFormatter: () =>
     Promise.resolve((key: string, opts?: { values?: { count?: number } }) => `${key}:${opts?.values?.count ?? ''}`),
 }));

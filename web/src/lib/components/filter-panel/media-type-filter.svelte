@@ -26,11 +26,12 @@
 
 <div class="flex gap-1.5" data-testid="media-type-filter">
   {#each options as option (option.value)}
-    {@const isActive = selected === option.value}
-    {@const isOrphaned =
+    {const isActive = $derived(selected === option.value)}
+    {const isOrphaned = $derived(
       availableMediaTypes !== undefined &&
-      option.assetType !== undefined &&
-      !availableMediaTypes.includes(option.assetType)}
+        option.assetType !== undefined &&
+        !availableMediaTypes.includes(option.assetType),
+    )}
     <button
       type="button"
       class="rounded-lg border px-2.5 py-1 text-xs {isOrphaned ? 'opacity-50' : ''}

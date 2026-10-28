@@ -1,4 +1,4 @@
-import type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata } from '$lib/utils/google-takeout-parser';
+import type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata } from '#lib/utils/google-takeout-parser.ts';
 import {
   derivePhotoRoots,
   detectAlbums,
@@ -6,7 +6,7 @@ import {
   matchSidecarToMedia,
   MEDIA_EXTENSIONS,
   parseGoogleTakeoutSidecar,
-} from '$lib/utils/google-takeout-parser';
+} from '#lib/utils/google-takeout-parser.ts';
 
 export interface ScanProgress {
   currentFile: string;
@@ -454,4 +454,4 @@ export {
   type TakeoutAlbum,
   type TakeoutMediaItem,
   type TakeoutMetadata,
-} from '$lib/utils/google-takeout-parser';
+} from '#lib/utils/google-takeout-parser.ts';

@@ -1,13 +1,13 @@
+import type { NavigationItem } from '#lib/managers/navigation-items.ts';
 import { render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { NavigationItem } from '$lib/managers/navigation-items';
 import CommandRootWrapper from './test-harness/command-root-wrapper.svelte';
 
 beforeAll(async () => {
   // Load en so `$t('cmdk_section_*')` resolves to English headings
   // ("System Settings", "Admin", "Navigation", "Actions") rather than raw keys.
-  register('en-US', () => import('$i18n/en.json'));
+  register('en-US', () => import('#i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
 });

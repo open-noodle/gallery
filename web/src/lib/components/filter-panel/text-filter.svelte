@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TEXT_FILTER_PARAM_MAX_LENGTH } from '$lib/utils/filter-url';
+  import { TEXT_FILTER_PARAM_MAX_LENGTH } from '#lib/utils/filter-url.ts';
   import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
 

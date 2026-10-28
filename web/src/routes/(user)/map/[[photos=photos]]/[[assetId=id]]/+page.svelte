@@ -104,7 +104,7 @@
   };
 
   // Filter state
-  let filters = $state<FilterState>(hydrateMapFilters(page.url));
+  let filters = $state<FilterState>(hydrateMapFilters(new URL(page.url.href)));
   // Token guard for the URL $effect below, at-stripped like the album page — see withoutAtParam's
   // docs: replaceScrollTarget writes `?at=<assetId>` onto /map when the timeline panel's asset
   // viewer closes, and that is not a filter change. Re-hydrating on it is pure churn — the
@@ -287,13 +287,13 @@
   });
 
   function syncMapFilterUrl(nextFilters: FilterState) {
-    const nextUrl = buildFilterStateUrl(page.url, nextFilters);
+    const nextUrl = buildFilterStateUrl(new URL(page.url.href), nextFilters);
     // NOT a string compare — buildFilterStateUrl re-appends the filter params last, so a URL like
     // /map?make=Apple&spaceId=s1 rebuilds re-ordered. See filter-target.ts.
-    if (isFilterStateUrlUnchanged(page.url, nextUrl)) {
+    if (isFilterStateUrlUnchanged(new URL(page.url.href), nextUrl)) {
       return;
     }
-    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+    void goto(nextUrl, { replace: true, reset: false });
   }
 
   $effect(() => {
@@ -307,23 +307,19 @@
       // rebuilding FilterState from the URL alone is lossless.
       filters = {
         ...createFilterState(),
-        ...hydrateMapFilters(page.url),
+        ...hydrateMapFilters(new URL(page.url.href)),
       };
       lastHandledFilterSearch = nextFilterSearch;
     });
   });
 
   function clearCommittedQuery() {
-    const url = new URL(page.url);
+    const url = new URL(page.url.href);
     url.searchParams.delete('q');
     const nextUrl = `${url.pathname}${url.search}${url.hash}`;
     // Only `q` is dropped. The re-hydrate effect above then rebuilds `filters` from the remaining
     // URL, which still carries every active filter — including the picked year/month.
-    void goto(nextUrl, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
-    });
+    void goto(nextUrl, { replace: true, reset: false });
   }
 
   // On mobile the panel *is* the drawer, so its collapse control has to dismiss the whole overlay.

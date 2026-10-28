@@ -1,13 +1,13 @@
+import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import { SharedSpaceRole } from '@immich/sdk';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { load } from './+page';
 
 const { authenticate } = vi.hoisted(() => ({
   authenticate: vi.fn(),
 }));
 
-vi.mock('$lib/utils/auth', () => ({ authenticate }));
+vi.mock('#lib/utils/auth.js', () => ({ authenticate }));
 
 describe('space people page load', () => {
   const space = {

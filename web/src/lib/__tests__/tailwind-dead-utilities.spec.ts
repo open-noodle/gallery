@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { compileUtilities, hasRuleFor } from '@test-data/tailwind';
+import { compileUtilities, hasRuleFor } from '#test-data/tailwind';
 
 /**
  * Guards whole utility families against names that compile to nothing.

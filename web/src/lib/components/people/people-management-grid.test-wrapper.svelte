@@ -1,6 +1,6 @@
 <script lang="ts">
-  import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
-  import type { ManagedPerson } from '$lib/components/people/people-types';
+  import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
+  import type { ManagedPerson } from '#lib/components/people/people-types.ts';
 
   type Person = {
     id: string;

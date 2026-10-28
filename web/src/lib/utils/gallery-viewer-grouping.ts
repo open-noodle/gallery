@@ -1,6 +1,6 @@
+import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
+import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
 import type { AssetResponseDto } from '@immich/sdk';
-import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
-import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
 
 export type GalleryViewerBucket = ActivatableTimelineBucket & {
   viewId: string;

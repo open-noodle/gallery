@@ -1,4 +1,4 @@
-import { getMyImmichLink } from '$lib/commands';
+import { getMyImmichLink } from '#lib/commands.ts';
 
 // `page` is a SvelteKit rune-backed object; the command only ever reads page.url.
 const mockPage = { url: new URL('https://abc123.noodlegallery.de/photos?at=2026-08-07#hash') };

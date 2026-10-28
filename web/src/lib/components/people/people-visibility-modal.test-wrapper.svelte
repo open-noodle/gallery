@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { VisibilityChange, VisibilityPerson, VisibilitySaveResult } from '$lib/components/people/people-types';
+  import type {
+    VisibilityChange,
+    VisibilityPerson,
+    VisibilitySaveResult,
+  } from '#lib/components/people/people-types.ts';
   import { TooltipProvider } from '@immich/ui';
   import PeopleVisibilityModal from './people-visibility-modal.svelte';
 

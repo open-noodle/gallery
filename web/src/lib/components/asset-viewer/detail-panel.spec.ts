@@ -1,3 +1,5 @@
+import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '#lib/utils/exif-utils.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import {
   AssetTypeEnum,
   AssetVisibility,
@@ -7,9 +9,7 @@ import {
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor, within } from '@testing-library/svelte';
-import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
-import { renderWithTooltips } from '$tests/helpers';
-import { assetFactory } from '@test-data/factories/asset-factory';
+import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanel from './DetailPanel.svelte';
 
 const { authManagerMock, faceManagerMock, getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(
@@ -46,17 +46,17 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
-vi.mock('$lib/utils/people-utils', () => ({
+vi.mock('#lib/utils/people-utils.js', () => ({
   zoomImageToBase64: zoomImageToBase64Mock,
 }));
 
-vi.mock('$lib/stores/face.svelte', () => ({
+vi.mock('#lib/stores/face.svelte.js', () => ({
   faceManager: faceManagerMock,
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: authManagerMock }));
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: authManagerMock }));
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     closeDetailPanel: vi.fn(),
     closeEditFacesPanel: vi.fn(),
@@ -71,7 +71,7 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: {
     value: {
       map: true,
@@ -80,61 +80,61 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
+vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
 // #734: these five stand in for the row-probe stub (echoes `isOwner`/`canEdit` as data
 // attributes) rather than the plain noop, so the editability-propagation tests below can assert
 // on what DetailPanel actually threaded down to each row.
-vi.mock('$lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
+vi.mock('#lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
+vi.mock('#lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
+vi.mock('#lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
+vi.mock('#lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
+vi.mock('#lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/faces-page/person-side-panel.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/faces-page/person-side-panel.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/OnEvents.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/LoadingSpinner.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+vi.mock('#lib/components/shared-components/LoadingSpinner.svelte', async () => {
+  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 

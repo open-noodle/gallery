@@ -1,8 +1,8 @@
+import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
-import StopPropagationHost from '@test-data/mocks/face-tile-overlay-stop-propagation.host.stub.svelte';
+import StopPropagationHost from '#test-data/mocks/face-tile-overlay-stop-propagation.host.stub.svelte';
 
 describe('FaceTileOverlay', () => {
   it('renders a month-and-year pill — the cheapest signal that separates two similar children', () => {

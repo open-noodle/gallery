@@ -1,6 +1,6 @@
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
 import TimelineRouteGroupingBar from './TimelineRouteGroupingBar.svelte';
 
 describe('TimelineRouteGroupingBar', () => {
