@@ -182,6 +182,7 @@ class SyncApiRepository {
           // generated enum has no `.value`.
           if (supportedSyncTypes != null)
             ...(_assetFavoriteSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson()))),
+          if (declares(SyncRequestType.sharedSpaceStacksV1)) SyncRequestType.sharedSpaceStacksV1,
         ],
       ).toJson(),
     );
@@ -347,6 +348,11 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
   SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
   SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceStackV1: SyncStackV1.fromJson,
+  SyncEntityType.sharedSpaceStackBackfillV1: SyncStackV1.fromJson,
+  SyncEntityType.sharedSpaceStackAlbumBackfillV1: SyncStackV1.fromJson,
+  SyncEntityType.sharedSpaceStackLibraryBackfillV1: SyncStackV1.fromJson,
+  SyncEntityType.sharedSpaceStackDeleteV1: SyncStackDeleteV1.fromJson,
   // --- gallery-fork: library sync types ---
   SyncEntityType.libraryV1: SyncLibraryV1.fromJson,
   SyncEntityType.libraryDeleteV1: SyncLibraryDeleteV1.fromJson,

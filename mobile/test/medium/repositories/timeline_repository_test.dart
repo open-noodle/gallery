@@ -562,6 +562,23 @@ void main() {
       final buckets = await sut.sharedSpace(space.id, GroupAssetsBy.none).bucketSource().first;
       expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 2);
     });
+
+    test('shows a stack flat when its cover is not on the device (#1243)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      // The stack row is synced, but its cover is outside the viewer's spaces, so it never reached the device.
+      final frame1 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final frame2 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      await insertStack(stackId, user.id, 'cover-not-on-device');
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: frame1.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: frame2.id);
+
+      final assets = await sut.sharedSpace(space.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {frame1.id, frame2.id});
+
+      final buckets = await sut.sharedSpace(space.id, GroupAssetsBy.day).bucketSource().first;
+      expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 2);
+    });
   });
 
   // #763: favorite() dropped the ownerId-only filter and mirrors the server/web /favorites scope —
