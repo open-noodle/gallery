@@ -39,9 +39,14 @@ const linkIdentity = async (assetFaceId: string, source: 'ml' | 'manual' = 'ml')
   await db.insertInto('face_identity_face').values({ identityId, assetFaceId, source }).execute();
 };
 
-const personExists = async (personGroupId: string) =>
-  (await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', personGroupId).execute())
-    .length === 1;
+const personExists = async (personGroupId: string) => {
+  const row = await db
+    .selectFrom('person')
+    .select('personGroupId')
+    .where('personGroupId', '=', personGroupId)
+    .executeTakeFirst();
+  return row !== undefined;
+};
 
 const detectQueue = async () => {
   const ids: string[] = [];
@@ -233,8 +238,9 @@ describe('FaceDissolveRepository.dissolve', () => {
     const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
 
     expect(result.hiddenFaceIds).toEqual([cropped.id]);
-    expect(await faceRow(cropped.id)).toMatchObject({ personGroupId: null, isVisible: false });
-    expect((await faceRow(cropped.id))?.deletedAt).toBeInstanceOf(Date);
+    const row = await faceRow(cropped.id);
+    expect(row).toMatchObject({ personGroupId: null, isVisible: false });
+    expect(row?.deletedAt).toBeInstanceOf(Date);
   });
 
   it('records 2500 faces in one dissolve', async () => {

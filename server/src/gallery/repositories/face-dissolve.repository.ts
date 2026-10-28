@@ -4,8 +4,8 @@ import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
 import {
-  deleteFacePredicate,
   DissolveScope,
+  deleteFacePredicate,
   dissolveFacePredicate,
   dissolveScopePredicate,
   hideFacePredicate,
@@ -93,6 +93,8 @@ const hasEmbedding = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
 /** Faces a dissolve takes off every Space person: the ones it hides and the ones it deletes. */
 const leavesSpaces = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   eb.or([hideFacePredicate(eb), deleteFacePredicate(eb)]);
+
+const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
 
 /** Postgres caps one statement at 65535 bind parameters; record rows go in well under that. */
 const RECORD_CHUNK = 1000;
@@ -382,15 +384,15 @@ export class FaceDissolveRepository {
         eb.and([inScope(eb), ...predicates.map((predicate) => predicate(eb))]);
 
     // 1. The Space persons this dissolve may empty.
-    const spacePersonIds = (
+    const spacePersonIds = ids(
       await trx
         .selectFrom('shared_space_person_face')
         .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
         .select('shared_space_person_face.personId as id')
         .distinct()
         .where(and(leavesSpaces))
-        .execute()
-    ).map((row) => row.id);
+        .execute(),
+    );
 
     // 2. Only the photos of deleted faces are re-scanned.
     const assetsCleared = await this.clearFacesRecognizedAt(personGroupId, scope, trx);
@@ -411,14 +413,14 @@ export class FaceDissolveRepository {
 
     // 4. Detected faces: the "Not a face" tombstone. Recognition (getAllFaces, searchFaces) skips deletedAt faces, and
     //    a re-scan matches the tombstone instead of adding the box again.
-    const hiddenFaceIds = (
+    const hiddenFaceIds = ids(
       await trx
         .updateTable('asset_face')
         .set({ deletedAt: new Date(), personGroupId: null })
         .where(and(hideFacePredicate, (eb) => eb('asset_face.deletedAt', 'is', null)))
         .returning('asset_face.id')
-        .execute()
-    ).map((row) => row.id);
+        .execute(),
+    );
     if (hiddenFaceIds.length > 0) {
       await trx
         .deleteFrom('face_identity_face')
@@ -447,7 +449,7 @@ export class FaceDissolveRepository {
     }
     let orphanedSpacePersonIds: string[] = [];
     if (spacePersonIds.length > 0) {
-      orphanedSpacePersonIds = (
+      orphanedSpacePersonIds = ids(
         await trx
           .deleteFrom('shared_space_person')
           .where('id', '=', (eb) => eb.fn.any(eb.val(spacePersonIds)))
@@ -462,8 +464,8 @@ export class FaceDissolveRepository {
             ),
           )
           .returning('id')
-          .execute()
-      ).map((row) => row.id);
+          .execute(),
+      );
 
       await trx
         .updateTable('shared_space_person')

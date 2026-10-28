@@ -2,8 +2,8 @@ import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SourceType } from 'src/enum.js';
 import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
-import { DB } from 'src/schema/index.js';
 import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
+import { DB } from 'src/schema/index.js';
 import {
   runDissolve,
   seedAsset,
@@ -236,20 +236,20 @@ describe('dissolve blast radius — deletedThumbnailPath (L7)', () => {
   });
 });
 
+const links = (personId: string) =>
+  db
+    .selectFrom('shared_space_person_face')
+    .select('assetFaceId')
+    .where('personId', '=', personId)
+    .execute()
+    .then((rows) => rows.map((r) => r.assetFaceId).sort());
+
+const spacePerson = (id: string) =>
+  db.selectFrom('shared_space_person').select(['id', 'representativeFaceId']).where('id', '=', id).executeTakeFirst();
+
 // Revision 2: a hidden face's row survives, so nothing cascades to the Space. The dissolve removes the Space links
 // itself, then only the Space persons it emptied, and repoints a survivor that was showing a hidden face.
 describe('dissolve blast radius — Spaces', () => {
-  const links = (personId: string) =>
-    db
-      .selectFrom('shared_space_person_face')
-      .select('assetFaceId')
-      .where('personId', '=', personId)
-      .execute()
-      .then((rows) => rows.map((r) => r.assetFaceId).sort());
-
-  const spacePerson = (id: string) =>
-    db.selectFrom('shared_space_person').select(['id', 'representativeFaceId']).where('id', '=', id).executeTakeFirst();
-
   it('removes the Space persons holding only hidden faces, and unlinks hidden faces from the rest', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);

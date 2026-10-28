@@ -9,20 +9,9 @@ const DissolveScopeSchema = z.enum(DissolveScope).describe('Which faces a dissol
   id: 'DissolveScope',
 });
 
-// Named for the same reason as the scope above, and additionally because the Dart generator cannot emit an
-// inline enum on a body property at all: it names the field's type `<Property>Enum` and then never generates
-// that class, so `mobile/openapi` stops compiling and takes the whole Flutter test suite down with it. A
-// `$ref` to a named schema is the only form both generators handle.
-const DissolveOutcomeSchema = z
-  .enum(['unassign', 'delete-faces', 'delete-faces-and-person'])
-  .describe('What a dissolve does with the faces it touches')
-  .meta({ id: 'DissolveOutcome' });
-
 export const DissolveRequestSchema = z
   .object({
     scope: DissolveScopeSchema,
-    outcome: DissolveOutcomeSchema,
-    redetect: z.boolean(),
     expectedFaceCount: z.number().int().min(0),
   })
   .meta({ id: 'DissolveRequestDto' });
@@ -30,20 +19,24 @@ export const DissolveRequestSchema = z
 export class DissolveRequestDto extends createZodDto(DissolveRequestSchema) {}
 export type DissolveRequest = z.infer<typeof DissolveRequestSchema>;
 
-// Every field here is a row count. `.int()` rather than a bare `z.number()`: patchOpenAPI rejects a
+// Every number here is a row count. `.int()` rather than a bare `z.number()`: patchOpenAPI rejects a
 // `type: number` property that carries no format, on the grounds that an unformatted number is almost
 // always an integer someone forgot to declare — and these are.
 const DissolveCountsSchema = z.object({
-  faces: z.number().int(),
-  exif: z.number().int(),
-  mlWithEmbedding: z.number().int(),
-  mlWithoutEmbedding: z.number().int(),
+  faces: z.number().int().describe('Every in-scope face; the apply must be sent this as expectedFaceCount'),
+  hide: z.number().int().describe('Detected faces that will be hidden, and can be restored'),
+  delete: z.number().int().describe('Imported metadata faces that will be deleted, their photos re-scanned'),
+  keep: z.number().int().describe('Hand-drawn or manual faces that will be unassigned and kept on the photo'),
   softDeleted: z.number().int(),
   assets: z.number().int(),
+  rescanAssets: z.number().int().describe('Photos re-scanned: those of the deleted faces'),
   sharedAssets: z.number().int(),
   notRedetectable: z.number().int(),
-  remainingLiveFaces: z.number().int(),
-  handDrawn: z.number().int().describe('In-scope hand-drawn faces; a delete outcome unassigns these instead'),
+  remainingFaces: z.number().int().describe('Faces of the person outside the selection'),
+  personRemoved: z.boolean(),
+  spacePersonsRemoved: z.number().int(),
+  spacePersonsKept: z.number().int().describe('Space persons that also hold other photos and will remain'),
+  spacesKept: z.number().int(),
 });
 
 const DissolveWarningSchema = z.object({ code: z.string(), count: z.number().int() });
@@ -54,6 +47,7 @@ export const DissolveResponseSchema = z
     counts: DissolveCountsSchema,
     expectedFaceCount: z.number().int(),
     warnings: z.array(DissolveWarningSchema),
+    dissolveId: z.string().optional().describe('The restore record, set by an apply that touched any face'),
   })
   .meta({ id: 'DissolveResponseDto' });
 

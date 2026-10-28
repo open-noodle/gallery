@@ -2,8 +2,8 @@ import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetVisibility, SourceType } from 'src/enum.js';
 import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
-import { DB } from 'src/schema/index.js';
 import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
+import { DB } from 'src/schema/index.js';
 import {
   seedAsset,
   seedFace,
