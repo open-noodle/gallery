@@ -38,20 +38,20 @@ const DAYS_UNTIL_BIRTHDAY = 3;
 const BIRTHDAY_MEMORY_ASSETS_PER_YEAR = 5;
 const MEMORY_ASSET_LIMIT = 25;
 /**
- * Cap on rule memories *visible* on a given day, so a multi-day recap holds its slot for its
- * whole window. Sized from the worst-case overlap of the current rules: the calendar-fixed
- * windows only ever overlap two deep (e.g. `person_throwback` 13–19 and `favorites_throwback`
- * 15–21), plus `recent_trip` and `trip_anniversary`, which can start on any day — four lingering
- * cards. The remaining two slots keep the date-anchored 1-day rules (`birthday` above all, since
- * a missed one waits a year) from ever being crowded out.
- */
+Cap on rule memories *visible* on a given day, so a multi-day recap holds its slot for its
+whole window. Sized from the worst-case overlap of the current rules: the calendar-fixed
+windows only ever overlap two deep (e.g. `person_throwback` 13–19 and `favorites_throwback`
+15–21), plus `recent_trip` and `trip_anniversary`, which can start on any day — four lingering
+cards. The remaining two slots keep the date-anchored 1-day rules (`birthday` above all, since
+a missed one waits a year) from ever being crowded out.
+*/
 export const RULE_DAILY_LIMIT = 6;
 
 /**
- * Claim-order bands. Offsets are far larger than any real rule score (the highest is `birthday`
- * at ~330), so type always outranks score: an `on_this_day` can never overtake a rule memory,
- * and no rule memory can overtake an unmanaged one. See spec §6.3.
- */
+Claim-order bands. Offsets are far larger than any real rule score (the highest is `birthday`
+at ~330), so type always outranks score: an `on_this_day` can never overtake a rule memory,
+and no rule memory can overtake an unmanaged one. See spec §6.3.
+*/
 const RANK_UNMANAGED = 2_000_000;
 const RANK_RULE = 1_000_000;
 const RANK_ON_THIS_DAY = 0;
@@ -256,12 +256,12 @@ export class MemoryService extends BaseService {
   }
 
   /**
-   * A memory may be stripped or deleted only when it is unambiguously one this job generated.
-   * `MemoryType` has just two values and `POST /memories` accepts both, so a hand-made memory is
-   * indistinguishable by type alone — hence the `showAt`/`hideAt` and registry checks. Anything
-   * else still claims its assets (otherwise the duplicate survives) but is never modified.
-   * See spec §6.2.1.
-   */
+  A memory may be stripped or deleted only when it is unambiguously one this job generated.
+  `MemoryType` has just two values and `POST /memories` accepts both, so a hand-made memory is
+  indistinguishable by type alone — hence the `showAt`/`hideAt` and registry checks. Anything
+  else still claims its assets (otherwise the duplicate survives) but is never modified.
+  See spec §6.2.1.
+  */
   private toReservable(row: MemoryOverlapRow, stripped: Map<string, Set<string>>): ReservableMemory {
     const key = getMemoryTypeKeyForMemory(row.type as MemoryType, row.data);
     const isKnownType = key !== undefined && getMemoryTypeMetadata(key) !== undefined;
@@ -286,11 +286,11 @@ export class MemoryService extends BaseService {
   }
 
   /**
-   * Reconcile overlap across history, once. The nightly window only reaches `today + DAYS`, but
-   * the memories index lists a year of history, so without this the duplicates already on screen
-   * would survive until retention expired them. Days outer / users inner, so one cursor makes it
-   * resumable — the same shape as `lastOnThisDayDate`.
-   */
+  Reconcile overlap across history, once. The nightly window only reaches `today + DAYS`, but
+  the memories index lists a year of history, so without this the duplicates already on screen
+  would survive until retention expired them. Days outer / users inner, so one cursor makes it
+  resumable — the same shape as `lastOnThisDayDate`.
+  */
   private async backfillMemoryOverlap(
     ownerIds: string[],
     today: DateTime,
@@ -334,10 +334,10 @@ export class MemoryService extends BaseService {
   }
 
   /**
-   * Make every day in `[from, to]` non-overlapping for one owner: no photo appears in two of that
-   * day's memories, and a generated memory left under its floor is deleted. Resolving per day is
-   * what keeps it exact — two memories whose windows never overlap are never forced apart.
-   */
+  Make every day in `[from, to]` non-overlapping for one owner: no photo appears in two of that
+  day's memories, and a generated memory left under its floor is deleted. Resolving per day is
+  what keeps it exact — two memories whose windows never overlap are never forced apart.
+  */
   private async reconcileMemoryOverlap(
     ownerId: string,
     from: DateTime,
@@ -415,9 +415,9 @@ export class MemoryService extends BaseService {
   }
 
   /**
-   * Memoized per-service-instance: the adapter holds the embedding cache, so a theme is encoded
-   * once per process rather than once per user per night.
-   */
+  Memoized per-service-instance: the adapter holds the embedding cache, so a theme is encoded
+  once per process rather than once per user per night.
+  */
   private getThemeSearchPort(): ThemeSearchPort {
     this.themeSearchPort ??= this.createThemeSearchPort();
     return this.themeSearchPort;
@@ -561,12 +561,12 @@ export class MemoryService extends BaseService {
   }
 
   /**
-   * A memory is visible unless its type maps to a KNOWN registry key that is currently
-   * unavailable (admin) or disabled (user). Saved memories and memories whose type key is
-   * unknown/underivable are always shown — except upstream's `birthday` type, which Gallery never
-   * shows (installed apps cannot decode it) and which therefore must not claim assets in overlap
-   * reconciliation either. See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
-   */
+  A memory is visible unless its type maps to a KNOWN registry key that is currently
+  unavailable (admin) or disabled (user). Saved memories and memories whose type key is
+  unknown/underivable are always shown — except upstream's `birthday` type, which Gallery never
+  shows (installed apps cannot decode it) and which therefore must not claim assets in overlap
+  reconciliation either. See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
+  */
   private isMemoryTypeVisible(
     memory: { type: MemoryType; data: unknown; isSaved: boolean },
     availableTypes: Set<string>,

@@ -604,10 +604,10 @@ class MemoryToAssetSync extends BaseSync {
   }
 
   /**
-   * Gallery: the links of exactly the memory types a client is sent (SyncService's
-   * `syncedMemoryTypes`). Upstream's getUpsertsV1 hard-codes on_this_day, which would strip the
-   * photos from every rule memory an installed Gallery app receives.
-   */
+  Gallery: the links of exactly the memory types a client is sent (SyncService's
+  `syncedMemoryTypes`). Upstream's getUpsertsV1 hard-codes on_this_day, which would strip the
+  photos from every rule memory an installed Gallery app receives.
+  */
   @GenerateSql({ params: [dummyQueryOptions, [MemoryType.OnThisDay, MemoryType.Rule]], stream: true })
   getUpsertsForTypes(options: SyncQueryOptions, types: MemoryType[]) {
     return this.upsertQuery('memory_asset', options)

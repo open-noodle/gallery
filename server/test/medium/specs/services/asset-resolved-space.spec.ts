@@ -58,9 +58,9 @@ const setup = () => {
 };
 
 /**
- * An admin-owned library photo of "Andressa", identity-backed like real recognition output. Spaces are
- * added per test; each gets its own space person for the same identity, as face sync would create.
- */
+An admin-owned library photo of "Andressa", identity-backed like real recognition output. Spaces are
+added per test; each gets its own space person for the same identity, as face sync would create.
+*/
 const createFixture = async () => {
   const { ctx, assetService, timelineService, faceIdentityRepository } = setup();
   const { user: admin } = await ctx.newUser();

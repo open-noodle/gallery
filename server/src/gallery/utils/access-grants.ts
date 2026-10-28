@@ -12,10 +12,10 @@ const spaceAlbumRead: Grant = (access, userId, ids) => access.spaceAlbum.checkSp
 const spaceAlbumWrite: Grant = (access, userId, ids) => access.spaceAlbum.checkSpaceLinkedAlbumAccess(userId, ids);
 
 /**
- * Fork grants that widen upstream's permission switch (utils/access.ts checkOtherAccess) for user sessions. Each runs
- * once, after upstream's grants, over the ids upstream did not grant. Shared-link sessions never reach this table:
- * checkSharedLinkAccess narrows inline, and the Person* replacement stays inline because it removes upstream grants.
- */
+Fork grants that widen upstream's permission switch (utils/access.ts checkOtherAccess) for user sessions. Each runs
+once, after upstream's grants, over the ids upstream did not grant. Shared-link sessions never reach this table:
+checkSharedLinkAccess narrows inline, and the Person* replacement stays inline because it removes upstream grants.
+*/
 export const galleryAccessGrants: Partial<Record<Permission, Grant>> = {
   [Permission.AssetRead]: spaceAssetRead,
   [Permission.AssetView]: spaceAssetRead,
@@ -53,15 +53,15 @@ export const withGalleryGrants = async (
 };
 
 /**
- * True when the caller reaches an album through a DIRECT grant — album owner or a shared album_user
- * (Viewer+) — as opposed to ONLY via shared-space membership (checkSpaceLinkedAlbumReadAccess, no role
- * filter). Mirrors upstream's AlbumRead case in utils/access.ts, i.e. everything AlbumRead grants BEFORE the
- * space-linked grant above is unioned in.
- *
- * When AlbumRead passed but this returns false, the caller is a "space-only reader". Used to deny
- * album-level activity (C1) and strip participant PII (security-8) for those callers, while leaving
- * genuine owners/participants untouched.
- */
+True when the caller reaches an album through a DIRECT grant — album owner or a shared album_user
+(Viewer+) — as opposed to ONLY via shared-space membership (checkSpaceLinkedAlbumReadAccess, no role
+filter). Mirrors upstream's AlbumRead case in utils/access.ts, i.e. everything AlbumRead grants BEFORE the
+space-linked grant above is unioned in.
+
+When AlbumRead passed but this returns false, the caller is a "space-only reader". Used to deny
+album-level activity (C1) and strip participant PII (security-8) for those callers, while leaving
+genuine owners/participants untouched.
+*/
 export const hasDirectAlbumReadAccess = async (
   access: AccessRepository,
   userId: string,
@@ -77,13 +77,13 @@ export const hasDirectAlbumReadAccess = async (
 };
 
 /**
- * AssetShare as it stood before immich-32609: owner ∪ partner, without upstream's new album arm.
- *
- * Upstream lets an album member re-share the album's assets (adding them to their own albums). Gallery keeps that
- * for albums, but not for adding assets to a space: a space Owner/Editor holds AssetUpdate over every space asset
- * (checkSpaceEditAccess), so an album Viewer adding the owner's photos to their own space would turn read access into
- * write access (rbac-2). SharedSpaceService.addAssets uses this instead of Permission.AssetShare.
- */
+AssetShare as it stood before immich-32609: owner ∪ partner, without upstream's new album arm.
+
+Upstream lets an album member re-share the album's assets (adding them to their own albums). Gallery keeps that
+for albums, but not for adding assets to a space: a space Owner/Editor holds AssetUpdate over every space asset
+(checkSpaceEditAccess), so an album Viewer adding the owner's photos to their own space would turn read access into
+write access (rbac-2). SharedSpaceService.addAssets uses this instead of Permission.AssetShare.
+*/
 export const requireSpaceShareAccess = async (access: AccessRepository, auth: AuthDto, assetIds: string[]) => {
   const ids = new Set(assetIds);
   const owned = await access.asset.checkOwnerAccess(auth.user.id, ids, false);

@@ -41,10 +41,10 @@ export const isAwayFromHome = (item: MemoryLocationCluster, home: MemoryLocation
 };
 
 /**
- * The strongest cluster whose UTC calendar day of `firstDate` equals `anniversary`'s UTC day,
- * is away from home, and meets both thresholds. Ties break on higher assetCount, then on
- * placeKeyOf ascending (deterministic). Returns null when none qualify or `clusters` is empty.
- */
+The strongest cluster whose UTC calendar day of `firstDate` equals `anniversary`'s UTC day,
+is away from home, and meets both thresholds. Ties break on higher assetCount, then on
+placeKeyOf ascending (deterministic). Returns null when none qualify or `clusters` is empty.
+*/
 export const findTripStartingOn = (
   clusters: MemoryLocationCluster[],
   anniversary: DateTime,

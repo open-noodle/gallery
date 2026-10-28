@@ -7,17 +7,17 @@ import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/stor
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 /**
- * A stored path that names a disk file: absolute, in upstream's layout. A relative key belongs to the configured
- * storage backend (S3, or the media location when S3 is off). StorageService.backendFor decides on it; sites
- * that run upstream's own disk code for disk files test it too.
- */
+A stored path that names a disk file: absolute, in upstream's layout. A relative key belongs to the configured
+storage backend (S3, or the media location when S3 is off). StorageService.backendFor decides on it; sites
+that run upstream's own disk code for disk files test it too.
+*/
 export const isDiskPath = (key: string) => isAbsolute(key);
 
 /**
- * exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
- * calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
- * unchanged for disk files.
- */
+exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
+calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
+unchanged for disk files.
+*/
 export class DiskStorageBackend implements StorageBackend {
   constructor(
     private mediaLocation: string,
@@ -121,10 +121,10 @@ export class DiskStorageBackend implements StorageBackend {
   }
 
   /**
-   * Move a file within this backend. Deliberately NOT on `StorageBackend`: S3 has no move, only a
-   * copy-then-delete that is neither atomic nor cheap for a multi-gigabyte object, and the one
-   * caller (the database backup's `.tmp` promote) only ever moves a file on the staging disk.
-   */
+  Move a file within this backend. Deliberately NOT on `StorageBackend`: S3 has no move, only a
+  copy-then-delete that is neither atomic nor cheap for a multi-gigabyte object, and the one
+  caller (the database backup's `.tmp` promote) only ever moves a file on the staging disk.
+  */
   rename(fromKey: string, toKey: string): Promise<void> {
     return this.storageRepository.rename(this.resolvePath(fromKey), this.resolvePath(toKey));
   }

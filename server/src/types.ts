@@ -275,12 +275,12 @@ export interface IFacialRecognitionJob extends IDeferrableJob {
 
 export interface IPetRecognitionJob extends IDeferrableJob {
   /**
-   * The species/breed label from ML pet detection. `asset_face` has no species column, so this is
-   * how the label reaches the point (Part B, brand-new-person creation) that needs it — set by
-   * `handlePetDetection` when it queues the job, and carried through the one deferred re-queue.
-   * Optional because a future caller without a freshly-detected label (e.g. Slice 6 reprocessing
-   * an existing unassigned face) may have none to offer.
-   */
+  The species/breed label from ML pet detection. `asset_face` has no species column, so this is
+  how the label reaches the point (Part B, brand-new-person creation) that needs it — set by
+  `handlePetDetection` when it queues the job, and carried through the one deferred re-queue.
+  Optional because a future caller without a freshly-detected label (e.g. Slice 6 reprocessing
+  an existing unassigned face) may have none to offer.
+  */
   label?: string;
 }
 
@@ -734,9 +734,9 @@ export type MemoriesState = {
   /** rule memories have already been created through this date */
   lastRuleDate?: string;
   /**
-   * Overlap reconciliation has already swept history through this date. Set once by the one-off
-   * backfill; when it reaches today the backfill never runs again.
-   */
+  Overlap reconciliation has already swept history through this date. Set once by the one-off
+  backfill; when it reaches today the backfill never runs again.
+  */
   overlapBackfilledAt?: string;
 };
 export type MediaLocation = { location: string };

@@ -5,21 +5,21 @@ import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
 
 /**
- * The filter panel's shared vocabulary, defined once for every fork surface that answers it: the
- * timeline buckets, filter suggestions, smart-search facets, the filtered map, the space people
- * lists, and the taken range of search results (searchAssetBuilderWithLocalTaken below). Viewer
- * scope (owner / space / visibility) is NOT part of it; each caller keeps its own.
- *
- * - taken: `asset.localDateTime`, the wall-clock time the timeline groups its buckets by, so a month
- *   a client sends is the same month the grid shows. `takenAfter` is inclusive, `takenBefore`
- *   exclusive. Clients send wall-clock ranges as UTC: the start of the first day and the start of
- *   the day after the last one (web filter-panel.ts, mobile search_api.repository.dart).
- * - place/camera: `null` means "has no value" (IS NULL), `undefined` and `''` mean "no filter".
- * - rating: a minimum (`>=`); `null` means unrated.
- *
- * `searchAssetBuilderLegacy` itself is upstream and untouched (fileCreatedAt, inclusive bound, exact
- * rating unless `ratingIsMinimum`); see specs/2026-07-23-search-v3-coexistence-design.md.
- */
+The filter panel's shared vocabulary, defined once for every fork surface that answers it: the
+timeline buckets, filter suggestions, smart-search facets, the filtered map, the space people
+lists, and the taken range of search results (searchAssetBuilderWithLocalTaken below). Viewer
+scope (owner / space / visibility) is NOT part of it; each caller keeps its own.
+
+- taken: `asset.localDateTime`, the wall-clock time the timeline groups its buckets by, so a month
+  a client sends is the same month the grid shows. `takenAfter` is inclusive, `takenBefore`
+  exclusive. Clients send wall-clock ranges as UTC: the start of the first day and the start of
+  the day after the last one (web filter-panel.ts, mobile search_api.repository.dart).
+- place/camera: `null` means "has no value" (IS NULL), `undefined` and `''` mean "no filter".
+- rating: a minimum (`>=`); `null` means unrated.
+
+`searchAssetBuilderLegacy` itself is upstream and untouched (fileCreatedAt, inclusive bound, exact
+rating unless `ratingIsMinimum`); see specs/2026-07-23-search-v3-coexistence-design.md.
+*/
 export interface AssetFilter {
   takenAfter?: Date | string;
   takenBefore?: Date | string;
@@ -95,9 +95,9 @@ export function withAssetFilter<T extends SelectQueryBuilder<DB, any, any>>(
 }
 
 /**
- * Upstream search (`searchAssetBuilderLegacy`) with its taken range swapped for this module's, so
- * search results agree with the timeline, suggestions and facets. Everything else stays upstream.
- */
+Upstream search (`searchAssetBuilderLegacy`) with its taken range swapped for this module's, so
+search results agree with the timeline, suggestions and facets. Everything else stays upstream.
+*/
 export function searchAssetBuilderWithLocalTaken(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
   return withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
     takenAfter: options.takenAfter,

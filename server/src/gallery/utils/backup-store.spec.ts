@@ -305,10 +305,10 @@ describe('validateBackupS3Config', () => {
 });
 
 /**
- * The maintenance worker lists its providers explicitly rather than spreading `services`, so a new
- * dependency on `DatabaseBackupService` has to be named there as well. Missing it is a boot failure
- * in the restore flow only — no type check and no other spec would catch it.
- */
+The maintenance worker lists its providers explicitly rather than spreading `services`, so a new
+dependency on `DatabaseBackupService` has to be named there as well. Missing it is a boot failure
+in the restore flow only — no type check and no other spec would catch it.
+*/
 describe('maintenance worker wiring', () => {
   // `Reflector` rather than `Reflect.getMetadata` directly: same lookup, without reaching for a
   // non-standard builtin property the lint rules reject.
