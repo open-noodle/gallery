@@ -70,6 +70,7 @@
         "SharedSpaceAssetsV1",
         "SharedSpaceAssetExifsV1",
         "SharedSpaceToAssetsV1",
+        "SharedSpaceStacksV1",
         "LibrariesV1",
         "LibraryAssetsV1",
         "LibraryAssetExifsV1",
