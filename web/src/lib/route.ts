@@ -209,6 +209,7 @@ export const Route = {
   viewFaceCleanupPerson: ({ id }: { id: string }) => `/admin/face-cleanup/${id}`,
   viewFaceCleanupManualPerson: ({ id }: { id: string }) => `/admin/face-cleanup/people/${id}`,
   faceCleanupResolutions: () => '/admin/face-cleanup/resolutions',
+  faceCleanupDissolved: () => '/admin/face-cleanup/dissolved',
 
   // queues
   queues: () => '/admin/queues',
