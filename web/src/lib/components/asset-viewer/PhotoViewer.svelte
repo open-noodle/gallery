@@ -32,11 +32,11 @@
     onError?: () => void;
     onSwipe?: (event: SwipeCustomEvent) => void;
     /**
-     * Slice 8 gap closure: `spaceId`/`canEditSpacePeople` come from AssetViewer.svelte
-     * (`resolveCanEditSpacePeople`, the same rule DetailPanel.svelte uses for the People row on
-     * this SAME asset), and are forwarded to `FaceEditorPanel` below, which decides between the
-     * owner `FaceEditor` and the space-flavoured `SpaceFaceEditor`.
-     */
+    Slice 8 gap closure: `spaceId`/`canEditSpacePeople` come from AssetViewer.svelte
+    (`resolveCanEditSpacePeople`, the same rule DetailPanel.svelte uses for the People row on
+    this SAME asset), and are forwarded to `FaceEditorPanel` below, which decides between the
+    owner `FaceEditor` and the space-flavoured `SpaceFaceEditor`.
+    */
     spaceId?: string;
     canEditSpacePeople?: boolean;
   };

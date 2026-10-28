@@ -8,12 +8,12 @@ import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 
 /**
- * Bulk (un)archive that returns the ids it changed, so the caller can update its own view.
- *
- * Upstream (immich-32189) replaced this with event-driven bulk actions in asset.service.ts. The fork's
- * filtered timelines (lib/gallery/filtered-timeline) also show search results, which no upstream event
- * listener updates, so the fork's selection toolbar keeps this callback-based path.
- */
+Bulk (un)archive that returns the ids it changed, so the caller can update its own view.
+
+Upstream (immich-32189) replaced this with event-driven bulk actions in asset.service.ts. The fork's
+filtered timelines (lib/gallery/filtered-timeline) also show search results, which no upstream event
+listener updates, so the fork's selection toolbar keeps this callback-based path.
+*/
 export const archiveAssets = async (assets: TimelineAsset[], visibility: AssetVisibility) => {
   const ids = assets.map(({ id }) => id);
   const $t = get(t);

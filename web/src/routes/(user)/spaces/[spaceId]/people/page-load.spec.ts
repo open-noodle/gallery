@@ -66,6 +66,7 @@ describe('space people page load', () => {
     detectedFaceCount: 1980,
   };
 
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const makeEvent = (overrides: { spaceId?: string } = {}) => ({
     url: new URL(`https://gallery.test/spaces/${overrides.spaceId ?? 'space-1'}/people`),
     params: { spaceId: overrides.spaceId ?? 'space-1' },

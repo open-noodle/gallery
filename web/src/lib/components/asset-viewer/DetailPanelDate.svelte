@@ -11,9 +11,9 @@
   type Props = {
     asset: AssetResponseDto;
     /**
-     * R3 — was re-derived locally from authManager; every other DetailPanel child takes it as a
-     * prop, and only the parent knows about a shared link (where authManager.user THROWS).
-     */
+    R3 — was re-derived locally from authManager; every other DetailPanel child takes it as a
+    prop, and only the parent knows about a shared link (where authManager.user THROWS).
+    */
     isOwner: boolean;
     /** R4/E2 — false on a shared link. */
     canFilter?: boolean;

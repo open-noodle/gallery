@@ -1,11 +1,11 @@
 import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
 
 /**
- * Cards tilt a few degrees toward the mouse, as if the picture were a physical print under the
- * cursor (the "follow the pointer" kind of motion). Only the picture that lifts on hover tilts; the
- * angle lives in two CSS variables that motion.css turns into a transform, so leaving the card lets
- * the transition settle it back flat.
- */
+Cards tilt a few degrees toward the mouse, as if the picture were a physical print under the
+cursor (the "follow the pointer" kind of motion). Only the picture that lifts on hover tilts; the
+angle lives in two CSS variables that motion.css turns into a transform, so leaving the card lets
+the transition settle it back flat.
+*/
 const GROUP = "[data-motion-lift-group], [data-testid='album-card']";
 const PICTURE = "[data-motion-lift]:not([data-motion-lift='flat']), img.aspect-square";
 

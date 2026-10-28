@@ -52,18 +52,18 @@
   );
 
   /**
-   * The list is always truncated — to INITIAL_SHOW_COUNT, or to a first page of search matches — and
-   * "Show more" adds one PAGE_SIZE at a time. Never render every match at once: each row mounts a
-   * tooltip and measures its own layout, and a one-letter search in a library with thousands of tags
-   * froze iOS Safari for ~15s doing exactly that (#1125).
-   *
-   * Truncation never hides a tag that is actually SELECTED. A library with thousands of tags will
-   * essentially never have the active one in the first ten, so a tag filter applied from anywhere
-   * other than this list (a contextual filter clicked in the asset viewer, a shared link, typed
-   * search) left the panel looking as though nothing was selected. Selected tags are hoisted rather
-   * than scrolled to: it needs no measurement, survives a re-fetch, and puts them alongside the
-   * orphaned tags already pinned above instead of splitting the selection across two places.
-   */
+  The list is always truncated — to INITIAL_SHOW_COUNT, or to a first page of search matches — and
+  "Show more" adds one PAGE_SIZE at a time. Never render every match at once: each row mounts a
+  tooltip and measures its own layout, and a one-letter search in a library with thousands of tags
+  froze iOS Safari for ~15s doing exactly that (#1125).
+  
+  Truncation never hides a tag that is actually SELECTED. A library with thousands of tags will
+  essentially never have the active one in the first ten, so a tag filter applied from anywhere
+  other than this list (a contextual filter clicked in the asset viewer, a shared link, typed
+  search) left the panel looking as though nothing was selected. Selected tags are hoisted rather
+  than scrolled to: it needs no measurement, survives a re-fetch, and puts them alongside the
+  orphaned tags already pinned above instead of splitting the selection across two places.
+  */
   let visibleLimit = $derived((searchQuery.trim() ? PAGE_SIZE : INITIAL_SHOW_COUNT) + extraPages * PAGE_SIZE);
 
   let visibleTags = $derived.by(() => {

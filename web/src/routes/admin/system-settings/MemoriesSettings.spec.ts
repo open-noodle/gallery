@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MemoriesSettings from './MemoriesSettings.svelte';
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const makeConfig = (retentionDays = 365) =>
   ({
     memories: {
