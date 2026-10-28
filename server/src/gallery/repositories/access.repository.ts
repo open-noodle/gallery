@@ -2,6 +2,8 @@ import { type Kysely } from 'kysely';
 import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
+import { withDefaultVisibility } from 'src/utils/database.js';
+import { setDifference } from 'src/utils/set.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
@@ -134,6 +136,36 @@ export class SpaceAssetAccess {
         }
         return allowedIds;
       });
+  }
+
+  /**
+   * A stack is readable when every photo StackRepository.getById returns for it (live, default visibilities)
+   * is readable through a space, so the stack never hands out a photo the member cannot see.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceStackAccess(userId: string, stackIds: Set<string>) {
+    if (stackIds.size === 0) {
+      return new Set<string>();
+    }
+
+    const assets = await this.db
+      .selectFrom('asset')
+      .select(['asset.id', 'asset.stackId'])
+      .where('asset.stackId', 'in', [...stackIds])
+      .where('asset.deletedAt', 'is', null)
+      .$call(withDefaultVisibility)
+      .execute();
+    const readable = await this.checkSpaceAccess(userId, new Set(assets.map((asset) => asset.id)));
+
+    const allowed = new Set<string>();
+    const denied = new Set<string>();
+    for (const { id, stackId } of assets) {
+      if (stackId) {
+        (readable.has(id) ? allowed : denied).add(stackId);
+      }
+    }
+    return setDifference(allowed, denied);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID_SET] })

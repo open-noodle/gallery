@@ -40,6 +40,11 @@ Map<SyncEntityType, GallerySyncHandler> gallerySyncHandlers(
   SyncEntityType.sharedSpaceToAssetV1: (data) => repo.updateSharedSpaceToAssetsV1(data.cast()),
   SyncEntityType.sharedSpaceToAssetBackfillV1: (data) => repo.updateSharedSpaceToAssetsV1(data.cast()),
   SyncEntityType.sharedSpaceToAssetDeleteV1: (data) => repo.deleteSharedSpaceToAssetsV1(data.cast()),
+  SyncEntityType.sharedSpaceStackV1: (data) => repo.updateSharedSpaceStacksV1(data.cast()),
+  SyncEntityType.sharedSpaceStackBackfillV1: (data) => repo.updateSharedSpaceStacksV1(data.cast()),
+  SyncEntityType.sharedSpaceStackAlbumBackfillV1: (data) => repo.updateSharedSpaceStacksV1(data.cast()),
+  SyncEntityType.sharedSpaceStackLibraryBackfillV1: (data) => repo.updateSharedSpaceStacksV1(data.cast()),
+  SyncEntityType.sharedSpaceStackDeleteV1: (data) => repo.deleteSharedSpaceStacksV1(data.cast()),
   SyncEntityType.libraryV1: (data) => repo.updateLibrariesV1(data.cast()),
   SyncEntityType.libraryDeleteV1: (data) async {
     final userId = currentUserId();
@@ -219,6 +224,13 @@ class GallerySyncStreamRepository extends DatabaseAccessor<Drift> {
   // Same delegation for exif rows.
   Future<void> updateSharedSpaceAssetExifsV1(Iterable<SyncAssetExifV1> data) =>
       _syncStream.updateAssetsExifV1(data, debugLabel: 'shared-space');
+
+  // The stacks of the photos a space brings land in stack_entity, like partner stacks.
+  Future<void> updateSharedSpaceStacksV1(Iterable<SyncStackV1> data) =>
+      _syncStream.updateStacksV1(data, debugLabel: 'shared-space');
+
+  Future<void> deleteSharedSpaceStacksV1(Iterable<SyncStackDeleteV1> data) =>
+      _syncStream.deleteStacksV1(data, debugLabel: 'shared-space');
 
   Future<void> updateSharedSpaceToAssetsV1(Iterable<SyncSharedSpaceToAssetV1> data) async {
     try {

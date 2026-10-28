@@ -13,7 +13,12 @@ import {
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
-import { accessibleSpaceAlbums, accessibleSpaces, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import {
+  accessibleSpaceAlbums,
+  accessibleSpaces,
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+} from 'src/utils/shared-space-album-scope.js';
 
 // Same dummy arguments as sync.repository.ts, so the SQL docs render identical queries.
 const dummyBackfillOptions = {
@@ -48,6 +53,7 @@ export class GallerySyncRepository {
   sharedSpaceAsset: SharedSpaceAssetSync;
   sharedSpaceAssetExif: SharedSpaceAssetExifSync;
   sharedSpaceToAsset: SharedSpaceToAssetSync;
+  sharedSpaceStack: SharedSpaceStackSync;
   library: LibrarySync;
   libraryAsset: LibraryAssetSync;
   libraryAssetExif: LibraryAssetExifSync;
@@ -67,6 +73,7 @@ export class GallerySyncRepository {
     this.sharedSpaceAsset = new SharedSpaceAssetSync(this.db);
     this.sharedSpaceAssetExif = new SharedSpaceAssetExifSync(this.db);
     this.sharedSpaceToAsset = new SharedSpaceToAssetSync(this.db);
+    this.sharedSpaceStack = new SharedSpaceStackSync(this.db);
     this.library = new LibrarySync(this.db);
     this.libraryAsset = new LibraryAssetSync(this.db);
     this.libraryAssetExif = new LibraryAssetExifSync(this.db);
@@ -1375,5 +1382,179 @@ class SharedSpaceAlbumAssetExifSync extends BaseSync {
       .where('asset.deletedAt', 'is', null);
 
     return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+}
+
+// #1243: the stacks of other members' photos that reach the user through a space; mobile shows a stacked photo only
+// once it knows its stack. A stack follows its cover, along the paths SharedSpaceAssetSync, SharedSpaceAlbumAssetSync
+// and LibraryAssetSync take, and is not sent while its cover reaches none of the user's spaces. The trash is not a
+// filter: restoring a cover bumps only asset.updateId, which the space and album arms do not watch, so a stack held
+// back while its cover was trashed would never be sent.
+class SharedSpaceStackSync extends BaseSync {
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    // Like PartnerStackSync: every stack a fellow member deletes, since the audit row no longer says where it was.
+    const userId = options.userId;
+    return this.auditQuery('stack_audit', options)
+      .select(['stack_audit.id', 'stack_audit.stackId'])
+      .where('stack_audit.userId', '!=', userId)
+      .where('stack_audit.userId', 'in', (eb) =>
+        eb
+          .selectFrom('shared_space_member')
+          .select('shared_space_member.userId')
+          .where('shared_space_member.spaceId', 'in', (eb) => accessibleSpaces(eb, userId)),
+      )
+      .stream();
+  }
+
+  // Whatever brings a stack, each arm keyed on its own row: the stack changed (new stack, new cover); its cover was
+  // added to a space or a linked album, or shown again (the visibility restores bump these rows); a library cover
+  // changed, as LibraryAssetSync.getUpserts.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    const { userId, nowId, ack } = options;
+
+    const stackArm = this.db
+      .selectFrom('stack')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('stack.updateId')
+      .where('stack.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('stack.updateId', '>', ack!.updateId))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .where((eb) =>
+        eb.or(
+          spaceAssetPathBranches(eb, {
+            correlateAssetId: 'asset.id',
+            correlateLibraryId: 'asset.libraryId',
+            scope: { memberUserId: userId },
+            albumTimelineGate: 'none',
+          }),
+        ),
+      );
+
+    const spaceArm = this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('stack', 'stack.primaryAssetId', 'shared_space_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('shared_space_asset.updateId', '>', ack!.updateId))
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, userId))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb));
+
+    const albumArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .innerJoin('stack', 'stack.primaryAssetId', 'album_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('album_asset.updateId')
+      .where('album_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_asset.updateId', '>', ack!.updateId))
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb));
+
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .innerJoin('stack', 'stack.primaryAssetId', 'album_space_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('album_space_asset.updateId')
+      .where('album_space_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_space_asset.updateId', '>', ack!.updateId))
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .where((eb) => contributionVisibleToMember(eb, userId));
+
+    const libraryArm = this.db
+      .selectFrom('asset')
+      .innerJoin('stack', 'stack.primaryAssetId', 'asset.id')
+      .select(columns.syncStack)
+      .select('asset.updateId')
+      .where('asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('asset.updateId', '>', ack!.updateId))
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb));
+
+    return stackArm
+      .union(spaceArm)
+      .union(albumArm)
+      .union(contributedArm)
+      .union(libraryArm)
+      .orderBy('updateId', 'asc')
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getSpaceBackfill(options: SyncBackfillOptions, spaceId: string, userId: string) {
+    return this.backfillQuery('shared_space_asset', options)
+      .innerJoin('stack', 'stack.primaryAssetId', 'shared_space_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getAlbumBackfill(options: SyncBackfillOptions, albumId: string, userId: string) {
+    const { nowId, beforeUpdateId, afterUpdateId } = options;
+
+    const albumArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('album', 'album.id', 'album_asset.albumId')
+      .innerJoin('stack', 'stack.primaryAssetId', 'album_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('album_asset.updateId')
+      .where('album_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_asset.updateId', '<', nowId)
+      .where('album_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_asset.updateId', '>', afterUpdateId!))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb));
+
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('album', 'album.id', 'album_space_asset.albumId')
+      .innerJoin('stack', 'stack.primaryAssetId', 'album_space_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'stack.primaryAssetId')
+      .select(columns.syncStack)
+      .select('album_space_asset.updateId')
+      .where('album_space_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_space_asset.updateId', '<', nowId)
+      .where('album_space_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_space_asset.updateId', '>', afterUpdateId!))
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .where((eb) => contributionVisibleToMember(eb, userId));
+
+    return albumArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getLibraryBackfill(options: SyncBackfillOptions, libraryId: string, userId: string) {
+    return this.backfillQuery('asset', options)
+      .innerJoin('stack', 'stack.primaryAssetId', 'asset.id')
+      .select(columns.syncStack)
+      .select('asset.updateId')
+      .where('asset.libraryId', '=', libraryId)
+      .where('stack.ownerId', '!=', userId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .stream();
   }
 }
