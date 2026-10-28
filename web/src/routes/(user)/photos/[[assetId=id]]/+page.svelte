@@ -18,6 +18,7 @@
   import { AssetAction } from '$lib/constants';
   import FilteredTimelinePage from '$lib/gallery/filtered-timeline/FilteredTimelinePage.svelte';
   import { createPhotosTimeline } from '$lib/gallery/filtered-timeline/photos-timeline';
+  import RemoveFromSpaceButton from '$lib/gallery/space-remove/RemoveFromSpaceButton.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -139,6 +140,7 @@
     <ActionButton action={Actions.CreateSharedLink} />
     <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} onSelectAll={filtered.onSelectAll} />
     <ActionButton action={Actions.AddToAlbum} />
+    <RemoveFromSpaceButton onLeaveTimeline={filtered.onAssetDelete} />
 
     <!-- #763: a favorite is a per-user overlay row, so it needs no ownership gate. -->
     <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={filtered.onFavorite} />
