@@ -529,14 +529,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
                 onUnlink: _onUnlinkAlbum,
               ),
             ),
+            dailyChallengeEnabled: dailyChallengeEnabled,
+            onDecideDaily: _decideDaily,
+            // Today's daily challenge, once opted in and generated server-side.
+            onPlayDaily: () => unawaited(_playDaily()),
+            // No standings section lives on the timeline itself — the Challenges page has the one
+            // and only leaderboard, so route there.
+            onDailyStandings: _navigateToChallenges,
           ),
-          dailyChallengeEnabled: dailyChallengeEnabled,
-          onDecideDaily: _decideDaily,
-          // Today's daily challenge, once opted in and generated server-side.
-          onPlayDaily: () => unawaited(_playDaily()),
-          // No standings section lives on the timeline itself — the Challenges page has the one
-          // and only leaderboard, so route there.
-          onDailyStandings: _navigateToChallenges,
         ),
         topSliverWidgetHeight: computeTopSliverHeight(
           ref: ref,
