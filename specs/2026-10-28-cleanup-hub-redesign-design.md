@@ -37,8 +37,8 @@ a row of queues showing what is quick to win; the year is still there but no lon
 
 - No new endpoints or changes to what the queues, calendar or rewind contain. (One exception may be needed
   for the banner collage; see "Today banner".)
-- The queue pages keep their current design, apart from the photo preview added to Blurry and Screenshots
-  (see that section).
+- Space hogs keeps its current design. Blurry, Screenshots and Bursts change only as "Queue pages: seeing
+  photos properly" describes.
 - One-at-a-time rewind mode keeps its layout; it only picks up the shared styling (tile radius, floating
   bottom bar, header).
 - Mobile app: unchanged.
@@ -230,60 +230,83 @@ under `prefers-reduced-motion` movement drops to plain fades or nothing. New hel
   scrollbars appearing during animations, no smearing on the calendar, and nothing stuck after fast
   hovering.
 
-## Blurry and Screenshots queues: photo preview
+## Queue pages: seeing photos properly
 
-The owner's request: on the Blurry & botched page the tiles are too small to tell what a photo shows, and there
-is no way to see it bigger or learn anything about it. Double-click opens the full asset viewer today, but
-nothing on the page says so, and the viewer gives no queue context. The fix follows the face suggestions
-review (`specs/2026-09-03-face-cleanup-photo-context-design.md`, #1079), which solved the same problem there.
+The owner's request: on the queue pages the thumbnails are too small to decide, and there is no way to see a
+photo bigger or learn anything about it. Double-click opens the full asset viewer today, but nothing on the
+page says so, and the viewer gives no queue context. This follows the face suggestions review
+(`specs/2026-09-03-face-cleanup-photo-context-design.md`, #1079), which solved the same problem there.
 
-Scope: both queues that use `QueueSelectGrid` (Blurry and Screenshots), since they share the grid. My call;
-the owner asked for Blurry. Space hogs and Bursts are unchanged.
+Mockup for the bursts layout and the photo window: `specs/mockups/2026-10-28-cleanup-bursts-mockup.html`
+(option A, plus the "open any frame" window at the bottom; options B and C were not chosen).
 
-### Expand button on each tile
+### Photo window (shared)
 
-- Each tile gets a small round expand button (a magnify or plus icon) in its bottom-right corner, on a dark
-  translucent chip so it reads on any photo. On pointer devices it appears on hover and on keyboard focus;
-  on touch it is always visible.
-- Pressing it opens the preview modal for that photo. It does not toggle the tile's selection.
-- Double-click keeps opening the full viewer. Space on a focused tile now opens the preview modal instead of
-  the viewer (my call: a quick look fits the queue better; the modal links on to the full viewer).
+One modal, used by the Blurry, Screenshots and Bursts queues.
 
-### Preview modal
+- **Opening it:** each tile or frame gets a small round expand button in its corner, on a dark translucent chip
+  so it reads on any photo. On pointer devices it appears on hover and keyboard focus; on touch it is always
+  visible. Pressing it never toggles the tile's selection or mark. Space on a focused tile opens it too (my
+  call: replaces Space opening the full viewer; double-click still opens the viewer).
+- **Layout:** the photo on the left, as large as the viewport allows and never cropped (preview size, thumbhash
+  while loading; videos show their poster with a ▶ badge and do not play). An information panel on the right,
+  always visible (the owner wants to see information about the photo, not dig for it). On narrow screens the
+  panel moves below the photo.
+- **Information:** taken date and time, place, camera and exposure, file name, dimensions and size, people
+  recognised, albums, and the queue's own signal: the reason for Blurry (Blurry, Too dark, Too bright), the
+  sharpness bar and rank within the series for Bursts ("Sharpest of the 8"). Read-only, like face review: no
+  edit pencils or filter links. The builder reuses the data loading and rows of face review's
+  `suggestion-asset-details` / `suggestion-asset-summary` (`web/src/lib/gallery/people/`), moved to a neutral
+  folder (for example `web/src/lib/gallery/asset-context/`) and given an always-open layout for this window,
+  with face review's collapsible use unchanged.
+- **Links:** "Open in new tab" (`Route.viewAsset`) and "Open in viewer" (the full viewer in place).
+- **Actions:** Keep and Trash for the photo shown, through the queue's existing paths (`keep`, `trashWithUndo`,
+  burst marks), with their confirmation, undo and animations. Blurry and Screenshots also get Select /
+  Deselect, mirroring the tile. After Keep or Trash in Blurry and Screenshots the window moves to the next
+  photo, and closes past the last. In Bursts, Keep and Trash set the frame's mark in its series (nothing is
+  committed until the series' own button, as today) and the window stays on the frame.
+- **Moving:** previous and next arrows and ← / →. In Blurry and Screenshots they step through the photos
+  loaded on the page in grid order, loading the next page at the end as the grid does. In Bursts they step
+  through the frames of that series only.
+- **Keys** (shown in the window, face review's keycap style): ← → move, K keep, Delete trash, Space select
+  (Blurry and Screenshots), O open in new tab, Esc close.
+- **Motion:** the window grows out of the tile that opened it and shrinks back into it on close (reduced
+  motion: fade). Stepping slides the photo in from the direction of travel.
 
-- **Photo:** the preview size (`AssetMediaSize.Preview`), as large as the viewport allows, never cropped. The
-  thumbhash shows while it loads. Videos show their poster with a ▶ badge; they are not played in the modal.
-- **Why it's here:** for Blurry, the reason badge (Blurry, Too dark, Too bright) in plain words. Showing the
-  raw sharpness score is not required.
-- **Context:** the summary line from face review (taken date, place) and its collapsible details block (capture
-  time, file name and size, dimensions, camera, albums, people recognised). Both are read-only and are reused
-  from `web/src/lib/gallery/people/` (`suggestion-asset-summary`, `suggestion-asset-details`). The builder
-  moves them to a neutral folder (for example `web/src/lib/gallery/asset-context/`) and updates the face review
-  imports, with no change to face review's behaviour. The details block remembers whether it is open, as it
-  does in face review, with its own storage key.
-- **Links:** "Open in new tab" (to `/photos/{id}`, through `Route.viewAsset`) and "Open in viewer" (the full
-  viewer in place, as double-click does).
-- **Actions:** Keep and Trash for this photo, using the queue's existing paths (`keep`, `trashWithUndo`, with
-  their confirmation, undo and animations), and a Select / Deselect toggle that mirrors the tile. After Keep or
-  Trash the modal moves on to the next photo; past the last one it closes.
-- **Moving through the queue:** previous and next arrows, and ← / → keys, step through the photos currently
-  loaded on the page in their grid order, loading the next page when the end is reached, as the grid does.
-- **Keys** (shown in the modal's footer, same keycap style as face review): ← → move, Space select, K keep,
-  Delete trash, O open in new tab, Esc close.
+### Bursts: big frame and filmstrip
 
-### Motion
+Each series card (`BurstGroupCard`) becomes:
 
-- The modal grows out of the tile that opened it (the photo scales from the tile's position to its full size)
-  and shrinks back into it on close; reduced motion fades instead.
-- Stepping to the next photo slides it in from the direction of travel. Keep and Trash use the queue's
-  existing animations on the grid behind the modal once it closes.
+- **Header:** "N photos · S seconds" (the span between first and last frame), the date and city, and the
+  existing actions on the right: Keep all, Stack instead, and "Keep X · trash Y".
+- **Big frame:** the series' current frame shown large (preview size, 3:2 area, `object-fit: contain` on a
+  black background so nothing is cropped), with "★ Sharpest" on the suggested frame, its keep or trash mark,
+  and "Frame i of N · time". Clicking it, or K, toggles the mark of the frame shown. Its expand button opens
+  the photo window.
+- **Filmstrip:** every frame of the series as a row of square thumbnails under the big frame, with today's
+  marks (kept ring and check, trashed greyed with a label). Hovering a thumbnail, or ← / → while the card has
+  focus, shows that frame in the big frame. Clicking a thumbnail toggles its mark, as clicking a tile does
+  today. The current frame has the focus outline.
+- **Sharpness:** a small panel beside the big frame with a sharpness bar per frame, best first (the score is
+  already in `CleanupAssetDto.sharpness`; frames without a score show none). On narrow screens it folds under
+  the filmstrip. Builder's call whether it lists every frame or the best few plus the current one.
+- **Defaults and commit:** unchanged: the suggested frame starts kept, the rest marked for trash, and the
+  series' button commits through `commitWithUndo`.
+- **Loading:** the big frame loads its preview only when the card nears the viewport, and the neighbouring
+  frames' previews preload when the card is focused or hovered, so a long list does not fetch every preview up
+  front.
+- **Motion:** swapping the big frame crossfades on `--motion-quick`; marks fade and their check pops (`pop()`),
+  as in rewind; a resolved series leaves with the existing trash animation and the list closes the gap
+  (`flipMotion`).
 
 ### Tests
 
-- The expand button opens the modal for its own photo and does not change the selection.
-- Space opens the modal; double-click still opens the viewer.
-- ← / → step through the loaded photos; Keep and Trash call the queue's paths and advance; Select toggles the
-  same selection the grid shows.
+- The expand button opens the photo window for its own photo and changes no selection or mark; Space opens it;
+  double-click still opens the viewer.
+- In Blurry and Screenshots, ← / → step through the loaded photos, Keep and Trash call the queue's paths and
+  advance, Select toggles the grid's selection.
+- In Bursts, hovering or ← / → changes the big frame, clicking the big frame or K toggles its mark, the window
+  steps only within the series, and committing still sends the same keep and trash ids.
 - Face review's existing specs still pass after the components move.
 
 ## i18n
