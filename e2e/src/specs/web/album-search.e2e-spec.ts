@@ -3,20 +3,21 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { utils } from 'src/utils.js';
 
 /**
- * #986 — page-aware search on the two album detail routes.
- *
- * Before this, searching from inside an album navigated to `/photos` and ran the query against the
- * caller's whole library. A space page searched its space correctly; a space album did not.
- *
- * SCOPE NOTE, same as photos-search.e2e-spec.ts: the e2e stack runs with
- * `IMMICH_MACHINE_LEARNING_ENABLED=false`, so `/search/smart` always trips the "Smart search is not
- * enabled" gate and returns no real CLIP results. That is fine here — every assertion below is
- * about the DESTINATION and the URL/UI plumbing, which is exactly where the reported bug lived. The
- * server-side album scoping (`albumIds` dropping the owner-scoping `userIds`, so a shared album
- * returns every member's matches) is covered at the API layer instead; it cannot be reached through
- * the UI while ML is off.
- */
+#986 — page-aware search on the two album detail routes.
 
+Before this, searching from inside an album navigated to `/photos` and ran the query against the
+caller's whole library. A space page searched its space correctly; a space album did not.
+
+SCOPE NOTE, same as photos-search.e2e-spec.ts: the e2e stack runs with
+`IMMICH_MACHINE_LEARNING_ENABLED=false`, so `/search/smart` always trips the "Smart search is not
+enabled" gate and returns no real CLIP results. That is fine here — every assertion below is
+about the DESTINATION and the URL/UI plumbing, which is exactly where the reported bug lived. The
+server-side album scoping (`albumIds` dropping the owner-scoping `userIds`, so a shared album
+returns every member's matches) is covered at the API layer instead; it cannot be reached through
+the UI while ML is off.
+*/
+
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 async function submitGlobalSearch(page: Page, query: string) {
   const mobileSearchButton = page.locator('#search-button');
   await ((await mobileSearchButton.isVisible()) ? mobileSearchButton.click() : page.keyboard.press('Control+k'));
