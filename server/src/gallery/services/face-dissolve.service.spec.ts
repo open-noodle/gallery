@@ -200,4 +200,51 @@ describe(FaceDissolveService.name, () => {
     await expect(sut.getPeopleHealth(query)).resolves.toBe(result);
     expect(mocks.faceDissolve.getPeopleHealth).toHaveBeenCalledWith(query);
   });
+
+  describe('restore', () => {
+    beforeEach(() => {
+      mocks.faceDissolve.getDissolve.mockResolvedValue({ id: 'dissolve-1', restoredAt: null });
+      mocks.faceDissolve.restore.mockResolvedValue({ restored: 4, skipped: 1 });
+    });
+
+    it('rejects an unknown dissolve', async () => {
+      mocks.faceDissolve.getDissolve.mockResolvedValue(void 0);
+      await expect(sut.restore('nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mocks.faceDissolve.restore).not.toHaveBeenCalled();
+    });
+
+    it('refuses a dissolve that was already restored', async () => {
+      mocks.faceDissolve.getDissolve.mockResolvedValue({ id: 'dissolve-1', restoredAt: new Date() });
+      await expect(sut.restore('dissolve-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(mocks.faceDissolve.restore).not.toHaveBeenCalled();
+    });
+
+    it.each([QueueName.FacialRecognition, QueueName.FaceDetection])('refuses while %s is running', async (queue) => {
+      mocks.job.isActive.mockImplementation((name) => Promise.resolve(name === queue));
+      await expect(sut.restore('dissolve-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(mocks.faceDissolve.restore).not.toHaveBeenCalled();
+    });
+
+    it('restores in a transaction and queues recognition once, never a cleanup', async () => {
+      await expect(sut.restore('dissolve-1')).resolves.toEqual({ restored: 4, skipped: 1 });
+      expect(mocks.database.transaction).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FacialRecognitionQueueAll,
+        data: { force: false },
+      });
+    });
+
+    it('queues nothing when no face came back', async () => {
+      mocks.faceDissolve.restore.mockResolvedValue({ restored: 0, skipped: 2 });
+      await sut.restore('dissolve-1');
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
+  it('listDissolves passes paging through', async () => {
+    mocks.faceDissolve.listDissolves.mockResolvedValue({ items: [], hasMore: false });
+    await expect(sut.listDissolves({ page: 2, size: 20 })).resolves.toEqual({ items: [], hasMore: false });
+    expect(mocks.faceDissolve.listDissolves).toHaveBeenCalledWith({ page: 2, size: 20 });
+  });
 });

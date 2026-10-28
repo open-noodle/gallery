@@ -1110,6 +1110,47 @@ describe(FaceRepairAdminController.name, () => {
     });
   });
 
+  describe('GET /admin/face-repair/dissolves', () => {
+    it('is admin-only: a non-admin caller gets 403', async () => {
+      ctx.authenticate.mockRejectedValue(new ForbiddenException('Forbidden'));
+      const { status } = await request(ctx.getHttpServer()).get('/admin/face-repair/dissolves');
+      expect(status).toBe(403);
+      expect(dissolveService.listDissolves).not.toHaveBeenCalled();
+    });
+
+    it('delegates paging with defaults', async () => {
+      dissolveService.listDissolves.mockResolvedValue({ items: [], hasMore: false });
+      const { status } = await request(ctx.getHttpServer()).get('/admin/face-repair/dissolves?page=2');
+      expect(status).toBe(200);
+      expect(dissolveService.listDissolves).toHaveBeenCalledWith({ page: 2, size: 50 });
+    });
+  });
+
+  describe('POST /admin/face-repair/dissolves/:id/restore', () => {
+    it('is admin-only: a non-admin caller gets 403', async () => {
+      ctx.authenticate.mockRejectedValue(new ForbiddenException('Forbidden'));
+      const { status } = await request(ctx.getHttpServer()).post(
+        '/admin/face-repair/dissolves/0199a8f0-0000-7000-8000-000000000001/restore',
+      );
+      expect(status).toBe(403);
+      expect(dissolveService.restore).not.toHaveBeenCalled();
+    });
+
+    it('accepts a v7 id and delegates to the service', async () => {
+      const id = '0199a8f0-0000-7000-8000-000000000001';
+      dissolveService.restore.mockResolvedValue({ restored: 1, skipped: 0 });
+      const { status, body } = await request(ctx.getHttpServer()).post(`/admin/face-repair/dissolves/${id}/restore`);
+      expect(status).toBe(201);
+      expect(body).toEqual({ restored: 1, skipped: 0 });
+      expect(dissolveService.restore).toHaveBeenCalledWith(id);
+    });
+
+    it('rejects a non-uuid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).post('/admin/face-repair/dissolves/nope/restore');
+      expect(status).toBe(400);
+    });
+  });
+
   describe('GET /admin/face-repair/people', () => {
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).get('/admin/face-repair/people');

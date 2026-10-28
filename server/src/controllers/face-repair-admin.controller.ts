@@ -45,8 +45,11 @@ import {
 } from 'src/dtos/face-repair.dto.js';
 import { ApiTag } from 'src/enum.js';
 import {
+  DissolveListQueryDto,
+  DissolveListResponseDto,
   DissolveRequestDto,
   DissolveResponseDto,
+  DissolveRestoreResponseDto,
   PeopleHealthQueryDto,
   PeopleHealthResponseDto,
 } from 'src/gallery/dtos/face-dissolve.dto.js';
@@ -298,6 +301,27 @@ export class FaceRepairAdminController {
     @Body() dto: DissolveRequestDto,
   ): Promise<DissolveResponseDto> {
     return this.dissolveService.preview(personId, dto) as Promise<DissolveResponseDto>;
+  }
+
+  @Get('dissolves')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'List dissolved people, newest first, with how many hidden faces can still be restored',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getFaceDissolves(@Query() dto: DissolveListQueryDto): Promise<DissolveListResponseDto> {
+    return this.dissolveService.listDissolves(dto);
+  }
+
+  // No uuid version: dissolve ids are v7.
+  @Post('dissolves/:id/restore')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Restore the faces a dissolve hid, as unnamed faces',
+    history: new HistoryBuilder().added('v1'),
+  })
+  restoreFaceDissolve(@Param('id', new ParseUUIDPipe()) id: string): Promise<DissolveRestoreResponseDto> {
+    return this.dissolveService.restore(id);
   }
 
   @Post('person/:personId/dissolve')

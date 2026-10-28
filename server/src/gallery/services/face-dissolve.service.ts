@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { JobName, QueueName } from 'src/enum.js';
 import {
+  DissolveListQuery,
+  DissolveListResponse,
   DissolveRequest,
   DissolveResponse,
   DissolveWarning,
@@ -9,6 +11,7 @@ import {
 } from 'src/gallery/dtos/face-dissolve.dto.js';
 import {
   DissolveCounts,
+  DissolveRecord,
   DissolveWriteResult,
   PersonHealthRow,
 } from 'src/gallery/repositories/face-dissolve.repository.js';
@@ -104,6 +107,47 @@ export class FaceDissolveService extends BaseService {
       warnings: await this.buildWarnings(counts),
       ...(result.dissolveId && { dissolveId: result.dissolveId }),
     };
+  }
+
+  async listDissolves(dto: DissolveListQuery): Promise<DissolveListResponse> {
+    const { items, hasMore } = await this.faceDissolveRepository.listDissolves({ page: dto.page, size: dto.size });
+    return {
+      items: items.map((item: DissolveRecord) => ({
+        ...item,
+        createdAt: item.createdAt.toISOString(),
+        restoredAt: item.restoredAt?.toISOString() ?? null,
+      })),
+      hasMore,
+    };
+  }
+
+  /**
+   * Brings a dissolve's hidden faces back as unnamed faces. Recognition then sorts them again, and will most likely
+   * group them the way it did before: the Dissolved page says so before the admin confirms.
+   */
+  async restore(dissolveId: string): Promise<{ restored: number; skipped: number }> {
+    const record = await this.faceDissolveRepository.getDissolve(dissolveId);
+    if (!record) {
+      throw new NotFoundException('Dissolve not found');
+    }
+    if (record.restoredAt) {
+      throw new ConflictException('This dissolve was already restored');
+    }
+    await this.refuseWhileRecognitionRuns();
+
+    const result = await this.databaseRepository.transaction((trx) =>
+      this.faceDissolveRepository.restore(dissolveId, trx),
+    );
+    if (!result) {
+      throw new NotFoundException('Dissolve not found');
+    }
+
+    // NOT PersonCleanup or any other unscoped job: the non-forced pass only picks up unassigned faces.
+    if (result.restored > 0) {
+      await this.jobRepository.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: false } });
+    }
+    this.logger.log(`Restored dissolve ${dissolveId}: ${result.restored} faces back, ${result.skipped} skipped`);
+    return result;
   }
 
   private async requirePerson(personId: string) {

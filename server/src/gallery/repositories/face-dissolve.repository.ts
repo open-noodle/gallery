@@ -41,6 +41,21 @@ export interface DissolveWriteResult {
   orphanedSpacePersonIds: string[];
 }
 
+export interface DissolveRecord {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  personName: string;
+  scope: string;
+  hiddenCount: number;
+  deletedCount: number;
+  unassignedCount: number;
+  /** Recorded faces that still exist, still hidden and unassigned: what a restore would bring back. */
+  restorableCount: number;
+  createdAt: Date;
+  restoredAt: Date | null;
+}
+
 export interface DissolveCounts {
   /** Every in-scope row, hidden and crop-hidden included: what the apply touches, and its concurrency guard. */
   faces: number;
@@ -95,6 +110,10 @@ const leavesSpaces = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   eb.or([hideFacePredicate(eb), deleteFacePredicate(eb)]);
 
 const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
+
+/** A recorded face a restore may bring back: still hidden, still on nobody. */
+const restorable = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+  eb.and([eb('asset_face.deletedAt', 'is not', null), eb('asset_face.personGroupId', 'is', null)]);
 
 /** Postgres caps one statement at 65535 bind parameters; record rows go in well under that. */
 const RECORD_CHUNK = 1000;
@@ -557,5 +576,90 @@ export class FaceDissolveRepository {
       deletedThumbnailPath,
       orphanedSpacePersonIds,
     };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getDissolve(id: string): Promise<{ id: string; restoredAt: Date | null } | undefined> {
+    return this.db.selectFrom('face_dissolve').select(['id', 'restoredAt']).where('id', '=', id).executeTakeFirst();
+  }
+
+  /** The Dissolved page, newest first. */
+  @GenerateSql({ params: [{ page: 1, size: 50 }] })
+  async listDissolves(options: { page: number; size: number }): Promise<{ items: DissolveRecord[]; hasMore: boolean }> {
+    const rows = await this.db
+      .selectFrom('face_dissolve')
+      .innerJoin('user', 'user.id', 'face_dissolve.ownerId')
+      .select((eb) => [
+        'face_dissolve.id',
+        'face_dissolve.ownerId',
+        'user.name as ownerName',
+        'face_dissolve.personName',
+        'face_dissolve.scope',
+        'face_dissolve.hiddenCount',
+        'face_dissolve.deletedCount',
+        'face_dissolve.unassignedCount',
+        'face_dissolve.createdAt',
+        'face_dissolve.restoredAt',
+        eb
+          .selectFrom('face_dissolve_face')
+          .innerJoin('asset_face', 'asset_face.id', 'face_dissolve_face.assetFaceId')
+          .select((inner) => inner.fn.countAll<number>().as('count'))
+          .whereRef('face_dissolve_face.dissolveId', '=', 'face_dissolve.id')
+          .where((inner) => restorable(inner))
+          .as('restorableCount'),
+      ])
+      .orderBy('face_dissolve.createdAt', 'desc')
+      .orderBy('face_dissolve.id', 'desc')
+      .limit(options.size + 1)
+      .offset((options.page - 1) * options.size)
+      .execute();
+
+    return {
+      items: rows.slice(0, options.size).map((row) => ({
+        ...row,
+        createdAt: new Date(row.createdAt as unknown as string),
+        restoredAt: row.restoredAt ? new Date(row.restoredAt as unknown as string) : null,
+        restorableCount: Number(row.restorableCount ?? 0),
+      })),
+      hasMore: rows.length > options.size,
+    };
+  }
+
+  /**
+   * Un-hides the faces one dissolve hid, as unnamed faces, and stamps the record. Only faces still in the state the
+   * dissolve left them (hidden and unassigned) come back: one re-assigned or re-hidden since is someone else's
+   * decision. Returns null for an unknown dissolve. The caller owns the transaction and the restored-twice check.
+   */
+  async restore(dissolveId: string, trx: Transaction<DB>): Promise<{ restored: number; skipped: number } | null> {
+    const record = await trx
+      .selectFrom('face_dissolve')
+      .select('id')
+      .where('id', '=', dissolveId)
+      .forUpdate()
+      .executeTakeFirst();
+    if (!record) {
+      return null;
+    }
+
+    const recorded = trx
+      .selectFrom('face_dissolve_face')
+      .select('face_dissolve_face.assetFaceId')
+      .where('face_dissolve_face.dissolveId', '=', dissolveId);
+    const restored = await trx
+      .updateTable('asset_face')
+      .set({ deletedAt: null })
+      .where('asset_face.id', 'in', recorded)
+      .where((eb) => restorable(eb))
+      .executeTakeFirst();
+    const total = await trx
+      .selectFrom('face_dissolve_face')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('dissolveId', '=', dissolveId)
+      .executeTakeFirstOrThrow();
+
+    await trx.updateTable('face_dissolve').set({ restoredAt: new Date() }).where('id', '=', dissolveId).execute();
+
+    const count = Number(restored.numUpdatedRows ?? 0);
+    return { restored: count, skipped: Number(total.count) - count };
   }
 }
