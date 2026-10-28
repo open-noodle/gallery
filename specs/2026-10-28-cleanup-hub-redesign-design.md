@@ -114,8 +114,7 @@ minute.
 - Hover/focus previews the day in the banner; click opens its rewind. Keyboard focus and the existing
   accessible labels (`cleanup_calendar_day_label*`) carry over.
 - The legend stays below the months.
-- Cells keep `data-no-press` (the site-wide hover scale fights their own) and the padding fix in
-  `CleanupCalendar.svelte`; small cells may drop the hover scale entirely if it looks noisy.
+- Cells keep `data-no-press` (the site-wide hover scale fights their own). See Motion for their hover.
 
 ## Rewind day
 
@@ -165,6 +164,71 @@ A thin progress bar with "N of M reviewed" on the left and the mark counts with 
 - Right: "Move N to trash" (danger) and "Finish day" (primary).
 - Behaviour unchanged (confirmation, undo toast, finish flow, leave guard).
 
+## Motion
+
+The owner wants both pages to feel premium and sleek, so motion is part of the design, not polish for later.
+Everything uses the motion language (`specs/2026-10-23-web-motion-language-design.md`, helpers in
+`web/src/lib/gallery/motion/`) and follows its rules: only `scale`, `translate`, `opacity`, `filter` and
+colours; nothing the user waits on runs past `--motion-slow`; celebrations stay rare and user-initiated;
+under `prefers-reduced-motion` movement drops to plain fades or nothing. New helpers go in that folder.
+
+### Hub
+
+- **Arrival.** The banner, then the quick-win cards, then the months rise in on a short stagger (about 40 ms
+  apart, the whole sequence under 400 ms) with `data-motion-reveal`. Skeletons are replaced in place, with
+  no second reveal when data lands.
+- **Banner day swap.** Hovering a day crossfades the collage photos and slides the text a few pixels in the
+  direction of travel (later day: from the right). Counts ("N photos from Y years") tween with `countMotion`.
+  Returning to today plays the same swap in reverse. Fast hovering never queues swaps: only the latest day
+  animates.
+- **Banner pin.** Pinning condenses the banner on the settle curve: the collage shrinks into the slim bar's
+  thumbnails and the headline scales down, with `translate`/`scale` and a crossfade between the two
+  layouts. No height animation on layout properties: the condensed bar is a separate layer.
+- **Quick-win cards.** Hover lifts and tilts the card (`data-motion-lift-group` / `data-motion-lift`, the
+  existing tilt), and the cover zooms in slightly inside its frame. Counts and bytes count up the first
+  time they load. A card that is empty shows its "All clear" check with `pop()`.
+- **Calendar.** Cells do not scale on hover (they are too small, and the scale caused smearing): the hovered
+  cell brightens and gets a soft primary ring instead. Today's cell pulses its outline once on arrival. When
+  the user comes back from finishing a day, that day's cell turns green with `pop()`; the rewind page tells
+  the hub which day it finished (navigation state or a store, builder's call).
+- **"Could still free"** keeps its count-up; when a queue's bytes change after returning from a queue page,
+  it tweens to the new value.
+
+### Hub to rewind
+
+- **Shared-element morph.** Pressing Start (or a calendar day) morphs the banner collage into the rewind
+  header's photo stack and the banner date into the page title, using the View Transitions API through
+  `page-transition.ts`. The elements get a `view-transition-name` only while the transition runs (rule 6),
+  and everything else crossfades as today. Browsers without View Transitions, and reduced motion, swap pages
+  instantly.
+
+### Rewind day
+
+- **Explainer.** Opens and closes by sliding its height (`slideMotion`) with a fade; the ⓘ button rotates
+  slightly while open. On the first visit it reveals after the header, not with it.
+- **Marking a photo.** The ring colour fades in, the corner badge pops (`pop()`), and a trash mark
+  desaturates and dims the photo over `--motion-base` instead of snapping. A favourite still bursts hearts
+  (already built). Undo reverses the same transitions.
+- **Progress.** The bar fills on the gentle spring and the summary counts tween; reaching 100% gives the bar
+  a single soft glow.
+- **Year reviewed.** The "Year reviewed" badge pops in when the last photo of a year is marked.
+- **Bottom bar.** Rises in on arrival. "Move N to trash" pulses once when its count first goes above zero,
+  then stays still. Counts in the bar tween.
+- **Move to trash and Finish day.** Unchanged from what is built: photos fly into the Trash link and the
+  grids close the gap (`flipMotion`); finishing celebrates, then the next day arrives with the page
+  crossfade.
+- **Day to day.** Previous and next day slide the year sections in the direction of travel (next: from the
+  right), instead of a plain crossfade.
+- **One at a time.** Keeps its current motion (each photo fades and drops in); the shared styling picks up
+  the bottom bar and badge motion above.
+
+### Tests and checks
+
+- Unit tests cover the new helpers' reduced-motion behaviour, as `list.spec.ts` does.
+- Before handing over, check the motion in a real browser (dev stack on `:3000`): no layout shift, no
+  scrollbars appearing during animations, no smearing on the calendar, and nothing stuck after fast
+  hovering.
+
 ## i18n
 
 New and reworded strings go in the overlay, `i18n/gallery/en.json` plus the nine maintained locales, per
@@ -187,5 +251,4 @@ uses it) are deleted from the overlay in all locales after grepping web and mobi
 - The per-photo pace for the time estimate.
 - Whether `CleanupQueueRail` is restyled into the quick-wins grid or replaced by a new component; the old
   rail can be deleted if nothing else uses it.
-- Motion details within the existing helpers (`data-motion-reveal` for the banner swap, `flipMotion`,
-  `countMotion`).
+- Exact durations and stagger values within the limits above.
