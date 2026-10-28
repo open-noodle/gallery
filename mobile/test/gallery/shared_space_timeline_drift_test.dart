@@ -14,6 +14,8 @@ import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.drif
 import 'package:immich_mobile/data/db/main/table/user/user.drift.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
+import 'package:openapi/api.dart' show SyncStackV1;
 
 // Polls `predicate` on the event loop for up to `timeout` before failing the
 // test. Used to wait for asynchronous stream emissions driven by Drift's
@@ -108,6 +110,86 @@ void main() {
       expect(buckets.single.assetCount, 1);
     },
   );
+
+  test("#1243: a member's stack shows through its cover, and flat while the cover is not on the device", () async {
+    const ownerId = 'owner-1';
+    const viewerId = 'viewer-1';
+    const spaceId = 'space-1';
+    final createdAt = DateTime(2024, 1, 1, 12);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: ownerId, email: 'owner@test.dev', name: 'Owner'));
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: viewerId, email: 'viewer@test.dev', name: 'Viewer'));
+    await db
+        .into(db.sharedSpaceEntity)
+        .insert(SharedSpaceEntityCompanion.insert(id: spaceId, name: 'Test Space', createdById: ownerId));
+    // An edit and its original, stacked by their owner (the edit is the cover) and both shared into the space.
+    for (final assetId in ['edit-1', 'original-1']) {
+      await db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: assetId,
+              name: '$assetId.jpg',
+              type: AssetType.image,
+              checksum: 'checksum-$assetId',
+              ownerId: ownerId,
+              visibility: AssetVisibility.timeline,
+              stackId: const Value('stack-1'),
+              createdAt: Value(createdAt),
+              updatedAt: Value(createdAt),
+              localDateTime: Value(createdAt),
+            ),
+          );
+      await db
+          .into(db.sharedSpaceAssetEntity)
+          .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+    }
+    await db
+        .into(db.sharedSpaceMemberEntity)
+        .insert(
+          SharedSpaceMemberEntityCompanion.insert(
+            spaceId: spaceId,
+            userId: viewerId,
+            role: 'editor',
+            showInTimeline: const Value(true),
+          ),
+        );
+
+    Future<int> visibleCount() async {
+      final buckets = await db.sharedSpaceTimelineDrift
+          .spaceMergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [viewerId], currentUserId: viewerId)
+          .get();
+      return buckets.fold<int>(0, (sum, bucket) => sum + bucket.assetCount);
+    }
+
+    // No stack row yet: both photos show flat.
+    expect(await visibleCount(), 2);
+
+    await GallerySyncStreamRepository(db).updateSharedSpaceStacksV1([
+      SyncStackV1(
+        id: 'stack-1',
+        ownerId: ownerId,
+        primaryAssetId: 'edit-1',
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      ),
+    ]);
+
+    // With it, the stack shows once, through its cover.
+    expect(await visibleCount(), 1);
+
+    // The cover leaves the viewer's spaces and the device: the original shows flat again.
+    await (db.delete(db.remoteAssetEntity)..where((t) => t.id.equals('edit-1'))).go();
+    expect(await visibleCount(), 1);
+    final assets = await db.sharedSpaceTimelineDrift
+        .spaceMergedAsset(userIds: [viewerId], currentUserId: viewerId, limit: (_) => Limit(10, 0))
+        .get();
+    expect(assets.map((asset) => asset.remoteId), ['original-1']);
+  });
 
   test('mergedBucket includes library-linked shared space assets for a viewer with showInTimeline=true', () async {
     const ownerId = 'owner-1';

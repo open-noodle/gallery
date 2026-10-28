@@ -460,6 +460,7 @@ exports[`checkAccess oracle > asset.upload 1`] = `
     "albumLink",
     "albumPerson",
     "albumSpaceAsset",
+    "albumSpaceStack",
     "albumViewer",
     "archivedSpaceAsset",
     "contributedAsset",
@@ -472,6 +473,7 @@ exports[`checkAccess oracle > asset.upload 1`] = `
     "ownAlbum",
     "ownAsset",
     "owner",
+    "partialSpaceStack",
     "partner",
     "privateFace",
     "privatePerson",
@@ -484,6 +486,7 @@ exports[`checkAccess oracle > asset.upload 1`] = `
     "spaceFace",
     "spaceLink",
     "spacePerson",
+    "spaceStack",
     "spaceViewer",
     "stack",
     "stackAsset",
@@ -903,6 +906,9 @@ exports[`checkAccess oracle > stack.create 1`] = `{}`;
 exports[`checkAccess oracle > stack.delete 1`] = `
 {
   "owner": [
+    "albumSpaceStack",
+    "partialSpaceStack",
+    "spaceStack",
     "stack",
   ],
 }
@@ -911,7 +917,18 @@ exports[`checkAccess oracle > stack.delete 1`] = `
 exports[`checkAccess oracle > stack.read 1`] = `
 {
   "owner": [
+    "albumSpaceStack",
+    "partialSpaceStack",
+    "spaceStack",
     "stack",
+  ],
+  "spaceEditor": [
+    "albumSpaceStack",
+    "spaceStack",
+  ],
+  "spaceViewer": [
+    "albumSpaceStack",
+    "spaceStack",
   ],
 }
 `;
@@ -919,6 +936,9 @@ exports[`checkAccess oracle > stack.read 1`] = `
 exports[`checkAccess oracle > stack.update 1`] = `
 {
   "owner": [
+    "albumSpaceStack",
+    "partialSpaceStack",
+    "spaceStack",
     "stack",
   ],
 }
