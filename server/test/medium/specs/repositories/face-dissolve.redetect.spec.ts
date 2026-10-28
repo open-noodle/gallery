@@ -40,7 +40,7 @@ describe('clearFacesRecognizedAt', () => {
     const mine: string[] = [];
     for (let i = 0; i < 2; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId });
+      await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
       await setFacesRecognizedAt(db, asset.id, new Date());
       mine.push(asset.id);
     }
@@ -85,6 +85,28 @@ describe('clearFacesRecognizedAt', () => {
 
     // db is shared across the tests in this file (see getKyselyDB), so other tests' assets may
     // already be pending — assert membership rather than exact equality.
+    const after = await pending(assetJob);
+    expect(after).toContain(exifAsset.id);
+    expect(after).not.toContain(mlAsset.id);
+  });
+
+  // Revision 2: detected faces are hidden, not re-scanned. Re-scanning their photo would find the same boxes, so only
+  // the photos of deleted imported faces are re-queued, even under the `all` scope.
+  it('never re-queues the photo of a detected face', async () => {
+    const dissolve = new FaceDissolveRepository(db);
+    const assetJob = new AssetJobRepository(db);
+
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Mixed' });
+    const exifAsset = await seedAsset(db, { ownerId: user.id });
+    await seedFace(db, { assetId: exifAsset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
+    await setFacesRecognizedAt(db, exifAsset.id, new Date());
+    const mlAsset = await seedAsset(db, { ownerId: user.id });
+    await seedFace(db, { assetId: mlAsset.id, personGroupId: person.personGroupId, withEmbedding: true });
+    await setFacesRecognizedAt(db, mlAsset.id, new Date());
+
+    expect(await dissolve.clearFacesRecognizedAt(person.personGroupId, DissolveScope.All)).toBe(1);
+
     const after = await pending(assetJob);
     expect(after).toContain(exifAsset.id);
     expect(after).not.toContain(mlAsset.id);

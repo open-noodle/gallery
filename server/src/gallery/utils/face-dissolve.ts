@@ -103,13 +103,3 @@ export const hideFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expr
  */
 export const deleteFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
   eb.and([eb('asset_face.sourceType', '=', SourceType.Exif), eb.not(keepFacePredicate(eb))]);
-
-/**
- * The faces a DELETE outcome actually deletes: in scope, and not hand-drawn. Shared for the same reason as
- * dissolveFacePredicate — the repository's delete statement must not be able to disagree with this rule.
- */
-export const dissolveDeletableFacePredicate = (
-  eb: ExpressionBuilder<DB, 'asset_face'>,
-  personGroupId: string,
-  scope: DissolveScope,
-): Expression<SqlBool> => eb.and([dissolveFacePredicate(eb, personGroupId, scope), eb.not(handDrawnFacePredicate(eb))]);

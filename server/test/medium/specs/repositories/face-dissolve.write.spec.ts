@@ -1,17 +1,19 @@
 import { Kysely, sql } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SourceType } from 'src/enum.js';
-import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
-import { DB } from 'src/schema/index.js';
 import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
+import { DB } from 'src/schema/index.js';
 import {
+  runDissolve,
   seedAsset,
   seedFace,
   seedPerson,
   seedUser,
   setFacesRecognizedAt,
 } from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
+import { mediumFactory } from 'test/medium.factory.js';
 import { newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -21,76 +23,103 @@ beforeAll(async () => {
   db = await getKyselyDB();
 });
 
+const faceRow = (id: string) =>
+  db
+    .selectFrom('asset_face')
+    .select(['id', 'personGroupId', 'deletedAt', 'isVisible'])
+    .where('id', '=', id)
+    .executeTakeFirst();
+
+const identityRows = (id: string) =>
+  db.selectFrom('face_identity_face').select('assetFaceId').where('assetFaceId', '=', id).execute();
+
+const linkIdentity = async (assetFaceId: string, source: 'ml' | 'manual' = 'ml') => {
+  const identityId = newUuid();
+  await db.insertInto('face_identity').values({ id: identityId }).execute();
+  await db.insertInto('face_identity_face').values({ identityId, assetFaceId, source }).execute();
+};
+
+const personExists = async (personGroupId: string) =>
+  (await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', personGroupId).execute())
+    .length === 1;
+
+const detectQueue = async () => {
+  const ids: string[] = [];
+  for await (const row of new AssetJobRepository(db).streamForDetectFacesJob(false)) {
+    ids.push(row.id);
+  }
+  return ids;
+};
+
 describe('FaceDissolveRepository.dissolve', () => {
-  it('clears the watermark BEFORE deleting, so the assets are still findable', async () => {
-    const repo = new FaceDissolveRepository(db);
-    const assetJob = new AssetJobRepository(db);
-
-    const user = await seedUser(db);
-    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
-    const asset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
-    await setFacesRecognizedAt(db, asset.id, new Date());
-
-    const result = await repo.dissolve({
-      personGroupId: person.personGroupId,
-      scope: DissolveScope.Exif,
-      outcome: 'delete-faces',
-      redetect: true,
-    });
-
-    expect(result.faces).toBe(1);
-    expect(result.assetsCleared).toBe(1);
-
-    expect(
-      await db.selectFrom('asset_face').select('id').where('personGroupId', '=', person.personGroupId).execute(),
-    ).toEqual([]);
-
-    const ids: string[] = [];
-    for await (const row of assetJob.streamForDetectFacesJob(false)) {
-      ids.push(row.id);
-    }
-    // Reversing the two statements leaves the watermark set and this array empty.
-    expect(ids).toEqual([asset.id]);
-  });
-
-  it('cascades to every dependent row and emits a sync tombstone', async () => {
+  it('hides detected faces, keeps their embedding, and records them for restore', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
-    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Cluster A' });
     const asset = await seedAsset(db, { ownerId: user.id });
     const face = await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, withEmbedding: true });
-    await db
-      .updateTable('person')
-      .set({ faceAssetId: face.id })
-      .where('personGroupId', '=', person.personGroupId)
-      .execute();
+    await linkIdentity(face.id);
 
-    await repo.dissolve({
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    const row = await faceRow(face.id);
+    expect(row?.personGroupId).toBeNull();
+    expect(row?.deletedAt).toBeInstanceOf(Date);
+    expect(await identityRows(face.id)).toEqual([]);
+    // The tombstone keeps its embedding, so a restore needs no re-detection.
+    expect(await db.selectFrom('face_search').select('faceId').where('faceId', '=', face.id).execute()).toHaveLength(1);
+
+    expect(result.hiddenFaceIds).toEqual([face.id]);
+    const record = await db
+      .selectFrom('face_dissolve')
+      .selectAll()
+      .where('id', '=', result.dissolveId!)
+      .executeTakeFirstOrThrow();
+    expect(record).toMatchObject({
+      ownerId: user.id,
+      actorId: user.id,
       personGroupId: person.personGroupId,
-      scope: DissolveScope.All,
-      outcome: 'delete-faces',
-      redetect: true,
+      personName: 'Cluster A',
+      scope: 'all',
+      hiddenCount: 1,
+      deletedCount: 0,
+      unassignedCount: 0,
+      restoredAt: null,
     });
-
-    expect(await db.selectFrom('face_search').select('faceId').where('faceId', '=', face.id).execute()).toEqual([]);
-
-    const [row] = await db
-      .selectFrom('person')
-      .select('faceAssetId')
-      .where('personGroupId', '=', person.personGroupId)
-      .execute();
-    expect(row.faceAssetId).toBeNull();
-
-    const audit = await db
-      .selectFrom('asset_face_audit')
-      .select('assetFaceId')
-      .where('assetFaceId', '=', face.id)
-      .execute();
-    expect(audit).toHaveLength(1);
+    expect(
+      await db.selectFrom('face_dissolve_face').select('assetFaceId').where('dissolveId', '=', record.id).execute(),
+    ).toEqual([{ assetFaceId: face.id }]);
   });
 
-  it('hard-deletes soft-deleted faces so re-detection can create a visible one (L12)', async () => {
+  it('deletes imported faces and re-queues only their photos', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const exifAsset = await seedAsset(db, { ownerId: user.id });
+    const mlAsset = await seedAsset(db, { ownerId: user.id });
+    const exif = await seedFace(db, {
+      assetId: exifAsset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Exif,
+    });
+    await seedFace(db, { assetId: mlAsset.id, personGroupId: person.personGroupId, withEmbedding: true });
+    await setFacesRecognizedAt(db, exifAsset.id, new Date());
+    await setFacesRecognizedAt(db, mlAsset.id, new Date());
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    expect(result).toMatchObject({ deleted: 1, assetsCleared: 1 });
+    expect(await faceRow(exif.id)).toBeUndefined();
+    // Deletion still reaches mobile clients.
+    expect(
+      await db.selectFrom('asset_face_audit').select('assetFaceId').where('assetFaceId', '=', exif.id).execute(),
+    ).toHaveLength(1);
+    const queued = await detectQueue();
+    expect(queued).toContain(exifAsset.id);
+    expect(queued).not.toContain(mlAsset.id);
+  });
+
+  it('hard-deletes soft-deleted imported faces so re-detection can create a visible one (L12)', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
@@ -102,112 +131,191 @@ describe('FaceDissolveRepository.dissolve', () => {
       deletedAt: new Date(),
     });
 
-    await repo.dissolve({
-      personGroupId: person.personGroupId,
-      scope: DissolveScope.Exif,
-      outcome: 'delete-faces',
-      redetect: true,
-    });
+    await runDissolve(db, repo, person.personGroupId, DissolveScope.Exif);
 
-    // A surviving tombstone would absorb the next detection's embedding and stay invisible.
-    expect(await db.selectFrom('asset_face').select('id').where('id', '=', tombstone.id).execute()).toEqual([]);
+    expect(await faceRow(tombstone.id)).toBeUndefined();
   });
 
-  it('does not hard-delete soft-deleted faces on unassign', async () => {
+  it('unassigns hand-drawn and manual faces and keeps them on the photo', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const editor = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    const manual = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Manual,
+    });
+    const drawn = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      withEmbedding: true,
+      createdBy: editor.id,
+    });
+    await linkIdentity(manual.id, 'manual');
+    await linkIdentity(drawn.id, 'manual');
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    expect(result).toMatchObject({ unassigned: 2, hiddenFaceIds: [], deleted: 0 });
+    for (const id of [manual.id, drawn.id]) {
+      expect(await faceRow(id)).toMatchObject({ personGroupId: null, deletedAt: null });
+      expect(await identityRows(id)).toEqual([]);
+    }
+  });
+
+  it('removes the person when nothing is left on it', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    const tombstone = await seedFace(db, {
-      assetId: asset.id,
-      personGroupId: person.personGroupId,
-      deletedAt: new Date(),
-    });
+    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, withEmbedding: true });
 
-    await repo.dissolve({
-      personGroupId: person.personGroupId,
-      scope: DissolveScope.All,
-      outcome: 'unassign',
-      redetect: false,
-    });
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
 
-    const [row] = await db
-      .selectFrom('asset_face')
-      .select(['id', 'personGroupId'])
-      .where('id', '=', tombstone.id)
-      .execute();
-    expect(row).toBeDefined();
-    expect(row.personGroupId).toBeNull();
+    expect(result.personRemoved).toBe(true);
+    expect(await personExists(person.personGroupId)).toBe(false);
   });
 
-  it('touches nothing when aimed at an id that does not exist', async () => {
+  it('keeps the person when faces outside the scope remain', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
+    const kept = await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, withEmbedding: true });
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.Exif);
+
+    expect(result.personRemoved).toBe(false);
+    expect(await personExists(person.personGroupId)).toBe(true);
+    expect(await faceRow(kept.id)).toMatchObject({ personGroupId: person.personGroupId, deletedAt: null });
+  });
+
+  it('clears faces that were already hidden, removes the person, and records nothing to restore', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    const hidden = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      withEmbedding: true,
+      deletedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    expect(result.hiddenFaceIds).toEqual([]);
+    expect(result.personRemoved).toBe(true);
+    expect(await faceRow(hidden.id)).toMatchObject({
+      personGroupId: null,
+      deletedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(
+      await db.selectFrom('face_dissolve_face').select('assetFaceId').where('assetFaceId', '=', hidden.id).execute(),
+    ).toEqual([]);
+  });
+
+  it('hides crop-hidden detected faces like the rest', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    const cropped = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      withEmbedding: true,
+      isVisible: false,
+    });
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    expect(result.hiddenFaceIds).toEqual([cropped.id]);
+    expect(await faceRow(cropped.id)).toMatchObject({ personGroupId: null, isVisible: false });
+    expect((await faceRow(cropped.id))?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('records 2500 faces in one dissolve', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Big' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    const faces = Array.from({ length: 2500 }, () =>
+      mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: person.personGroupId }),
+    );
+    for (let index = 0; index < faces.length; index += 500) {
+      await db
+        .insertInto('asset_face')
+        .values(faces.slice(index, index + 500))
+        .execute();
+    }
+
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.All);
+
+    expect(result.hiddenFaceIds).toHaveLength(2500);
+    const [{ count }] = await db
+      .selectFrom('face_dissolve_face')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('dissolveId', '=', result.dissolveId!)
+      .execute();
+    expect(Number(count)).toBe(2500);
+  });
+
+  it('touches nothing and records nothing when aimed at an id that does not exist', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Bystander' });
     const asset = await seedAsset(db, { ownerId: user.id });
     await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId });
 
-    const result = await repo.dissolve({
-      personGroupId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      scope: DissolveScope.All,
-      outcome: 'delete-faces-and-person',
-      redetect: true,
-    });
+    const result = await runDissolve(db, repo, 'ffffffff-ffff-4fff-8fff-ffffffffffff', DissolveScope.All);
 
-    expect(result.faces).toBe(0);
+    expect(result).toMatchObject({ dissolveId: null, hiddenFaceIds: [], deleted: 0, unassigned: 0 });
     expect(
       await db.selectFrom('asset_face').select('id').where('personGroupId', '=', person.personGroupId).execute(),
     ).toHaveLength(1);
   });
 
-  // L10 — the row the spec's matrix names and nobody wrote. It guards a live regression: dissolve() passes
-  // `trx` into clearFacesRecognizedAt(personGroupId, scope, trx). Drop that third argument and the UPDATE falls
-  // back to `this.db`, running in its own autocommit outside the transaction — so a dissolve that rolls back
-  // still leaves its assets re-queued for detection, with no face change to justify it. Verified: dropping
-  // that argument fails THIS test and no other in the file.
-  it('rolls back the watermark clear too when the dissolve fails partway', async () => {
+  // L10. The failure is forced at the LAST statement (the record insert), so a rollback has to undo the watermark
+  // clear, the hide, the delete and the person removal. Dropping `trx` from any inner call moves that statement
+  // outside the transaction and fails this test.
+  it('rolls everything back when the dissolve fails partway', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    const face = await seedFace(db, {
+    const exif = await seedFace(db, {
       assetId: asset.id,
       personGroupId: person.personGroupId,
       sourceType: SourceType.Exif,
     });
+    const ml = await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, withEmbedding: true });
     const watermark = new Date('2026-01-01T00:00:00.000Z');
     await setFacesRecognizedAt(db, asset.id, watermark);
 
-    // Forces the failure at the LAST statement of the transaction — after the watermark clear AND after the
-    // face delete — so a rollback has to undo both.
     await sql`
       CREATE FUNCTION dissolve_rollback_boom() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN RAISE EXCEPTION 'forced dissolve failure'; END $$
     `.execute(db);
     await sql`
-      CREATE TRIGGER dissolve_rollback_boom BEFORE DELETE ON person
+      CREATE TRIGGER dissolve_rollback_boom BEFORE INSERT ON face_dissolve
       FOR EACH ROW EXECUTE FUNCTION dissolve_rollback_boom()
     `.execute(db);
 
     try {
-      await expect(
-        repo.dissolve({
-          personGroupId: person.personGroupId,
-          scope: DissolveScope.Exif,
-          outcome: 'delete-faces-and-person',
-          redetect: true,
-        }),
-      ).rejects.toThrow(/forced dissolve failure/);
+      await expect(runDissolve(db, repo, person.personGroupId, DissolveScope.All)).rejects.toThrow(
+        /forced dissolve failure/,
+      );
     } finally {
-      await sql`DROP TRIGGER IF EXISTS dissolve_rollback_boom ON person`.execute(db);
+      await sql`DROP TRIGGER IF EXISTS dissolve_rollback_boom ON face_dissolve`.execute(db);
       await sql`DROP FUNCTION IF EXISTS dissolve_rollback_boom()`.execute(db);
     }
 
-    expect(await db.selectFrom('asset_face').select('id').where('id', '=', face.id).execute()).toHaveLength(1);
-    expect(
-      await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', person.personGroupId).execute(),
-    ).toHaveLength(1);
-
+    expect(await faceRow(exif.id)).toMatchObject({ personGroupId: person.personGroupId });
+    expect(await faceRow(ml.id)).toMatchObject({ personGroupId: person.personGroupId, deletedAt: null });
+    expect(await personExists(person.personGroupId)).toBe(true);
     const [status] = await db
       .selectFrom('asset_job_status')
       .select('facesRecognizedAt')
@@ -215,86 +323,6 @@ describe('FaceDissolveRepository.dissolve', () => {
       .execute();
     expect(status.facesRecognizedAt).toEqual(watermark);
   });
-
-  // A dissolve never deletes a box someone drew by hand: `createdBy` is the sole deletability signal for those
-  // (space-editor-face-assignment design §6.6). Both delete outcomes unassign them instead — same treatment as
-  // `unassign` — while the detector face beside them, in the same scope, is deleted as before.
-  it.each(['delete-faces', 'delete-faces-and-person'] as const)(
-    'keeps and unassigns a hand-drawn face on %s while deleting the detector face beside it',
-    async (outcome) => {
-      const repo = new FaceDissolveRepository(db);
-      const user = await seedUser(db);
-      const editor = await seedUser(db);
-      const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
-      const asset = await seedAsset(db, { ownerId: user.id });
-      const detected = await seedFace(db, {
-        assetId: asset.id,
-        personGroupId: person.personGroupId,
-        withEmbedding: true,
-      });
-      const handDrawn = await seedFace(db, {
-        assetId: asset.id,
-        personGroupId: person.personGroupId,
-        sourceType: SourceType.Manual,
-        createdBy: editor.id,
-      });
-
-      // The human-placement record must go with the person link, exactly as `unassign` clears it — a stale
-      // link marks the face settled forever (person.repository.ts:327).
-      const identityId = newUuid();
-      await db.insertInto('face_identity').values({ id: identityId }).execute();
-      await db
-        .insertInto('face_identity_face')
-        .values({ identityId, assetFaceId: handDrawn.id, source: 'manual' })
-        .execute();
-
-      const counts = await repo.getCounts(person.personGroupId, DissolveScope.All);
-      expect(counts.faces).toBe(2);
-      expect(counts.handDrawn).toBe(1);
-
-      const result = await repo.dissolve({
-        personGroupId: person.personGroupId,
-        scope: DissolveScope.All,
-        outcome,
-        redetect: true,
-      });
-
-      // Preview and apply describe the same set: both faces are touched, one of them kept.
-      expect(result.faces).toBe(counts.faces);
-      expect(result.handDrawnUnassigned).toBe(counts.handDrawn);
-
-      expect(await db.selectFrom('asset_face').select('id').where('id', '=', detected.id).execute()).toEqual([]);
-
-      const kept = await db
-        .selectFrom('asset_face')
-        .leftJoin('asset_face_creator', 'asset_face_creator.assetFaceId', 'asset_face.id')
-        .select([
-          'asset_face.id',
-          'asset_face.personGroupId',
-          'asset_face_creator.userId as createdBy',
-          'asset_face.deletedAt',
-        ])
-        .where('asset_face.id', '=', handDrawn.id)
-        .executeTakeFirst();
-      expect(kept).toEqual({ id: handDrawn.id, personGroupId: null, createdBy: editor.id, deletedAt: null });
-
-      expect(
-        await db
-          .selectFrom('face_identity_face')
-          .select('assetFaceId')
-          .where('assetFaceId', '=', handDrawn.id)
-          .execute(),
-      ).toEqual([]);
-
-      // On delete-faces-and-person the person row is gone and the hand-drawn box still survived it.
-      const personRows = await db
-        .selectFrom('person')
-        .select('personGroupId')
-        .where('personGroupId', '=', person.personGroupId)
-        .execute();
-      expect(personRows).toHaveLength(outcome === 'delete-faces-and-person' ? 0 : 1);
-    },
-  );
 
   it('leaves an out-of-scope hand-drawn face entirely alone', async () => {
     const repo = new FaceDissolveRepository(db);
@@ -309,18 +337,9 @@ describe('FaceDissolveRepository.dissolve', () => {
       createdBy: user.id,
     });
 
-    const counts = await repo.getCounts(person.personGroupId, DissolveScope.Exif);
-    expect(counts.handDrawn).toBe(0);
+    const result = await runDissolve(db, repo, person.personGroupId, DissolveScope.Exif);
 
-    const result = await repo.dissolve({
-      personGroupId: person.personGroupId,
-      scope: DissolveScope.Exif,
-      outcome: 'delete-faces',
-      redetect: true,
-    });
-
-    expect(result).toMatchObject({ faces: 1, handDrawnUnassigned: 0 });
-    const [row] = await db.selectFrom('asset_face').select('personGroupId').where('id', '=', handDrawn.id).execute();
-    expect(row.personGroupId).toBe(person.personGroupId);
+    expect(result).toMatchObject({ deleted: 1, unassigned: 0 });
+    expect(await faceRow(handDrawn.id)).toMatchObject({ personGroupId: person.personGroupId });
   });
 });
