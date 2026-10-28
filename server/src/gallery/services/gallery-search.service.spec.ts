@@ -280,7 +280,11 @@ describe(GallerySearchService.name, () => {
         { withSharedSpaces: true, isFavorite: false },
         'withSharedSpaces is only supported for non-archived, non-trashed assets',
       ],
-      [{ withPartners: true }, 'withPartners is only supported for non-archived, non-trashed, non-locked assets'],
+      // { withPartners: true } alone now defaults to timeline visibility, as /timeline/buckets does (immich-32565)
+      [
+        { withPartners: true, visibility: AssetVisibility.Archive },
+        'withPartners is only supported for non-archived, non-trashed, non-locked assets',
+      ],
       [
         { withSharedSpaces: true, visibility: AssetVisibility.Archive },
         'withSharedSpaces is only supported for non-archived, non-trashed assets',
