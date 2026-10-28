@@ -206,7 +206,9 @@ dissolve.
 with how many hidden faces can still be brought back. **Restore** returns them as unnamed faces, and face
 recognition sorts them again on its next run, so they will most likely group the way they did before.
 
-Deleted imported faces cannot be restored. A full **Detect faces (All)** run deletes every detected face, hidden
+Restore brings back faces, not the person: the dissolved person's name and birthday, and any Space people the
+dissolve removed, are gone for good. Deleted imported faces cannot be restored either. The dissolve dialog lists
+these under **Cannot be undone** before you confirm. A full **Detect faces (All)** run deletes every detected face, hidden
 ones included, so after one a dissolve has nothing left to restore.
 
 ## Advanced scan

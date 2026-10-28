@@ -85,23 +85,37 @@
     },
   ]);
 
-  // What happens to each kind of face, in words. Only the treatments this selection actually uses are shown.
-  const treatments = $derived(
-    previewing || !preview
-      ? []
-      : [
-          { key: 'hide', label: 'admin.face_cleanup_dissolve_hide_count' as Translations, count: preview.counts.hide },
-          {
+  // What the dissolve does, in words, split by whether a restore from the Dissolved page can undo it. The admin
+  // must see the permanent part before typing the name: deleted imported faces, the person itself (its name and
+  // birthday) and emptied Space people are never brought back, while hidden faces are.
+  const counts = $derived(previewing ? undefined : preview?.counts);
+  const undoable = $derived(
+    counts && counts.hide > 0
+      ? [{ key: 'hide', text: $t('admin.face_cleanup_dissolve_hide_count', { values: { count: counts.hide } }) }]
+      : [],
+  );
+  const permanent = $derived(
+    counts
+      ? [
+          counts.delete > 0 && {
             key: 'delete',
-            label: 'admin.face_cleanup_dissolve_delete_count' as Translations,
-            count: preview.counts.delete,
+            testId: 'dissolve-treatment-delete',
+            text: $t('admin.face_cleanup_dissolve_delete_count', { values: { count: counts.delete } }),
           },
-          {
-            key: 'unassign',
-            label: 'admin.face_cleanup_dissolve_unassign_count' as Translations,
-            count: preview.counts.keep,
+          counts.personRemoved && {
+            key: 'person',
+            testId: 'dissolve-person-outcome',
+            text: $t('admin.face_cleanup_dissolve_person_removed'),
           },
-        ].filter((treatment) => treatment.count > 0),
+          counts.spacePersonsRemoved > 0 && {
+            key: 'space-persons',
+            testId: 'dissolve-space-persons-removed',
+            text: $t('admin.face_cleanup_dissolve_space_persons_removed', {
+              values: { count: counts.spacePersonsRemoved },
+            }),
+          },
+        ].filter((item): item is { key: string; testId: string; text: string } => !!item)
+      : [],
   );
 
   const buildRequest = (expectedFaceCount: number): DissolveRequestDto => ({
@@ -218,27 +232,51 @@
         </ul>
       {/if}
 
-      {#if treatments.length > 0}
-        <ul class="flex flex-col gap-1 text-sm" data-testid="dissolve-treatments">
-          {#each treatments as treatment (treatment.key)}
-            <li data-testid="dissolve-treatment-{treatment.key}">
-              {$t(treatment.label, { values: { count: treatment.count } })}
+      {#if undoable.length > 0}
+        <section
+          class="rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700"
+          data-testid="dissolve-undoable"
+        >
+          <h3 class="font-semibold">{$t('admin.face_cleanup_dissolve_undoable_heading')}</h3>
+          <ul class="mt-1 flex flex-col gap-1">
+            {#each undoable as item (item.key)}
+              <li data-testid="dissolve-treatment-{item.key}">{item.text}</li>
+            {/each}
+          </ul>
+          <p class="mt-1 text-gray-500 dark:text-gray-400" data-testid="dissolve-real-faces-note">
+            {$t('admin.face_cleanup_dissolve_real_faces_note')}
+          </p>
+        </section>
+      {/if}
+
+      {#if permanent.length > 0}
+        <section
+          class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-300"
+          data-testid="dissolve-permanent"
+        >
+          <h3 class="font-semibold">{$t('admin.face_cleanup_dissolve_permanent_heading')}</h3>
+          <ul class="mt-1 flex flex-col gap-1">
+            {#each permanent as item (item.key)}
+              <li data-testid={item.testId}>{item.text}</li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if counts && (counts.keep > 0 || !counts.personRemoved)}
+        <ul class="flex flex-col gap-1 text-sm">
+          {#if counts.keep > 0}
+            <li data-testid="dissolve-treatment-unassign">
+              {$t('admin.face_cleanup_dissolve_unassign_count', { values: { count: counts.keep } })}
             </li>
-          {/each}
+          {/if}
+          {#if !counts.personRemoved}
+            <li data-testid="dissolve-person-outcome">
+              {$t('admin.face_cleanup_dissolve_person_kept', { values: { count: counts.remainingFaces } })}
+            </li>
+          {/if}
         </ul>
       {/if}
-
-      {#if preview && !previewing}
-        <p class="text-sm" data-testid="dissolve-person-outcome">
-          {preview.counts.personRemoved
-            ? $t('admin.face_cleanup_dissolve_person_removed')
-            : $t('admin.face_cleanup_dissolve_person_kept', { values: { count: preview.counts.remainingFaces } })}
-        </p>
-      {/if}
-
-      <p class="text-sm text-gray-500 dark:text-gray-400" data-testid="dissolve-real-faces-note">
-        {$t('admin.face_cleanup_dissolve_real_faces_note')}
-      </p>
 
       <div class="flex flex-col gap-2">
         <label class="text-sm font-semibold" for="dissolve-confirmation">
