@@ -87,7 +87,7 @@ You do not need to redo any machine learning jobs after enabling hardware accele
 - Optional: Configure your `.env` file, see [environment variables](/install/environment-variables) for RKNN specific settings
   - By default each model gets one context per NPU core (1 on RK3566/RK3568, 2 on RK3576, 3 on RK3588), so concurrent requests run on all cores at once. The contexts of a model share its weights, but each one needs its own working memory. Extra contexts therefore cost little for models that are mostly weights, such as CLIP, but for OCR detection each one can add close to the model's own memory again, more so at higher OCR resolutions. Set `MACHINE_LEARNING_RKNN_THREADS=1` to trade throughput for memory.
   - Keep `MACHINE_LEARNING_WORKERS=1` unless you have a specific reason not to: each worker process still loads its own copy of the weights.
-  - Raise Immich job concurrency (Smart Search, Face Detection, OCR) a bit above the number of NPU cores, e.g. `4`–`6`, so a prepared image is always waiting when a core frees up.
+  - Raise Gallery job concurrency (Smart Search, Face Detection, OCR) a bit above the number of NPU cores, e.g. `4`–`6`, so a prepared image is always waiting when a core frees up.
 
 ## Setup
 
@@ -179,4 +179,4 @@ Note that you should increase job concurrencies to increase overall utilization 
     - With a single context (`MACHINE_LEARNING_RKNN_THREADS=1`), RKNPU will have substantially lower throughput for ML jobs than ARM NN in most cases, but similar latency (such as when searching)
     - With three contexts (the default on RK3588), it will be somewhat faster than ARM NN at FP32, but somewhat slower than ARM NN if `MACHINE_LEARNING_ANN_FP16_TURBO` is enabled
     - When other tasks also use the GPU (like transcoding), RKNPU has a significant advantage over ARM NN as it uses the otherwise idle NPU instead of competing for GPU usage
-  - Lower RAM usage than earlier RKNN builds: the contexts of a model share its weights instead of each loading their own copy. Keep `MACHINE_LEARNING_WORKERS=1` and raise Immich ML job concurrency a bit above the core count so every NPU core stays busy.
+  - Lower RAM usage than earlier RKNN builds: the contexts of a model share its weights instead of each loading their own copy. Keep `MACHINE_LEARNING_WORKERS=1` and raise Gallery ML job concurrency a bit above the core count so every NPU core stays busy.
