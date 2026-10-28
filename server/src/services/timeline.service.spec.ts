@@ -299,11 +299,8 @@ describe(TimelineService.name, () => {
       });
 
       it('should throw with visibility unset unless the request is for favourites', async () => {
-        for (const dto of [
-          { withSharedSpaces: true },
-          { withPartners: true },
-          { withSharedSpaces: true, isFavorite: false },
-        ]) {
+        // withPartners alone no longer throws: upstream defaults a partner request to the timeline (immich-32565).
+        for (const dto of [{ withSharedSpaces: true }, { withSharedSpaces: true, isFavorite: false }]) {
           await expect(sut.getTimeBuckets(authStub.admin, dto)).rejects.toThrow(BadRequestException);
         }
         expect(mocks.asset.getTimeBuckets).not.toHaveBeenCalled();
