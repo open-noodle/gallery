@@ -299,14 +299,14 @@
   }
 
   /**
-   * Drops an active search so a just-created folder or newly-linked album becomes visible.
-   *
-   * Search flattens the whole space and hides both the breadcrumb and every folder row, but the
-   * create/link actions stay enabled and keep targeting `currentFolderId`. The result therefore
-   * lands somewhere the user can neither see nor is told about. Clearing the query is the smallest
-   * fix that keeps the capability (disabling the buttons mid-search would remove it) while making
-   * the outcome observable.
-   */
+  Drops an active search so a just-created folder or newly-linked album becomes visible.
+  
+  Search flattens the whole space and hides both the breadcrumb and every folder row, but the
+  create/link actions stay enabled and keep targeting `currentFolderId`. The result therefore
+  lands somewhere the user can neither see nor is told about. Clearing the query is the smallest
+  fix that keeps the capability (disabling the buttons mid-search would remove it) while making
+  the outcome observable.
+  */
   function clearSearchToRevealResult() {
     searchQuery = '';
   }

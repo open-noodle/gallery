@@ -11,23 +11,23 @@
     selectedCity?: string;
     selectedCountry?: string;
     /**
-     * A state/province/region narrowing, which this panel can DISPLAY and CLEAR but not browse:
-     * there is no state list to pick from, so the only way one arrives is a contextual filter
-     * clicked in the asset viewer, typed search, or a shared link.
-     *
-     * It still has to be honoured here, because city / state / country are ONE filter and one chip
-     * (`getActiveFilterCount` counts them once): without this the state was invisible in the panel,
-     * unremovable from it, and silently AND-ed onto the next country or city clicked — which nearly
-     * always returns nothing.
-     */
+    A state/province/region narrowing, which this panel can DISPLAY and CLEAR but not browse:
+    there is no state list to pick from, so the only way one arrives is a contextual filter
+    clicked in the asset viewer, typed search, or a shared link.
+    
+    It still has to be honoured here, because city / state / country are ONE filter and one chip
+    (`getActiveFilterCount` counts them once): without this the state was invisible in the panel,
+    unremovable from it, and silently AND-ed onto the next country or city clicked — which nearly
+    always returns nothing.
+    */
     selectedState?: string;
     context?: FilterContext;
     onCityFetch: (country: string, context?: FilterContext) => Promise<string[]>;
     /**
-     * `state` is the LAST parameter, and omitting it clears the state — every country/city click
-     * replaces the whole location group, so those call sites pass two arguments and get that for
-     * free.
-     */
+    `state` is the LAST parameter, and omitting it clears the state — every country/city click
+    replaces the whole location group, so those call sites pass two arguments and get that for
+    free.
+    */
     onSelectionChange: (country?: string, city?: string, state?: string) => void;
     emptyText?: string;
   }
@@ -109,12 +109,12 @@
   });
 
   /**
-   * The truncated head of the country list, with the SELECTED country hoisted into it.
-   *
-   * Everything below a country — its cities, and the state row — renders inside that country's
-   * block, so a selected country that falls outside the first ten takes the whole selection off
-   * screen with it. Same reasoning (and same hoist) as the selected tag and the selected person.
-   */
+  The truncated head of the country list, with the SELECTED country hoisted into it.
+  
+  Everything below a country — its cities, and the state row — renders inside that country's
+  block, so a selected country that falls outside the first ten takes the whole selection off
+  screen with it. Same reasoning (and same hoist) as the selected tag and the selected person.
+  */
   let visibleCountries = $derived.by(() => {
     if (searchQuery.trim() || showAll) {
       return filteredCountries;

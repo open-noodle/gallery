@@ -11,21 +11,21 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ROUTES_ROOT = resolve(here, '..', '..', 'routes');
 
 /**
- * Resolves a NAVIGATION_ITEMS `route` (a URL pathname, optionally with a
- * `?query` or `#hash` suffix) to a real SvelteKit page directory under
- * `web/src/routes`, i.e. proves the route isn't a dead hardcoded string.
- *
- * Has to understand two SvelteKit filesystem-routing constructs that don't
- * appear in the URL:
- *  - route GROUPS `(name)` — transparent, consume zero path segments
- *    (e.g. all user pages live under `routes/(user)/...`)
- *  - OPTIONAL params `[[name=matcher]]` — may consume one path segment OR be
- *    skipped entirely (e.g. `routes/(user)/photos/[[assetId=id]]/+page.svelte`
- *    serves plain `/photos` by skipping the optional segment)
- *
- * Returns true iff some path through the directory tree consumes all of
- * `segments` and lands on a directory containing `+page.svelte`.
- */
+Resolves a NAVIGATION_ITEMS `route` (a URL pathname, optionally with a
+`?query` or `#hash` suffix) to a real SvelteKit page directory under
+`web/src/routes`, i.e. proves the route isn't a dead hardcoded string.
+
+Has to understand two SvelteKit filesystem-routing constructs that don't
+appear in the URL:
+ - route GROUPS `(name)` — transparent, consume zero path segments
+   (e.g. all user pages live under `routes/(user)/...`)
+ - OPTIONAL params `[[name=matcher]]` — may consume one path segment OR be
+   skipped entirely (e.g. `routes/(user)/photos/[[assetId=id]]/+page.svelte`
+   serves plain `/photos` by skipping the optional segment)
+
+Returns true iff some path through the directory tree consumes all of
+`segments` and lands on a directory containing `+page.svelte`.
+*/
 function resolveRoute(pathname: string, dir = ROUTES_ROOT, segments = pathToSegments(pathname)): boolean {
   if (segments.length === 0) {
     if (existsSync(join(dir, '+page.svelte'))) {

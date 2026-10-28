@@ -5,13 +5,13 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * Space-flavoured sibling of `CreateFaceModal.svelte` (Slice 8, Task 2). §6.5's
-   * `SpaceAssetFaceCreateDto.spacePersonId` is required -- a box cannot be drawn "unassigned" the
-   * way the owner path allows -- so creating a brand-new space person for a freshly drawn box is
-   * two calls: create the person (§6.2), then draw the box already attached to it (§6.5). No
-   * feature-photo preview here (unlike the owner modal): a space person's representative face is
-   * chosen separately, and skipping it keeps this modal to the one thing §6.2/§6.5 need -- a name.
-   */
+  Space-flavoured sibling of `CreateFaceModal.svelte` (Slice 8, Task 2). §6.5's
+  `SpaceAssetFaceCreateDto.spacePersonId` is required -- a box cannot be drawn "unassigned" the
+  way the owner path allows -- so creating a brand-new space person for a freshly drawn box is
+  two calls: create the person (§6.2), then draw the box already attached to it (§6.5). No
+  feature-photo preview here (unlike the owner modal): a space person's representative face is
+  chosen separately, and skipping it keeps this modal to the one thing §6.2/§6.5 need -- a name.
+  */
   type Props = {
     spaceId: string;
     assetId: string;

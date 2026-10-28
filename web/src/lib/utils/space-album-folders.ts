@@ -13,11 +13,11 @@ export type SearchHit = {
 const FOLDER_PREVIEW_LIMIT = 4;
 
 /**
- * Every function here is total over the two arrays the albums page already holds. They must
- * never throw on inconsistent input: another editor can delete a folder between our folder
- * fetch and our album fetch, so a `parentId` pointing at a folder we never received is normal,
- * not exceptional. Such a folder is treated as a root.
- */
+Every function here is total over the two arrays the albums page already holds. They must
+never throw on inconsistent input: another editor can delete a folder between our folder
+fetch and our album fetch, so a `parentId` pointing at a folder we never received is normal,
+not exceptional. Such a folder is treated as a root.
+*/
 const byId = (folders: SharedSpaceAlbumFolderDto[]) => new Map(folders.map((f) => [f.id, f]));
 
 /** Walks parent links upward, guarding against a cycle in malformed data. */
@@ -169,15 +169,15 @@ const recencyOf = (album: SharedSpaceLinkedAlbumDto): number =>
   new Date(album.endDate ?? album.updatedAt ?? 0).getTime();
 
 /**
- * Newest first, ties broken by id.
- *
- * The tie-break is not cosmetic. Albums routinely share a recency — a bulk import lands many in
- * the same tick, and an album with no photos falls back to a timestamp it shares with its
- * siblings. Without a total order, which four covers a folder shows depends on the order the
- * albums happen to arrive in, so the same folder can render a different collage after a refetch,
- * and two callers that walk the space differently disagree about the same folder. Mobile's
- * `_byRecencyThenId` is the same comparator, for the same reason.
- */
+Newest first, ties broken by id.
+
+The tie-break is not cosmetic. Albums routinely share a recency — a bulk import lands many in
+the same tick, and an album with no photos falls back to a timestamp it shares with its
+siblings. Without a total order, which four covers a folder shows depends on the order the
+albums happen to arrive in, so the same folder can render a different collage after a refetch,
+and two callers that walk the space differently disagree about the same folder. Mobile's
+`_byRecencyThenId` is the same comparator, for the same reason.
+*/
 const byRecencyThenId = (a: SharedSpaceLinkedAlbumDto, b: SharedSpaceLinkedAlbumDto): number =>
   recencyOf(b) - recencyOf(a) || a.id.localeCompare(b.id);
 
@@ -219,23 +219,23 @@ export type FolderSummary = { albumCount: number; previewAssetIds: string[] };
 export const EMPTY_FOLDER_SUMMARY: FolderSummary = { albumCount: 0, previewAssetIds: [] };
 
 /**
- * Every folder's recursive album count and preview covers, in one pass over the space.
- *
- * `getRecursiveAlbumCount` and `getFolderPreviewAssetIds` are each O(folders + albums) on their
- * own — both rebuild the parent index and re-scan every album in the space. Calling them from a
- * card's props, once per rendered folder, makes a level of F folders cost O(F × (folders +
- * albums)) and re-pays it on every reactive change. At this feature's own limits (500 folders per
- * space, and `GET /:id/albums` deliberately unpaginated) that is millions of array operations per
- * render.
- *
- * Here the two indexes are built once and shared, so each folder only walks its own subtree:
- * O(folders × depth + albums) for the whole level, with depth capped at 10 server-side.
- *
- * Cycle and dangling-parent behaviour is deliberately identical to the single-folder functions —
- * self-references are not treated as children, and the `seen` set terminates any longer cycle,
- * with every member of it counting the others' albums exactly as `subtreeIds` does. The
- * "agrees with the single-folder functions" test pins that equivalence so the two cannot drift.
- */
+Every folder's recursive album count and preview covers, in one pass over the space.
+
+`getRecursiveAlbumCount` and `getFolderPreviewAssetIds` are each O(folders + albums) on their
+own — both rebuild the parent index and re-scan every album in the space. Calling them from a
+card's props, once per rendered folder, makes a level of F folders cost O(F × (folders +
+albums)) and re-pays it on every reactive change. At this feature's own limits (500 folders per
+space, and `GET /:id/albums` deliberately unpaginated) that is millions of array operations per
+render.
+
+Here the two indexes are built once and shared, so each folder only walks its own subtree:
+O(folders × depth + albums) for the whole level, with depth capped at 10 server-side.
+
+Cycle and dangling-parent behaviour is deliberately identical to the single-folder functions —
+self-references are not treated as children, and the `seen` set terminates any longer cycle,
+with every member of it counting the others' albums exactly as `subtreeIds` does. The
+"agrees with the single-folder functions" test pins that equivalence so the two cannot drift.
+*/
 export const buildFolderSummaries = (
   folders: SharedSpaceAlbumFolderDto[],
   albums: SharedSpaceLinkedAlbumDto[],
@@ -331,6 +331,7 @@ export const isDescendant = (
 export const flattenForSearch = (
   folders: SharedSpaceAlbumFolderDto[],
   albums: SharedSpaceLinkedAlbumDto[],
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   query: string,
 ): SearchHit[] => {
   const needle = (query ?? '').trim().toLowerCase();

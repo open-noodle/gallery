@@ -113,6 +113,7 @@ vi.mock('lodash-es', async (importOriginal) => {
   };
 });
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function asset(id: string, localDateTime: string, overrides: Partial<AssetResponseDto> = {}): AssetResponseDto {
   return {
     id,
@@ -134,6 +135,7 @@ function asset(id: string, localDateTime: string, overrides: Partial<AssetRespon
 function renderViewer({
   assets = defaultAssets(),
   enableGrouping = true,
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   assetInteraction = asAssetInteraction(mockAssetInteraction),
   onIntersected,
   viewerAssets,

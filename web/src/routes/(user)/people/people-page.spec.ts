@@ -158,9 +158,9 @@ function renderPage(
 }
 
 /**
- * Renders the page with page 1 loaded and a second page available, and hands back a trigger that
- * reports the infinite-scroll sentinel as intersecting so pagination can be driven deterministically.
- */
+Renders the page with page 1 loaded and a second page available, and hands back a trigger that
+reports the infinite-scroll sentinel as intersecting so pagination can be driven deterministically.
+*/
 function renderPaginatedPage() {
   let intersectionCallback: IntersectionObserverCallback | undefined;
   let observedSentinel: Element | undefined;

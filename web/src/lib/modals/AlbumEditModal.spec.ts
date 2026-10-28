@@ -12,6 +12,7 @@ const updateAlbumInfoMock = sdkMock.updateAlbumInfo;
 
 const originalZone = Settings.defaultZone;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const album = (o: Partial<AlbumResponseDto> = {}): AlbumResponseDto =>
   ({
     id: 'a1',

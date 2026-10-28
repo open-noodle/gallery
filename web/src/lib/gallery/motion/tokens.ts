@@ -1,7 +1,7 @@
 /**
- * Gallery motion tokens. `motion.css` mirrors these as custom properties, and
- * `tokens.spec.ts` keeps the two in sync. Design: specs/2026-10-23-web-motion-language-design.md.
- */
+Gallery motion tokens. `motion.css` mirrors these as custom properties, and
+`tokens.spec.ts` keeps the two in sync. Design: specs/2026-10-23-web-motion-language-design.md.
+*/
 
 /** Durations (ms) for eased motion. Springs carry their own duration below. */
 export const duration = {
@@ -31,9 +31,9 @@ export interface SpringToken {
 }
 
 /**
- * Springs, generated from stiffness/damping (mass 1). Regenerate with the script in the design doc.
- * Overshoot is the peak past the target: keep everyday motion under ~8%.
- */
+Springs, generated from stiffness/damping (mass 1). Regenerate with the script in the design doc.
+Overshoot is the peak past the target: keep everyday motion under ~8%.
+*/
 export const spring = {
   /** stiffness 300, damping 22: 7.6% overshoot. Releases, entrances, selection. */
   gentle: {

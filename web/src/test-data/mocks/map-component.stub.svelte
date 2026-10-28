@@ -16,10 +16,10 @@
     popup?: Snippet<[{ marker: Marker }]>;
     onClusterSelect?: (assetIds: string[], bbox: SelectionBBox) => void;
     /**
-     * Map.svelte renders its "open in map view" control ONLY when this callback is passed (see
-     * Map.svelte's `{#if onOpenInMapView && showSimpleControls}`), so a caller that withholds it
-     * genuinely has no control. Mirror that here: the stub's button exists iff the callback does.
-     */
+    Map.svelte renders its "open in map view" control ONLY when this callback is passed (see
+    Map.svelte's `{#if onOpenInMapView && showSimpleControls}`), so a caller that withholds it
+    genuinely has no control. Mirror that here: the stub's button exists iff the callback does.
+    */
     onOpenInMapView?: () => Promise<void> | void;
     [key: string]: unknown;
   }

@@ -202,6 +202,7 @@ vi.mock('svelte-i18n', async (orig) => {
 
 const flushMicrotasks = () => new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function mockResolvedTypedSearch(queryText = 'beach', filters: FilterState = createFilterState()) {
   typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
     ok: true,
@@ -1332,6 +1333,7 @@ describe('activate("command")', () => {
   });
 
   describe('destructive activate', () => {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     const makeDestructive = (id: string, handler = vi.fn().mockResolvedValue(undefined)): CommandItem => ({
       id: id as `cmd:${string}`,
       labelKey: 'x',
@@ -6907,6 +6909,7 @@ describe('person activation navigation', () => {
       ...overrides,
     }) as PersonResponseDto;
 
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const spacePerson = (spaceId: string, overrides: Partial<PersonResponseDto> = {}) =>
     ({
       id: 'sp1',

@@ -36,14 +36,14 @@ const readFile = (file: string): Messages =>
 const translated = new Map(FORK_LOCALES.map((code) => [code, readFile(path.join(I18N_DIR, `${code}.json`))]));
 
 /**
- * A fork string is one this repo wrote: a key of the overlay's `i18n/gallery/en.json` that at least one of the
- * nine translates.
- *
- * Deliberately keyed on "at least one" of the nine, never "all nine" — the latter would make the parity
- * assertion below circular and permanently green. It also means a brand-new fork key living only in en.json
- * is not yet a fork string, which is what the project invariant wants: new keys land in en.json alone and get
- * translated in a later pass.
- */
+A fork string is one this repo wrote: a key of the overlay's `i18n/gallery/en.json` that at least one of the
+nine translates.
+
+Deliberately keyed on "at least one" of the nine, never "all nine" — the latter would make the parity
+assertion below circular and permanently green. It also means a brand-new fork key living only in en.json
+is not yet a fork string, which is what the project invariant wants: new keys land in en.json alone and get
+translated in a later pass.
+*/
 const inSomeTranslated = new Set([...translated.values()].flatMap((messages) => Object.keys(messages)));
 
 const forkStrings = Object.keys(readFile(OVERLAY_EN)).filter((key) => inSomeTranslated.has(key));

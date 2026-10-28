@@ -8,11 +8,11 @@
 
   type Props = {
     /**
-     * #1018: set on a space surface where the caller is an Owner/Editor. The link is then
-     * authorized against the space rather than against asset ownership, so the WHOLE selection
-     * goes in — including photos other members contributed. Undefined everywhere else, which
-     * keeps the owned-subset narrowing below.
-     */
+    #1018: set on a space surface where the caller is an Owner/Editor. The link is then
+    authorized against the space rather than against asset ownership, so the WHOLE selection
+    goes in — including photos other members contributed. Undefined everywhere else, which
+    keeps the owned-subset narrowing below.
+    */
     spaceId?: string;
   };
 

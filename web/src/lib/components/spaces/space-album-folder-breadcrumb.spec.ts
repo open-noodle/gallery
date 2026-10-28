@@ -15,6 +15,7 @@ const crumb = (id: string, name: string, parentId: string | null = null) =>
     updatedAt: '2026-01-01T00:00:00.000Z',
   }) as SharedSpaceAlbumFolderDto;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const album = (id: string, folderId: string | null = null) =>
   ({ id, albumName: id, folderId }) as SharedSpaceLinkedAlbumDto;
 

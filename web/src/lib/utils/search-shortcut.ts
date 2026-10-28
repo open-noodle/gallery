@@ -7,14 +7,14 @@ export const isEditableTarget = (element: Element | null): boolean =>
   element !== null && element.closest(EDITABLE_SELECTOR) !== null;
 
 /**
- * Descriptors binding `/` to the global search palette.
- *
- * Two of them, because `matchesShortcut` compares modifiers strictly
- * (`Boolean(shortcut.shift) === event.shiftKey`) and several common layouts
- * produce `/` with Shift held — QWERTZ and Spanish use Shift+7, AZERTY Shift+:.
- * A lone `{ key: '/' }` would be dead for all of them. There is no clash with
- * `?`, which arrives as `event.key === '?'` on US layouts.
- */
+Descriptors binding `/` to the global search palette.
+
+Two of them, because `matchesShortcut` compares modifiers strictly
+(`Boolean(shortcut.shift) === event.shiftKey`) and several common layouts
+produce `/` with Shift held — QWERTZ and Spanish use Shift+7, AZERTY Shift+:.
+A lone `{ key: '/' }` would be dead for all of them. There is no clash with
+`?`, which arrives as `event.key === '?'` on US layouts.
+*/
 export const searchShortcuts = (open: () => void): ShortcutOptions[] => {
   const openUnlessEditing = (event: KeyboardEvent) => {
     // `shouldIgnoreEvent` in @immich/ui only skips a fixed list of input types

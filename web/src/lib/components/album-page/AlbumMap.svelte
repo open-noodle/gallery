@@ -18,10 +18,10 @@
   interface Props {
     album: AlbumResponseDto;
     /**
-     * Gallery (#767): the album's LIVE filter state. Absent on the shared-link album view
-     * (AlbumViewer.svelte), which must keep using the album endpoint: /gallery/map/markers takes no
-     * shared-link key, and a shared link exposes no filter affordances anyway (E2).
-     */
+    Gallery (#767): the album's LIVE filter state. Absent on the shared-link album view
+    (AlbumViewer.svelte), which must keep using the album endpoint: /gallery/map/markers takes no
+    shared-link key, and a shared link exposes no filter affordances anyway (E2).
+    */
     filters?: FilterState;
   }
 

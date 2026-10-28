@@ -1,12 +1,12 @@
 import type { FilterSection, FilterSuggestionsResponse } from './filter-panel';
 
 /**
- * Whether a filter section can do anything for the user right now (#910).
- *
- * - `available`   — render normally.
- * - `empty`       — the current filters narrowed it to nothing; grey it out with `(0)`.
- * - `unavailable` — nothing in this scope could ever populate it; do not render it at all.
- */
+Whether a filter section can do anything for the user right now (#910).
+
+- `available`   — render normally.
+- `empty`       — the current filters narrowed it to nothing; grey it out with `(0)`.
+- `unavailable` — nothing in this scope could ever populate it; do not render it at all.
+*/
 export type SectionAvailability = 'available' | 'empty' | 'unavailable';
 
 export interface AvailabilityInput {
@@ -21,9 +21,9 @@ export interface AvailabilityInput {
 }
 
 /**
- * Whether this section's facet offers the user a choice. Not simply "is the list empty": a control that
- * can only select everything, or only select nothing, is equally useless.
- */
+Whether this section's facet offers the user a choice. Not simply "is the list empty": a control that
+can only select everything, or only select nothing, is equally useless.
+*/
 function isSectionEmpty(section: FilterSection, facets: FilterSuggestionsResponse): boolean {
   switch (section) {
     case 'people': {

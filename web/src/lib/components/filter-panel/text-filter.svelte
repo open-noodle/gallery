@@ -17,6 +17,7 @@
     debounceMs?: number;
   }
 
+  // eslint-disable-next-line unicorn/prefer-default-parameters
   let { description, originalFileName, ocr, onChange, debounceMs = 250 }: Props = $props();
 
   // Local mirrors so typing stays responsive without waiting for the parent round-trip.

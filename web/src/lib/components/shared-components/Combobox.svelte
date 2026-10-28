@@ -42,9 +42,9 @@
     defaultFirstOption?: boolean;
     onSelect?: (option: ComboBoxOption | undefined) => void;
     /**
-     * Fires on every keystroke, for fields whose value is the typed text itself rather than a
-     * choice from `options`. Without it, text that is never selected is discarded on blur.
-     */
+    Fires on every keystroke, for fields whose value is the typed text itself rather than a
+    choice from `options`. Without it, text that is never selected is discarded on blur.
+    */
     onTextInput?: (value: string) => void;
     forceFocus?: boolean;
   }
@@ -175,19 +175,19 @@
 
   // TODO: move this combobox component into @immich/ui
   /**
-   * The dropdown is `position: fixed`, but "fixed" does not always mean "against the
-   * viewport", so the offsets it is placed at are measured rather than assumed:
-   *
-   * - Bits UI dialogs use `contain: layout`, which positions fixed descendants in dialog space.
-   * - iPadOS Safari resolves fixed positions against the *document* while the on-screen
-   *   keyboard is up, so a dropdown placed at the input's client coordinates lands
-   *   `window.scrollY` too high - off-screen once the keyboard scrolls the page (#959).
-   *
-   * `frameStart` and `frameEnd` are zero-sized probes pinned to the top and bottom of
-   * whatever box this dropdown's `fixed` positions actually resolve against. Wherever
-   * `fixed` behaves like the viewport they read 0 and `window.innerHeight`, leaving the
-   * arithmetic below unchanged.
-   */
+  The dropdown is `position: fixed`, but "fixed" does not always mean "against the
+  viewport", so the offsets it is placed at are measured rather than assumed:
+  
+  - Bits UI dialogs use `contain: layout`, which positions fixed descendants in dialog space.
+  - iPadOS Safari resolves fixed positions against the *document* while the on-screen
+    keyboard is up, so a dropdown placed at the input's client coordinates lands
+    `window.scrollY` too high - off-screen once the keyboard scrolls the page (#959).
+  
+  `frameStart` and `frameEnd` are zero-sized probes pinned to the top and bottom of
+  whatever box this dropdown's `fixed` positions actually resolve against. Wherever
+  `fixed` behaves like the viewport they read 0 and `window.innerHeight`, leaving the
+  arithmetic below unchanged.
+  */
   const getFixedFrame = () => {
     const start = frameStart?.getBoundingClientRect();
     const end = frameEnd?.getBoundingClientRect();
@@ -199,9 +199,9 @@
   };
 
   /**
-   * The height the user can actually see. The on-screen keyboard shrinks the visual
-   * viewport, and on iPadOS it shrinks `window.innerHeight` along with it.
-   */
+  The height the user can actually see. The on-screen keyboard shrinks the visual
+  viewport, and on iPadOS it shrinks `window.innerHeight` along with it.
+  */
   const getVisibleHeight = () => window.visualViewport?.height || window.innerHeight;
 
   const calculatePosition = (boundary: DOMRect | undefined) => {

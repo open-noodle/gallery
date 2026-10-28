@@ -25,6 +25,7 @@
     searchQuery = '',
     filters,
     withSharedSpaces,
+    // eslint-disable-next-line unicorn/prefer-default-parameters
     spaceId,
     albumIds,
     language = '',

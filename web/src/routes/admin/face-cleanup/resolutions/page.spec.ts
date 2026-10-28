@@ -171,6 +171,7 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
     await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
 
     const rows = screen.getAllByTestId('resolution-row');
+    // eslint-disable-next-line unicorn/prefer-default-parameters
     expect(rows.map((r) => r.dataset.source).sort((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual([
       'cleanup',
       'suggestion',

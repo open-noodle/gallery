@@ -310,6 +310,7 @@ describe('SpaceAlbumsList', () => {
   });
 
   describe('folders', () => {
+    // eslint-disable-next-line unicorn/no-unnecessary-parameters
     function makeFolder(id: string, name: string, parentId: string | null = null): SharedSpaceAlbumFolderDto {
       return {
         id,

@@ -28,15 +28,15 @@ export const manualCrumb = (t: Translate): BreadcrumbItem => ({
 });
 
 /**
- * The root crumb followed by `tail`, with the LAST crumb's href removed — you never link to the page you are
- * standing on.
- *
- * That rule is what lets `guidedCrumb($t)` be written identically on /scan and on /[personId] and still
- * render unlinked on the first and linked on the second. No page decides for itself whether its own crumb
- * should be a link, so no page can get it wrong.
- *
- * Returns new objects; the caller's crumbs are never mutated.
- */
+The root crumb followed by `tail`, with the LAST crumb's href removed — you never link to the page you are
+standing on.
+
+That rule is what lets `guidedCrumb($t)` be written identically on /scan and on /[personId] and still
+render unlinked on the first and linked on the second. No page decides for itself whether its own crumb
+should be a link, so no page can get it wrong.
+
+Returns new objects; the caller's crumbs are never mutated.
+*/
 export const faceCleanupBreadcrumbs = (t: Translate, ...tail: BreadcrumbItem[]): BreadcrumbItem[] => {
   const trail = [faceCleanupRootCrumb(t), ...tail];
 

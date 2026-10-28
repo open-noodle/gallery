@@ -1,12 +1,13 @@
 import { clampOverflow } from '#lib/actions/clamp-overflow.ts';
 
 /**
- * happy-dom has no layout engine, so heights are supplied by the test.
- *
- * They are driven through a mutable `metrics` object behind getters rather than assigned onto the
- * element: `scrollHeight` is `readonly` in lib.dom.d.ts and happy-dom exposes only a getter, so
- * `node.scrollHeight = 100` fails `pnpm check:typescript` even though it would work at runtime.
- */
+happy-dom has no layout engine, so heights are supplied by the test.
+
+They are driven through a mutable `metrics` object behind getters rather than assigned onto the
+element: `scrollHeight` is `readonly` in lib.dom.d.ts and happy-dom exposes only a getter, so
+`node.scrollHeight = 100` fails `pnpm check:typescript` even though it would work at runtime.
+*/
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 function makeNode(scrollHeight: number, clientHeight: number) {
   const node = document.createElement('div');
   const metrics = { scrollHeight, clientHeight };

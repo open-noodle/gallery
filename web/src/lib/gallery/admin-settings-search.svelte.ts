@@ -6,10 +6,10 @@ type Translate = (key: Translations) => string;
 export type SettingsSection = { key: string; title: string; subtitle: string };
 
 /**
- * Source file of each system-settings section, by the section `key` the settings page uses. A section is
- * searchable by the translated text of every `$t('…')` key its component renders, so a query like "merge",
- * "delete" or "cache" finds the setting inside a section whose title does not mention it (#1112).
- */
+Source file of each system-settings section, by the section `key` the settings page uses. A section is
+searchable by the translated text of every `$t('…')` key its component renders, so a query like "merge",
+"delete" or "cache" finds the setting inside a section whose title does not mention it (#1112).
+*/
 const SECTION_SOURCES: Record<string, string> = {
   authentication: '/src/routes/admin/system-settings/AuthSettings.svelte',
   backup: '/src/routes/admin/system-settings/BackupSettings.svelte',

@@ -87,15 +87,15 @@ export const getAssetBulkActions = (
     editableSelectedAssetIds,
   }: {
     /**
-     * The album whose page is showing this selection. Upstream passed it positionally; it moved
-     * into this bag next to the fork's options. Gates RemoveFromAlbum.
-     */
+    The album whose page is showing this selection. Upstream passed it positionally; it moved
+    into this bag next to the fork's options. Gates RemoveFromAlbum.
+    */
     album?: AlbumResponseDto;
     /**
-     * #734: which of the current selection the caller may edit (resolved by `SelectionToolbar`
-     * via `POST /assets/editable`). When set, Tag sends only these and reports the skipped count;
-     * omitted on every other surface, which keeps upstream's all-owned behaviour.
-     */
+    #734: which of the current selection the caller may edit (resolved by `SelectionToolbar`
+    via `POST /assets/editable`). When set, Tag sends only these and reports the skipped count;
+    omitted on every other surface, which keeps upstream's all-owned behaviour.
+    */
     editableSelectedAssetIds?: string[];
   } = {},
 ) => {
@@ -239,14 +239,14 @@ export const getAssetActions = (
     album,
   }: {
     /**
-     * The shared space this asset is being viewed through, when the viewer sits on a space
-     * surface. Drives the add-to-album gating below; absent everywhere else.
-     */
+    The shared space this asset is being viewed through, when the viewer sits on a space
+    surface. Drives the add-to-album gating below; absent everywhere else.
+    */
     space?: { id: string; canWrite: boolean };
     /**
-     * The album this asset is being viewed through. Upstream passed it positionally; it moved
-     * into this bag so the fork's `space` and it can coexist. Gates RemoveFromAlbum.
-     */
+    The album this asset is being viewed through. Upstream passed it positionally; it moved
+    into this bag so the fork's `space` and it can coexist. Gates RemoveFromAlbum.
+    */
     album?: AlbumResponseDto;
   } = {},
 ) => {

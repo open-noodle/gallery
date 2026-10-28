@@ -178,13 +178,13 @@ describe('SpaceFaceEditor', () => {
   });
 
   /**
-   * The reported bug: tagging from the ON-PHOTO editor left both the People row and the face boxes
-   * over the photo showing their pre-tag contents until a full page reload. This component simply
-   * called `onClose()` and told nothing to re-read.
-   *
-   * Asserting the refresh happens BEFORE `onClose` matters -- closing first unmounts the editor,
-   * and a refresh fired after that races the teardown.
-   */
+  The reported bug: tagging from the ON-PHOTO editor left both the People row and the face boxes
+  over the photo showing their pre-tag contents until a full page reload. This component simply
+  called `onClose()` and told nothing to re-read.
+  
+  Asserting the refresh happens BEFORE `onClose` matters -- closing first unmounts the editor,
+  and a refresh fired after that races the teardown.
+  */
   it('refreshes the asset people after attaching to an existing space person', async () => {
     getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Bob' })]);
     createSpaceAssetFaceMock.mockResolvedValue({ id: 'new-face' });

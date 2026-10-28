@@ -2,9 +2,9 @@ import { isDescendant } from '#lib/utils/space-album-folders.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 
 /**
- * A gallery-specific MIME type, not text/plain. DragAndDropUploadOverlay listens for file
- * drags; a generic payload would risk being picked up by other code that keys off a common type.
- */
+A gallery-specific MIME type, not text/plain. DragAndDropUploadOverlay listens for file
+drags; a generic payload would risk being picked up by other code that keys off a common type.
+*/
 export const SPACE_ITEM_MIME = 'application/x-gallery-space-item';
 
 export type DragPayload = { kind: 'album' | 'folder'; id: string };
@@ -28,18 +28,18 @@ export const readDragPayload = (dataTransfer: DataTransfer): DragPayload | null 
 };
 
 /**
- * `dragenter`/`dragover` see the DataTransfer in the Drag and Drop spec's "protected mode": real
- * browsers return an empty string from getData() there — only `.types` is readable before the
- * drop itself. That makes readDragPayload unusable inside an `ondragover` handler in production,
- * even though a hand-rolled DataTransfer in a unit test won't reproduce that restriction.
- *
- * This module-level slot is the workaround: the dragged element records the payload here at
- * `ondragstart` (alongside writeDragPayload) and clears it at `ondragend`. Folder cards and
- * breadcrumb crumbs read it back during dragover to run the real canDrop check and decide
- * whether to preventDefault() — which is also what is needed for `drop` to fire at all.
- * `ondrop` itself still reads the authoritative payload off the DataTransfer via
- * readDragPayload, since read access there is unrestricted.
- */
+`dragenter`/`dragover` see the DataTransfer in the Drag and Drop spec's "protected mode": real
+browsers return an empty string from getData() there — only `.types` is readable before the
+drop itself. That makes readDragPayload unusable inside an `ondragover` handler in production,
+even though a hand-rolled DataTransfer in a unit test won't reproduce that restriction.
+
+This module-level slot is the workaround: the dragged element records the payload here at
+`ondragstart` (alongside writeDragPayload) and clears it at `ondragend`. Folder cards and
+breadcrumb crumbs read it back during dragover to run the real canDrop check and decide
+whether to preventDefault() — which is also what is needed for `drop` to fire at all.
+`ondrop` itself still reads the authoritative payload off the DataTransfer via
+readDragPayload, since read access there is unrestricted.
+*/
 let activeDragPayload: DragPayload | null = null;
 
 export const setActiveDragPayload = (payload: DragPayload | null): void => {
@@ -49,9 +49,9 @@ export const setActiveDragPayload = (payload: DragPayload | null): void => {
 export const getActiveDragPayload = (): DragPayload | null => activeDragPayload;
 
 /**
- * Decided entirely client-side, so an illegal drop fires no request at all — the user never
- * sees a spinner followed by an error the client could have predicted.
- */
+Decided entirely client-side, so an illegal drop fires no request at all — the user never
+sees a spinner followed by an error the client could have predicted.
+*/
 export const canDrop = (
   folders: SharedSpaceAlbumFolderDto[],
   albums: SharedSpaceLinkedAlbumDto[],
@@ -84,18 +84,18 @@ export const canDrop = (
 const DRAG_CHIP_ATTRIBUTE = 'data-space-drag-chip';
 
 /**
- * Replaces the browser's default drag image — a snapshot of the dragged element, which for a folder
- * card is a full tile with a four-up collage that covers the drop targets — with a small text chip.
- *
- * Three constraints, each a real failure if broken:
- *  - The chip must be RENDERED. `display: none` yields no drag image at all, so it is placed
- *    offscreen instead.
- *  - It must be in the DOM when `setDragImage` runs (the snapshot is taken synchronously) and gone
- *    afterwards, hence the next-tick removal rather than an immediate one.
- *  - `setDragImage` must be feature-detected. The unit tests hand-roll a `DataTransfer` with only
- *    `setData`/`getData`/`types`, and jsdom-family DOMs do not implement it either; without the
- *    guard, every dragstart test throws.
- */
+Replaces the browser's default drag image — a snapshot of the dragged element, which for a folder
+card is a full tile with a four-up collage that covers the drop targets — with a small text chip.
+
+Three constraints, each a real failure if broken:
+ - The chip must be RENDERED. `display: none` yields no drag image at all, so it is placed
+   offscreen instead.
+ - It must be in the DOM when `setDragImage` runs (the snapshot is taken synchronously) and gone
+   afterwards, hence the next-tick removal rather than an immediate one.
+ - `setDragImage` must be feature-detected. The unit tests hand-roll a `DataTransfer` with only
+   `setData`/`getData`/`types`, and jsdom-family DOMs do not implement it either; without the
+   guard, every dragstart test throws.
+*/
 export const setDragLabel = (dataTransfer: DataTransfer, label: string): void => {
   if (typeof document === 'undefined' || typeof dataTransfer.setDragImage !== 'function') {
     return;

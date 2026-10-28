@@ -19,18 +19,18 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * Space-flavoured sibling of `FaceEditor.svelte` (Slice 8, Task 2) -- draws a face box on a
-   * member's asset and attaches it to a space person (spec §6.5), instead of the owner's
-   * `createFace`. The drag/canvas math (`computeImageContentMetrics`,
-   * `computeFaceCroppedCoordinates`, `computeSelectorPosition`) is shared with `FaceEditor.svelte`
-   * via `$lib/utils/face-box-drag` -- the SAME transform, so a rotated/edited asset (#992) is
-   * handled identically to the owner path. Only the SDK calls and the candidate source (space
-   * people, not the owner's global people) differ.
-   *
-   * `SpaceAssetFaceCreateDto.spacePersonId` is REQUIRED (spec §6.5) -- unlike the owner path, a box
-   * cannot be drawn "unassigned" here, so "create a new person" is `CreateSpaceFaceModal`'s
-   * create-then-draw, not a bare `createFace`.
-   */
+  Space-flavoured sibling of `FaceEditor.svelte` (Slice 8, Task 2) -- draws a face box on a
+  member's asset and attaches it to a space person (spec §6.5), instead of the owner's
+  `createFace`. The drag/canvas math (`computeImageContentMetrics`,
+  `computeFaceCroppedCoordinates`, `computeSelectorPosition`) is shared with `FaceEditor.svelte`
+  via `$lib/utils/face-box-drag` -- the SAME transform, so a rotated/edited asset (#992) is
+  handled identically to the owner path. Only the SDK calls and the candidate source (space
+  people, not the owner's global people) differ.
+  
+  `SpaceAssetFaceCreateDto.spacePersonId` is REQUIRED (spec §6.5) -- unlike the owner path, a box
+  cannot be drawn "unassigned" here, so "create a new person" is `CreateSpaceFaceModal`'s
+  create-then-draw, not a bare `createFace`.
+  */
   type Props = {
     htmlElement: HTMLImageElement | HTMLVideoElement;
     containerWidth: number;

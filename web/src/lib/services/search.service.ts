@@ -5,9 +5,9 @@ const COLLECT_PAGE_SIZE = 1000;
 export type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
 
 /**
- * Pages through the search API for the given filter and returns the ids of every matching asset.
- * IDs only — `withExif: false` keeps each page payload minimal.
- */
+Pages through the search API for the given filter and returns the ids of every matching asset.
+IDs only — `withExif: false` keeps each page payload minimal.
+*/
 export const collectSearchResultAssetIds = async (
   terms: SearchTerms,
   options: { smartSearchEnabled: boolean; language: string },

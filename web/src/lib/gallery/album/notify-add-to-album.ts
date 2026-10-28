@@ -5,11 +5,11 @@ import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 
 /**
- * Toast the outcome of an add-to-album call truthfully (#764). The server returns HTTP 200 with
- * per-asset failures, so severity must follow the result counts — a green "Successful" heading is
- * reserved for the all-succeeded case; nothing-added is a warning; partial / already-present is info.
- * Used by upstream's addAssetsToAlbumsMutation (album.query.ts) in place of its own toast.
- */
+Toast the outcome of an add-to-album call truthfully (#764). The server returns HTTP 200 with
+per-asset failures, so severity must follow the result counts — a green "Successful" heading is
+reserved for the all-succeeded case; nothing-added is a warning; partial / already-present is info.
+Used by upstream's addAssetsToAlbumsMutation (album.query.ts) in place of its own toast.
+*/
 export const notifyAddToAlbum = (
   $t: MessageFormatter,
   albumId: string,

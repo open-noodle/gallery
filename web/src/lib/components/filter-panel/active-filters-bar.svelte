@@ -48,10 +48,10 @@
     onClearSearch?: () => void;
     embedded?: boolean;
     /**
-     * When provided (and there are results), shows an "Add all N to…" action that hands the current
-     * filter result off to a collection picker. Surfaces where adding the visible assets to an
-     * album/space doesn't apply (tags, trash, locked, partners) simply pass no handler.
-     */
+    When provided (and there are results), shows an "Add all N to…" action that hands the current
+    filter result off to a collection picker. Surfaces where adding the visible assets to an
+    album/space doesn't apply (tags, trash, locked, partners) simply pass no handler.
+    */
     onAddAllToCollection?: () => void;
   }
 

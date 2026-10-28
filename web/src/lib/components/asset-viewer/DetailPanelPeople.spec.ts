@@ -105,9 +105,11 @@ const rerenderPanel = async (
 // A person as the server sends it inside a shared space: the id stays the GLOBAL person id
 // (AssetService.applySpacePeople only *adds* spacePersonId), which is why faceManager's
 // facesByPersonId lookup still matches for space members.
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const spacePerson = (name: string, spacePersonId: string): PersonResponseDto =>
   ({ ...person(name), spacePersonId }) as unknown as PersonResponseDto;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const givePersonAFace = (personId: string, faceId = 'face-1') => {
   faceManagerMock.facesByPersonId = new Map<string, unknown[]>([[personId, [{ id: faceId }]]]);
   faceManagerMock.data = [{ id: faceId }];

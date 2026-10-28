@@ -2,25 +2,25 @@ import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { clearTimelineTemporalFilter } from '#lib/utils/timeline-temporal-filters.ts';
 
 /**
- * The single shared "remove one active filter chip" reducer, used by every surface that renders
- * the active-filters bar (`/photos`, `/albums`, `/map` via `handlePhotosRemoveFilter`, and
- * `/spaces` via `handleSpaceRemoveFilter`). Both of those were previously byte-for-byte identical
- * copies of this switch — keeping one copy means a new chip type can no longer be wired into one
- * surface and forgotten on the other.
- *
- * Some cases clear more than the field their chip label shows, because the chip represents a
- * GROUP of sibling fields that all narrow the same dimension. The rule: a chip's ✕ clears a
- * sibling field ONLY if that sibling has no chip of its own — otherwise clearing it here would
- * silently drop a filter the user never touched, with no chip having shown it was going away.
- *  - `location` clears `city` + `state` + `country`. `state` has no chip of its own (it is folded
- *    into the location chip's label, and `getActiveFilterCount` counts city/state/country as a
- *    single filter), so it must go with the rest of the group.
- *  - `camera` clears `make` + `model` only. `lensModel` has its own chip and its own `lens` case
- *    below (`getActiveFilterCount` counts `make` and `lensModel` separately), so clearing it here
- *    would clear a filter with no chip shown for it.
- *  - `albums` clears `isInAlbum` + `isNotInAlbum` only. `albumId` has its own chip and its own
- *    `album` case below, for the same reason.
- */
+The single shared "remove one active filter chip" reducer, used by every surface that renders
+the active-filters bar (`/photos`, `/albums`, `/map` via `handlePhotosRemoveFilter`, and
+`/spaces` via `handleSpaceRemoveFilter`). Both of those were previously byte-for-byte identical
+copies of this switch — keeping one copy means a new chip type can no longer be wired into one
+surface and forgotten on the other.
+
+Some cases clear more than the field their chip label shows, because the chip represents a
+GROUP of sibling fields that all narrow the same dimension. The rule: a chip's ✕ clears a
+sibling field ONLY if that sibling has no chip of its own — otherwise clearing it here would
+silently drop a filter the user never touched, with no chip having shown it was going away.
+ - `location` clears `city` + `state` + `country`. `state` has no chip of its own (it is folded
+   into the location chip's label, and `getActiveFilterCount` counts city/state/country as a
+   single filter), so it must go with the rest of the group.
+ - `camera` clears `make` + `model` only. `lensModel` has its own chip and its own `lens` case
+   below (`getActiveFilterCount` counts `make` and `lensModel` separately), so clearing it here
+   would clear a filter with no chip shown for it.
+ - `albums` clears `isInAlbum` + `isNotInAlbum` only. `albumId` has its own chip and its own
+   `album` case below, for the same reason.
+*/
 export function handleRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
   switch (type) {
     case 'person': {

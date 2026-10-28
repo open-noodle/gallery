@@ -69,37 +69,37 @@ export interface ManualReviewModel {
   readonly hasStagedWork: boolean;
 
   /** Appends a page of faces. Preserves every existing face's state and the current selection; a face already
-   *  present (by assetFaceId) is skipped, so re-fetching an overlapping page is a no-op. `total` is always
-   *  refreshed from the server value passed in. */
+  present (by assetFaceId) is skipped, so re-fetching an overlapping page is a no-op. `total` is always
+  refreshed from the server value passed in. */
   appendFaces(faces: ManualFace[], total: number): void;
   /** Drops every loaded face, every staged state, and the selection — back to the model's just-constructed
-   *  state. The counterpart `appendFaces` needs: appending is idempotent by assetFaceId, so REFETCHING the
-   *  cluster (as the page does after a successful apply) into a populated model skips every id it already
-   *  holds and keeps rendering the faces the resolve just moved away. A refresh has to replace, not merge. */
+  state. The counterpart `appendFaces` needs: appending is idempotent by assetFaceId, so REFETCHING the
+  cluster (as the page does after a successful apply) into a populated model skips every id it already
+  holds and keeps rendering the faces the resolve just moved away. A refresh has to replace, not merge. */
   clear(): void;
   stateOf(assetFaceId: string): ManualFaceState;
   /** Only meaningful when stateOf(id) === 'move' (the picked destination); null otherwise. */
   destinationOf(assetFaceId: string): string | null;
   isSelected(assetFaceId: string): boolean;
   /** Click: toggles one tile in/out of the selection and anchors the next shift-click range. Shift-click:
-   *  selects every tile between the last toggled tile and this one, inclusive — bounded by the faces actually
-   *  loaded, since that is all this model (or the admin) can see. */
+  selects every tile between the last toggled tile and this one, inclusive — bounded by the faces actually
+  loaded, since that is all this model (or the admin) can see. */
   toggle(assetFaceId: string, shiftKey?: boolean): void;
   /** Selects exactly the faces currently loaded — never `total`. A cluster can hold thousands; "select all"
-   *  can only ever mean what is on screen (design §6.4, "Selection cannot claim the whole cluster"). */
+  can only ever mean what is on screen (design §6.4, "Selection cannot claim the whole cluster"). */
   selectAllLoaded(): void;
   clearSelection(): void;
   /** Applies `state` (+ optional destination for `move`) to every selected face, then clears the selection. */
   applyToSelection(state: ManualFaceState, destination?: { personId: string; lock: boolean }): void;
   /** Returns every selected face to `keep`, removing it from whatever bucket it was in, then clears the
-   *  selection. The undo a `keep`-default review needs, since marking here is a deliberate act (design §6.4,
-   *  "A keep default needs an undo"). */
+  selection. The undo a `keep`-default review needs, since marking here is a deliberate act (design §6.4,
+  "A keep default needs an undo"). */
   unmarkSelection(): void;
   /** Returns every loaded face to `keep` and clears the selection. */
   reset(): void;
   /** Pure builder: groups `move` faces by (destinationPersonId, lock) and emits `lock`/`unknown`/`detach` id
-   *  lists. `keep` faces are omitted entirely. Returns null when nothing is staged — not an empty request —
-   *  so a disabled Apply cannot be bypassed (an empty resolve is a 400 server-side). */
+  lists. `keep` faces are omitted entirely. Returns null when nothing is staged — not an empty request —
+  so a disabled Apply cannot be bypassed (an empty resolve is a 400 server-side). */
   buildResolveRequest(): ManualResolveRequest | null;
 }
 

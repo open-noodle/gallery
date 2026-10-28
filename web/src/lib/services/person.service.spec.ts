@@ -269,6 +269,7 @@ describe('getPersonActions viewer gating', () => {
 });
 
 describe('representative face routing', () => {
+  // eslint-disable-next-line unicorn/no-unnecessary-parameters
   const spaceScopedPerson = (overrides: Parameters<typeof personFactory.build>[0] = {}) =>
     personFactory.build({
       id: 'space-person-1',

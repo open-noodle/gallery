@@ -28,12 +28,12 @@
   import { fly } from 'svelte/transition';
 
   /**
-   * The space-flavoured sibling of `PersonSidePanel.svelte` (Slice 8, Task 2). Same job -- name an
-   * unrecognised face, correct a wrong one -- routed to the shared-space endpoints (spec §6.1-6.4)
-   * instead of the owner-only person/face endpoints. Unlike the owner panel, every action here is
-   * immediate (PUT/DELETE), not a batched "Done" -- the space endpoints are already transactional
-   * per action, so there is nothing to defer.
-   */
+  The space-flavoured sibling of `PersonSidePanel.svelte` (Slice 8, Task 2). Same job -- name an
+  unrecognised face, correct a wrong one -- routed to the shared-space endpoints (spec §6.1-6.4)
+  instead of the owner-only person/face endpoints. Unlike the owner panel, every action here is
+  immediate (PUT/DELETE), not a batched "Done" -- the space endpoints are already transactional
+  per action, so there is nothing to defer.
+  */
   interface Props {
     spaceId: string;
     assetId: string;
@@ -52,16 +52,16 @@
   let candidatesLoaded = $state(false);
   let isLoadingCandidates = $state(false);
   /**
-   * One field, two jobs: it filters the candidate list below AND names the person the create
-   * button makes. The picker used to offer only the create half, so typing a name that already
-   * existed matched nothing and the only way to reach that person was to scroll the whole space
-   * -- reported on #992 as "assigning to an existing person is broken". Its two siblings both
-   * search too (the owner's `AssignFaceSidePanel` against the server, `SpaceFaceEditor` over its
-   * own loaded candidates), and the panel is too narrow to carry two text inputs.
-   *
-   * The field itself belongs to `PersonPickerPanel`, which is why this is bound rather than local:
-   * the owner's picker needs the same field, and the create half is what only this one does with it.
-   */
+  One field, two jobs: it filters the candidate list below AND names the person the create
+  button makes. The picker used to offer only the create half, so typing a name that already
+  existed matched nothing and the only way to reach that person was to scroll the whole space
+  -- reported on #992 as "assigning to an existing person is broken". Its two siblings both
+  search too (the owner's `AssignFaceSidePanel` against the server, `SpaceFaceEditor` over its
+  own loaded candidates), and the panel is too narrow to carry two text inputs.
+  
+  The field itself belongs to `PersonPickerPanel`, which is why this is bound rather than local:
+  the owner's picker needs the same field, and the create half is what only this one does with it.
+  */
   let personQuery = $state('');
   let isSavingNewPerson = $state(false);
   let isAttaching = $state(false);

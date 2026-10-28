@@ -8,11 +8,11 @@
   interface Props {
     spaceId: string;
     /**
-     * The space's LIVE filter state. Required on purpose: this link used to be a hard-coded
-     * `/map?spaceId=<id>`, which silently dropped every active filter and the search term on the
-     * way to the map (#767a). Making the prop required means a new call site cannot re-introduce
-     * that by simply forgetting it.
-     */
+    The space's LIVE filter state. Required on purpose: this link used to be a hard-coded
+    `/map?spaceId=<id>`, which silently dropped every active filter and the search term on the
+    way to the map (#767a). Making the prop required means a new call site cannot re-introduce
+    that by simply forgetting it.
+    */
     filters: FilterState;
     searchQuery?: string;
   }

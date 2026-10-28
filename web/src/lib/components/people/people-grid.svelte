@@ -9,10 +9,10 @@
     hasNextPage?: boolean;
     loading?: boolean;
     /**
-     * Pages loaded so far. A page can add no visible items (all hidden, or all already shown), which leaves the
-     * sentinel in view without a new intersection; a change here re-runs the visibility check anyway (#1184).
-     * It only advances on a successful load, so a failed request is not retried in a loop.
-     */
+    Pages loaded so far. A page can add no visible items (all hidden, or all already shown), which leaves the
+    sentinel in view without a new intersection; a change here re-runs the visibility check anyway (#1184).
+    It only advances on a successful load, so a failed request is not retried in a loop.
+    */
     loadedPages?: number;
     loadNextPage: () => void;
     children?: Snippet<[T, number]>;

@@ -8,12 +8,12 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * "Add to space" — the pool of an expanded space, offered as a child row alongside that
-   * space's linked albums (#965).
-   *
-   * It carries the same `PickerCollection` as its parent space row, so ticking either one
-   * means the same destination and both show the tick.
-   */
+  "Add to space" — the pool of an expanded space, offered as a child row alongside that
+  space's linked albums (#965).
+  
+  It carries the same `PickerCollection` as its parent space row, so ticking either one
+  means the same destination and both show the tick.
+  */
   interface Props {
     spaceId: string;
     selected: boolean;
