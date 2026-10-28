@@ -1,12 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
-import { isFavoritesAcrossScope } from 'src/gallery/utils/favorites-scope.js';
 import type { GalleryBaseService } from 'src/gallery/services/gallery-base.service.js';
 import type { AccessRepository } from 'src/repositories/access.repository.js';
 import type { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import type { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum.js';
+import { isFavoritesAcrossScope } from 'src/gallery/utils/favorites-scope.js';
 import { requireAccess } from 'src/utils/access.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { rejectSharedLinkFavoriteFilter } from 'src/utils/favorite.js';

@@ -17,8 +17,8 @@ import {
 } from 'src/dtos/server.dto.js';
 import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum.js';
 import {
-  getAdminAvailableMemoryTypeKeys,
   MEMORY_TYPE_KEYS,
+  getAdminAvailableMemoryTypeKeys,
 } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
 import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';

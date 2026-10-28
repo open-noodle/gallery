@@ -8,8 +8,8 @@ import {
   TimeBucketsResponseDto,
 } from 'src/dtos/time-bucket.dto.js';
 import { AssetVisibility, Permission } from 'src/enum.js';
-import { galleryTimeBucketChecks, galleryTimeBucketOptions } from 'src/gallery/utils/timeline-scope.js';
 import { isFavoritesAcrossScope } from 'src/gallery/utils/favorites-scope.js';
+import { galleryTimeBucketChecks, galleryTimeBucketOptions } from 'src/gallery/utils/timeline-scope.js';
 import { requireTimelineTagAccess } from 'src/gallery/utils/timeline-tag-access.js';
 import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';

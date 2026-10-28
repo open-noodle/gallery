@@ -15,8 +15,8 @@ import { GalleryServerController } from 'src/gallery/controllers/gallery-server.
 import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
-import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -38,8 +38,8 @@ import { GallerySearchService } from 'src/gallery/services/gallery-search.servic
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
-import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
+import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
