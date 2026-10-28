@@ -48,13 +48,13 @@ export class QueueMaintenanceRepository {
   }
 
   /**
-   * Removes job ids stuck in a queue's BullMQ "active" list that no longer have a backing job hash.
-   * These orphans (e.g. removeOnComplete racing stalled-recovery) permanently wedge a concurrency-1
-   * queue with no user-reachable recovery. We deliberately do NOT use `clean(0, _, 'active')`, which
-   * targets jobs by age and would kill legitimately-running jobs; instead we LREM only ids whose
-   * `getJob` returns nothing. A genuine in-flight job always has its hash, so it is never touched.
-   * Intended to run at bootstrap, before workers start.
-   */
+  Removes job ids stuck in a queue's BullMQ "active" list that no longer have a backing job hash.
+  These orphans (e.g. removeOnComplete racing stalled-recovery) permanently wedge a concurrency-1
+  queue with no user-reachable recovery. We deliberately do NOT use `clean(0, _, 'active')`, which
+  targets jobs by age and would kill legitimately-running jobs; instead we LREM only ids whose
+  `getJob` returns nothing. A genuine in-flight job always has its hash, so it is never touched.
+  Intended to run at bootstrap, before workers start.
+  */
   async removeOrphanedActiveJobs(name: QueueName): Promise<string[]> {
     const queue = this.getQueue(name);
     const activeKey = queue.toKey('active');
@@ -80,12 +80,12 @@ export class QueueMaintenanceRepository {
   }
 
   /**
-   * Removes failed jobs whose jobId starts with one of the given prefixes. Stable-jobId jobs that
-   * failed while `removeOnFail` was unset permanently occupy their dedup jobIds — BullMQ silently
-   * ignores any later add() with the same id, blocking every re-queue of that work. Collects all
-   * matches before removing anything: removal shifts the failed set's ranks, so a
-   * remove-while-paging walk would skip entries.
-   */
+  Removes failed jobs whose jobId starts with one of the given prefixes. Stable-jobId jobs that
+  failed while `removeOnFail` was unset permanently occupy their dedup jobIds — BullMQ silently
+  ignores any later add() with the same id, blocking every re-queue of that work. Collects all
+  matches before removing anything: removal shifts the failed set's ranks, so a
+  remove-while-paging walk would skip entries.
+  */
   async removeFailedJobsByJobIdPrefix(name: QueueName, prefixes: string[]): Promise<number> {
     const queue = this.getQueue(name);
     const pageSize = 1000;
@@ -105,17 +105,17 @@ export class QueueMaintenanceRepository {
   }
 
   /**
-   * True when a dedup chain is already running for the space — a pass-scoped follow-up
-   * (`space-dedup-<spaceId>-pass-<n>`, n >= 2) is queued, active, delayed, or paused on the
-   * FacialRecognition queue. The initial dedup trigger uses the bare `space-dedup-<spaceId>` id,
-   * which only de-duplicates concurrent triggers while pass 1 is still in flight; once a chain
-   * advances to pass-scoped follow-ups the bare id frees, so the next trigger would otherwise start a
-   * parallel chain (doubling work + reviving the removeOnComplete/stalled-recovery orphan race on the
-   * shared pass-scoped jobIds). {@link SharedSpaceService.handleSharedSpacePersonDedup} uses this to
-   * keep one chain per space. Relies on the FacialRecognition queue being concurrency 1: the gating
-   * pass-1 job is the only active dedup job and carries the bare id, never the `-pass-` prefix, so it
-   * never matches itself.
-   */
+  True when a dedup chain is already running for the space — a pass-scoped follow-up
+  (`space-dedup-<spaceId>-pass-<n>`, n >= 2) is queued, active, delayed, or paused on the
+  FacialRecognition queue. The initial dedup trigger uses the bare `space-dedup-<spaceId>` id,
+  which only de-duplicates concurrent triggers while pass 1 is still in flight; once a chain
+  advances to pass-scoped follow-ups the bare id frees, so the next trigger would otherwise start a
+  parallel chain (doubling work + reviving the removeOnComplete/stalled-recovery orphan race on the
+  shared pass-scoped jobIds). {@link SharedSpaceService.handleSharedSpacePersonDedup} uses this to
+  keep one chain per space. Relies on the FacialRecognition queue being concurrency 1: the gating
+  pass-1 job is the only active dedup job and carries the bare id, never the `-pass-` prefix, so it
+  never matches itself.
+  */
   async hasInFlightDedupChain(spaceId: string): Promise<boolean> {
     const prefix = `space-dedup-${spaceId}-pass-`;
     const jobs = await this.getQueue(QueueName.FacialRecognition).getJobs(

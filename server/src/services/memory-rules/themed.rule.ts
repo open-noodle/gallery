@@ -14,9 +14,9 @@ export const MAX_CANDIDATES = 3;
 export const SCORE_BASE = 70;
 
 /**
- * "Sunsets from 2023" — a curated CLIP theme (rotated by calendar month) resurfaced from a past
- * year via smart search. Never sees `maxDistance`; the port/adapter owns quality thresholding.
- */
+"Sunsets from 2023" — a curated CLIP theme (rotated by calendar month) resurfaced from a past
+year via smart search. Never sees `maxDistance`; the port/adapter owns quality thresholding.
+*/
 export class ThemedMemoryRule implements MemoryRule {
   readonly id = 'themed';
 

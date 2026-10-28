@@ -17,23 +17,23 @@ export interface SuggestionScopeOptions {
   spaceId?: string;
   timelineSpaceIds?: string[];
   /**
-   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
-   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
-   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
-   * the "is the Favourites section worth offering" answer has to span the same set the favourites
-   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
-   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
-   */
+  #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+  to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+  stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+  the "is the Favourites section worth offering" answer has to span the same set the favourites
+  filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+  OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+  */
   favoriteSpaceIds?: string[];
   takenAfter?: Date;
   takenBefore?: Date;
   /**
-   * Mirrors `AssetSearchBuilderOptions.visibility` (see `searchAssetBuilder` in `src/utils/database.ts`):
-   * a concrete value filters to exactly that visibility, `'not-locked'` excludes only Locked, and
-   * `undefined` applies no filter. The caller (SearchService) resolves this the same way it resolves
-   * search's own visibility — `dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined :
-   * 'not-locked')` — so suggestions cover the same asset set search would return (LOW #7).
-   */
+  Mirrors `AssetSearchBuilderOptions.visibility` (see `searchAssetBuilder` in `src/utils/database.ts`):
+  a concrete value filters to exactly that visibility, `'not-locked'` excludes only Locked, and
+  `undefined` applies no filter. The caller (SearchService) resolves this the same way it resolves
+  search's own visibility — `dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined :
+  'not-locked')` — so suggestions cover the same asset set search would return (LOW #7).
+  */
   visibility?: AssetVisibility | 'not-locked';
 }
 
@@ -48,11 +48,11 @@ interface FilterSuggestionFilterOptions {
   forceEmptyResult?: boolean;
   country?: string;
   /**
-   * State/province. A first-class facet key (not just an outer `getCities` predicate) so that an
-   * active state narrows *every* suggestion list — people, tags, camera makes, ratings, media types
-   * — the way `country` / `city` already do. The location group members that a list must NOT be
-   * narrowed by are excluded per call site via `without(...)`, never here.
-   */
+  State/province. A first-class facet key (not just an outer `getCities` predicate) so that an
+  active state narrows *every* suggestion list — people, tags, camera makes, ratings, media types
+  — the way `country` / `city` already do. The location group members that a list must NOT be
+  narrowed by are excluded per call site via `without(...)`, never here.
+  */
   state?: string;
   city?: string;
   make?: string;
@@ -60,10 +60,10 @@ interface FilterSuggestionFilterOptions {
   /** Lens model. Same reasoning as `state`, for the camera group. */
   lensModel?: string;
   /**
-   * Contributor filter: a plain `AND asset.ownerId = X` applied *inside* whatever scope
-   * `applySuggestionScope` resolved, so it can only ever shrink the suggestion set. It is NOT an
-   * ownership scope — see `SearchUserIdOptions.ownerId` for the same distinction on the search path.
-   */
+  Contributor filter: a plain `AND asset.ownerId = X` applied *inside* whatever scope
+  `applySuggestionScope` resolved, so it can only ever shrink the suggestion set. It is NOT an
+  ownership scope — see `SearchUserIdOptions.ownerId` for the same distinction on the search path.
+  */
   ownerId?: string;
   tagIds?: string[];
   rating?: number;
@@ -145,10 +145,10 @@ export async function getFilteredIdentityPeople(
 }
 
 /**
- * {@link getFilteredIdentityPeople} plus, per person, the number of filtered assets that show the identity and the
- * identity id (to mark the selected ones). The count runs through `face_identity_face`, the join a `person:` /
- * `space-person:` filter token resolves to, so it is the result count that adding this person would leave.
- */
+{@link getFilteredIdentityPeople} plus, per person, the number of filtered assets that show the identity and the
+identity id (to mark the selected ones). The count runs through `face_identity_face`, the join a `person:` /
+`space-person:` filter token resolves to, so it is the result count that adding this person would leave.
+*/
 export async function getFilteredIdentityPeopleWithCounts(
   filteredIds: SelectQueryBuilder<DB, 'asset', { id: string }>,
   userId: string,
@@ -880,9 +880,9 @@ export class FilterSuggestionRepository {
   }
 
   /**
-   * #910: presence probes for the Favourites / Albums sections. `limit 1` rather than an aggregate so
-   * Postgres stops at the first matching row — the answer is "does one exist", not "how many".
-   */
+  #910: presence probes for the Favourites / Albums sections. `limit 1` rather than an aggregate so
+  Postgres stops at the first matching row — the answer is "does one exist", not "how many".
+  */
   private async getFilteredHasFavorites(userIds: string[], options: FilterSuggestionsOptions): Promise<boolean> {
     const row = await this.db
       .selectFrom('asset')

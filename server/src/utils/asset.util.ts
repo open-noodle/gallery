@@ -33,14 +33,14 @@ export const getAssetFiles = (files: AssetFile[]) => ({
 });
 
 /**
- * How the caller wants the assets gated.
- *
- * `ownerOnly` exists because upstream expresses "only the asset's owner may do this" as
- * `Permission.AssetUpdate`, and in this fork that permission ALSO admits space editors — see
- * `utils/access.ts`. Adopting upstream's constant verbatim therefore widens the rule instead of
- * applying it. Rather than mint a public `Permission` value for the narrow case (permissions are
- * API-key scopes, so a new one is public surface), callers that mean owner-only say so directly.
- */
+How the caller wants the assets gated.
+
+`ownerOnly` exists because upstream expresses "only the asset's owner may do this" as
+`Permission.AssetUpdate`, and in this fork that permission ALSO admits space editors — see
+`utils/access.ts`. Adopting upstream's constant verbatim therefore widens the rule instead of
+applying it. Rather than mint a public `Permission` value for the narrow case (permissions are
+API-key scopes, so a new one is public surface), callers that mean owner-only say so directly.
+*/
 type AddAssetsAccess = { permission: Permission } | { ownerOnly: true };
 
 export const addAssets = async (
@@ -278,17 +278,17 @@ export interface FaceBoxInOriginalSpace {
 }
 
 /**
- * Converts a face box drawn on a (possibly edited) preview image into the coordinate space of the
- * ORIGINAL, unedited asset. Coordinates a client sends always describe the edited preview it
- * rendered, never the original bytes on disk, so this must run before a box is persisted.
- *
- * Single implementation shared by the owner's `PersonService.createFace` and the space
- * face-assign endpoint (`SharedSpaceService.createSpaceAssetFace`, design doc §6.5) so the two
- * can never drift on this geometry -- a drift here silently misplaces boxes.
- *
- * Throws `BadRequestException`, matching the owner path's message, when the asset carries edits
- * but its dimensions are unavailable to compute the inverse transform.
- */
+Converts a face box drawn on a (possibly edited) preview image into the coordinate space of the
+ORIGINAL, unedited asset. Coordinates a client sends always describe the edited preview it
+rendered, never the original bytes on disk, so this must run before a box is persisted.
+
+Single implementation shared by the owner's `PersonService.createFace` and the space
+face-assign endpoint (`SharedSpaceService.createSpaceAssetFace`, design doc §6.5) so the two
+can never drift on this geometry -- a drift here silently misplaces boxes.
+
+Throws `BadRequestException`, matching the owner path's message, when the asset carries edits
+but its dimensions are unavailable to compute the inverse transform.
+*/
 export const convertFaceBoxToOriginalImageSpace = (
   box: FaceBoxDraft,
   asset: FaceBoxDraftAsset,

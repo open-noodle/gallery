@@ -1,25 +1,25 @@
 /**
- * #1041 — "hide from timeline" ROLE × OWNERSHIP × PATH matrix.
- *
- * `hidden-album-timeline.medium.spec.ts` proves the RULES (S1-S16, E1-E17) with a single
- * actor who is always the space's creator. This file proves the rules are INDEPENDENT OF ROLE
- * and of who owns the photo, which is the other half of the claim in §2 of the design doc:
- *
- *   - the two "my timeline" switches are per-member preferences, so an Owner, an Editor and a
- *     Viewer must all be able to flip them, with identical effect;
- *   - each one subtracts BOTH the actor's own photos and their peers' photos from the ACTOR's
- *     timeline, because "hide" is about what I see, not about what I own;
- *   - neither one changes any other member's timeline, whatever the actor's role;
- *   - the SHARED `shared_space_album.showInTimeline` flag is the mirror image: Editor+ only, and
- *     it changes the space's own Photos tab for everyone while changing NOBODY's timeline.
- *
- * Everything here goes through SharedSpaceService (not the repository), so the role gate is
- * genuinely exercised, and reads go through TimelineService so the assertion is what the user
- * would actually see on /photos.
- *
- * Deliberately mutation-checked: every "absent" assertion below was observed to fail when the
- * corresponding switch was left un-flipped, so none of them can pass vacuously.
- */
+#1041 — "hide from timeline" ROLE × OWNERSHIP × PATH matrix.
+
+`hidden-album-timeline.medium.spec.ts` proves the RULES (S1-S16, E1-E17) with a single
+actor who is always the space's creator. This file proves the rules are INDEPENDENT OF ROLE
+and of who owns the photo, which is the other half of the claim in §2 of the design doc:
+
+  - the two "my timeline" switches are per-member preferences, so an Owner, an Editor and a
+    Viewer must all be able to flip them, with identical effect;
+  - each one subtracts BOTH the actor's own photos and their peers' photos from the ACTOR's
+    timeline, because "hide" is about what I see, not about what I own;
+  - neither one changes any other member's timeline, whatever the actor's role;
+  - the SHARED `shared_space_album.showInTimeline` flag is the mirror image: Editor+ only, and
+    it changes the space's own Photos tab for everyone while changing NOBODY's timeline.
+
+Everything here goes through SharedSpaceService (not the repository), so the role gate is
+genuinely exercised, and reads go through TimelineService so the assertion is what the user
+would actually see on /photos.
+
+Deliberately mutation-checked: every "absent" assertion below was observed to fail when the
+corresponding switch was left un-flipped, so none of them can pass vacuously.
+*/
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -117,18 +117,18 @@ const spaceTab = async (
 };
 
 /**
- * One space, three members, and four assets covering the ownership × path grid:
- *
- *   ownViaAlbum   — the ACTOR owns it; reaches the space as a cross-owner CONTRIBUTION
- *                   (`album_space_asset`) to the linked album  → hiddenAlbumSpacePairs arm
- *   peerViaAlbum  — the HOST owns it; reaches the space as normal album content
- *                   (`album_asset`)                            → hiddenAlbumIds arm
- *   ownDirect     — the ACTOR owns it; added straight to the space (`shared_space_asset`)
- *   peerDirect    — the HOST owns it; added straight to the space
- *
- * `bystander` is a second Viewer who never touches a switch: every test asserts their timeline is
- * unchanged, which is what makes "this is MY preference" a claim and not a slogan.
- */
+One space, three members, and four assets covering the ownership × path grid:
+
+  ownViaAlbum   — the ACTOR owns it; reaches the space as a cross-owner CONTRIBUTION
+                  (`album_space_asset`) to the linked album  → hiddenAlbumSpacePairs arm
+  peerViaAlbum  — the HOST owns it; reaches the space as normal album content
+                  (`album_asset`)                            → hiddenAlbumIds arm
+  ownDirect     — the ACTOR owns it; added straight to the space (`shared_space_asset`)
+  peerDirect    — the HOST owns it; added straight to the space
+
+`bystander` is a second Viewer who never touches a switch: every test asserts their timeline is
+unchanged, which is what makes "this is MY preference" a claim and not a slogan.
+*/
 const buildWorld = async (ctx: MediumTestContext, actorRole: SharedSpaceRole) => {
   const { user: host } = await ctx.newUser();
   const { user: actor } = await ctx.newUser();

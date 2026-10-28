@@ -44,6 +44,7 @@ const axisEmbedding = (axis: 'first' | 'second') => {
   return '[' + values.join(',') + ']';
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   const { ctx, sut } = newMediumService(PersonService, {
     database: db || defaultDatabase,
@@ -80,6 +81,7 @@ const setup = (db?: Kysely<DB>) => {
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository) };
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupSharedSpace = (db?: Kysely<DB>) => {
   const { ctx, sut } = newMediumService(SharedSpaceService, {
     database: db || defaultDatabase,
@@ -144,6 +146,7 @@ const drainSharedSpaceFaceMatchFromBackfillJobs = async (
   }
 };
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setupSearch = (db?: Kysely<DB>) => {
   const { ctx, sut } = newMediumService(SearchService, {
     database: db || defaultDatabase,

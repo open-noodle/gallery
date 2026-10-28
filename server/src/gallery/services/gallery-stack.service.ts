@@ -6,12 +6,12 @@ import { BaseService } from 'src/services/base.service.js';
 @Injectable()
 export class GalleryStackService extends BaseService {
   /**
-   * Trashing a stack's cover hid the whole stack: the timeline shows a stack through its primary asset, and
-   * upstream only promotes a new primary on permanent deletion (`handleAssetDeletion`). Promote the first
-   * remaining member when a primary is trashed, the same choice permanent deletion makes (#1187). The stack is
-   * kept, so restoring a trashed member puts it back. Every trash path (bulk delete, duplicate resolve,
-   * integrity) emits `AssetTrashAll`.
-   */
+  Trashing a stack's cover hid the whole stack: the timeline shows a stack through its primary asset, and
+  upstream only promotes a new primary on permanent deletion (`handleAssetDeletion`). Promote the first
+  remaining member when a primary is trashed, the same choice permanent deletion makes (#1187). The stack is
+  kept, so restoring a trashed member puts it back. Every trash path (bulk delete, duplicate resolve,
+  integrity) emits `AssetTrashAll`.
+  */
   @OnEvent({ name: 'AssetTrashAll' })
   async onAssetsTrash({ assetIds }: ArgOf<'AssetTrashAll'>): Promise<void> {
     const trashed = new Set(assetIds);

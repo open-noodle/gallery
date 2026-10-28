@@ -64,25 +64,25 @@ import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
 
 /**
- * S9 (F19): upper bound on how long a forced `handleQueueRecognizeFaces` run waits for the
- * concurrency-1 PeopleBackfill queue before giving up and proceeding anyway. PeopleBackfill also
- * carries the person/space-person suggestion-scan sweep (F17/F18), which can legitimately take a
- * while on a large library — generous enough not to abandon a real drain in progress, bounded so a
- * forced recognition run is never wedged indefinitely behind it.
- */
+S9 (F19): upper bound on how long a forced `handleQueueRecognizeFaces` run waits for the
+concurrency-1 PeopleBackfill queue before giving up and proceeding anyway. PeopleBackfill also
+carries the person/space-person suggestion-scan sweep (F17/F18), which can legitimately take a
+while on a large library — generous enough not to abandon a real drain in progress, bounded so a
+forced recognition run is never wedged indefinitely behind it.
+*/
 const PEOPLE_BACKFILL_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
- * Gallery: upstream's person sharing (immich-31620) is pulled but dormant. Its model needs several `person` rows per
- * person group, which Option M's `person_personGroupId_key` forbids, and it shares only inside a cluster group, which
- * Gallery keeps inert. See specs/2026-10-01-upstream-person-sharing-dormant-design.md.
- */
+Gallery: upstream's person sharing (immich-31620) is pulled but dormant. Its model needs several `person` rows per
+person group, which Option M's `person_personGroupId_key` forbids, and it shares only inside a cluster group, which
+Gallery keeps inert. See specs/2026-10-01-upstream-person-sharing-dormant-design.md.
+*/
 export const personSharingUnsupported = () => new BadRequestException('Person sharing is not available in Gallery');
 
 /**
- * Upstream lets `userId` address another owner's row of the same person through a `person_user` grant. Gallery's
- * person access is owner-only, so an override naming anyone else would bypass it: refuse it.
- */
+Upstream lets `userId` address another owner's row of the same person through a `person_user` grant. Gallery's
+person access is owner-only, so an override naming anyone else would bypass it: refuse it.
+*/
 const assertOwnRecord = (auth: AuthDto, userId: string | undefined) => {
   if (userId !== undefined && userId !== auth.user.id) {
     throw personSharingUnsupported();
@@ -1062,15 +1062,15 @@ export class PersonService extends BaseService {
   }
 
   /**
-   * Multi-person bulk merge (upstream's cluster-group `mergePeople`, adopted inert). Upstream's own
-   * "merge an ordered list of people into a single person" contract already reduces to a single
-   * target: `ids[0]` is that person, everything after it merges into it — exactly what
-   * {@link mergePerson} does, cross-owner authorizer included. An earlier per-owner grouping here
-   * (splitting `ids` into same-owner clusters) silently no-opped a target/source pair that
-   * belonged to different owners instead of merging them, which broke the fork's real cross-owner
-   * flow (#733: a personal merge that reaches into another owner's identity). Delegating directly
-   * avoids that trap and matches `origin/main`'s `mergePerson` behavior.
-   */
+  Multi-person bulk merge (upstream's cluster-group `mergePeople`, adopted inert). Upstream's own
+  "merge an ordered list of people into a single person" contract already reduces to a single
+  target: `ids[0]` is that person, everything after it merges into it — exactly what
+  {@link mergePerson} does, cross-owner authorizer included. An earlier per-owner grouping here
+  (splitting `ids` into same-owner clusters) silently no-opped a target/source pair that
+  belonged to different owners instead of merging them, which broke the fork's real cross-owner
+  flow (#733: a personal merge that reaches into another owner's identity). Delegating directly
+  avoids that trap and matches `origin/main`'s `mergePerson` behavior.
+  */
   async mergePeople(auth: AuthDto, { ids, confirmCrossOwner }: MergePersonDto): Promise<BulkIdResponseDto[]> {
     if (ids.length < 2) {
       throw new BadRequestException('At least two people are required for merging');
