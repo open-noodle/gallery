@@ -1,0 +1,132 @@
+import { createZodDto } from 'nestjs-zod';
+import z from 'zod';
+import { DissolveScope } from 'src/gallery/utils/face-dissolve.js';
+
+// Named, not anonymous: without an id oazapfts emits a bare `enum Scope` into the SDK, squatting a generic
+// name (OAuth/permission scope) that a later endpoint will want — and a published SDK export cannot be
+// renamed without a breaking change.
+const DissolveScopeSchema = z.enum(DissolveScope).describe('Which faces a dissolve touches').meta({
+  id: 'DissolveScope',
+});
+
+export const DissolveRequestSchema = z
+  .object({
+    scope: DissolveScopeSchema,
+    expectedFaceCount: z.number().int().min(0),
+  })
+  .meta({ id: 'DissolveRequestDto' });
+
+export class DissolveRequestDto extends createZodDto(DissolveRequestSchema) {}
+export type DissolveRequest = z.infer<typeof DissolveRequestSchema>;
+
+// Every number here is a row count. `.int()` rather than a bare `z.number()`: patchOpenAPI rejects a
+// `type: number` property that carries no format, on the grounds that an unformatted number is almost
+// always an integer someone forgot to declare — and these are.
+const DissolveCountsSchema = z.object({
+  faces: z.number().int().describe('Every in-scope face; the apply must be sent this as expectedFaceCount'),
+  hide: z.number().int().describe('Detected faces that will be hidden, and can be restored'),
+  delete: z.number().int().describe('Imported metadata faces that will be deleted, their photos re-scanned'),
+  keep: z.number().int().describe('Hand-drawn or manual faces that will be unassigned and kept on the photo'),
+  softDeleted: z.number().int(),
+  assets: z.number().int(),
+  rescanAssets: z.number().int().describe('Photos re-scanned: those of the deleted faces'),
+  sharedAssets: z.number().int(),
+  notRedetectable: z.number().int(),
+  remainingFaces: z.number().int().describe('Faces of the person outside the selection'),
+  personRemoved: z.boolean(),
+  spacePersonsRemoved: z.number().int(),
+  spacePersonsKept: z.number().int().describe('Space persons that also hold other photos and will remain'),
+  spacesKept: z.number().int(),
+});
+
+const DissolveWarningSchema = z.object({ code: z.string(), count: z.number().int() });
+
+export const DissolveResponseSchema = z
+  .object({
+    personId: z.string(),
+    counts: DissolveCountsSchema,
+    expectedFaceCount: z.number().int(),
+    warnings: z.array(DissolveWarningSchema),
+    dissolveId: z.string().optional().describe('The restore record, set by an apply that touched any face'),
+  })
+  .meta({ id: 'DissolveResponseDto' });
+
+export class DissolveResponseDto extends createZodDto(DissolveResponseSchema) {}
+export type DissolveResponse = z.infer<typeof DissolveResponseSchema>;
+export type DissolveWarning = z.infer<typeof DissolveWarningSchema>;
+
+// Discovery (Task 8): the contamination signal. The only existing people endpoint is the move-to-person
+// picker (searchOwnerPeople) — it has no way to surface a person made entirely of EXIF faces, since no scan
+// ever flags one. This aggregate is what makes such a person findable at all.
+export const PeopleHealthQuerySchema = z
+  .object({
+    // Required, not optional. Without it the aggregate GROUPs BY person.id over every visible asset_face row
+    // on the instance and ORDERs BY an aggregate alias, so LIMIT/OFFSET prune nothing and each page re-runs
+    // the whole thing. The only client always sends it, so requiring it costs nothing and removes the
+    // unbounded case from the API surface entirely.
+    ownerId: z.uuid(),
+    // A literal union, not an inline z.enum — an anonymous enum gets renumbered by oazapfts on regeneration.
+    sort: z
+      .union([z.literal('exifFaces'), z.literal('facesWithoutEmbedding'), z.literal('faceCount')])
+      .default('faceCount'),
+    page: z.coerce.number().int().min(1).default(1).describe('Page number'),
+    size: z.coerce.number().int().min(1).max(200).default(50).describe('Number of people per page'),
+  })
+  .meta({ id: 'PeopleHealthQueryDto' });
+export class PeopleHealthQueryDto extends createZodDto(PeopleHealthQuerySchema) {}
+export type PeopleHealthQuery = z.infer<typeof PeopleHealthQuerySchema>;
+
+const PersonHealthRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  ownerId: z.string(),
+  faceCount: z.number().int(),
+  machineLearning: z.number().int(),
+  exif: z.number().int(),
+  manual: z.number().int(),
+  facesWithoutEmbedding: z.number().int(),
+});
+
+export const PeopleHealthResponseSchema = z
+  .object({
+    people: z.array(PersonHealthRowSchema),
+    total: z.number().int(),
+    hasMore: z.boolean(),
+  })
+  .meta({ id: 'PeopleHealthResponseDto' });
+export class PeopleHealthResponseDto extends createZodDto(PeopleHealthResponseSchema) {}
+export type PeopleHealthResponse = z.infer<typeof PeopleHealthResponseSchema>;
+
+export const DissolveListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1).describe('Page number'),
+    size: z.coerce.number().int().min(1).max(200).default(50).describe('Number of dissolves per page'),
+  })
+  .meta({ id: 'DissolveListQueryDto' });
+export class DissolveListQueryDto extends createZodDto(DissolveListQuerySchema) {}
+export type DissolveListQuery = z.infer<typeof DissolveListQuerySchema>;
+
+const DissolveRecordSchema = z.object({
+  id: z.string(),
+  ownerId: z.string(),
+  ownerName: z.string(),
+  personName: z.string(),
+  scope: z.string(),
+  hiddenCount: z.number().int(),
+  deletedCount: z.number().int(),
+  unassignedCount: z.number().int(),
+  restorableCount: z.number().int().describe('Hidden faces a restore would still bring back'),
+  createdAt: z.string().meta({ format: 'date-time' }),
+  restoredAt: z.string().meta({ format: 'date-time' }).nullable(),
+});
+
+export const DissolveListResponseSchema = z
+  .object({ items: z.array(DissolveRecordSchema), hasMore: z.boolean() })
+  .meta({ id: 'DissolveListResponseDto' });
+export class DissolveListResponseDto extends createZodDto(DissolveListResponseSchema) {}
+
+export const DissolveRestoreResponseSchema = z
+  .object({ restored: z.number().int(), skipped: z.number().int() })
+  .meta({ id: 'DissolveRestoreResponseDto' });
+export class DissolveRestoreResponseDto extends createZodDto(DissolveRestoreResponseSchema) {}
+export type DissolveListResponse = z.infer<typeof DissolveListResponseSchema>;

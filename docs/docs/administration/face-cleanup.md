@@ -175,6 +175,42 @@ cluster strongly enough to make a safe assignment. Those faces are left alone on
 arbitrary cluster would create new errors. They appear in the **Unattributable** stat tile and count towards the
 totals, but they are never presented for action.
 
+## Dissolving a person
+
+Sometimes a whole person is wrong, not just a few of its faces. Face recognition can chain small, blurry or non-face
+detections (patterns, toys, backs of heads) into a person that keeps growing with every run, and importing faces
+from file metadata can fill a real person with regions that are not them. **Dissolve** takes such a person apart.
+
+To find the person, give it a name on the People page first (for example "junk 1"), then search for that name under
+**Manual review** and open it. The **Dissolve** button is in the page header.
+
+Choose which faces to dissolve: **All faces**, **From metadata**, **Detected**, or **No embedding**. Each face then
+gets the treatment that keeps it from coming back:
+
+| Face                         | What happens                                                       |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Detected by face recognition | Hidden as "not a face". Recognition and re-scans skip it for good. |
+| Imported from file metadata  | Deleted, and its photo scanned again for a real face.              |
+| Drawn by hand                | Unassigned and left on the photo, ready to be named again.         |
+
+When no face is left on the person, the person is removed. Its copies in Spaces lose the same faces, and a Space
+person with nothing left is removed too. The preview tells you how many Space people remain because they also
+hold other photos.
+
+Real faces caught in a junk person are hidden along with it. To keep one, move it to the right person before you
+dissolve.
+
+### Restoring a dissolve
+
+**View dissolved** on the scan page opens `Administration → Face cleanup → Dissolved`, a list of every dissolve
+with how many hidden faces can still be brought back. **Restore** returns them as unnamed faces, and face
+recognition sorts them again on its next run, so they will most likely group the way they did before.
+
+Restore brings back faces, not the person: the dissolved person's name and birthday, and any Space people the
+dissolve removed, are gone for good. Deleted imported faces cannot be restored either. The dissolve dialog lists
+these under **Cannot be undone** before you confirm. A full **Detect faces (All)** run deletes every detected face, hidden
+ones included, so after one a dissolve has nothing left to restore.
+
 ## Advanced scan
 
 The **Advanced** button next to Re-scan opens a tuning modal for a single scan run. Three knobs are exposed,

@@ -10,6 +10,7 @@ import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.co
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -21,6 +22,7 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -93,6 +95,7 @@ export const galleryRepositories = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  FaceDissolveRepository,
 ];
 
 export const galleryServices = [
@@ -101,6 +104,7 @@ export const galleryServices = [
   BackupStoreResolver,
   AssetVisibilityTransitionService,
   ClassificationService,
+  FaceDissolveService,
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,

@@ -615,6 +615,27 @@ export type FaceRepairDeclineRequestDto = {
 export type FaceRepairDeclineCreatedDto = {
     created: number;
 };
+export type DissolveListResponseDto = {
+    hasMore: boolean;
+    items: {
+        createdAt: string;
+        deletedCount: number;
+        hiddenCount: number;
+        id: string;
+        ownerId: string;
+        ownerName: string;
+        personName: string;
+        /** Hidden faces a restore would still bring back */
+        restorableCount: number;
+        restoredAt: string | null;
+        scope: string;
+        unassignedCount: number;
+    }[];
+};
+export type DissolveRestoreResponseDto = {
+    restored: number;
+    skipped: number;
+};
 export type FaceRepairOwnerPeopleResponseDto = {
     hasMore: boolean;
     people: {
@@ -631,12 +652,63 @@ export type FaceRepairOwnerPersonCreateRequestDto = {
 export type FaceRepairOwnerPersonCreatedResponseDto = {
     id: string;
 };
+export type PeopleHealthResponseDto = {
+    hasMore: boolean;
+    people: {
+        exif: number;
+        faceCount: number;
+        facesWithoutEmbedding: number;
+        id: string;
+        machineLearning: number;
+        manual: number;
+        name: string;
+        ownerId: string;
+    }[];
+    total: number;
+};
 export type FaceRepairPersonMetadataResponseDto = {
     faceCount: number;
     id: string;
     name: string;
     ownerId: string;
     thumbnailFaceId: string | null;
+};
+export type DissolveRequestDto = {
+    expectedFaceCount: number;
+    scope: DissolveScope;
+};
+export type DissolveResponseDto = {
+    counts: {
+        assets: number;
+        /** Imported metadata faces that will be deleted, their photos re-scanned */
+        "delete": number;
+        /** Every in-scope face; the apply must be sent this as expectedFaceCount */
+        faces: number;
+        /** Detected faces that will be hidden, and can be restored */
+        hide: number;
+        /** Hand-drawn or manual faces that will be unassigned and kept on the photo */
+        keep: number;
+        notRedetectable: number;
+        personRemoved: boolean;
+        /** Faces of the person outside the selection */
+        remainingFaces: number;
+        /** Photos re-scanned: those of the deleted faces */
+        rescanAssets: number;
+        sharedAssets: number;
+        softDeleted: number;
+        /** Space persons that also hold other photos and will remain */
+        spacePersonsKept: number;
+        spacePersonsRemoved: number;
+        spacesKept: number;
+    };
+    /** The restore record, set by an apply that touched any face */
+    dissolveId?: string;
+    expectedFaceCount: number;
+    personId: string;
+    warnings: {
+        code: string;
+        count: number;
+    }[];
 };
 export type FaceRepairResolutionsListDto = {
     resolutions: {
@@ -5659,6 +5731,37 @@ export function declineFaceRepair({ faceRepairDeclineRequestDto }: {
     })));
 }
 /**
+ * List dissolved people, newest first, with how many hidden faces can still be restored
+ */
+export function getFaceDissolves({ page, size }: {
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: DissolveListResponseDto;
+    }>(`/admin/face-repair/dissolves${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Restore the faces a dissolve hid, as unnamed faces
+ */
+export function restoreFaceDissolve({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveRestoreResponseDto;
+    }>(`/admin/face-repair/dissolves/${encodeURIComponent(id)}/restore`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Get an admin face-repair source photo
  */
 export function getFaceRepairFacePreview({ assetFaceId }: {
@@ -5719,6 +5822,27 @@ export function createFaceRepairOwnerPerson({ ownerId, faceRepairOwnerPersonCrea
     })));
 }
 /**
+ * List people with per-source face counts, to find a person worth dissolving
+ */
+export function getFaceRepairPeopleHealth({ ownerId, page, size, sort }: {
+    ownerId: string;
+    page?: number;
+    size?: number;
+    sort?: "exifFaces" | "facesWithoutEmbedding" | "faceCount";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleHealthResponseDto;
+    }>(`/admin/face-repair/people${QS.query(QS.explode({
+        ownerId,
+        page,
+        size,
+        sort
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * Get a person for manual review
  */
 export function getFaceRepairPersonMetadata({ personId }: {
@@ -5730,6 +5854,38 @@ export function getFaceRepairPersonMetadata({ personId }: {
     }>(`/admin/face-repair/person/${encodeURIComponent(personId)}`, {
         ...opts
     }));
+}
+/**
+ * Dissolve a person
+ */
+export function dissolvePerson({ personId, dissolveRequestDto }: {
+    personId: string;
+    dissolveRequestDto: DissolveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveResponseDto;
+    }>(`/admin/face-repair/person/${encodeURIComponent(personId)}/dissolve`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: dissolveRequestDto
+    })));
+}
+/**
+ * Preview what dissolving a person would change
+ */
+export function previewDissolvePerson({ personId, dissolveRequestDto }: {
+    personId: string;
+    dissolveRequestDto: DissolveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveResponseDto;
+    }>(`/admin/face-repair/person/${encodeURIComponent(personId)}/dissolve/preview`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: dissolveRequestDto
+    })));
 }
 /**
  * List face-repair resolutions (negative verdicts from both engines)
@@ -11604,6 +11760,12 @@ export enum ReleaseChannel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
+}
+export enum DissolveScope {
+    All = "all",
+    Exif = "exif",
+    MachineLearning = "machine-learning",
+    WithoutEmbedding = "without-embedding"
 }
 export enum Recommendation {
     Confident = "confident",

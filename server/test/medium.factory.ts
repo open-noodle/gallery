@@ -22,6 +22,7 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -663,6 +664,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case ClusterGroupRepository:
     case DownloadRepository:
     case DuplicateRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FaceRepairDeclineRepository:
     case FilterSuggestionRepository:
@@ -764,6 +766,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case ClassificationRepository:
     case ConfigRepository:
     case CryptoRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
     case FilterSuggestionRepository:
