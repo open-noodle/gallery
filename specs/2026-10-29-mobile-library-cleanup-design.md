@@ -439,6 +439,9 @@ calendar day labels) rather than adding mobile copies.
     Pending rewind marks are stored separately in a fork-owned file in the app's documents directory, not in the
     store, because they can be large.
   - `pubspec.yaml` / `pubspec.lock`: the `flutter_timezone` dependency.
+  - `services/api.service.dart`: `late CleanupApi cleanupApi;` and `late DuplicatesApi duplicatesApi;` plus their two
+    initialiser lines, next to the fork's existing `sharedSpacesApi` (the client is private, so fork APIs are
+    declared there).
 - Nothing else upstream: no settings switch, no timeline or viewer hook. A slice that finds it needs another upstream
   touch stops and raises it.
 - Every slice that touches an upstream file reports `git diff --stat refs/upstream/vX.Y.Z -- <file>` before and after
@@ -650,7 +653,7 @@ stamp and button row); `pages/rewind.page.dart`; `pages/rewind_finish.page.dart`
 **Behaviours:**
 - Year sections newest first with "X years ago · city · N photos" and "Keep the rest" (marks every untouched photo of
   that year as keep).
-- A tap cycles keep → trash → none; a long press opens the details sheet.
+- A tap cycles none → keep → favourite → trash → none; a long press opens the details sheet.
 - Switching deck ↔ grid keeps every mark and the position.
 - Done, the finish screen and the close guard behave as in Slice 3.
 - "Review the N first" on the finish screen opens this grid filtered to trash marks; a tap rescues one.
