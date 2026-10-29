@@ -35,7 +35,7 @@ const ids = (count: number, prefix = 'id') => Array.from({ length: count }, (_, 
 describe('cleanup actions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: [] });
     mocks.sdk.commitCleanup.mockImplementation(({ cleanupCommitDto }) =>
       Promise.resolve({ trashed: cleanupCommitDto.trashIds ?? [], kept: 0, favorited: 0, skipped: [] }),
     );
@@ -70,7 +70,7 @@ describe('cleanup actions', () => {
     });
 
     it('warns about Space photos and commits nothing when the user cancels', async () => {
-      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'] });
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'], externalAssetIds: [] });
       mocks.showDialog.mockResolvedValue(false);
       const onRemoved = vi.fn();
 
@@ -85,12 +85,35 @@ describe('cleanup actions', () => {
     });
 
     it('commits after the warning when the user confirms', async () => {
-      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'] });
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'], externalAssetIds: [] });
 
       await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
 
       expect(mocks.showDialog).toHaveBeenCalled();
       expect(mocks.sdk.commitCleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns that external-library photos come back at the next scan, before committing', async () => {
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: ['a'] });
+      mocks.showDialog.mockResolvedValue(false);
+
+      await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: 'cleanup_external_library_warning', confirmColor: 'danger' }),
+      );
+      expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    });
+
+    it('puts the Space and external-library warnings in one confirmation', async () => {
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'], externalAssetIds: ['a'] });
+
+      await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).toHaveBeenCalledTimes(1);
+      expect(mocks.showDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: 'cleanup_space_warning cleanup_external_library_warning' }),
+      );
     });
 
     it('skips the warning when nothing is in a Space', async () => {
@@ -227,7 +250,7 @@ describe('cleanup actions', () => {
     });
 
     it('adds the Space sentence to the one permanent-delete confirmation', async () => {
-      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'] });
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'], externalAssetIds: [] });
 
       await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
 
@@ -237,6 +260,16 @@ describe('cleanup actions', () => {
           prompt: 'cleanup_permanent_delete_prompt cleanup_permanent_delete_space_warning',
           confirmText: 'permanently_delete',
         }),
+      );
+    });
+
+    it('adds the external-library sentence to the permanent-delete confirmation', async () => {
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: ['a'] });
+
+      await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: 'cleanup_permanent_delete_prompt cleanup_external_library_warning' }),
       );
     });
 

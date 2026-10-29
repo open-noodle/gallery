@@ -476,6 +476,7 @@
   "cleanup_explainer_nothing_deleted": "Rien n'est supprimé tant que vous n'avez pas cliqué sur <b>Terminer</b> ou <b>Mettre à la corbeille</b>.",
   "cleanup_explainer_open": "Qu'est-ce que la Rétrospective ?",
   "cleanup_explainer_title": "Chaque {date}, au même endroit",
+  "cleanup_external_library_warning": "{count, plural, one {# photo provient} other {# photos proviennent}} d'une bibliothèque externe. Si le serveur ne peut que lire ce dossier, {count, plural, one {elle réapparaîtra} other {elles réapparaîtront}} à la prochaine analyse de la bibliothèque et aucun espace ne sera libéré.",
   "cleanup_finish_day": "Terminer la journée",
   "cleanup_finish_day_failed": "Impossible de terminer la journée. Vos marques sont conservées.",
   "cleanup_finish_day_named": "Terminer le {date}",

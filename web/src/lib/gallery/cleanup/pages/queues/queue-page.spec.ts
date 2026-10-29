@@ -83,7 +83,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.authenticated = false;
   mocks.sdk.getCleanupQueueCount.mockResolvedValue({ count: 3, bytes: 300 });
-  mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [] });
+  mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: [] });
   mocks.sdk.commitCleanup.mockImplementation(({ cleanupCommitDto }) =>
     Promise.resolve({ trashed: cleanupCommitDto.trashIds ?? [], kept: 0, favorited: 0, skipped: [] }),
   );
@@ -153,7 +153,7 @@ describe('blurry queue', () => {
 
   it('keeps nothing and trashes nothing when the Space warning is cancelled', async () => {
     mocks.sdk.getCleanupQueue.mockResolvedValue(page([asset('a')]));
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(false);
     renderBlurry();
     await waitFor(() => expect(item('a')).toBeInTheDocument());

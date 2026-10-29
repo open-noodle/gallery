@@ -59,7 +59,7 @@ beforeAll(async () => {
 
 describe(CleanupRepository.name, () => {
   describe('getCalendarCounts / scope rules', () => {
-    it('counts in-scope assets per month/day and excludes every out-of-scope kind', async () => {
+    it('counts in-scope assets per month/day, external-library ones included, and excludes every out-of-scope kind', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { user: other } = await ctx.newUser();
@@ -75,20 +75,20 @@ describe(CleanupRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id, localDateTime: d, visibility: AssetVisibility.Locked });
       await ctx.newAsset({ ownerId: user.id, localDateTime: d, isOffline: true });
       await ctx.newAsset({ ownerId: other.id, localDateTime: d });
-      // external library asset
+      // An external-library photo is in scope like any other.
       const { library } = await ctx.newLibrary({ ownerId: user.id });
-      await ctx.newAsset({ ownerId: user.id, localDateTime: d, libraryId: library.id });
+      const keepExternal = await ctx.newAsset({ ownerId: user.id, localDateTime: d, libraryId: library.id });
       const leap = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date('2020-02-29T08:00:00Z') });
 
       const rows = await sut.getCalendarCounts(user.id);
       expect(rows).toEqual(
         expect.arrayContaining([
-          { monthDay: 923, assetCount: 2 },
+          { monthDay: 923, assetCount: 3 },
           { monthDay: 229, assetCount: 1 },
         ]),
       );
-      expect(rows.find((r) => r.monthDay === 923)!.assetCount).toBe(2);
-      expect([keepA, keepArchived, leap]).toHaveLength(3);
+      expect(rows.find((r) => r.monthDay === 923)!.assetCount).toBe(3);
+      expect([keepA, keepArchived, keepExternal, leap]).toHaveLength(4);
     });
 
     it('counts stack members towards the calendar even though queues would exclude them', async () => {
@@ -339,7 +339,7 @@ describe(CleanupRepository.name, () => {
   });
 
   describe('getTrashTotals', () => {
-    it('counts only trashed, owned, non-external assets and sums exif size', async () => {
+    it('counts only trashed, owned assets, external-library ones included, and sums exif size', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { user: other } = await ctx.newUser();
@@ -361,7 +361,7 @@ describe(CleanupRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id });
       // another user's trashed asset
       await ctx.newAsset({ ownerId: other.id, deletedAt: new Date(), status: AssetStatus.Trashed });
-      // external library trashed asset
+      // external library trashed asset: counted too
       const { library } = await ctx.newLibrary({ ownerId: user.id });
       await ctx.newAsset({
         ownerId: user.id,
@@ -371,7 +371,7 @@ describe(CleanupRepository.name, () => {
       });
 
       const totals = await sut.getTrashTotals(user.id);
-      expect(totals).toEqual({ count: 2, bytes: 300 });
+      expect(totals).toEqual({ count: 3, bytes: 300 });
     });
   });
 
@@ -394,6 +394,18 @@ describe(CleanupRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: user.id }, [asset.id]);
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const ids = await sut.getAssetIdsInSpaces(user.id, [asset.id]);
+      expect(ids).toEqual([asset.id]);
+    });
+
+    it('returns the library route via shared_space_library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
 
       const ids = await sut.getAssetIdsInSpaces(user.id, [asset.id]);
       expect(ids).toEqual([asset.id]);
@@ -425,8 +437,24 @@ describe(CleanupRepository.name, () => {
     });
   });
 
+  describe('getExternalLibraryAssetIds', () => {
+    it('returns only the caller own external-library asset ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { library: otherLibrary } = await ctx.newLibrary({ ownerId: other.id });
+      const { asset: external } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: uploaded } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: othersExternal } = await ctx.newAsset({ ownerId: other.id, libraryId: otherLibrary.id });
+
+      const ids = await sut.getExternalLibraryAssetIds(user.id, [external.id, uploaded.id, othersExternal.id]);
+      expect(ids).toEqual([external.id]);
+    });
+  });
+
   describe('streamAssetsForQualityAnalysis', () => {
-    it('force: false returns null-analysed and stale-version assets, skips analysed and external-library assets', async () => {
+    it('force: false returns null-analysed, stale-version and external-library assets, skips analysed ones', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
@@ -464,9 +492,8 @@ describe(CleanupRepository.name, () => {
       await ctx.newJobStatus({ assetId: external.id });
 
       const ids = await Array.fromAsync(sut.streamAssetsForQualityAnalysis(false), (r) => r.id);
-      expect(ids).toEqual(expect.arrayContaining([neverAnalyzed.id, staleVersion.id]));
+      expect(ids).toEqual(expect.arrayContaining([neverAnalyzed.id, staleVersion.id, external.id]));
       expect(ids).not.toContain(analyzed.id);
-      expect(ids).not.toContain(external.id);
     });
 
     it('force: true returns all in-scope assets', async () => {
@@ -491,7 +518,7 @@ describe(CleanupRepository.name, () => {
 
       const ids = await Array.fromAsync(sut.streamAssetsForQualityAnalysis(true), (r) => r.id);
       expect(ids).toContain(analyzed.id);
-      expect(ids).not.toContain(external.id);
+      expect(ids).toContain(external.id);
     });
   });
 

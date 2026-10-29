@@ -390,9 +390,7 @@ export class CleanupService extends BaseService {
         return 'already_trashed';
       }
       const inScope =
-        (row.visibility === AssetVisibility.Timeline || row.visibility === AssetVisibility.Archive) &&
-        !row.isOffline &&
-        !row.libraryId;
+        (row.visibility === AssetVisibility.Timeline || row.visibility === AssetVisibility.Archive) && !row.isOffline;
       if (!inScope) {
         return 'out_of_scope';
       }
@@ -447,8 +445,11 @@ export class CleanupService extends BaseService {
   }
 
   async getAssetsInSpaces(auth: AuthDto, dto: CleanupInSpacesDto): Promise<CleanupInSpacesResponseDto> {
-    const assetIds = await this.cleanupRepository.getAssetIdsInSpaces(auth.user.id, dto.assetIds);
-    return { assetIds };
+    const [assetIds, externalAssetIds] = await Promise.all([
+      this.cleanupRepository.getAssetIdsInSpaces(auth.user.id, dto.assetIds),
+      this.cleanupRepository.getExternalLibraryAssetIds(auth.user.id, dto.assetIds),
+    ]);
+    return { assetIds, externalAssetIds };
   }
 
   // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched; same gate as
@@ -488,7 +489,7 @@ export class CleanupService extends BaseService {
   @OnJob({ name: JobName.AssetAnalyzeQuality, queue: QueueName.QualityAnalysis })
   async handleQualityAnalysis({ id }: JobOf<JobName.AssetAnalyzeQuality>): Promise<JobStatus> {
     const asset = await this.cleanupRepository.getForQualityAnalysis(id);
-    if (!asset || asset.libraryId || asset.deletedAt) {
+    if (!asset || asset.deletedAt) {
       return JobStatus.Skipped;
     }
 

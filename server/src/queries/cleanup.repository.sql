@@ -31,7 +31,6 @@ select
   "asset"."ownerId",
   "asset"."type",
   "asset"."originalFileName",
-  "asset"."libraryId",
   "asset"."visibility",
   "asset"."deletedAt",
   (
@@ -83,7 +82,6 @@ where
   "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $1
 group by
   1
@@ -133,7 +131,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $1
 group by
   1
@@ -218,7 +215,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $7
 order by
   "asset"."localDateTime",
@@ -255,8 +251,7 @@ select
   "asset"."ownerId",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."isOffline",
-  "asset"."libraryId"
+  "asset"."isOffline"
 from
   "asset"
 where
@@ -273,7 +268,6 @@ where
   "asset"."ownerId" = $1
   and "asset"."deletedAt" is not null
   and "asset"."status" = $2
-  and "asset"."libraryId" is null
 
 -- CleanupRepository.getAssetIdsInSpaces
 select
@@ -303,7 +297,25 @@ where
         "album_asset"."assetId" = "asset"."id"
         and "album"."deletedAt" is null
     )
+    or exists (
+      select
+        1 as "one"
+      from
+        "shared_space_library"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+    )
   )
+
+-- CleanupRepository.getExternalLibraryAssetIds
+select
+  "asset"."id"
+from
+  "asset"
+where
+  "asset"."id" = any ($1::uuid[])
+  and "asset"."ownerId" = $2
+  and "asset"."libraryId" is not null
 
 -- CleanupRepository.getAnalysedPercent
 select
@@ -329,7 +341,6 @@ where
   "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $2
 
 -- CleanupRepository.getSpaceHogs
@@ -376,7 +387,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $2
   and (
     "asset"."stackId" is null
@@ -453,7 +463,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $1
   and (
     "asset"."stackId" is null
@@ -548,7 +557,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $9
   and (
     "asset"."stackId" is null
@@ -616,7 +624,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $2
   and (
     "asset"."stackId" is null
@@ -688,7 +695,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $1
   and not exists (
     select
@@ -762,7 +768,6 @@ with
       and "asset"."deletedAt" is null
       and "asset"."visibility" in ('timeline', 'archive')
       and "asset"."isOffline" = false
-      and "asset"."libraryId" is null
       and "asset"."ownerId" = $2
   ),
   "flagged" as (
@@ -872,7 +877,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."libraryId" is null
   and "asset"."ownerId" = $3
   and (
     "asset"."stackId" is null

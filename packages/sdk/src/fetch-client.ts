@@ -2064,6 +2064,7 @@ export type CleanupInSpacesDto = {
 };
 export type CleanupInSpacesResponseDto = {
     assetIds: string[];
+    externalAssetIds: string[];
 };
 export type CleanupAssetDto = {
     city: string | null;

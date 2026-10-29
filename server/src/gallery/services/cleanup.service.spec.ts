@@ -62,6 +62,19 @@ describe(CleanupService.name, () => {
     ({ sut, mocks } = newTestService(CleanupService));
   });
 
+  describe('getAssetsInSpaces', () => {
+    it('returns the Space ids and the external-library ids, both scoped to the caller', async () => {
+      mocks.cleanup.getAssetIdsInSpaces.mockResolvedValue(['s']);
+      mocks.cleanup.getExternalLibraryAssetIds.mockResolvedValue(['x']);
+
+      await expect(sut.getAssetsInSpaces(authStub.user1, { assetIds: ['s', 'x', 'y'] })).resolves.toEqual({
+        assetIds: ['s'],
+        externalAssetIds: ['x'],
+      });
+      expect(mocks.cleanup.getExternalLibraryAssetIds).toHaveBeenCalledWith(authStub.user1.user.id, ['s', 'x', 'y']);
+    });
+  });
+
   describe('commit', () => {
     const userId = authStub.user1.user.id;
     const row = (
@@ -71,7 +84,6 @@ describe(CleanupService.name, () => {
         deletedAt: Date | null;
         visibility: AssetVisibility;
         isOffline: boolean;
-        libraryId: string | null;
       }> = {},
     ) => ({
       id,
@@ -79,7 +91,6 @@ describe(CleanupService.name, () => {
       deletedAt: null,
       visibility: AssetVisibility.Timeline,
       isOffline: false,
-      libraryId: null,
       ...over,
     });
 
@@ -89,12 +100,11 @@ describe(CleanupService.name, () => {
         row('b', { deletedAt: new Date() }),
         row('c', { ownerId: 'someone-else' }),
         row('d', { visibility: AssetVisibility.Locked }),
-        row('e', { libraryId: 'lib' }),
         row('f', { isOffline: true }),
       ]);
       const res = await sut.commit(authStub.user1, {
         queue: CleanupQueue.Rewind,
-        trashIds: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+        trashIds: ['a', 'b', 'c', 'd', 'f', 'g'],
         favoriteIds: [],
         keepIds: [],
       });
@@ -109,7 +119,6 @@ describe(CleanupService.name, () => {
           { id: 'b', reason: 'already_trashed' },
           { id: 'c', reason: 'not_found' },
           { id: 'd', reason: 'out_of_scope' },
-          { id: 'e', reason: 'out_of_scope' },
           { id: 'f', reason: 'out_of_scope' },
           { id: 'g', reason: 'not_found' },
         ]),
@@ -270,7 +279,6 @@ describe(CleanupService.name, () => {
         ownerId: 'u',
         type: 'IMAGE',
         originalFileName: 'a.jpg',
-        libraryId: null,
         visibility: AssetVisibility.Timeline,
         deletedAt: null,
         previewPath: null,
@@ -282,10 +290,10 @@ describe(CleanupService.name, () => {
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.cleanup.upsertQuality).not.toHaveBeenCalled();
     });
-    it('skips external-library and missing assets', async () => {
+    it('skips missing and trashed assets', async () => {
       mocks.cleanup.getForQualityAnalysis.mockResolvedValue(undefined);
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Skipped);
-      mocks.cleanup.getForQualityAnalysis.mockResolvedValue({ libraryId: 'lib' } as never);
+      mocks.cleanup.getForQualityAnalysis.mockResolvedValue({ deletedAt: new Date() } as never);
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Skipped);
     });
     it('writes only the screenshot flag for videos', async () => {
@@ -294,7 +302,6 @@ describe(CleanupService.name, () => {
         ownerId: 'u',
         type: 'VIDEO',
         originalFileName: 'Screen Recording 1.mov',
-        libraryId: null,
         visibility: AssetVisibility.Timeline,
         deletedAt: null,
         previewPath: '/p.jpg',
@@ -319,7 +326,6 @@ describe(CleanupService.name, () => {
         ownerId: 'u',
         type: 'IMAGE',
         originalFileName: 'a.jpg',
-        libraryId: null,
         visibility: AssetVisibility.Timeline,
         deletedAt: null,
         previewPath: 'upload/p.jpg',
@@ -350,7 +356,6 @@ describe(CleanupService.name, () => {
         ownerId: 'u',
         type: 'IMAGE',
         originalFileName: 'a.jpg',
-        libraryId: null,
         visibility: AssetVisibility.Timeline,
         deletedAt: null,
         previewPath: 'upload/p.jpg',

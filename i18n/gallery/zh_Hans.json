@@ -480,6 +480,7 @@
   "cleanup_explainer_nothing_deleted": "在你点击<b>完成</b>或<b>移至回收站</b>之前，不会删除任何内容。",
   "cleanup_explainer_open": "什么是回顾？",
   "cleanup_explainer_title": "每年的{date}，汇集一处",
+  "cleanup_external_library_warning": "{count} 张照片来自外部库。如果服务器对该文件夹只有读取权限，它们会在下次扫描该库时重新出现，也不会释放空间。",
   "cleanup_finish_day": "完成这一天",
   "cleanup_finish_day_failed": "无法完成这一天。你的标记已保留。",
   "cleanup_finish_day_named": "完成{date}",

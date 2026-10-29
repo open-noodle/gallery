@@ -475,6 +475,7 @@
   "cleanup_explainer_nothing_deleted": "Nothing is deleted until you press <b>Finish</b> or <b>Move to trash</b>.",
   "cleanup_explainer_open": "What is Rewind?",
   "cleanup_explainer_title": "Every {date}, all in one place",
+  "cleanup_external_library_warning": "{count, plural, one {# photo is} other {# photos are}} from an external library. If the server can only read that folder, {count, plural, one {it comes} other {they come}} back at the next library scan and no space is freed.",
   "cleanup_finish_day": "Finish day",
   "cleanup_finish_day_failed": "Could not finish the day. Your marks are kept.",
   "cleanup_finish_day_named": "Finish {date}",

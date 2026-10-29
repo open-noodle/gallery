@@ -476,6 +476,7 @@
   "cleanup_explainer_nothing_deleted": "Nic nie zostanie usunięte, dopóki nie klikniesz <b>Zakończ</b> lub <b>Przenieś do kosza</b>.",
   "cleanup_explainer_open": "Czym jest przegląd dnia?",
   "cleanup_explainer_title": "Każdy {date} w jednym miejscu",
+  "cleanup_external_library_warning": "Zdjęcia z biblioteki zewnętrznej: {count}. Jeśli serwer może tylko odczytywać ten folder, wrócą one przy następnym skanowaniu biblioteki i miejsce nie zostanie zwolnione.",
   "cleanup_finish_day": "Zakończ dzień",
   "cleanup_finish_day_failed": "Nie udało się zakończyć dnia. Twoje oznaczenia zostały zachowane.",
   "cleanup_finish_day_named": "Zakończ {date}",

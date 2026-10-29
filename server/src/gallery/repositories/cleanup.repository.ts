@@ -34,7 +34,8 @@ export type CleanupAssetRow = Omit<CleanupAssetDto, 'localDateTime'> & { localDa
 
 /**
  * The Include/exclude scope rules shared by every Cleanup query (calendar, rewind, queues):
- * owned, not deleted, timeline/archive visibility, not offline, not in an external library.
+ * owned, not deleted, timeline/archive visibility, not offline. External-library photos are included: the
+ * trash confirmation warns that a read-only library brings them back at its next scan.
  *
  * `queue: true` additionally applies the stack rule (queues only, not rewind or the calendar):
  * an asset is in scope only if it is not in a stack, or is its stack's primary.
@@ -47,8 +48,7 @@ export const withCleanupScope = <O>(
   let q = qb
     .where('asset.deletedAt', 'is', null)
     .where('asset.visibility', 'in', [sql.lit(AssetVisibility.Timeline), sql.lit(AssetVisibility.Archive)])
-    .where('asset.isOffline', '=', sql.lit(false))
-    .where('asset.libraryId', 'is', null);
+    .where('asset.isOffline', '=', sql.lit(false));
   if (userId) {
     q = q.where('asset.ownerId', '=', userId);
   }
@@ -305,7 +305,6 @@ export class CleanupRepository {
         'asset.ownerId',
         'asset.type',
         'asset.originalFileName',
-        'asset.libraryId',
         'asset.visibility',
         'asset.deletedAt',
         withFilePath(eb, AssetFileType.Preview).as('previewPath'),
@@ -527,7 +526,6 @@ export class CleanupRepository {
       deletedAt: Date | null;
       visibility: AssetVisibility;
       isOffline: boolean;
-      libraryId: string | null;
     }>
   > {
     if (ids.length === 0) {
@@ -536,14 +534,7 @@ export class CleanupRepository {
 
     return this.db
       .selectFrom('asset')
-      .select([
-        'asset.id',
-        'asset.ownerId',
-        'asset.deletedAt',
-        'asset.visibility',
-        'asset.isOffline',
-        'asset.libraryId',
-      ])
+      .select(['asset.id', 'asset.ownerId', 'asset.deletedAt', 'asset.visibility', 'asset.isOffline'])
       .where('asset.id', 'in', ids)
       .execute();
   }
@@ -560,7 +551,6 @@ export class CleanupRepository {
       .where('asset.ownerId', '=', userId)
       .where('asset.deletedAt', 'is not', null)
       .where('asset.status', '=', AssetStatus.Trashed)
-      .where('asset.libraryId', 'is', null)
       .executeTakeFirstOrThrow();
 
     return { count: Number(row.count), bytes: Number(row.bytes) };
@@ -596,8 +586,34 @@ export class CleanupRepository {
               .where('album.deletedAt', 'is', null)
               .select(sql.lit(1).as('one')),
           ),
+          // External-library photos are in Cleanup's scope, and a space can include a whole library.
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .select(sql.lit(1).as('one')),
+          ),
         ]),
       )
+      .execute();
+
+    return rows.map((row) => row.id);
+  }
+
+  // The trash confirmation's external-library warning: a read-only library re-imports a trashed file at its
+  // next scan. Scoped to the caller's own assets like getAssetIdsInSpaces.
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async getExternalLibraryAssetIds(userId: string, ids: string[]): Promise<string[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', '=', anyUuid(ids))
+      .where('asset.ownerId', '=', userId)
+      .where('asset.libraryId', 'is not', null)
       .execute();
 
     return rows.map((row) => row.id);

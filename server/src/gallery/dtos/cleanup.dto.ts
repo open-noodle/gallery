@@ -137,7 +137,11 @@ const CleanupCommitResponseSchema = z
   .object({ trashed: z.array(z.uuid()), favorited: z.int(), kept: z.int(), skipped: z.array(CleanupSkippedSchema) })
   .meta({ id: 'CleanupCommitResponseDto' });
 const CleanupInSpacesResponseSchema = z
-  .object({ assetIds: z.array(z.uuid()) })
+  .object({
+    assetIds: z.array(z.uuid()),
+    /** The ids from an external library: a read-only one brings a trashed file back at its next scan. */
+    externalAssetIds: z.array(z.uuid()),
+  })
   .meta({ id: 'CleanupInSpacesResponseDto' });
 
 export class CleanupCountResponseDto extends createZodDto(CleanupCountResponseSchema) {}

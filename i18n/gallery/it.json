@@ -476,6 +476,7 @@
   "cleanup_explainer_nothing_deleted": "Non viene eliminato nulla finché non premi <b>Completa</b> o <b>Sposta nel cestino</b>.",
   "cleanup_explainer_open": "Cos'è Rivedi?",
   "cleanup_explainer_title": "Ogni {date}, tutto in un unico posto",
+  "cleanup_external_library_warning": "{count, plural, one {# foto proviene} other {# foto provengono}} da una libreria esterna. Se il server può solo leggere quella cartella, {count, plural, one {ricomparirà} other {ricompariranno}} alla prossima scansione della libreria e non verrà liberato spazio.",
   "cleanup_finish_day": "Completa la giornata",
   "cleanup_finish_day_failed": "Impossibile completare la giornata. I tuoi contrassegni sono stati mantenuti.",
   "cleanup_finish_day_named": "Completa il {date}",

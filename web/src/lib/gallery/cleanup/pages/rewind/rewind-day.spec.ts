@@ -114,7 +114,7 @@ describe('RewindDay', () => {
     mocks.sdk.commitCleanup.mockResolvedValue({ trashed: [], favorited: 0, kept: 0, skipped: [] });
     mocks.sdk.restoreAssets.mockResolvedValue(undefined);
     mocks.goto.mockResolvedValue(undefined);
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: [] });
     mocks.flags.value.trash = true;
   });
 
@@ -256,7 +256,7 @@ describe('RewindDay', () => {
   });
 
   it('warns about photos in a Space before moving them to the trash, and keeps the marks on cancel', async () => {
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(false);
     renderDay();
     await fireEvent.keyDown(document, { key: 'Delete' });
@@ -272,7 +272,7 @@ describe('RewindDay', () => {
   });
 
   it('moves Space photos to the trash once the warning is confirmed', async () => {
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(true);
     renderDay();
     await fireEvent.keyDown(document, { key: 'Delete' });
@@ -283,7 +283,7 @@ describe('RewindDay', () => {
   });
 
   it('warns about Space photos before finishing a day with trash marks, and stays put on cancel', async () => {
-    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(false);
     renderDay();
     await fireEvent.keyDown(document, { key: 'Delete' });

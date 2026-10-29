@@ -48,8 +48,10 @@ export const animateCleanupRemoval = (ids: string[]) => {
  *
  * - Trashing an owned photo that is also in a shared space removes it for the space's members too,
  *   so the server is asked which of `ids` are in a space; if any are, the user confirms.
- * - With the trash turned off the delete is permanent, so the user always confirms, with the Space
- *   sentence added when it applies.
+ * - A photo from an external library comes back at the library's next scan when Gallery can only read
+ *   its folder, so the same lookup returns those ids and the user confirms with a sentence about it.
+ * - With the trash turned off the delete is permanent, so the user always confirms, with the Space and
+ *   external-library sentences added when they apply.
  *
  * Resolves to true when the trash may go ahead. Throws when the lookup fails, so callers never
  * trash without having checked.
@@ -60,17 +62,22 @@ export const confirmCleanupTrash = async (ids: string[]): Promise<boolean> => {
   }
 
   let count = 0;
+  let external = 0;
   for (const assetIds of chunk(ids, CLEANUP_MAX_IDS)) {
     const response = await getCleanupAssetsInSpaces({ cleanupInSpacesDto: { assetIds } });
     count += response.assetIds.length;
+    external += response.externalAssetIds.length;
   }
 
   const $t = get(t);
+  // A read-only external library re-imports a trashed file at its next scan, so its photos come back.
+  const externalWarning = external > 0 ? [$t('cleanup_external_library_warning', { values: { count: external } })] : [];
   if (!isTrashEnabled()) {
     const sentences = [$t('cleanup_permanent_delete_prompt', { values: { count: ids.length } })];
     if (count > 0) {
       sentences.push($t('cleanup_permanent_delete_space_warning', { values: { count } }));
     }
+    sentences.push(...externalWarning);
     return modalManager.showDialog({
       title: $t('permanently_delete'),
       prompt: sentences.join(' '),
@@ -79,12 +86,14 @@ export const confirmCleanupTrash = async (ids: string[]): Promise<boolean> => {
     });
   }
 
-  if (count === 0) {
+  if (count === 0 && external === 0) {
     return true;
   }
 
+  const sentences = count > 0 ? [$t('cleanup_space_warning', { values: { count } })] : [];
+  sentences.push(...externalWarning);
   return modalManager.showDialog({
-    prompt: $t('cleanup_space_warning', { values: { count } }),
+    prompt: sentences.join(' '),
     confirmText: $t('trash'),
     confirmColor: 'danger',
   });

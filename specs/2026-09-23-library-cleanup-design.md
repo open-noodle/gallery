@@ -141,7 +141,7 @@ which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
 
 - `asset_localMonthDay_idx` on `asset`: a partial expression index.
   - Columns: `("ownerId", ((extract(month from ("localDateTime" at time zone 'UTC')) * 100 + extract(day from ("localDateTime" at time zone 'UTC')))::smallint), "localDateTime")`.
-  - Condition: `WHERE "deletedAt" IS NULL AND "visibility" IN ('timeline','archive') AND "isOffline" = false AND "libraryId" IS NULL`.
+  - Condition: `WHERE "deletedAt" IS NULL AND "visibility" IN ('timeline','archive') AND "isOffline" = false`.
   - It is an expression index, so the migration also inserts its `migration_overrides` row (precedent:
     `1782000000000-AddAssetExifDescriptionTrigramIndex.ts`).
   - The calendar and rewind queries must repeat this expression and condition **verbatim**; otherwise
@@ -184,11 +184,13 @@ which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
 ### Include and exclude rules (every queue, rewind and calendar)
 
 - **Included:** assets owned by the user with `deletedAt IS NULL`, including **archived** ones (they still use
-  storage).
+  storage) and **external-library** ones (2026-10-29, owner's decision: owners asked to see them). Trashing one
+  behaves as everywhere in Immich: when the trash is emptied the original is deleted if the server can write to
+  the library folder; on a read-only mount the file stays and the next library scan imports it again, so no space
+  is freed. The trash confirmation says so (see the Space confirmation below).
 - **Excluded:**
   - `visibility` of `hidden` (the motion part of a live photo) or `locked`.
   - `isOffline`.
-  - Any asset with a `libraryId` (external library). Trashing those does not free the file on disk.
 - **Stacks (queues only):** in a queue, an asset appears only if it is not in a stack or is the stack's primary. **Rewind and the calendar show every in-scope asset, stack members included**: rewind is about seeing every photo, and leaving the stack rule out keeps the calendar count answerable from the partial index alone. If the primary asset is
   in the trash, the stack drops out of Cleanup until the primary is restored or the trash is emptied. When the
   trash is emptied, the existing hard-delete path reassigns the primary.
@@ -213,8 +215,7 @@ shared-space guard its visibility marker.
   - `queue.service.spec.ts`, which expects every `QueueName`
 - **Chaining:** in `job.service.ts`, the `onDone` handler for `AssetGenerateThumbnails` queues the new job next
   to the fork's existing `PetDetection` hook, so uploads are analysed automatically. External-library scans also
-  pass through this hook (`source: 'upload'`), so the handler skips assets that have a `libraryId`. The QueueAll
-  query excludes them as well.
+  pass through this hook (`source: 'upload'`), so their assets are analysed too.
 - **Admin Jobs card, "Quality analysis":**
   - **Missing** picks assets where `qualityAnalyzedAt IS NULL`, or whose `asset_quality.version` is older than
     the current one. Like the classification query, it inner-joins `asset_job_status`. It applies the scope
@@ -278,7 +279,7 @@ is the precedent), in `newTestService` in `test/utils.ts`, and in the real and m
 | Endpoint                                | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /cleanup/queues/{queue}/count`     | Returns `{count, bytes, analysedPercent?}`. `queue` also accepts `duplicates`. `analysedPercent` is included for `blurry` and `screenshots`: analysed in-scope assets divided by all in-scope assets, floored to a whole number (so it reads 100 only when everything is done), or 100 when there are none. An image the thumbnail job has not processed (`thumbhash` is null, so there is no preview) counts as done, because the quality job skips it until a preview exists; `thumbhash` stands in for the preview row because an exact `asset_file` check measured +55% at 500k. The hub sends one of these per card, all in parallel. For `space_hogs`, `count` is the number of in-scope files at or above `minSize` (default 100 MiB, shared with the page's default filter) and `bytes` is their total. The same filter query parameters as the list are accepted |
-| `GET /cleanup/trash`                    | Returns `{count, bytes}` for the user's trashed assets that are not in an external library                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `GET /cleanup/trash`                    | Returns `{count, bytes}` for the user's trashed assets, external-library ones included                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `GET /cleanup/calendar?tz=`             | Returns 366 rows of `{monthDay, assetCount, reviewedAt \| null}`, plus `{daysReviewed, streak}`. **Streak** counts consecutive dates in the viewer's timezone, ending today or yesterday, on which at least one day was completed; catching up on several days in one sitting counts once. `daysReviewed` counts only dates that have photos                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `GET /cleanup/rewind/{monthDay}`        | Returns `{years: [{year, count}]}`, newest first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /cleanup/rewind/{monthDay}/{year}` | Returns that year's assets: `{id, type, originalFileName, localDateTime, thumbhash, width, height, duration, fileSize, isFavorite, inAlbum, kept, city}`, plus `reason` (the Blurry reason at the default strictness, for the one-at-a-time hints card; the burst hint is computed client-side with the 2 s gap rule over images only, matching the Bursts queue). The queue pages use the same asset shape                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -349,12 +350,13 @@ assets.
   - `ShortcutsModal` receives the page's own list through its `shortcuts` prop.
 - **Confirmation for Space assets.** Before trashing, the page calls `POST /cleanup/in-spaces`, which returns
   the ids that belong to any shared space through the direct (`shared_space_asset`) or album
-  (`shared_space_album` → `album_asset`, `album.deletedAt IS NULL`) route. The library route cannot apply,
-  because external-library assets are out of scope. If any ids come back, the confirmation says those photos
-  will disappear for Space members too.
+  (`shared_space_album` → `album_asset`, `album.deletedAt IS NULL`) or library (`shared_space_library` on
+  `asset.libraryId`) route. If any ids come back, the confirmation says those photos will disappear for Space
+  members too. The same call returns `externalAssetIds`, the ids from an external library; when there are any,
+  the confirmation adds that a read-only library brings them back at its next scan.
   - The query lives in `cleanup.repository.ts`. It returns ids only, so it gets a `VIS_ALLOWLIST` entry in
-    `shared-space-album-scope.guard.spec.ts` with that reason. It does not reference `shared_space_library`, so
-    `ALBUM_ALLOWLIST` is not needed.
+    `shared-space-album-scope.guard.spec.ts` with that reason. Its `shared_space_library` arm sits next to the album arm,
+    so `ALBUM_ALLOWLIST` is not needed.
 - **i18n:** new `cleanup_*` keys go into `en.json` and the nine required locales, sorted. `fork-string-parity`
   requires every key in all nine. The admin Jobs card and `JobSettings` labels use i18n keys, not hard-coded
   English.
@@ -403,7 +405,7 @@ assets.
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Asset trashed or deleted elsewhere, or in another tab, before a commit | Reported in `skipped[]` (`already_trashed` / `not_found`). The rest of the batch succeeds and the UI reports how many were skipped                                                                                         |
 | Ids of another user's assets sent to `commit`                          | Reported in `skipped[]` as `not_found`, exactly like a missing id, so the response does not confirm that they exist                                                                                                        |
-| Locked, hidden, offline or external-library ids sent to `commit`       | Reported in `skipped[]` as `out_of_scope`                                                                                                                                                                                  |
+| Locked, hidden or offline ids sent to `commit`                         | Reported in `skipped[]` as `out_of_scope`                                                                                                                                                                                  |
 | Restored from the trash                                                | The asset returns to any queue it matches. This is intended                                                                                                                                                                |
 | Keep decisions on assets that are later trashed or restored            | The keep stays. It still applies after a restore                                                                                                                                                                           |
 | Live photo still trashed                                               | The motion part is **not** trashed; it stays hidden until the trash is emptied. Its size is still counted with the still                                                                                                   |
@@ -441,7 +443,7 @@ assets.
   - The streak calculation, including gaps, today versus yesterday, several completions in one sitting, and a
     timezone boundary.
   - The quality job: the Skipped path when there is no preview, the S3 path (`ensureLocalFile` cleanup is called
-    even when scoring throws), the decode-failure path, a video, and an external-library asset.
+    even when scoring throws), the decode-failure path and a video.
 - **Controller specs** (the `controllerSetup` pattern): 400s for an invalid `monthDay`, `tz`, enum value, cursor
   or oversized id list, and the permission metadata on every route.
 - `queue.service.spec.ts` updated for the new queue.
@@ -449,7 +451,7 @@ assets.
 **Server medium tests (real database), under `test/medium/specs/`:**
 
 - `repositories/cleanup.repository.spec.ts`:
-  - The scope rules, one fixture per exclusion: trashed, hidden, locked, offline, external library, another
+  - The scope rules, one fixture per exclusion: trashed, hidden, locked, offline, another
     owner, a stack that is not the primary, and a trashed primary.
   - Keep exclusion applies per queue.
   - Keyset pagination for every queue, with no duplicates and no gaps across pages.
@@ -513,7 +515,7 @@ reasons behind the design survive.
    trash is emptied).
 3. `StorageRepository.readFile` only reads local disk, so it fails for previews on S3. The job uses
    `BaseService.ensureLocalFile`.
-4. The thumbnail chain also runs for external-library assets, so the handler skips those. The chain does not
+4. The thumbnail chain also runs for external-library assets, which are analysed like uploads. The chain does not
    run after edits, so edited assets are not re-scored.
 5. A plain `fileSizeInByte` index serves `DESC` sorts on its own, so it needs no `migration_overrides` row. The
    `DESC` index in the draft would have forced one.

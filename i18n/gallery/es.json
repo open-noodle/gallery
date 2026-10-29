@@ -476,6 +476,7 @@
   "cleanup_explainer_nothing_deleted": "No se elimina nada hasta que pulses <b>Terminar</b> o <b>Mover a la papelera</b>.",
   "cleanup_explainer_open": "¿Qué es el repaso?",
   "cleanup_explainer_title": "Cada {date}, todo en un mismo lugar",
+  "cleanup_external_library_warning": "{count, plural, one {# foto es} other {# fotos son}} de una biblioteca externa. Si el servidor solo puede leer esa carpeta, {count, plural, one {volverá} other {volverán}} en el próximo escaneo de la biblioteca y no se liberará espacio.",
   "cleanup_finish_day": "Terminar el día",
   "cleanup_finish_day_failed": "No se pudo terminar el día. Tus marcas se conservan.",
   "cleanup_finish_day_named": "Terminar el {date}",

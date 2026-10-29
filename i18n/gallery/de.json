@@ -478,6 +478,7 @@
   "cleanup_explainer_nothing_deleted": "Nichts wird gelöscht, bis du auf <b>Abschließen</b> oder <b>In den Papierkorb verschieben</b> klickst.",
   "cleanup_explainer_open": "Was ist der Rückblick?",
   "cleanup_explainer_title": "Jeder {date}, alles an einem Ort",
+  "cleanup_external_library_warning": "{count, plural, one {# Foto stammt} other {# Fotos stammen}} aus einer externen Bibliothek. Wenn der Server diesen Ordner nur lesen kann, {count, plural, one {taucht es} other {tauchen sie}} beim nächsten Scannen der Bibliothek wieder auf und es wird kein Speicher frei.",
   "cleanup_finish_day": "Tag abschließen",
   "cleanup_finish_day_failed": "Der Tag konnte nicht abgeschlossen werden. Deine Markierungen bleiben erhalten.",
   "cleanup_finish_day_named": "{date} abschließen",

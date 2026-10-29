@@ -489,6 +489,7 @@
   "cleanup_explainer_nothing_deleted": "在你點擊<b>完成</b>或<b>移至垃圾桶</b>之前，不會刪除任何內容。",
   "cleanup_explainer_open": "什麼是回顧？",
   "cleanup_explainer_title": "每年的{date}，匯集一處",
+  "cleanup_external_library_warning": "{count} 張照片來自外部媒體庫。如果伺服器對該資料夾只有讀取權限，它們會在下次掃描該媒體庫時重新出現，也不會釋放空間。",
   "cleanup_finish_day": "完成這一天",
   "cleanup_finish_day_failed": "無法完成這一天。你的標記已保留。",
   "cleanup_finish_day_named": "完成{date}",

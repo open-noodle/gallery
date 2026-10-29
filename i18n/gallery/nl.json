@@ -476,6 +476,7 @@
   "cleanup_explainer_nothing_deleted": "Er wordt niets verwijderd totdat je op <b>Afronden</b> of <b>Naar prullenbak verplaatsen</b> klikt.",
   "cleanup_explainer_open": "Wat is terugkijken?",
   "cleanup_explainer_title": "Elke {date}, alles op één plek",
+  "cleanup_external_library_warning": "{count, plural, one {# foto komt} other {# foto's komen}} uit een externe bibliotheek. Als de server die map alleen kan lezen, {count, plural, one {komt hij} other {komen ze}} bij de volgende scan van de bibliotheek terug en komt er geen ruimte vrij.",
   "cleanup_finish_day": "Dag afronden",
   "cleanup_finish_day_failed": "Kan de dag niet afronden. Je markeringen blijven bewaard.",
   "cleanup_finish_day_named": "{date} afronden",

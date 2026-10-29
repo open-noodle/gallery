@@ -249,6 +249,7 @@ describe('/cleanup', () => {
 
       expect(status).toBe(200);
       expect(body.assetIds).toEqual([spaceAsset.id]);
+      expect(body.externalAssetIds).toEqual([]);
     });
   });
 
