@@ -9,6 +9,7 @@ import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_calendar.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
+import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_session_state.dart';
 import 'package:immich_mobile/gallery/cleanup/navigation.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
@@ -16,12 +17,16 @@ import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_session.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart'
+    show libraryCleanupCardRadius, libraryCleanupPreview;
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_details_sheet.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_finish.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_dialogs.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_trash_confirm.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/rewind_grid.dart';
+import 'package:immich_mobile/gallery/motion/flight.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/removal.dart';
@@ -32,9 +37,9 @@ import 'package:openapi/api.dart';
 
 enum _Phase { deck, finish, done }
 
-/// One date's rewind (specs/2026-10-29-mobile-library-cleanup-design.md, "Rewind"; mockup `1-flow.html`, screens 3a and
-/// 3b): the date's photos from every past year in the deck, then the finish screen and, once the day is finished, its
-/// celebration. Runs in the shared session screen.
+/// One date's rewind (specs/2026-10-29-mobile-library-cleanup-design.md, "Rewind"; mockups `1-flow.html`, screens 3a
+/// and 3b, and `5-grid-and-finish.html`): the date's photos from every past year in the deck or the grid, then the
+/// finish screen and, once the day is finished, its celebration. Runs in the shared session screen.
 ///
 /// [heroAssetId] (with its [heroThumbhash]) is the overview photo the session was opened from; it flies into the first
 /// card. Plain strings, so the route needs no API type.
@@ -84,6 +89,18 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
   bool _overlay = false;
   bool _overlayChecked = false;
   bool _restoredShown = false;
+
+  /// The grid, for the flight between a card and its tile. A new key each time the grid is shown, so a grid still
+  /// fading out never shares one with the grid fading in.
+  GlobalKey<LibraryCleanupRewindGridState> _gridKey = GlobalKey();
+
+  /// Button mode's photo, after a sideways swipe (swipe mode is always on its first undecided photo).
+  String? _buttonCurrentId;
+
+  /// The tile a card is flying into, left empty until it lands.
+  String? _landingId;
+  bool _gridEntrance = false;
+  bool _gridHint = false;
 
   /// Where the photos of the apply in progress fly once the server is being asked (null: none fly).
   Offset? _flightTarget;
@@ -411,6 +428,137 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
     }
   }
 
+  // ---------------------------------------------------------------------------------------------------------------
+  // Swipe and Grid
+  // ---------------------------------------------------------------------------------------------------------------
+
+  /// Where the deck's card for [asset] is on screen: the top card in swipe mode, the page in button mode.
+  Rect? _cardRect(CleanupAssetDto asset) {
+    final keys = {Key('cleanup-card-${asset.id}'), Key('cleanup-page-${asset.id}')};
+    RenderBox? found;
+    void visit(Element element) {
+      if (found != null) {
+        return;
+      }
+      final box = element.renderObject;
+      if (keys.contains(element.widget.key) && box is RenderBox && box.hasSize && box.attached) {
+        found = box;
+        return;
+      }
+      element.visitChildElements(visit);
+    }
+
+    if (mounted) {
+      (context as Element).visitChildElements(visit);
+    }
+    final box = found;
+    return box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  void _afterLayout(VoidCallback callback) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        callback();
+      }
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  /// Switches between the deck and the grid, keeping every mark and the position: the current card shrinks into its
+  /// tile (the grid scrolled to it), or the first undecided tile grows back into the card. Reduced motion: a crossfade.
+  void _setView(LibraryCleanupView view) {
+    final prefs = ref.read(libraryCleanupPrefsProvider);
+    if (prefs.viewFor(LibraryCleanupQueue.rewind) == view) {
+      return;
+    }
+    final state = ref.read(libraryCleanupSessionProvider(_request));
+    final reduced = GalleryMotion.reduced(context);
+    final first = state.undecided.firstOrNull;
+    ref.read(libraryCleanupPrefsProvider.notifier).setView(LibraryCleanupQueue.rewind, view);
+    if (view == LibraryCleanupView.grid) {
+      final current =
+          (prefs.deckMode == LibraryCleanupDeckMode.button
+              ? state.assets.where((asset) => asset.id == _buttonCurrentId).firstOrNull
+              : null) ??
+          first;
+      final from = current == null ? null : _cardRect(current);
+      final showHint = !prefs.gridHintSeen;
+      setState(() {
+        _gridKey = GlobalKey();
+        _gridEntrance = !reduced;
+        _gridHint = _gridHint || showHint;
+        _landingId = reduced || from == null ? null : current?.id;
+      });
+      if (showHint) {
+        ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+      }
+      if (current == null) {
+        return;
+      }
+      _afterLayout(() {
+        _gridKey.currentState?.reveal(current.id);
+        _afterLayout(() {
+          final to = _gridKey.currentState?.tileRect(current.id);
+          if (reduced || from == null || to == null) {
+            setState(() => _landingId = null);
+            return;
+          }
+          _fly(
+            current,
+            from: from,
+            to: to,
+            fromRadius: libraryCleanupCardRadius,
+            toRadius: libraryCleanupGridTileRadius,
+          );
+        });
+      });
+    } else {
+      final from = first == null ? null : _gridKey.currentState?.tileRect(first.id);
+      setState(() {
+        _buttonCurrentId = null;
+        _gridEntrance = false;
+        _landingId = null;
+      });
+      if (reduced || from == null || first == null) {
+        return;
+      }
+      _afterLayout(() {
+        final to = _cardRect(first);
+        if (to != null) {
+          _fly(first, from: from, to: to, fromRadius: libraryCleanupGridTileRadius, toRadius: libraryCleanupCardRadius);
+        }
+      });
+    }
+  }
+
+  void _fly(CleanupAssetDto asset, {required Rect from, required Rect to, double fromRadius = 0, double toRadius = 0}) {
+    GalleryFlight.fly(
+      from: from,
+      to: to,
+      fromRadius: fromRadius,
+      toRadius: toRadius,
+      child: Image(
+        image: libraryCleanupPreview(asset),
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black),
+      ),
+      onLand: () {
+        if (mounted && _landingId == asset.id) {
+          setState(() => _landingId = null);
+        }
+      },
+    );
+  }
+
+  /// A long press in a grid: the details sheet, and the mark chosen there applied to the tile.
+  Future<void> _gridDetails(CleanupAssetDto asset) async {
+    final mark = await _details(asset, null);
+    if (mark != null && mounted) {
+      _session.mark(asset.id, mark);
+    }
+  }
+
   void _showOverlay() {
     setState(() => _overlay = true);
     // Seen as soon as it shows, as the web explainer counts it.
@@ -424,19 +572,30 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
     ref.listen(libraryCleanupSessionProvider(_request), _onSession);
     ref.watch(libraryCleanupCalendarProvider);
 
+    final view = prefs.viewFor(LibraryCleanupQueue.rewind);
+    final grid = view == LibraryCleanupView.grid;
     if (state.isReady && !_overlayChecked) {
       _overlayChecked = true;
-      if (!prefs.overlaySeen) {
+      // The gesture overlay teaches the deck; a session opening in the grid gets the grid's hint instead.
+      if (!grid && !prefs.overlaySeen) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _showOverlay();
           }
         });
       }
+      if (grid && !prefs.gridHintSeen) {
+        _gridHint = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+          }
+        });
+      }
     }
-
-    // Deciding the last card opens the finish screen.
-    final phase = _phase == _Phase.deck && state.isReady && state.undecided.isEmpty && !_stayOnDeck
+    // Deciding the last card opens the finish screen. Not in the grid, where a tap only steps a tile's mark on: Done
+    // opens it there.
+    final phase = _phase == _Phase.deck && state.isReady && state.undecided.isEmpty && !_stayOnDeck && !grid
         ? _Phase.finish
         : _phase;
     _shown = phase;
@@ -445,17 +604,35 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
     final canPop = phase == _Phase.done || (phase == _Phase.deck && state.pendingCount == 0);
 
     final Widget body = switch (phase) {
-      _Phase.deck => LibraryCleanupDeck(
-        assets: state.assets,
-        marks: state.marks,
-        mode: prefs.deckMode,
-        canUndo: state.canUndo,
-        onMark: _session.mark,
-        onUndo: _session.undo,
-        onOpen: (asset) => unawaited(_open(asset)),
-        info: (context, asset) => _info(context, state, asset),
-        openDetails: _details,
-        heroTag: heroTag,
+      _Phase.deck => AnimatedSwitcher(
+        duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
+        child: grid
+            ? LibraryCleanupRewindGrid(
+                key: _gridKey,
+                years: state.years,
+                marks: state.marks,
+                nowYear: ref.read(libraryCleanupClockProvider)().year,
+                onCycle: _session.cycle,
+                onKeepTheRest: (year) => _session.keepTheRest(year: year),
+                onDetails: (asset) => unawaited(_gridDetails(asset)),
+                hiddenId: _landingId,
+                showHint: _gridHint,
+                entrance: _gridEntrance,
+              )
+            : LibraryCleanupDeck(
+                key: const ValueKey('deck'),
+                assets: state.assets,
+                marks: state.marks,
+                mode: prefs.deckMode,
+                canUndo: state.canUndo,
+                onMark: _session.mark,
+                onUndo: _session.undo,
+                onOpen: (asset) => unawaited(_open(asset)),
+                info: (context, asset) => _info(context, state, asset),
+                openDetails: _details,
+                heroTag: heroTag,
+                onCurrentChanged: (asset) => _buttonCurrentId = asset.id,
+              ),
       ),
       _Phase.finish => LibraryCleanupFinishView(
         title: libraryCleanupMonthDayLabel(context, widget.monthDay),
@@ -479,6 +656,7 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
           _stayOnDeck = state.undecided.isEmpty;
         }),
         onRescue: (asset) => _session.keep(asset.id),
+        onDetails: (asset) => unawaited(_gridDetails(asset)),
       ),
       _Phase.done => LibraryCleanupDayDone(
         data: _done!,
@@ -514,25 +692,29 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
           deckMode: prefs.deckMode,
           onDeckMode: ref.read(libraryCleanupPrefsProvider.notifier).setDeckMode,
           onHowItWorks: _showOverlay,
+          view: view,
+          onView: _setView,
         ),
-        skeleton: LibraryCleanupDeckSkeleton(
-          hero: heroTag == null
-              ? null
-              : Hero(
-                  tag: heroTag,
-                  child: Image(
-                    image: RemoteImageProvider.thumbnail(
-                      assetId: widget.heroAssetId!,
-                      thumbhash: widget.heroThumbhash ?? '',
-                    ),
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (_, _, _) => const SizedBox.expand(),
-                  ),
-                ),
-        ),
-        overlay: _overlay && phase == _Phase.deck
+        skeleton: grid
+            ? const LibraryCleanupGridSkeleton()
+            : LibraryCleanupDeckSkeleton(
+                hero: heroTag == null
+                    ? null
+                    : Hero(
+                        tag: heroTag,
+                        child: Image(
+                          image: RemoteImageProvider.thumbnail(
+                            assetId: widget.heroAssetId!,
+                            thumbhash: widget.heroThumbhash ?? '',
+                          ),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (_, _, _) => const SizedBox.expand(),
+                        ),
+                      ),
+              ),
+        overlay: _overlay && phase == _Phase.deck && !grid
             ? LibraryCleanupGestureOverlay(onDismiss: () => setState(() => _overlay = false))
             : null,
         body: AnimatedSwitcher(

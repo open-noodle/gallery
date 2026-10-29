@@ -3,9 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_session_state.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/rewind_grid.dart';
 import 'package:immich_mobile/gallery/motion/celebrate.dart';
 import 'package:immich_mobile/gallery/motion/entrance.dart';
 import 'package:immich_mobile/gallery/motion/gallery_tile.dart';
@@ -57,6 +59,7 @@ class LibraryCleanupFinishView extends StatefulWidget {
     required this.onKeepGoing,
     required this.onRescue,
     this.trashIconKey,
+    this.onDetails,
   });
 
   final String title;
@@ -78,6 +81,9 @@ class LibraryCleanupFinishView extends StatefulWidget {
 
   /// On the trash count's icon, where the trashed photos fly when the day finishes.
   final Key? trashIconKey;
+
+  /// A long press on a photo in "Review the N first" (the details sheet). Without it a long press does nothing.
+  final ValueChanged<CleanupAssetDto>? onDetails;
 
   @override
   State<LibraryCleanupFinishView> createState() => _LibraryCleanupFinishViewState();
@@ -110,6 +116,7 @@ class _LibraryCleanupFinishViewState extends State<LibraryCleanupFinishView> {
       return _Review(
         trash: summary.trash,
         onRescue: widget.onRescue,
+        onDetails: widget.onDetails,
         onClose: () => setState(() => _reviewing = false),
       );
     }
@@ -303,17 +310,18 @@ class _TrashStrip extends StatelessWidget {
   );
 }
 
-/// "Review the N first": only the photos marked for trash; a tap keeps one instead.
+/// "Review the N first": only the photos marked for trash, in the grid's tiles; a tap keeps one instead, a long press
+/// opens its details.
 class _Review extends StatelessWidget {
-  const _Review({required this.trash, required this.onRescue, required this.onClose});
+  const _Review({required this.trash, required this.onRescue, required this.onClose, this.onDetails});
 
   final List<CleanupAssetDto> trash;
   final ValueChanged<CleanupAssetDto> onRescue;
   final VoidCallback onClose;
+  final ValueChanged<CleanupAssetDto>? onDetails;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       key: const Key('cleanup-finish-review-grid'),
       children: [
@@ -337,42 +345,12 @@ class _Review extends StatelessWidget {
             itemCount: trash.length,
             itemBuilder: (context, index) {
               final asset = trash[index];
-              return GestureDetector(
+              return LibraryCleanupGridTile(
                 key: Key('cleanup-review-${asset.id}'),
+                asset: asset,
+                mark: LibraryCleanupMark.trash,
                 onTap: () => onRescue(asset),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ColorFiltered(
-                        colorFilter: const ColorFilter.matrix([
-                          0.33, 0.33, 0.33, 0, 0, //
-                          0.33, 0.33, 0.33, 0, 0,
-                          0.33, 0.33, 0.33, 0, 0,
-                          0, 0, 0, 1, 0,
-                        ]),
-                        child: Image(
-                          image: libraryCleanupThumbnail(asset),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => ColoredBox(color: theme.colorScheme.surfaceContainerHighest),
-                        ),
-                      ),
-                      Positioned(
-                        left: 4,
-                        bottom: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: libraryCleanupTrashColor,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(context.t.trash, style: const TextStyle(color: Colors.white, fontSize: 10)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                onLongPress: onDetails == null ? null : () => onDetails!(asset),
               );
             },
           ),

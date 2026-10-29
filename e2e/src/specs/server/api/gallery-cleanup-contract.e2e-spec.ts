@@ -29,6 +29,8 @@ const TZ = 'Europe/Lisbon';
 /** Mobile pages queues this many at a time in the test (the app asks for 100). */
 const PAGE = 4;
 const REWIND_DAY = 815;
+/** The day the mobile grid test rewinds. */
+const GRID_DAY = 621;
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Query = Record<string, string | string[]>;
@@ -93,6 +95,14 @@ for (const n of [1, 2]) {
     quality: { sharpness: 300, brightness: 10, clippedDark: 0.9 },
   };
 }
+// 21 June, two years, untouched by the earlier fixtures: the rewind the mobile grid test marks and finishes. Last, so
+// the sizes of the photos above (1000 + seed order) stay what the earlier fixtures recorded.
+Object.assign(assetSeeds, {
+  r1: { takenAt: '2024-06-21T09:00:00.000Z', city: 'Faro' },
+  r2: { takenAt: '2024-06-21T18:00:00.000Z', city: 'Faro' },
+  s1: { takenAt: '2019-06-21T10:00:00.000Z', city: 'Braga' },
+  s2: { takenAt: '2019-06-21T12:00:00.000Z' },
+} satisfies Record<string, AssetSeed>);
 
 const world = {
   login: undefined as unknown as LoginResponseDto,
@@ -558,6 +568,48 @@ const fixtureCases = (): FixtureCase[] => [
     name: '101-details-albums-q2',
     description: 'The details sheet opens on q2: the albums it is in',
     request: { method: 'GET', path: '/api/albums', query: { assetId: asset('q2') } },
+  },
+  // The rewind of 21 June in grid mode (mobile rewind_grid_e2e_test.dart): marked in the grid, finished in the deck.
+  {
+    name: '110-rewind-621-years',
+    description: 'Rewind of 21 June: the years, newest first',
+    request: { method: 'GET', path: `/api/cleanup/rewind/${GRID_DAY}` },
+  },
+  {
+    name: '111-rewind-621-2024',
+    description: 'Rewind 21 June 2024',
+    request: { method: 'GET', path: `/api/cleanup/rewind/${GRID_DAY}/2024` },
+  },
+  {
+    name: '112-rewind-621-2019',
+    description: 'Rewind 21 June 2019',
+    request: { method: 'GET', path: `/api/cleanup/rewind/${GRID_DAY}/2019` },
+  },
+  {
+    name: '113-in-spaces-r1',
+    description: 'Before trashing r1, marked in the grid: not in a shared space',
+    request: inSpaces(['r1']),
+  },
+  {
+    name: '114-commit-finish-621',
+    description:
+      'Finish 21 June: r1 trashed and r2 kept ("Keep all remaining") in the grid, s1 favourited and s2 kept in the deck',
+    request: {
+      method: 'POST',
+      path: '/api/cleanup/commit',
+      body: {
+        queue: 'rewind',
+        trashIds: [asset('r1')],
+        favoriteIds: [asset('s1')],
+        keepIds: [asset('r2'), asset('s2')],
+        completeMonthDay: GRID_DAY,
+      },
+    },
+  },
+  {
+    name: '115-calendar-after-621',
+    description: 'The calendar after 21 June was finished',
+    request: calendar,
   },
 ];
 

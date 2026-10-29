@@ -54,6 +54,7 @@ class LibraryCleanupDeck extends StatelessWidget {
     this.onDetails,
     this.openDetails,
     this.heroTag,
+    this.onCurrentChanged,
   });
 
   /// Every photo of the session, in deck order, marked or not.
@@ -79,6 +80,9 @@ class LibraryCleanupDeck extends StatelessWidget {
   final LibraryCleanupDetailsOpener? openDetails;
 
   bool get hasDetails => onDetails != null || openDetails != null;
+
+  /// Button mode: the photo shown changed by a sideways swipe. Swipe mode is always on its first undecided photo.
+  final ValueChanged<CleanupAssetDto>? onCurrentChanged;
 
   /// The hero the session was opened with, on the top card in swipe mode.
   final String? heroTag;
@@ -762,11 +766,14 @@ class _ButtonDeckState extends State<_ButtonDeck> {
           key: const Key('cleanup-deck-pages'),
           controller: _pages,
           itemCount: deck.assets.length,
-          onPageChanged: (index) => setState(() {
-            _index = index;
-            _flash = null;
-            _preloadNext();
-          }),
+          onPageChanged: (index) {
+            setState(() {
+              _index = index;
+              _flash = null;
+              _preloadNext();
+            });
+            deck.onCurrentChanged?.call(deck.assets[index]);
+          },
           itemBuilder: (context, index) {
             final asset = deck.assets[index];
             final flash = _flash?.id == asset.id ? _flash!.mark : null;

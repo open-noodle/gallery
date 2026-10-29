@@ -48,11 +48,17 @@ class LibraryCleanupSessionMenu {
     required this.onDeckMode,
     required this.onHowItWorks,
     this.extra = const [],
+    this.view = LibraryCleanupView.swipe,
+    this.onView,
   });
 
   final LibraryCleanupDeckMode deckMode;
   final ValueChanged<LibraryCleanupDeckMode> onDeckMode;
   final VoidCallback onHowItWorks;
+
+  /// Swipe or Grid. Without [onView] the session has no grid yet: Grid shows disabled, "coming soon".
+  final LibraryCleanupView view;
+  final ValueChanged<LibraryCleanupView>? onView;
 
   /// Items after the shared ones (a queue's filters).
   final List<PopupMenuEntry<VoidCallback>> extra;
@@ -226,14 +232,22 @@ class _Menu extends StatelessWidget {
       icon: const Icon(Icons.more_horiz_rounded),
       onSelected: (action) => action(),
       itemBuilder: (context) => [
-        // Swipe or Grid: Grid arrives with its own slice.
+        // Swipe or Grid; a session without a grid yet shows it disabled.
         CheckedPopupMenuItem(
           key: const Key('cleanup-menu-swipe'),
-          checked: true,
-          value: () {},
+          checked: menu.view == LibraryCleanupView.swipe,
+          value: () => menu.onView?.call(LibraryCleanupView.swipe),
           child: Text(t.cleanup_menu_swipe),
         ),
-        PopupMenuItem(key: const Key('cleanup-menu-grid'), enabled: false, child: Text(t.cleanup_menu_grid_soon)),
+        if (menu.onView == null)
+          PopupMenuItem(key: const Key('cleanup-menu-grid'), enabled: false, child: Text(t.cleanup_menu_grid_soon))
+        else
+          CheckedPopupMenuItem(
+            key: const Key('cleanup-menu-grid'),
+            checked: menu.view == LibraryCleanupView.grid,
+            value: () => menu.onView!(LibraryCleanupView.grid),
+            child: Text(t.cleanup_mode_grid),
+          ),
         const PopupMenuDivider(),
         mode(LibraryCleanupDeckMode.swipe, t.cleanup_deck_mode_swipe),
         mode(LibraryCleanupDeckMode.button, t.cleanup_deck_mode_buttons),

@@ -45,6 +45,7 @@ through the real rewind screens.
 | `060`–`063`   | Blurry, 4 photos a page: the first three pages open, the fourth as ten cards remain                                   |
 | `070`–`073`   | Applies Blurry marks, undoes the trash, then changes the filters                                                      |
 | `100`, `101`  | The details sheet on q2: `GET /assets/{id}` and `GET /albums?assetId=` (read-only; served mid-walk by `rewind_e2e`)  |
+| `110`–`115`   | 21 June in grid mode (`rewind_grid_e2e`): the day, the lookup, one commit with `completeMonthDay`, the calendar again |
 
 ## File format
 
@@ -85,6 +86,8 @@ Seeded values (taken dates, places, sizes, sharpness) are real.
 - 24 December 2021 (`x1`): reviewed before the script starts, so the calendar has a reviewed day. The streak is the
   server's own count from the review time, so it is 1 for a run that does not cross midnight.
 - Eleven blurry photos (`blurry-01`, the newest, to `blurry-11`) and two sharp but dark ones (`dark-1`, `dark-2`).
+- 21 June: two photos in 2024 (`r1`, `r2`, Faro) and two in 2019 (`s1` in Braga, `s2`), untouched until `110`. Seeded
+  last, so the sizes of the photos above stay as recorded.
 - The calendar request carries `tz=Europe/Lisbon`, the zone the mobile test reports as the device's.
 
 ### Fallback views

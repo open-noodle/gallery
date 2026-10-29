@@ -114,7 +114,7 @@ void main() {
     expect(find.byKey(const Key('cleanup-today-photo-2')), findsOneWidget);
     expect(find.text("Start today's rewind"), findsOneWidget);
 
-    // The seeded library: only Blurry has photos, and quality analysis has seen 68% of it.
+    // The seeded library: only Blurry has photos, and quality analysis has seen 56% of it.
     expect(find.byKey(const Key('cleanup-clear-space_hogs')), findsOneWidget);
     expect(find.byKey(const Key('cleanup-clear-bursts')), findsOneWidget);
     expect(find.byKey(const Key('cleanup-clear-screenshots')), findsOneWidget);
@@ -122,7 +122,7 @@ void main() {
     await settle(tester, server);
     expect(find.byKey(const Key('cleanup-clear-duplicates')), findsOneWidget);
     expect(textOf(tester, 'cleanup-count-blurry'), '13 so far · −12.9 KiB');
-    expect(textOf(tester, 'cleanup-analysing-blurry'), 'Analysing… 68% of library');
+    expect(textOf(tester, 'cleanup-analysing-blurry'), 'Analysing… 56% of library');
     expect(find.byKey(const Key('cleanup-cover-blurry')), findsOneWidget);
     expect(textOf(tester, 'cleanup-could-free'), 'Could still free 12.9 KiB');
     expect(textOf(tester, 'cleanup-trash-size'), 'Trash: 0 B');
