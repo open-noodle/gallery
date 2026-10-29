@@ -11,13 +11,15 @@
   import { RewindSession, type RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { slideMotion } from '$lib/components/filter-panel/motion';
+  import RewindDayDone from '$lib/gallery/cleanup/RewindDayDone.svelte';
   import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
-  import { explainerSeen } from '$lib/gallery/cleanup/explainer-seen';
+  import { explainerSeen, tapHintDone } from '$lib/gallery/cleanup/explainer-seen';
   import { finishedDay } from '$lib/gallery/cleanup/finished-day';
   import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
   import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
   import { getAssetMediaUrl } from '$lib/utils';
   import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '$lib/gallery/motion';
+  import CleanupFinishButton from '$lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
@@ -43,7 +45,7 @@
     type CleanupRewindYearDto,
   } from '@immich/sdk';
   import { Breadcrumbs, Button, Heading, IconButton, isModalOpen, modalManager, toastManager } from '@immich/ui';
-  import { mdiCheck, mdiInformationOutline, mdiKeyboard, mdiSlashForward } from '@mdi/js';
+  import { mdiInformationOutline, mdiKeyboard, mdiSlashForward, mdiUndo } from '@mdi/js';
   import { onMount, tick } from 'svelte';
   import { locale, t } from 'svelte-i18n';
   import { Tween } from 'svelte/motion';
@@ -90,6 +92,19 @@
   let explainerOpen = $state(!explainerSeen.get());
   // True while the Space check for a trash commit is in flight, so a second press cannot start another.
   let checkingSpaces = $state(false);
+  // Touch screens get a one-line "how to mark" hint until the first finished day.
+  let showTapHint = $state(!tapHintDone.get());
+
+  type DaySummary = {
+    kept: number;
+    favorites: number;
+    trashed: number;
+    freedBytes: number;
+    streak?: number;
+    next?: number;
+  };
+  // Set once the day is finished: the success card shows and waits for Next day or Back to Cleanup.
+  let done = $state<DaySummary | null>(null);
 
   // svelte-ignore state_referenced_locally
   const session = new RewindSession(monthDay, (dto) => commitCleanup({ cleanupCommitDto: dto }));
@@ -129,6 +144,8 @@
   const focusedIndex = $derived(flat.findIndex((asset) => asset.id === session.focusedId));
   const current = $derived(focusedIndex === -1 ? flat[0] : flat[focusedIndex]);
   const busy = $derived(session.progress !== null || checkingSpaces);
+  const dayLabel = $derived(monthDayLabel(monthDay, lang));
+  const finishLabel = $derived($t('cleanup_finish_day_named', { values: { date: dayLabel } }));
   const previousDay = $derived(shiftMonthDay(monthDay, -1));
   const nextDay = $derived(shiftMonthDay(monthDay, 1));
 
@@ -367,21 +384,29 @@
   };
 
   const onFinishDay = async () => {
-    // Same guard as the Finish day button: a date with no photos cannot be completed (Shift+Enter
+    // Same guard as the Finish button: a date with no photos cannot be completed (Shift+Enter
     // reaches here without the button's `disabled`).
-    if (busy || total === 0) {
+    if (busy || total === 0 || done) {
       return;
     }
     if (!(await confirmTrash())) {
       return;
     }
+    // Counted before the commit clears the marks. Unmarked photos are left as they are, so they do
+    // not count as kept.
+    const counts = { ...session.counts };
+    const freedBytes = trashBytes;
+    let trashedCount: number;
     try {
       const { trashed, skipped } = await session.finishDay();
+      const removed = trashed.map((id) => assetById.get(id)).filter((asset) => asset !== undefined);
+      trashedCount = trashed.length;
       finishedDay.set(monthDay);
+      tapHintDone.set();
+      showTapHint = false;
       animateCleanupRemoval(trashed);
-      celebrate('success');
-      toastManager.success($t('cleanup_day_complete'));
-      showRemovedToast(trashed);
+      removeAssets(trashed);
+      showRemovedToast(trashed, () => reinsertAssets(removed));
       showSkippedToast(skipped);
     } catch (error) {
       handleError(error, $t('cleanup_finish_day_failed'));
@@ -389,13 +414,34 @@
     }
 
     let next: number | undefined;
+    let streak: number | undefined;
     try {
       const calendar = await getCleanupCalendar({ tz: browserTimeZone() });
       next = nextUnreviewedDay(calendar.days, monthDay);
+      streak = calendar.streak;
     } catch {
-      // Falling back to the hub is fine; the day itself is already saved.
+      // The card still shows; without a next date it offers only the way back to the hub.
     }
-    await goto(next === undefined ? CleanupRoute.utility() : CleanupRoute.rewind({ monthDay: next }));
+    done = {
+      kept: counts.keep,
+      favorites: counts.fav,
+      trashed: trashedCount,
+      freedBytes: trashedCount > 0 ? freedBytes : 0,
+      streak,
+      next,
+    };
+  };
+
+  const goToNextDay = async () => {
+    if (done?.next === undefined) {
+      return;
+    }
+    rewindDirection.set(1);
+    await goto(CleanupRoute.rewind({ monthDay: done.next }));
+  };
+
+  const goToHub = async () => {
+    await goto(CleanupRoute.utility());
   };
 
   const onAssetsDelete = (ids: string[]) => {
@@ -530,14 +576,32 @@
       finish: () => void onFinishDay(),
       openInNewTab: mode === 'one' ? openCurrentInNewTab : undefined,
     },
-    // Off while the viewer or any modal (the leave confirmation, the shortcuts list) is open.
-    () => assetViewerManager.isViewing || isModalOpen(),
+    // Off while the viewer, any modal (the leave confirmation, the shortcuts list) or the success card is open.
+    () => assetViewerManager.isViewing || isModalOpen() || done !== null,
   )}
 />
 
 <OnEvents {onAssetsDelete} />
 
-<div bind:this={root} class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4" data-testid="cleanup-rewind">
+{#if done}
+  <RewindDayDone
+    date={dayLabel}
+    kept={done.kept}
+    favorites={done.favorites}
+    trashed={done.trashed}
+    freedBytes={done.freedBytes}
+    streak={done.streak}
+    nextDate={done.next === undefined ? undefined : monthDayLabel(done.next, lang)}
+    onNext={() => void goToNextDay()}
+    onHub={() => void goToHub()}
+  />
+{/if}
+
+<div
+  bind:this={root}
+  class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4 pointer-coarse:pb-24"
+  data-testid="cleanup-rewind"
+>
   <header class="mb-4 flex flex-wrap items-end gap-3">
     <div class="min-w-0">
       <Breadcrumbs
@@ -687,6 +751,15 @@
     </label>
   </div>
 
+  {#if showTapHint && mode === 'grid'}
+    <p
+      class="mb-2 hidden rounded-xl bg-primary/10 px-3 py-2 text-xs text-primary pointer-coarse:block"
+      data-testid="cleanup-rewind-tap-hint"
+    >
+      {$t('cleanup_tap_hint')}
+    </p>
+  {/if}
+
   <div bind:this={daySections}>
     {#if mode === 'grid'}
       {#if total === 0}
@@ -713,6 +786,15 @@
         <div use:observeSentinel class="grid place-items-center py-6" data-testid="cleanup-rewind-sentinel">
           <span class="h-3 w-40 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></span>
         </div>
+      {:else if total > 0}
+        <!-- The end of the day's photos: finish here, without scrolling back up to a button. -->
+        <div
+          class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed px-4 py-6 text-center"
+          data-testid="cleanup-rewind-end"
+        >
+          <p class="text-sm text-muted">{$t('cleanup_end_of_day', { values: { date: dayLabel } })}</p>
+          <CleanupFinishButton label={finishLabel} disabled={busy} loading={busy} onclick={() => void onFinishDay()} />
+        </div>
       {/if}
     {:else}
       <RewindOneAtATime
@@ -734,7 +816,7 @@
   </div>
 
   <div
-    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md"
+    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md pointer-coarse:fixed pointer-coarse:inset-x-3 pointer-coarse:bottom-[max(0.75rem,env(safe-area-inset-bottom))] pointer-coarse:my-0 pointer-coarse:gap-2 pointer-coarse:px-3"
     data-motion-reveal
     data-testid="cleanup-rewind-actionbar"
   >
@@ -765,8 +847,27 @@
       <span class="hidden text-muted tabular-nums pointer-fine:inline">
         {$t('cleanup_marked_for_trash', { values: { count: session.counts.trash } })}
       </span>
+      <!-- Phones have no Z key, so Undo is a button, with the counts beside it. -->
+      <IconButton
+        class="pointer-fine:hidden"
+        shape="round"
+        variant="ghost"
+        color="secondary"
+        size="small"
+        icon={mdiUndo}
+        aria-label={$t('undo')}
+        disabled={!session.hasUncommitted}
+        onclick={() => session.undo()}
+        data-testid="cleanup-rewind-undo"
+      />
+      <span class="min-w-0 flex-1 truncate text-muted tabular-nums pointer-fine:hidden">
+        {$t('cleanup_bar_summary', {
+          values: { kept: session.counts.keep + session.counts.fav, trash: session.counts.trash },
+        })}
+      </span>
+      <!-- Finishing trashes the marked photos too, so phones keep only the Finish button. -->
       <Button
-        class="flex-1 pointer-fine:flex-none"
+        class="hidden pointer-fine:inline-flex"
         size="small"
         color="danger"
         disabled={busy || session.counts.trash === 0}
@@ -776,17 +877,14 @@
       >
         {$t('cleanup_move_to_trash', { values: { count: session.counts.trash } })}
       </Button>
-      <Button
-        class="flex-1 pointer-fine:flex-none"
+      <CleanupFinishButton
+        label={finishLabel}
         size="small"
-        trailingIcon={mdiCheck}
         disabled={busy || total === 0}
         loading={busy}
         onclick={() => void onFinishDay()}
-        data-testid="cleanup-finish-day"
-      >
-        {$t('cleanup_finish_day')}
-      </Button>
+        testId="cleanup-finish-day"
+      />
     </div>
   </div>
 </div>

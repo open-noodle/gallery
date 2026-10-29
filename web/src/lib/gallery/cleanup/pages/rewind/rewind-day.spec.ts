@@ -1,7 +1,7 @@
 import { AssetTypeEnum, CleanupQueue, type CleanupAssetDto } from '@immich/sdk';
 import type { BeforeNavigate } from '@sveltejs/kit';
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { finishedDay } from '$lib/gallery/cleanup/finished-day';
@@ -41,7 +41,11 @@ vi.mock('@immich/ui', async (importOriginal) => {
 });
 vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
-vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pulse: vi.fn() }));
+vi.mock('$lib/gallery/motion', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  pulse: vi.fn(),
+  celebrate: vi.fn(),
+}));
 vi.mock('$app/state', () => ({
   page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
 }));
@@ -204,7 +208,7 @@ describe('RewindDay', () => {
     expect(mocks.toast.primary).not.toHaveBeenCalled();
   });
 
-  it('finishes the day and moves on to the next date that still needs a review', async () => {
+  it('finishes the day, shows the success card and waits for the choice of next date', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({
       days: [
         { monthDay: 923, assetCount: 3, reviewedAt: null },
@@ -219,7 +223,7 @@ describe('RewindDay', () => {
 
     await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup/rewind/925'));
+    const card = await screen.findByTestId('cleanup-day-done');
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: {
         queue: CleanupQueue.Rewind,
@@ -229,7 +233,26 @@ describe('RewindDay', () => {
         completeMonthDay: 923,
       },
     });
-    expect(mocks.toast.success).toHaveBeenCalledWith('cleanup_day_complete');
+    // The card does not move on by itself.
+    expect(mocks.goto).not.toHaveBeenCalled();
+    expect(card).toHaveTextContent('cleanup_day_done_title');
+
+    await fireEvent.click(screen.getByTestId('cleanup-day-done-next'));
+    expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup/rewind/925');
+  });
+
+  it('goes back to the hub from the success card when asked', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({
+      days: [{ monthDay: 925, assetCount: 4, reviewedAt: null }],
+      daysReviewed: 0,
+      streak: 0,
+    });
+    renderDay();
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await fireEvent.click(await screen.findByTestId('cleanup-day-done-hub'));
+
+    expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup');
   });
 
   it('warns about photos in a Space before moving them to the trash, and keeps the marks on cancel', async () => {
@@ -282,7 +305,7 @@ describe('RewindDay', () => {
 
     await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalled());
+    await screen.findByTestId('cleanup-day-done');
     expect(mocks.sdk.getCleanupAssetsInSpaces).not.toHaveBeenCalled();
   });
 
@@ -304,19 +327,30 @@ describe('RewindDay', () => {
 
     await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
 
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup'));
+    await screen.findByTestId('cleanup-day-done');
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: expect.objectContaining({ completeMonthDay: 923 }),
     });
   });
 
-  it('falls back to the hub when no other date needs a review', async () => {
+  it('offers only the way back to the hub when no other date needs a review', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
     renderDay();
 
     await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup'));
+    expect(await screen.findByTestId('cleanup-day-done-hub')).toBeInTheDocument();
+    expect(screen.queryByTestId('cleanup-day-done-next')).not.toBeInTheDocument();
+  });
+
+  it('offers Finish again at the end of the day, once every year is loaded', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
+    renderDay();
+
+    const end = screen.getByTestId('cleanup-rewind-end');
+    await fireEvent.click(within(end).getByRole('button'));
+
+    expect(await screen.findByTestId('cleanup-day-done')).toBeInTheDocument();
   });
 
   it('keeps the marks and stays put when finishing fails', async () => {
@@ -527,6 +561,16 @@ describe('RewindDay', () => {
     expect(screen.getByTestId('cleanup-rewind-subtitle')).toHaveTextContent('cleanup_rewind_subtitle');
   });
 
+  it('undoes the last mark from the Undo button, for phones without a Z key', async () => {
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+    expect(tile('a')).toHaveAttribute('data-mark', 'keep');
+
+    await fireEvent.click(screen.getByTestId('cleanup-rewind-undo'));
+
+    expect(tile('a')).not.toHaveAttribute('data-mark', 'keep');
+  });
+
   it('records the finished date for the hub', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
     finishedDay.take();
@@ -534,7 +578,7 @@ describe('RewindDay', () => {
 
     await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalled());
+    await screen.findByTestId('cleanup-day-done');
     expect(finishedDay.take()).toBe(923);
   });
 

@@ -79,7 +79,15 @@
     </span>
     <div class="ms-auto">
       {#if remaining > 0}
-        <Button size="small" variant="ghost" color="secondary" onclick={() => onKeepRemaining(year)}>
+        <Button
+          size="small"
+          variant="outline"
+          color="secondary"
+          shape="round"
+          leadingIcon={mdiCheck}
+          onclick={() => onKeepRemaining(year)}
+          data-testid="cleanup-keep-remaining-{year}"
+        >
           {$t('cleanup_keep_all_remaining')}
         </Button>
       {:else}
