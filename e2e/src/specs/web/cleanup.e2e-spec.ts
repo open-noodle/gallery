@@ -98,13 +98,13 @@ test.describe('Cleanup Utility', () => {
     await expect(page.getByTestId(`cleanup-rewind-tile-${asset.id}`)).toBeVisible();
 
     await page.getByTestId('cleanup-finish-day').click();
-    await expect(page.getByText('Day complete')).toBeVisible();
 
-    // Finishing the day navigates away (to the next unreviewed day, or the hub) on its own; wait for
-    // that to happen before driving our own navigation, so the two don't race.
-    await page.waitForURL((url) => !url.pathname.endsWith(`/rewind/${monthDay}`));
+    // The success card waits for a choice instead of moving on by itself.
+    await expect(page.getByTestId('cleanup-day-done')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/rewind/${monthDay}$`));
+    await page.getByTestId('cleanup-day-done-hub').click();
 
-    await page.goto('/utilities/cleanup');
+    await expect(page).toHaveURL('/utilities/cleanup');
     await expect(page.getByTestId(`cleanup-cal-${monthDay}`)).toHaveAttribute('data-state', 'reviewed');
   });
 
@@ -123,10 +123,14 @@ test.describe('Cleanup Utility', () => {
     }
 
     await page.goto('/utilities/cleanup/blurry');
-    const tile = page.getByTestId(`cleanup-item-${first.id}`);
-    await expect(tile).toBeVisible();
+    await expect(page.getByTestId(`cleanup-item-${first.id}`)).toBeVisible();
+    await expect(page.getByTestId(`cleanup-item-${second.id}`)).toBeVisible();
+    // Both were uploaded at the same moment, so their queue order is the id tiebreak; open whichever
+    // shows first, so there is a next photo to step to.
+    const tile = page.locator('[data-testid^="cleanup-item-"]').first();
+    const openedId = await tile.getAttribute('data-asset-id');
     await tile.hover();
-    await page.getByTestId(`cleanup-expand-${first.id}`).click();
+    await page.getByTestId(`cleanup-expand-${openedId}`).click();
 
     const photo = page.getByTestId('cleanup-photo-window-photo');
     await expect(photo).toBeVisible();
