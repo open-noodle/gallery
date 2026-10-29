@@ -17,6 +17,7 @@ Gallery checks the caller's role on every endpoint. The three roles (Owner, Edit
 - **Shared face recognition.** People detected across the space are browsable by all members.
 - **Activity log.** A feed of everything that happened in the space: photos added or removed, members joining or leaving, settings changes.
 - **New since last visit.** See what changed since you last opened a space, with badges and timeline dividers.
+- **A badge on photos in a space.** A thumbnail shows when its photo is in one of your spaces: the Spaces icon in the space's color, or with a count when it is in several. See [Seeing Which Photos Are in a Space](#seeing-which-photos-are-in-a-space).
 - **Map view.** Browse a space's geotagged photos on an interactive map.
 - **Search within a space.** Smart search scoped to a single space's assets.
 - **Connected libraries.** Admins can link external libraries to spaces, which pulls in every photo the library holds.
@@ -166,7 +167,20 @@ For the full walkthrough (linking versus creating, cross-owner contributions, pe
 
 1. Open the space.
 2. Long-press to select photos.
-3. Tap **Remove from Space** in the bottom sheet.
+3. Tap **Remove from space** in the bottom sheet.
+
+### From the Photos timeline
+
+You can also remove photos from a space without opening it, from **Photos** on the web and in the mobile app. Select the photos (the [space badge](#seeing-which-photos-are-in-a-space) shows which ones are in a space), then:
+
+- If the selection is in one space you own or edit, the action reads **Remove from** followed by the space's name.
+- If it is in several, **Remove from a space…** lets you choose the space, with how many of the selected photos each one holds.
+
+The removal works as it does inside the space: the web asks you to confirm, the mobile app does not. Only spaces where you are an Owner or Editor are offered.
+
+### Photos that stay
+
+Only photos added to the space directly can be removed this way. A photo that is in the space because it belongs to a linked album, or to a connected library, stays: Gallery tells you which album to remove it from, or that a library brings it (remove it from the library's folder, or unlink the library).
 
 ## Stacked Photos
 
@@ -228,6 +242,19 @@ Hiding asks for confirmation and states how many photos it will actually remove 
 That is the usual surprise: a photo can be in a linked album _and_ in a linked external library, or added to the space directly as well. Hiding the album alone changes nothing for those photos until the other path is hidden too, so hide the whole space (or unlink the library) if you want them all gone.
 
 > Timeline integration cannot be combined with archive, favorites, or trash filters.
+
+## Seeing Which Photos Are in a Space
+
+A photo that is in at least one of your spaces carries a small badge in the top-left corner of its thumbnail, on the web and in the mobile app. Like the other marks on a thumbnail, it is an icon drawn on the photo:
+
+- **One space:** the Spaces icon in the space's color.
+- **Several spaces:** a white Spaces icon with the number of spaces. On small thumbnails in the mobile app, the icon without the number.
+
+Every way into a space counts: added directly, in a linked album, or in a connected library. Spaces and albums you hid from your timeline count too, since the photo is still in them and their members can still see it. Only spaces you are a member of count, and an album linked to a space puts the badge on all of its photos.
+
+The badge does not appear inside a space (its photos, people, map and search), in the trash, the locked folder or shared links. When you select a photo, or point at it on the web, the selection checkmark takes the corner.
+
+The badges follow the changes you make, including a new space color. On the web, other members' changes show when you move to another page; the mobile app follows them as it syncs.
 
 ## Renaming and Editing Space Details
 
@@ -429,6 +456,7 @@ Each space can have an assigned color, chosen during creation or changed later b
 
 - Gradient backgrounds on space cards (when no cover photo or collage is available)
 - Hero banner gradients on the space detail page
+- The badge on the thumbnails of photos that are in a single space
 
 Ten colors are available, matching the user avatar color palette.
 

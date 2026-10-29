@@ -45,6 +45,30 @@ describe(GalleryAssetController.name, () => {
     });
   });
 
+  describe('POST /assets/spaces', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).post('/assets/spaces');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require between 1 and 1000 valid asset ids', async () => {
+      const tooMany = Array.from({ length: 1001 }, () => factory.uuid());
+      for (const assetIds of [[], ['123'], tooMany]) {
+        const { status } = await request(ctx.getHttpServer()).post('/assets/spaces').send({ assetIds });
+        expect(status).toBe(400);
+      }
+      expect(service.getSpaces).not.toHaveBeenCalled();
+    });
+
+    it('should resolve the spaces', async () => {
+      const assetIds = [factory.uuid()];
+      service.getSpaces.mockResolvedValue({ assets: [] });
+      const { status } = await request(ctx.getHttpServer()).post('/assets/spaces').send({ assetIds });
+      expect(status).toBe(200);
+      expect(service.getSpaces).toHaveBeenCalledWith(undefined, { assetIds });
+    });
+  });
+
   describe('PUT /assets/:id/trim', () => {
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/trim`);

@@ -1616,6 +1616,20 @@ export type AssetMetadataBulkResponseDto = {
         [key: string]: any;
     };
 };
+export type AssetSpacesDto = {
+    /** Asset IDs */
+    assetIds: string[];
+};
+export type AssetSpacesItemDto = {
+    /** Asset ID */
+    assetId: string;
+    /** IDs of the caller's spaces that show the asset */
+    spaceIds: string[];
+};
+export type AssetSpacesResponseDto = {
+    /** The requested assets that at least one of the caller's spaces shows */
+    assets: AssetSpacesItemDto[];
+};
 export type ExifResponseDto = {
     /** City name */
     city?: string | null;
@@ -6732,6 +6746,21 @@ export function updateBulkAssetMetadata({ assetMetadataBulkUpsertDto }: {
         ...opts,
         method: "PUT",
         body: assetMetadataBulkUpsertDto
+    })));
+}
+/**
+ * Resolve which of the caller's spaces show the given assets
+ */
+export function getAssetSpaces({ assetSpacesDto }: {
+    assetSpacesDto: AssetSpacesDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetSpacesResponseDto;
+    }>("/assets/spaces", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: assetSpacesDto
     })));
 }
 /**

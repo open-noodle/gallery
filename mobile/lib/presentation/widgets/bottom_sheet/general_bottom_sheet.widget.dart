@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/remove_from_spaces.action.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/archive.action.dart';
 import 'package:immich_mobile/presentation/actions/asset_debug.action.dart';
@@ -59,6 +60,7 @@ class _GeneralBottomSheetState extends ConsumerState<GeneralBottomSheet> {
         .new(action: DeleteAction(source: .timeline)),
         .new(action: FavoriteAction(source: .timeline)),
         .new(action: ArchiveAction(source: .timeline)),
+        .new(action: RemoveFromSpacesAction(source: .timeline)),
         .new(action: TagAction(source: .timeline)),
         .new(action: EditDateTimeAction(source: .timeline)),
         .new(action: EditLocationAction(source: .timeline)),

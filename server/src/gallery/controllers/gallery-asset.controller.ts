@@ -4,6 +4,7 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import { ApiTag, Permission, RouteKey } from 'src/enum.js';
+import { AssetSpacesDto, AssetSpacesResponseDto } from 'src/gallery/dtos/asset-spaces.dto.js';
 import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -28,6 +29,21 @@ export class GalleryAssetController {
   })
   getEditableAssets(@Auth() auth: AuthDto, @Body() dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
     return this.service.getEditable(auth, dto);
+  }
+
+  @Post('spaces')
+  @Authenticated({ permission: Permission.AssetRead })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: "Resolve which of the caller's spaces show the given assets",
+    description:
+      "For each given asset the caller can read, the IDs of the caller's spaces that show it by any path: added " +
+      'to the space, in an album linked to it, or in a library linked to it, hidden from the timeline or not. ' +
+      'Assets in none of them are left out, and hidden, locked and trashed assets are in none.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getAssetSpaces(@Auth() auth: AuthDto, @Body() dto: AssetSpacesDto): Promise<AssetSpacesResponseDto> {
+    return this.service.getSpaces(auth, dto);
   }
 
   @Put('favorites')

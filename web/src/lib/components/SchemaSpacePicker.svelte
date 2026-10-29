@@ -32,7 +32,7 @@
   const nameFor = (id: string) => spaces.find((space) => space.id === id)?.name;
 
   const onChoose = async () => {
-    const space = await modalManager.show(SpacePickerModal);
+    const space = await modalManager.show(SpacePickerModal, {});
     if (!space) {
       return;
     }
