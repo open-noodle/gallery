@@ -256,6 +256,9 @@ class FakeSearchRepository implements GallerySearchRepository {
   /// The parameters of every results call (buckets, smart, metadata), in order.
   final resultParams = <SearchParams>[];
 
+  /// Every options request's parameters, in order.
+  final optionsParams = <SearchParams>[];
+
   /// Single-dimension options requests wait for their completer here: a dimension still on its way.
   final held = <SearchDimension, Completer<void>>{};
 
@@ -389,6 +392,7 @@ class FakeSearchRepository implements GallerySearchRepository {
 
   @override
   Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) async {
+    optionsParams.add(p);
     final old = staleLibrary;
     if (old != null) {
       final current = library;

@@ -3046,6 +3046,7 @@ export type MetadataSearchDto = {
     lensModel?: string | null;
     /** Library ID to filter by */
     libraryId?: string | null;
+    libraryView?: LibraryView;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3162,6 +3163,7 @@ export type SearchOptionsRequestDto = {
     language?: string;
     /** Filter by lens model */
     lensModel?: string | null;
+    libraryView?: LibraryView;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3362,6 +3364,7 @@ export type RandomSearchDto = {
     lensModel?: string | null;
     /** Library ID to filter by */
     libraryId?: string | null;
+    libraryView?: LibraryView;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3439,6 +3442,7 @@ export type SmartSearchDto = {
     lensModel?: string | null;
     /** Library ID to filter by */
     libraryId?: string | null;
+    libraryView?: LibraryView;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3605,6 +3609,7 @@ export type StatisticsSearchDto = {
     lensModel?: string | null;
     /** Library ID to filter by */
     libraryId?: string | null;
+    libraryView?: LibraryView;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -8719,7 +8724,7 @@ export function getExploreData(opts?: Oazapfts.RequestOpts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, ownerId, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, libraryView, make, minFileSize, model, ocr, ownerId, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -8733,6 +8738,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     isOffline?: boolean;
     lensModel?: string | null;
     libraryId?: string | null;
+    libraryView?: LibraryView;
     make?: string | null;
     minFileSize?: number;
     model?: string | null;
@@ -8774,6 +8780,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         isOffline,
         lensModel,
         libraryId,
+        libraryView,
         make,
         minFileSize,
         model,
@@ -10760,7 +10767,7 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -10773,6 +10780,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
     isTrashed?: boolean;
     key?: string;
     lensModel?: string;
+    libraryView?: LibraryView;
     make?: string;
     model?: string;
     ocr?: string;
@@ -10817,6 +10825,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
         isTrashed,
         key,
         lensModel,
+        libraryView,
         make,
         model,
         ocr,
@@ -10851,7 +10860,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
 /**
  * Get time bucket covers
  */
-export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -10864,6 +10873,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
     isTrashed?: boolean;
     key?: string;
     lensModel?: string;
+    libraryView?: LibraryView;
     make?: string;
     model?: string;
     ocr?: string;
@@ -10908,6 +10918,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
         isTrashed,
         key,
         lensModel,
+        libraryView,
         make,
         model,
         ocr,
@@ -10942,7 +10953,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -10955,6 +10966,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
     isTrashed?: boolean;
     key?: string;
     lensModel?: string;
+    libraryView?: LibraryView;
     make?: string;
     model?: string;
     ocr?: string;
@@ -10998,6 +11010,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
         isTrashed,
         key,
         lensModel,
+        libraryView,
         make,
         model,
         ocr,
@@ -12134,6 +12147,10 @@ export enum QueueJobStatus {
     Delayed = "delayed",
     Waiting = "waiting",
     Paused = "paused"
+}
+export enum LibraryView {
+    Personal = "personal",
+    Spaces = "spaces"
 }
 export enum SearchOrderField {
     FileCreatedAt = "fileCreatedAt",

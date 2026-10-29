@@ -13,6 +13,7 @@ import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/photos_view_menu.widget.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
@@ -140,9 +141,8 @@ void main() {
   group('adopted timeline route contracts', () {
     test('Main Photos keeps app bar selector and route-local controls contract', () {
       expect(MainTimelinePage.timelineOverviewControlsEnabled, isTrue);
-      // The Photos app bar leads with the grouping selector (#625); it also carries
-      // the live-search sort and filter actions (#654), so it is no longer a single action.
-      expect(PhotosTimelineAppBar.actions.first, isA<TimelineGroupingSelector>());
+      // The Photos app bar's display menu holds the grouping (#625) with the library view (#1038).
+      expect(PhotosTimelineAppBar.actions.first, isA<PhotosViewMenuButton>());
     });
 
     test('all pill-adopting routes expose controls flag; composed pages expose extra-sliver heights', () {

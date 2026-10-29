@@ -153,6 +153,7 @@
           onExpandFilters={() => (controller.filterCollapsed = false)}
           showSearchButton={searchButton && controller.isBrowse && !selecting}
           onSearch={searchButton ? () => globalSearchManager.open() : undefined}
+          showLibraryView={controller.showLibraryView && !selecting}
         />
       {/if}
       {#if controller.showSearchResults && !pickerOpen}

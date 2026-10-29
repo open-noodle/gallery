@@ -1,5 +1,6 @@
 import {
   AssetEditAction,
+  LibraryView,
   getAssetInfo,
   updateAsset,
   updateAssetFavorites,
@@ -8,6 +9,7 @@ import {
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
+import { libraryView } from '$lib/gallery/library-view/library-view.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
@@ -80,6 +82,8 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), function () {
     featureFlagsManager: { init: vi.fn(), loadFeatureFlags: vi.fn(), value: {} } as never,
   };
 });
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 describe('AssetService', () => {
   describe('getAssetActions', () => {
@@ -269,6 +273,17 @@ describe('AssetService', () => {
       expect(downloadUrlMock.mock.calls[0][0]).toContain('edited=false');
       expect(downloadUrlMock.mock.calls[0][0]).toContain('c=cache-1');
     });
+  });
+});
+
+describe('view in timeline', () => {
+  it('#1038: goes back to both library views, so the photo is on the timeline', async () => {
+    libraryView.current = LibraryView.Personal;
+    const action = getAssetActions(() => '', assetFactory.build()).ViewInTimeline;
+
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(libraryView.current).toBe('both');
   });
 });
 

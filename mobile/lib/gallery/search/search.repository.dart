@@ -117,6 +117,7 @@ class GallerySearchRepository {
       spaceId: _opt(p.spaceId),
       withSharedSpaces: _opt(p.withSharedSpaces),
       withPartners: _opt(p.withPartners),
+      libraryView: _opt(p.libraryView?.apiValue),
       query: _opt(p.query),
       queryAssetId: _opt(p.queryAssetId),
       dimensions: Optional.present([
@@ -347,6 +348,7 @@ class GallerySearchRepository {
       visibility: _visibility(a.p.visibility),
       withPartners: a.p.withPartners,
       withSharedSpaces: a.p.withSharedSpaces,
+      libraryView: a.p.libraryView?.apiValue,
     );
     return buckets ?? const [];
   }
@@ -390,6 +392,7 @@ class GallerySearchRepository {
       visibility: _visibility(a.p.visibility),
       withPartners: a.p.withPartners,
       withSharedSpaces: a.p.withSharedSpaces,
+      libraryView: a.p.libraryView?.apiValue,
     );
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, utf8.decode(response.bodyBytes));
@@ -468,6 +471,7 @@ class GallerySearchRepository {
           ownerId: _opt(p.ownerId),
           spaceId: _opt(p.spaceId),
           withSharedSpaces: _opt(p.withSharedSpaces),
+          libraryView: _opt(p.libraryView?.apiValue),
           order: _opt(_order(sort) ?? AssetOrder.desc),
           page: Optional.present(page),
           size: Optional.present(size),
@@ -500,6 +504,7 @@ class GallerySearchRepository {
         ownerId: _opt(p.ownerId),
         spaceId: _opt(p.spaceId),
         withSharedSpaces: _opt(p.withSharedSpaces),
+        libraryView: _opt(p.libraryView?.apiValue),
       ),
     );
     return response?.total;

@@ -88,7 +88,7 @@ class Timeline extends ConsumerWidget {
 
   /// Overlay the always-visible Years|Months|All bottom pill and reserve bottom
   /// clearance for it. Detail timelines (album/space/person/...) opt in; the main
-  /// Photos page keeps its app-bar chip and stays off.
+  /// Photos page keeps its grouping in the app-bar menu and stays off.
   final bool withGroupingPill;
 
   /// The space this timeline shows, for timelines scoped to one. Only a "view in

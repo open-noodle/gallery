@@ -9,6 +9,7 @@ import type { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SearchFilter } from 'src/dtos/search.dto.js';
 import { AssetVisibility } from 'src/enum.js';
+import { type LibraryViewOptions, checkLibraryView } from 'src/gallery/utils/library-view.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -32,7 +33,7 @@ import {
  */
 export type ViewerSurface = 'timeline' | 'search' | 'map' | 'filtered-map' | 'memories' | 'folders';
 
-export type ViewerScopeRequest = {
+export type ViewerScopeRequest = LibraryViewOptions & {
   userId?: string;
   withSharedSpaces?: boolean;
   withSharedAlbums?: boolean;
@@ -179,6 +180,7 @@ export const resolveViewerScope = async <S extends ViewerSurface>(
   repos: { sharedSpaceRepository: SharedSpaceRepository; faceIdentityRepository: FaceIdentityRepository },
   ...[auth, surface, request = {}, db]: ViewerScopeArgs<S>
 ): Promise<ViewerScopeFor<S>> => {
+  checkLibraryView(auth, surface, request);
   const userId = auth.user.id;
   const rule = surfaceRule(surface, request);
   const tokens = request.personIds?.filter(Boolean) ?? [];
@@ -257,7 +259,7 @@ export const resolveViewerScope = async <S extends ViewerSurface>(
 };
 
 /** The Gallery flat fields a structured (search V3) request may carry next to `filter`. */
-export type StructuredSearchRequest = {
+export type StructuredSearchRequest = LibraryViewOptions & {
   filter?: SearchFilter;
   withSharedSpaces?: boolean;
   spaceId?: string;
@@ -272,8 +274,10 @@ export type StructuredSearchRequest = {
  * answer with a wider set than was asked for.
  */
 export const structuredSearchViewerRequest = (dto: StructuredSearchRequest, albumIds: string[]): ViewerScopeRequest => {
-  if (dto.spaceId || dto.spacePersonIds?.length || dto.ownerId || dto.isInAlbum !== undefined) {
-    throw new BadRequestException('spaceId, spacePersonIds, ownerId and isInAlbum need the flat search fields');
+  if (dto.spaceId || dto.spacePersonIds?.length || dto.ownerId || dto.isInAlbum !== undefined || dto.libraryView) {
+    throw new BadRequestException(
+      'spaceId, spacePersonIds, ownerId, isInAlbum and libraryView need the flat search fields',
+    );
   }
   const filter = dto.filter ?? {};
   return {

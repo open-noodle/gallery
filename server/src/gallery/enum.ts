@@ -37,3 +37,14 @@ export const TimeBucketSizeSchema = z
   .enum(TimeBucketSize)
   .describe('Timeline bucket granularity')
   .meta({ id: 'TimeBucketSize' });
+
+/** #1038: which photos the Photos timeline shows (unset: both). */
+export enum LibraryView {
+  Personal = 'personal',
+  Spaces = 'spaces',
+}
+
+export const LibraryViewSchema = z
+  .enum(LibraryView)
+  .describe('Only your photos that are in no space, or only the photos of the spaces on your timeline (unset: both)')
+  .meta({ id: 'LibraryView' });

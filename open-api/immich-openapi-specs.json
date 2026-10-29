@@ -14356,6 +14356,14 @@
             }
           },
           {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -23874,6 +23882,14 @@
             }
           },
           {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -24301,6 +24317,14 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
             }
           },
           {
@@ -24736,6 +24760,14 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
             }
           },
           {
@@ -33894,6 +33926,14 @@
         ],
         "type": "object"
       },
+      "LibraryView": {
+        "description": "Only your photos that are in no space, or only the photos of the spaces on your timeline (unset: both)",
+        "enum": [
+          "personal",
+          "spaces"
+        ],
+        "type": "string"
+      },
       "LicenseKeyDto": {
         "properties": {
           "activationKey": {
@@ -34931,6 +34971,9 @@
               }
             ],
             "x-immich-state": "Deprecated"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "deprecated": true,
@@ -38043,6 +38086,9 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
+          },
           "make": {
             "deprecated": true,
             "description": "Filter by camera make",
@@ -39333,6 +39379,9 @@
             "description": "Filter by lens model",
             "nullable": true,
             "type": "string"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "description": "Filter by camera make",
@@ -41880,6 +41929,9 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
+          },
           "make": {
             "deprecated": true,
             "description": "Filter by camera make",
@@ -43270,6 +43322,9 @@
               }
             ],
             "x-immich-state": "Deprecated"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "deprecated": true,

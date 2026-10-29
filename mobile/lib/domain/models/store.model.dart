@@ -23,6 +23,8 @@ enum StoreKey<T> {
   searchPeopleSort<String>._(90003),
   searchPlacesSort<String>._(90004),
   searchPeopleType<String>._(90005),
+  // The Photos tab's library view (lib/gallery/library_view.provider.dart, #1038).
+  photosLibraryView<String>._(90007),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
