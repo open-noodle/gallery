@@ -48,6 +48,7 @@ export const updateSpaceDetails = async (
     // string clears it server-side, whereas `undefined` would be dropped from the update
     // payload and keep the old value.
     await updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto });
+    eventManager.emit('SpaceUpdate', { spaceId });
     toastManager.primary($t('spaces_edit_success'));
 
     return true;

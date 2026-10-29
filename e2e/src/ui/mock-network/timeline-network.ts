@@ -135,6 +135,14 @@ export const setupTimelineMockApiRoutes = async (
     await route.fallback();
   });
 
+  // Every mounted thumbnail asks which spaces hold its asset (the space badge); none here.
+  await context.route('**/api/assets/spaces', async (route, request) => {
+    if (request.method() === 'POST') {
+      return route.fulfill({ status: 200, contentType: 'application/json', json: { assets: [] } });
+    }
+    await route.fallback();
+  });
+
   await context.route('**/api/assets/*/ocr', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', json: [] });
   });

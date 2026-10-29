@@ -81,6 +81,7 @@ eventManager.on({
   AlbumDelete: () => resetRecentAlbums(),
   SpaceAddAssets: () => resetRecentSpaces(),
   SpaceRemoveAssets: () => resetRecentSpaces(),
+  SpaceUpdate: () => resetRecentSpaces(),
   SpaceLinkAlbum: ({ spaceId }) => {
     resetRecentSpaces();
     dropSpaceAlbumCache(spaceId);

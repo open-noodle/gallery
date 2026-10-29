@@ -25,6 +25,7 @@
   import type { ClassValue } from 'svelte/elements';
   import { fade } from 'svelte/transition';
   import Thumbhash from '$lib/components/Thumbhash.svelte';
+  import SpaceBadge from '$lib/gallery/space-badge/SpaceBadge.svelte';
   import ImageThumbnail from './ImageThumbnail.svelte';
   import VideoThumbnail from './VideoThumbnail.svelte';
   interface Props {
@@ -317,6 +318,7 @@
           ></div>
         {/if}
 
+        <SpaceBadge assetId={asset.id} enabled={!readonly} covered={mouseOver || selected || selectionCandidate} />
         <!-- Favorite asset star -->
         {#if !authManager.isSharedLink && asset.isFavorite}
           <div class="absolute inset-s-2 bottom-2 z-2">

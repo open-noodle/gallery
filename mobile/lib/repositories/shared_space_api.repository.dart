@@ -1,17 +1,31 @@
+import 'dart:async';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/people_sort.dart';
 import 'package:openapi/api.dart';
 
-final sharedSpaceApiRepositoryProvider = Provider((ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider)));
+final sharedSpaceApiRepositoryProvider = Provider(
+  (ref) => SharedSpaceApiRepository(
+    ref.watch(apiServiceProvider),
+    // Queued behind a sync already running, which may have read the space before the change.
+    onSpaceChanged: () => unawaited(ref.read(backgroundSyncProvider).syncRemote(enqueue: true)),
+  ),
+);
 
 class SharedSpaceApiRepository extends ApiRepository {
   final ApiService _apiService;
 
-  SharedSpaceApiRepository(this._apiService);
+  /// Called once the server has taken a change to a space's photos or look. The timeline's space marks read the
+  /// local tables, which the change reaches at the next sync, so the provider asks for one now. Here rather than at
+  /// the call sites so that every surface that adds, removes or edits gets it.
+  final void Function()? _onSpaceChanged;
+
+  SharedSpaceApiRepository(this._apiService, {this._onSpaceChanged});
 
   // Resolved lazily on each call. `ApiService.setEndpoint()` reassigns the
   // `*Api` fields to new instances tied to a fresh ApiClient (and basePath);
@@ -57,7 +71,9 @@ class SharedSpaceApiRepository extends ApiRepository {
       description: description == null ? const Optional.absent() : Optional.present(description),
       color: color == null ? const Optional.absent() : Optional.present(color),
     );
-    return await checkNull(_api.updateSpace(id, dto));
+    final space = await checkNull(_api.updateSpace(id, dto));
+    _onSpaceChanged?.call();
+    return space;
   }
 
   Future<void> delete(String id) async {
@@ -188,11 +204,13 @@ class SharedSpaceApiRepository extends ApiRepository {
   Future<void> addAssets(String spaceId, List<String> assetIds) async {
     final dto = SharedSpaceAssetAddDto(assetIds: assetIds);
     await _api.addAssets(spaceId, dto);
+    _onSpaceChanged?.call();
   }
 
   Future<void> removeAssets(String spaceId, List<String> assetIds) async {
     final dto = SharedSpaceAssetRemoveDto(assetIds: assetIds);
     await _api.removeAssets(spaceId, dto);
+    _onSpaceChanged?.call();
   }
 
   /// Link an album to a shared space (PUT /shared-spaces/{id}/albums/{albumId}).
