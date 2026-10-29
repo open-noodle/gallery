@@ -435,8 +435,9 @@ describe(DatabaseBackupService.name, () => {
 
     it('should abort the backup and remove the temporary file when the signal is aborted', async () => {
       await expect(sut.createDatabaseBackup('', AbortSignal.abort())).rejects.toThrow('The operation was aborted');
-      expect(mocks.storage.unlink).toHaveBeenCalled();
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      // Gallery #1226: the dump goes through the backup store, so the staged .tmp key is what gets removed.
+      expect(staging.delete).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+      expect(staging.rename).not.toHaveBeenCalled();
     });
 
     it('should run a database backup successfully', async () => {
