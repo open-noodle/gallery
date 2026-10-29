@@ -180,10 +180,10 @@ const seed = async () => {
     if (seedValue.quality) {
       const { sharpness, brightness = 120, clippedDark = 0 } = seedValue.quality;
       await db.query(
-        `INSERT INTO "asset_quality" ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "version")
-         VALUES ($1, $2, $3, $4, $5, 0, 1)
+        `INSERT INTO "asset_quality" ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "version", "screenshotVersion")
+         VALUES ($1, $2, $3, $4, $5, 0, 1, 1)
          ON CONFLICT ("assetId") DO UPDATE SET "sharpness" = EXCLUDED."sharpness", "brightness" = EXCLUDED."brightness",
-           "clippedDark" = EXCLUDED."clippedDark", "clippedBright" = 0, "version" = 1`,
+           "clippedDark" = EXCLUDED."clippedDark", "clippedBright" = 0, "version" = 1, "screenshotVersion" = 1`,
         [id(`asset:${label}`), me.userId, sharpness, brightness, clippedDark],
       );
     }
@@ -294,8 +294,8 @@ const seedQueues = async () => {
       const { sharpness, clippedBright = 0, isScreenshot = false } = seedValue.quality;
       await db.query(
         `INSERT INTO "asset_quality"
-           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version")
-         VALUES ($1, $2, $3, 120, 0, $4, $5, 1)`,
+           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version", "screenshotVersion")
+         VALUES ($1, $2, $3, 120, 0, $4, $5, 1, 1)`,
         [assetId, me.userId, sharpness, clippedBright, isScreenshot],
       );
     }
@@ -409,8 +409,8 @@ const seedSeries = async () => {
     if (seedValue.sharpness !== undefined) {
       await db.query(
         `INSERT INTO "asset_quality"
-           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version")
-         VALUES ($1, $2, $3, 120, 0, 0, false, 1)`,
+           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version", "screenshotVersion")
+         VALUES ($1, $2, $3, 120, 0, 0, false, 1, 1)`,
         [assetId, me.userId, seedValue.sharpness],
       );
     }
