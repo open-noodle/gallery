@@ -22,7 +22,7 @@ import '../search/switch_over_harness.dart' show stubRemoteImages;
 import 'cleanup_test_utils.dart';
 
 // Slice 2's screens (specs/2026-10-29-mobile-library-cleanup-design.md, "Slice 2"): the Library entry and the overview,
-// under a small router holding the real overview and placeholder routes. The Library stand-in is the action grid's
+// under a small router holding the real overview, rewind, queue and year routes. The Library stand-in is the action grid's
 // shape: the real `LibraryCleanupButton` under a row of upstream-looking buttons, as `library.page.dart` places it.
 
 const _libraryName = 'CleanupTestLibrary';
@@ -34,7 +34,7 @@ class CleanupOverviewRouter extends RootStackRouter {
   List<AutoRoute> get routes => [
     AutoRoute(page: _library, initial: true),
     AutoRoute(page: LibraryCleanupOverviewRoute.page),
-    AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
+    AutoRoute(page: LibraryCleanupQueueRoute.page),
     AutoRoute(page: LibraryCleanupRewindRoute.page),
     AutoRoute(page: LibraryCleanupYearRoute.page),
   ];

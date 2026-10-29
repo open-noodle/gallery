@@ -42,9 +42,17 @@ class LibraryCleanupDetailsRequest {
     this.heroTag,
     this.onOpenInLibrary,
     this.onShowDay,
+    this.fullAsset,
+    this.marks = LibraryCleanupMark.values,
   });
 
   final CleanupAssetDto asset;
+
+  /// The full asset when the session already has it (a duplicate copy): the sheet then only asks for the albums.
+  final AssetResponseDto? fullAsset;
+
+  /// The pinned actions offered, in order trash, favourite, keep. A series frame is only kept or trashed.
+  final List<LibraryCleanupMark> marks;
 
   /// Under the date: how long ago and the position in the session ("7 years ago · Photo 16 of 42").
   final String? subtitle;
@@ -233,7 +241,10 @@ class _Sheet extends ConsumerWidget {
     final t = context.t;
     final asset = request.asset;
     // Shows the card's data at once; what the server adds fills in place. A failure adds nothing, and says nothing.
-    final details = ref.watch(libraryCleanupDetailsProvider(asset.id)).valueOrNull;
+    final known = request.fullAsset;
+    final details = known == null
+        ? ref.watch(libraryCleanupDetailsProvider(asset.id)).valueOrNull
+        : LibraryCleanupDetails(asset: known, albums: ref.watch(libraryCleanupAlbumsProvider(asset.id)).valueOrNull);
     final full = details?.asset;
     final exif = full?.exifInfo.orElse(null);
     final rows = _Rows(context, asset, full, exif, details?.albums);
@@ -360,7 +371,7 @@ class _Sheet extends ConsumerWidget {
               ],
             ),
           ),
-          _Actions(onMark: onMark),
+          _Actions(marks: request.marks, onMark: onMark),
         ],
       ),
     );
@@ -540,8 +551,9 @@ class _Row extends StatelessWidget {
 
 /// Keep, Favourite and Trash, pinned at the bottom of the sheet. Choosing one closes the sheet and decides the photo.
 class _Actions extends StatelessWidget {
-  const _Actions({required this.onMark});
+  const _Actions({required this.marks, required this.onMark});
 
+  final List<LibraryCleanupMark> marks;
   final ValueChanged<LibraryCleanupMark> onMark;
 
   @override
@@ -578,9 +590,10 @@ class _Actions extends StatelessWidget {
       child: Row(
         spacing: 8,
         children: [
-          action(LibraryCleanupMark.trash, Icons.close_rounded, t.trash),
-          action(LibraryCleanupMark.favorite, Icons.favorite_rounded, t.favorite),
-          action(LibraryCleanupMark.keep, Icons.check_rounded, t.keep),
+          if (marks.contains(LibraryCleanupMark.trash)) action(LibraryCleanupMark.trash, Icons.close_rounded, t.trash),
+          if (marks.contains(LibraryCleanupMark.favorite))
+            action(LibraryCleanupMark.favorite, Icons.favorite_rounded, t.favorite),
+          if (marks.contains(LibraryCleanupMark.keep)) action(LibraryCleanupMark.keep, Icons.check_rounded, t.keep),
         ],
       ),
     );

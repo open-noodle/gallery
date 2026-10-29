@@ -30,7 +30,9 @@ So two files may hold the same request with different responses (`020-rewind-815
 twice (`023`–`025`: the overview reads the day, then the rewind it opens reads it again). A test serves only the files
 its flow sends. The mobile stand-in serves matching fixtures in file order, **each once**: a request that has no
 unserved fixture left fails the test, like a request that matches none. `rewind_e2e_test.dart` walks `020`–`053`
-through the real rewind screens, and `cleanup_queues_e2e_test.dart` walks `200`–`233` through the queue screen.
+through the real rewind screens, `cleanup_queues_e2e_test.dart` walks `200`–`233` through the queue screen, and
+`cleanup_bursts_e2e_test.dart` and `cleanup_duplicates_e2e_test.dart` walk `300`–`305` and `310`–`314` through the
+series queues.
 
 | Files         | What the app does                                                                                                     |
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -49,6 +51,8 @@ through the real rewind screens, and `cleanup_queues_e2e_test.dart` walks `200`�
 | `200`–`211`   | The queue screen on Blurry: count and pages with the defaults, then blurry only, paging on, apply, undo the trash     |
 | `220`–`223`   | Screenshots: count, one page, three trashed from the grid                                                             |
 | `230`–`233`   | Space hogs: count and page with the web's defaults, then every type from 50 MiB                                       |
+| `300`–`305`   | Bursts: count, one page; one commit for two accepted series, a stack for the third, then the trash undo               |
+| `310`–`314`   | Duplicates: the list; the lookup, one resolve for two groups, one dismiss (204), then the trash undo                  |
 
 ## File format
 
@@ -57,7 +61,7 @@ through the real rewind screens, and `cleanup_queues_e2e_test.dart` walks `200`�
   "description": "…",
   "responseView": "no-cleanup",       // optional: the response as another server would give it (see below)
   "request": {
-    "method": "POST",
+    "method": "POST",                 // GET, POST or DELETE
     "path": "/api/cleanup/commit",    // includes the /api prefix the app's base URL carries
     "query": { "key": "value" },      // optional; a repeated key is an array of its values, in order
     "body": { … },                    // optional; the JSON body exactly as sent
@@ -96,6 +100,11 @@ Seeded values (taken dates, places, sizes, sharpness) are real.
   recorded): four more blurry photos (`blurry-12` to `blurry-15`, the newest) and an overexposed one (`bright-1`);
   four screenshots (`shot-1`, `shot-2` phone screens, `shot-3` landscape, `shot-4` with no dimensions); and three
   large files (`hog-1` 300 MiB and `hog-2` 150 MiB videos, `hog-3` an 80 MiB photo).
+- Seeded at `300`, the same way: three bursts, `burst-a1`–`a3` and `burst-c1`–`c2` from a camera burst id
+  (`asset_exif.autoStackId`) and `burst-b1`–`b3` found by time and looks (their `smart_search` embeddings are equal; the
+  stack is `stack:burst-c`, named from the `304` response); and three duplicate groups, `duplicate:a` (`dup-a1`,
+  `dup-a2`), `duplicate:b` (`dup-b1`–`b3`) and `duplicate:c` (`dup-c1`, `dup-c2`), whose ids are fixed so the server
+  lists them in one order. In each duplicate group the largest file and the highest resolution are different copies.
 
 ### Fallback views
 
@@ -124,5 +133,4 @@ Headers and auth are not matched.
 ## Limits of the recording stack
 
 The e2e stack runs without machine learning, so only the facts the seed writes (`asset_quality`, sizes, places) are
-real; the quality job's own output is replaced by the seed. Burst and duplicate queues arrive with the slice that uses
-them.
+real; the quality job's own output is replaced by the seed, and so are the embeddings a time-only burst needs.

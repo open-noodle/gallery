@@ -12,29 +12,39 @@ import '../search/switch_over_harness.dart' show stubRemoteImages;
 import 'cleanup_overview_harness.dart';
 
 // Slice 8's screens (specs/2026-10-29-mobile-library-cleanup-design.md, "Slice 8") under a small router holding the
-// real overview, year, month and placeholder routes, with the app's hero controller.
+// real overview, year and month routes and a stand-in for the rewind, with the app's hero controller.
+
+const _rewindName = 'YearTestRewind';
 
 class CleanupYearRouter extends RootStackRouter {
   CleanupYearRouter({required this.startAtOverview});
 
   final bool startAtOverview;
 
+  late final _rewind = PageInfo(
+    _rewindName,
+    builder: (_) => Scaffold(
+      appBar: AppBar(),
+      body: const Text('rewind', key: Key('test-rewind')),
+    ),
+  );
+
   @override
   List<AutoRoute> get routes => [
     AutoRoute(page: LibraryCleanupOverviewRoute.page, initial: startAtOverview),
     AutoRoute(page: LibraryCleanupYearRoute.page, initial: !startAtOverview),
     AutoRoute(page: LibraryCleanupMonthRoute.page),
-    AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
+    AutoRoute(page: _rewind),
   ];
 }
 
-/// Records every rewind the screens open, and opens the placeholder as the real function does on this branch.
+/// Records every rewind the screens open, and opens a stand-in for it.
 class RewindSpy {
   final opened = <int>[];
 
   Override get override => libraryCleanupRewindOpenerProvider.overrideWithValue((context, monthDay) {
     opened.add(monthDay);
-    return context.pushRoute(LibraryCleanupPlaceholderRoute(title: 'rewind $monthDay'));
+    return context.pushRoute(const PageRouteInfo(_rewindName));
   });
 }
 

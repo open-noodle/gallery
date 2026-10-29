@@ -59,7 +59,6 @@ class RewindTestRouter extends RootStackRouter {
   List<AutoRoute> get routes => [
     AutoRoute(page: _home, initial: true),
     AutoRoute(page: LibraryCleanupOverviewRoute.page),
-    AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
     AutoRoute(page: LibraryCleanupRewindRoute.page),
     AutoRoute(page: _viewer),
     AutoRoute(page: _day),

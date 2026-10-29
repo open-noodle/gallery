@@ -34,7 +34,7 @@ import 'rewind_harness.dart';
 //                                     trash off offers no undo
 // Restore     When the app dies with pending marks and the queue is reopened   Then the marks are back, and it says so
 // Close       When ‹ is pressed with marks   Then Apply / Discard / Keep going
-// Overview    When a quick win is tapped   Then its queue opens with the cover flying in; Bursts still a placeholder
+// Overview    When a quick win is tapped   Then its queue opens with the cover flying in
 
 const _mib = 1048576;
 
@@ -573,12 +573,6 @@ void main() {
       );
       await tapKey(tester, 'cleanup-session-back');
       expect(find.byKey(const Key('cleanup-quick-wins')), findsOneWidget);
-    });
-
-    testWidgets('Bursts and Duplicates still open the placeholder', (tester) async {
-      await openOverview(tester);
-      await tapKey(tester, 'cleanup-quick-win-bursts');
-      expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget);
     });
   });
 }

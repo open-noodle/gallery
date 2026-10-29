@@ -64,14 +64,11 @@ final libraryCleanupRepositoryProvider = Provider<LibraryCleanupRepository>((ref
   return LibraryCleanupRepository(
     cleanupApi: api.cleanupApi,
     trashApi: api.trashApi,
+    duplicatesApi: api.duplicatesApi,
+    stacksApi: api.stacksApi,
     timeZone: ref.watch(libraryCleanupTimeZoneProvider),
   );
 });
-
-// ignore: unused-code
-final libraryCleanupDuplicatesApiProvider = Provider<DuplicatesApi>(
-  (ref) => ref.watch(apiServiceProvider).duplicatesApi,
-);
 
 /// Where the saved marks live; tests point it at a temporary folder.
 final libraryCleanupMarksDirectoryProvider = Provider<Future<Directory> Function()>(

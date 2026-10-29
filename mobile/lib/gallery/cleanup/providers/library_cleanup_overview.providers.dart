@@ -5,6 +5,7 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart'
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
+import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_series.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup_marks_store.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:openapi/api.dart';
@@ -101,10 +102,13 @@ final libraryCleanupDayPhotosProvider = FutureProvider.autoDispose.family<Librar
 
 /// One quick win's count, without filters (as the web hub asks). A 403 hides the card: the user may not use that
 /// queue (Duplicates for a session without the duplicate permission). Any other failure keeps the card, without a
-/// figure.
+/// figure. Once the duplicates themselves were refused, the Duplicates card is hidden without asking again.
 final libraryCleanupQueueCountProvider = FutureProvider.autoDispose
     .family<LibraryCleanupQueueCount, LibraryCleanupQueue>((ref, queue) async {
       ref.watch(libraryCleanupUserIdProvider);
+      if (queue == LibraryCleanupQueue.duplicates && ref.watch(libraryCleanupDuplicatesForbiddenProvider)) {
+        return const LibraryCleanupQueueCount.hidden();
+      }
       try {
         return LibraryCleanupQueueCount.loaded(await ref.watch(libraryCleanupRepositoryProvider).queueCount(queue));
       } on ApiException catch (error) {

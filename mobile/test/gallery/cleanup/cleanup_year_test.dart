@@ -368,7 +368,7 @@ void main() {
       await tester.tap(find.byKey(const Key('cleanup-day-sheet-rewind')));
       await settle(tester);
       expect(rewinds.opened, [815]);
-      expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget);
+      expect(find.byKey(const Key('test-rewind')), findsOneWidget);
     });
 
     yearTest('another day swaps the contents in place, sliding from the side of travel', (tester) async {

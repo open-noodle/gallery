@@ -36,7 +36,7 @@ type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Query = Record<string, string | string[]>;
 
 type ContractRequest = {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'DELETE';
   path: string;
   query?: Query;
   body?: Json;
@@ -68,6 +68,8 @@ type FixtureCase = Omit<Fixture, 'response' | 'ids' | 'request'> & {
   before?: () => Promise<void>;
   /** Records the response's `nextCursor` under this name, for a later case's `cursor: '@name'`. */
   saveCursorAs?: string;
+  /** Names the entities the response creates (a new stack), so the normaliser can refer to them. */
+  nameFrom?: (body: Json) => void;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -300,6 +302,130 @@ const seedQueues = async () => {
   }
 };
 
+/**
+ * The series the 300s need (mobile cleanup_bursts_e2e_test.dart and cleanup_duplicates_e2e_test.dart), seeded at `300`:
+ * three bursts, two from the camera's burst id and one by time alone, and three duplicate groups.
+ */
+type SeriesSeed = {
+  takenAt: string;
+  fileSize: number;
+  sharpness?: number;
+  /** The camera's burst id (`asset_exif.autoStackId`); a burst without one is grouped by time and looks. */
+  autoStackId?: string;
+  /** Duplicates: the copy's resolution, so the filmstrip can tell copies apart. */
+  resolution?: { width: number; height: number };
+  duplicate?: string;
+};
+
+/**
+ * Duplicate group ids are fixed (as `duplicate-favorite.e2e-spec.ts` fixes them), so the server lists the groups in
+ * the same order on every run.
+ */
+const duplicateGroups: Record<string, string> = {
+  'duplicate:a': '00000000-0000-4000-8000-000000000301',
+  'duplicate:b': '00000000-0000-4000-8000-000000000302',
+  'duplicate:c': '00000000-0000-4000-8000-000000000303',
+};
+
+const burstFrame = (day: number, second: number, sharpness: number, autoStackId?: string): SeriesSeed => ({
+  takenAt: `2023-09-0${day}T10:00:0${second}.000Z`,
+  fileSize: 3000 + day * 100 + second,
+  sharpness,
+  autoStackId,
+});
+const copy = (takenAt: string, fileSize: number, width: number, height: number, duplicate: string): SeriesSeed => ({
+  takenAt,
+  fileSize,
+  resolution: { width, height },
+  duplicate,
+});
+const seriesSeeds: Record<string, SeriesSeed> = {
+  // Three frames from a camera burst; the second is the sharpest.
+  'burst-a1': burstFrame(1, 0, 20, 'cleanup-burst-a'),
+  'burst-a2': burstFrame(1, 1, 80, 'cleanup-burst-a'),
+  'burst-a3': burstFrame(1, 2, 40, 'cleanup-burst-a'),
+  // Three shots a second apart with no burst id, which look alike (the same embedding); the third is the sharpest.
+  'burst-b1': burstFrame(2, 0, 50),
+  'burst-b2': burstFrame(2, 1, 30),
+  'burst-b3': burstFrame(2, 2, 90),
+  // Two frames from another camera burst.
+  'burst-c1': burstFrame(3, 0, 70, 'cleanup-burst-c'),
+  'burst-c2': burstFrame(3, 1, 60, 'cleanup-burst-c'),
+  // Duplicates, an hour apart so they make no burst. In each group the largest file is not the sharpest resolution.
+  'dup-a1': copy('2023-10-01T10:00:00.000Z', 3000, 4000, 3000, 'duplicate:a'),
+  'dup-a2': copy('2023-10-01T11:00:00.000Z', 6000, 2000, 1500, 'duplicate:a'),
+  'dup-b1': copy('2023-10-02T10:00:00.000Z', 2500, 1000, 1000, 'duplicate:b'),
+  'dup-b2': copy('2023-10-02T11:00:00.000Z', 4500, 3000, 2000, 'duplicate:b'),
+  'dup-b3': copy('2023-10-02T12:00:00.000Z', 3500, 4000, 3000, 'duplicate:b'),
+  'dup-c1': copy('2023-10-03T10:00:00.000Z', 2000, 1200, 900, 'duplicate:c'),
+  'dup-c2': copy('2023-10-03T11:00:00.000Z', 2200, 1200, 900, 'duplicate:c'),
+};
+
+/** A 512-d embedding along one axis: the time-only burst's frames share it, so they look alike to the server. */
+const burstEmbedding = `[${Array.from({ length: 512 }, (_, i) => (i === 0 ? '1' : '0')).join(',')}]`;
+
+const seedSeries = async () => {
+  const me = world.login;
+  const db = await utils.connectDatabase();
+  const fresh: string[] = [];
+  for (const [label, seedValue] of Object.entries(seriesSeeds)) {
+    const asset = await utils.createAsset(me.accessToken, {
+      assetData: { bytes: pngFor(label), filename: `${label}.png` },
+      fileCreatedAt: seedValue.takenAt,
+      fileModifiedAt: seedValue.takenAt,
+    });
+    fresh.push(name(`asset:${label}`, asset.id));
+  }
+  await utils.waitForQueueFinish(me.accessToken, 'metadataExtraction');
+  await utils.waitForQueueFinish(me.accessToken, 'thumbnailGeneration');
+  await utils.waitForQueueFinish(me.accessToken, 'qualityAnalysis');
+  await db.query('DELETE FROM "asset_quality" WHERE "assetId" = ANY($1::uuid[])', [fresh]);
+
+  for (const [label, duplicateId] of Object.entries(duplicateGroups)) {
+    name(label, duplicateId);
+  }
+  for (const [label, seedValue] of Object.entries(seriesSeeds)) {
+    const assetId = id(`asset:${label}`);
+    await db.query(`UPDATE "asset" SET "fileCreatedAt" = $2, "localDateTime" = $2, "createdAt" = $2 WHERE "id" = $1`, [
+      assetId,
+      seedValue.takenAt,
+    ]);
+    await db.query(
+      `INSERT INTO "asset_exif" ("assetId", "fileSizeInByte", "timeZone", "autoStackId")
+       VALUES ($1, $2, 'UTC', $3)
+       ON CONFLICT ("assetId") DO UPDATE SET "city" = NULL, "fileSizeInByte" = EXCLUDED."fileSizeInByte",
+         "timeZone" = 'UTC', "state" = NULL, "autoStackId" = EXCLUDED."autoStackId"`,
+      [assetId, seedValue.fileSize, seedValue.autoStackId ?? null],
+    );
+    if (seedValue.resolution) {
+      const { width, height } = seedValue.resolution;
+      await db.query(`UPDATE "asset" SET "width" = $2, "height" = $3 WHERE "id" = $1`, [assetId, width, height]);
+      await db.query(`UPDATE "asset_exif" SET "exifImageWidth" = $2, "exifImageHeight" = $3 WHERE "assetId" = $1`, [
+        assetId,
+        width,
+        height,
+      ]);
+    }
+    if (seedValue.sharpness !== undefined) {
+      await db.query(
+        `INSERT INTO "asset_quality"
+           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version")
+         VALUES ($1, $2, $3, 120, 0, 0, false, 1)`,
+        [assetId, me.userId, seedValue.sharpness],
+      );
+    }
+    if (label.startsWith('burst-b')) {
+      await db.query(`INSERT INTO "smart_search" ("assetId", "embedding") VALUES ($1, $2::vector)`, [
+        assetId,
+        burstEmbedding,
+      ]);
+    }
+    if (seedValue.duplicate) {
+      await utils.setAssetDuplicateId(me.accessToken, assetId, id(seedValue.duplicate));
+    }
+  }
+};
+
 // ---------------------------------------------------------------------------------------------------------------
 // Normalisation: real ids become stable fake UUIDs named in the legend; volatile values become fixed ones
 // ---------------------------------------------------------------------------------------------------------------
@@ -425,7 +551,12 @@ const send = async (contract: ContractRequest, view?: ResponseView) => {
     }
   }
   const url = params.size > 0 ? `${path}?${params}` : path;
-  const base = contract.method === 'GET' ? request(app).get(url) : request(app).post(url);
+  const base =
+    contract.method === 'GET'
+      ? request(app).get(url)
+      : contract.method === 'DELETE'
+        ? request(app).delete(url)
+        : request(app).post(url);
   const pending = base.set(asBearerAuth(world.login.accessToken)).set(contract.headers);
   const { status, body } = contract.body === undefined ? await pending : await pending.send(contract.body as object);
   if (view === 'no-cleanup' && body && typeof body === 'object') {
@@ -616,6 +747,98 @@ const queueCases = (): FixtureCase[] => [
     name: '233-queues-space-hogs-all-page-1',
     description: 'Space hogs, every type from 50 MiB: the large photo joins the videos',
     request: queuePage('space_hogs', hogsAll),
+  },
+];
+
+/**
+ * The series queues, on series seeded at `300`. Bursts (mobile cleanup_bursts_e2e_test.dart): one series accepted as
+ * set, another accepted after a frame's mark changed, a third stacked, all applied at once, then the toast's Undo.
+ * Duplicates (mobile cleanup_duplicates_e2e_test.dart): one group accepted on the suggestion, another after its marks
+ * changed, a third dismissed, all applied at once, then the toast's Undo.
+ */
+const seriesCases = (): FixtureCase[] => [
+  {
+    name: '300-bursts-count',
+    description: "Bursts opens: the title's count (the series are seeded first)",
+    before: seedSeries,
+    request: queueCount('bursts'),
+  },
+  {
+    name: '301-bursts-page-1',
+    description: 'Bursts: the first page, every series in it, oldest first',
+    request: queuePage('bursts', {}),
+  },
+  {
+    name: '302-bursts-in-spaces',
+    description: 'Done → Apply: the lookup for the frames marked for trash in the two accepted series',
+    request: () => inSpaces(['burst-a1', 'burst-a3', 'burst-b2']),
+  },
+  {
+    name: '303-bursts-commit',
+    description:
+      "Apply on Bursts: both accepted series in one commit, each frame kept or trashed by its mark (the web's resolve)",
+    request: queueCommit('bursts', {
+      trash: ['burst-a1', 'burst-a3', 'burst-b2'],
+      keep: ['burst-a2', 'burst-b1', 'burst-b3'],
+    }),
+  },
+  {
+    name: '304-bursts-stack',
+    description: "Apply on Bursts: the third series stacked instead, its suggested frame first (the web's stack call)",
+    request: () => ({
+      method: 'POST',
+      path: '/api/stacks',
+      body: { assetIds: [asset('burst-c1'), asset('burst-c2')] },
+    }),
+    nameFrom: (body) => {
+      const stackId = (body as { id?: string } | null)?.id;
+      if (stackId) {
+        name('stack:burst-c', stackId);
+      }
+    },
+  },
+  {
+    name: '305-bursts-restore',
+    description: "The toast's Undo restores the trashed frames only; the kept ones stay kept",
+    request: () => restore(['burst-a1', 'burst-a3', 'burst-b2']),
+  },
+  {
+    name: '310-duplicates-list',
+    description: 'Duplicates opens: every group with its full assets and the suggested copy to keep',
+    request: { method: 'GET', path: '/api/duplicates' },
+  },
+  {
+    name: '311-duplicates-in-spaces',
+    description: 'Done → Apply: the lookup for the copies marked for trash',
+    request: () => inSpaces(['dup-a1', 'dup-b1', 'dup-b2']),
+  },
+  {
+    name: '312-duplicates-resolve',
+    description: 'Apply on Duplicates: both accepted groups in one resolve, each copy kept or trashed by its mark',
+    request: () => ({
+      method: 'POST',
+      path: '/api/duplicates/resolve',
+      body: {
+        groups: [
+          { duplicateId: id('duplicate:a'), keepAssetIds: [asset('dup-a2')], trashAssetIds: [asset('dup-a1')] },
+          {
+            duplicateId: id('duplicate:b'),
+            keepAssetIds: [asset('dup-b3')],
+            trashAssetIds: [asset('dup-b1'), asset('dup-b2')],
+          },
+        ],
+      },
+    }),
+  },
+  {
+    name: '313-duplicates-dismiss',
+    description: 'Apply on Duplicates: the group kept whole is dismissed ("not duplicates"), nothing deleted',
+    request: () => ({ method: 'DELETE', path: `/api/duplicates/${id('duplicate:c')}` }),
+  },
+  {
+    name: '314-duplicates-restore',
+    description: "The toast's Undo restores the trashed copies; the groups do not come back",
+    request: () => restore(['dup-a1', 'dup-b1', 'dup-b2']),
   },
 ];
 
@@ -851,6 +1074,7 @@ const fixtureCases = (): FixtureCase[] => [
     request: calendar,
   },
   ...queueCases(),
+  ...seriesCases(),
 ];
 
 /**
@@ -924,11 +1148,21 @@ describe('mobile cleanup contract', () => {
           throw new Error(`${stale.join(', ')} not in the script; delete them`);
         }
         let page = 0;
-        for (const { name: caseName, description, responseView, request: lazy, before, saveCursorAs } of cases) {
+        for (const fixtureCase of cases) {
+          const {
+            name: caseName,
+            description,
+            responseView,
+            request: lazy,
+            before,
+            saveCursorAs,
+            nameFrom,
+          } = fixtureCase;
           await before?.();
           const base = typeof lazy === 'function' ? lazy() : lazy;
           const realRequest: ContractRequest = { ...resolveCursor(base), headers: GALLERY_APP_HEADER };
           const response = await send(realRequest, responseView);
+          nameFrom?.(response.body);
           const next = (response.body as { nextCursor?: string | null } | null)?.nextCursor;
           if (saveCursorAs) {
             if (next) {
@@ -954,11 +1188,12 @@ describe('mobile cleanup contract', () => {
       async () => {
         const fixtures = readFixtures();
         expect(fixtures.length).toBeGreaterThan(0);
-        const seeds = new Map(fixtureCases().map(({ name: caseName, before }) => [caseName, before]));
+        const scripted = new Map(fixtureCases().map((fixtureCase) => [fixtureCase.name, fixtureCase]));
         for (const { name: fileName, fixture } of fixtures) {
-          await seeds.get(fileName)?.();
+          await scripted.get(fileName)?.before?.();
           const realRequest = denormalize(fixture.request as unknown as Json) as unknown as ContractRequest;
           const response = await send(realRequest, fixture.responseView);
+          scripted.get(fileName)?.nameFrom?.(response.body);
           const actual = toFixture(fixture.description, realRequest, response, fixture.responseView);
           expect({ fixture: fileName, ...actual }).toEqual({ fixture: fileName, ...fixture });
         }

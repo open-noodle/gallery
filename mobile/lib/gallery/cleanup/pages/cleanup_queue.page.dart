@@ -11,10 +11,12 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.da
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_session_state.dart';
 import 'package:immich_mobile/gallery/cleanup/navigation.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_series_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
+import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_series.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_session.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
@@ -37,12 +39,12 @@ import 'package:openapi/api.dart';
 
 enum _Phase { content, finish, allClear }
 
-/// A queue of single photos: Blurry, Screenshots and Space hogs (specs/2026-10-29-mobile-library-cleanup-design.md,
-/// "Queues: Blurry, Screenshots, Space hogs"; mockups `3-queues.html` and `5-grid-and-finish.html`). Runs in the shared
-/// session screen with the deck or the grid; marks build up locally until Done → Apply, as in the rewind.
+/// A cleanup queue (specs/2026-10-29-mobile-library-cleanup-design.md, "Queues: Blurry, Screenshots, Space hogs";
+/// mockups `3-queues.html` and `5-grid-and-finish.html`). Runs in the shared session screen with the deck or the grid;
+/// marks build up locally until Done → Apply, as in the rewind.
 ///
-/// The queue only supplies its card signal ([libraryCleanupQueueCardInfo]) and its filters; Bursts and Duplicates (a
-/// series per card, Slice 7) plug in a different card here. [queue] is the queue's [LibraryCleanupQueue.slug], and
+/// A photo queue only supplies its card signal ([libraryCleanupQueueCardInfo]) and its filters; Bursts and Duplicates
+/// plug in the series card ([LibraryCleanupSeriesQueueView]). [queue] is the queue's [LibraryCleanupQueue.slug], and
 /// [heroAssetId] (with [heroThumbhash]) the overview card's cover, which flies into the first card: plain strings, so
 /// the route needs no fork type in the router.
 @RoutePage()
@@ -324,6 +326,9 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
 
   @override
   Widget build(BuildContext context) {
+    if (libraryCleanupSeriesQueues.contains(_queue)) {
+      return LibraryCleanupSeriesQueueView(queue: _queue);
+    }
     final t = context.t;
     final state = ref.watch(libraryCleanupSessionProvider(_request));
     final prefs = ref.watch(libraryCleanupPrefsProvider);
@@ -416,7 +421,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
         onRescue: (asset) => _session.keep(asset.id),
         onDetails: (asset) => unawaited(_gridDetails(asset)),
       ),
-      _Phase.allClear => _AllClear(onBack: _leave),
+      _Phase.allClear => LibraryCleanupAllClear(onBack: _leave),
     };
 
     return PopScope(
@@ -481,7 +486,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
             : null,
         body: Column(
           children: [
-            if (phase == _Phase.content) _ViewSwitch(view: view, onView: _setView),
+            if (phase == _Phase.content) LibraryCleanupViewSwitch(view: view, onView: _setView),
             Expanded(
               child: AnimatedSwitcher(
                 duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
@@ -496,8 +501,8 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
 }
 
 /// Swipe / Grid at the top of a queue, remembered per queue.
-class _ViewSwitch extends StatelessWidget {
-  const _ViewSwitch({required this.view, required this.onView});
+class LibraryCleanupViewSwitch extends StatelessWidget {
+  const LibraryCleanupViewSwitch({super.key, required this.view, required this.onView});
 
   final LibraryCleanupView view;
   final ValueChanged<LibraryCleanupView> onView;
@@ -532,8 +537,8 @@ class _ViewSwitch extends StatelessWidget {
 }
 
 /// An emptied queue: "All clear", its check popping, and the way back.
-class _AllClear extends StatelessWidget {
-  const _AllClear({required this.onBack});
+class LibraryCleanupAllClear extends StatelessWidget {
+  const LibraryCleanupAllClear({super.key, required this.onBack});
 
   final VoidCallback onBack;
 

@@ -260,7 +260,6 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: LibraryCleanupYearRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupMonthRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupOverviewRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: LibraryCleanupPlaceholderRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupQueueRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupRewindRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupDayPhotosRoute.page, guards: [_authGuard, _duplicateGuard]),

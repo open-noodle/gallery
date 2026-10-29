@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
+import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_series.dart';
 
 /// Pending marks saved on the device as they are made, so closing the app or a crash loses nothing. One small JSON
 /// file per user and day (rewind) or per user and queue, in a fork-owned folder of the app's documents directory.
@@ -25,24 +26,44 @@ class LibraryCleanupMarksStore {
     return File('${directory.path}${Platform.pathSeparator}${key.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_')}.json');
   }
 
-  /// The saved marks, or null when there are none or the file cannot be read.
-  Future<LibraryCleanupMarkBook?> load(String key) async {
+  Future<Object?> _read(String key) async {
     try {
       final file = await _file(key);
-      if (!file.existsSync()) {
-        return null;
-      }
-      final book = LibraryCleanupMarkBook.fromJson(jsonDecode(await file.readAsString()));
-      return book.isEmpty ? null : book;
+      return file.existsSync() ? jsonDecode(await file.readAsString()) : null;
     } catch (_) {
       return null;
     }
   }
 
+  /// The saved marks, or null when there are none or the file cannot be read.
+  Future<LibraryCleanupMarkBook?> load(String key) async {
+    final json = await _read(key);
+    if (json == null) {
+      return null;
+    }
+    final book = LibraryCleanupMarkBook.fromJson(json);
+    return book.isEmpty ? null : book;
+  }
+
+  /// A series queue's saved marks (Bursts, Duplicates), or null when there are none.
+  Future<LibraryCleanupSeriesBook?> loadSeries(String key) async {
+    final json = await _read(key);
+    if (json == null) {
+      return null;
+    }
+    final book = LibraryCleanupSeriesBook.fromJson(json);
+    return book.isEmpty ? null : book;
+  }
+
   /// Saves the book (and removes the file when it is empty). Failures are swallowed: saving is a safety net and
   /// must never break deciding.
-  Future<void> save(String key, LibraryCleanupMarkBook book) {
-    final json = book.isEmpty ? null : jsonEncode(book.toJson());
+  Future<void> save(String key, LibraryCleanupMarkBook book) => _write(key, book.isEmpty ? null : book.toJson());
+
+  Future<void> saveSeries(String key, LibraryCleanupSeriesBook book) =>
+      _write(key, book.isEmpty ? null : book.toJson());
+
+  Future<void> _write(String key, Map<String, Object?>? value) {
+    final json = value == null ? null : jsonEncode(value);
     return _tail = _tail.then((_) async {
       try {
         final file = await _file(key);

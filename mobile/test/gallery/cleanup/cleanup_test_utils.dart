@@ -77,6 +77,8 @@ class FakeCleanupServer {
   LibraryCleanupRepository repository({LibraryCleanupTimeZoneReader? timeZone}) => LibraryCleanupRepository(
     cleanupApi: CleanupApi(client),
     trashApi: TrashApi(client),
+    duplicatesApi: DuplicatesApi(client),
+    stacksApi: StacksApi(client),
     timeZone: timeZone ?? () async => 'Europe/Lisbon',
   );
 }

@@ -31,7 +31,7 @@ import 'cleanup_test_utils.dart';
 //   Given the trash is on    Then the trash line shows its size;  Given it is off   Then no line and no trash call
 //   "Could still free" shows only once every count has arrived, and is their sum
 // Pull to refresh   reloads every section
-// Navigation        Start opens the rewind; a quick win opens its placeholder; "See all" opens Your year
+// Navigation        Start opens the rewind; Bursts opens its series queue; "See all" opens Your year
 // Motion            the sections arrive on a stagger; a pressed card squishes; reduced motion shows everything at once
 
 const _mib = 1024 * 1024;
@@ -120,6 +120,19 @@ class _Library {
         pageJson(['blur-1']),
       ),
       'GET /cleanup/trash' => const FakeResponse({'count': 4, 'bytes': 2048}),
+      // The Bursts queue the quick win opens.
+      'GET /cleanup/queues/bursts' => FakeResponse({
+        'items': const <Object>[],
+        'groups': [
+          {
+            'groupId': 'burst-1',
+            'source': 'burstId',
+            'suggestedKeepId': 'burst-1',
+            'assets': [assetJson('burst-1'), assetJson('burst-2')],
+          },
+        ],
+        'nextCursor': null,
+      }),
       _ => null,
     };
   }
@@ -401,9 +414,7 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('Start opens the rewind, Bursts its placeholder, "See all" Your year, and back returns', (
-      tester,
-    ) async {
+    testWidgets('Start opens the rewind, Bursts its queue, "See all" Your year, and back returns', (tester) async {
       await openOverview(tester);
 
       await tester.tap(find.byKey(const Key('cleanup-today-start')));
@@ -415,21 +426,16 @@ void main() {
       expect(find.byKey(const Key('cleanup-session')), findsNothing);
       expect(find.byKey(const Key('cleanup-today-card')), findsOneWidget);
 
-      Future<void> openAndBack(String key, String title) async {
-        await tester.ensureVisible(find.byKey(Key(key)));
-        await settle(tester);
-        await tester.tap(find.byKey(Key(key)));
-        await settle(tester);
-        expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget, reason: key);
-        expect(textOf(tester, 'cleanup-placeholder-title'), title, reason: key);
-        expect(find.text('This part of Cleanup is still being built.'), findsOneWidget);
-        await tester.pageBack();
-        await settle(tester);
-        expect(find.byKey(const Key('cleanup-placeholder')), findsNothing);
-      }
-
-      // Bursts has no screen yet (Slice 7); the photo queues open theirs (cleanup_queue_page_test.dart).
-      await openAndBack('cleanup-quick-win-bursts', 'Bursts & series');
+      // Bursts opens its series queue (cleanup_series_queue_test.dart has the rest).
+      await tester.ensureVisible(find.byKey(const Key('cleanup-quick-win-bursts')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('cleanup-quick-win-bursts')));
+      await settle(tester);
+      expect(textOf(tester, 'cleanup-session-title'), 'Bursts & series · 1 of 7');
+      expect(find.byKey(const Key('cleanup-series-card-burst-1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('cleanup-session-back')));
+      await settle(tester);
+      expect(find.byKey(const Key('cleanup-session')), findsNothing);
 
       await tester.ensureVisible(find.byKey(const Key('cleanup-see-all')));
       await settle(tester);

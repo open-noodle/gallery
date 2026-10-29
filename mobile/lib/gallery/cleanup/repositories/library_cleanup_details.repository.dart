@@ -32,6 +32,10 @@ class LibraryCleanupDetailsRepository {
     ).wait;
     return LibraryCleanupDetails(asset: asset, albums: albums);
   }
+
+  /// Only the albums, for a photo whose full asset the session already has. Null when the call failed.
+  Future<List<AlbumResponseDto>?> albums(String assetId) =>
+      _albums.getAllAlbums(assetId: assetId).then<List<AlbumResponseDto>?>((value) => value, onError: (_) => null);
 }
 
 final libraryCleanupDetailsRepositoryProvider = Provider<LibraryCleanupDetailsRepository>((ref) {
@@ -42,4 +46,9 @@ final libraryCleanupDetailsRepositoryProvider = Provider<LibraryCleanupDetailsRe
 /// One photo's details, loaded when its sheet opens and dropped when it closes.
 final libraryCleanupDetailsProvider = FutureProvider.autoDispose.family<LibraryCleanupDetails, String>(
   (ref, assetId) => ref.read(libraryCleanupDetailsRepositoryProvider).load(assetId),
+);
+
+/// The albums of a photo whose full asset the session already carries (a duplicate copy).
+final libraryCleanupAlbumsProvider = FutureProvider.autoDispose.family<List<AlbumResponseDto>?, String>(
+  (ref, assetId) => ref.read(libraryCleanupDetailsRepositoryProvider).albums(assetId),
 );

@@ -26,8 +26,8 @@ import 'cleanup_overview_harness.dart';
 import 'cleanup_test_utils.dart';
 import 'rewind_harness.dart';
 
-// Slice 6's screen under a small router: a home stand-in, the real overview, the real queue page, a placeholder, and a
-// stand-in for the asset viewer. The in-memory server holds the three photo queues and answers what the queue page
+// Slice 6's screen under a small router: a home stand-in, the real overview, the real queue page and a stand-in for the
+// asset viewer. The in-memory server holds the three photo queues and answers what the queue page
 // asks, filtering and paging as the server does, and records every commit.
 
 const _homeName = 'QueueTestHome';
@@ -50,7 +50,6 @@ class QueueTestRouter extends RootStackRouter {
   List<AutoRoute> get routes => [
     AutoRoute(page: _home, initial: true),
     AutoRoute(page: LibraryCleanupOverviewRoute.page),
-    AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
     AutoRoute(page: LibraryCleanupRewindRoute.page),
     AutoRoute(page: LibraryCleanupQueueRoute.page),
     AutoRoute(page: _viewer),
@@ -210,19 +209,21 @@ class QueueLibrary {
   List<Map<String, List<String>>> get pageQueries => [for (final query in pages) Map.of(query)..remove('limit')];
 }
 
-/// A container for the queues: [library]'s server (or [repository]), pages of [pageSize], today fixed, saved marks in
-/// [directory], "Open in library" pushing the viewer stand-in, and the details sheet asking [library]'s server.
+/// A container for the queues: [library]'s server (or [server], or [repository]), pages of [pageSize], today fixed,
+/// saved marks in [directory], "Open in library" pushing the viewer stand-in, and the details sheet asking the server.
 ProviderContainer queueContainer({
   QueueLibrary? library,
+  FakeCleanupServer? server,
   LibraryCleanupRepository? repository,
   required Directory directory,
   bool trashEnabled = true,
   int pageSize = 4,
 }) {
   openedInLibrary.clear();
-  final client = library?.server.client;
+  final fake = server ?? library?.server;
+  final client = fake?.client;
   return cleanupContainer(
-    server: library?.server,
+    server: fake,
     repository: repository,
     directory: directory,
     trashEnabled: trashEnabled,

@@ -4,13 +4,6 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart'
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:openapi/api.dart';
 
-/// The queues the queue screen runs (one photo per card). Bursts and Duplicates use the series card (Slice 7).
-const libraryCleanupPhotoQueues = {
-  LibraryCleanupQueue.blurry,
-  LibraryCleanupQueue.screenshots,
-  LibraryCleanupQueue.spaceHogs,
-};
-
 /// The queues with filters in the ⋯ menu, as on web: Blurry's strictness, reason and hide faces, Space hogs' type and
 /// minimum size. Screenshots has none.
 bool libraryCleanupHasFilters(LibraryCleanupQueue queue) =>

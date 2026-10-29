@@ -25,12 +25,24 @@ class LibraryCleanupRepository {
   const LibraryCleanupRepository({
     required CleanupApi cleanupApi,
     required TrashApi trashApi,
+    DuplicatesApi? duplicatesApi,
+    StacksApi? stacksApi,
     this.timeZone = readDeviceTimeZone,
   }) : _cleanup = cleanupApi,
-       _trash = trashApi;
+       _trash = trashApi,
+       _duplicates = duplicatesApi,
+       _stacks = stacksApi;
 
   final CleanupApi _cleanup;
   final TrashApi _trash;
+
+  /// Upstream's duplicates API (no fork endpoint), for the Duplicates queue.
+  final DuplicatesApi? _duplicates;
+
+  /// Bursts' "Stack instead", the call the web `BurstGroupCard` makes.
+  final StacksApi? _stacks;
+
+  DuplicatesApi get _duplicatesApi => _duplicates ?? (throw StateError('No duplicates API'));
   final LibraryCleanupTimeZoneReader timeZone;
 
   static T _present<T>(T? value) => value ?? (throw ApiException(500, 'The server sent an empty response'));
@@ -134,6 +146,23 @@ class LibraryCleanupRepository {
       external.addAll(response.externalAssetIds);
     }
     return (inSpaces: inSpaces, external: external);
+  }
+
+  /// Every duplicate group with its full assets and the copies the server suggests keeping. Not paged by the server.
+  Future<List<DuplicateResponseDto>> duplicates() async => _present(await _duplicatesApi.getAssetDuplicates());
+
+  /// Resolves [groups] in one request: each copy kept or trashed (deleted with the trash off). Resolves to the
+  /// server's answer per group.
+  Future<List<BulkIdResponseDto>> resolveDuplicates(List<DuplicateResolveGroupDto> groups) async =>
+      _present(await _duplicatesApi.resolveDuplicates(DuplicateResolveDto(groups: groups)));
+
+  /// "Not duplicates": unlinks the group's copies without deleting any.
+  Future<void> dismissDuplicate(String duplicateId) => _duplicatesApi.deleteDuplicate(duplicateId);
+
+  /// Stacks [orderedIds], the first on top (the web's `stackGroup`).
+  Future<void> stack(List<String> orderedIds) async {
+    final stacks = _stacks ?? (throw StateError('No stacks API'));
+    await stacks.createStack(StackCreateDto(assetIds: orderedIds));
   }
 
   /// Takes the trashed assets back out of the trash.

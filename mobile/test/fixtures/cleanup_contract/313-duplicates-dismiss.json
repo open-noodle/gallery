@@ -1,0 +1,17 @@
+{
+  "description": "Apply on Duplicates: the group kept whole is dismissed (\"not duplicates\"), nothing deleted",
+  "ids": {
+    "ec5b7533-82af-4814-8ecd-c2639054084e": "duplicate:c"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "DELETE",
+    "path": "/api/duplicates/ec5b7533-82af-4814-8ecd-c2639054084e"
+  },
+  "response": {
+    "body": {},
+    "status": 204
+  }
+}

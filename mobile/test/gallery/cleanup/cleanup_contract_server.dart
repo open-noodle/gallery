@@ -74,10 +74,13 @@ class CleanupContractServer {
     }
     _used.add(fixture);
     served.add(fixture.name);
-    request.response
-      ..statusCode = fixture.status
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode(fixture.responseBody));
+    request.response.statusCode = fixture.status;
+    // A 204 (a dismissed duplicate group) has no body.
+    if (fixture.status != HttpStatus.noContent) {
+      request.response
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode(fixture.responseBody));
+    }
     await request.response.close();
   }
 }

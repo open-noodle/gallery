@@ -8,7 +8,6 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart'
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_support.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
-import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_header.dart';
@@ -16,7 +15,6 @@ import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_quick_wins.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_today_card.dart';
 import 'package:immich_mobile/gallery/motion/entrance.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
-import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 /// The Cleanup overview (specs/2026-10-29-mobile-library-cleanup-design.md, "Cleanup overview"; mockup `1-flow.html`,
@@ -47,16 +45,10 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
   /// Days finished in a rewind since this screen was last on top; their teaser cells pop as they turn green.
   final Set<int> _popped = {};
 
-  // Bursts and Duplicates open a placeholder until their slice (7) lands.
-  void _open(String title) => context.pushRoute(LibraryCleanupPlaceholderRoute(title: title));
-
-  /// A quick win's queue; its cover, when the card shows one, flies into the first card. The cover is only read if the
-  /// card already asked for it, so opening never sends a request of its own.
+  /// A quick win's queue; its cover, when the card shows one, flies into the first card (Bursts and Duplicates show an
+  /// icon, as on web, so nothing flies). The cover is only read if the card already asked for it, so opening never
+  /// sends a request of its own.
   void _openQueue(LibraryCleanupQueue queue) {
-    if (!libraryCleanupPhotoQueues.contains(queue)) {
-      _open(libraryCleanupQueueName(context, queue));
-      return;
-    }
     final cover = ref.exists(libraryCleanupQueueCoverProvider(queue))
         ? ref.read(libraryCleanupQueueCoverProvider(queue)).valueOrNull
         : null;
@@ -154,33 +146,6 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
                     ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Stands in for a Cleanup screen whose slice has not landed yet (the rewind, a queue, Your year), so the overview's
-/// navigation can be used and tested now. Removed once the last of them lands.
-@RoutePage()
-class LibraryCleanupPlaceholderPage extends StatelessWidget {
-  const LibraryCleanupPlaceholderPage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title, key: const Key('cleanup-placeholder-title'))),
-      body: Center(
-        key: const Key('cleanup-placeholder'),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            context.t.cleanup_coming_soon,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
         ),
       ),
     );
