@@ -26,6 +26,7 @@ import 'rewind_harness.dart';
 // Undo      When a card is decided   Then Done counts it; Undo takes it back
 // Back      With a pending mark, ‹ asks Apply / Discard / Keep going; so does the iOS back swipe from the screen's edge
 // Grid      When Grid is chosen   Then the grid (the series list) shows, and a held photo opens its details
+// The walk runs again under reduced motion, where every transition is a fade or nothing, and must reach every part.
 
 class _Cleanup {
   const _Cleanup(this.name, this.route, this.load, this.title, {this.series = false, required this.first});
@@ -196,12 +197,18 @@ void main() {
     await settle(tester);
   }
 
-  Future<void> open(WidgetTester tester, _Cleanup cleanup, {bool hold = false}) async {
+  Future<void> open(WidgetTester tester, _Cleanup cleanup, {bool hold = false, bool reduceMotion = false}) async {
     library.load = cleanup.load;
     library.hold = hold ? Completer<void>() : null;
     listenToPlatform(tester);
     final container = queueContainer(server: library.server, directory: tempDirectory());
-    await pumpQueue(tester, container, first: cleanup.route, requests: () => library.routes.length);
+    await pumpQueue(
+      tester,
+      container,
+      first: cleanup.route,
+      reduceMotion: reduceMotion,
+      requests: () => library.routes.length,
+    );
     if (!hold) {
       await settle(tester);
     }
@@ -226,92 +233,94 @@ void main() {
 
   for (final cleanup in _cleanups) {
     group(cleanup.name, () {
-      testWidgets('has every part of the session screen', (tester) async {
-        // Loading: the real layout with the deck's skeleton, under the full top bar.
-        library.failFirst = true;
-        await open(tester, cleanup, hold: true);
-        for (var i = 0; i < 6; i++) {
-          await tester.pump(const Duration(milliseconds: 50));
-        }
-        expectTopBar();
-        expect(key('cleanup-view-switch'), findsOneWidget);
-        expect(key('cleanup-deck-skeleton'), findsOneWidget, reason: 'a skeleton of the deck, never a spinner');
-        expect(tester.widget<TextButton>(key('cleanup-session-done')).onPressed, isNull, reason: 'Done waits');
+      for (final reduced in [false, true]) {
+        testWidgets('has every part of the session screen${reduced ? ' (reduced motion)' : ''}', (tester) async {
+          // Loading: the real layout with the deck's skeleton, under the full top bar.
+          library.failFirst = true;
+          await open(tester, cleanup, hold: true, reduceMotion: reduced);
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          expectTopBar();
+          expect(key('cleanup-view-switch'), findsOneWidget);
+          expect(key('cleanup-deck-skeleton'), findsOneWidget, reason: 'a skeleton of the deck, never a spinner');
+          expect(tester.widget<TextButton>(key('cleanup-session-done')).onPressed, isNull, reason: 'Done waits');
 
-        // Error: inline, with Retry, under the same top bar.
-        library.hold!.complete();
-        await settle(tester);
-        expectTopBar();
-        expect(key('cleanup-session-error'), findsOneWidget);
-        await tapKey(tester, 'cleanup-session-retry');
-        expect(key('cleanup-session-error'), findsNothing);
-
-        // The top bar says what and where.
-        expectTopBar();
-        expect(textOf(tester, 'cleanup-session-title'), startsWith('${cleanup.title} · 1 of '));
-        expect(key('cleanup-view-switch'), findsOneWidget);
-
-        // The ⋯ menu.
-        await tapKey(tester, 'cleanup-session-menu');
-        for (final item in ['swipe', 'grid', 'how-it-works']) {
-          expect(key('cleanup-menu-$item'), findsOneWidget, reason: 'the menu has $item');
-        }
-        for (final mode in ['swipe', 'button']) {
-          expect(
-            key('cleanup-menu-mode-$mode'),
-            cleanup.series ? findsNothing : findsOneWidget,
-            reason: 'swipe / button mode only where the deck has both',
-          );
-        }
-        await tapKey(tester, 'cleanup-menu-how-it-works');
-        expect(key('cleanup-gesture-overlay'), findsOneWidget, reason: 'How it works replays the gesture lesson');
-        await tapKey(tester, 'cleanup-gesture-overlay-ok');
-
-        // The deck, its buttons and the details sheet.
-        final buttons = cleanup.series
-            ? ['cleanup-series-top', 'cleanup-series-undo', 'cleanup-series-trash-all', 'cleanup-series-as-set']
-            : ['cleanup-deck-top', 'cleanup-deck-undo', 'cleanup-deck-trash', 'cleanup-deck-favorite'];
-        for (final part in [
-          ...buttons,
-          if (!cleanup.series) 'cleanup-deck-keep',
-          if (!cleanup.series) 'cleanup-deck-open',
-        ]) {
-          expect(key(part), findsOneWidget, reason: 'the deck has $part');
-        }
-        await tapKey(tester, cleanup.series ? 'cleanup-series-details' : 'cleanup-chip-details-${cleanup.first}');
-        expect(key('cleanup-details-sheet'), findsOneWidget, reason: 'details are one tap away');
-        await tester.tapAt(tester.getCenter(key('cleanup-details-photo')));
-        await settle(tester);
-        expect(key('cleanup-details-sheet'), findsNothing);
-
-        // A decision counts on Done; Undo takes it back.
-        await decide(tester, cleanup);
-        expect(badge(tester), '1');
-        await tapKey(tester, cleanup.series ? 'cleanup-series-undo' : 'cleanup-deck-undo');
-        expect(badge(tester), isNull);
-        expect(topCardId(tester), cleanup.first);
-
-        // Back with a pending mark asks first.
-        await decide(tester, cleanup);
-        await tapKey(tester, 'cleanup-session-back');
-        expect(key('cleanup-close-guard'), findsOneWidget);
-        await tapKey(tester, 'cleanup-close-keep-going');
-        expect(key('cleanup-session'), findsOneWidget);
-
-        // The grid, with the details a hold away.
-        await tapKey(tester, 'cleanup-view-grid');
-        if (cleanup.series) {
-          expect(key('cleanup-series-list'), findsOneWidget);
-          expect(key('cleanup-series-details'), findsWidgets);
-        } else {
-          expect(key('cleanup-grid'), findsOneWidget);
-          await tester.longPress(key('cleanup-grid-tile-${cleanup.first}'));
+          // Error: inline, with Retry, under the same top bar.
+          library.hold!.complete();
           await settle(tester);
-          expect(key('cleanup-details-sheet'), findsOneWidget, reason: 'a held tile opens its details');
-        }
-        expect(library.queues.commits, isEmpty);
-        expect(library.rewind.commits, isEmpty);
-      });
+          expectTopBar();
+          expect(key('cleanup-session-error'), findsOneWidget);
+          await tapKey(tester, 'cleanup-session-retry');
+          expect(key('cleanup-session-error'), findsNothing);
+
+          // The top bar says what and where.
+          expectTopBar();
+          expect(textOf(tester, 'cleanup-session-title'), startsWith('${cleanup.title} · 1 of '));
+          expect(key('cleanup-view-switch'), findsOneWidget);
+
+          // The ⋯ menu.
+          await tapKey(tester, 'cleanup-session-menu');
+          for (final item in ['swipe', 'grid', 'how-it-works']) {
+            expect(key('cleanup-menu-$item'), findsOneWidget, reason: 'the menu has $item');
+          }
+          for (final mode in ['swipe', 'button']) {
+            expect(
+              key('cleanup-menu-mode-$mode'),
+              cleanup.series ? findsNothing : findsOneWidget,
+              reason: 'swipe / button mode only where the deck has both',
+            );
+          }
+          await tapKey(tester, 'cleanup-menu-how-it-works');
+          expect(key('cleanup-gesture-overlay'), findsOneWidget, reason: 'How it works replays the gesture lesson');
+          await tapKey(tester, 'cleanup-gesture-overlay-ok');
+
+          // The deck, its buttons and the details sheet.
+          final buttons = cleanup.series
+              ? ['cleanup-series-top', 'cleanup-series-undo', 'cleanup-series-trash-all', 'cleanup-series-as-set']
+              : ['cleanup-deck-top', 'cleanup-deck-undo', 'cleanup-deck-trash', 'cleanup-deck-favorite'];
+          for (final part in [
+            ...buttons,
+            if (!cleanup.series) 'cleanup-deck-keep',
+            if (!cleanup.series) 'cleanup-deck-open',
+          ]) {
+            expect(key(part), findsOneWidget, reason: 'the deck has $part');
+          }
+          await tapKey(tester, cleanup.series ? 'cleanup-series-details' : 'cleanup-chip-details-${cleanup.first}');
+          expect(key('cleanup-details-sheet'), findsOneWidget, reason: 'details are one tap away');
+          await tester.tapAt(tester.getCenter(key('cleanup-details-photo')));
+          await settle(tester);
+          expect(key('cleanup-details-sheet'), findsNothing);
+
+          // A decision counts on Done; Undo takes it back.
+          await decide(tester, cleanup);
+          expect(badge(tester), '1');
+          await tapKey(tester, cleanup.series ? 'cleanup-series-undo' : 'cleanup-deck-undo');
+          expect(badge(tester), isNull);
+          expect(topCardId(tester), cleanup.first);
+
+          // Back with a pending mark asks first.
+          await decide(tester, cleanup);
+          await tapKey(tester, 'cleanup-session-back');
+          expect(key('cleanup-close-guard'), findsOneWidget);
+          await tapKey(tester, 'cleanup-close-keep-going');
+          expect(key('cleanup-session'), findsOneWidget);
+
+          // The grid, with the details a hold away.
+          await tapKey(tester, 'cleanup-view-grid');
+          if (cleanup.series) {
+            expect(key('cleanup-series-list'), findsOneWidget);
+            expect(key('cleanup-series-details'), findsWidgets);
+          } else {
+            expect(key('cleanup-grid'), findsOneWidget);
+            await tester.longPress(key('cleanup-grid-tile-${cleanup.first}'));
+            await settle(tester);
+            expect(key('cleanup-details-sheet'), findsOneWidget, reason: 'a held tile opens its details');
+          }
+          expect(library.queues.commits, isEmpty);
+          expect(library.rewind.commits, isEmpty);
+        });
+      }
 
       testWidgets('the iOS back swipe with a pending mark asks, as ‹ does', (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
