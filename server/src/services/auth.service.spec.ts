@@ -1167,7 +1167,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
@@ -1198,7 +1198,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.png' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         // Regardless of the OAuth picture mime, the S3 object mirrors the locally-generated
@@ -1224,7 +1224,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
@@ -1256,7 +1256,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
@@ -1281,7 +1281,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
@@ -2127,7 +2127,7 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2150,7 +2150,7 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2196,7 +2196,7 @@ describe(AuthService.name, () => {
       const auth = factory.auth({ user, apiKey: { permissions: [] } });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user as any);
       mocks.user.update.mockResolvedValue(user);
 
@@ -2217,7 +2217,7 @@ describe(AuthService.name, () => {
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
-        profile: {
+        rawProfile: {
           sub: oauthId,
           email: user.email,
           given_name: 'John',
@@ -2244,7 +2244,7 @@ describe(AuthService.name, () => {
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
-        profile: {
+        rawProfile: {
           sub: oauthId,
           email: user.email,
           name: 'Full Name',
@@ -2274,7 +2274,7 @@ describe(AuthService.name, () => {
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
-        profile: {
+        rawProfile: {
           sub: oauthId,
           email: user.email,
           picture: 'https://auth.immich.cloud/profiles/1.jpg',
@@ -2303,7 +2303,7 @@ describe(AuthService.name, () => {
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
-        profile: {
+        rawProfile: {
           sub: oauthId,
           email: userNoProfile.email,
           picture: 'https://auth.immich.cloud/profiles/1.jpg',
@@ -2384,7 +2384,7 @@ describe(AuthService.name, () => {
       it(`should apply the mobile redirect override to ${url}`, async () => {
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
         mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
-        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: OAuthProfileFactory.create() });
         mocks.session.create.mockResolvedValue(SessionFactory.create());
 
         await sut.callback({ url, state: 'xyz789', codeVerifier: 'foo' }, {}, loginDetails);
@@ -2402,7 +2402,7 @@ describe(AuthService.name, () => {
     it('should not rewrite an https callback url even when the override is enabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
       mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: OAuthProfileFactory.create() });
       mocks.session.create.mockResolvedValue(SessionFactory.create());
 
       await sut.callback(
@@ -2423,7 +2423,7 @@ describe(AuthService.name, () => {
     it('should not rewrite a lookalike path', async () => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
       mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ rawProfile: OAuthProfileFactory.create() });
       mocks.session.create.mockResolvedValue(SessionFactory.create());
 
       await sut.callback(
