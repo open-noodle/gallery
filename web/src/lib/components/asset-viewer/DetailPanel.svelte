@@ -114,12 +114,7 @@
   // R9/E6/E7 — a value that is empty or whitespace-only trims to nothing (filter-url.ts's
   // setTrimmed), so it must not render as a clickable filter affordance: the click would close the
   // viewer and apply no filter at all.
-  let cameraLabel = $derived(
-    [asset.exifInfo?.make, asset.exifInfo?.model]
-      .map((value) => value?.trim())
-      .filter(Boolean)
-      .join(' '),
-  );
+  let cameraLabel = $derived(getCameraName(asset.exifInfo?.make, asset.exifInfo?.model));
   let lensLabel = $derived(asset.exifInfo?.lensModel?.trim() ?? '');
 
   const cameraFilterPatch = () => ({
