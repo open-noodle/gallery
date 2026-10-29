@@ -63,6 +63,13 @@ describe('Cleanup hub page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     observers.callbacks = [];
+    // resetAllMocks clears the global matchMedia stub; the calendar's touch check needs one.
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: false,
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
     vi.stubGlobal(
       'IntersectionObserver',
       class {

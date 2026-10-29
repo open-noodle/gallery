@@ -11,6 +11,8 @@ export type CleanupShortcutHandlers = {
   open: () => void;
   undo: () => void;
   finish: () => void;
+  /** Open the photo in a new browser tab (one-at-a-time mode). */
+  openInNewTab?: () => void;
 };
 
 const isFormField = (target: EventTarget | null) => {
@@ -82,6 +84,9 @@ export const cleanupShortcuts = (handlers: CleanupShortcutHandlers, isViewing: (
     [{ key: 'z' }, handlers.undo],
     [{ key: 'Enter', shift: true }, handlers.finish],
   ];
+  if (handlers.openInNewTab) {
+    bindings.push([{ key: 'o' }, handlers.openInNewTab]);
+  }
 
   return bind(bindings);
 };

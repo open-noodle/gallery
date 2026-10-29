@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
   import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
   import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
   import { duration as motionDuration, pop } from '$lib/gallery/motion';
@@ -208,7 +209,7 @@
       >
         <button
           type="button"
-          class="block aspect-3/2 w-full outline-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="block aspect-3/2 w-full outline-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary focus-visible:outline-solid"
           aria-label={shown.originalFileName}
           aria-pressed={shownMark === 'keep'}
           data-testid="cleanup-burst-frame-toggle-{group.groupId}"
@@ -288,10 +289,9 @@
         {@const suggested = asset.id === group.suggestedKeepId}
         <button
           type="button"
-          class="relative block rounded-md outline-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary {shownId ===
-            asset.id || focusedId === asset.id
-            ? 'outline-2 outline-offset-2 outline-primary'
-            : ''}"
+          class="relative block rounded-md {shownId === asset.id || focusedId === asset.id
+            ? FOCUS_RING
+            : 'outline-none'}"
           data-testid="cleanup-item-{asset.id}"
           data-asset-id={asset.id}
           data-asset={asset.id}

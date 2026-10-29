@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
   import { flipMotion } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
@@ -72,10 +73,7 @@
     >
       <button
         type="button"
-        class="relative block w-full rounded-md outline-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary {focusedId ===
-        item.id
-          ? 'outline-2 outline-offset-2 outline-primary/60'
-          : ''}"
+        class="relative block w-full rounded-md {focusedId === item.id ? FOCUS_RING : 'outline-none'}"
         data-testid="cleanup-item-{item.id}"
         data-asset-id={item.id}
         data-selected={isSelected}

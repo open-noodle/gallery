@@ -111,6 +111,15 @@ describe('RewindYearSection', () => {
     expect(screen.getByTestId('cleanup-rewind-tile-a')).toHaveAttribute('data-focused', 'false');
   });
 
+  // Tailwind 4's outline-none zeroes the style outline-3 reads, so the ring needs outline-solid to show.
+  it('draws a visible outline on the focused tile only', () => {
+    setup({ focusedId: 'b' });
+
+    expect(screen.getByTestId('cleanup-rewind-tile-b')).toHaveClass('outline-solid', 'outline-3');
+    expect(screen.getByTestId('cleanup-rewind-tile-b')).not.toHaveClass('outline-none');
+    expect(screen.getByTestId('cleanup-rewind-tile-a')).toHaveClass('outline-none');
+  });
+
   it('calls onKeepRemaining with the year', async () => {
     const { onKeepRemaining } = setup();
 

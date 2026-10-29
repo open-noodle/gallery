@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
   import { flipMotion, pop } from '$lib/gallery/motion';
   import { flip } from 'svelte/animate';
   import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
@@ -101,7 +102,7 @@
       <button
         animate:flip={flipMotion()}
         type="button"
-        class="relative block rounded-xl outline-none {focused ? 'outline-3 outline-offset-2 outline-primary' : ''}"
+        class="relative block rounded-xl {focused ? FOCUS_RING : 'outline-none'}"
         data-testid="cleanup-rewind-tile-{asset.id}"
         data-asset-id={asset.id}
         data-asset={asset.id}

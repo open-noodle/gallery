@@ -48,6 +48,18 @@ describe('cleanupShortcuts', () => {
     expect(cleanupShortcuts(makeHandlers(), () => true)).toEqual([]);
   });
 
+  it('binds O only when an open-in-new-tab handler is given', () => {
+    const keysOf = (handlers: CleanupShortcutHandlers) =>
+      cleanupShortcuts(handlers, () => false).map(({ shortcut }) => shortcut.key);
+    expect(keysOf(makeHandlers())).not.toContain('o');
+
+    const openInNewTab = vi.fn();
+    expect(keysOf({ ...makeHandlers(), openInNewTab })).toContain('o');
+    bind({ ...makeHandlers(), openInNewTab });
+    press(root, 'o');
+    expect(openInNewTab).toHaveBeenCalledOnce();
+  });
+
   it('binds all eleven keys when the viewer is closed', () => {
     const keys = cleanupShortcuts(makeHandlers(), () => false).map(({ shortcut }) =>
       shortcut.shift ? `Shift+${shortcut.key}` : shortcut.key,

@@ -213,3 +213,9 @@ export const busiestYear = <T extends { year: number; count: number }>(years: T[
   }
   return best;
 };
+
+/**
+ * The outline on the photo the keyboard shortcuts act on. `outline-solid` is needed: Tailwind 4's
+ * `outline-none` also zeroes the style that `outline-3` reads, so without it the outline never shows.
+ */
+export const FOCUS_RING = 'outline-solid outline-3 outline-offset-2 outline-primary';

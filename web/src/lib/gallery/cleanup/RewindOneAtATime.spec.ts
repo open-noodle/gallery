@@ -1,7 +1,19 @@
-import { AssetTypeEnum, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
+import { AssetTypeEnum, CleanupBlurReason, type AssetResponseDto, type CleanupAssetDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/svelte';
 import RewindOneAtATime from '$lib/gallery/cleanup/RewindOneAtATime.svelte';
+
+const mocks = vi.hoisted(() => ({
+  getAssetInfo: vi.fn(),
+  getAllAlbums: vi.fn(),
+}));
+
+vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks }));
+
+beforeEach(() => {
+  mocks.getAssetInfo.mockReset().mockReturnValue(new Promise(() => {}));
+  mocks.getAllAlbums.mockReset().mockResolvedValue([]);
+});
 
 const asset = (overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id: 'a',
@@ -74,5 +86,40 @@ describe('RewindOneAtATime hints', () => {
         .getAllByRole('link')
         .map((link) => link.getAttribute('href')),
     ).toEqual(['/utilities/cleanup/bursts', '/utilities/cleanup/blurry']);
+  });
+});
+
+describe('RewindOneAtATime layout', () => {
+  it('sizes the stage to the photo, so a portrait photo is not boxed into 4:3', () => {
+    renderOne(asset({ id: 'tall', width: 3000, height: 4000 }));
+    expect(screen.getByTestId('cleanup-rewind-stage-tall').style.aspectRatio).toMatch(/^0.75/);
+  });
+
+  it('links to the photo in a new tab', () => {
+    renderOne(asset({ id: 'p1' }));
+    const link = screen.getByTestId('cleanup-rewind-open-new-tab');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('href')).toContain('p1');
+  });
+
+  it('shows the date and the named people from the full record, read-only', async () => {
+    mocks.getAssetInfo.mockResolvedValue({
+      id: 'p2',
+      ownerId: 'someone-else',
+      originalFileName: 'p2.jpg',
+      localDateTime: '2016-10-29T14:32:00.000Z',
+      people: [
+        { id: 'anna', name: 'Anna', faces: [] },
+        { id: 'x', name: '', faces: [] },
+      ],
+      tags: [],
+      exifInfo: {},
+    } as unknown as AssetResponseDto);
+    renderOne(asset({ id: 'p2', localDateTime: '2016-10-29T14:32:00.000Z' }));
+
+    expect(screen.getByTestId('cleanup-rewind-info-date')).toHaveTextContent('2016');
+    const people = await screen.findByTestId('cleanup-rewind-info-people');
+    expect(people).toHaveTextContent('Anna');
+    expect(within(people).queryByRole('button')).not.toBeInTheDocument();
   });
 });

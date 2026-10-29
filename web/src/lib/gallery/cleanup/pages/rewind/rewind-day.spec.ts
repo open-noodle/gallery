@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
     getCleanupCalendar: vi.fn(),
     getCleanupRewindAssets: vi.fn(),
     getCleanupAssetsInSpaces: vi.fn(),
+    // The one-at-a-time info panel's lookups; never resolved, the panel just shows its placeholder.
+    getAssetInfo: vi.fn(() => new Promise(() => {})),
+    getAllAlbums: vi.fn(() => Promise.resolve([])),
   },
   goto: vi.fn(),
   navigate: vi.fn(),

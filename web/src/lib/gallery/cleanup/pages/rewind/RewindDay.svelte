@@ -451,7 +451,13 @@
     event.returnValue = '';
   };
 
-  const legend = [
+  const openCurrentInNewTab = () => {
+    if (current) {
+      open(Route.viewAsset({ id: current.id }), '_blank', 'noopener');
+    }
+  };
+
+  const baseLegend = [
     { keys: ['K'], label: 'cleanup_shortcut_keep' },
     { keys: ['F'], label: 'favorite' },
     { keys: ['Delete'], label: 'trash' },
@@ -460,6 +466,9 @@
     { keys: ['Z'], label: 'undo' },
     { keys: ['Shift+Enter'], label: 'cleanup_shortcut_finish' },
   ] as const;
+  const legend = $derived(
+    mode === 'one' ? [...baseLegend, { keys: ['O'], label: 'cleanup_open_in_new_tab' } as const] : baseLegend,
+  );
 
   const showShortcuts = () =>
     modalManager.show(ShortcutsModal, {
@@ -519,6 +528,7 @@
       open: () => void openAsset(current?.id),
       undo: () => session.undo(),
       finish: () => void onFinishDay(),
+      openInNewTab: mode === 'one' ? openCurrentInNewTab : undefined,
     },
     // Off while the viewer or any modal (the leave confirmation, the shortcuts list) is open.
     () => assetViewerManager.isViewing || isModalOpen(),
@@ -728,7 +738,8 @@
     data-motion-reveal
     data-testid="cleanup-rewind-actionbar"
   >
-    <div class="flex flex-wrap items-center gap-3 text-muted">
+    <!-- Touch screens have no keyboard, so the legend only shows with a mouse or trackpad. -->
+    <div class="hidden flex-wrap items-center gap-3 text-muted pointer-fine:flex">
       {#each legend as item (item.label)}
         <span class="inline-flex items-center gap-1">
           {#each item.keys as key (key)}
@@ -748,11 +759,14 @@
         onclick={showShortcuts}
       />
     </div>
-    <div class="ms-auto flex flex-wrap items-center gap-2">
-      <span class="text-muted tabular-nums">
+    <div
+      class="flex w-full items-center justify-end gap-2 pointer-fine:ms-auto pointer-fine:w-auto pointer-fine:flex-wrap"
+    >
+      <span class="hidden text-muted tabular-nums pointer-fine:inline">
         {$t('cleanup_marked_for_trash', { values: { count: session.counts.trash } })}
       </span>
       <Button
+        class="flex-1 pointer-fine:flex-none"
         size="small"
         color="danger"
         disabled={busy || session.counts.trash === 0}
@@ -763,6 +777,7 @@
         {$t('cleanup_move_to_trash', { values: { count: session.counts.trash } })}
       </Button>
       <Button
+        class="flex-1 pointer-fine:flex-none"
         size="small"
         trailingIcon={mdiCheck}
         disabled={busy || total === 0}

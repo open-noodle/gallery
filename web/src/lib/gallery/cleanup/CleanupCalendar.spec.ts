@@ -1,5 +1,7 @@
 import type { CleanupCalendarDayDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import type { Component, ComponentProps } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import CleanupCalendar from '$lib/gallery/cleanup/CleanupCalendar.svelte';
 import { pop } from '$lib/gallery/motion';
 
@@ -17,11 +19,17 @@ const days: CleanupCalendarDayDto[] = [
   { monthDay: 923, assetCount: 12, reviewedAt: null },
 ];
 
+type CalendarProps = ComponentProps<typeof CleanupCalendar>;
+
 const renderCalendar = (props: { justReviewed?: number } = {}) => {
   const onPeek = vi.fn();
   const onLeave = vi.fn();
   const onOpen = vi.fn();
-  render(CleanupCalendar, { days, today: 923, onPeek, onLeave, onOpen, ...props });
+  // The open month's IconButtons need the tooltip provider the app wraps everything in.
+  render(TestWrapper as Component<{ component: typeof CleanupCalendar; componentProps: CalendarProps }>, {
+    component: CleanupCalendar,
+    componentProps: { days, today: 923, onPeek, onLeave, onOpen, ...props },
+  });
   return { onPeek, onLeave, onOpen };
 };
 
@@ -134,5 +142,45 @@ describe('CleanupCalendar', () => {
     const classes = [...screen.getByTestId('cleanup-cal-923').classList];
     expect(classes.some((name) => name.startsWith('motion-safe:animate-'))).toBe(true);
     expect(classes.some((name) => name.startsWith('animate-'))).toBe(false);
+  });
+});
+
+describe('CleanupCalendar on a touch screen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: media.includes('coarse'),
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens a tapped month large, with day numbers, and opens the tapped day', async () => {
+    const { onOpen } = renderCalendar();
+
+    await fireEvent.click(screen.getByTestId('cleanup-month-open-1'));
+
+    expect(screen.getByTestId('cleanup-month-open')).toBeInTheDocument();
+    expect(screen.getByTestId('cleanup-cal-102')).toHaveTextContent('2');
+    expect(screen.queryByTestId('cleanup-cal-923')).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByTestId('cleanup-cal-102'));
+    expect(onOpen).toHaveBeenCalledWith(102);
+  });
+
+  it('steps between months and goes back to the year', async () => {
+    renderCalendar();
+
+    await fireEvent.click(screen.getByTestId('cleanup-month-open-12'));
+    await fireEvent.click(screen.getByRole('button', { name: 'next' }));
+    expect(screen.getByTestId('cleanup-cal-131')).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByTestId('cleanup-month-back'));
+    expect(screen.queryByTestId('cleanup-month-open')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cleanup-month-9')).toBeInTheDocument();
   });
 });
