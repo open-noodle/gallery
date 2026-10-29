@@ -148,11 +148,10 @@ void main() {
     expect(markOf('q1'), LibraryCleanupMark.trash);
 
     await tapKey(tester, 'cleanup-grid-keep-rest-2020');
-    expect([markOf('q1'), markOf('q2'), markOf('q3')], [
-      LibraryCleanupMark.trash,
-      LibraryCleanupMark.keep,
-      LibraryCleanupMark.keep,
-    ]);
+    expect(
+      [markOf('q1'), markOf('q2'), markOf('q3')],
+      [LibraryCleanupMark.trash, LibraryCleanupMark.keep, LibraryCleanupMark.keep],
+    );
     expect([markOf('p1'), markOf('p2')], [null, null]);
     expect(find.byKey(const Key('cleanup-grid-year-reviewed-2020')), findsOneWidget);
     expect(find.byKey(const Key('cleanup-grid-keep-rest-2020')), findsNothing);
@@ -212,9 +211,7 @@ void main() {
       final flight = find.byKey(const Key('gallery-flight'));
       if (flight.evaluate().isNotEmpty) {
         flights.add(tester.getRect(flight));
-        final opacity = tester.widget<Opacity>(
-          find.descendant(of: tile('p1'), matching: find.byType(Opacity)).first,
-        );
+        final opacity = tester.widget<Opacity>(find.descendant(of: tile('p1'), matching: find.byType(Opacity)).first);
         hiddenWhileFlying = hiddenWhileFlying || opacity.opacity == 0;
       }
     }
