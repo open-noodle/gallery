@@ -71,6 +71,7 @@ void main() {
       ).copyWith(type: CleanupAssetTypeFilter.all, minSize: 524288000),
     );
     notifier.markOverlaySeen();
+    notifier.markSeriesOverlaySeen();
     notifier.markGridHintSeen();
     await pumpEvents();
 
@@ -88,6 +89,7 @@ void main() {
     final hogs = prefs.filtersFor(LibraryCleanupQueue.spaceHogs);
     expect([hogs.type, hogs.minSize], [CleanupAssetTypeFilter.all, 524288000]);
     expect(prefs.overlaySeen, isTrue);
+    expect(prefs.seriesOverlaySeen, isTrue);
     expect(prefs.gridHintSeen, isTrue);
     expect(Store.tryGet(StoreKey.libraryCleanupPrefs), isA<String>());
   });

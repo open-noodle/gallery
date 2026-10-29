@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_calendar_bits.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
@@ -416,7 +417,7 @@ void main() {
 
     expect(find.byKey(const Key('cleanup-today-card')), findsOneWidget);
     final cell = tester.widget<Container>(find.byKey(const Key('cleanup-teaser-day-815')));
-    expect((cell.decoration! as BoxDecoration).color, const Color(0xFF2FBF71));
+    expect((cell.decoration! as BoxDecoration).color!.withValues(alpha: 1), libraryCleanupReviewedGreen);
     expect(
       find.ancestor(of: find.byKey(const Key('cleanup-teaser-day-815')), matching: find.byType(GalleryPop)),
       findsOneWidget,

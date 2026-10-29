@@ -14,6 +14,7 @@ import 'package:immich_mobile/gallery/motion/celebrate.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:openapi/api.dart';
 
@@ -118,11 +119,47 @@ List<CleanupAssetDto> _undecided(LibraryCleanupDeck deck) => [
     if (!deck.marks.containsKey(asset.id)) asset,
 ];
 
-/// Asks for the previews of [assets] before they are on top, so a card is ready when the one above it leaves.
-void _preload(BuildContext context, Iterable<CleanupAssetDto> assets, Set<String> done) {
-  for (final asset in assets) {
-    if (done.add(asset.id)) {
-      unawaited(precacheImage(libraryCleanupPreview(asset), context, onError: (_, _) {}));
+/// Decodes an image into the cache; resolves once it is decoded or has failed. A provider so tests can hold a decode.
+final libraryCleanupPrecacheProvider = Provider<Future<void> Function(ImageProvider image, BuildContext context)>(
+  (ref) =>
+      (image, context) => precacheImage(image, context, onError: (_, _) {}),
+);
+
+/// How many cards ahead have their preview decoded before they come up, and how many their thumbhash
+/// (specs/2026-10-29-mobile-library-cleanup-design.md, "Performance").
+const _previewsAhead = 3;
+const _thumbhashesAhead = 10;
+
+/// The decks' preloading, and the gate on it (the anti-goal "No stutter"): a card only shows its preview once the
+/// preview has decoded (or failed); until then it shows its thumbhash and thumbnail, and the preview fades in over them.
+/// So a thrown card never uncovers a card that is still blank or half drawn, and throwing never waits on the network.
+mixin _DeckPreload<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  final Set<String> _requested = {};
+  final Set<String> _ready = {};
+  final Set<String> _hashed = {};
+
+  bool _previewReady(CleanupAssetDto asset) => _ready.contains(asset.id);
+
+  /// [upcoming] starts at the card on top (or the photo shown): its preview and the next [_previewsAhead], and the
+  /// thumbhashes of the next [_thumbhashesAhead].
+  void _preload(Iterable<CleanupAssetDto> upcoming) {
+    final precache = ref.read(libraryCleanupPrecacheProvider);
+    for (final asset in upcoming.take(_previewsAhead + 1)) {
+      if (_requested.add(asset.id)) {
+        unawaited(
+          precache(libraryCleanupPreview(asset), context).whenComplete(() {
+            if (mounted) {
+              setState(() => _ready.add(asset.id));
+            }
+          }),
+        );
+      }
+    }
+    for (final asset in upcoming.take(_thumbhashesAhead + 1)) {
+      final hash = asset.thumbhash;
+      if (hash != null && hash.isNotEmpty && _hashed.add(asset.id)) {
+        unawaited(precache(ThumbHashProvider(thumbHash: hash), context));
+      }
     }
   }
 }
@@ -150,14 +187,13 @@ class _SwipeDeck extends ConsumerStatefulWidget {
   ConsumerState<_SwipeDeck> createState() => _SwipeDeckState();
 }
 
-class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderStateMixin {
+class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderStateMixin, _DeckPreload {
   late final AnimationController _x = AnimationController.unbounded(vsync: this);
   late final AnimationController _y = AnimationController.unbounded(vsync: this);
 
   /// A card coming back after Undo fades in under reduced motion.
   late final AnimationController _fadeIn = AnimationController(vsync: this, duration: GalleryMotion.quick, value: 1);
   final List<_Flight> _flights = [];
-  final Set<String> _preloaded = {};
   Size _size = Size.zero;
 
   /// The mark the drag is past the threshold of, for the one haptic per crossing.
@@ -190,7 +226,7 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
     _preloadNext();
   }
 
-  void _preloadNext() => _preload(context, _undecided(deck).skip(1).take(3), _preloaded);
+  void _preloadNext() => _preload(_undecided(deck));
 
   @override
   void dispose() {
@@ -360,7 +396,11 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
                       Positioned.fill(
                         key: ValueKey('behind-${next.id}'),
                         child: _Behind(
-                          child: LibraryCleanupDeckCard(asset: next, info: deck.info(context, next)),
+                          child: LibraryCleanupDeckCard(
+                            asset: next,
+                            info: deck.info(context, next),
+                            previewReady: _previewReady(next),
+                          ),
                         ),
                       ),
                     if (top != null)
@@ -392,6 +432,7 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
                                     asset: top,
                                     info: deck.info(context, top),
                                     heroTag: _heroFor(deck, top),
+                                    previewReady: _previewReady(top),
                                     stamps: _stampsAt(_offset),
                                     onDetails: deck.hasDetails ? () => unawaited(_details(top)) : null,
                                   ),
@@ -654,19 +695,18 @@ class _RoundButton extends StatelessWidget {
 // Button mode
 // ---------------------------------------------------------------------------------------------------------------------
 
-class _ButtonDeck extends StatefulWidget {
+class _ButtonDeck extends ConsumerStatefulWidget {
   const _ButtonDeck({super.key, required this.deck});
 
   final LibraryCleanupDeck deck;
 
   @override
-  State<_ButtonDeck> createState() => _ButtonDeckState();
+  ConsumerState<_ButtonDeck> createState() => _ButtonDeckState();
 }
 
-class _ButtonDeckState extends State<_ButtonDeck> {
+class _ButtonDeckState extends ConsumerState<_ButtonDeck> with _DeckPreload {
   late final PageController _pages = PageController(initialPage: _firstUndecided(widget.deck, 0));
   late int _index = _firstUndecided(widget.deck, 0);
-  final Set<String> _preloaded = {};
 
   /// The mark just made, flashed as a stamp on the photo.
   ({String id, LibraryCleanupMark mark})? _flash;
@@ -709,7 +749,7 @@ class _ButtonDeckState extends State<_ButtonDeck> {
     _preloadNext();
   }
 
-  void _preloadNext() => _preload(context, deck.assets.skip(_index + 1).take(3), _preloaded);
+  void _preloadNext() => _preload(deck.assets.skip(_index));
 
   void _goTo(int index) {
     if (!_pages.hasClients) {
@@ -787,6 +827,7 @@ class _ButtonDeckState extends State<_ButtonDeck> {
                 info: deck.info(context, asset),
                 edgeToEdge: true,
                 heroTag: _heroFor(deck, asset, top: false),
+                previewReady: _previewReady(asset),
                 mark: deck.marks[asset.id],
                 stamps: flash == null ? const {} : {flash: 1},
                 infoBottomInset: 104,

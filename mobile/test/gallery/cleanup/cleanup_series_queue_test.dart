@@ -34,6 +34,9 @@ import 'rewind_harness.dart';
 //            Given the duplicates list is refused   Then the queue shows its error and the overview then has no
 //                                     Duplicates card, without asking again
 // Overview   When the Bursts or Duplicates quick win is tapped   Then its series queue opens
+// Session    The first series session shows the series card's own gesture lesson (right as set, up keep all, left
+//            trash all or "Keep at least one copy"), seen once shown; How it works replays it; the menu has no
+//            swipe / button choice; Swipe ↔ Grid flies the big frame (reduced motion: nothing flies)
 
 Map<String, Object?> _burst(String id, List<String> frames, {required String suggested}) => {
   'groupId': id,
@@ -164,6 +167,7 @@ void main() {
     bool trashEnabled = true,
     Directory? directory,
     bool overview = false,
+    bool reduceMotion = false,
   }) async {
     listenToPlatform(tester);
     final container = queueContainer(
@@ -176,6 +180,7 @@ void main() {
       container,
       queue: queue,
       first: overview ? const LibraryCleanupOverviewRoute() : null,
+      reduceMotion: reduceMotion,
       requests: () => library.routes.length,
     );
     await settle(tester);
@@ -308,6 +313,87 @@ void main() {
     await tapKey(tester, 'cleanup-finish-apply');
     expect(library.commits.single['keepIds'], ['x2', 'y1', 'z1']);
     expect(library.commits.single['trashIds'], ['x1', 'x3', 'y2', 'z2']);
+  });
+
+  group('the session parts every cleanup shares', () {
+    String overlayText(WidgetTester tester, String key) => textOf(tester, 'cleanup-gesture-$key');
+
+    testWidgets('the first Bursts session teaches the series swipes; How it works replays them', (tester) async {
+      await setQueuePrefs(overlaySeen: false);
+      await open(tester, LibraryCleanupQueue.bursts);
+      expect(find.byKey(const Key('cleanup-gesture-overlay')), findsOneWidget);
+      expect(
+        [overlayText(tester, 'right'), overlayText(tester, 'up'), overlayText(tester, 'left')],
+        ['→  Keep as set', '↑  Keep all', 'Trash all  ←'],
+      );
+      expect(find.byKey(const Key('cleanup-gesture-hint')), findsOneWidget);
+      expect(storedPrefs().seriesOverlaySeen, isTrue, reason: 'seen as soon as it shows');
+      expect(storedPrefs().overlaySeen, isFalse, reason: "the photo decks' lesson is still to come");
+
+      await tapKey(tester, 'cleanup-gesture-overlay-ok');
+      expect(find.byKey(const Key('cleanup-gesture-overlay')), findsNothing);
+      await tapKey(tester, 'cleanup-session-menu');
+      await tapKey(tester, 'cleanup-menu-how-it-works');
+      expect(find.byKey(const Key('cleanup-gesture-overlay')), findsOneWidget);
+    });
+
+    testWidgets('Duplicates: left keeps at least one copy, so the lesson says so', (tester) async {
+      await setQueuePrefs(overlaySeen: false);
+      await open(tester, LibraryCleanupQueue.duplicates);
+      expect(overlayText(tester, 'left'), 'Keep at least one copy  ✕');
+      expect(overlayText(tester, 'right'), '→  Keep as set');
+    });
+
+    testWidgets('the menu offers Swipe / Grid but no swipe / button choice: the series card has one layout', (
+      tester,
+    ) async {
+      await open(tester, LibraryCleanupQueue.bursts);
+      await tapKey(tester, 'cleanup-session-menu');
+      expect(find.byKey(const Key('cleanup-menu-grid')), findsOneWidget);
+      expect(find.byKey(const Key('cleanup-menu-how-it-works')), findsOneWidget);
+      expect(find.byKey(const Key('cleanup-menu-mode-swipe')), findsNothing);
+      expect(find.byKey(const Key('cleanup-menu-mode-button')), findsNothing);
+    });
+
+    Future<List<Rect>> flights(WidgetTester tester) async {
+      final rects = <Rect>[];
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final flight = find.byKey(const Key('gallery-flight'));
+        if (flight.evaluate().isNotEmpty) {
+          rects.add(tester.getRect(flight));
+        }
+      }
+      await settle(tester);
+      return rects;
+    }
+
+    testWidgets('Swipe ↔ Grid: the big frame flies into its series in the list and back', (tester) async {
+      await open(tester, LibraryCleanupQueue.bursts);
+      await swipe(tester, 'x1', const Offset(300, 0));
+      final frame = tester.getRect(find.byKey(const Key('cleanup-series-frame-y1')));
+
+      await tester.tap(find.byKey(const Key('cleanup-view-grid')));
+      final there = await flights(tester);
+      expect(there, isNotEmpty, reason: "the deck's frame flies");
+      expect(there.first.width, closeTo(frame.width, frame.width * 0.25));
+      expect(
+        (there.last.center - tester.getRect(find.byKey(const Key('cleanup-series-frame-y1'))).center).distance,
+        lessThan(12),
+        reason: "it lands on y's frame in the list, the first undecided series",
+      );
+
+      await tester.tap(find.byKey(const Key('cleanup-view-swipe')));
+      expect(await flights(tester), isNotEmpty, reason: 'and flies back into the deck');
+      expect(topCardId(tester), 'y1');
+    });
+
+    testWidgets('Swipe ↔ Grid under reduced motion: nothing flies', (tester) async {
+      await open(tester, LibraryCleanupQueue.bursts, reduceMotion: true);
+      await tester.tap(find.byKey(const Key('cleanup-view-grid')));
+      expect(await flights(tester), isEmpty);
+      expect(find.byKey(const Key('cleanup-series-list')), findsOneWidget);
+    });
   });
 
   group('Duplicates', () {

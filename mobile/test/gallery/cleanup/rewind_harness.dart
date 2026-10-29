@@ -305,6 +305,7 @@ ProviderContainer rewindContainer({
   LibraryCleanupDetailsRepository? details,
   required Directory directory,
   bool trashEnabled = true,
+  List<Override> overrides = const [],
 }) {
   openedInLibrary.clear();
   shownDays.clear();
@@ -333,6 +334,7 @@ ProviderContainer rewindContainer({
       libraryCleanupInlineVideoProvider.overrideWithValue(
         (asset) => ColoredBox(key: Key('test-video-${asset.id}'), color: Colors.black),
       ),
+      ...overrides,
     ],
   );
 }

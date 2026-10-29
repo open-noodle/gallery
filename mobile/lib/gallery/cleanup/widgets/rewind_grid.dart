@@ -5,7 +5,9 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart'
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_session_state.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
 import 'package:immich_mobile/gallery/motion/entrance.dart';
+import 'package:immich_mobile/gallery/motion/gallery_tile.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -47,18 +49,10 @@ class LibraryCleanupGridTile extends StatelessWidget {
   /// On the photo, so a flight can find where it lands.
   final Key? photoKey;
 
-  static const _grey = ColorFilter.matrix([
-    0.33, 0.33, 0.33, 0, 0, //
-    0.33, 0.33, 0.33, 0, 0,
-    0.33, 0.33, 0.33, 0, 0,
-    0, 0, 0, 1, 0,
-  ]);
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final mark = this.mark;
-    final duration = GalleryMotion.reduced(context) ? Duration.zero : GalleryMotion.quick;
     final image = Image(
       image: libraryCleanupThumbnail(asset),
       fit: BoxFit.cover,
@@ -81,70 +75,118 @@ class LibraryCleanupGridTile extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 ColoredBox(color: scheme.surfaceContainerHighest),
-                if (mark == LibraryCleanupMark.trash) ColorFiltered(colorFilter: _grey, child: image) else image,
+                // Findable by its id, so photos applied from the grid (the close prompt's Apply) fly out of it.
+                GalleryTile(
+                  remoteId: asset.id,
+                  child: mark == LibraryCleanupMark.trash
+                      ? ColorFiltered(colorFilter: libraryCleanupGreyscale, child: image)
+                      : image,
+                ),
                 if (asset.type == AssetTypeEnum.VIDEO)
                   const Positioned(
                     left: 4,
                     bottom: 4,
                     child: Icon(Icons.play_circle_fill_rounded, size: 18, color: Colors.white),
                   ),
-                // The mark fades in; its badge pops.
-                AnimatedSwitcher(
-                  duration: duration,
-                  child: KeyedSubtree(
-                    key: ValueKey(mark),
-                    child: switch (mark) {
-                      null => const SizedBox.expand(),
-                      LibraryCleanupMark.trash => ColoredBox(
-                        key: Key('cleanup-grid-mark-${asset.id}-trash'),
-                        color: libraryCleanupTrashColor.withValues(alpha: 0.35),
-                        child: Center(
-                          child: Text(
-                            context.t.trash.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      _ => DecoratedBox(
-                        key: Key('cleanup-grid-mark-${asset.id}-${mark.name}'),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: libraryCleanupMarkColor(mark), width: 3),
-                          borderRadius: BorderRadius.circular(_tileRadius),
-                        ),
-                      ),
-                    },
-                  ),
-                ),
-                Positioned(
-                  top: 5,
-                  right: 5,
-                  child: GalleryPop(
-                    trigger: mark,
-                    child: mark == LibraryCleanupMark.keep || mark == LibraryCleanupMark.favorite
-                        ? Container(
-                            key: Key('cleanup-grid-badge-${asset.id}'),
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(color: libraryCleanupMarkColor(mark!), shape: BoxShape.circle),
-                            child: Icon(
-                              mark == LibraryCleanupMark.keep ? Icons.check_rounded : Icons.favorite_rounded,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
+                LibraryCleanupMarkLayer(id: asset.id, mark: mark, radius: _tileRadius),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The greyscale a photo marked for trash shows in every grid.
+const libraryCleanupGreyscale = ColorFilter.matrix([
+  0.33, 0.33, 0.33, 0, 0, //
+  0.33, 0.33, 0.33, 0, 0,
+  0.33, 0.33, 0.33, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+
+/// A tile's mark, the same in every cleanup grid (the rewind's, a queue's, "Review the N first"): keep and favourite a
+/// ring plus a corner badge, trash a red wash labelled "Trash" over the greyed photo (which the tile draws). The mark
+/// fades in and its badge pops; under reduced motion both are there at once.
+class LibraryCleanupMarkLayer extends StatelessWidget {
+  const LibraryCleanupMarkLayer({
+    super.key,
+    required this.id,
+    required this.mark,
+    required this.radius,
+    this.badgeAlignment = AlignmentDirectional.topEnd,
+  });
+
+  final String id;
+  final LibraryCleanupMark? mark;
+  final double radius;
+
+  /// Where the keep / favourite badge sits: top end in the rewind, bottom start in a queue (whose top end holds the
+  /// selection check).
+  final AlignmentDirectional badgeAlignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final mark = this.mark;
+    final duration = GalleryMotion.reduced(context) ? Duration.zero : GalleryMotion.quick;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        AnimatedSwitcher(
+          duration: duration,
+          child: KeyedSubtree(
+            key: ValueKey(mark),
+            child: switch (mark) {
+              null => const SizedBox.expand(),
+              LibraryCleanupMark.trash => ColoredBox(
+                key: Key('cleanup-grid-mark-$id-trash'),
+                color: libraryCleanupTrashColor.withValues(alpha: 0.35),
+                child: Center(
+                  child: Text(
+                    context.t.trash.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              _ => DecoratedBox(
+                key: Key('cleanup-grid-mark-$id-${mark.name}'),
+                decoration: BoxDecoration(
+                  border: Border.all(color: libraryCleanupMarkColor(mark), width: 3),
+                  borderRadius: BorderRadius.circular(radius),
+                ),
+              ),
+            },
+          ),
+        ),
+        Align(
+          alignment: badgeAlignment,
+          child: Padding(
+            padding: const EdgeInsets.all(5),
+            child: GalleryPop(
+              trigger: mark,
+              child: mark == LibraryCleanupMark.keep || mark == LibraryCleanupMark.favorite
+                  ? Container(
+                      key: Key('cleanup-grid-badge-$id'),
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(color: libraryCleanupMarkColor(mark!), shape: BoxShape.circle),
+                      child: Icon(
+                        mark == LibraryCleanupMark.keep ? Icons.check_rounded : Icons.favorite_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -189,13 +231,13 @@ class LibraryCleanupRewindGrid extends StatefulWidget {
   State<LibraryCleanupRewindGrid> createState() => LibraryCleanupRewindGridState();
 }
 
-class LibraryCleanupRewindGridState extends State<LibraryCleanupRewindGrid> {
+class LibraryCleanupRewindGridState extends State<LibraryCleanupRewindGrid> implements LibraryCleanupFlightGrid {
   final _scroll = ScrollController();
   final _photoKeys = <String, GlobalKey>{};
 
   GlobalKey _keyFor(String id) => _photoKeys.putIfAbsent(id, GlobalKey.new);
 
-  /// Where [id]'s tile is on screen, if it is laid out.
+  @override
   Rect? tileRect(String id) {
     final box = _photoKeys[id]?.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.hasSize) {
@@ -204,7 +246,7 @@ class LibraryCleanupRewindGridState extends State<LibraryCleanupRewindGrid> {
     return box.localToGlobal(Offset.zero) & box.size;
   }
 
-  /// Scrolls [id]'s tile into view at once (the position the deck was at).
+  @override
   void reveal(String id) {
     final context = _photoKeys[id]?.currentContext;
     if (context != null) {

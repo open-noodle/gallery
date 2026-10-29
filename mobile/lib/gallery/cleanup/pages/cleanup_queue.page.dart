@@ -29,6 +29,8 @@ import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_queue_grid.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_dialogs.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_trash_confirm.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/rewind_grid.dart' show libraryCleanupGridTileRadius;
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
@@ -59,7 +61,7 @@ class LibraryCleanupQueuePage extends ConsumerStatefulWidget {
   ConsumerState<LibraryCleanupQueuePage> createState() => _LibraryCleanupQueuePageState();
 }
 
-class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePage> {
+class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePage> with LibraryCleanupViewFlight {
   late final LibraryCleanupQueue _queue = LibraryCleanupQueue.fromSlug(widget.queue) ?? LibraryCleanupQueue.blurry;
   late final _request = LibraryCleanupSessionRequest.queue(_queue);
   final _doneKey = GlobalKey();
@@ -74,6 +76,10 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
   bool _overlay = false;
   bool _overlayChecked = false;
   bool _restoredShown = false;
+  bool _gridHint = false;
+
+  /// Button mode's photo, after a sideways swipe (swipe mode is always on its first undecided photo).
+  String? _buttonCurrentId;
 
   /// Every photo this session has shown, so marks made under other filters still have their size on the finish screen.
   final Map<String, CleanupAssetDto> _seen = {};
@@ -286,12 +292,53 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
     }
   }
 
+  /// Where the deck's card for [id] is on screen: the top card in swipe mode, the page in button mode.
+  Rect? _cardRect(String id) => libraryCleanupRectOf(context, {Key('cleanup-card-$id'), Key('cleanup-page-$id')});
+
+  /// Swipe ↔ Grid, as in the rewind: the current card shrinks into its tile, or the first undecided tile grows back into
+  /// the card; reduced motion crossfades. Marks and the finish state are kept.
   void _setView(LibraryCleanupView view) {
-    ref.read(libraryCleanupPrefsProvider.notifier).setView(_queue, view);
-    setState(() {
-      _phase = _Phase.content;
-      _stayOnDeck = false;
-    });
+    final prefs = ref.read(libraryCleanupPrefsProvider);
+    if (prefs.viewFor(_queue) == view && _phase == _Phase.content) {
+      return;
+    }
+    final state = ref.read(libraryCleanupSessionProvider(_request));
+    final toGrid = view == LibraryCleanupView.grid;
+    final first = state.undecided.firstOrNull;
+    final current = toGrid && prefs.deckMode == LibraryCleanupDeckMode.button
+        ? state.assets.where((asset) => asset.id == _buttonCurrentId).firstOrNull ?? first
+        : first;
+    final byId = {for (final asset in state.assets) asset.id: asset};
+    switchViewWithFlight(
+      toGrid: toGrid,
+      // Only from the photos on screen: the finish screen has no card to fly from.
+      id: _shown == _Phase.content ? current?.id : null,
+      cardRect: _cardRect,
+      picture: (id) => libraryCleanupFlightPicture(byId[id]!),
+      cardRadius: libraryCleanupCardRadius,
+      tileRadius: libraryCleanupGridTileRadius,
+      commit: () {
+        ref.read(libraryCleanupPrefsProvider.notifier).setView(_queue, view);
+        setState(() {
+          _phase = _Phase.content;
+          _stayOnDeck = false;
+          if (!toGrid) {
+            _buttonCurrentId = null;
+          }
+        });
+        if (toGrid) {
+          _showGridHint();
+        }
+      },
+    );
+  }
+
+  /// "Hold a photo for details", the first time a grid shows: seen as soon as it shows, one flag for every grid.
+  void _showGridHint() {
+    if (!ref.read(libraryCleanupPrefsProvider).gridHintSeen) {
+      setState(() => _gridHint = true);
+      ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+    }
   }
 
   void _showOverlay() {
@@ -342,10 +389,12 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
 
     if (state.isReady && !_overlayChecked) {
       _overlayChecked = true;
-      if (!prefs.overlaySeen && view == LibraryCleanupView.swipe) {
+      // The gesture overlay teaches the deck; a session opening in the grid gets the grid's hint instead.
+      final swipe = view == LibraryCleanupView.swipe;
+      if (swipe ? !prefs.overlaySeen : !prefs.gridHintSeen) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _showOverlay();
+            swipe ? _showOverlay() : _showGridHint();
           }
         });
       }
@@ -375,17 +424,16 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
       _Phase.content =>
         view == LibraryCleanupView.grid
             ? LibraryCleanupQueueGrid(
-                key: const ValueKey('grid'),
+                key: gridKey,
                 queue: _queue,
                 assets: state.assets,
                 marks: state.marks,
                 onMark: _session.markMany,
-                onDetails: (asset) {
-                  ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
-                  unawaited(_gridDetails(asset));
-                },
+                onDetails: (asset) => unawaited(_gridDetails(asset)),
                 onNearEnd: () => unawaited(_session.loadMore()),
-                showHint: !prefs.gridHintSeen,
+                showHint: _gridHint,
+                hiddenId: landingId,
+                entrance: gridEntrance,
               )
             : LibraryCleanupDeck(
                 key: const ValueKey('deck'),
@@ -399,6 +447,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
                 info: (context, asset) => libraryCleanupQueueCardInfo(context, _queue, asset),
                 openDetails: _details,
                 heroTag: heroTag,
+                onCurrentChanged: (asset) => _buttonCurrentId = asset.id,
               ),
       _Phase.finish => LibraryCleanupFinishView.queue(
         title: libraryCleanupQueueName(context, _queue),
@@ -432,6 +481,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
         }
       },
       child: LibraryCleanupSessionScaffold(
+        guardBackSwipe: !canPop,
         title: libraryCleanupQueueName(context, _queue),
         position: state.isReady && total > 0 && phase == _Phase.content
             ? (index: math.min(state.decided + 1, total), total: total)
@@ -484,52 +534,10 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
         overlay: _overlay && phase == _Phase.content && view == LibraryCleanupView.swipe
             ? LibraryCleanupGestureOverlay(onDismiss: () => setState(() => _overlay = false))
             : null,
-        body: Column(
-          children: [
-            if (phase == _Phase.content) LibraryCleanupViewSwitch(view: view, onView: _setView),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
-                child: KeyedSubtree(key: ValueKey((phase, view)), child: body),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Swipe / Grid at the top of a queue, remembered per queue.
-class LibraryCleanupViewSwitch extends StatelessWidget {
-  const LibraryCleanupViewSwitch({super.key, required this.view, required this.onView});
-
-  final LibraryCleanupView view;
-  final ValueChanged<LibraryCleanupView> onView;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: SegmentedButton<LibraryCleanupView>(
-          key: const Key('cleanup-view-switch'),
-          showSelectedIcon: false,
-          style: const ButtonStyle(visualDensity: VisualDensity.compact),
-          segments: [
-            ButtonSegment(
-              value: LibraryCleanupView.swipe,
-              label: Text(t.cleanup_menu_swipe, key: const Key('cleanup-view-swipe')),
-            ),
-            ButtonSegment(
-              value: LibraryCleanupView.grid,
-              label: Text(t.cleanup_mode_grid, key: const Key('cleanup-view-grid')),
-            ),
-          ],
-          selected: {view},
-          onSelectionChanged: (selected) => onView(selected.single),
+        showViewSwitch: phase == _Phase.content,
+        body: AnimatedSwitcher(
+          duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
+          child: KeyedSubtree(key: ValueKey((phase, view)), child: body),
         ),
       ),
     );

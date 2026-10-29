@@ -6,8 +6,11 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart'
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_queue_card.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/rewind_grid.dart';
+import 'package:immich_mobile/gallery/motion/entrance.dart';
+import 'package:immich_mobile/gallery/motion/gallery_tile.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
-import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:openapi/api.dart';
@@ -19,6 +22,7 @@ import 'package:openapi/api.dart';
 const _columns = 3;
 const _spacing = 4.0;
 const _padding = EdgeInsets.fromLTRB(10, 4, 10, 120);
+const _tileRadius = libraryCleanupGridTileRadius;
 
 /// Asks for the next page when the grid is scrolled this close to its end.
 const _nearEnd = 600.0;
@@ -32,7 +36,9 @@ class LibraryCleanupQueueGrid extends StatefulWidget {
     required this.onMark,
     this.onDetails,
     this.onNearEnd,
-    this.showHint = true,
+    this.showHint = false,
+    this.hiddenId,
+    this.entrance = false,
   });
 
   final LibraryCleanupQueue queue;
@@ -48,14 +54,21 @@ class LibraryCleanupQueueGrid extends StatefulWidget {
   final ValueChanged<CleanupAssetDto>? onDetails;
   final VoidCallback? onNearEnd;
 
-  /// The one-time "Hold a photo for details" hint (shared with the rewind grid), until the user holds a photo.
+  /// The one-time "Hold a photo for details" hint (one flag for every grid, seen once it shows).
   final bool showHint;
 
+  /// The tile a flight from the deck is landing in, kept empty until it lands.
+  final String? hiddenId;
+
+  /// The other tiles fade and settle in on a short stagger (switching from the deck).
+  final bool entrance;
+
   @override
-  State<LibraryCleanupQueueGrid> createState() => _LibraryCleanupQueueGridState();
+  State<LibraryCleanupQueueGrid> createState() => LibraryCleanupQueueGridState();
 }
 
-class _LibraryCleanupQueueGridState extends State<LibraryCleanupQueueGrid> {
+/// Its state says where a tile is and brings one into view, for the flight between the deck's card and its tile.
+class LibraryCleanupQueueGridState extends State<LibraryCleanupQueueGrid> implements LibraryCleanupFlightGrid {
   final _scroll = ScrollController();
   final Set<String> _selected = {};
 
@@ -64,7 +77,28 @@ class _LibraryCleanupQueueGridState extends State<LibraryCleanupQueueGrid> {
   bool _runSelects = true;
   Set<String> _runBase = const {};
 
+  /// The grid's width at its last layout, to find a tile that is not built yet.
+  double _width = 0;
+
   bool get _screenshots => widget.queue == LibraryCleanupQueue.screenshots;
+
+  double get _tileHeight => (_width - _padding.horizontal - _spacing * (_columns - 1)) / _columns / _tileAspect;
+
+  @override
+  Rect? tileRect(String id) => libraryCleanupRectOf(context, {Key('cleanup-grid-photo-$id')});
+
+  @override
+  void reveal(String id) {
+    final index = widget.assets.indexWhere((asset) => asset.id == id);
+    if (index < 0 || !_scroll.hasClients || _width <= 0) {
+      return;
+    }
+    // Lazily built, so the row is found by arithmetic and scrolled to the middle of the view.
+    final position = _scroll.position;
+    final rowTop = _padding.top + (index ~/ _columns) * (_tileHeight + _spacing);
+    final target = rowTop - (position.viewportDimension - _tileHeight) / 2;
+    position.jumpTo(target.clamp(position.minScrollExtent, position.maxScrollExtent));
+  }
 
   /// Screenshots keep their tall shape; the others are square.
   double get _tileAspect => _screenshots ? 9 / 19.5 : 1;
@@ -189,44 +223,52 @@ class _LibraryCleanupQueueGridState extends State<LibraryCleanupQueueGrid> {
             ),
             Expanded(
               child: LayoutBuilder(
-                builder: (context, constraints) => NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification.metrics.extentAfter < _nearEnd) {
-                      widget.onNearEnd?.call();
-                    }
-                    return false;
-                  },
-                  // A sideways drag selects a run; an up or down drag still scrolls.
-                  child: GestureDetector(
-                    onHorizontalDragStart: (details) => _runFrom(details.localPosition, constraints.maxWidth),
-                    onHorizontalDragUpdate: (details) => _runTo(details.localPosition, constraints.maxWidth),
-                    onHorizontalDragEnd: (_) => _runStart = null,
-                    child: GridView.builder(
-                      key: const Key('cleanup-grid-scroll'),
-                      controller: _scroll,
-                      padding: _padding,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _columns,
-                        crossAxisSpacing: _spacing,
-                        mainAxisSpacing: _spacing,
-                        childAspectRatio: _tileAspect,
+                builder: (context, constraints) {
+                  _width = constraints.maxWidth;
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification.metrics.extentAfter < _nearEnd) {
+                        widget.onNearEnd?.call();
+                      }
+                      return false;
+                    },
+                    // A sideways drag selects a run; an up or down drag still scrolls.
+                    child: GestureDetector(
+                      onHorizontalDragStart: (details) => _runFrom(details.localPosition, constraints.maxWidth),
+                      onHorizontalDragUpdate: (details) => _runTo(details.localPosition, constraints.maxWidth),
+                      onHorizontalDragEnd: (_) => _runStart = null,
+                      child: GridView.builder(
+                        key: const Key('cleanup-grid-scroll'),
+                        controller: _scroll,
+                        padding: _padding,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _columns,
+                          crossAxisSpacing: _spacing,
+                          mainAxisSpacing: _spacing,
+                          childAspectRatio: _tileAspect,
+                        ),
+                        itemCount: widget.assets.length,
+                        itemBuilder: (context, index) {
+                          final asset = widget.assets[index];
+                          return GalleryEntrance(
+                            delay: Duration(milliseconds: 18 * math.min(index, 14)),
+                            enabled: widget.entrance && !GalleryMotion.reduced(context),
+                            child: _Tile(
+                              key: Key('cleanup-grid-tile-${asset.id}'),
+                              asset: asset,
+                              queue: widget.queue,
+                              mark: widget.marks[asset.id],
+                              selected: _selected.contains(asset.id),
+                              hidden: widget.hiddenId == asset.id,
+                              onTap: () => _toggle(asset.id),
+                              onLongPress: widget.onDetails == null ? null : () => widget.onDetails!(asset),
+                            ),
+                          );
+                        },
                       ),
-                      itemCount: widget.assets.length,
-                      itemBuilder: (context, index) {
-                        final asset = widget.assets[index];
-                        return _Tile(
-                          key: Key('cleanup-grid-tile-${asset.id}'),
-                          asset: asset,
-                          queue: widget.queue,
-                          mark: widget.marks[asset.id],
-                          selected: _selected.contains(asset.id),
-                          onTap: () => _toggle(asset.id),
-                          onLongPress: widget.onDetails == null ? null : () => widget.onDetails!(asset),
-                        );
-                      },
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],
@@ -348,6 +390,7 @@ class _Tile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
+    this.hidden = false,
   });
 
   final CleanupAssetDto asset;
@@ -357,12 +400,8 @@ class _Tile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
-  static const _greyscale = ColorFilter.matrix([
-    0.33, 0.33, 0.33, 0, 0, //
-    0.33, 0.33, 0.33, 0, 0,
-    0.33, 0.33, 0.33, 0, 0,
-    0, 0, 0, 1, 0,
-  ]);
+  /// While a flight lands here, the tile leaves its place empty.
+  final bool hidden;
 
   @override
   Widget build(BuildContext context) {
@@ -387,116 +426,79 @@ class _Tile extends StatelessWidget {
       );
     }
     if (mark == LibraryCleanupMark.trash) {
-      image = ColorFiltered(
-        colorFilter: _greyscale,
-        child: Opacity(opacity: 0.6, child: image),
-      );
+      image = ColorFiltered(colorFilter: libraryCleanupGreyscale, child: image);
     }
     final reason = queue == LibraryCleanupQueue.blurry ? libraryCleanupReasonLabel(context, asset) : null;
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            image,
-            if (reason != null)
-              Positioned(
-                top: 4,
-                left: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(reason, style: const TextStyle(color: Colors.white, fontSize: 10)),
-                ),
-              ),
-            if (queue == LibraryCleanupQueue.spaceHogs)
-              Positioned(
-                right: 4,
-                bottom: 4,
-                child: Text(
-                  formatBytes(asset.fileSize.round()),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    shadows: [Shadow(blurRadius: 4)],
+      child: Opacity(
+        opacity: hidden ? 0 : 1,
+        child: ClipRRect(
+          key: Key('cleanup-grid-photo-${asset.id}'),
+          borderRadius: BorderRadius.circular(_tileRadius),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Findable by its id, so photos applied from the grid (the close prompt's Apply) fly out of it.
+              GalleryTile(remoteId: asset.id, child: image),
+              if (reason != null)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(reason, style: const TextStyle(color: Colors.white, fontSize: 10)),
                   ),
                 ),
+              if (queue == LibraryCleanupQueue.spaceHogs)
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: Text(
+                    formatBytes(asset.fileSize.round()),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      shadows: [Shadow(blurRadius: 4)],
+                    ),
+                  ),
+                ),
+              // Marked from the bar: the mark fades in and its badge pops, as in the rewind's grid.
+              LibraryCleanupMarkLayer(
+                id: asset.id,
+                mark: mark,
+                radius: _tileRadius,
+                badgeAlignment: AlignmentDirectional.bottomStart,
               ),
-            if (mark != null) ...[
-              if (mark != LibraryCleanupMark.trash)
+              if (selected) ...[
+                ColoredBox(color: Colors.black.withValues(alpha: 0.25)),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    border: Border.all(color: libraryCleanupMarkColor(mark), width: 3),
-                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: scheme.primary, width: 2.5),
+                    borderRadius: BorderRadius.circular(_tileRadius),
                   ),
                 ),
-              Positioned(
-                left: 4,
-                bottom: 4,
-                child: GalleryPop(
-                  key: Key('cleanup-grid-mark-${mark.name}-${asset.id}'),
-                  onMount: true,
-                  child: _MarkBadge(mark: mark),
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: Container(
+                    key: Key('cleanup-grid-selected-${asset.id}'),
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                    child: Icon(Icons.check_rounded, size: 14, color: scheme.onPrimary),
+                  ),
                 ),
-              ),
+              ],
             ],
-            if (selected) ...[
-              ColoredBox(color: Colors.black.withValues(alpha: 0.25)),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: scheme.primary, width: 2.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              Positioned(
-                top: 5,
-                right: 5,
-                child: Container(
-                  key: Key('cleanup-grid-selected-${asset.id}'),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
-                  child: Icon(Icons.check_rounded, size: 14, color: scheme.onPrimary),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _MarkBadge extends StatelessWidget {
-  const _MarkBadge({required this.mark});
-
-  final LibraryCleanupMark mark;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = libraryCleanupMarkColor(mark);
-    if (mark == LibraryCleanupMark.trash) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
-        child: Text(context.t.trash, style: const TextStyle(color: Colors.white, fontSize: 10)),
-      );
-    }
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: Icon(
-        mark == LibraryCleanupMark.keep ? Icons.check_rounded : Icons.favorite_rounded,
-        size: 13,
-        color: Colors.white,
       ),
     );
   }

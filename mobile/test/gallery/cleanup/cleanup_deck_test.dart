@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 
 import 'cleanup_overview_harness.dart';
 import 'cleanup_test_utils.dart';
@@ -21,6 +26,7 @@ import 'rewind_harness.dart';
 //   When Undo is pressed                           Then the last card flies back from where it left, unmarked
 //   Given a video                                  When ▶ is tapped   Then it plays on the card, which still swipes
 //   Then the next three previews are requested before they are on top
+//   Given a preview not decoded yet                Then its card shows the placeholder, and the preview once decoded
 //   Given reduced motion                           Then a decided card fades where it was, without a throw
 // Button mode
 //   When the photo is swiped sideways              Then the next photo shows and nothing is marked
@@ -44,9 +50,9 @@ void main() {
 
   Future<void> settle(WidgetTester tester) => settleCleanup(tester, requests: () => library.routes.length);
 
-  Future<void> open(WidgetTester tester, {bool reduceMotion = false}) async {
+  Future<void> open(WidgetTester tester, {bool reduceMotion = false, List<Override> overrides = const []}) async {
     platform = listenToPlatform(tester);
-    final container = rewindContainer(library: library, directory: tempDirectory());
+    final container = rewindContainer(library: library, directory: tempDirectory(), overrides: overrides);
     await pumpRewind(tester, container, reduceMotion: reduceMotion, requests: () => library.routes.length);
   }
 
@@ -218,6 +224,45 @@ void main() {
       await tester.fling(top, const Offset(160, 0), 1500);
       await settle(tester);
       expect(platform.requested('q3'), isTrue);
+    });
+
+    testWidgets('a card shows its preview only once it has decoded; until then its placeholder', (tester) async {
+      // Decodes held until the test lets them finish, by asset id.
+      final decodes = <String, Completer<void>>{};
+      await open(
+        tester,
+        overrides: [
+          libraryCleanupPrecacheProvider.overrideWithValue((image, context) {
+            final url = image is RemoteImageProvider ? image.url : '';
+            final id = RegExp(r'/assets/([^/]+)/thumbnail').firstMatch(url)?.group(1);
+            return id == null ? Future.value() : (decodes[id] ??= Completer<void>()).future;
+          }),
+        ],
+      );
+      bool preview(String id) => find.byKey(Key('cleanup-card-preview-$id')).evaluate().isNotEmpty;
+      bool placeholder(String id) => find.byKey(Key('cleanup-card-placeholder-$id')).evaluate().isNotEmpty;
+
+      expect(decodes.keys, ['p1', 'p2', 'q1', 'q2'], reason: 'the top card and the next three');
+      expect([placeholder('p1'), placeholder('p2')], [true, true]);
+      expect([preview('p1'), preview('p2')], [false, false]);
+
+      decodes['p2']!.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(preview('p2'), isTrue, reason: 'the card behind shows its preview once decoded');
+      expect(placeholder('p1'), isTrue, reason: 'the top card still waits for its own');
+
+      // Thrown before q1 decoded: the next card comes up on its placeholder, never blank, and the throw did not wait.
+      await tester.fling(top, const Offset(160, 0), 1500);
+      await settle(tester);
+      expect(topCardId(tester), 'p2');
+      expect(preview('p2'), isTrue);
+      expect(placeholder('q1'), isTrue);
+      expect(decodes.keys, contains('q3'), reason: 'the next preview is asked for as the deck moves on');
+      decodes['q1']!.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(preview('q1'), isTrue);
     });
 
     testWidgets('reduced motion: a decided card fades where it was, with no throw', (tester) async {

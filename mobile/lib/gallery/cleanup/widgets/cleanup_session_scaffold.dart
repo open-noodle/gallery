@@ -41,25 +41,28 @@ class LibraryCleanupProgress {
   String? get label => current < segments.length ? segments[current].label : null;
 }
 
-/// The ⋯ menu's choices. Queues add their filters through [extra].
+/// The ⋯ menu's choices, the same in every cleanup: Swipe / Grid, swipe / button mode, the session's own items (a
+/// queue's filters) and "How it works".
 class LibraryCleanupSessionMenu {
   const LibraryCleanupSessionMenu({
+    required this.view,
+    required this.onView,
     required this.deckMode,
-    required this.onDeckMode,
     required this.onHowItWorks,
+    this.onDeckMode,
     this.extra = const [],
-    this.view = LibraryCleanupView.swipe,
-    this.onView,
   });
 
-  final LibraryCleanupDeckMode deckMode;
-  final ValueChanged<LibraryCleanupDeckMode> onDeckMode;
-  final VoidCallback onHowItWorks;
-
-  /// Swipe or Grid: the rewind's and every queue's grid. Without [onView] the session has no grid yet: Grid shows
-  /// disabled, "coming soon", and Swipe stays checked.
+  /// Swipe or Grid.
   final LibraryCleanupView view;
-  final ValueChanged<LibraryCleanupView>? onView;
+  final ValueChanged<LibraryCleanupView> onView;
+
+  final LibraryCleanupDeckMode deckMode;
+
+  /// Null where the deck has one layout for both modes (the series card, whose buttons are always under it): the menu
+  /// then offers no swipe / button choice rather than one that does nothing.
+  final ValueChanged<LibraryCleanupDeckMode>? onDeckMode;
+  final VoidCallback onHowItWorks;
 
   /// Items after the shared ones (a queue's filters).
   final List<PopupMenuEntry<VoidCallback>> extra;
@@ -86,6 +89,8 @@ class LibraryCleanupSessionScaffold extends StatelessWidget {
     this.doneKey,
     this.skeleton,
     this.overlay,
+    this.guardBackSwipe = false,
+    this.showViewSwitch = false,
   });
 
   /// What the session is about ("Aug 15", "Blurry").
@@ -113,6 +118,14 @@ class LibraryCleanupSessionScaffold extends StatelessWidget {
   /// Drawn over the body (the first-run gesture overlay).
   final Widget? overlay;
 
+  /// The page's PopScope is holding the route (pending marks). On iOS that disables the system back swipe outright
+  /// (Flutter's `popGestureEnabled` is false for a route that would not pop, and no callback fires), so an edge swipe
+  /// strip stands in for it and calls [onBack], which asks as ‹ does.
+  final bool guardBackSwipe;
+
+  /// Swipe / Grid above the body (not on the finish screen), loading included so the layout does not jump.
+  final bool showViewSwitch;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -120,7 +133,7 @@ class LibraryCleanupSessionScaffold extends StatelessWidget {
     final heading = position == null
         ? title
         : context.t.cleanup_session_title(what: title, index: position.index, total: position.total);
-    return Scaffold(
+    final scaffold = Scaffold(
       key: const Key('cleanup-session'),
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -153,14 +166,75 @@ class LibraryCleanupSessionScaffold extends StatelessWidget {
         children: [
           Positioned.fill(
             child: switch (status) {
-              LibraryCleanupLoadStatus.loading => skeleton ?? const LibraryCleanupDeckSkeleton(),
               LibraryCleanupLoadStatus.error => _Error(onRetry: onRetry),
-              LibraryCleanupLoadStatus.ready => body,
+              _ => Column(
+                children: [
+                  if (showViewSwitch) LibraryCleanupViewSwitch(view: menu.view, onView: menu.onView),
+                  Expanded(
+                    child: status == LibraryCleanupLoadStatus.ready
+                        ? body
+                        : skeleton ?? const LibraryCleanupDeckSkeleton(),
+                  ),
+                ],
+              ),
             },
           ),
           if (overlay != null && status == LibraryCleanupLoadStatus.ready) Positioned.fill(child: overlay!),
         ],
       ),
+    );
+    if (!guardBackSwipe || theme.platform != TargetPlatform.iOS) {
+      return scaffold;
+    }
+    return Stack(
+      children: [
+        scaffold,
+        PositionedDirectional(
+          start: 0,
+          top: 0,
+          bottom: 0,
+          width: _BackSwipe.edge,
+          child: _BackSwipe(onBack: onBack),
+        ),
+      ],
+    );
+  }
+}
+
+/// The iOS back swipe while the route is held: a drag from the leading edge that would have popped the page asks
+/// instead (the same Apply / Discard / Keep going as ‹).
+class _BackSwipe extends StatefulWidget {
+  const _BackSwipe({required this.onBack});
+
+  final VoidCallback onBack;
+
+  /// The width of the edge the system back swipe starts in.
+  static const edge = 20.0;
+
+  @override
+  State<_BackSwipe> createState() => _BackSwipeState();
+}
+
+class _BackSwipeState extends State<_BackSwipe> {
+  double _travel = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    double inward(double dx) => rtl ? -dx : dx;
+    return GestureDetector(
+      key: const Key('cleanup-session-back-swipe'),
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) => _travel = 0,
+      onHorizontalDragUpdate: (details) => _travel += inward(details.delta.dx),
+      onHorizontalDragEnd: (details) {
+        final width = MediaQuery.sizeOf(context).width;
+        // The system back swipe's own rule: past half the screen, or a fling inwards.
+        if (_travel > width / 2 || inward(details.velocity.pixelsPerSecond.dx) > 500) {
+          widget.onBack();
+        }
+        _travel = 0;
+      },
     );
   }
 }
@@ -225,7 +299,7 @@ class _Menu extends StatelessWidget {
     CheckedPopupMenuItem<VoidCallback> mode(LibraryCleanupDeckMode mode, String label) => CheckedPopupMenuItem(
       key: Key('cleanup-menu-mode-${mode.name}'),
       checked: menu.deckMode == mode,
-      value: () => menu.onDeckMode(mode),
+      value: () => menu.onDeckMode?.call(mode),
       child: Text(label),
     );
     return PopupMenuButton<VoidCallback>(
@@ -233,25 +307,23 @@ class _Menu extends StatelessWidget {
       icon: const Icon(Icons.more_horiz_rounded),
       onSelected: (action) => action(),
       itemBuilder: (context) => [
-        // Swipe or Grid; a session without a grid yet shows it disabled.
         CheckedPopupMenuItem(
           key: const Key('cleanup-menu-swipe'),
-          checked: menu.onView == null || menu.view == LibraryCleanupView.swipe,
-          value: () => menu.onView?.call(LibraryCleanupView.swipe),
+          checked: menu.view == LibraryCleanupView.swipe,
+          value: () => menu.onView(LibraryCleanupView.swipe),
           child: Text(t.cleanup_menu_swipe),
         ),
-        if (menu.onView == null)
-          PopupMenuItem(key: const Key('cleanup-menu-grid'), enabled: false, child: Text(t.cleanup_menu_grid_soon))
-        else
-          CheckedPopupMenuItem(
-            key: const Key('cleanup-menu-grid'),
-            checked: menu.view == LibraryCleanupView.grid,
-            value: () => menu.onView!(LibraryCleanupView.grid),
-            child: Text(t.cleanup_mode_grid),
-          ),
-        const PopupMenuDivider(),
-        mode(LibraryCleanupDeckMode.swipe, t.cleanup_deck_mode_swipe),
-        mode(LibraryCleanupDeckMode.button, t.cleanup_deck_mode_buttons),
+        CheckedPopupMenuItem(
+          key: const Key('cleanup-menu-grid'),
+          checked: menu.view == LibraryCleanupView.grid,
+          value: () => menu.onView(LibraryCleanupView.grid),
+          child: Text(t.cleanup_mode_grid),
+        ),
+        if (menu.onDeckMode != null) ...[
+          const PopupMenuDivider(),
+          mode(LibraryCleanupDeckMode.swipe, t.cleanup_deck_mode_swipe),
+          mode(LibraryCleanupDeckMode.button, t.cleanup_deck_mode_buttons),
+        ],
         ...menu.extra,
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -371,6 +443,42 @@ class _Error extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Swipe / Grid at the top of every cleanup, the same choice as the ⋯ menu's (remembered per queue).
+class LibraryCleanupViewSwitch extends StatelessWidget {
+  const LibraryCleanupViewSwitch({super.key, required this.view, required this.onView});
+
+  final LibraryCleanupView view;
+  final ValueChanged<LibraryCleanupView> onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: SegmentedButton<LibraryCleanupView>(
+          key: const Key('cleanup-view-switch'),
+          showSelectedIcon: false,
+          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+          segments: [
+            ButtonSegment(
+              value: LibraryCleanupView.swipe,
+              label: Text(t.cleanup_menu_swipe, key: const Key('cleanup-view-swipe')),
+            ),
+            ButtonSegment(
+              value: LibraryCleanupView.grid,
+              label: Text(t.cleanup_mode_grid, key: const Key('cleanup-view-grid')),
+            ),
+          ],
+          selected: {view},
+          onSelectionChanged: (selected) => onView(selected.single),
+        ),
+      ),
+    );
+  }
 }
 
 /// The deck's loading state: the card stack in its real place, with the sheen. [hero] (the photo the session was

@@ -6,8 +6,10 @@ import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
+import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
@@ -29,6 +31,14 @@ Color libraryCleanupMarkColor(LibraryCleanupMark mark) => switch (mark) {
 /// A cleanup photo's preview, the size the deck shows (the thumbnail sits under it until it lands).
 ImageProvider libraryCleanupPreview(CleanupAssetDto asset) => RemoteImageProvider(
   url: getThumbnailUrlForRemoteId(asset.id, type: AssetMediaSize.preview, thumbhash: asset.thumbhash),
+);
+
+/// What flies between a card and its grid tile (cleanup_view_flight.dart): the preview, cropped as both show it.
+Widget libraryCleanupFlightPicture(CleanupAssetDto asset) => Image(
+  image: libraryCleanupPreview(asset),
+  fit: BoxFit.cover,
+  gaplessPlayback: true,
+  errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black),
 );
 
 /// What the card's info strip says first: the rewind's "2019 · 7 years ago", or a queue's date; then the city and time.
@@ -77,6 +87,7 @@ class LibraryCleanupDeckCard extends ConsumerStatefulWidget {
     this.edgeToEdge = false,
     this.mark,
     this.infoBottomInset = 0,
+    this.previewReady = true,
   });
 
   final CleanupAssetDto asset;
@@ -96,6 +107,10 @@ class LibraryCleanupDeckCard extends ConsumerStatefulWidget {
   /// Room left under the info strip (button mode's floating bar).
   final double infoBottomInset;
 
+  /// The deck decoded the preview: show it. Until then the card shows its thumbhash and thumbnail, and the preview fades
+  /// in over them once it is ready, so a card never comes up blank or half drawn.
+  final bool previewReady;
+
   @override
   ConsumerState<LibraryCleanupDeckCard> createState() => _LibraryCleanupDeckCardState();
 }
@@ -107,14 +122,20 @@ class _LibraryCleanupDeckCardState extends ConsumerState<LibraryCleanupDeckCard>
   Widget build(BuildContext context) {
     final asset = widget.asset;
     final isVideo = asset.type == AssetTypeEnum.VIDEO;
-    final photo = Image(
-      image: libraryCleanupPreview(asset),
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      gaplessPlayback: true,
-      frameBuilder: (context, child, frame, sync) => frame == null && !sync ? _thumbnail(asset) : child,
-      errorBuilder: (_, _, _) => _thumbnail(asset),
+    final photo = AnimatedSwitcher(
+      duration: GalleryMotion.reduced(context) ? Duration.zero : GalleryMotion.quick,
+      child: widget.previewReady
+          ? Image(
+              key: Key('cleanup-card-preview-${asset.id}'),
+              image: libraryCleanupPreview(asset),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              gaplessPlayback: true,
+              frameBuilder: (context, child, frame, sync) => frame == null && !sync ? _placeholder(asset) : child,
+              errorBuilder: (_, _, _) => _placeholder(asset),
+            )
+          : KeyedSubtree(key: Key('cleanup-card-placeholder-${asset.id}'), child: _placeholder(asset)),
     );
     final hero = widget.heroTag;
     final picture = _playing
@@ -198,14 +219,30 @@ class _LibraryCleanupDeckCardState extends ConsumerState<LibraryCleanupDeckCard>
     );
   }
 
-  Widget _thumbnail(CleanupAssetDto asset) => Image(
-    image: libraryCleanupThumbnail(asset),
-    fit: BoxFit.cover,
-    width: double.infinity,
-    height: double.infinity,
-    gaplessPlayback: true,
-    errorBuilder: (_, _, _) => const SizedBox.expand(),
-  );
+  /// What a card shows before its preview: the thumbhash at once (decoded on the device), the thumbnail over it.
+  Widget _placeholder(CleanupAssetDto asset) {
+    final hash = asset.thumbhash;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (hash != null && hash.isNotEmpty)
+          Image(
+            image: ThumbHashProvider(thumbHash: hash),
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.expand(),
+          ),
+        Image(
+          image: libraryCleanupThumbnail(asset),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => const SizedBox.expand(),
+        ),
+      ],
+    );
+  }
 }
 
 /// "KEEP", "TRASH" or "♥", stamped on the card as a drag passes its threshold.

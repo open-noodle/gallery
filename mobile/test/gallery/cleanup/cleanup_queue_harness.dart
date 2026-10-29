@@ -254,7 +254,12 @@ Future<void> setQueuePrefs({
   Map<LibraryCleanupQueue, LibraryCleanupFilters> filters = const {},
 }) => Store.put(
   StoreKey.libraryCleanupPrefs,
-  LibraryCleanupPrefs(overlaySeen: overlaySeen, views: views, filters: filters).toJsonString(),
+  LibraryCleanupPrefs(
+    overlaySeen: overlaySeen,
+    seriesOverlaySeen: overlaySeen,
+    views: views,
+    filters: filters,
+  ).toJsonString(),
 );
 
 LibraryCleanupPrefs storedPrefs() => LibraryCleanupPrefs.fromJsonString(Store.tryGet(StoreKey.libraryCleanupPrefs));

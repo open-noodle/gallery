@@ -15,12 +15,14 @@ import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.provider
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_series.provider.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart' show libraryCleanupPreview;
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_details_sheet.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_finish.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_dialogs.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_trash_confirm.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/series_card.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
@@ -43,12 +45,15 @@ class LibraryCleanupSeriesQueueView extends ConsumerStatefulWidget {
   ConsumerState<LibraryCleanupSeriesQueueView> createState() => _LibraryCleanupSeriesQueueViewState();
 }
 
-class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSeriesQueueView> {
+class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSeriesQueueView>
+    with LibraryCleanupViewFlight {
   final _doneKey = GlobalKey();
   _Phase _phase = _Phase.content;
   _Phase _shown = _Phase.content;
   bool _stayOnDeck = false;
   bool _restoredShown = false;
+  bool _overlay = false;
+  bool _overlayChecked = false;
   Offset? _flightTarget;
   bool _flightDissolves = false;
 
@@ -232,12 +237,56 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
     }
   }
 
+  /// The big frame of [seriesId]'s card in the deck.
+  Rect? _cardRect(String seriesId) => libraryCleanupRectOf(context, {Key('cleanup-series-frame-$seriesId')});
+
+  /// Swipe ↔ Grid, as everywhere: the deck's big frame flies into its series in the list, or the first undecided
+  /// series' frame flies back into the deck; reduced motion crossfades.
   void _setView(LibraryCleanupView view) {
-    ref.read(libraryCleanupPrefsProvider.notifier).setView(_queue, view);
-    setState(() {
-      _phase = _Phase.content;
-      _stayOnDeck = false;
-    });
+    final prefs = ref.read(libraryCleanupPrefsProvider);
+    if (prefs.viewFor(_queue) == view && _phase == _Phase.content) {
+      return;
+    }
+    final state = _state;
+    final first = state.undecided.firstOrNull;
+    final byId = {for (final series in state.series) series.id: series};
+    switchViewWithFlight(
+      toGrid: view == LibraryCleanupView.grid,
+      id: _shown == _Phase.content ? first?.id : null,
+      cardRect: _cardRect,
+      picture: (id) => _framePicture(byId[id]!),
+      cardRadius: 16,
+      tileRadius: 16,
+      commit: () {
+        ref.read(libraryCleanupPrefsProvider.notifier).setView(_queue, view);
+        setState(() {
+          _phase = _Phase.content;
+          _stayOnDeck = false;
+        });
+      },
+    );
+  }
+
+  /// The series' frame as both views open on it: its suggestion, whole on black.
+  Widget _framePicture(LibraryCleanupSeries series) {
+    final frame =
+        series.assets.where((asset) => series.suggested.contains(asset.id)).firstOrNull ?? series.assets.first;
+    return ColoredBox(
+      color: Colors.black,
+      child: Image(
+        image: libraryCleanupPreview(frame),
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const SizedBox.expand(),
+      ),
+    );
+  }
+
+  /// "How it works", and the first Bursts or Duplicates session: the series card's own gestures. Seen as soon as it
+  /// shows; a flag of its own, since the photo decks' lesson does not teach these swipes.
+  void _showOverlay() {
+    setState(() => _overlay = true);
+    ref.read(libraryCleanupPrefsProvider.notifier).markSeriesOverlaySeen();
   }
 
   void _onSession(LibraryCleanupSeriesState? previous, LibraryCleanupSeriesState next) {
@@ -265,7 +314,6 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
 
   @override
   Widget build(BuildContext context) {
-    final t = context.t;
     final state = ref.watch(libraryCleanupSeriesProvider(_queue));
     final prefs = ref.watch(libraryCleanupPrefsProvider);
     ref.listen(libraryCleanupSeriesProvider(_queue), _onSession);
@@ -275,6 +323,16 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
         : ref.watch(libraryCleanupQueueTotalProvider(LibraryCleanupFilters.defaults(_queue))).valueOrNull;
     final view = prefs.viewFor(_queue);
     final total = math.max(count?.count ?? 0, state.series.length);
+    if (state.isReady && !_overlayChecked) {
+      _overlayChecked = true;
+      if (view == LibraryCleanupView.swipe && !prefs.seriesOverlaySeen && state.series.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showOverlay();
+          }
+        });
+      }
+    }
 
     final empty = state.isReady && state.series.isEmpty && !state.hasMore && !state.loadingMore;
     final lastDecided =
@@ -310,7 +368,8 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
       _Phase.content =>
         view == LibraryCleanupView.grid
             ? LibraryCleanupSeriesList(
-                key: const ValueKey('series-list'),
+                key: gridKey,
+                hiddenId: landingId,
                 state: state,
                 actions: actions,
                 onKeepSuggestionForAll: _session.keepSuggestionForAll,
@@ -346,6 +405,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
         }
       },
       child: LibraryCleanupSessionScaffold(
+        guardBackSwipe: !canPop,
         title: libraryCleanupQueueName(context, _queue),
         position: state.isReady && total > 0 && phase == _Phase.content
             ? (index: math.min(state.decided + 1, total), total: total)
@@ -361,25 +421,24 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
           }
         },
         doneKey: _doneKey,
+        // The series card has one layout: its buttons are always under it and its swipes always decide, so the menu
+        // offers no swipe / button choice here.
         menu: LibraryCleanupSessionMenu(
           deckMode: prefs.deckMode,
-          onDeckMode: ref.read(libraryCleanupPrefsProvider.notifier).setDeckMode,
-          onHowItWorks: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(key: const Key('cleanup-series-how'), content: Text(t.cleanup_series_how_it_works))),
+          onHowItWorks: _showOverlay,
           view: view,
           onView: _setView,
         ),
-        body: Column(
-          children: [
-            if (phase == _Phase.content) LibraryCleanupViewSwitch(view: view, onView: _setView),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
-                child: KeyedSubtree(key: ValueKey((phase, view)), child: body),
-              ),
-            ),
-          ],
+        overlay: _overlay && phase == _Phase.content && view == LibraryCleanupView.swipe
+            ? LibraryCleanupGestureOverlay(
+                gestures: LibraryCleanupGestures.series(context, duplicates: _duplicates),
+                onDismiss: () => setState(() => _overlay = false),
+              )
+            : null,
+        showViewSwitch: phase == _Phase.content,
+        body: AnimatedSwitcher(
+          duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
+          child: KeyedSubtree(key: ValueKey((phase, view)), child: body),
         ),
       ),
     );

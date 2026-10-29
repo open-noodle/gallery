@@ -21,6 +21,7 @@ class LibraryCleanupPrefs {
     this.views = const {},
     this.filters = const {},
     this.overlaySeen = false,
+    this.seriesOverlaySeen = false,
     this.gridHintSeen = false,
   });
 
@@ -30,8 +31,11 @@ class LibraryCleanupPrefs {
   /// Only the queues the user changed filters for; the others are at their defaults.
   final Map<LibraryCleanupQueue, LibraryCleanupFilters> filters;
 
-  /// The gesture overlay of the first session ever.
+  /// The gesture overlay of the first photo deck ever (rewind or a photo queue).
   final bool overlaySeen;
+
+  /// The series card's own gesture overlay, the first time Bursts or Duplicates opens: its swipes mean something else.
+  final bool seriesOverlaySeen;
 
   /// The one-time "Hold a photo for details" hint.
   final bool gridHintSeen;
@@ -46,12 +50,14 @@ class LibraryCleanupPrefs {
     Map<LibraryCleanupQueue, LibraryCleanupView>? views,
     Map<LibraryCleanupQueue, LibraryCleanupFilters>? filters,
     bool? overlaySeen,
+    bool? seriesOverlaySeen,
     bool? gridHintSeen,
   }) => LibraryCleanupPrefs(
     deckMode: deckMode ?? this.deckMode,
     views: views ?? this.views,
     filters: filters ?? this.filters,
     overlaySeen: overlaySeen ?? this.overlaySeen,
+    seriesOverlaySeen: seriesOverlaySeen ?? this.seriesOverlaySeen,
     gridHintSeen: gridHintSeen ?? this.gridHintSeen,
   );
 
@@ -60,6 +66,7 @@ class LibraryCleanupPrefs {
     'views': {for (final entry in views.entries) entry.key.slug: entry.value.name},
     'filters': {for (final entry in filters.entries) entry.key.slug: entry.value.toJson()},
     'overlaySeen': overlaySeen,
+    'seriesOverlaySeen': seriesOverlaySeen,
     'gridHintSeen': gridHintSeen,
   });
 
@@ -102,6 +109,7 @@ class LibraryCleanupPrefs {
         views: views,
         filters: filters,
         overlaySeen: json['overlaySeen'] == true,
+        seriesOverlaySeen: json['seriesOverlaySeen'] == true,
         gridHintSeen: json['gridHintSeen'] == true,
       );
     } catch (_) {
@@ -134,6 +142,13 @@ class LibraryCleanupPrefsNotifier extends Notifier<LibraryCleanupPrefs> {
     }
   }
 
+  void markSeriesOverlaySeen() {
+    if (!state.seriesOverlaySeen) {
+      _set(state.copyWith(seriesOverlaySeen: true));
+    }
+  }
+
+  /// One flag for every grid's "Hold a photo for details", seen as soon as it shows.
   void markGridHintSeen() {
     if (!state.gridHintSeen) {
       _set(state.copyWith(gridHintSeen: true));

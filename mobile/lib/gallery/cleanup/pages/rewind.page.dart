@@ -18,15 +18,15 @@ import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.p
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_session.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart'
-    show libraryCleanupCardRadius, libraryCleanupPreview;
+    show libraryCleanupCardRadius, libraryCleanupFlightPicture;
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_details_sheet.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_finish.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_dialogs.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_trash_confirm.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/rewind_grid.dart';
-import 'package:immich_mobile/gallery/motion/flight.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/removal.dart';
@@ -73,7 +73,7 @@ class _RewindSession extends ConsumerStatefulWidget {
   ConsumerState<_RewindSession> createState() => _RewindSessionState();
 }
 
-class _RewindSessionState extends ConsumerState<_RewindSession> {
+class _RewindSessionState extends ConsumerState<_RewindSession> with LibraryCleanupViewFlight {
   late final _request = LibraryCleanupSessionRequest.rewind(widget.monthDay);
   final _doneKey = GlobalKey();
   final _trashIconKey = GlobalKey();
@@ -90,16 +90,9 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
   bool _overlayChecked = false;
   bool _restoredShown = false;
 
-  /// The grid, for the flight between a card and its tile. A new key each time the grid is shown, so a grid still
-  /// fading out never shares one with the grid fading in.
-  GlobalKey<LibraryCleanupRewindGridState> _gridKey = GlobalKey();
-
   /// Button mode's photo, after a sideways swipe (swipe mode is always on its first undecided photo).
   String? _buttonCurrentId;
 
-  /// The tile a card is flying into, left empty until it lands.
-  String? _landingId;
-  bool _gridEntrance = false;
   bool _gridHint = false;
 
   /// Where the photos of the apply in progress fly once the server is being asked (null: none fly).
@@ -432,37 +425,8 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
   // Swipe and Grid
   // ---------------------------------------------------------------------------------------------------------------
 
-  /// Where the deck's card for [asset] is on screen: the top card in swipe mode, the page in button mode.
-  Rect? _cardRect(CleanupAssetDto asset) {
-    final keys = {Key('cleanup-card-${asset.id}'), Key('cleanup-page-${asset.id}')};
-    RenderBox? found;
-    void visit(Element element) {
-      if (found != null) {
-        return;
-      }
-      final box = element.renderObject;
-      if (keys.contains(element.widget.key) && box is RenderBox && box.hasSize && box.attached) {
-        found = box;
-        return;
-      }
-      element.visitChildElements(visit);
-    }
-
-    if (mounted) {
-      (context as Element).visitChildElements(visit);
-    }
-    final box = found;
-    return box == null ? null : box.localToGlobal(Offset.zero) & box.size;
-  }
-
-  void _afterLayout(VoidCallback callback) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        callback();
-      }
-    });
-    WidgetsBinding.instance.scheduleFrame();
-  }
+  /// Where the deck's card for [id] is on screen: the top card in swipe mode, the page in button mode.
+  Rect? _cardRect(String id) => libraryCleanupRectOf(context, {Key('cleanup-card-$id'), Key('cleanup-page-$id')});
 
   /// Switches between the deck and the grid, keeping every mark and the position: the current card shrinks into its
   /// tile (the grid scrolled to it), or the first undecided tile grows back into the card. Reduced motion: a crossfade.
@@ -472,83 +436,36 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
       return;
     }
     final state = ref.read(libraryCleanupSessionProvider(_request));
-    final reduced = GalleryMotion.reduced(context);
+    final toGrid = view == LibraryCleanupView.grid;
     final first = state.undecided.firstOrNull;
-    ref.read(libraryCleanupPrefsProvider.notifier).setView(LibraryCleanupQueue.rewind, view);
-    if (view == LibraryCleanupView.grid) {
-      final current =
-          (prefs.deckMode == LibraryCleanupDeckMode.button
-              ? state.assets.where((asset) => asset.id == _buttonCurrentId).firstOrNull
-              : null) ??
-          first;
-      final from = current == null ? null : _cardRect(current);
-      final showHint = !prefs.gridHintSeen;
-      setState(() {
-        _gridKey = GlobalKey();
-        _gridEntrance = !reduced;
-        _gridHint = _gridHint || showHint;
-        _landingId = reduced || from == null ? null : current?.id;
-      });
-      if (showHint) {
-        ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
-      }
-      if (current == null) {
-        return;
-      }
-      _afterLayout(() {
-        _gridKey.currentState?.reveal(current.id);
-        _afterLayout(() {
-          final to = _gridKey.currentState?.tileRect(current.id);
-          if (reduced || from == null || to == null) {
-            setState(() => _landingId = null);
-            return;
-          }
-          _fly(
-            current,
-            from: from,
-            to: to,
-            fromRadius: libraryCleanupCardRadius,
-            toRadius: libraryCleanupGridTileRadius,
-          );
-        });
-      });
-    } else {
-      final from = first == null ? null : _gridKey.currentState?.tileRect(first.id);
-      setState(() {
-        _buttonCurrentId = null;
-        _gridEntrance = false;
-        _landingId = null;
-      });
-      if (reduced || from == null || first == null) {
-        return;
-      }
-      _afterLayout(() {
-        final to = _cardRect(first);
-        if (to != null) {
-          _fly(first, from: from, to: to, fromRadius: libraryCleanupGridTileRadius, toRadius: libraryCleanupCardRadius);
-        }
-      });
-    }
-  }
-
-  void _fly(CleanupAssetDto asset, {required Rect from, required Rect to, double fromRadius = 0, double toRadius = 0}) {
-    GalleryFlight.fly(
-      from: from,
-      to: to,
-      fromRadius: fromRadius,
-      toRadius: toRadius,
-      child: Image(
-        image: libraryCleanupPreview(asset),
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black),
-      ),
-      onLand: () {
-        if (mounted && _landingId == asset.id) {
-          setState(() => _landingId = null);
+    final current = toGrid && prefs.deckMode == LibraryCleanupDeckMode.button
+        ? state.assets.where((asset) => asset.id == _buttonCurrentId).firstOrNull ?? first
+        : first;
+    final byId = {for (final asset in state.assets) asset.id: asset};
+    switchViewWithFlight(
+      toGrid: toGrid,
+      id: current?.id,
+      cardRect: _cardRect,
+      picture: (id) => libraryCleanupFlightPicture(byId[id]!),
+      cardRadius: libraryCleanupCardRadius,
+      tileRadius: libraryCleanupGridTileRadius,
+      commit: () {
+        ref.read(libraryCleanupPrefsProvider.notifier).setView(LibraryCleanupQueue.rewind, view);
+        if (toGrid) {
+          _showGridHint();
+        } else {
+          _buttonCurrentId = null;
         }
       },
     );
+  }
+
+  /// "Hold a photo for details", the first time a grid shows: seen as soon as it shows, one flag for every grid.
+  void _showGridHint() {
+    if (!ref.read(libraryCleanupPrefsProvider).gridHintSeen) {
+      setState(() => _gridHint = true);
+      ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+    }
   }
 
   /// A long press in a grid: the details sheet, and the mark chosen there applied to the tile.
@@ -585,10 +502,9 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
         });
       }
       if (grid && !prefs.gridHintSeen) {
-        _gridHint = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+            _showGridHint();
           }
         });
       }
@@ -608,16 +524,16 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
         duration: GalleryMotion.reduced(context) ? GalleryMotion.quick : GalleryMotion.base,
         child: grid
             ? LibraryCleanupRewindGrid(
-                key: _gridKey,
+                key: gridKey,
                 years: state.years,
                 marks: state.marks,
                 nowYear: ref.read(libraryCleanupClockProvider)().year,
                 onCycle: _session.cycle,
                 onKeepTheRest: (year) => _session.keepTheRest(year: year),
                 onDetails: (asset) => unawaited(_gridDetails(asset)),
-                hiddenId: _landingId,
+                hiddenId: landingId,
                 showHint: _gridHint,
-                entrance: _gridEntrance,
+                entrance: gridEntrance,
               )
             : LibraryCleanupDeck(
                 key: const ValueKey('deck'),
@@ -675,6 +591,8 @@ class _RewindSessionState extends ConsumerState<_RewindSession> {
         }
       },
       child: LibraryCleanupSessionScaffold(
+        guardBackSwipe: !canPop,
+        showViewSwitch: phase == _Phase.deck,
         title: _shortDate,
         position: state.isReady && total > 0 ? (index: math.min(state.decided + 1, total), total: total) : null,
         pendingCount: state.pendingCount,

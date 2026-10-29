@@ -448,6 +448,22 @@ void main() {
     });
   });
 
+  testWidgets("the year teaser's cells are the year screen's: every day of the month, in the same colours", (
+    tester,
+  ) async {
+    await openOverview(tester);
+    Color? colour(String key) => (tester.widget<Container>(find.byKey(Key(key))).decoration! as BoxDecoration).color;
+    final teaser = [for (var day = 1; day <= 31; day++) colour('cleanup-teaser-day-${800 + day}')];
+    expect(find.byKey(const Key('cleanup-teaser-day-832')), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const Key('cleanup-see-all')));
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('cleanup-see-all')));
+    await settle(tester);
+    final year = [for (var day = 1; day <= 31; day++) colour('cleanup-year-day-${800 + day}')];
+    expect(teaser, year);
+  });
+
   group('Motion', () {
     testWidgets('the today card, quick wins and year teaser arrive on a stagger', (tester) async {
       final container = overviewContainer(server: library.server, directory: tempDirectory());

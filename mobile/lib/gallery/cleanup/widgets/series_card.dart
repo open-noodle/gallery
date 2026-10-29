@@ -11,6 +11,7 @@ import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_series.p
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/gallery/motion/pressable.dart';
@@ -102,6 +103,7 @@ class LibraryCleanupSeriesCard extends StatefulWidget {
     this.frameHeight,
     this.warning = false,
     this.decision,
+    this.hidden = false,
   });
 
   final LibraryCleanupSeries series;
@@ -123,6 +125,9 @@ class LibraryCleanupSeriesCard extends StatefulWidget {
 
   /// The list shows what was decided for the series.
   final LibraryCleanupSeriesDecision? decision;
+
+  /// While a flight from the deck lands on the big frame, the frame leaves its place empty.
+  final bool hidden;
 
   @override
   State<LibraryCleanupSeriesCard> createState() => _LibraryCleanupSeriesCardState();
@@ -175,60 +180,63 @@ class _LibraryCleanupSeriesCardState extends State<LibraryCleanupSeriesCard> {
           _show(_shown - 1);
         }
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: ColoredBox(
-          color: Colors.black,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Changing the big frame crossfades.
-              AnimatedSwitcher(
-                duration: reduced ? Duration.zero : GalleryMotion.quick,
-                child: _BigFrame(key: Key('cleanup-series-shown-${shown.id}'), asset: shown, trashed: !kept),
-              ),
-              if (series.suggested.contains(shown.id))
-                PositionedDirectional(
-                  top: 10,
-                  start: 10,
-                  child: _Badge(
-                    key: const Key('cleanup-series-badge'),
-                    label: widget.duplicates ? t.cleanup_series_suggested : '★ ${t.cleanup_sharpest}',
-                  ),
+      child: Opacity(
+        opacity: widget.hidden ? 0 : 1,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: ColoredBox(
+            color: Colors.black,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Changing the big frame crossfades.
+                AnimatedSwitcher(
+                  duration: reduced ? Duration.zero : GalleryMotion.quick,
+                  child: _BigFrame(key: Key('cleanup-series-shown-${shown.id}'), asset: shown, trashed: !kept),
                 ),
-              PositionedDirectional(
-                top: 10,
-                end: 10,
-                child: _MarkPill(key: Key('cleanup-series-shown-mark-${kept ? 'keep' : 'trash'}'), kept: kept),
-              ),
-              PositionedDirectional(
-                bottom: 10,
-                start: 10,
-                child: _Caption(
-                  textKey: const Key('cleanup-series-position'),
-                  text: t.cleanup_frame_position(index: _shown + 1, total: series.assets.length),
-                ),
-              ),
-              if (widget.onDetails != null)
-                PositionedDirectional(
-                  bottom: 4,
-                  end: 4,
-                  child: IconButton(
-                    key: const Key('cleanup-series-details'),
-                    tooltip: t.details,
-                    onPressed: () => widget.onDetails!(shown),
-                    icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
-                  ),
-                ),
-              for (final MapEntry(key: decision, value: amount) in widget.stamps.entries)
-                if (amount > 0)
-                  Center(
-                    child: Opacity(
-                      opacity: amount.clamp(0.0, 1.0),
-                      child: _Stamp(decision: decision, duplicates: widget.duplicates),
+                if (series.suggested.contains(shown.id))
+                  PositionedDirectional(
+                    top: 10,
+                    start: 10,
+                    child: _Badge(
+                      key: const Key('cleanup-series-badge'),
+                      label: widget.duplicates ? t.cleanup_series_suggested : '★ ${t.cleanup_sharpest}',
                     ),
                   ),
-            ],
+                PositionedDirectional(
+                  top: 10,
+                  end: 10,
+                  child: _MarkPill(key: Key('cleanup-series-shown-mark-${kept ? 'keep' : 'trash'}'), kept: kept),
+                ),
+                PositionedDirectional(
+                  bottom: 10,
+                  start: 10,
+                  child: _Caption(
+                    textKey: const Key('cleanup-series-position'),
+                    text: t.cleanup_frame_position(index: _shown + 1, total: series.assets.length),
+                  ),
+                ),
+                if (widget.onDetails != null)
+                  PositionedDirectional(
+                    bottom: 4,
+                    end: 4,
+                    child: IconButton(
+                      key: const Key('cleanup-series-details'),
+                      tooltip: t.details,
+                      onPressed: () => widget.onDetails!(shown),
+                      icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
+                    ),
+                  ),
+                for (final MapEntry(key: decision, value: amount) in widget.stamps.entries)
+                  if (amount > 0)
+                    Center(
+                      child: Opacity(
+                        opacity: amount.clamp(0.0, 1.0),
+                        child: _Stamp(decision: decision, duplicates: widget.duplicates),
+                      ),
+                    ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1179,14 +1187,16 @@ class _SeriesButton extends StatelessWidget {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /// Grid mode for the series queues: the series cards one under another, each with its actions, and "Keep the
-/// suggestion for all" for the loaded series. Built lazily, so a series' previews load as it scrolls in.
-class LibraryCleanupSeriesList extends StatelessWidget {
+/// suggestion for all" for the loaded series. Built lazily, so a series' previews load as it scrolls in. Its state is a
+/// flight grid keyed by series id: the deck's big frame flies into the series' frame here and back.
+class LibraryCleanupSeriesList extends StatefulWidget {
   const LibraryCleanupSeriesList({
     super.key,
     required this.state,
     required this.actions,
     required this.onKeepSuggestionForAll,
     this.onNearEnd,
+    this.hiddenId,
   });
 
   final LibraryCleanupSeriesState state;
@@ -1194,19 +1204,70 @@ class LibraryCleanupSeriesList extends StatelessWidget {
   final VoidCallback onKeepSuggestionForAll;
   final VoidCallback? onNearEnd;
 
+  /// The series a flight is landing on, its frame kept empty until it lands.
+  final String? hiddenId;
+
+  @override
+  State<LibraryCleanupSeriesList> createState() => _LibraryCleanupSeriesListState();
+}
+
+class _LibraryCleanupSeriesListState extends State<LibraryCleanupSeriesList> implements LibraryCleanupFlightGrid {
+  final _scroll = ScrollController();
+
+  LibraryCleanupSeriesState get state => widget.state;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// The series' big frame, while it is on screen (a flight never aims off it).
+  @override
+  Rect? tileRect(String id) {
+    final rect = libraryCleanupRectOf(context, {Key('cleanup-series-frame-$id')});
+    final view = libraryCleanupRectOf(context, {const Key('cleanup-series-list')});
+    return rect == null || view == null || !view.contains(rect.center) ? null : rect;
+  }
+
+  @override
+  void reveal(String id) {
+    final index = state.series.indexWhere((series) => series.id == id);
+    if (index < 0 || !_scroll.hasClients) {
+      return;
+    }
+    final row = libraryCleanupRectOf(context, {Key('cleanup-series-row-$id')});
+    final position = _scroll.position;
+    final double target;
+    if (row != null) {
+      final view = libraryCleanupRectOf(context, {const Key('cleanup-series-list')})!;
+      target = position.pixels + row.top - view.top - (position.viewportDimension - row.height) / 2;
+    } else {
+      // Not built yet: the rows are about the same height, so the first one built tells where it is.
+      final first = libraryCleanupRectOf(context, {Key('cleanup-series-row-${state.series.first.id}')});
+      if (first == null) {
+        return;
+      }
+      target = 56 + index * (first.height + 14) - (position.viewportDimension - first.height) / 2;
+    }
+    position.jumpTo(target.clamp(position.minScrollExtent, position.maxScrollExtent));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final duplicates = state.isDuplicates;
+    final actions = widget.actions;
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification.metrics.extentAfter < 800) {
-          onNearEnd?.call();
+          widget.onNearEnd?.call();
         }
         return false;
       },
       child: ListView.separated(
         key: const Key('cleanup-series-list'),
+        controller: _scroll,
         padding: const EdgeInsets.fromLTRB(14, 4, 14, 40),
         itemCount: state.series.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: 14),
@@ -1216,7 +1277,7 @@ class LibraryCleanupSeriesList extends StatelessWidget {
               alignment: AlignmentDirectional.centerStart,
               child: FilledButton.tonalIcon(
                 key: const Key('cleanup-series-keep-suggestion-all'),
-                onPressed: state.undecided.isEmpty ? null : onKeepSuggestionForAll,
+                onPressed: state.undecided.isEmpty ? null : widget.onKeepSuggestionForAll,
                 icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                 label: Text(t.cleanup_series_keep_suggestion_all),
               ),
@@ -1236,6 +1297,7 @@ class LibraryCleanupSeriesList extends StatelessWidget {
                 onDetails: (frame) => actions.details(series, frame),
                 frameHeight: 240,
                 decision: decision,
+                hidden: widget.hiddenId == series.id,
                 warning: duplicates && !state.canAcceptAsSet(series),
               ),
               const SizedBox(height: 6),

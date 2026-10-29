@@ -29,7 +29,9 @@ import 'rewind_harness.dart';
 // Filters     When the ⋯ filters change   Then the pages and count are asked with them as the web asks, they are
 //                                     remembered for the queue, and the pending marks stay
 // Grid        When tiles are tapped, dragged across or all selected   Then the bar counts them with their size, and
-//                                     Keep / ♥ / Trash N mark them; the switch is remembered per queue
+//                                     Keep / ♥ / Trash N mark them, the mark fading in and its badge popping; the
+//                                     switch is remembered per queue; the hold hint is seen once it shows
+// Switching   When Swipe ↔ Grid   Then the card flies into its tile and back; reduced motion crossfades
 // Apply       When a photo is in a shared space, or the trash is off   Then one confirmation; cancel commits nothing;
 //                                     trash off offers no undo
 // Restore     When the app dies with pending marks and the queue is reopened   Then the marks are back, and it says so
@@ -75,6 +77,7 @@ void main() {
     WidgetTester tester,
     LibraryCleanupQueue queue, {
     bool trashEnabled = true,
+    bool reduceMotion = false,
     dynamic directory,
   }) async {
     listenToPlatform(tester);
@@ -83,7 +86,13 @@ void main() {
       directory: directory ?? tempDirectory(),
       trashEnabled: trashEnabled,
     );
-    final router = await pumpQueue(tester, container, queue: queue, requests: () => library.routes.length);
+    final router = await pumpQueue(
+      tester,
+      container,
+      queue: queue,
+      reduceMotion: reduceMotion,
+      requests: () => library.routes.length,
+    );
     await settle(tester);
     return router;
   }
@@ -381,7 +390,7 @@ void main() {
   group('grid', () {
     Finder tile(String id) => find.byKey(Key('cleanup-grid-tile-$id'));
     bool selected(String id) => find.byKey(Key('cleanup-grid-selected-$id')).evaluate().isNotEmpty;
-    bool marked(String id, String mark) => find.byKey(Key('cleanup-grid-mark-$mark-$id')).evaluate().isNotEmpty;
+    bool marked(String id, String mark) => find.byKey(Key('cleanup-grid-mark-$id-$mark')).evaluate().isNotEmpty;
 
     testWidgets('tap selects, a drag across selects a run, the bar marks them and Done counts up', (tester) async {
       await open(tester, LibraryCleanupQueue.screenshots);
@@ -430,6 +439,104 @@ void main() {
       });
     });
 
+    /// Pumps frame by frame after a switch, collecting where the flying copy was.
+    Future<List<Rect>> flights(WidgetTester tester, {bool Function()? whileFlying}) async {
+      final rects = <Rect>[];
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final flight = find.byKey(const Key('gallery-flight'));
+        if (flight.evaluate().isNotEmpty) {
+          rects.add(tester.getRect(flight));
+          whileFlying?.call();
+        }
+      }
+      await settle(tester);
+      return rects;
+    }
+
+    testWidgets('Swipe ↔ Grid: the card flies into its tile and back, as in the rewind', (tester) async {
+      await open(tester, LibraryCleanupQueue.blurry);
+      await keep(tester);
+      final card = tester.getRect(find.byKey(const Key('cleanup-card-b2')));
+
+      await tester.tap(find.byKey(const Key('cleanup-view-grid')));
+      var hidden = false;
+      final there = await flights(
+        tester,
+        whileFlying: () => hidden =
+            hidden ||
+            tester.widget<Opacity>(find.descendant(of: tile('b2'), matching: find.byType(Opacity)).first).opacity == 0,
+      );
+      expect(there, isNotEmpty, reason: 'the current card flies');
+      expect(hidden, isTrue, reason: 'its tile stays empty until it lands');
+      expect(there.first.width, closeTo(card.width, card.width * 0.25));
+      expect((there.last.center - tester.getRect(tile('b2')).center).distance, lessThan(12));
+      expect(marked('b1', 'keep'), isTrue, reason: 'the marks come along');
+
+      await tester.tap(find.byKey(const Key('cleanup-view-swipe')));
+      expect(await flights(tester), isNotEmpty, reason: 'the first undecided tile grows back into the card');
+      expect(topCardId(tester), 'b2');
+    });
+
+    testWidgets('Swipe ↔ Grid under reduced motion: a crossfade, nothing flies', (tester) async {
+      await open(tester, LibraryCleanupQueue.blurry, reduceMotion: true);
+      await tester.tap(find.byKey(const Key('cleanup-view-grid')));
+      expect(await flights(tester), isEmpty);
+      expect(find.byKey(const Key('cleanup-grid')), findsOneWidget);
+    });
+
+    testWidgets('applied from the grid, the trashed tiles fly into Done while the grid closes the gap', (tester) async {
+      await setQueuePrefs(views: {LibraryCleanupQueue.blurry: LibraryCleanupView.grid});
+      await open(tester, LibraryCleanupQueue.blurry);
+      await tester.tap(tile('b1'));
+      await tester.tap(tile('b2'));
+      await settle(tester);
+      await tapKey(tester, 'cleanup-grid-trash');
+      final done = tester.getCenter(find.byKey(const Key('cleanup-session-done')));
+
+      await tapKey(tester, 'cleanup-session-back');
+      await tester.tap(find.byKey(const Key('cleanup-close-apply')));
+      var flew = false;
+      Offset? last;
+      for (var i = 0; i < 80; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        // The commit goes through the loopback client, which needs real time.
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 1)));
+        final layer = find.byKey(const Key('gallery-removal'));
+        if (layer.evaluate().isNotEmpty) {
+          flew = true;
+          final copies = find.descendant(of: layer, matching: find.byType(Image));
+          if (copies.evaluate().isNotEmpty) {
+            last = tester.getCenter(copies.first);
+          }
+        }
+      }
+      await settle(tester);
+      expect(flew, isTrue, reason: 'the trashed tiles lift off the grid');
+      expect(last, isNotNull);
+      expect((last! - done).distance, lessThan(120), reason: 'into the Done button');
+      expect(library.commits.single['trashIds'], ['b1', 'b2']);
+    });
+
+    testWidgets('a mark from the bar fades in and its badge pops, as in the rewind grid', (tester) async {
+      await setQueuePrefs(views: {LibraryCleanupQueue.blurry: LibraryCleanupView.grid});
+      await open(tester, LibraryCleanupQueue.blurry);
+      await tester.tap(tile('b1'));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('cleanup-grid-keep')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final ring = find.byKey(const Key('cleanup-grid-mark-b1-keep'));
+      final fade = tester.widget<FadeTransition>(find.ancestor(of: ring, matching: find.byType(FadeTransition)).first);
+      expect(fade.opacity.value, inExclusiveRange(0, 1), reason: 'the ring fades in');
+      final pop = tester.widget<Transform>(
+        find.ancestor(of: find.byKey(const Key('cleanup-grid-badge-b1')), matching: find.byType(Transform)).first,
+      );
+      expect(pop.transform.storage[0], lessThan(1), reason: 'the badge pops');
+      await settle(tester);
+      expect(marked('b1', 'keep'), isTrue);
+    });
+
     testWidgets('screenshots keep their shape in the grid', (tester) async {
       await setQueuePrefs(views: {LibraryCleanupQueue.screenshots: LibraryCleanupView.grid});
       await open(tester, LibraryCleanupQueue.screenshots);
@@ -437,9 +544,7 @@ void main() {
       expect(aspectOf(tester, 'cleanup-grid-whole-s2'), closeTo(9 / 19.5, 0.01));
     });
 
-    testWidgets('a long press opens the details sheet; Keep there marks the tile, and the hint is gone', (
-      tester,
-    ) async {
+    testWidgets('a long press opens the details sheet, and Keep there marks the tile', (tester) async {
       await setQueuePrefs(views: {LibraryCleanupQueue.blurry: LibraryCleanupView.grid});
       await open(tester, LibraryCleanupQueue.blurry);
       await tester.longPress(tile('b3'));
@@ -452,8 +557,20 @@ void main() {
       expect(find.byKey(const Key('cleanup-details-sheet')), findsNothing);
       expect(marked('b3', 'keep'), isTrue);
       expect(badge(tester), '1');
-      expect(find.byKey(const Key('cleanup-grid-hint')), findsNothing);
       expect(library.commits, isEmpty);
+    });
+
+    testWidgets('the hold hint counts as seen once it shows, one flag with the rewind grid', (tester) async {
+      await setQueuePrefs(views: {LibraryCleanupQueue.blurry: LibraryCleanupView.grid});
+      final router = await open(tester, LibraryCleanupQueue.blurry);
+      expect(find.byKey(const Key('cleanup-grid-hint')), findsOneWidget);
+      expect(storedPrefs().gridHintSeen, isTrue, reason: 'seen when shown, not on the first hold');
+      await tapKey(tester, 'cleanup-session-back');
+
+      unawaited(router.push(LibraryCleanupQueueRoute(queue: LibraryCleanupQueue.screenshots.slug)));
+      await settle(tester);
+      await tapKey(tester, 'cleanup-view-grid');
+      expect(find.byKey(const Key('cleanup-grid-hint')), findsNothing, reason: 'shown once across every grid');
     });
 
     testWidgets('Swipe / Grid is remembered per queue', (tester) async {

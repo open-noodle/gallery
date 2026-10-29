@@ -8,8 +8,8 @@ import 'package:immich_mobile/generated/translations.g.dart';
 /// What the user chose when closing a session with pending marks.
 enum LibraryCleanupCloseChoice { apply, discard, keepGoing }
 
-/// Asked when a session with pending marks is closed (‹, Android back): apply them and stop, discard them, or keep
-/// going. Dismissing the dialog keeps going.
+/// Asked when a session with pending marks is closed (‹, Android back, the iOS back swipe): apply them and stop,
+/// discard them, or keep going. Dismissing the dialog keeps going.
 Future<LibraryCleanupCloseChoice> showLibraryCleanupCloseGuard(
   BuildContext context, {
   required int pending,
@@ -45,12 +45,49 @@ Future<LibraryCleanupCloseChoice> showLibraryCleanupCloseGuard(
   return choice ?? LibraryCleanupCloseChoice.keepGoing;
 }
 
-/// The first session's short lesson, over the first card: a hand shows right = keep, left = trash, up = favourite, and
-/// one line says nothing is deleted until Done. A tap anywhere closes it.
+/// What each swipe does, as the gesture overlay teaches it.
+class LibraryCleanupGestures {
+  const LibraryCleanupGestures({
+    required this.right,
+    required this.left,
+    required this.up,
+    this.leftRefused = false,
+    this.hint,
+  });
+
+  /// The photo decks: right keep, left trash, up favourite.
+  factory LibraryCleanupGestures.photos(BuildContext context) =>
+      LibraryCleanupGestures(right: context.t.keep, left: context.t.trash, up: context.t.favorite);
+
+  /// The series card (Bursts and Duplicates): right accepts the marks as set, up keeps all, left trashes the whole
+  /// burst, or for duplicates resists with "Keep at least one copy". [hint] says how the frames are marked.
+  factory LibraryCleanupGestures.series(BuildContext context, {required bool duplicates}) => LibraryCleanupGestures(
+    right: context.t.cleanup_series_keep_as_set,
+    left: duplicates ? context.t.cleanup_series_keep_one_copy : context.t.cleanup_series_trash_all,
+    up: context.t.cleanup_keep_all,
+    leftRefused: duplicates,
+    hint: context.t.cleanup_series_frames_hint,
+  );
+
+  final String right;
+  final String left;
+  final String up;
+
+  /// Left decides nothing here: the hand only nudges that way and springs back, and the label is muted.
+  final bool leftRefused;
+  final String? hint;
+}
+
+/// The first session's short lesson, over the first card: a hand shows what right, left and up do ([gestures]: keep,
+/// trash and favourite on a photo deck, the series card's own on Bursts and Duplicates), and one line says nothing is
+/// deleted until Done. A tap anywhere closes it.
 class LibraryCleanupGestureOverlay extends StatefulWidget {
-  const LibraryCleanupGestureOverlay({super.key, required this.onDismiss});
+  const LibraryCleanupGestureOverlay({super.key, required this.onDismiss, this.gestures});
 
   final VoidCallback onDismiss;
+
+  /// Null: the photo decks' gestures.
+  final LibraryCleanupGestures? gestures;
 
   @override
   State<LibraryCleanupGestureOverlay> createState() => _LibraryCleanupGestureOverlayState();
@@ -79,14 +116,15 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
     super.dispose();
   }
 
-  Offset _handAt(double t) {
+  Offset _handAt(double t, {required bool leftRefused}) {
     // Six legs of the loop; each eases out and back.
     final leg = (t * 6).floor().clamp(0, 5);
     final local = GalleryMotion.standard.transform(t * 6 - leg);
     const reach = 70.0;
     final target = switch (leg ~/ 2) {
       0 => const Offset(reach, 0),
-      1 => const Offset(-reach, 0),
+      // A refused left only nudges, as the card's rubber band does.
+      1 => Offset(leftRefused ? -reach * 0.25 : -reach, 0),
       _ => const Offset(0, -reach),
     };
     return leg.isEven ? target * local : target * (1 - local);
@@ -95,6 +133,7 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final gestures = widget.gestures ?? LibraryCleanupGestures.photos(context);
     const label = TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600);
     return GestureDetector(
       key: const Key('cleanup-gesture-overlay'),
@@ -106,24 +145,56 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('↑  ${t.favorite}', style: label.copyWith(color: libraryCleanupFavoriteColor)),
+              Text(
+                '↑  ${gestures.up}',
+                key: const Key('cleanup-gesture-up'),
+                style: label.copyWith(
+                  color: widget.gestures == null ? libraryCleanupFavoriteColor : libraryCleanupKeepColor,
+                ),
+              ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('${t.trash}  ←', style: label.copyWith(color: libraryCleanupTrashColor)),
+                  Flexible(
+                    child: Text(
+                      gestures.leftRefused ? '${gestures.left}  ✕' : '${gestures.left}  ←',
+                      key: const Key('cleanup-gesture-left'),
+                      textAlign: TextAlign.end,
+                      style: label.copyWith(color: gestures.leftRefused ? Colors.white70 : libraryCleanupTrashColor),
+                    ),
+                  ),
                   SizedBox(
                     width: 150,
                     height: 120,
                     child: AnimatedBuilder(
                       animation: _hand,
-                      builder: (context, child) => Transform.translate(offset: _handAt(_hand.value), child: child),
+                      builder: (context, child) => Transform.translate(
+                        offset: _handAt(_hand.value, leftRefused: gestures.leftRefused),
+                        child: child,
+                      ),
                       child: const Icon(Icons.touch_app_rounded, size: 56, color: Colors.white),
                     ),
                   ),
-                  Text('→  ${t.keep}', style: label.copyWith(color: libraryCleanupKeepColor)),
+                  Flexible(
+                    child: Text(
+                      '→  ${gestures.right}',
+                      key: const Key('cleanup-gesture-right'),
+                      style: label.copyWith(color: libraryCleanupKeepColor),
+                    ),
+                  ),
                 ],
               ),
+              if (gestures.hint != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
+                  child: Text(
+                    gestures.hint!,
+                    key: const Key('cleanup-gesture-hint'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ),
               const SizedBox(height: 28),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),

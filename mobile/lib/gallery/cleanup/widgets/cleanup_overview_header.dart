@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_calendar_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -82,7 +83,9 @@ class LibraryCleanupOverviewHeader extends StatelessWidget {
   }
 }
 
-/// The current month's days as a small strip, in the web calendar's colours, with "See all ›" (mockup screen 2).
+/// The current month's days as a small strip, with "See all ›" (mockup screen 2). Its cells are the year screen's: the
+/// same days (every day of the month, from the 1st) in the same colours (cleanup_calendar_bits.dart), so the teaser
+/// and the screen it opens never disagree.
 class LibraryCleanupYearTeaser extends StatelessWidget {
   const LibraryCleanupYearTeaser({
     super.key,
@@ -99,19 +102,13 @@ class LibraryCleanupYearTeaser extends StatelessWidget {
   /// Days just finished in a rewind: their cells pop as they turn green.
   final Set<int> popDays;
 
-  /// The web calendar's reviewed green.
-  static const reviewedColor = Color(0xFF2FBF71);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final scale = LibraryCleanupShadeScale(days.map((day) => day.assetCount));
-    final month = [
-      for (final day in days)
-        if (day.monthDay ~/ 100 == today ~/ 100) day,
-    ]..sort((a, b) => a.monthDay.compareTo(b.monthDay));
-    const alphas = [0.0, 0.3, 0.5, 0.72, 1.0];
+    final byMonthDay = libraryCleanupDaysByMonthDay(days);
+    final month = today ~/ 100;
 
     return Padding(
       key: const Key('cleanup-year-teaser'),
@@ -134,22 +131,18 @@ class LibraryCleanupYearTeaser extends StatelessWidget {
               spacing: 4,
               runSpacing: 4,
               children: [
-                for (final day in month)
+                for (var day = 1; day <= libraryCleanupDaysIn(month); day++)
                   _popIf(
-                    popDays.contains(day.monthDay),
-                    day.monthDay,
+                    popDays.contains(month * 100 + day),
+                    month * 100 + day,
                     Container(
-                      key: Key('cleanup-teaser-day-${day.monthDay}'),
+                      key: Key('cleanup-teaser-day-${month * 100 + day}'),
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(3),
-                        color: day.reviewedAt != null && day.assetCount > 0
-                            ? reviewedColor
-                            : scale.level(day.assetCount) == 0
-                            ? scheme.surfaceContainerHighest
-                            : scheme.primary.withValues(alpha: alphas[scale.level(day.assetCount)]),
-                        border: day.monthDay == today ? Border.all(color: scheme.onSurface, width: 1.5) : null,
+                        color: libraryCleanupCellColor(scheme, byMonthDay[month * 100 + day], scale),
+                        border: month * 100 + day == today ? Border.all(color: scheme.onSurface, width: 1.5) : null,
                       ),
                     ),
                   ),
