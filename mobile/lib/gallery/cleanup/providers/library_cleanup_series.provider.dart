@@ -36,6 +36,7 @@ class LibraryCleanupSeriesState {
     this.series = const [],
     this.decisions = const {},
     this.frames = const {},
+    this.instead = const {},
     this.canUndo = false,
     this.restoredMarks = false,
     this.hasMore = false,
@@ -53,6 +54,9 @@ class LibraryCleanupSeriesState {
 
   /// Frames whose mark the user changed: kept (true) or trashed (false).
   final Map<String, bool> frames;
+
+  /// Series whose "Stack instead" / "Not duplicates" chip is on.
+  final Set<String> instead;
   final bool canUndo;
   final bool restoredMarks;
   final bool hasMore;
@@ -64,26 +68,65 @@ class LibraryCleanupSeriesState {
 
   bool isKept(LibraryCleanupSeries series, String frameId) => frames[frameId] ?? series.suggested.contains(frameId);
 
-  /// What a frame will be once applied: its series' decision first, else its own mark.
+  /// Whether the series' "Stack instead" / "Not duplicates" chip is on.
+  bool isInstead(LibraryCleanupSeries series) => instead.contains(series.id);
+
+  /// A frame's mark as the card shows it: every frame kept while the "instead" chip is on (a stack or a dismissal
+  /// keeps them all), else its own mark.
+  bool shownKept(LibraryCleanupSeries series, String frameId) => isInstead(series) || isKept(series, frameId);
+
+  /// What a frame will be once applied: kept by a stack or a dismissal, else by its own mark.
   bool willKeep(LibraryCleanupSeries series, String frameId) => switch (decisions[series.id]) {
-    LibraryCleanupSeriesDecision.trashAll => false,
-    LibraryCleanupSeriesDecision.keepAll ||
-    LibraryCleanupSeriesDecision.stack ||
-    LibraryCleanupSeriesDecision.dismiss => true,
-    LibraryCleanupSeriesDecision.asSet || null => isKept(series, frameId),
+    LibraryCleanupSeriesDecision.stack || LibraryCleanupSeriesDecision.dismiss => true,
+    LibraryCleanupSeriesDecision.asSet || LibraryCleanupSeriesDecision.skip || null => isKept(series, frameId),
   };
 
-  /// A duplicate group whose marks trash every copy cannot be accepted: that would delete the photo.
-  bool canAcceptAsSet(LibraryCleanupSeries series) =>
-      !isDuplicates || series.assets.any((asset) => isKept(series, asset.id));
+  /// What applying the series' selection would do: the primary button's words.
+  LibraryCleanupSeriesOutcome outcome(LibraryCleanupSeries series) {
+    final count = series.assets.length;
+    if (isInstead(series)) {
+      return (
+        kind: isDuplicates ? LibraryCleanupSeriesOutcomeKind.dismiss : LibraryCleanupSeriesOutcomeKind.stack,
+        keep: count,
+        trash: 0,
+      );
+    }
+    final keep = series.assets.where((asset) => isKept(series, asset.id)).length;
+    final kind = keep == count
+        ? LibraryCleanupSeriesOutcomeKind.keepAll
+        : keep > 0
+        ? LibraryCleanupSeriesOutcomeKind.keepTrash
+        // Every copy of a duplicate group trashed would delete the photo.
+        : isDuplicates
+        ? LibraryCleanupSeriesOutcomeKind.refused
+        : LibraryCleanupSeriesOutcomeKind.trashAll;
+    return (kind: kind, keep: keep, trash: count - keep);
+  }
 
+  /// The decision applying the selection records, or null when it is refused.
+  LibraryCleanupSeriesDecision? decisionFor(LibraryCleanupSeries series) => switch (outcome(series).kind) {
+    LibraryCleanupSeriesOutcomeKind.refused => null,
+    LibraryCleanupSeriesOutcomeKind.stack => LibraryCleanupSeriesDecision.stack,
+    LibraryCleanupSeriesOutcomeKind.dismiss => LibraryCleanupSeriesDecision.dismiss,
+    _ => LibraryCleanupSeriesDecision.asSet,
+  };
+
+  bool canApply(LibraryCleanupSeries series) => decisionFor(series) != null;
+
+  /// A decision Apply will send (a skip is not one).
+  bool isPending(LibraryCleanupSeries series) => decisions[series.id]?.pending ?? false;
+
+  /// The deck's order: the series with no decision, not even a skip.
   List<LibraryCleanupSeries> get undecided => [
     for (final item in series)
       if (!decisions.containsKey(item.id)) item,
   ];
 
+  /// Gone through, skips included: the deck's position and progress.
   int get decided => series.where((item) => decisions.containsKey(item.id)).length;
-  int get pendingCount => decided;
+
+  /// What Done counts and Apply sends.
+  int get pendingCount => series.where(isPending).length;
 
   LibraryCleanupSeriesState copyWith({
     LibraryCleanupLoadStatus? status,
@@ -92,6 +135,7 @@ class LibraryCleanupSeriesState {
     List<LibraryCleanupSeries>? series,
     Map<String, LibraryCleanupSeriesDecision>? decisions,
     Map<String, bool>? frames,
+    Set<String>? instead,
     bool? canUndo,
     bool? restoredMarks,
     bool? hasMore,
@@ -105,6 +149,7 @@ class LibraryCleanupSeriesState {
     series: series ?? this.series,
     decisions: decisions ?? this.decisions,
     frames: frames ?? this.frames,
+    instead: instead ?? this.instead,
     canUndo: canUndo ?? this.canUndo,
     restoredMarks: restoredMarks ?? this.restoredMarks,
     hasMore: hasMore ?? this.hasMore,
@@ -114,11 +159,11 @@ class LibraryCleanupSeriesState {
 }
 
 /// One Bursts or Duplicates session. Like every cleanup it collects marks locally until Done → Apply, keeps them saved
-/// on the device, and steps back one series at a time.
+/// on the device, and steps back one series decision (an apply or a skip) at a time. A skip marks nothing.
 ///
-/// Applying sends what the web sends: Bursts commit every accepted series' keep and trash ids in one
+/// Applying sends what the web sends: Bursts commit every applied series' keep and trash ids in one
 /// `POST /cleanup/commit` (chunked at [libraryCleanupMaxIds]) and stack the "Stack instead" ones with `POST /stacks`;
-/// Duplicates resolve the accepted groups with `POST /duplicates/resolve` and dismiss each kept-whole group with
+/// Duplicates resolve the applied groups with `POST /duplicates/resolve` and dismiss each "Not duplicates" group with
 /// `DELETE /duplicates/{id}`. The shared-space lookup and the trash confirmation come first, as for every trash commit.
 class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryCleanupSeriesState, LibraryCleanupQueue> {
   late LibraryCleanupSessionCore _core;
@@ -170,7 +215,13 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
 
   void _sync({bool? restored}) {
     _emit(
-      state.copyWith(decisions: _book.decisions, frames: _book.frames, canUndo: _book.canUndo, restoredMarks: restored),
+      state.copyWith(
+        decisions: _book.decisions,
+        frames: _book.frames,
+        instead: _book.instead,
+        canUndo: _book.canUndo,
+        restoredMarks: restored,
+      ),
     );
     unawaited(ref.read(libraryCleanupMarksStoreProvider).saveSeries(_storeKey, _book));
     _maybeLoadMore();
@@ -304,33 +355,56 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
 
   LibraryCleanupSeries? _find(String seriesId) => state.series.where((item) => item.id == seriesId).firstOrNull;
 
-  /// Tapping the big frame: flips the frame shown between keep and trash.
+  LibraryCleanupSeries? _seriesOf(String frameId) =>
+      state.series.where((item) => item.assets.any((asset) => asset.id == frameId)).firstOrNull;
+
+  /// Tapping the big frame or a filmstrip frame: flips that frame between keep and trash.
   void flip(String seriesId, String frameId) {
     final series = _find(seriesId);
     if (series == null) {
       return;
     }
     _book.flip(series, frameId);
-    _sync();
+    _changed(series);
   }
 
   /// The details sheet's Keep or Trash on one frame.
   void setFrame(String frameId, {required bool keep}) {
-    _book.setFrame(frameId, keep: keep);
+    final series = _seriesOf(frameId);
+    if (series == null) {
+      return;
+    }
+    _book.setFrame(series, frameId, keep: keep);
+    _changed(series);
+  }
+
+  /// A chip under the filmstrip: changes the selection, never applies it.
+  void pick(String seriesId, LibraryCleanupSeriesPick pick) {
+    final series = _find(seriesId);
+    if (series == null) {
+      return;
+    }
+    _book.pick(series, pick);
+    _changed(series);
+  }
+
+  /// After a selection change: a series already applied (the list, the finish screen's pile) is applied as it now
+  /// stands, or taken back when that is refused, so what is pending is always what its button says.
+  void _changed(LibraryCleanupSeries series) {
+    final decision = _book.decisions[series.id];
+    if (decision != null && decision.pending) {
+      _emit(state.copyWith(frames: _book.frames, instead: _book.instead));
+      _book.redecide(series.id, state.decisionFor(series));
+    }
     _sync();
   }
 
-  /// Decides a series. Accepting a duplicate group that would trash every copy is refused: returns false and marks
-  /// nothing.
-  bool decide(String seriesId, LibraryCleanupSeriesDecision decision) {
+  /// The primary button or a swipe right: applies the series' selection as shown (pending until Done → Apply). A
+  /// duplicate group whose every copy is marked for trash is refused: returns false and marks nothing.
+  bool applySeries(String seriesId) {
     final series = _find(seriesId);
-    if (series == null) {
-      return false;
-    }
-    if (decision == LibraryCleanupSeriesDecision.asSet && !state.canAcceptAsSet(series)) {
-      return false;
-    }
-    if (_isDuplicates && decision == LibraryCleanupSeriesDecision.trashAll) {
+    final decision = series == null ? null : state.decisionFor(series);
+    if (decision == null) {
       return false;
     }
     _book.decide(seriesId, decision);
@@ -338,9 +412,22 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
     return true;
   }
 
-  /// "Keep the suggestion for all": every undecided loaded series accepted on its suggested frames, as one undo step.
+  /// Skip or a swipe left: moves on and marks nothing. The series comes back next session.
+  void skip(String seriesId) {
+    if (_find(seriesId) == null) {
+      return;
+    }
+    _book.decide(seriesId, LibraryCleanupSeriesDecision.skip);
+    _sync();
+  }
+
+  /// "Keep the suggestion for all": every loaded series with nothing pending set to its suggested frames and applied,
+  /// as one undo step.
   void keepSuggestionForAll() {
-    final open = state.undecided;
+    final open = [
+      for (final series in state.series)
+        if (!state.isPending(series)) series,
+    ];
     _book.decideMany(
       [for (final series in open) series.id],
       LibraryCleanupSeriesDecision.asSet,
@@ -362,22 +449,7 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
   }
 
   /// "Review the N first" on the finish screen: a tap takes a frame off the trash pile.
-  void rescue(String frameId) {
-    final series = state.series.where((item) => item.assets.any((asset) => asset.id == frameId)).firstOrNull;
-    if (series == null) {
-      return;
-    }
-    if (state.decisions[series.id] == LibraryCleanupSeriesDecision.trashAll) {
-      // The series is no longer trashed whole: every other frame stays marked for trash.
-      for (final asset in series.assets) {
-        _book.setFrame(asset.id, keep: asset.id == frameId);
-      }
-      _book.decide(series.id, LibraryCleanupSeriesDecision.asSet);
-    } else {
-      _book.setFrame(frameId, keep: true);
-    }
-    _sync();
-  }
+  void rescue(String frameId) => setFrame(frameId, keep: true);
 
   // ---------------------------------------------------------------------------------------------------------------
   // Applying
@@ -391,7 +463,7 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
     }
     final decided = [
       for (final series in state.series)
-        if (state.decisions.containsKey(series.id)) series,
+        if (state.isPending(series)) series,
     ];
     final keep = <String>[];
     final trash = <String>[];
@@ -412,9 +484,9 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
           stacks.add(series);
         case LibraryCleanupSeriesDecision.dismiss:
           dismiss.add(series);
-        case LibraryCleanupSeriesDecision.asSet ||
-            LibraryCleanupSeriesDecision.trashAll ||
-            LibraryCleanupSeriesDecision.keepAll:
+        case LibraryCleanupSeriesDecision.skip:
+          break;
+        case LibraryCleanupSeriesDecision.asSet:
           trash.addAll(trashed);
           if (_isDuplicates) {
             resolve.add((

@@ -19,10 +19,11 @@ import 'rewind_harness.dart';
 //
 // Given three duplicate groups: a (a2 the largest file, a1 the highest resolution), b (b2 the largest, b3 the highest
 //   resolution) and c, each with the server's suggested copy to keep
-// When a is accepted on the suggestion; b's suggested copy is flipped to trash, so every copy would go, and the user
-//   tries to accept it (swipe right, swipe left, Keep as set); then b3 is flipped to keep and b accepted; c is swiped up
-//   ("not duplicates"); the marks applied once
-// Then trying to trash every copy is refused with "Keep at least one copy" and sends nothing; Apply sends one lookup,
+// When a is swiped right on the suggestion; b's suggested copy is flipped to trash, so every copy would go, and the
+//   user tries to apply it (the button, a swipe right); then b3's thumbnail is tapped to keep it and b applied; c is
+//   switched to "Not duplicates" and swiped right; the marks applied once
+// Then the button says "Keep at least one copy" and is disabled, the swipe resists, and nothing is sent; Apply sends one
+//   lookup,
 //   one resolve with both accepted groups' keep and trash ids, and one dismiss of c; the toast says the copies come back
 //   but not the groups, and its Undo restores exactly the trashed copies.
 
@@ -93,31 +94,27 @@ void main() {
     expect(topCardId(tester), idOf(b));
     expect(inCard(b, 'cleanup-series-shown-${idOf('asset:dup-b2')}'), findsOneWidget);
     await tap('cleanup-series-frame-${idOf(b)}');
-    expect(inCard(b, 'cleanup-series-keep-one'), findsOneWidget);
-    final asSet = tester.widget<InkWell>(
-      find.descendant(of: find.byKey(const Key('cleanup-series-as-set')), matching: find.byType(InkWell)),
-    );
-    expect(asSet.onTap, isNull, reason: 'Keep as set is disabled while every copy is marked for trash');
-    for (final swipe in const [Offset(300, 0), Offset(-300, 0)]) {
-      await tester.fling(inCard(b, 'cleanup-series-header'), swipe, 1500);
-      await settle();
-      expect(topCardId(tester), idOf(b), reason: 'the card resists ($swipe)');
-    }
-    await tap('cleanup-series-trash-all');
-    expect(topCardId(tester), idOf(b));
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Keep at least one copy');
+    final apply = tester.widget<FilledButton>(find.byKey(const Key('cleanup-series-apply')));
+    expect(apply.onPressed, isNull, reason: 'the button is disabled while every copy is marked for trash');
+    await tester.fling(inCard(b, 'cleanup-series-header'), const Offset(300, 0), 1500);
+    await settle();
+    expect(topCardId(tester), idOf(b), reason: 'the card resists a swipe right');
+    expect(inCard(b, 'cleanup-series-keep-one'), findsOneWidget, reason: 'and says why');
     expect(textOf(tester, 'cleanup-session-badge-count'), '1', reason: 'only a is decided');
     expect(server.served, hasLength(1), reason: 'nothing is sent');
 
-    // Keep b3 instead, then accept.
+    // Keep b3 instead (its thumbnail shows and flips it), then apply.
     await tap('cleanup-series-thumb-${idOf('asset:dup-b3')}');
-    await tap('cleanup-series-frame-${idOf(b)}');
-    expect(inCard(b, 'cleanup-series-keep-one'), findsNothing);
-    await tap('cleanup-series-as-set');
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Keep 1 · Trash 2');
+    await tap('cleanup-series-apply');
 
-    // c: swiped up, "not duplicates".
+    // c: "Not duplicates", applied with a swipe right.
     const c = 'duplicate:c';
     expect(topCardId(tester), idOf(c));
-    await tester.fling(inCard(c, 'cleanup-series-header'), const Offset(0, -300), 1500);
+    await tap('cleanup-series-pick-instead');
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Not duplicates');
+    await tester.fling(inCard(c, 'cleanup-series-header'), const Offset(300, 0), 1500);
     await settle();
     expect(textOf(tester, 'cleanup-session-badge-count'), '3');
     expect(server.served, hasLength(1));

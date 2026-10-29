@@ -20,8 +20,8 @@ import 'rewind_harness.dart';
 //
 // Given three bursts: a (three camera frames, a2 the sharpest), b (three frames found by time and looks, b3 the
 //   sharpest) and c (two camera frames, c1 the sharpest)
-// When a is swiped right on its suggestion, b1's mark is flipped to keep and b accepted with Keep as set, c is stacked
-//   instead, and the marks applied once
+// When a is swiped right on its suggestion ("Keep 1 · Trash 2"), b1's thumbnail tapped to keep it and b applied with
+//   the button ("Keep 2 · Trash 1"), c switched to "Stack instead" and applied ("Stack 2"), and the marks applied once
 // Then the count and one page are asked; nothing else until Apply; then one lookup of the trashed frames, one commit
 //   with every frame of a and b kept or trashed by its mark, and one stack of c with its suggested frame first; the
 //   emptied queue says "All clear", and the toast's Undo restores exactly the trashed frames and brings a back with
@@ -82,25 +82,28 @@ void main() {
     expect(topCardId(tester), idOf(a));
     expect(inCard(a, 'cleanup-series-shown-${idOf('asset:burst-a2')}'), findsOneWidget);
     expect(inCard(a, 'cleanup-series-badge'), findsOneWidget);
-    expect(cardText(a, 'cleanup-series-chip'), 'Keep 1, trash 2 (${formatBytes(3100 + 3102)})');
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Keep 1 · Trash 2');
+    expect(cardText(a, 'cleanup-series-frees'), formatBytes(3100 + 3102));
     expect(cardText(a, 'cleanup-series-header'), startsWith('3 photos in 2 s · Sep 1, 2023'));
-    // Swiped right from the header, outside the big frame: accepted as set.
+    // Swiped right from the header, outside the big frame: the button's "Keep 1 · Trash 2".
     await tester.fling(inCard(a, 'cleanup-series-header'), const Offset(300, 0), 1500);
     await settle();
 
-    // b: show b1, then flip it to keep; accept with the button.
+    // b: tap b1's thumbnail, which shows it and flips it to keep; apply with the button.
     const b = 'asset:burst-b1';
     expect(topCardId(tester), idOf(b));
     await tap('cleanup-series-thumb-${idOf('asset:burst-b1')}');
     expect(inCard(b, 'cleanup-series-shown-${idOf('asset:burst-b1')}'), findsOneWidget);
-    await tap('cleanup-series-frame-${idOf(b)}');
     expect(inCard(b, 'cleanup-series-mark-${idOf('asset:burst-b1')}-keep'), findsOneWidget);
-    expect(cardText(b, 'cleanup-series-chip'), 'Keep 2, trash 1 (${formatBytes(3201)})');
-    await tap('cleanup-series-as-set');
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Keep 2 · Trash 1');
+    expect(cardText(b, 'cleanup-series-frees'), formatBytes(3201));
+    await tap('cleanup-series-apply');
 
-    // c: stacked instead.
+    // c: "Stack instead", then the button, which now says "Stack 2".
     expect(topCardId(tester), idOf('asset:burst-c1'));
-    await tap('cleanup-series-stack');
+    await tap('cleanup-series-pick-instead');
+    expect(textOf(tester, 'cleanup-series-apply-label'), 'Stack 2');
+    await tap('cleanup-series-apply');
     expect(textOf(tester, 'cleanup-session-badge-count'), '3');
     expect(server.served, hasLength(2), reason: 'deciding sends nothing');
 

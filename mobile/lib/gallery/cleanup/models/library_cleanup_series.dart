@@ -84,70 +84,146 @@ CleanupAssetDto libraryCleanupAssetOf(AssetResponseDto asset) {
   );
 }
 
-/// What the user decided for a whole series. Like every other mark, it is pending until Done → Apply.
+/// What the user decided for a whole series. Like every other mark it is pending until Done → Apply, except [skip],
+/// which marks nothing.
+///
+/// A decision is the series' selection at the moment it was applied (specs/2026-10-29-mobile-library-cleanup-design.md,
+/// "Queues: Bursts and Duplicates"): its frames by their marks, or the stack or dismissal the "instead" chip chose.
 enum LibraryCleanupSeriesDecision {
-  /// Swipe right, "Keep as set": each frame kept or trashed by its mark.
+  /// The primary button or a swipe right on the frames' marks: each frame kept or trashed by its mark.
   asSet,
 
-  /// Bursts, swipe left: every frame to the trash.
-  trashAll,
-
-  /// Bursts, swipe up: every frame kept.
-  keepAll,
-
-  /// Bursts, "Stack instead": the frames become one stack, the suggested frame on top.
+  /// Bursts, applied while "Stack instead" is on: the frames become one stack, the suggested frame on top.
   stack,
 
-  /// Duplicates, swipe up: "not duplicates", the group dismissed and nothing deleted.
-  dismiss;
+  /// Duplicates, applied while "Not duplicates" is on: the group dismissed and nothing deleted.
+  dismiss,
+
+  /// Skip or a swipe left: the series moves on with nothing marked. Never saved, so it comes back next session.
+  skip;
+
+  /// True for a decision Apply sends.
+  bool get pending => this != skip;
 
   static LibraryCleanupSeriesDecision? fromName(Object? name) =>
       LibraryCleanupSeriesDecision.values.where((decision) => decision.name == name).firstOrNull;
 }
 
+/// The chips under the filmstrip. Each changes the selection; none applies it.
+enum LibraryCleanupSeriesPick {
+  /// "★ Best only" (Bursts) / "Suggested only" (Duplicates): the suggested frames kept, the rest marked for trash.
+  suggested,
+
+  /// "Keep all": every frame kept.
+  all,
+
+  /// "Stack instead" (Bursts) / "Not duplicates" (Duplicates), a toggle: while it is on, applying stacks or dismisses.
+  instead,
+}
+
+/// What applying a series' selection does, as its primary button and its swipe-right stamp say.
+enum LibraryCleanupSeriesOutcomeKind {
+  /// "Keep 1 · Trash 5".
+  keepTrash,
+
+  /// "Keep all 6".
+  keepAll,
+
+  /// Bursts: "Trash all 6".
+  trashAll,
+
+  /// Bursts with "Stack instead" on: "Stack 6".
+  stack,
+
+  /// Duplicates with "Not duplicates" on.
+  dismiss,
+
+  /// Duplicates with every copy marked for trash: refused, "Keep at least one copy".
+  refused,
+}
+
+typedef LibraryCleanupSeriesOutcome = ({LibraryCleanupSeriesOutcomeKind kind, int keep, int trash});
+
 /// The marks of a series session: each frame's mark where the user changed it (any other frame follows the
-/// suggestion), and the decision on each series, with an undo stack that steps back one series at a time.
+/// suggestion), the series whose "instead" chip is on, and the decision on each series, with an undo stack that steps
+/// back one series decision at a time.
 class LibraryCleanupSeriesBook {
   LibraryCleanupSeriesBook();
 
   /// Frame id → kept (true) or trashed (false), only where the user flipped it.
   final Map<String, bool> _frames = {};
 
+  /// Series whose "Stack instead" / "Not duplicates" chip is on.
+  final Set<String> _instead = {};
+
   /// Series id → its decision, in the order they were made.
   final Map<String, LibraryCleanupSeriesDecision> _decisions = {};
 
   /// Each step: the series it decided and what each was before (several for "Keep the suggestion for all"), with the
-  /// frame marks it reset.
+  /// frame marks and "instead" chips it reset.
   final List<_Step> _history = [];
 
   Map<String, LibraryCleanupSeriesDecision> get decisions => Map.unmodifiable(_decisions);
   Map<String, bool> get frames => Map.unmodifiable(_frames);
-  bool get isEmpty => _decisions.isEmpty && _frames.isEmpty;
+  Set<String> get instead => Set.unmodifiable(_instead);
+  bool get isEmpty => !_decisions.values.any((decision) => decision.pending) && _frames.isEmpty && _instead.isEmpty;
   bool get canUndo => _history.isNotEmpty;
 
   /// A frame's mark: what the user set, else kept when the series suggests it.
   bool isKept(LibraryCleanupSeries series, String frameId) => _frames[frameId] ?? series.suggested.contains(frameId);
 
-  List<String> keptIds(LibraryCleanupSeries series) => [
-    for (final asset in series.assets)
-      if (isKept(series, asset.id)) asset.id,
-  ];
+  /// Flips one frame between keep and trash. While the "instead" chip is on every frame shows kept, so the chip goes
+  /// off and the frame flips from what was shown: the others stay kept. Not an undo step: undo steps back whole series.
+  void flip(LibraryCleanupSeries series, String frameId) {
+    if (_instead.remove(series.id)) {
+      for (final asset in series.assets) {
+        _frames[asset.id] = asset.id != frameId;
+      }
+      return;
+    }
+    _frames[frameId] = !isKept(series, frameId);
+  }
 
-  List<String> trashedIds(LibraryCleanupSeries series) => [
-    for (final asset in series.assets)
-      if (!isKept(series, asset.id)) asset.id,
-  ];
+  /// Sets one frame's mark (the details sheet), which also turns the "instead" chip off.
+  void setFrame(LibraryCleanupSeries series, String frameId, {required bool keep}) {
+    if (_instead.remove(series.id)) {
+      for (final asset in series.assets) {
+        _frames[asset.id] = true;
+      }
+    }
+    _frames[frameId] = keep;
+  }
 
-  /// Flips one frame between keep and trash. Not an undo step: undo steps back whole series.
-  void flip(LibraryCleanupSeries series, String frameId) => setFrame(frameId, keep: !isKept(series, frameId));
+  /// A chip: changes the selection of [series], never decides it.
+  void pick(LibraryCleanupSeries series, LibraryCleanupSeriesPick pick) {
+    switch (pick) {
+      case LibraryCleanupSeriesPick.suggested || LibraryCleanupSeriesPick.all:
+        _instead.remove(series.id);
+        for (final asset in series.assets) {
+          _frames[asset.id] = pick == LibraryCleanupSeriesPick.all || series.suggested.contains(asset.id);
+        }
+      case LibraryCleanupSeriesPick.instead:
+        if (!_instead.remove(series.id)) {
+          _instead.add(series.id);
+        }
+    }
+  }
 
-  void setFrame(String frameId, {required bool keep}) => _frames[frameId] = keep;
+  /// Replaces a decision without an undo step: a decided series whose selection changed (the list, the finish
+  /// screen's rescue) is applied as it now stands. Null takes the decision back.
+  void redecide(String seriesId, LibraryCleanupSeriesDecision? decision) {
+    if (decision == null) {
+      _decisions.remove(seriesId);
+    } else {
+      _decisions[seriesId] = decision;
+    }
+  }
 
   /// Decides [series] as one undo step.
   void decide(String seriesId, LibraryCleanupSeriesDecision decision) => decideMany([seriesId], decision);
 
-  /// Decides every series in [ids] as one undo step. With [resetFrames] their frames go back to the suggestion
-  /// ("Keep the suggestion for all").
+  /// Decides every series in [ids] as one undo step. With [resetFrames] their frames go back to the suggestion and
+  /// their "instead" chip off ("Keep the suggestion for all").
   void decideMany(
     Iterable<String> ids,
     LibraryCleanupSeriesDecision decision, {
@@ -164,10 +240,12 @@ class LibraryCleanupSeriesBook {
           for (final frames in resetFrames.values)
             for (final frame in frames) MapEntry(frame, _frames[frame]),
         ],
+        instead: [for (final id in resetFrames.keys) MapEntry(id, _instead.contains(id))],
       ),
     );
-    for (final frames in resetFrames.values) {
+    for (final MapEntry(key: id, value: frames) in resetFrames.entries) {
       frames.forEach(_frames.remove);
+      _instead.remove(id);
     }
     for (final id in list) {
       _decisions[id] = decision;
@@ -194,11 +272,19 @@ class LibraryCleanupSeriesBook {
         _frames[key] = value;
       }
     }
+    for (final MapEntry(:key, :value) in step.instead) {
+      if (value) {
+        _instead.add(key);
+      } else {
+        _instead.remove(key);
+      }
+    }
     return [for (final entry in step.decisions) entry.key];
   }
 
   void clear() {
     _frames.clear();
+    _instead.clear();
     _decisions.clear();
     _history.clear();
   }
@@ -207,6 +293,7 @@ class LibraryCleanupSeriesBook {
   void settle(Iterable<LibraryCleanupSeries> applied) {
     for (final series in applied) {
       _decisions.remove(series.id);
+      _instead.remove(series.id);
       for (final asset in series.assets) {
         _frames.remove(asset.id);
       }
@@ -217,29 +304,44 @@ class LibraryCleanupSeriesBook {
   /// Keeps only the marks of series [present] holds and frames [frame] accepts.
   void retainWhere({required bool Function(String seriesId) present, required bool Function(String frameId) frame}) {
     _decisions.removeWhere((id, _) => !present(id));
+    _instead.removeWhere((id) => !present(id));
     _frames.removeWhere((id, _) => !frame(id));
     for (final step in _history) {
       step.decisions.removeWhere((entry) => !present(entry.key));
       step.frames.removeWhere((entry) => !frame(entry.key));
+      step.instead.removeWhere((entry) => !present(entry.key));
     }
     _history.removeWhere((step) => step.decisions.isEmpty);
   }
 
-  Map<String, Object?> toJson() => {
-    'frames': _frames,
-    'decisions': {for (final entry in _decisions.entries) entry.key: entry.value.name},
-    'history': [
-      for (final step in _history)
-        {
-          'decisions': [
-            for (final entry in step.decisions) [entry.key, entry.value?.name],
-          ],
-          'frames': [
-            for (final entry in step.frames) [entry.key, entry.value],
-          ],
-        },
-    ],
-  };
+  /// A skip is not saved: a skipped series comes back next session. A step that only skipped goes with it, and a step
+  /// that took back a skip takes it back to undecided.
+  Map<String, Object?> toJson() {
+    String? saved(LibraryCleanupSeriesDecision? decision) => decision?.pending == true ? decision!.name : null;
+    return {
+      'frames': _frames,
+      'instead': _instead.toList(),
+      'decisions': {
+        for (final entry in _decisions.entries)
+          if (entry.value.pending) entry.key: entry.value.name,
+      },
+      'history': [
+        for (final step in _history)
+          if (step.decisions.any((entry) => _decisions[entry.key]?.pending == true || entry.value?.pending == true))
+            {
+              'decisions': [
+                for (final entry in step.decisions) [entry.key, saved(entry.value)],
+              ],
+              'frames': [
+                for (final entry in step.frames) [entry.key, entry.value],
+              ],
+              'instead': [
+                for (final entry in step.instead) [entry.key, entry.value],
+              ],
+            },
+      ],
+    };
+  }
 
   /// Reads what [toJson] wrote. A malformed entry is skipped rather than failing the whole restore.
   static LibraryCleanupSeriesBook fromJson(Object? json) {
@@ -255,11 +357,15 @@ class LibraryCleanupSeriesBook {
         }
       }
     }
+    final instead = json['instead'];
+    if (instead is List) {
+      book._instead.addAll(instead.whereType<String>());
+    }
     final decisions = json['decisions'];
     if (decisions is Map) {
       for (final entry in decisions.entries) {
         final decision = LibraryCleanupSeriesDecision.fromName(entry.value);
-        if (entry.key is String && decision != null) {
+        if (entry.key is String && decision != null && decision.pending) {
           book._decisions[entry.key as String] = decision;
         }
       }
@@ -281,6 +387,11 @@ class LibraryCleanupSeriesBook {
               if (entry is List && entry.length == 2 && entry[0] is String)
                 MapEntry(entry[0] as String, entry[1] is bool ? entry[1] as bool : null),
           ],
+          instead: [
+            for (final entry in (raw['instead'] as List?) ?? const [])
+              if (entry is List && entry.length == 2 && entry[0] is String && entry[1] is bool)
+                MapEntry(entry[0] as String, entry[1] as bool),
+          ],
         );
         if (step.decisions.isNotEmpty) {
           book._history.add(step);
@@ -292,8 +403,9 @@ class LibraryCleanupSeriesBook {
 }
 
 class _Step {
-  _Step({required this.decisions, required this.frames});
+  _Step({required this.decisions, required this.frames, required this.instead});
 
   final List<MapEntry<String, LibraryCleanupSeriesDecision?>> decisions;
   final List<MapEntry<String, bool?>> frames;
+  final List<MapEntry<String, bool>> instead;
 }

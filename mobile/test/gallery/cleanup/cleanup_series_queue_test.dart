@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart' show libraryCleanupTrashColor;
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 
@@ -17,7 +18,15 @@ import 'rewind_harness.dart';
 // cleanup_duplicates_e2e_test.dart; these cover the rest against an in-memory server.
 //
 // Given bursts x (x1–x3, x2 the sharpest), y (y1–y2) and z (z1–z2), and duplicate groups d (d1, d2 suggested) and e
-// Bursts     When x is swiped left and y up, and applied   Then x's frames all go in trashIds and y's in keepIds
+// Bursts     When frames are tapped   Then the primary button's words follow ("Keep 1 · Trash 2" → "Keep 2 · Trash 1";
+//                                     every frame trashed: "Trash all 2"), and the button and a swipe right apply
+//                                     exactly that, sent only on Apply
+//            While a swipe is under way   Then its stamp says the button's words (right) or "SKIP" (left)
+//            When a series is swiped left or Skip pressed   Then it moves on with nothing marked, Undo brings it back,
+//                                     Apply sends nothing for it, and it is back next session
+//            When a series is swiped up   Then nothing happens: the card springs back
+//            When a chip is tapped   Then the selection changes ("Keep all 3", "Keep 1 · Trash 2", "Stack 3"), the
+//                                     chip shows selected, and nothing is applied; a tapped frame leaves stack mode
 //            When a series is decided and Undo pressed   Then that series is back on top and nothing is pending
 //            When the big frame is swiped sideways   Then the frames step and nothing is decided
 //            When the deck is on x   Then only x and y are built: z's previews do not load
@@ -28,14 +37,17 @@ import 'rewind_harness.dart';
 // Grid       When "Keep the suggestion for all" is pressed   Then every loaded series is accepted on its suggestion, a
 //                                     frame flipped before goes back to the suggestion, and nothing is sent until
 //                                     Apply
-// Duplicates When ⓘ is tapped   Then only the albums are asked (the copy is already a full asset)
+// Duplicates When every copy is marked for trash   Then the button is disabled with "Keep at least one copy", a swipe
+//                                     right resists and says so, and "Not duplicates" turns the button into the
+//                                     dismissal, applied as `DELETE /duplicates/{id}`
+//            When ⓘ is tapped   Then only the albums are asked (the copy is already a full asset)
 //            When the trash is off and a copy is marked for trash   Then Apply asks first; cancelling sends nothing
 // Permission Given the duplicates count is refused   Then there is no Duplicates card and no duplicates request
 //            Given the duplicates list is refused   Then the queue shows its error and the overview then has no
 //                                     Duplicates card, without asking again
 // Overview   When the Bursts or Duplicates quick win is tapped   Then its series queue opens
-// Session    The first series session shows the series card's own gesture lesson (right as set, up keep all, left
-//            trash all or "Keep at least one copy"), seen once shown; How it works replays it; the menu has no
+// Session    The first series session shows the series card's own gesture lesson (tap frames to choose, right does
+//            what the button says, left skips, no swipe up), seen once shown; How it works replays it; the menu has no
 //            swipe / button choice; Swipe ↔ Grid flies the big frame (reduced motion: nothing flies)
 
 Map<String, Object?> _burst(String id, List<String> frames, {required String suggested}) => {
@@ -128,6 +140,8 @@ class _SeriesLibrary {
         final ids = (body['ids']! as List).cast<String>();
         restored.add(ids);
         return FakeResponse({'count': ids.length});
+      case 'DELETE /duplicates/d':
+        return const FakeResponse(null, 204);
       case 'GET /albums':
         return const FakeResponse(<Object>[]);
       case 'GET /cleanup/calendar':
@@ -203,11 +217,59 @@ void main() {
   String position(WidgetTester tester) =>
       tester.widget<Text>(inCard(topCardId(tester)!, 'cleanup-series-position')).data!;
 
+  String applyLabel(WidgetTester tester) => textOf(tester, 'cleanup-series-apply-label');
+  bool chipSelected(WidgetTester tester, String series, String pick) =>
+      tester.widget<ChoiceChip>(inCard(series, 'cleanup-series-pick-$pick')).selected;
+
+  /// Taps a chip on [series]' card (the card behind shows its chips too).
+  Future<void> pick(WidgetTester tester, String series, String pick) async {
+    await tester.tap(inCard(series, 'cleanup-series-pick-$pick'));
+    await settle(tester);
+  }
+
+  /// Drags the top card sideways by [dx] without letting go, returns the stamp's words, and lets go back in place.
+  Future<String?> stampWhileDragging(WidgetTester tester, String series, double dx) async {
+    final gesture = await tester.startGesture(tester.getCenter(inCard(series, 'cleanup-series-header')));
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(Offset(dx / 6, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final stamp = find.byKey(const Key('cleanup-series-stamp'));
+    final text = stamp.evaluate().isEmpty ? null : textOf(tester, 'cleanup-series-stamp');
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(Offset(-dx / 6, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await settle(tester);
+    return text;
+  }
+
   group('Bursts', () {
-    testWidgets('left trashes every frame, up keeps every frame; both are sent only on Apply', (tester) async {
+    testWidgets('tapping frames changes what the button says; the button and a swipe right apply exactly that', (
+      tester,
+    ) async {
       await open(tester, LibraryCleanupQueue.bursts);
-      await swipe(tester, 'x1', const Offset(-300, 0));
-      await swipe(tester, 'y1', const Offset(0, -300));
+      expect(applyLabel(tester), 'Keep 1 · Trash 2', reason: 'it arrives with the suggestion');
+      // A thumbnail shows its frame and flips it.
+      await tapKey(tester, 'cleanup-series-thumb-x1');
+      expect(inCard('x1', 'cleanup-series-shown-x1'), findsOneWidget);
+      expect(inCard('x1', 'cleanup-series-mark-x1-keep'), findsOneWidget);
+      expect(applyLabel(tester), 'Keep 2 · Trash 1');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing, reason: 'tapping applies nothing');
+      expect(topCardId(tester), 'x1');
+      await tapKey(tester, 'cleanup-series-apply');
+      expect(topCardId(tester), 'y1');
+
+      // Every frame of y marked for trash: the button says so, in red, and a swipe right does it.
+      await tapKey(tester, 'cleanup-series-frame-y1');
+      expect(applyLabel(tester), 'Trash all 2');
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('cleanup-series-apply'))).style!.backgroundColor!.resolve({}),
+        libraryCleanupTrashColor,
+      );
+      await swipe(tester, 'y1', const Offset(300, 0));
+      expect(topCardId(tester), 'z1');
       expect(badge(tester), '2');
       expect(library.commits, isEmpty);
 
@@ -216,11 +278,88 @@ void main() {
       expect(library.commits, [
         {
           'queue': 'bursts',
-          'trashIds': ['x1', 'x2', 'x3'],
+          'trashIds': ['x3', 'y1', 'y2'],
           'favoriteIds': <String>[],
-          'keepIds': ['y1', 'y2'],
+          'keepIds': ['x1', 'x2'],
         },
       ]);
+    });
+
+    testWidgets("the swipe's stamp says the button's words, or Skip", (tester) async {
+      await open(tester, LibraryCleanupQueue.bursts);
+      await tapKey(tester, 'cleanup-series-thumb-x3');
+      expect(applyLabel(tester), 'Keep 2 · Trash 1');
+      expect(await stampWhileDragging(tester, 'x1', 160), applyLabel(tester).toUpperCase());
+      expect(await stampWhileDragging(tester, 'x1', -160), 'SKIP');
+      await pick(tester, 'x1', 'instead');
+      expect(await stampWhileDragging(tester, 'x1', 160), 'STACK 3');
+      expect(topCardId(tester), 'x1', reason: 'a drag let go in place decides nothing');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing);
+    });
+
+    testWidgets('a swipe left or Skip moves on with nothing marked; the series is back next session', (tester) async {
+      final directory = tempDirectory();
+      await open(tester, LibraryCleanupQueue.bursts, directory: directory);
+      await swipe(tester, 'x1', const Offset(-300, 0));
+      expect(topCardId(tester), 'y1');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing, reason: 'a skip marks nothing');
+      await tapKey(tester, 'cleanup-series-undo');
+      expect(topCardId(tester), 'x1', reason: 'Undo returns to the skipped series');
+      await tapKey(tester, 'cleanup-series-skip');
+      expect(topCardId(tester), 'y1');
+      await tapKey(tester, 'cleanup-series-apply');
+      expect(badge(tester), '1');
+
+      await tapKey(tester, 'cleanup-session-done');
+      await tapKey(tester, 'cleanup-finish-apply');
+      expect(library.commits.single['keepIds'], ['y1']);
+      expect(library.commits.single['trashIds'], ['y2'], reason: 'nothing of the skipped x is sent');
+      expect(find.byKey(const Key('test-home')), findsOneWidget, reason: 'x and z are left');
+
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+      await open(tester, LibraryCleanupQueue.bursts, directory: directory);
+      expect(topCardId(tester), 'x1', reason: 'the skipped series is back next session');
+      expect(find.byKey(const Key('cleanup-restored')), findsNothing);
+    });
+
+    testWidgets('a swipe up does nothing: the card springs back', (tester) async {
+      await open(tester, LibraryCleanupQueue.bursts);
+      await swipe(tester, 'x1', const Offset(0, -400));
+      expect(topCardId(tester), 'x1');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing);
+      expect(applyLabel(tester), 'Keep 1 · Trash 2');
+    });
+
+    testWidgets('the chips change the selection and never apply it', (tester) async {
+      await open(tester, LibraryCleanupQueue.bursts);
+      expect(chipSelected(tester, 'x1', 'suggested'), isTrue, reason: 'the suggestion is "Best only"');
+      expect(chipSelected(tester, 'x1', 'all'), isFalse);
+
+      await pick(tester, 'x1', 'all');
+      expect(applyLabel(tester), 'Keep all 3');
+      expect(chipSelected(tester, 'x1', 'all'), isTrue);
+      expect(chipSelected(tester, 'x1', 'suggested'), isFalse);
+      expect(inCard('x1', 'cleanup-series-mark-x1-keep'), findsOneWidget);
+
+      await pick(tester, 'x1', 'suggested');
+      expect(applyLabel(tester), 'Keep 1 · Trash 2');
+      expect(inCard('x1', 'cleanup-series-mark-x1-trash'), findsOneWidget);
+
+      await pick(tester, 'x1', 'instead');
+      expect(applyLabel(tester), 'Stack 3');
+      expect(chipSelected(tester, 'x1', 'instead'), isTrue);
+      expect(chipSelected(tester, 'x1', 'suggested'), isFalse);
+      expect(inCard('x1', 'cleanup-series-mark-x1-keep'), findsOneWidget, reason: 'a stack keeps every frame');
+
+      // A tapped frame leaves stack mode, flipping from what was shown.
+      await tapKey(tester, 'cleanup-series-frame-x1');
+      expect(chipSelected(tester, 'x1', 'instead'), isFalse);
+      expect(applyLabel(tester), 'Keep 2 · Trash 1');
+      expect(inCard('x1', 'cleanup-series-mark-x2-trash'), findsOneWidget);
+
+      expect(topCardId(tester), 'x1');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing, reason: 'no chip applied anything');
     });
 
     testWidgets('Undo steps back one series', (tester) async {
@@ -271,7 +410,9 @@ void main() {
 
     testWidgets("a series trashed whole comes back with every frame from the toast's Undo", (tester) async {
       await open(tester, LibraryCleanupQueue.bursts);
-      await swipe(tester, 'x1', const Offset(-300, 0));
+      await tapKey(tester, 'cleanup-series-frame-x1');
+      expect(applyLabel(tester), 'Trash all 3');
+      await tapKey(tester, 'cleanup-series-apply');
       await tapKey(tester, 'cleanup-session-done');
       await tapKey(tester, 'cleanup-finish-apply');
       expect(find.byKey(const Key('test-home')), findsOneWidget, reason: 'y and z are left');
@@ -285,7 +426,10 @@ void main() {
     testWidgets('killed with a decided series, the reopened queue restores it and says so', (tester) async {
       final directory = tempDirectory();
       await open(tester, LibraryCleanupQueue.bursts, directory: directory);
-      await tapKey(tester, 'cleanup-series-stack');
+      await pick(tester, 'x1', 'instead');
+      await tapKey(tester, 'cleanup-series-apply');
+      // y's chip, on but not applied, is a selection: it is kept too.
+      await pick(tester, 'y1', 'instead');
       await tester.pumpWidget(const SizedBox());
       await settle(tester);
 
@@ -293,6 +437,7 @@ void main() {
       expect(find.text('Restored your marks'), findsOneWidget);
       expect(badge(tester), '1');
       expect(topCardId(tester), 'y1');
+      expect(applyLabel(tester), 'Stack 2');
     });
   });
 
@@ -307,6 +452,16 @@ void main() {
     await tapKey(tester, 'cleanup-series-keep-suggestion-all');
     expect(badge(tester), '3');
     expect(inCard('x1', 'cleanup-series-mark-x2-keep'), findsOneWidget);
+    // Each row's own button says what is pending for it, and shows applied.
+    final row = tester.widget<ChoiceChip>(find.byKey(const Key('cleanup-series-list-apply-x1')));
+    expect(row.selected, isTrue);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('cleanup-series-list-apply-x1')),
+        matching: find.text('Keep 1 · Trash 2'),
+      ),
+      findsOneWidget,
+    );
     expect(library.commits, isEmpty);
 
     await tapKey(tester, 'cleanup-session-done');
@@ -322,11 +477,13 @@ void main() {
       await setQueuePrefs(overlaySeen: false);
       await open(tester, LibraryCleanupQueue.bursts);
       expect(find.byKey(const Key('cleanup-gesture-overlay')), findsOneWidget);
+      expect([overlayText(tester, 'right'), overlayText(tester, 'left')], ['→  Does what the button says', 'Skip  ←']);
+      expect(find.byKey(const Key('cleanup-gesture-up')), findsNothing, reason: 'there is no swipe up');
       expect(
-        [overlayText(tester, 'right'), overlayText(tester, 'up'), overlayText(tester, 'left')],
-        ['→  Keep as set', '↑  Keep all', 'Trash all  ←'],
+        overlayText(tester, 'hint'),
+        'Tap the photo or a thumbnail to keep or trash it. The button, or a swipe right, does exactly what it says; '
+        'a swipe left skips.',
       );
-      expect(find.byKey(const Key('cleanup-gesture-hint')), findsOneWidget);
       expect(storedPrefs().seriesOverlaySeen, isTrue, reason: 'seen as soon as it shows');
       expect(storedPrefs().overlaySeen, isFalse, reason: "the photo decks' lesson is still to come");
 
@@ -337,11 +494,12 @@ void main() {
       expect(find.byKey(const Key('cleanup-gesture-overlay')), findsOneWidget);
     });
 
-    testWidgets('Duplicates: left keeps at least one copy, so the lesson says so', (tester) async {
+    testWidgets('Duplicates: the same lesson, left skips there too', (tester) async {
       await setQueuePrefs(overlaySeen: false);
       await open(tester, LibraryCleanupQueue.duplicates);
-      expect(overlayText(tester, 'left'), 'Keep at least one copy  ✕');
-      expect(overlayText(tester, 'right'), '→  Keep as set');
+      expect(overlayText(tester, 'left'), 'Skip  ←');
+      expect(overlayText(tester, 'right'), '→  Does what the button says');
+      expect(find.byKey(const Key('cleanup-gesture-up')), findsNothing);
     });
 
     testWidgets('the menu offers Swipe / Grid but no swipe / button choice: the series card has one layout', (
@@ -397,6 +555,35 @@ void main() {
   });
 
   group('Duplicates', () {
+    testWidgets('every copy marked for trash is refused; "Not duplicates" turns the button into the dismissal', (
+      tester,
+    ) async {
+      await open(tester, LibraryCleanupQueue.duplicates);
+      expect(applyLabel(tester), 'Keep 1 · Trash 1');
+      await tapKey(tester, 'cleanup-series-frame-d');
+      expect(applyLabel(tester), 'Keep at least one copy');
+      expect(tester.widget<FilledButton>(find.byKey(const Key('cleanup-series-apply'))).onPressed, isNull);
+      expect(inCard('d', 'cleanup-series-keep-one'), findsNothing);
+      await swipe(tester, 'd', const Offset(300, 0));
+      expect(topCardId(tester), 'd', reason: 'the card resists');
+      expect(inCard('d', 'cleanup-series-keep-one'), findsOneWidget, reason: 'and says why');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing);
+
+      await pick(tester, 'd', 'instead');
+      expect(applyLabel(tester), 'Not duplicates');
+      expect(await stampWhileDragging(tester, 'd', 160), 'NOT DUPLICATES');
+      await tapKey(tester, 'cleanup-series-apply');
+      expect(topCardId(tester), 'e');
+      expect(badge(tester), '1');
+      expect(library.routes.where((route) => route.startsWith('DELETE ')), isEmpty, reason: 'sent only on Apply');
+
+      await tapKey(tester, 'cleanup-session-done');
+      await tapKey(tester, 'cleanup-finish-apply');
+      expect(library.routes.where((route) => route.contains('/duplicates/') || route.startsWith('POST /dup')), [
+        'DELETE /duplicates/d',
+      ]);
+    });
+
     testWidgets('ⓘ asks only for the albums: the copy is already a full asset', (tester) async {
       await open(tester, LibraryCleanupQueue.duplicates);
       await tapKey(tester, 'cleanup-series-details');

@@ -227,9 +227,9 @@ void main() {
     return finder.evaluate().isEmpty ? null : tester.widget<Text>(finder).data;
   }
 
-  /// Decides the card on top with the deck's own button ("Keep" / "Keep as set").
+  /// Decides the card on top with the deck's own button ("Keep" / the series' primary button).
   Future<void> decide(WidgetTester tester, _Cleanup cleanup) =>
-      tapKey(tester, cleanup.series ? 'cleanup-series-as-set' : 'cleanup-deck-keep');
+      tapKey(tester, cleanup.series ? 'cleanup-series-apply' : 'cleanup-deck-keep');
 
   for (final cleanup in _cleanups) {
     group(cleanup.name, () {
@@ -277,7 +277,7 @@ void main() {
 
           // The deck, its buttons and the details sheet.
           final buttons = cleanup.series
-              ? ['cleanup-series-top', 'cleanup-series-undo', 'cleanup-series-trash-all', 'cleanup-series-as-set']
+              ? ['cleanup-series-top', 'cleanup-series-undo', 'cleanup-series-apply', 'cleanup-series-skip']
               : ['cleanup-deck-top', 'cleanup-deck-undo', 'cleanup-deck-trash', 'cleanup-deck-favorite'];
           for (final part in [
             ...buttons,

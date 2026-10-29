@@ -138,7 +138,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
   /// The frames that will go to the trash once applied, in deck order.
   List<CleanupAssetDto> _trashPile(LibraryCleanupSeriesState state) => [
     for (final series in state.series)
-      if (state.decisions.containsKey(series.id))
+      if (state.isPending(series))
         for (final asset in series.assets)
           if (!state.willKeep(series, asset.id)) asset,
   ];
@@ -351,7 +351,9 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
     final canPop = phase == _Phase.allClear || (phase == _Phase.content && state.pendingCount == 0);
 
     final actions = LibraryCleanupSeriesActions(
-      decide: _session.decide,
+      apply: _session.applySeries,
+      skip: _session.skip,
+      pick: _session.pick,
       flip: _session.flip,
       undo: _session.undo,
       details: (series, frame) => unawaited(_details(series, frame)),
@@ -359,7 +361,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
     final pile = _trashPile(state);
     final kept = [
       for (final series in state.series)
-        if (state.decisions.containsKey(series.id))
+        if (state.isPending(series))
           for (final asset in series.assets)
             if (state.willKeep(series, asset.id)) asset,
     ];
@@ -421,7 +423,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
           }
         },
         doneKey: _doneKey,
-        // The series card has one layout: its buttons are always under it and its swipes always decide, so the menu
+        // The series card has one layout: its buttons are always under it and its swipes do what they do, so the menu
         // offers no swipe / button choice here.
         menu: LibraryCleanupSessionMenu(
           deckMode: prefs.deckMode,
@@ -431,7 +433,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
         ),
         overlay: _overlay && phase == _Phase.content && view == LibraryCleanupView.swipe
             ? LibraryCleanupGestureOverlay(
-                gestures: LibraryCleanupGestures.series(context, duplicates: _duplicates),
+                gestures: LibraryCleanupGestures.series(context),
                 onDismiss: () => setState(() => _overlay = false),
               )
             : null,

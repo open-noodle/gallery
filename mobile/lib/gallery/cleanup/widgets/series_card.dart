@@ -15,15 +15,18 @@ import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_view_flight.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/gallery/motion/pressable.dart';
+import 'package:immich_mobile/gallery/motion/swap.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:openapi/api.dart';
 
 // The series card (specs/2026-10-29-mobile-library-cleanup-design.md, "Queues: Bursts and Duplicates"; mockup
-// `3-queues.html`, third screen): one card per burst or duplicate group, shared by both queues so they feel the same.
-// A big frame on black with "Frame i of N" and the suggestion's badge, a header, and a filmstrip of every frame with its
-// mark. The deck stacks these cards and throws them like the photo deck; the list shows them one under another.
+// `3-queues.html`, third screen, reworked in `6-bursts-v2.html`): one card per burst or duplicate group, shared by both
+// queues so they feel the same. A big frame on black with "Frame i of N" and the suggestion's badge, a header, a
+// filmstrip of every frame with its mark, and the selection chips. The rule: the selection changes only by tapping
+// frames or a chip, and one primary action applies it, its label always saying exactly what will happen. The deck
+// stacks these cards and throws them like the photo deck; the list shows them one under another.
 
 /// Opens the details sheet on one frame; resolves with the frame's new mark (true keep, false trash), or null.
 typedef LibraryCleanupFrameDetails = Future<bool?> Function(LibraryCleanupSeries series, CleanupAssetDto frame);
@@ -31,22 +34,47 @@ typedef LibraryCleanupFrameDetails = Future<bool?> Function(LibraryCleanupSeries
 /// How far a sideways drag on the big frame must go to step to the next frame.
 const _frameStep = 40.0;
 
-/// The share of the card's width (or height, upwards) a drag must pass to decide, and a throw's speed.
+/// The share of the card's width a drag must pass to act, and a throw's speed.
 const _horizontalThreshold = 0.28;
-const _upThreshold = 0.16;
 const _throwVelocity = 800.0;
 
-/// Where a decision throws the card: right keeps as set, left trashes all (Bursts), up keeps all or dismisses.
-Offset _direction(LibraryCleanupSeriesDecision decision) => switch (decision) {
-  LibraryCleanupSeriesDecision.asSet => const Offset(1, 0),
-  LibraryCleanupSeriesDecision.trashAll => const Offset(-1, 0),
-  LibraryCleanupSeriesDecision.keepAll || LibraryCleanupSeriesDecision.dismiss => const Offset(0, -1),
-  LibraryCleanupSeriesDecision.stack => const Offset(0, 1),
+/// A vertical drag does nothing (there is no swipe up), so the card follows only part of the finger and springs back.
+const _verticalFollow = 0.35;
+
+const _stackColor = Color(0xFF6C8CFF);
+const _skipColor = Color(0xFFCFD5E2);
+
+/// The primary button's words, which the swipe-right stamp repeats: "Keep 1 · Trash 5", "Trash all 6", "Stack 6".
+String libraryCleanupSeriesApplyLabel(BuildContext context, LibraryCleanupSeriesOutcome outcome) {
+  final t = context.t;
+  return switch (outcome.kind) {
+    LibraryCleanupSeriesOutcomeKind.keepTrash => t.cleanup_series_apply_keep_trash(
+      keep: outcome.keep,
+      trash: outcome.trash,
+    ),
+    LibraryCleanupSeriesOutcomeKind.keepAll => t.cleanup_series_apply_keep_all(count: outcome.keep),
+    LibraryCleanupSeriesOutcomeKind.trashAll => t.cleanup_series_apply_trash_all(count: outcome.trash),
+    LibraryCleanupSeriesOutcomeKind.stack => t.cleanup_series_apply_stack(count: outcome.keep),
+    LibraryCleanupSeriesOutcomeKind.dismiss => t.cleanup_series_not_duplicates,
+    LibraryCleanupSeriesOutcomeKind.refused => t.cleanup_series_keep_one_copy,
+  };
+}
+
+IconData _outcomeIcon(LibraryCleanupSeriesOutcomeKind kind) => switch (kind) {
+  LibraryCleanupSeriesOutcomeKind.keepTrash => Icons.check_rounded,
+  LibraryCleanupSeriesOutcomeKind.keepAll => Icons.done_all_rounded,
+  LibraryCleanupSeriesOutcomeKind.trashAll => Icons.delete_outline_rounded,
+  LibraryCleanupSeriesOutcomeKind.stack => Icons.layers_outlined,
+  LibraryCleanupSeriesOutcomeKind.dismiss => Icons.call_split_rounded,
+  LibraryCleanupSeriesOutcomeKind.refused => Icons.error_outline_rounded,
 };
 
-/// The decision a swipe up makes: keep all for a burst, "not duplicates" for a duplicate group.
-LibraryCleanupSeriesDecision _upDecision(bool duplicates) =>
-    duplicates ? LibraryCleanupSeriesDecision.dismiss : LibraryCleanupSeriesDecision.keepAll;
+/// The stamp's colour: red when it trashes every frame, the stack's blue, else keep's green.
+Color _outcomeColor(LibraryCleanupSeriesOutcomeKind kind) => switch (kind) {
+  LibraryCleanupSeriesOutcomeKind.trashAll => libraryCleanupTrashColor,
+  LibraryCleanupSeriesOutcomeKind.stack => _stackColor,
+  _ => libraryCleanupKeepColor,
+};
 
 String _locale(BuildContext context) => Localizations.maybeLocaleOf(context)?.toLanguageTag() ?? 'en';
 
@@ -80,51 +108,53 @@ String libraryCleanupSeriesHeader(BuildContext context, LibraryCleanupSeries ser
   return [what, _format(context, first.localDateTime, DateFormat.yMMMd), ?city].where((p) => p.isNotEmpty).join(' · ');
 }
 
-/// "Keep 1, trash 2 (6.1 KiB)": what the marks would do, with the size the trash frees.
-String libraryCleanupSeriesChip(BuildContext context, LibraryCleanupSeries series, bool Function(String id) kept) {
-  final keep = series.assets.where((asset) => kept(asset.id)).length;
-  final trashBytes = series.assets
-      .where((asset) => !kept(asset.id))
-      .fold<int>(0, (sum, asset) => sum + asset.fileSize.round());
-  return '${context.t.cleanup_keep_n_trash_m(keep: keep, trash: series.assets.length - keep)} (${formatBytes(trashBytes)})';
-}
+/// The size the frames marked for trash would free.
+String libraryCleanupSeriesFrees(LibraryCleanupSeries series, bool Function(String id) kept) => formatBytes(
+  series.assets.where((asset) => !kept(asset.id)).fold<int>(0, (sum, asset) => sum + asset.fileSize.round()),
+);
 
-/// One series card: the big frame, the header and the filmstrip. Tap a thumbnail to show it; tap the big frame to flip
-/// the shown frame's mark; swipe sideways on the big frame to step through the frames; ⓘ opens its details.
+/// A drag's stamp on the big frame: the exact words of what letting go does, and how far the drag is, 0 to 1.
+typedef LibraryCleanupSeriesStamp = ({String text, Color color, double amount});
+
+/// One series card: the big frame, the header, the filmstrip and the selection chips. Tapping the big frame or a
+/// thumbnail flips that frame between keep and trash (a thumbnail also shows it); swiping sideways on the big frame
+/// steps through the frames; the chips change the selection; ⓘ opens the frame's details. Nothing here applies it.
 class LibraryCleanupSeriesCard extends StatefulWidget {
   const LibraryCleanupSeriesCard({
     super.key,
     required this.series,
     required this.duplicates,
     required this.isKept,
+    this.instead = false,
     this.onFlip,
+    this.onPick,
     this.onDetails,
-    this.stamps = const {},
+    this.stamp,
     this.frameHeight,
     this.warning = false,
-    this.decision,
     this.hidden = false,
   });
 
   final LibraryCleanupSeries series;
   final bool duplicates;
 
-  /// A frame's mark as it stands: kept or marked for trash.
+  /// A frame's mark as the card shows it: kept or marked for trash.
   final bool Function(String frameId) isKept;
+
+  /// The "Stack instead" / "Not duplicates" chip is on.
+  final bool instead;
   final ValueChanged<String>? onFlip;
+  final ValueChanged<LibraryCleanupSeriesPick>? onPick;
   final ValueChanged<CleanupAssetDto>? onDetails;
 
-  /// How far a drag is towards each decision, 0 to 1.
-  final Map<LibraryCleanupSeriesDecision, double> stamps;
+  /// The drag's stamp, while one is under way.
+  final LibraryCleanupSeriesStamp? stamp;
 
   /// The big frame's height in the list; null fills what the deck leaves.
   final double? frameHeight;
 
-  /// "Keep at least one copy": a duplicate group whose marks trash every copy, or a left swipe it refused.
+  /// "Keep at least one copy": a swipe right the duplicate group refused, its every copy marked for trash.
   final bool warning;
-
-  /// The list shows what was decided for the series.
-  final LibraryCleanupSeriesDecision? decision;
 
   /// While a flight from the deck lands on the big frame, the frame leaves its place empty.
   final bool hidden;
@@ -155,6 +185,12 @@ class _LibraryCleanupSeriesCardState extends State<LibraryCleanupSeriesCard> {
       return;
     }
     setState(() => _shown = index);
+  }
+
+  /// A thumbnail: shows that frame and flips its mark, as tapping the big frame does.
+  void _tapThumb(int index) {
+    _show(index);
+    widget.onFlip?.call(widget.series.assets[index].id);
   }
 
   @override
@@ -227,14 +263,13 @@ class _LibraryCleanupSeriesCardState extends State<LibraryCleanupSeriesCard> {
                       icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
                     ),
                   ),
-                for (final MapEntry(key: decision, value: amount) in widget.stamps.entries)
-                  if (amount > 0)
-                    Center(
-                      child: Opacity(
-                        opacity: amount.clamp(0.0, 1.0),
-                        child: _Stamp(decision: decision, duplicates: widget.duplicates),
-                      ),
+                if (widget.stamp case final stamp? when stamp.amount > 0)
+                  Center(
+                    child: Opacity(
+                      opacity: stamp.amount.clamp(0.0, 1.0),
+                      child: _Stamp(text: stamp.text, color: stamp.color),
                     ),
+                  ),
               ],
             ),
           ),
@@ -258,36 +293,29 @@ class _LibraryCleanupSeriesCardState extends State<LibraryCleanupSeriesCard> {
             else
               SizedBox(height: widget.frameHeight, child: frame),
             const SizedBox(height: 10),
-            Text(
-              libraryCleanupSeriesHeader(context, series, duplicates: widget.duplicates),
-              key: const Key('cleanup-series-header'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
             Row(
               children: [
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      libraryCleanupSeriesChip(context, series, widget.isKept),
-                      key: const Key('cleanup-series-chip'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-                    ),
+                Expanded(
+                  child: Text(
+                    libraryCleanupSeriesHeader(context, series, duplicates: widget.duplicates),
+                    key: const Key('cleanup-series-header'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
-                if (widget.decision != null) ...[
-                  const SizedBox(width: 8),
-                  _DecisionChip(decision: widget.decision!, duplicates: widget.duplicates),
-                ],
+                const SizedBox(width: 8),
+                // What the frames marked for trash would free; the counts are on the button.
+                Icon(Icons.delete_outline_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 2),
+                Text(
+                  libraryCleanupSeriesFrees(series, widget.isKept),
+                  key: const Key('cleanup-series-frees'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               ],
             ),
             AnimatedSize(
@@ -317,7 +345,15 @@ class _LibraryCleanupSeriesCardState extends State<LibraryCleanupSeriesCard> {
               shown: _shown,
               duplicates: widget.duplicates,
               isKept: widget.isKept,
-              onShow: _show,
+              onTap: _tapThumb,
+            ),
+            const SizedBox(height: 8),
+            _PickChips(
+              series: series,
+              duplicates: widget.duplicates,
+              instead: widget.instead,
+              isKept: widget.isKept,
+              onPick: widget.onPick,
             ),
           ],
         ),
@@ -363,14 +399,14 @@ class _Filmstrip extends StatelessWidget {
     required this.shown,
     required this.duplicates,
     required this.isKept,
-    required this.onShow,
+    required this.onTap,
   });
 
   final LibraryCleanupSeries series;
   final int shown;
   final bool duplicates;
   final bool Function(String frameId) isKept;
-  final ValueChanged<int> onShow;
+  final ValueChanged<int> onTap;
 
   static const _thumb = 56.0;
   static const _gap = 6.0;
@@ -404,7 +440,7 @@ class _Filmstrip extends StatelessWidget {
                     width: _thumb,
                     child: Column(
                       children: [
-                        _Thumb(asset: asset, kept: isKept(asset.id), onTap: () => onShow(index)),
+                        _Thumb(asset: asset, kept: isKept(asset.id), onTap: () => onTap(index)),
                         if (duplicates) ...[
                           const SizedBox(height: 4),
                           _CopyLabel(
@@ -597,66 +633,91 @@ class _Caption extends StatelessWidget {
   );
 }
 
-String _decisionLabel(BuildContext context, LibraryCleanupSeriesDecision decision) => switch (decision) {
-  LibraryCleanupSeriesDecision.asSet => context.t.cleanup_series_keep_as_set,
-  LibraryCleanupSeriesDecision.trashAll => context.t.cleanup_series_trash_all,
-  LibraryCleanupSeriesDecision.keepAll || LibraryCleanupSeriesDecision.dismiss => context.t.cleanup_keep_all,
-  LibraryCleanupSeriesDecision.stack => context.t.cleanup_stack_instead,
-};
-
-Color _decisionColor(LibraryCleanupSeriesDecision decision) => switch (decision) {
-  LibraryCleanupSeriesDecision.trashAll => libraryCleanupTrashColor,
-  LibraryCleanupSeriesDecision.stack => const Color(0xFF6C8CFF),
-  _ => libraryCleanupKeepColor,
-};
-
-/// A drag's stamp on the big frame, as the photo deck's stamps.
+/// A drag's stamp on the big frame, as the photo deck's stamps: the exact words of what letting go does.
 class _Stamp extends StatelessWidget {
-  const _Stamp({required this.decision, required this.duplicates});
+  const _Stamp({required this.text, required this.color});
 
-  final LibraryCleanupSeriesDecision decision;
-  final bool duplicates;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _decisionColor(decision);
-    return Transform.rotate(
-      angle: -0.12,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: color, width: 3),
-          borderRadius: BorderRadius.circular(10),
-          color: Colors.black.withValues(alpha: 0.35),
-        ),
-        child: Text(
-          _decisionLabel(context, decision).toUpperCase(),
-          style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w900),
-        ),
-      ),
-    );
-  }
-}
-
-class _DecisionChip extends StatelessWidget {
-  const _DecisionChip({required this.decision, required this.duplicates});
-
-  final LibraryCleanupSeriesDecision decision;
-  final bool duplicates;
+  final String text;
+  final Color color;
 
   @override
-  Widget build(BuildContext context) => GalleryPop(
-    onMount: true,
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: -0.12,
     child: Container(
-      key: Key('cleanup-series-decision-${decision.name}'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: _decisionColor(decision), borderRadius: BorderRadius.circular(999)),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: color, width: 3),
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.black.withValues(alpha: 0.35),
+      ),
       child: Text(
-        _decisionLabel(context, decision),
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+        text,
+        key: const Key('cleanup-series-stamp'),
+        maxLines: 1,
+        style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w900),
       ),
     ),
   );
+}
+
+/// The shortcuts under the filmstrip. Each changes the selection and none applies it; the one matching the selection
+/// shows selected. Bursts: "★ Best only", "Keep all", "Stack instead". Duplicates: "Suggested only", "Keep all", "Not
+/// duplicates". The last is a toggle: tapping a frame or another chip turns it off.
+class _PickChips extends StatelessWidget {
+  const _PickChips({
+    required this.series,
+    required this.duplicates,
+    required this.instead,
+    required this.isKept,
+    required this.onPick,
+  });
+
+  final LibraryCleanupSeries series;
+  final bool duplicates;
+  final bool instead;
+  final bool Function(String frameId) isKept;
+  final ValueChanged<LibraryCleanupSeriesPick>? onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final allKept = !instead && series.assets.every((asset) => isKept(asset.id));
+    final suggested =
+        !instead && series.assets.every((asset) => isKept(asset.id) == series.suggested.contains(asset.id));
+    final chips = [
+      (
+        LibraryCleanupSeriesPick.suggested,
+        duplicates ? t.cleanup_series_suggested_only : t.cleanup_series_best_only,
+        duplicates ? Icons.auto_awesome_rounded : Icons.star_rounded,
+        suggested,
+      ),
+      (LibraryCleanupSeriesPick.all, t.cleanup_keep_all, Icons.done_all_rounded, allKept),
+      (
+        LibraryCleanupSeriesPick.instead,
+        duplicates ? t.cleanup_series_not_duplicates : t.cleanup_stack_instead,
+        duplicates ? Icons.call_split_rounded : Icons.layers_outlined,
+        instead,
+      ),
+    ];
+    return Wrap(
+      key: const Key('cleanup-series-picks'),
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (pick, label, icon, selected) in chips)
+          ChoiceChip(
+            key: Key('cleanup-series-pick-${pick.name}'),
+            avatar: Icon(icon, size: 16),
+            label: Text(label),
+            selected: selected,
+            showCheckmark: false,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onSelected: onPick == null ? null : (_) => onPick!(pick),
+          ),
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -666,39 +727,41 @@ class _DecisionChip extends StatelessWidget {
 /// What the deck and the list need from the session.
 class LibraryCleanupSeriesActions {
   const LibraryCleanupSeriesActions({
-    required this.decide,
+    required this.apply,
+    required this.skip,
+    required this.pick,
     required this.flip,
     required this.undo,
     required this.details,
   });
 
-  /// Decides a series; false when the decision is refused (a duplicate group that would lose every copy).
-  final bool Function(String seriesId, LibraryCleanupSeriesDecision decision) decide;
+  /// Applies a series' selection as its button says; false when refused (a duplicate group that would lose every copy).
+  final bool Function(String seriesId) apply;
+  final void Function(String seriesId) skip;
+  final void Function(String seriesId, LibraryCleanupSeriesPick pick) pick;
   final void Function(String seriesId, String frameId) flip;
   final VoidCallback undo;
   final void Function(LibraryCleanupSeries series, CleanupAssetDto frame) details;
 }
 
+/// The deck's two swipes: right applies the selection (the primary button), left skips.
+enum _Swipe { apply, skip }
+
 class _Flight {
-  _Flight({
-    required this.series,
-    required this.decision,
-    required this.from,
-    required this.to,
-    required this.controller,
-  });
+  _Flight({required this.series, required this.stamp, required this.from, required this.to, required this.controller});
 
   final LibraryCleanupSeries series;
-  final LibraryCleanupSeriesDecision decision;
+  final LibraryCleanupSeriesStamp stamp;
   final Offset from;
   final Offset to;
   final AnimationController controller;
 }
 
-/// The series deck: the current series on top, the next behind it. Swipes on the card outside the big frame decide the
-/// whole series (right: as set; left: trash all for a burst, refused for duplicates; up: keep all or "not duplicates"),
-/// and the buttons under it do the same. Only the top and next series are built, so a series' previews load when it is
-/// next or on top.
+/// The series deck: the current series on top, the next behind it. Under it: Undo, the primary button, whose label is
+/// what applying the selection does ("Keep 1 · Trash 5", "Trash all 6", "Stack 6"), and Skip. A swipe right on the
+/// card is the primary button and its stamp shows the same words; a swipe left is Skip; there is no swipe up. A
+/// duplicate group with every copy marked for trash cannot be applied: the button is disabled and the card resists.
+/// Only the top and next series are built, so a series' previews load when it is next or on top.
 class LibraryCleanupSeriesDeck extends ConsumerStatefulWidget {
   const LibraryCleanupSeriesDeck({super.key, required this.state, required this.actions});
 
@@ -716,9 +779,9 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
   final List<_Flight> _flights = [];
   final Set<String> _preloaded = {};
   Size _size = Size.zero;
-  LibraryCleanupSeriesDecision? _armed;
+  _Swipe? _armed;
 
-  /// A refused decision (every copy trashed) shows "Keep at least one copy" for a moment.
+  /// A refused swipe right (every copy trashed) shows "Keep at least one copy" for a moment.
   Timer? _warningTimer;
   bool _refused = false;
 
@@ -774,29 +837,33 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
 
   Offset get _offset => Offset(_x.value, _y.value);
 
-  LibraryCleanupSeriesDecision? _decisionAt(Offset offset) {
+  _Swipe? _swipeAt(Offset offset) {
     if (_size.isEmpty) {
       return null;
     }
-    if (offset.dy < -_size.height * _upThreshold && -offset.dy > offset.dx.abs()) {
-      return _upDecision(_duplicates);
-    }
-    if (offset.dx.abs() > _size.width * _horizontalThreshold && offset.dx.abs() >= -offset.dy) {
-      return offset.dx > 0 ? LibraryCleanupSeriesDecision.asSet : LibraryCleanupSeriesDecision.trashAll;
+    if (offset.dx.abs() > _size.width * _horizontalThreshold && offset.dx.abs() >= offset.dy.abs()) {
+      return offset.dx > 0 ? _Swipe.apply : _Swipe.skip;
     }
     return null;
   }
 
-  /// Whether the top series may take [decision]: duplicates never trash every copy.
-  bool _allowed(LibraryCleanupSeriesDecision decision) {
+  /// Skip always goes; applying is refused for a duplicate group whose every copy is marked for trash.
+  bool _allowed(_Swipe swipe) {
     final top = _top;
-    if (top == null) {
-      return false;
+    return top != null && (swipe == _Swipe.skip || _state.canApply(top));
+  }
+
+  /// The stamp a swipe shows: the primary button's words for a swipe right, "Skip" for a swipe left.
+  LibraryCleanupSeriesStamp _stampFor(_Swipe swipe, LibraryCleanupSeries series, double amount) {
+    if (swipe == _Swipe.skip) {
+      return (text: context.t.skip.toUpperCase(), color: _skipColor, amount: amount);
     }
-    if (_duplicates && decision == LibraryCleanupSeriesDecision.trashAll) {
-      return false;
-    }
-    return decision != LibraryCleanupSeriesDecision.asSet || _state.canAcceptAsSet(top);
+    final outcome = _state.outcome(series);
+    return (
+      text: libraryCleanupSeriesApplyLabel(context, outcome).toUpperCase(),
+      color: _outcomeColor(outcome.kind),
+      amount: amount,
+    );
   }
 
   void _refuse() {
@@ -817,17 +884,13 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
 
   void _onPanUpdate(DragUpdateDetails details) {
     var dx = details.delta.dx;
-    // A direction the series may not take resists: the card follows a quarter of the finger (rubber band).
-    final towards = _x.value + dx;
-    final horizontal = towards.abs() >= -_y.value;
-    if (horizontal &&
-        ((towards < 0 && !_allowed(LibraryCleanupSeriesDecision.trashAll)) ||
-            (towards > 0 && !_allowed(LibraryCleanupSeriesDecision.asSet)))) {
+    // A refused swipe right resists: the card follows a quarter of the finger (rubber band).
+    if (_x.value + dx > 0 && !_allowed(_Swipe.apply)) {
       dx *= 0.25;
     }
     _x.value += dx;
-    _y.value += details.delta.dy;
-    final armed = _decisionAt(_offset);
+    _y.value += details.delta.dy * _verticalFollow;
+    final armed = _swipeAt(_offset);
     final usable = armed != null && _allowed(armed) ? armed : null;
     if (usable != null && usable != _armed) {
       ref.read(hapticFeedbackProvider.notifier).selectionClick();
@@ -838,22 +901,18 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
   void _onPanEnd(DragEndDetails details) {
     final velocity = details.velocity.pixelsPerSecond;
     _armed = null;
-    var decision = _decisionAt(_offset);
-    if (decision == null) {
-      if (velocity.dy < -_throwVelocity && -velocity.dy > velocity.dx.abs()) {
-        decision = _upDecision(_duplicates);
-      } else if (velocity.dx.abs() > _throwVelocity && velocity.dx.abs() > velocity.dy.abs()) {
-        decision = velocity.dx > 0 ? LibraryCleanupSeriesDecision.asSet : LibraryCleanupSeriesDecision.trashAll;
-      }
+    var swipe = _swipeAt(_offset);
+    if (swipe == null && velocity.dx.abs() > _throwVelocity && velocity.dx.abs() > velocity.dy.abs()) {
+      swipe = velocity.dx > 0 ? _Swipe.apply : _Swipe.skip;
     }
-    if (decision != null && !_allowed(decision)) {
+    if (swipe != null && !_allowed(swipe)) {
       _refuse();
-      decision = null;
+      swipe = null;
     }
-    if (decision == null) {
+    if (swipe == null) {
       _springBack(velocity);
     } else {
-      _throw(decision, speed: velocity.distance);
+      _throw(swipe, speed: velocity.distance);
     }
   }
 
@@ -867,35 +926,39 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
     unawaited(_y.animateWith(SpringSimulation(GalleryMotion.bouncy, _y.value, 0, velocity.dy)));
   }
 
-  /// A button's decision: thrown as the swipe would be, or refused with the rubber band's message.
-  void _press(LibraryCleanupSeriesDecision decision) {
-    if (!_allowed(decision)) {
+  /// A button: thrown as its swipe would be, or refused with the rubber band's message.
+  void _press(_Swipe swipe) {
+    if (!_allowed(swipe)) {
       _refuse();
       if (!GalleryMotion.reduced(context)) {
-        // A small nudge in the refused direction, springing back.
-        _x.value = _direction(decision).dx * -18;
+        // A small nudge towards the refused side, springing back.
+        _x.value = 18;
         _springBack(Offset.zero);
       }
       return;
     }
-    _throw(decision);
+    _throw(swipe);
   }
 
-  void _throw(LibraryCleanupSeriesDecision decision, {double speed = 0}) {
+  void _throw(_Swipe swipe, {double speed = 0}) {
     final top = _top;
     if (top == null) {
       return;
     }
-    if (!widget.actions.decide(top.id, decision)) {
+    // The stamp is read before the decision, so the flying card says what was applied.
+    final stamp = _stampFor(swipe, top, 1);
+    if (swipe == _Swipe.skip) {
+      widget.actions.skip(top.id);
+    } else if (!widget.actions.apply(top.id)) {
       _refuse();
       _springBack(Offset.zero);
       return;
     }
     final reduced = GalleryMotion.reduced(context);
     final from = _offset;
-    final direction = _direction(decision);
+    final direction = swipe == _Swipe.apply ? 1.0 : -1.0;
     final reach = _size.longestSide * 1.3;
-    final to = reduced ? from : Offset(direction.dx * reach + from.dx * 0.2, direction.dy * reach + from.dy * 0.2);
+    final to = reduced ? from : Offset(direction * reach + from.dx * 0.2, from.dy * 0.2);
     final distance = (to - from).distance;
     final millis = reduced
         ? GalleryMotion.quick.inMilliseconds
@@ -904,7 +967,7 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
       vsync: this,
       duration: Duration(milliseconds: millis.round()),
     );
-    final flight = _Flight(series: top, decision: decision, from: from, to: to, controller: controller);
+    final flight = _Flight(series: top, stamp: stamp, from: from, to: to, controller: controller);
     setState(() => _flights.add(flight));
     unawaited(
       controller.forward().whenComplete(() {
@@ -918,7 +981,7 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
     _y.value = 0;
   }
 
-  /// Undo: the series flies back in from where it left.
+  /// Undo: the series flies back in from the side it left by.
   void _comeBack(LibraryCleanupSeries series, LibraryCleanupSeriesDecision decision) {
     for (final flight in _flights.where((flight) => flight.series.id == series.id).toList()) {
       flight.controller.stop();
@@ -931,49 +994,36 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
       unawaited(_fadeIn.forward());
       return;
     }
-    final direction = _direction(decision);
-    final reach = _size.longestSide * 1.3;
-    final start = Offset(direction.dx * reach, direction.dy * reach);
-    _x.value = start.dx;
-    _y.value = start.dy;
-    unawaited(_x.animateWith(SpringSimulation(GalleryMotion.gentle, start.dx, 0, 0)));
-    unawaited(_y.animateWith(SpringSimulation(GalleryMotion.gentle, start.dy, 0, 0)));
+    final direction = decision == LibraryCleanupSeriesDecision.skip ? -1.0 : 1.0;
+    final start = direction * _size.longestSide * 1.3;
+    _x.value = start;
+    _y.value = 0;
+    unawaited(_x.animateWith(SpringSimulation(GalleryMotion.gentle, start, 0, 0)));
   }
 
-  Map<LibraryCleanupSeriesDecision, double> _stampsAt(Offset offset) {
-    if (_size.isEmpty || offset == Offset.zero) {
-      return const {};
-    }
-    final decision = _decisionAt(offset) ?? _leaning(offset);
-    if (decision == null || !_allowed(decision)) {
-      return const {};
-    }
-    final amount = _direction(decision).dy != 0
-        ? -offset.dy / (_size.height * _upThreshold)
-        : offset.dx.abs() / (_size.width * _horizontalThreshold);
-    return {decision: amount.clamp(0.0, 1.0)};
-  }
-
-  LibraryCleanupSeriesDecision? _leaning(Offset offset) {
-    if (-offset.dy > offset.dx.abs()) {
-      return _upDecision(_duplicates);
-    }
-    if (offset.dx == 0) {
+  LibraryCleanupSeriesStamp? _stampAt(LibraryCleanupSeries top, Offset offset) {
+    if (_size.isEmpty || offset.dx == 0 || offset.dx.abs() < offset.dy.abs()) {
       return null;
     }
-    return offset.dx > 0 ? LibraryCleanupSeriesDecision.asSet : LibraryCleanupSeriesDecision.trashAll;
+    final swipe = _swipeAt(offset) ?? (offset.dx > 0 ? _Swipe.apply : _Swipe.skip);
+    if (!_allowed(swipe)) {
+      return null;
+    }
+    return _stampFor(swipe, top, (offset.dx.abs() / (_size.width * _horizontalThreshold)).clamp(0.0, 1.0));
   }
 
-  Widget _card(LibraryCleanupSeries series, {bool top = false, Map<LibraryCleanupSeriesDecision, double>? stamps}) =>
+  Widget _card(LibraryCleanupSeries series, {bool top = false, LibraryCleanupSeriesStamp? stamp}) =>
       LibraryCleanupSeriesCard(
         key: ValueKey('series-${series.id}'),
         series: series,
         duplicates: _duplicates,
-        isKept: (frameId) => _state.isKept(series, frameId),
+        isKept: (frameId) => _state.shownKept(series, frameId),
+        instead: _state.isInstead(series),
         onFlip: top ? (frameId) => widget.actions.flip(series.id, frameId) : null,
+        onPick: top ? (pick) => widget.actions.pick(series.id, pick) : null,
         onDetails: top ? (frame) => widget.actions.details(series, frame) : null,
-        stamps: stamps ?? const {},
-        warning: top && _duplicates && (_refused || !_state.canAcceptAsSet(series)),
+        stamp: stamp,
+        warning: top && _refused,
       );
 
   @override
@@ -1022,7 +1072,7 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
                                 offset: _offset,
                                 width: _size.width,
                                 rotate: !reduced,
-                                child: _card(top, top: true, stamps: _stampsAt(_offset)),
+                                child: _card(top, top: true, stamp: _stampAt(top, _offset)),
                               ),
                             ),
                           ),
@@ -1048,7 +1098,7 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
                                 ),
                               );
                             },
-                            child: _card(flight.series, stamps: {flight.decision: 1}),
+                            child: _card(flight.series, stamp: flight.stamp),
                           ),
                         ),
                       ),
@@ -1061,47 +1111,32 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
           SizedBox(
             height: libraryCleanupButtonRowHeight,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _SeriesButton(
                   key: const Key('cleanup-series-undo'),
                   icon: Icons.undo_rounded,
                   label: t.undo,
-                  small: true,
                   onPressed: _state.canUndo ? widget.actions.undo : null,
                 ),
-                _SeriesButton(
-                  key: const Key('cleanup-series-trash-all'),
-                  icon: Icons.close_rounded,
-                  label: _duplicates ? t.cleanup_series_keep_one_copy : t.cleanup_series_trash_all,
-                  color: _duplicates ? null : libraryCleanupTrashColor,
-                  muted: _duplicates,
-                  onPressed: top == null ? null : () => _press(LibraryCleanupSeriesDecision.trashAll),
-                ),
-                _SeriesButton(
-                  key: const Key('cleanup-series-as-set'),
-                  icon: Icons.check_rounded,
-                  label: t.cleanup_series_keep_as_set,
-                  color: libraryCleanupKeepColor,
-                  onPressed: top == null || !_state.canAcceptAsSet(top)
-                      ? null
-                      : () => _press(LibraryCleanupSeriesDecision.asSet),
-                ),
-                _SeriesButton(
-                  key: const Key('cleanup-series-keep-all'),
-                  icon: Icons.done_all_rounded,
-                  label: t.cleanup_keep_all,
-                  color: libraryCleanupKeepColor,
-                  onPressed: top == null ? null : () => _press(_upDecision(_duplicates)),
-                ),
-                if (!_duplicates)
-                  _SeriesButton(
-                    key: const Key('cleanup-series-stack'),
-                    icon: Icons.layers_outlined,
-                    label: t.cleanup_stack_instead,
-                    small: true,
-                    onPressed: top == null ? null : () => _press(LibraryCleanupSeriesDecision.stack),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ApplyButton(
+                    buttonKey: const Key('cleanup-series-apply'),
+                    outcome: top == null ? null : _state.outcome(top),
+                    onPressed: top == null || !_state.canApply(top) ? null : () => _press(_Swipe.apply),
                   ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton(
+                  key: const Key('cleanup-series-skip'),
+                  onPressed: top == null ? null : () => _press(_Swipe.skip),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(64, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(t.skip),
+                ),
               ],
             ),
           ),
@@ -1128,33 +1163,76 @@ class _Moved extends StatelessWidget {
   );
 }
 
-class _SeriesButton extends StatelessWidget {
-  const _SeriesButton({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.color,
-    this.small = false,
-    this.muted = false,
-  });
+/// The primary button: its label is what applying the selection does, and it changes as frames and chips are tapped
+/// (the new words rise into place). Red when it trashes every frame, the stack's blue when it stacks; disabled, with
+/// "Keep at least one copy", for a duplicate group whose every copy is marked for trash.
+class _ApplyButton extends StatelessWidget {
+  const _ApplyButton({required this.buttonKey, required this.outcome, required this.onPressed});
 
-  final IconData icon;
-  final String label;
+  final Key buttonKey;
+  final LibraryCleanupSeriesOutcome? outcome;
   final VoidCallback? onPressed;
-  final Color? color;
-  final bool small;
-
-  /// Looks unavailable but still answers a press (Duplicates' left action explains why it does nothing).
-  final bool muted;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final size = small ? 44.0 : 56.0;
-    final foreground = onPressed == null || muted
-        ? scheme.onSurface.withValues(alpha: 0.3)
-        : (color ?? scheme.onSurface);
+    final outcome = this.outcome;
+    final label = outcome == null ? '' : libraryCleanupSeriesApplyLabel(context, outcome);
+    final kind = outcome?.kind ?? LibraryCleanupSeriesOutcomeKind.keepTrash;
+    final (background, foreground) = switch (kind) {
+      LibraryCleanupSeriesOutcomeKind.trashAll => (libraryCleanupTrashColor, Colors.white),
+      LibraryCleanupSeriesOutcomeKind.stack => (_stackColor, Colors.white),
+      _ => (scheme.primary, scheme.onPrimary),
+    };
+    return GalleryPressable(
+      enabled: onPressed != null,
+      pressedScale: 0.96,
+      child: FilledButton(
+        key: buttonKey,
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: const StadiumBorder(),
+        ),
+        child: GallerySwap(
+          value: label,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_outcomeIcon(kind), size: 20),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  key: const Key('cleanup-series-apply-label'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SeriesButton extends StatelessWidget {
+  const _SeriesButton({super.key, required this.icon, required this.label, required this.onPressed});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final foreground = onPressed == null ? scheme.onSurface.withValues(alpha: 0.3) : scheme.onSurface;
     return GalleryPressable(
       enabled: onPressed != null,
       pressedScale: 0.86,
@@ -1170,10 +1248,7 @@ class _SeriesButton extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onPressed,
-              child: SizedBox.square(
-                dimension: size,
-                child: Icon(icon, color: foreground, size: small ? 20 : 26),
-              ),
+              child: SizedBox.square(dimension: 44, child: Icon(icon, color: foreground, size: 20)),
             ),
           ),
         ),
@@ -1186,9 +1261,11 @@ class _SeriesButton extends StatelessWidget {
 // The list (grid mode)
 // ---------------------------------------------------------------------------------------------------------------------
 
-/// Grid mode for the series queues: the series cards one under another, each with its actions, and "Keep the
-/// suggestion for all" for the loaded series. Built lazily, so a series' previews load as it scrolls in. Its state is a
-/// flight grid keyed by series id: the deck's big frame flies into the series' frame here and back.
+/// Grid mode for the series queues: the series cards one under another, each with its chips and its own apply button
+/// (the deck's primary, as a chip that shows selected while the series is applied), and "Keep the suggestion for all",
+/// which sets every loaded series with nothing applied to its suggestion and applies it. Built lazily, so a series'
+/// previews load as it scrolls in. Its state is a flight grid keyed by series id: the deck's big frame flies into the
+/// series' frame here and back.
 class LibraryCleanupSeriesList extends StatefulWidget {
   const LibraryCleanupSeriesList({
     super.key,
@@ -1258,6 +1335,7 @@ class _LibraryCleanupSeriesListState extends State<LibraryCleanupSeriesList> imp
     final t = context.t;
     final duplicates = state.isDuplicates;
     final actions = widget.actions;
+    final open = state.series.any((series) => !state.isPending(series));
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification.metrics.extentAfter < 800) {
@@ -1277,14 +1355,15 @@ class _LibraryCleanupSeriesListState extends State<LibraryCleanupSeriesList> imp
               alignment: AlignmentDirectional.centerStart,
               child: FilledButton.tonalIcon(
                 key: const Key('cleanup-series-keep-suggestion-all'),
-                onPressed: state.undecided.isEmpty ? null : widget.onKeepSuggestionForAll,
+                onPressed: open ? widget.onKeepSuggestionForAll : null,
                 icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                 label: Text(t.cleanup_series_keep_suggestion_all),
               ),
             );
           }
           final series = state.series[index - 1];
-          final decision = state.decisions[series.id];
+          final outcome = state.outcome(series);
+          final pending = state.isPending(series);
           return Column(
             key: Key('cleanup-series-row-${series.id}'),
             mainAxisSize: MainAxisSize.min,
@@ -1292,49 +1371,31 @@ class _LibraryCleanupSeriesListState extends State<LibraryCleanupSeriesList> imp
               LibraryCleanupSeriesCard(
                 series: series,
                 duplicates: duplicates,
-                isKept: (frameId) => state.willKeep(series, frameId),
+                isKept: (frameId) => state.shownKept(series, frameId),
+                instead: state.isInstead(series),
                 onFlip: (frameId) => actions.flip(series.id, frameId),
+                onPick: (pick) => actions.pick(series.id, pick),
                 onDetails: (frame) => actions.details(series, frame),
                 frameHeight: 240,
-                decision: decision,
                 hidden: widget.hiddenId == series.id,
-                warning: duplicates && !state.canAcceptAsSet(series),
               ),
               const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                children: [
-                  if (!duplicates)
-                    _ListAction(
-                      key: Key('cleanup-series-list-trash-all-${series.id}'),
-                      label: t.cleanup_series_trash_all,
-                      selected: decision == LibraryCleanupSeriesDecision.trashAll,
-                      onPressed: () => actions.decide(series.id, LibraryCleanupSeriesDecision.trashAll),
-                    ),
-                  _ListAction(
-                    key: Key('cleanup-series-list-as-set-${series.id}'),
-                    label: t.cleanup_series_keep_as_set,
-                    selected: decision == LibraryCleanupSeriesDecision.asSet,
-                    onPressed: state.canAcceptAsSet(series)
-                        ? () => actions.decide(series.id, LibraryCleanupSeriesDecision.asSet)
-                        : null,
-                  ),
-                  _ListAction(
-                    key: Key('cleanup-series-list-keep-all-${series.id}'),
-                    label: t.cleanup_keep_all,
-                    selected: decision == _upDecision(duplicates),
-                    onPressed: () => actions.decide(series.id, _upDecision(duplicates)),
-                  ),
-                  if (!duplicates)
-                    _ListAction(
-                      key: Key('cleanup-series-list-stack-${series.id}'),
-                      label: t.cleanup_stack_instead,
-                      selected: decision == LibraryCleanupSeriesDecision.stack,
-                      onPressed: () => actions.decide(series.id, LibraryCleanupSeriesDecision.stack),
-                    ),
-                ],
+              ChoiceChip(
+                key: Key('cleanup-series-list-apply-${series.id}'),
+                avatar: Icon(_outcomeIcon(outcome.kind), size: 18),
+                label: GallerySwap(
+                  value: libraryCleanupSeriesApplyLabel(context, outcome),
+                  child: Text(libraryCleanupSeriesApplyLabel(context, outcome)),
+                ),
+                selected: pending,
+                showCheckmark: false,
+                onSelected: state.canApply(series)
+                    ? (_) {
+                        if (!pending) {
+                          actions.apply(series.id);
+                        }
+                      }
+                    : null,
               ),
             ],
           );
@@ -1342,16 +1403,4 @@ class _LibraryCleanupSeriesListState extends State<LibraryCleanupSeriesList> imp
       ),
     );
   }
-}
-
-class _ListAction extends StatelessWidget {
-  const _ListAction({super.key, required this.label, required this.selected, required this.onPressed});
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) =>
-      ChoiceChip(label: Text(label), selected: selected, onSelected: onPressed == null ? null : (_) => onPressed!());
 }

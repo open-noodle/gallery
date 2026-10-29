@@ -47,31 +47,25 @@ Future<LibraryCleanupCloseChoice> showLibraryCleanupCloseGuard(
 
 /// What each swipe does, as the gesture overlay teaches it.
 class LibraryCleanupGestures {
-  const LibraryCleanupGestures({
-    required this.right,
-    required this.left,
-    required this.up,
-    this.leftRefused = false,
-    this.hint,
-  });
+  const LibraryCleanupGestures({required this.right, required this.left, this.up, this.leftRefused = false, this.hint});
 
   /// The photo decks: right keep, left trash, up favourite.
   factory LibraryCleanupGestures.photos(BuildContext context) =>
       LibraryCleanupGestures(right: context.t.keep, left: context.t.trash, up: context.t.favorite);
 
-  /// The series card (Bursts and Duplicates): right accepts the marks as set, up keeps all, left trashes the whole
-  /// burst, or for duplicates resists with "Keep at least one copy". [hint] says how the frames are marked.
-  factory LibraryCleanupGestures.series(BuildContext context, {required bool duplicates}) => LibraryCleanupGestures(
-    right: context.t.cleanup_series_keep_as_set,
-    left: duplicates ? context.t.cleanup_series_keep_one_copy : context.t.cleanup_series_trash_all,
-    up: context.t.cleanup_keep_all,
-    leftRefused: duplicates,
+  /// The series card (Bursts and Duplicates): tapping frames chooses, right does what the button says, left skips, and
+  /// there is no swipe up. [hint] says how the frames are chosen.
+  factory LibraryCleanupGestures.series(BuildContext context) => LibraryCleanupGestures(
+    right: context.t.cleanup_series_lesson_right,
+    left: context.t.skip,
     hint: context.t.cleanup_series_frames_hint,
   );
 
   final String right;
   final String left;
-  final String up;
+
+  /// Null: no swipe up, so the lesson shows none.
+  final String? up;
 
   /// Left decides nothing here: the hand only nudges that way and springs back, and the label is muted.
   final bool leftRefused;
@@ -116,10 +110,11 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
     super.dispose();
   }
 
-  Offset _handAt(double t, {required bool leftRefused}) {
-    // Six legs of the loop; each eases out and back.
-    final leg = (t * 6).floor().clamp(0, 5);
-    final local = GalleryMotion.standard.transform(t * 6 - leg);
+  Offset _handAt(double t, {required bool leftRefused, required bool up}) {
+    // Six legs of the loop (four with no swipe up); each eases out and back.
+    final legs = up ? 6 : 4;
+    final leg = (t * legs).floor().clamp(0, legs - 1);
+    final local = GalleryMotion.standard.transform(t * legs - leg);
     const reach = 70.0;
     final target = switch (leg ~/ 2) {
       0 => const Offset(reach, 0),
@@ -145,14 +140,16 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '↑  ${gestures.up}',
-                key: const Key('cleanup-gesture-up'),
-                style: label.copyWith(
-                  color: widget.gestures == null ? libraryCleanupFavoriteColor : libraryCleanupKeepColor,
+              if (gestures.up != null) ...[
+                Text(
+                  '↑  ${gestures.up}',
+                  key: const Key('cleanup-gesture-up'),
+                  style: label.copyWith(
+                    color: widget.gestures == null ? libraryCleanupFavoriteColor : libraryCleanupKeepColor,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -170,7 +167,7 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
                     child: AnimatedBuilder(
                       animation: _hand,
                       builder: (context, child) => Transform.translate(
-                        offset: _handAt(_hand.value, leftRefused: gestures.leftRefused),
+                        offset: _handAt(_hand.value, leftRefused: gestures.leftRefused, up: gestures.up != null),
                         child: child,
                       ),
                       child: const Icon(Icons.touch_app_rounded, size: 56, color: Colors.white),
