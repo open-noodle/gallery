@@ -43197,12 +43197,7 @@
             "type": "string"
           },
           "type": {
-            "description": "Scoped profile type",
-            "enum": [
-              "person",
-              "space-person"
-            ],
-            "type": "string"
+            "$ref": "#/components/schemas/ScopedPersonProfileType"
           }
         },
         "required": [
@@ -43210,6 +43205,14 @@
           "type"
         ],
         "type": "object"
+      },
+      "ScopedPersonProfileType": {
+        "description": "Scoped profile type",
+        "enum": [
+          "person",
+          "space-person"
+        ],
+        "type": "string"
       },
       "ScopedPrimaryProfile": {
         "properties": {
