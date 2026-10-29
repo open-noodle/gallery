@@ -48,7 +48,7 @@
     RepresentativeFaceSource,
     searchPerson,
     SharedSpaceRole,
-    Type2 as ScopedPersonProfileType,
+    ScopedPersonProfileType,
     updateSpacePersonRepresentativeFace,
     updateSpacePerson,
     type PersonFaceResponseDto,

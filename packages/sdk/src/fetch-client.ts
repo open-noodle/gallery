@@ -2967,8 +2967,7 @@ export type ScopedPersonProfileRefDto = {
     id: string;
     /** Space ID for Space Person refs */
     spaceId?: string;
-    /** Scoped profile type */
-    "type": Type5;
+    "type": ScopedPersonProfileType;
 };
 export type DetachScopedPersonDto = {
     /** Scoped profile to detach */
@@ -13289,7 +13288,7 @@ export enum PartnerDirection {
     SharedBy = "shared-by",
     SharedWith = "shared-with"
 }
-export enum Type5 {
+export enum ScopedPersonProfileType {
     Person = "person",
     SpacePerson = "space-person"
 }
