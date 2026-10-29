@@ -12,6 +12,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/cleanup_overview.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/rewind.page.dart';
 import 'package:immich_mobile/gallery/motion/transitions.dart';
 import 'package:immich_mobile/models/folder/recursive_folder.model.dart';
 import 'package:immich_mobile/models/shared_link/shared_link.model.dart';
@@ -254,6 +255,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: CleanupPreviewRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupOverviewRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupPlaceholderRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupRewindRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SlideshowRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: MemoryListRoute.page, guards: [_authGuard, _duplicateGuard]),
     // required to handle all deeplinks in deep_link.service.dart

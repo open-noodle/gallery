@@ -31,7 +31,7 @@ import 'cleanup_test_utils.dart';
 //   Given the trash is on    Then the trash line shows its size;  Given it is off   Then no line and no trash call
 //   "Could still free" shows only once every count has arrived, and is their sum
 // Pull to refresh   reloads every section
-// Navigation        Start, a quick win and "See all" open their placeholders
+// Navigation        Start opens the rewind; a quick win and "See all" open their placeholders
 // Motion            the sections arrive on a stagger; a pressed card squishes; reduced motion shows everything at once
 
 const _mib = 1024 * 1024;
@@ -286,8 +286,8 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('cleanup-today-start')));
       await settle(tester);
-      expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget);
-      expect(find.text('August 15'), findsOneWidget);
+      expect(find.byKey(const Key('cleanup-session')), findsOneWidget);
+      expect(textOf(tester, 'cleanup-session-title'), 'Aug 15 · 1 of 5');
     });
 
     testWidgets('a failed years request shows an inline error, and Retry loads the card', (tester) async {
@@ -401,8 +401,19 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('Start, a quick win and "See all" open their placeholders, and back returns', (tester) async {
+    testWidgets('Start opens the rewind, a quick win and "See all" their placeholders, and back returns', (
+      tester,
+    ) async {
       await openOverview(tester);
+
+      await tester.tap(find.byKey(const Key('cleanup-today-start')));
+      await settle(tester);
+      expect(find.byKey(const Key('cleanup-session')), findsOneWidget);
+      expect(textOf(tester, 'cleanup-session-title'), 'Aug 15 · 1 of 5');
+      await tester.tap(find.byKey(const Key('cleanup-session-back')));
+      await settle(tester);
+      expect(find.byKey(const Key('cleanup-session')), findsNothing);
+      expect(find.byKey(const Key('cleanup-today-card')), findsOneWidget);
 
       Future<void> openAndBack(String key, String title) async {
         await tester.ensureVisible(find.byKey(Key(key)));
@@ -417,7 +428,6 @@ void main() {
         expect(find.byKey(const Key('cleanup-placeholder')), findsNothing);
       }
 
-      await openAndBack('cleanup-today-start', 'August 15');
       await openAndBack('cleanup-quick-win-space_hogs', 'Space hogs');
       await openAndBack('cleanup-see-all', 'Your year');
     });

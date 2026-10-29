@@ -26,19 +26,24 @@ finished day turns reviewed. The fixtures are one script, in the order the app s
 earlier ones left. The spec fails if the script is not in name order.
 
 So two files may hold the same request with different responses (`020-rewind-815-years` and
-`040-rewind-815-years-resumed`; the three in-spaces lookups). The mobile stand-in serves matching fixtures in file
-order, **each once**: a request that has no unserved fixture left fails the test, like a request that matches none.
+`040-rewind-815-years-resumed`; the three in-spaces lookups), or the same request recorded twice because the app sends it
+twice (`023`–`025`: the overview reads the day, then the rewind it opens reads it again). A test serves only the files
+its flow sends. The mobile stand-in serves matching fixtures in file order, **each once**: a request that has no
+unserved fixture left fails the test, like a request that matches none. `rewind_e2e_test.dart` walks `020`–`053`
+through the real rewind screens.
 
-| Files        | What the app does                                                                                                    |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `010`, `011` | The support probe: the calendar. `011` is the same request on a Gallery server without Library Cleanup (404)         |
-| `012`–`019b` | The overview: each quick-win count without filters, Blurry's cover (`limit=1`), the trash total, and 24 December     |
-| `020`–`022`  | Opens the rewind of 15 August: the years, then each year                                                             |
-| `030`–`032`  | Apply and stop: the in-spaces lookup, one commit with no `completeMonthDay`, the trash undo                          |
-| `040`–`042`  | Reopens the day: the photos decided before are `kept: true`                                                          |
-| `050`–`053`  | Keep the rest and finish: lookups (declined, then confirmed), one commit with `completeMonthDay`, the calendar again |
-| `060`–`063`  | Blurry, 4 photos a page: the first three pages open, the fourth as ten cards remain                                  |
-| `070`–`073`  | Applies Blurry marks, undoes the trash, then changes the filters                                                     |
+| Files         | What the app does                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `010`, `011`  | The support probe: the calendar. `011` is the same request on a Gallery server without Library Cleanup (404)          |
+| `012`–`019b`  | The overview: each quick-win count without filters, Blurry's cover (`limit=1`), the trash total, and 24 December      |
+| `019c`–`019d` | Start on 24 December's today card: the rewind loads the day itself (the same answers as `019a`–`019b`)                |
+| `020`–`022`   | Opens the rewind of 15 August: the years, then each year                                                              |
+| `023`–`025`   | Start on 15 August's today card: the rewind loads the day itself after the overview (the same answers as `020`–`022`) |
+| `030`–`032`   | Apply and stop: the in-spaces lookup, one commit with no `completeMonthDay`, the trash undo                           |
+| `040`–`042`   | Reopens the day: the photos decided before are `kept: true`                                                           |
+| `050`–`053`   | Keep the rest and finish: lookups (declined, then confirmed), one commit with `completeMonthDay`, the calendar again  |
+| `060`–`063`   | Blurry, 4 photos a page: the first three pages open, the fourth as ten cards remain                                   |
+| `070`–`073`   | Applies Blurry marks, undoes the trash, then changes the filters                                                      |
 
 ## File format
 

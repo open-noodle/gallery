@@ -394,12 +394,38 @@ const fixtureCases = (): FixtureCase[] => [
     request: { method: 'GET', path: '/api/cleanup/rewind/1224/2021' },
   },
   {
+    name: '019c-rewind-1224-years',
+    description: "Start on 24 December's today card: the rewind loads its own years",
+    request: { method: 'GET', path: '/api/cleanup/rewind/1224' },
+  },
+  {
+    name: '019d-rewind-1224-2021',
+    description: "Start on 24 December's today card: the rewind loads its own photos",
+    request: { method: 'GET', path: '/api/cleanup/rewind/1224/2021' },
+  },
+  {
     name: '020-rewind-815-years',
     description: 'Rewind of 15 August: the years that have photos, newest first',
     request: rewindYears,
   },
   { name: '021-rewind-815-2022', description: 'Rewind 15 August 2022', request: rewindYear(2022) },
   { name: '022-rewind-815-2020', description: 'Rewind 15 August 2020', request: rewindYear(2020) },
+  {
+    name: '023-rewind-815-years-from-overview',
+    description:
+      "Start on the today card: the rewind loads its own years, after the overview's (nothing has changed yet)",
+    request: rewindYears,
+  },
+  {
+    name: '024-rewind-815-2022-from-overview',
+    description: 'Start on the today card: the rewind loads 2022',
+    request: rewindYear(2022),
+  },
+  {
+    name: '025-rewind-815-2020-from-overview',
+    description: 'Start on the today card: the rewind loads 2020 again (the overview read it for the collage)',
+    request: rewindYear(2020),
+  },
   {
     name: '030-in-spaces-q2',
     description: 'Before trashing q2: none of the ids is in a shared space',

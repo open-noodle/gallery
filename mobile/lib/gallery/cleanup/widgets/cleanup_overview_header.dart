@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
+import 'package:immich_mobile/gallery/motion/pop.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:openapi/api.dart';
@@ -83,11 +84,20 @@ class LibraryCleanupOverviewHeader extends StatelessWidget {
 
 /// The current month's days as a small strip, in the web calendar's colours, with "See all ›" (mockup screen 2).
 class LibraryCleanupYearTeaser extends StatelessWidget {
-  const LibraryCleanupYearTeaser({super.key, required this.days, required this.today, required this.onSeeAll});
+  const LibraryCleanupYearTeaser({
+    super.key,
+    required this.days,
+    required this.today,
+    required this.onSeeAll,
+    this.popDays = const {},
+  });
 
   final List<CleanupCalendarDayDto> days;
   final int today;
   final VoidCallback onSeeAll;
+
+  /// Days just finished in a rewind: their cells pop as they turn green.
+  final Set<int> popDays;
 
   /// The web calendar's reviewed green.
   static const reviewedColor = Color(0xFF2FBF71);
@@ -125,18 +135,22 @@ class LibraryCleanupYearTeaser extends StatelessWidget {
               runSpacing: 4,
               children: [
                 for (final day in month)
-                  Container(
-                    key: Key('cleanup-teaser-day-${day.monthDay}'),
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(3),
-                      color: day.reviewedAt != null && day.assetCount > 0
-                          ? reviewedColor
-                          : scale.level(day.assetCount) == 0
-                          ? scheme.surfaceContainerHighest
-                          : scheme.primary.withValues(alpha: alphas[scale.level(day.assetCount)]),
-                      border: day.monthDay == today ? Border.all(color: scheme.onSurface, width: 1.5) : null,
+                  _popIf(
+                    popDays.contains(day.monthDay),
+                    day.monthDay,
+                    Container(
+                      key: Key('cleanup-teaser-day-${day.monthDay}'),
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: day.reviewedAt != null && day.assetCount > 0
+                            ? reviewedColor
+                            : scale.level(day.assetCount) == 0
+                            ? scheme.surfaceContainerHighest
+                            : scheme.primary.withValues(alpha: alphas[scale.level(day.assetCount)]),
+                        border: day.monthDay == today ? Border.all(color: scheme.onSurface, width: 1.5) : null,
+                      ),
                     ),
                   ),
               ],
@@ -147,3 +161,6 @@ class LibraryCleanupYearTeaser extends StatelessWidget {
     );
   }
 }
+
+Widget _popIf(bool pop, int monthDay, Widget cell) =>
+    pop ? GalleryPop(key: ValueKey('cleanup-teaser-pop-$monthDay'), onMount: true, child: cell) : cell;

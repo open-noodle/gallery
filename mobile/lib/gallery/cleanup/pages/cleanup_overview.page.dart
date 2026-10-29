@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.da
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_support.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
+import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_header.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_quick_wins.dart';
@@ -39,12 +42,42 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
     return libraryCleanupRefreshOverview(ref, _today, trashEnabled: ref.read(libraryCleanupTrashEnabledProvider));
   }
 
-  // Start, the quick wins and "See all" open placeholders until their slices land: the rewind in Slice 3, the queues
-  // in Slices 6 and 7, Your year in Slice 8.
+  /// Days finished in a rewind since this screen was last on top; their teaser cells pop as they turn green.
+  final Set<int> _popped = {};
+
+  // The quick wins and "See all" open placeholders until their slices land: the queues in Slices 6 and 7, Your year in
+  // Slice 8.
   void _open(String title) => context.pushRoute(LibraryCleanupPlaceholderRoute(title: title));
+
+  /// Today's rewind; the collage's large photo flies into its first card.
+  void _startRewind() {
+    final hero = ref.read(libraryCleanupDayPhotosProvider(_today)).valueOrNull?.collage.firstOrNull;
+    unawaited(
+      context.pushRoute(
+        LibraryCleanupRewindRoute(monthDay: _today, heroAssetId: hero?.id, heroThumbhash: hero?.thumbhash),
+      ),
+    );
+  }
+
+  /// A finished day turns green with a pop once this screen is back on top (the rewind may have gone on to other days).
+  void _takeFinishedDays() {
+    final finished = ref.read(libraryCleanupFinishedDaysProvider);
+    if (finished.isEmpty || !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _popped.addAll(finished));
+      ref.read(libraryCleanupFinishedDaysProvider.notifier).update((days) => days.difference(finished));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(libraryCleanupFinishedDaysProvider);
+    _takeFinishedDays();
     final support = ref.watch(libraryCleanupSupportProvider);
     final calendar = support.valueOrNull?.calendar;
     final trashEnabled = ref.watch(libraryCleanupTrashEnabledProvider);
@@ -82,11 +115,7 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
                       )
                     : calendar == null
                     ? const LibraryCleanupSkeleton(height: LibraryCleanupTodayCard.height, radius: 22)
-                    : LibraryCleanupTodayCard(
-                        monthDay: _today,
-                        day: day,
-                        onStart: () => _open(libraryCleanupMonthDayLabel(context, _today)),
-                      ),
+                    : LibraryCleanupTodayCard(monthDay: _today, day: day, onStart: _startRewind),
               ),
             ),
             const SizedBox(height: 22),
@@ -108,6 +137,7 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
                   : LibraryCleanupYearTeaser(
                       days: calendar.days,
                       today: _today,
+                      popDays: _popped,
                       onSeeAll: () => _open(context.t.cleanup_your_year),
                     ),
             ),

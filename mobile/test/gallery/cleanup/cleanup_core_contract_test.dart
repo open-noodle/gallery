@@ -54,7 +54,14 @@ void main() {
   }
 
   test('probe, rewind, apply and stop, undo, resume, finish, Blurry, apply, undo, filters', () async {
-    final server = await CleanupContractServer.start(include: (name) => !name.contains('no-cleanup'));
+    final server = await CleanupContractServer.start(
+      // Without the no-cleanup view, and without the rewind's loads after the overview, which ask the same as 020–022.
+      include: (name) =>
+          !name.contains('no-cleanup') &&
+          !name.startsWith('019c') &&
+          !name.startsWith('019d') &&
+          !name.contains('from-overview'),
+    );
     addTearDown(server.close);
     final container = containerFor(server);
     container.listen(libraryCleanupSupportProvider, (_, _) {});

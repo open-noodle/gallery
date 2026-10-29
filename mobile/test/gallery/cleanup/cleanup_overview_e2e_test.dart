@@ -17,7 +17,8 @@ import 'cleanup_test_utils.dart';
 // not send (a rewind call for an empty day, any call after a 404 probe) fails it.
 //
 //   An ordinary day (15 August)     Library: the button, then "Today: 5 photos from 2 years"; the overview: the today
-//                                   card, every quick win in the recorded words, the trash line; Start opens the rewind
+//                                   card, every quick win in the recorded words, the trash line; Start opens the rewind,
+//                                   which loads the day itself
 //   The same day with saved marks   "Resume · 1 of 5", from every year's photos
 //   An empty day (1 January)        the empty copy, a disabled button, no rewind request
 //   A reviewed day (24 December)    "Reviewed", and the button still opens it
@@ -34,6 +35,13 @@ const _overviewLoads = [
   '016-overview-count-blurry',
   '017-overview-cover-blurry',
   '018-overview-trash',
+];
+
+/// Start on the today card: the rewind's own load of the day.
+const _rewindFromOverview = [
+  '023-rewind-815-years-from-overview',
+  '024-rewind-815-2022-from-overview',
+  '025-rewind-815-2020-from-overview',
 ];
 
 void main() {
@@ -85,6 +93,7 @@ void main() {
       '020-rewind-815-years',
       '022-rewind-815-2020',
       ..._overviewLoads,
+      ..._rewindFromOverview,
     });
     final container = overviewContainer(repository: repositoryFor(server), directory: tempDirectory());
     await pumpCleanup(tester, container, settle: false);
@@ -119,12 +128,20 @@ void main() {
     expect(textOf(tester, 'cleanup-trash-size'), 'Trash: 0 B');
     expect(tester.widget<TextButton>(find.byKey(const Key('cleanup-empty-trash'))).onPressed, isNull);
 
+    // Start: the rewind loads the day itself, and opens on its first photo.
     await tester.tap(find.byKey(const Key('cleanup-today-start')));
     await settle(tester, server);
-    expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget);
+    expect(textOf(tester, 'cleanup-session-title'), 'Aug 15 · 1 of 5');
+    expect(textOf(tester, 'cleanup-card-headline-${idOf('asset:p1')}'), '2022 · 4 years ago');
 
     expect(server.unmatched, isEmpty);
-    expect(server.served.toSet(), {'010-calendar', '020-rewind-815-years', '022-rewind-815-2020', ..._overviewLoads});
+    expect(server.served.toSet(), {
+      '010-calendar',
+      '020-rewind-815-years',
+      '022-rewind-815-2020',
+      ..._overviewLoads,
+      ..._rewindFromOverview,
+    });
     await finish(tester);
   });
 
@@ -173,6 +190,8 @@ void main() {
       '010-calendar',
       '019a-overview-rewind-1224-years',
       '019b-overview-rewind-1224-2021',
+      '019c-rewind-1224-years',
+      '019d-rewind-1224-2021',
       ..._overviewLoads,
     });
     final container = overviewContainer(
@@ -190,8 +209,10 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('cleanup-today-start')));
     await settle(tester, server);
-    expect(find.byKey(const Key('cleanup-placeholder')), findsOneWidget);
+    // Its one photo was kept on an earlier visit: the rewind opens on the finish screen.
+    expect(find.byKey(const Key('cleanup-finish')), findsOneWidget);
     expect(server.unmatched, isEmpty);
+    expect(server.served, containsAll(['019c-rewind-1224-years', '019d-rewind-1224-2021']));
     await finish(tester);
   });
 
