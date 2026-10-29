@@ -44,6 +44,7 @@ through the real rewind screens.
 | `050`–`053`   | Keep the rest and finish: lookups (declined, then confirmed), one commit with `completeMonthDay`, the calendar again  |
 | `060`–`063`   | Blurry, 4 photos a page: the first three pages open, the fourth as ten cards remain                                   |
 | `070`–`073`   | Applies Blurry marks, undoes the trash, then changes the filters                                                      |
+| `100`, `101`  | The details sheet on q2: `GET /assets/{id}` and `GET /albums?assetId=` (read-only; served mid-walk by `rewind_e2e`)  |
 
 ## File format
 
@@ -73,12 +74,14 @@ fails the recording. A queue `cursor` and `nextCursor` are base64url JSON that h
 replaced the same way, so the app can hand the cursor it received back unchanged.
 
 Values the server sets on its own are fixed, keeping their JSON type so the generated Dart client still decodes them:
-`createdAt`, `updatedAt` and `reviewedAt` become `2000-01-01T00:00:00.000Z`; `thumbhash` becomes its own key name.
+`createdAt`, `updatedAt`, `reviewedAt`, `profileChangedAt` and `lastModifiedAssetTimestamp` become
+`2000-01-01T00:00:00.000Z`; `thumbhash` and `originalPath` (named after a random upload id) become their own key name.
 Seeded values (taken dates, places, sizes, sharpness) are real.
 
 ### The seeded library
 
-- 15 August: two photos in 2022 (`p1`, `p2`) and three in 2020 (`q1`, `q2`, `q3`); `q1` is also in a shared space.
+- 15 August: two photos in 2022 (`p1`, `p2`) and three in 2020 (`q1`, `q2`, `q3`); `q1` is also in a shared space;
+  `q2` has a camera, lens, exposure and full dimensions in its EXIF and is in the album Summer (`album:summer`).
 - 24 December 2021 (`x1`): reviewed before the script starts, so the calendar has a reviewed day. The streak is the
   server's own count from the review time, so it is 1 for a run that does not cross midnight.
 - Eleven blurry photos (`blurry-01`, the newest, to `blurry-11`) and two sharp but dark ones (`dark-1`, `dark-2`).

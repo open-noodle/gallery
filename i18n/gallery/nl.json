@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "{count} van 366 dagen beoordeeld",
   "cleanup_deck_mode_buttons": "Knoppen tikken",
   "cleanup_deck_mode_swipe": "Vegen om te beslissen",
+  "cleanup_details_show_that_day": "Die dag tonen",
   "cleanup_end_of_day": "Dit waren alle foto's van {date}.",
   "cleanup_explainer_body": "Terugkijken verzamelt de foto's die je op deze datum in elk afgelopen jaar hebt gemaakt. Kijk elke dag één datum terug en je hele bibliotheek wordt beetje bij beetje opgeruimd.",
   "cleanup_explainer_nothing_deleted": "Er wordt niets verwijderd totdat je op <b>Afronden</b> of <b>Naar prullenbak verplaatsen</b> klikt.",

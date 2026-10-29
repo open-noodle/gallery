@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "Просмотрено дней: {count} из 366",
   "cleanup_deck_mode_buttons": "Нажимать кнопки",
   "cleanup_deck_mode_swipe": "Решать свайпом",
+  "cleanup_details_show_that_day": "Показать этот день",
   "cleanup_end_of_day": "Это все фото за {date}.",
   "cleanup_explainer_body": "Обзор дня собирает фото, сделанные в эту дату за все прошлые годы. Пересматривайте по одной дате в день, и вся ваша библиотека постепенно придёт в порядок.",
   "cleanup_explainer_nothing_deleted": "Ничего не удаляется, пока вы не нажмёте <b>Завершить</b> или <b>Переместить в корзину</b>.",

@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup.repository.dart';
+import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup_details.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:openapi/api.dart';
 
 import 'cleanup_contract_server.dart';
@@ -12,14 +14,20 @@ import 'cleanup_overview_harness.dart';
 import 'cleanup_test_utils.dart';
 import 'rewind_harness.dart';
 
-// Slice 3 end to end (specs/2026-10-29-mobile-library-cleanup-design.md, "Slice 3"): the real rewind page, deck and
-// finish screen, with the real providers and the generated OpenAPI client, against the strict contract server, which
+// Slices 3 and 4 end to end (specs/2026-10-29-mobile-library-cleanup-design.md, "Slice 3", "Slice 4"): the real rewind
+// page, deck, details sheet and finish screen, with the real providers and the generated OpenAPI client, against the
+// strict contract server, which
 // answers only what the real server was recorded answering (e2e/src/specs/server/api/gallery-cleanup-contract.e2e-spec.ts).
 // A request the recording does not have (a completeMonthDay on Apply and stop, a favourite sent as a keep, a second
 // lookup) fails the test.
 //
-// Given the rewind of 15 August (p1, p2 in 2022; q1, q2, q3 in 2020; q1 is in a shared space)
-//   When p1 is swiped right and p2 up, then in button mode q1 is skipped and q2 trashed, and the user applies and stops
+// Given the rewind of 15 August (p1, p2 in 2022; q1, q2, q3 in 2020; q1 is in a shared space; q2 has a camera and is
+// in the album Summer)
+//   When p1 is swiped right and p2 up, then in button mode q1 is skipped
+//   When the details of q2 are opened              Then the sheet shows its date, place and album from the recorded
+//                                                  asset and albums answers (100, 101), and fully open its camera and file
+//   When Trash is chosen on the sheet               Then q2 is marked as the bar would, and the next photo shows
+//   When the user applies and stops
 //                                    Then one lookup and one commit without completeMonthDay; back home with "Saved"
 //   When the toast's Undo is tapped  Then exactly q2 is restored
 //   When the day is reopened         Then it resumes at the first untouched photo, q1, at "3 of 5", in button mode
@@ -32,6 +40,8 @@ String idOf(String label) => ids[label] ?? (throw StateError('no fixture names $
 
 const _script = {
   '010-calendar',
+  '100-details-asset-q2',
+  '101-details-albums-q2',
   '020-rewind-815-years',
   '021-rewind-815-2022',
   '022-rewind-815-2020',
@@ -63,6 +73,7 @@ void main() {
         trashApi: TrashApi(client),
         timeZone: () async => 'Europe/Lisbon',
       ),
+      details: LibraryCleanupDetailsRepository(assetsApi: AssetsApi(client), albumsApi: AlbumsApi(client)),
       directory: tempDirectory(),
     );
     Future<void> settle() => settleCleanup(tester, requests: () => server.requests.length);
@@ -96,22 +107,40 @@ void main() {
     await settle();
     expect(card(), idOf('asset:q1'));
 
-    // Button mode: skip q1 with a sideways swipe, trash q2 from the bar.
+    // Button mode: skip q1 with a sideways swipe.
     await tap('cleanup-session-menu');
     await tap('cleanup-menu-mode-button');
     expect(showing('q1'), isTrue);
     await tester.fling(pages, const Offset(-300, 0), 1200);
     await settle();
     expect(showing('q2'), isTrue);
-    await tap('cleanup-bar-trash');
+
+    // q2's details: the card's date at once, then the recorded asset and albums.
+    await tap('cleanup-chip-details-${idOf('asset:q2')}');
+    expect(server.served.skip(4).toSet(), {'100-details-asset-q2', '101-details-albums-q2'});
+    expect(textOf(tester, 'cleanup-details-date'), 'Saturday, August 15, 2020 11:00');
+    expect(textOf(tester, 'cleanup-details-subtitle'), '6 years ago · Photo 4 of 5');
+    expect(textOf(tester, 'cleanup-details-place-title'), 'Porto');
+    expect(textOf(tester, 'cleanup-details-albums-title'), 'Summer');
+    expect(find.byKey(const Key('cleanup-details-people')), findsNothing, reason: 'no one is recognised in q2');
+    await tester.fling(find.byKey(const Key('cleanup-details-handle')), const Offset(0, -400), 1500);
+    await settle();
+    expect(textOf(tester, 'cleanup-details-camera-title'), 'Fujifilm X-T3 · XF23mmF2 R WR');
+    expect(textOf(tester, 'cleanup-details-camera-detail'), 'ƒ/2.8 · 1/250 s · ISO 400 · 23 mm');
+    expect(textOf(tester, 'cleanup-details-file-title'), 'q2.png');
+    expect(textOf(tester, 'cleanup-details-file-detail'), '6240 × 4160 · 26 MP · ${formatBytes(1004)}');
+
+    // Trash from the sheet: marked as the bar would, and the next photo shows.
+    await tap('cleanup-details-trash');
+    expect(find.byKey(const Key('cleanup-details-sheet')), findsNothing);
     expect(showing('q3'), isTrue);
-    expect(server.served, hasLength(4), reason: 'marking sends nothing');
+    expect(server.served, hasLength(6), reason: 'marking sends nothing');
 
     // Done → Apply and stop: the lookup, then one commit without completeMonthDay.
     await tap('cleanup-session-done');
     expect(textOf(tester, 'cleanup-finish-gone-through'), '3 of 5 gone through');
     await tap('cleanup-finish-apply-and-stop');
-    expect(server.served.skip(4), ['030-in-spaces-q2', '031-commit-apply-and-stop']);
+    expect(server.served.skip(6), ['030-in-spaces-q2', '031-commit-apply-and-stop']);
     expect(find.byKey(const Key('test-home')), findsOneWidget);
     expect(find.text('Saved · 1 moved to trash · pick up at photo 4 any time'), findsOneWidget);
 
@@ -123,7 +152,7 @@ void main() {
     // Reopen: p1 and p2 were kept, so the day resumes at q1, still in button mode.
     unawaited(router.push(LibraryCleanupRewindRoute(monthDay: 815)));
     await settle();
-    expect(server.served.skip(7).toSet(), {
+    expect(server.served.skip(9).toSet(), {
       '040-rewind-815-years-resumed',
       '041-rewind-815-2022-resumed',
       '042-rewind-815-2020-resumed',
@@ -149,7 +178,7 @@ void main() {
     await tap('cleanup-finish-keep-rest');
     await tap('cleanup-trash-confirm-ok');
     await settle();
-    expect(server.served.skip(11), ['051-in-spaces-q1-again', '052-commit-finish-day', '053-calendar-after-finish']);
+    expect(server.served.skip(13), ['051-in-spaces-q1-again', '052-commit-finish-day', '053-calendar-after-finish']);
     expect(textOf(tester, 'cleanup-day-done-title'), 'August 15 cleaned up');
     expect(textOf(tester, 'cleanup-day-done-trashed'), '1');
     expect(textOf(tester, 'cleanup-day-done-kept'), '2');

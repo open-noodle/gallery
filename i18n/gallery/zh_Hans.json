@@ -485,6 +485,7 @@
   "cleanup_days_reviewed": "已检查 {count}/366 天",
   "cleanup_deck_mode_buttons": "点按按钮",
   "cleanup_deck_mode_swipe": "滑动决定",
+  "cleanup_details_show_that_day": "查看当天",
   "cleanup_end_of_day": "这就是{date}的全部照片。",
   "cleanup_explainer_body": "回顾会汇集过去每一年在这一天拍摄的照片。每天回顾一个日期，你的整个图库就会一点点变得整洁。",
   "cleanup_explainer_nothing_deleted": "在你点击<b>完成</b>或<b>移至回收站</b>之前，不会删除任何内容。",

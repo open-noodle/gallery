@@ -239,9 +239,13 @@ class _MarkLabel extends StatelessWidget {
   }
 }
 
+/// How far up (logical pixels), or how fast, a drag on the info strip must go to open the details.
+const _detailsDrag = 24.0;
+const _detailsFling = 300.0;
+
 /// The card's bottom: the headline, the city and time, and the chips (size, "In an album", details). A video adds
-/// ▶ and its duration.
-class _InfoStrip extends StatelessWidget {
+/// ▶ and its duration. Dragging it upwards opens the details, where the rest of the card's upward drag favourites.
+class _InfoStrip extends StatefulWidget {
   const _InfoStrip({
     required this.asset,
     required this.info,
@@ -257,8 +261,44 @@ class _InfoStrip extends StatelessWidget {
   final VoidCallback? onPlay;
 
   @override
+  State<_InfoStrip> createState() => _InfoStripState();
+}
+
+class _InfoStripState extends State<_InfoStrip> {
+  double _dragged = 0;
+
+  void _onDragEnd(DragEndDetails details) {
+    final open = _dragged < -_detailsDrag || (details.primaryVelocity ?? 0) < -_detailsFling;
+    _dragged = 0;
+    if (open) {
+      widget.onDetails?.call();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final onDetails = widget.onDetails;
+    final strip = _strip(context);
+    if (onDetails == null) {
+      return strip;
+    }
+    return GestureDetector(
+      key: Key('cleanup-card-info-${widget.asset.id}'),
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: (_) => _dragged = 0,
+      onVerticalDragUpdate: (details) => _dragged += details.delta.dy,
+      onVerticalDragEnd: _onDragEnd,
+      onVerticalDragCancel: () => _dragged = 0,
+      child: strip,
+    );
+  }
+
+  Widget _strip(BuildContext context) {
     final t = context.t;
+    final asset = widget.asset;
+    final info = widget.info;
+    final onPlay = widget.onPlay;
+    final onDetails = widget.onDetails;
     final duration = asset.duration;
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -269,7 +309,7 @@ class _InfoStrip extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 40, 16, 14 + bottomInset),
+        padding: EdgeInsets.fromLTRB(16, 40, 16, 14 + widget.bottomInset),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,

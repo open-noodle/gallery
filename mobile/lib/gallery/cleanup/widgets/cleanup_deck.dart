@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_details_sheet.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_session_scaffold.dart';
 import 'package:immich_mobile/gallery/motion/celebrate.dart';
 import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
@@ -50,6 +52,7 @@ class LibraryCleanupDeck extends StatelessWidget {
     required this.onOpen,
     required this.info,
     this.onDetails,
+    this.openDetails,
     this.heroTag,
   });
 
@@ -67,8 +70,15 @@ class LibraryCleanupDeck extends StatelessWidget {
   /// The card's signal: the rewind's year line, a queue's date.
   final LibraryCleanupCardInfo Function(BuildContext context, CleanupAssetDto asset) info;
 
-  /// The details sheet (Slice 4); without it the chip shows but does nothing and a tap on the photo is ignored.
+  /// Called when the details are asked for (ⓘ, a tap on the photo, an upward drag on the info strip), when
+  /// [openDetails] is not given. Without either the chip shows but does nothing and a tap on the photo is ignored.
   final ValueChanged<CleanupAssetDto>? onDetails;
+
+  /// Opens the details sheet (cleanup_details_sheet.dart). A mark chosen on the sheet is applied to the card exactly as
+  /// the deck's own button would: thrown in swipe mode, flashed and stepped past in button mode.
+  final LibraryCleanupDetailsOpener? openDetails;
+
+  bool get hasDetails => onDetails != null || openDetails != null;
 
   /// The hero the session was opened with, on the top card in swipe mode.
   final String? heroTag;
@@ -84,6 +94,20 @@ class LibraryCleanupDeck extends StatelessWidget {
     );
   }
 }
+
+/// Asks for [asset]'s details. Resolves with the mark chosen on the sheet, if any; [hero] is the card's hero tag.
+Future<LibraryCleanupMark?> _askDetails(LibraryCleanupDeck deck, CleanupAssetDto asset, String? hero) async {
+  final open = deck.openDetails;
+  if (open == null) {
+    deck.onDetails?.call(asset);
+    return null;
+  }
+  return open(asset, hero);
+}
+
+/// The hero a card carries: the session's on the top card, else the details sheet's.
+String? _heroFor(LibraryCleanupDeck deck, CleanupAssetDto asset, {bool top = true}) =>
+    (top ? deck.heroTag : null) ?? (deck.openDetails == null ? null : libraryCleanupDetailsHeroTag(asset.id));
 
 List<CleanupAssetDto> _undecided(LibraryCleanupDeck deck) => [
   for (final asset in deck.assets)
@@ -278,6 +302,19 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
     deck.onMark(top.id, mark);
   }
 
+  Future<void> _details(CleanupAssetDto asset) async {
+    final deck = this.deck;
+    final mark = await _askDetails(deck, asset, _heroFor(deck, asset));
+    if (mark == null) {
+      return;
+    }
+    if (mounted && _top?.id == asset.id) {
+      _throw(mark);
+    } else {
+      deck.onMark(asset.id, mark);
+    }
+  }
+
   /// Undo: the card flies back in from where it left, on the same path.
   void _comeBack(CleanupAssetDto asset, LibraryCleanupMark mark) {
     for (final flight in _flights.where((flight) => flight.asset.id == asset.id).toList()) {
@@ -333,10 +370,13 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
                             child: GestureDetector(
                               key: const Key('cleanup-deck-top'),
                               behavior: HitTestBehavior.opaque,
+                              // With a tap (the details) in the arena too, the pan wins only past its slop: counted
+                              // from the touch, the card still follows the finger 1:1.
+                              dragStartBehavior: DragStartBehavior.down,
                               onPanStart: _onPanStart,
                               onPanUpdate: _onPanUpdate,
                               onPanEnd: _onPanEnd,
-                              onTap: deck.onDetails == null ? null : () => deck.onDetails!(top),
+                              onTap: deck.hasDetails ? () => unawaited(_details(top)) : null,
                               child: AnimatedBuilder(
                                 animation: Listenable.merge([_x, _y]),
                                 builder: (context, child) => _Moved(
@@ -347,9 +387,9 @@ class _SwipeDeckState extends ConsumerState<_SwipeDeck> with TickerProviderState
                                     key: Key('cleanup-card-${top.id}'),
                                     asset: top,
                                     info: deck.info(context, top),
-                                    heroTag: deck.heroTag,
+                                    heroTag: _heroFor(deck, top),
                                     stamps: _stampsAt(_offset),
-                                    onDetails: deck.onDetails == null ? null : () => deck.onDetails!(top),
+                                    onDetails: deck.hasDetails ? () => unawaited(_details(top)) : null,
                                   ),
                                 ),
                               ),
@@ -678,6 +718,19 @@ class _ButtonDeckState extends State<_ButtonDeck> {
     }
   }
 
+  Future<void> _details(CleanupAssetDto asset) async {
+    final deck = this.deck;
+    final mark = await _askDetails(deck, asset, _heroFor(deck, asset, top: false));
+    if (mark == null) {
+      return;
+    }
+    if (mounted && deck.assets.elementAtOrNull(_index)?.id == asset.id) {
+      _mark(mark);
+    } else {
+      deck.onMark(asset.id, mark);
+    }
+  }
+
   void _mark(LibraryCleanupMark mark) {
     final asset = deck.assets.elementAtOrNull(_index);
     if (asset == null) {
@@ -717,15 +770,21 @@ class _ButtonDeckState extends State<_ButtonDeck> {
           itemBuilder: (context, index) {
             final asset = deck.assets[index];
             final flash = _flash?.id == asset.id ? _flash!.mark : null;
-            return LibraryCleanupDeckCard(
+            final details = deck.hasDetails ? () => unawaited(_details(asset)) : null;
+            return GestureDetector(
               key: Key('cleanup-page-${asset.id}'),
-              asset: asset,
-              info: deck.info(context, asset),
-              edgeToEdge: true,
-              mark: deck.marks[asset.id],
-              stamps: flash == null ? const {} : {flash: 1},
-              infoBottomInset: 104,
-              onDetails: deck.onDetails == null ? null : () => deck.onDetails!(asset),
+              behavior: HitTestBehavior.opaque,
+              onTap: details,
+              child: LibraryCleanupDeckCard(
+                asset: asset,
+                info: deck.info(context, asset),
+                edgeToEdge: true,
+                heroTag: _heroFor(deck, asset, top: false),
+                mark: deck.marks[asset.id],
+                stamps: flash == null ? const {} : {flash: 1},
+                infoBottomInset: 104,
+                onDetails: details,
+              ),
             );
           },
         ),

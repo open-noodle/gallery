@@ -483,6 +483,7 @@
   "cleanup_days_reviewed": "{count} von 366 Tagen überprüft",
   "cleanup_deck_mode_buttons": "Tasten tippen",
   "cleanup_deck_mode_swipe": "Zum Entscheiden wischen",
+  "cleanup_details_show_that_day": "Diesen Tag zeigen",
   "cleanup_end_of_day": "Das waren alle Fotos vom {date}.",
   "cleanup_explainer_body": "Der Rückblick sammelt die Fotos, die du an diesem Datum in jedem vergangenen Jahr aufgenommen hast. Geh jeden Tag ein Datum durch, und deine ganze Bibliothek wird nach und nach aufgeräumt.",
   "cleanup_explainer_nothing_deleted": "Nichts wird gelöscht, bis du auf <b>Abschließen</b> oder <b>In den Papierkorb verschieben</b> klickst.",

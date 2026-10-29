@@ -1,0 +1,82 @@
+{
+  "description": "The details sheet opens on q2: the full asset (camera, exposure, file, people)",
+  "ids": {
+    "08b9a1e0-f911-48af-8535-98ed8e450e3b": "user:me",
+    "816fe8ca-0ed2-4d29-8f14-c3e7033874c3": "asset:q2"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/assets/816fe8ca-0ed2-4d29-8f14-c3e7033874c3"
+  },
+  "response": {
+    "body": {
+      "canEdit": true,
+      "checksum": "7V/icPiznwUMte5OqoZddyQUPyQ=",
+      "createdAt": "2000-01-01T00:00:00.000Z",
+      "duplicateId": null,
+      "duration": null,
+      "exifInfo": {
+        "city": "Porto",
+        "country": null,
+        "dateTimeOriginal": "2020-08-15T11:00:00+00:00",
+        "description": "",
+        "exifImageHeight": 4160,
+        "exifImageWidth": 6240,
+        "exposureTime": "1/250",
+        "fNumber": 2.8,
+        "fileSizeInByte": 1004,
+        "focalLength": 23,
+        "iso": 400,
+        "latitude": null,
+        "lensModel": "XF23mmF2 R WR",
+        "longitude": null,
+        "make": "Fujifilm",
+        "model": "X-T3",
+        "modifyDate": "2020-08-15T11:00:00+00:00",
+        "orientation": null,
+        "projectionType": null,
+        "rating": null,
+        "state": null,
+        "timeZone": "UTC"
+      },
+      "fileCreatedAt": "2020-08-15T11:00:00.000Z",
+      "fileModifiedAt": "2020-08-15T11:00:00.000Z",
+      "hasMetadata": true,
+      "height": 1,
+      "id": "816fe8ca-0ed2-4d29-8f14-c3e7033874c3",
+      "isArchived": false,
+      "isEdited": false,
+      "isFavorite": false,
+      "isOffline": false,
+      "isTrashed": false,
+      "libraryId": null,
+      "livePhotoVideoId": null,
+      "localDateTime": "2020-08-15T11:00:00.000Z",
+      "originalFileName": "q2.png",
+      "originalMimeType": "image/png",
+      "originalPath": "originalPath",
+      "owner": {
+        "avatarColor": "orange",
+        "email": "admin@immich.cloud",
+        "id": "08b9a1e0-f911-48af-8535-98ed8e450e3b",
+        "name": "Immich Admin",
+        "profileChangedAt": "2000-01-01T00:00:00.000Z",
+        "profileImagePath": ""
+      },
+      "ownerId": "08b9a1e0-f911-48af-8535-98ed8e450e3b",
+      "people": [],
+      "resized": true,
+      "stack": null,
+      "tags": [],
+      "thumbhash": "thumbhash",
+      "type": "IMAGE",
+      "updatedAt": "2000-01-01T00:00:00.000Z",
+      "visibility": "timeline",
+      "width": 1
+    },
+    "status": 200
+  }
+}

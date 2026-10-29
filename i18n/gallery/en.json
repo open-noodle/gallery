@@ -480,6 +480,7 @@
   "cleanup_days_reviewed": "{count} of 366 days reviewed",
   "cleanup_deck_mode_buttons": "Tap buttons",
   "cleanup_deck_mode_swipe": "Swipe to decide",
+  "cleanup_details_show_that_day": "Show that day",
   "cleanup_end_of_day": "That's every photo from {date}.",
   "cleanup_explainer_body": "Rewind gathers the photos you took on this date in every past year. Go through one date a day and your whole library gets tidied a little at a time.",
   "cleanup_explainer_nothing_deleted": "Nothing is deleted until you press <b>Finish</b> or <b>Move to trash</b>.",

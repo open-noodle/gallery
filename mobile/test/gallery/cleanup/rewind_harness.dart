@@ -10,25 +10,30 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/cleanup/cleanup_prefs.dart';
+import 'package:immich_mobile/gallery/cleanup/navigation.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup.repository.dart';
+import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup_details.repository.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/platform/remote_image_api.g.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:openapi/api.dart';
 
 import '../../widget_tester_extensions.dart';
 import 'cleanup_overview_harness.dart';
 import 'cleanup_test_utils.dart';
 
-// Slice 3's screens under a small router: a home stand-in, the real overview, the real rewind, and a stand-in for the
-// asset viewer, which "Open in library" pushes. The in-memory server holds a few days of photos and answers what the
-// rewind asks, recording every commit.
+// Slice 3's screens under a small router: a home stand-in, the real overview, the real rewind, and stand-ins for the
+// asset viewer, which "Open in library" pushes, and for a day's search results, which "Show that day" pushes. The
+// in-memory server holds a few days of photos and answers what the rewind and the details sheet ask, recording every
+// commit.
 
 const _homeName = 'CleanupTestHome';
 const _viewerName = 'CleanupTestViewer';
+const _dayName = 'CleanupTestDay';
 
 class RewindTestRouter extends RootStackRouter {
   late final _home = PageInfo(
@@ -42,6 +47,13 @@ class RewindTestRouter extends RootStackRouter {
       body: const Text('viewer', key: Key('test-viewer')),
     ),
   );
+  late final _day = PageInfo(
+    _dayName,
+    builder: (_) => Scaffold(
+      appBar: AppBar(),
+      body: const Text('day', key: Key('test-day')),
+    ),
+  );
 
   @override
   List<AutoRoute> get routes => [
@@ -50,6 +62,7 @@ class RewindTestRouter extends RootStackRouter {
     AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
     AutoRoute(page: LibraryCleanupRewindRoute.page),
     AutoRoute(page: _viewer),
+    AutoRoute(page: _day),
   ];
 }
 
@@ -66,12 +79,24 @@ class RewindLibrary {
 
   /// While set, the years requests wait for it.
   Completer<void>? hold;
+
+  /// The details sheet's answers: `GET /assets/{id}` and `GET /albums?assetId=`. A photo without an entry is a 404.
+  final assetInfo = <String, Map<String, Object?>>{};
+  final albumsOf = <String, List<Map<String, Object?>>>{};
+  bool detailsFail = false;
+
+  /// While set, the details requests wait for it.
+  Completer<void>? detailsHold;
   final commits = <Map<String, Object?>>[];
   final restored = <List<String>>[];
 
   late final server = FakeCleanupServer(
     _respond,
-    gate: (request) => RegExp(r'^GET /cleanup/rewind/\d+$').hasMatch(request.route) ? hold?.future : null,
+    gate: (request) => RegExp(r'^GET /cleanup/rewind/\d+$').hasMatch(request.route)
+        ? hold?.future
+        : RegExp(r'^GET /(assets/[^/]+|albums)$').hasMatch(request.route)
+        ? detailsHold?.future
+        : null,
   );
 
   Map<String, Object?> get _calendar => {
@@ -147,6 +172,16 @@ class RewindLibrary {
     if (route == 'GET /cleanup/trash') {
       return const FakeResponse({'count': 0, 'bytes': 0});
     }
+    final info = RegExp(r'^GET /assets/([^/]+)$').firstMatch(route);
+    if (info != null) {
+      final found = assetInfo[info.group(1)];
+      return detailsFail || found == null ? const FakeResponse({'message': 'boom'}, 500) : FakeResponse(found);
+    }
+    if (route == 'GET /albums') {
+      return detailsFail
+          ? const FakeResponse({'message': 'boom'}, 500)
+          : FakeResponse(albumsOf[request.query['assetId']?.single] ?? const <Object>[]);
+    }
     if (route == 'POST /trash/restore/assets') {
       final ids = ((request.body! as Map)['ids'] as List).cast<String>();
       restored.add(ids);
@@ -211,15 +246,70 @@ DateTime rewindNow() => DateTime(2026, 8, 15, 10);
 /// Opens of "Open in library", by asset id.
 final openedInLibrary = <String>[];
 
+/// Days "Show that day" opened.
+final shownDays = <DateTime>[];
+
+/// What `GET /assets/{id}` answers for a photo: [exif] and [people] (name, or '' for an unnamed face) as given.
+Map<String, Object?> assetInfoJson(
+  String id, {
+  String localDateTime = '2022-08-15T09:00:00.000Z',
+  Map<String, Object?> exif = const {},
+  List<String> people = const [],
+}) => {
+  'id': id,
+  'checksum': 'checksum-$id',
+  'createdAt': '2026-01-01T00:00:00.000Z',
+  'updatedAt': '2026-01-01T00:00:00.000Z',
+  'fileCreatedAt': localDateTime,
+  'fileModifiedAt': localDateTime,
+  'localDateTime': localDateTime,
+  'hasMetadata': true,
+  'isArchived': false,
+  'isEdited': false,
+  'isFavorite': false,
+  'isOffline': false,
+  'isTrashed': false,
+  'originalFileName': 'IMG_$id.JPG',
+  'originalPath': '/library/$id.jpg',
+  'ownerId': 'user-1',
+  'thumbhash': null,
+  'type': 'IMAGE',
+  'visibility': 'timeline',
+  'duration': null,
+  'width': 6240,
+  'height': 4160,
+  'exifInfo': exif,
+  'people': [
+    for (final (index, name) in people.indexed)
+      {'id': '$id-person-$index', 'name': name, 'isHidden': false, 'thumbnailPath': '/thumbs/$index.jpg'},
+  ],
+};
+
+Map<String, Object?> albumJson(String id, String name) => {
+  'id': id,
+  'albumName': name,
+  'albumUsers': const <Object>[],
+  'assetCount': 3,
+  'createdAt': '2026-01-01T00:00:00.000Z',
+  'updatedAt': '2026-01-01T00:00:00.000Z',
+  'description': '',
+  'hasSharedLink': false,
+  'isActivityEnabled': false,
+  'shared': false,
+};
+
 /// A container for the rewind: [library]'s server (or [repository]), today fixed, saved marks in [directory], and
 /// "Open in library" pushing the viewer stand-in.
 ProviderContainer rewindContainer({
   RewindLibrary? library,
   LibraryCleanupRepository? repository,
+  LibraryCleanupDetailsRepository? details,
   required Directory directory,
   bool trashEnabled = true,
 }) {
   openedInLibrary.clear();
+  shownDays.clear();
+  final client = library?.server.client;
   return cleanupContainer(
     server: library?.server,
     repository: repository,
@@ -233,6 +323,14 @@ ProviderContainer rewindContainer({
         await context.router.push(const PageRouteInfo(_viewerName));
         return true;
       }),
+      libraryCleanupShowDayProvider.overrideWithValue((context, day) async {
+        shownDays.add(day);
+        await context.router.push(const PageRouteInfo(_dayName));
+      }),
+      if (details != null || client != null)
+        libraryCleanupDetailsRepositoryProvider.overrideWithValue(
+          details ?? LibraryCleanupDetailsRepository(assetsApi: AssetsApi(client), albumsApi: AlbumsApi(client)),
+        ),
       libraryCleanupInlineVideoProvider.overrideWithValue(
         (asset) => ColoredBox(key: Key('test-video-${asset.id}'), color: Colors.black),
       ),

@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "{count, plural, one {# jour sur 366 vérifié} other {# jours sur 366 vérifiés}}",
   "cleanup_deck_mode_buttons": "Toucher des boutons",
   "cleanup_deck_mode_swipe": "Balayer pour décider",
+  "cleanup_details_show_that_day": "Afficher ce jour",
   "cleanup_end_of_day": "Vous avez vu toutes les photos du {date}.",
   "cleanup_explainer_body": "La Rétrospective rassemble les photos que vous avez prises à cette date au cours de chaque année passée. Revoyez une date par jour et toute votre bibliothèque se range petit à petit.",
   "cleanup_explainer_nothing_deleted": "Rien n'est supprimé tant que vous n'avez pas cliqué sur <b>Terminer</b> ou <b>Mettre à la corbeille</b>.",

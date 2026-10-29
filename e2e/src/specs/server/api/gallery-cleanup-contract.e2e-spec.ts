@@ -170,6 +170,16 @@ const seed = async () => {
     }
   }
 
+  // q2 carries what the details sheet shows beyond the card: a camera and its exposure, the full dimensions, an album.
+  await db.query(
+    `UPDATE "asset_exif" SET "make" = 'Fujifilm', "model" = 'X-T3', "lensModel" = 'XF23mmF2 R WR', "fNumber" = 2.8,
+       "exposureTime" = '1/250', "iso" = 400, "focalLength" = 23, "exifImageWidth" = 6240, "exifImageHeight" = 4160
+     WHERE "assetId" = $1`,
+    [id('asset:q2')],
+  );
+  const album = await utils.createAlbum(me.accessToken, { albumName: 'Summer', assetIds: [id('asset:q2')] });
+  name('album:summer', album.id);
+
   // q1 is also in a shared space, so trashing it needs the user's confirmation.
   const space = await utils.createSpace(me.accessToken, { name: 'Family' });
   name('space:family', space.id);
@@ -190,9 +200,15 @@ const seed = async () => {
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const FIXED_TIME = '2000-01-01T00:00:00.000Z';
 /** Set by the server when the row is written, so they differ on every run. */
-const VOLATILE_TIMESTAMPS = new Set(['createdAt', 'updatedAt', 'reviewedAt']);
-/** Derived from the upload bytes or the thumbnail pipeline. */
-const VOLATILE_STRINGS = new Set(['thumbhash']);
+const VOLATILE_TIMESTAMPS = new Set([
+  'createdAt',
+  'updatedAt',
+  'reviewedAt',
+  'profileChangedAt',
+  'lastModifiedAssetTimestamp',
+]);
+/** Derived from the upload bytes or the thumbnail pipeline, or a server path named after a random upload id. */
+const VOLATILE_STRINGS = new Set(['thumbhash', 'originalPath']);
 /** Opaque to the app, but base64url JSON that holds a real asset id: the id is replaced inside it. */
 const CURSOR_KEYS = new Set(['cursor', 'nextCursor']);
 
@@ -530,6 +546,18 @@ const fixtureCases = (): FixtureCase[] => [
       path: '/api/cleanup/queues/blurry',
       query: { limit: String(PAGE), strictness: 'strict', reason: 'dark', hideFaces: 'false' },
     },
+  },
+  // The details sheet on q2 (mobile rewind_e2e_test.dart): the two calls the web photo window makes. Read-only, and
+  // q2 ends the script as it starts (trashed and restored, then kept), so these answer for any point of the walk.
+  {
+    name: '100-details-asset-q2',
+    description: 'The details sheet opens on q2: the full asset (camera, exposure, file, people)',
+    request: { method: 'GET', path: `/api/assets/${asset('q2')}` },
+  },
+  {
+    name: '101-details-albums-q2',
+    description: 'The details sheet opens on q2: the albums it is in',
+    request: { method: 'GET', path: '/api/albums', query: { assetId: asset('q2') } },
   },
 ];
 

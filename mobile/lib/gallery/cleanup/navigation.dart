@@ -14,3 +14,15 @@ final libraryCleanupRewindOpenerProvider = Provider<LibraryCleanupRewindOpener>(
 
 Future<void> _pushRewind(BuildContext context, int monthDay) =>
     context.pushRoute(LibraryCleanupRewindRoute(monthDay: monthDay));
+
+/// "Show that day" from the details sheet: opens every photo taken on [day] (its wall-clock date) and completes when
+/// the user comes back. A provider so tests can watch it.
+typedef LibraryCleanupDayOpener = Future<void> Function(BuildContext context, DateTime day);
+
+final libraryCleanupShowDayProvider = Provider<LibraryCleanupDayOpener>((ref) => _pushDay);
+
+String _two(int value) => value.toString().padLeft(2, '0');
+
+Future<void> _pushDay(BuildContext context, DateTime day) => context.pushRoute(
+  LibraryCleanupDayPhotosRoute(date: '${day.year.toString().padLeft(4, '0')}-${_two(day.month)}-${_two(day.day)}'),
+);

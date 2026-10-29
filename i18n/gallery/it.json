@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "{count, plural, one {# giorno su 366 revisionato} other {# giorni su 366 revisionati}}",
   "cleanup_deck_mode_buttons": "Tocca i pulsanti",
   "cleanup_deck_mode_swipe": "Scorri per decidere",
+  "cleanup_details_show_that_day": "Mostra quel giorno",
   "cleanup_end_of_day": "Hai visto tutte le foto del {date}.",
   "cleanup_explainer_body": "Rivedi raccoglie le foto che hai scattato in questa data in ogni anno passato. Rivedi una data al giorno e tutta la tua libreria si riordina un po' alla volta.",
   "cleanup_explainer_nothing_deleted": "Non viene eliminato nulla finché non premi <b>Completa</b> o <b>Sposta nel cestino</b>.",

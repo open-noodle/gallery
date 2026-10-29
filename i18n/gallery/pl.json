@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "Przejrzane dni: {count} z 366",
   "cleanup_deck_mode_buttons": "Stuknij przyciski",
   "cleanup_deck_mode_swipe": "Przesuń, aby zdecydować",
+  "cleanup_details_show_that_day": "Pokaż ten dzień",
   "cleanup_end_of_day": "To wszystkie zdjęcia z {date}.",
   "cleanup_explainer_body": "Przegląd dnia zbiera zdjęcia zrobione tego dnia w każdym minionym roku. Przeglądaj jeden dzień dziennie, a cała biblioteka będzie porządkowana krok po kroku.",
   "cleanup_explainer_nothing_deleted": "Nic nie zostanie usunięte, dopóki nie klikniesz <b>Zakończ</b> lub <b>Przenieś do kosza</b>.",

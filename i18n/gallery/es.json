@@ -481,6 +481,7 @@
   "cleanup_days_reviewed": "{count} de 366 días revisados",
   "cleanup_deck_mode_buttons": "Tocar botones",
   "cleanup_deck_mode_swipe": "Deslizar para decidir",
+  "cleanup_details_show_that_day": "Ver ese día",
   "cleanup_end_of_day": "Estas son todas las fotos del {date}.",
   "cleanup_explainer_body": "El repaso reúne las fotos que tomaste en esta fecha en cada año pasado. Repasa una fecha al día y toda tu biblioteca se irá ordenando poco a poco.",
   "cleanup_explainer_nothing_deleted": "No se elimina nada hasta que pulses <b>Terminar</b> o <b>Mover a la papelera</b>.",
