@@ -60,7 +60,22 @@ class LibraryCleanupFinishView extends StatefulWidget {
     required this.onRescue,
     this.trashIconKey,
     this.onDetails,
-  });
+  }) : onApply = null;
+
+  /// A queue's finish screen: one Apply, which commits the marks (there is no day to finish).
+  const LibraryCleanupFinishView.queue({
+    super.key,
+    required this.title,
+    required this.summary,
+    required this.applying,
+    required VoidCallback this.onApply,
+    required this.onKeepGoing,
+    required this.onRescue,
+    this.trashIconKey,
+    this.onDetails,
+  }) : onApplyAndStop = onApply,
+       onKeepTheRest = onApply,
+       onFinish = onApply;
 
   final String title;
   final LibraryCleanupFinishSummary summary;
@@ -74,6 +89,9 @@ class LibraryCleanupFinishView extends StatefulWidget {
 
   /// Every photo decided: commit and finish.
   final VoidCallback onFinish;
+
+  /// Queues only: commit the marks.
+  final VoidCallback? onApply;
   final VoidCallback onKeepGoing;
 
   /// "Review the N first": a tap takes a photo off the trash pile.
@@ -186,7 +204,16 @@ class _LibraryCleanupFinishViewState extends State<LibraryCleanupFinishView> {
               ],
             ),
           ),
-        if (summary.allDecided)
+        if (widget.onApply != null)
+          rise(
+            3,
+            FilledButton(
+              key: const Key('cleanup-finish-apply'),
+              onPressed: busy || (summary.kept + summary.favorites + trashCount == 0) ? null : widget.onApply,
+              child: Text(t.cleanup_finish_apply),
+            ),
+          )
+        else if (summary.allDecided)
           rise(
             3,
             FilledButton(

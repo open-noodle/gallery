@@ -401,7 +401,7 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('Start opens the rewind, a quick win its placeholder, "See all" Your year, and back returns', (
+    testWidgets('Start opens the rewind, Bursts its placeholder, "See all" Your year, and back returns', (
       tester,
     ) async {
       await openOverview(tester);
@@ -428,7 +428,8 @@ void main() {
         expect(find.byKey(const Key('cleanup-placeholder')), findsNothing);
       }
 
-      await openAndBack('cleanup-quick-win-space_hogs', 'Space hogs');
+      // Bursts has no screen yet (Slice 7); the photo queues open theirs (cleanup_queue_page_test.dart).
+      await openAndBack('cleanup-quick-win-bursts', 'Bursts & series');
 
       await tester.ensureVisible(find.byKey(const Key('cleanup-see-all')));
       await settle(tester);

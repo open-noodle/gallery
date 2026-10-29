@@ -33,11 +33,31 @@ ImageProvider libraryCleanupPreview(CleanupAssetDto asset) => RemoteImageProvide
 
 /// What the card's info strip says first: the rewind's "2019 · 7 years ago", or a queue's date; then the city and time.
 class LibraryCleanupCardInfo {
-  const LibraryCleanupCardInfo({required this.headline, this.detail});
+  const LibraryCleanupCardInfo({required this.headline, this.detail, this.badge, this.signal, this.whole = false});
 
   final String headline;
   final String? detail;
+
+  /// A queue's badge in the card's top corner (Blurry's reason).
+  final Widget? badge;
+
+  /// A queue's signal in the info strip, above the chips (Blurry's sharpness bar, Space hogs' size).
+  final Widget? signal;
+
+  /// The photo is shown whole at its own aspect ratio on a neutral background, never cropped (Screenshots).
+  final bool whole;
 }
+
+/// The shape a photo is shown whole at: its own, or a phone screen's 9:19.5 when the server has no dimensions (as the
+/// web's `QueueSelectGrid`).
+double libraryCleanupAspectRatio(CleanupAssetDto asset) {
+  final width = asset.width;
+  final height = asset.height;
+  return width != null && height != null && width > 0 && height > 0 ? width / height : 9 / 19.5;
+}
+
+/// The neutral background a whole photo sits on.
+const libraryCleanupWholeBackground = Color(0xFF1A1D25);
 
 /// Plays a video inline, muted. A provider so tests, which have no platform video view, can stand in for it.
 final libraryCleanupInlineVideoProvider = Provider<Widget Function(CleanupAssetDto asset)>(
@@ -113,11 +133,25 @@ class _LibraryCleanupDeckCardState extends ConsumerState<LibraryCleanupDeckCard>
           (best, e) => best == null || e.value > best.value ? e : best,
         );
 
+    final info = widget.info;
     final body = Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: Colors.black),
-        picture,
+        ColoredBox(color: info.whole ? libraryCleanupWholeBackground : Colors.black),
+        if (info.whole)
+          // Uncropped at its own shape, clear of the info strip, so a screenshot's text can be read.
+          Padding(
+            key: Key('cleanup-card-whole-${asset.id}'),
+            padding: EdgeInsets.fromLTRB(14, 14, 14, 112 + widget.infoBottomInset),
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: libraryCleanupAspectRatio(asset),
+                child: ClipRRect(borderRadius: BorderRadius.circular(12), child: picture),
+              ),
+            ),
+          )
+        else
+          picture,
         // The departing card tints towards its mark.
         if (strongest != null)
           IgnorePointer(
@@ -125,7 +159,19 @@ class _LibraryCleanupDeckCardState extends ConsumerState<LibraryCleanupDeckCard>
           ),
         for (final MapEntry(key: mark, value: amount) in widget.stamps.entries)
           if (amount > 0.12) _Stamp(mark: mark, opacity: ((amount - 0.12) / 0.88).clamp(0.0, 1.0)),
-        if (widget.mark != null) Positioned(top: 14, left: 14, child: _MarkLabel(mark: widget.mark!)),
+        if (widget.mark != null || info.badge != null)
+          Positioned(
+            top: 14,
+            left: 14,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.mark != null) _MarkLabel(mark: widget.mark!),
+                if (widget.mark != null && info.badge != null) const SizedBox(height: 6),
+                ?info.badge,
+              ],
+            ),
+          ),
         Positioned(
           left: 0,
           right: 0,
@@ -345,6 +391,7 @@ class _InfoStripState extends State<_InfoStrip> {
             ),
             if (info.detail != null)
               Text(info.detail!, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+            if (info.signal != null) Padding(padding: const EdgeInsets.only(top: 6), child: info.signal),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,

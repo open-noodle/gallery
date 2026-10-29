@@ -488,6 +488,7 @@
   "cleanup_explainer_open": "¿Qué es el repaso?",
   "cleanup_explainer_title": "Cada {date}, todo en un mismo lugar",
   "cleanup_external_library_warning": "{count, plural, one {# foto es} other {# fotos son}} de una biblioteca externa. Si el servidor solo puede leer esa carpeta, {count, plural, one {volverá} other {volverán}} en el próximo escaneo de la biblioteca y no se liberará espacio.",
+  "cleanup_finish_apply": "Aplicar",
   "cleanup_finish_apply_and_stop": "Aplicar y parar por ahora",
   "cleanup_finish_applying": "Aplicando… {done} de {total}",
   "cleanup_finish_day": "Terminar el día",

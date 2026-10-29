@@ -4,9 +4,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
+import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_support.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
+import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_header.dart';
@@ -45,8 +47,25 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
   /// Days finished in a rewind since this screen was last on top; their teaser cells pop as they turn green.
   final Set<int> _popped = {};
 
-  // The quick wins open placeholders until their slices land: the queues in Slices 6 and 7.
+  // Bursts and Duplicates open a placeholder until their slice (7) lands.
   void _open(String title) => context.pushRoute(LibraryCleanupPlaceholderRoute(title: title));
+
+  /// A quick win's queue; its cover, when the card shows one, flies into the first card. The cover is only read if the
+  /// card already asked for it, so opening never sends a request of its own.
+  void _openQueue(LibraryCleanupQueue queue) {
+    if (!libraryCleanupPhotoQueues.contains(queue)) {
+      _open(libraryCleanupQueueName(context, queue));
+      return;
+    }
+    final cover = ref.exists(libraryCleanupQueueCoverProvider(queue))
+        ? ref.read(libraryCleanupQueueCoverProvider(queue)).valueOrNull
+        : null;
+    unawaited(
+      context.pushRoute(
+        LibraryCleanupQueueRoute(queue: queue.slug, heroAssetId: cover?.id, heroThumbhash: cover?.thumbhash),
+      ),
+    );
+  }
 
   /// Today's rewind; the collage's large photo flies into its first card.
   void _startRewind() {
@@ -118,13 +137,7 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
               ),
             ),
             const SizedBox(height: 22),
-            arrive(
-              1,
-              LibraryCleanupQuickWins(
-                trashEnabled: trashEnabled,
-                onOpen: (queue) => _open(libraryCleanupQueueName(context, queue)),
-              ),
-            ),
+            arrive(1, LibraryCleanupQuickWins(trashEnabled: trashEnabled, onOpen: _openQueue)),
             const SizedBox(height: 18),
             arrive(
               2,

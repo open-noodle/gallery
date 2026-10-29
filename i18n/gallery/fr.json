@@ -488,6 +488,7 @@
   "cleanup_explainer_open": "Qu'est-ce que la Rétrospective ?",
   "cleanup_explainer_title": "Chaque {date}, au même endroit",
   "cleanup_external_library_warning": "{count, plural, one {# photo provient} other {# photos proviennent}} d'une bibliothèque externe. Si le serveur ne peut que lire ce dossier, {count, plural, one {elle réapparaîtra} other {elles réapparaîtront}} à la prochaine analyse de la bibliothèque et aucun espace ne sera libéré.",
+  "cleanup_finish_apply": "Appliquer",
   "cleanup_finish_apply_and_stop": "Appliquer et s'arrêter là pour l'instant",
   "cleanup_finish_applying": "Application… {done} sur {total}",
   "cleanup_finish_day": "Terminer la journée",

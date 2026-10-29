@@ -488,6 +488,7 @@
   "cleanup_explainer_open": "Czym jest przegląd dnia?",
   "cleanup_explainer_title": "Każdy {date} w jednym miejscu",
   "cleanup_external_library_warning": "Zdjęcia z biblioteki zewnętrznej: {count}. Jeśli serwer może tylko odczytywać ten folder, wrócą one przy następnym skanowaniu biblioteki i miejsce nie zostanie zwolnione.",
+  "cleanup_finish_apply": "Zastosuj",
   "cleanup_finish_apply_and_stop": "Zastosuj i na razie przerwij",
   "cleanup_finish_applying": "Stosowanie… {done} z {total}",
   "cleanup_finish_day": "Zakończ dzień",

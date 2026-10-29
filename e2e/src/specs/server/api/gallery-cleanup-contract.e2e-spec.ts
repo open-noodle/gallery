@@ -58,9 +58,16 @@ type Fixture = {
   ids: Record<string, string>;
 };
 
+type CaseRequest = Omit<ContractRequest, 'headers'>;
+
 type FixtureCase = Omit<Fixture, 'response' | 'ids' | 'request'> & {
   name: string;
-  request: Omit<ContractRequest, 'headers'>;
+  /** A function when it names photos a `before` seeds, so their ids exist by the time it is built. */
+  request: CaseRequest | (() => CaseRequest);
+  /** Runs before this case, when recording and when replaying: a seed the script needs from this point on. */
+  before?: () => Promise<void>;
+  /** Records the response's `nextCursor` under this name, for a later case's `cursor: '@name'`. */
+  saveCursorAs?: string;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -201,6 +208,96 @@ const seed = async () => {
     .set(asBearerAuth(me.accessToken))
     .send({ queue: 'rewind', keepIds: [id('asset:x1')], completeMonthDay: 1224 });
   expect(reviewed.status).toBe(200);
+};
+
+/** The queue photos the 200s need. Seeded mid-script, so the fixtures before them see the library they recorded. */
+type QueueSeed = {
+  takenAt: string;
+  quality?: { sharpness: number; clippedBright?: number; isScreenshot?: boolean };
+  /** Null clears both the asset's and the EXIF dimensions (a screenshot whose shape is unknown). */
+  size?: { width: number; height: number } | null;
+  fileSize?: number;
+  type?: 'VIDEO';
+};
+
+const MIB = 1_048_576;
+const screenshot = (takenAt: string, size: QueueSeed['size']): QueueSeed => ({
+  takenAt,
+  quality: { sharpness: 300, isScreenshot: true },
+  size,
+});
+const queueSeeds: Record<string, QueueSeed> = {
+  // Four more blurry photos, newer than the first eleven, and an overexposed one.
+  ...Object.fromEntries(
+    [12, 13, 14, 15].map((n): [string, QueueSeed] => [
+      `blurry-${n}`,
+      { takenAt: `2023-06-${n}T10:00:00.000Z`, quality: { sharpness: 5 } },
+    ]),
+  ),
+  'bright-1': { takenAt: '2023-05-25T10:00:00.000Z', quality: { sharpness: 300, clippedBright: 0.7 } },
+  // Screenshots: two phone screens, a landscape one, and one whose shape is unknown.
+  'shot-1': screenshot('2023-07-04T10:00:00.000Z', { width: 1170, height: 2532 }),
+  'shot-2': screenshot('2023-07-03T10:00:00.000Z', { width: 1170, height: 2532 }),
+  'shot-3': screenshot('2023-07-02T10:00:00.000Z', { width: 2532, height: 1170 }),
+  'shot-4': screenshot('2023-07-01T10:00:00.000Z', null),
+  // Space hogs: two large videos and a large photo (the sizes go straight into EXIF; the uploads are 1px).
+  'hog-1': { takenAt: '2023-08-01T10:00:00.000Z', fileSize: 300 * MIB, type: 'VIDEO' },
+  'hog-2': { takenAt: '2023-08-02T10:00:00.000Z', fileSize: 150 * MIB, type: 'VIDEO' },
+  'hog-3': { takenAt: '2023-08-03T10:00:00.000Z', fileSize: 80 * MIB },
+};
+
+const seedQueues = async () => {
+  const me = world.login;
+  const db = await utils.connectDatabase();
+  const fresh: string[] = [];
+  for (const [label, seedValue] of Object.entries(queueSeeds)) {
+    const asset = await utils.createAsset(me.accessToken, {
+      assetData: { bytes: pngFor(label), filename: `${label}.png` },
+      fileCreatedAt: seedValue.takenAt,
+      fileModifiedAt: seedValue.takenAt,
+    });
+    fresh.push(name(`asset:${label}`, asset.id));
+  }
+  await utils.waitForQueueFinish(me.accessToken, 'metadataExtraction');
+  await utils.waitForQueueFinish(me.accessToken, 'thumbnailGeneration');
+  await utils.waitForQueueFinish(me.accessToken, 'qualityAnalysis');
+  // Only the new photos' analysis is replaced: the first seed's facts stay as the earlier fixtures recorded them.
+  await db.query('DELETE FROM "asset_quality" WHERE "assetId" = ANY($1::uuid[])', [fresh]);
+
+  for (const [label, seedValue] of Object.entries(queueSeeds)) {
+    const assetId = id(`asset:${label}`);
+    await db.query(
+      `UPDATE "asset" SET "fileCreatedAt" = $2, "localDateTime" = $2, "createdAt" = $2, "type" = COALESCE($3, "type")
+       WHERE "id" = $1`,
+      [assetId, seedValue.takenAt, seedValue.type ?? null],
+    );
+    await db.query(
+      `INSERT INTO "asset_exif" ("assetId", "fileSizeInByte", "timeZone")
+       VALUES ($1, $2, 'UTC')
+       ON CONFLICT ("assetId") DO UPDATE SET "city" = NULL, "fileSizeInByte" = EXCLUDED."fileSizeInByte",
+         "timeZone" = 'UTC', "state" = NULL`,
+      [assetId, seedValue.fileSize ?? 2000],
+    );
+    if (seedValue.size !== undefined) {
+      const width = seedValue.size?.width ?? null;
+      const height = seedValue.size?.height ?? null;
+      await db.query(`UPDATE "asset" SET "width" = $2, "height" = $3 WHERE "id" = $1`, [assetId, width, height]);
+      await db.query(`UPDATE "asset_exif" SET "exifImageWidth" = $2, "exifImageHeight" = $3 WHERE "assetId" = $1`, [
+        assetId,
+        width,
+        height,
+      ]);
+    }
+    if (seedValue.quality) {
+      const { sharpness, clippedBright = 0, isScreenshot = false } = seedValue.quality;
+      await db.query(
+        `INSERT INTO "asset_quality"
+           ("assetId", "ownerId", "sharpness", "brightness", "clippedDark", "clippedBright", "isScreenshot", "version")
+         VALUES ($1, $2, $3, 120, 0, $4, $5, 1)`,
+        [assetId, me.userId, sharpness, clippedBright, isScreenshot],
+      );
+    }
+  }
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -379,6 +476,148 @@ const blurryPage = (cursor?: string): Omit<ContractRequest, 'headers'> => ({
   path: '/api/cleanup/queues/blurry',
   query: { limit: String(PAGE), ...blurryFilters, ...(cursor && { cursor }) },
 });
+
+/** A queue page as the mobile queue screen asks for it: its filters, `PAGE` photos, and the cursor when paging on. */
+const queuePage = (queue: string, filters: Query, cursor?: string): CaseRequest => ({
+  method: 'GET',
+  path: `/api/cleanup/queues/${queue}`,
+  query: { limit: String(PAGE), ...filters, ...(cursor && { cursor }) },
+});
+/** The queue screen's title count, asked with the same filters as its pages. */
+const queueCount = (queue: string, filters?: Query): CaseRequest => ({
+  method: 'GET',
+  path: `/api/cleanup/queues/${queue}/count`,
+  ...(filters && { query: filters }),
+});
+const blurryOnly = { ...blurryFilters, reason: 'blurry' };
+const hogsDefault = { type: 'video', minSize: '104857600' };
+const hogsAll = { type: 'all', minSize: '52428800' };
+const queueCommit = (queue: string, marks: { trash?: string[]; favorite?: string[]; keep?: string[] }) => () =>
+  ({
+    method: 'POST',
+    path: '/api/cleanup/commit',
+    body: {
+      queue,
+      trashIds: (marks.trash ?? []).map((label) => asset(label)),
+      favoriteIds: (marks.favorite ?? []).map((label) => asset(label)),
+      keepIds: (marks.keep ?? []).map((label) => asset(label)),
+    },
+  }) as const;
+
+/**
+ * The queue screens (mobile/test/gallery/cleanup/cleanup_queues_e2e_test.dart), on photos seeded at `200`: Blurry
+ * opened with its defaults, then filtered to blurry only, paged on, applied and undone; three screenshots trashed from
+ * the grid; Space hogs opened and filtered.
+ */
+const queueCases = (): FixtureCase[] => [
+  {
+    name: '200-queues-blurry-count',
+    description: "Blurry opens: the title's count, with the default filters (four more blurry photos seeded first)",
+    before: seedQueues,
+    request: queueCount('blurry', blurryFilters),
+  },
+  {
+    name: '201-queues-blurry-page-1',
+    description: 'Blurry opens: the first page, default filters',
+    request: queuePage('blurry', blurryFilters),
+    saveCursorAs: 'blurry-default-1',
+  },
+  {
+    name: '202-queues-blurry-page-2',
+    description: 'Blurry: the second page, as ten or fewer cards remain',
+    request: queuePage('blurry', blurryFilters, '@blurry-default-1'),
+    saveCursorAs: 'blurry-default-2',
+  },
+  {
+    name: '203-queues-blurry-page-3',
+    description: 'Blurry: the third page; now more than ten cards wait',
+    request: queuePage('blurry', blurryFilters, '@blurry-default-2'),
+  },
+  {
+    name: '204-queues-blurry-reason-count',
+    description: 'The filter changed to blurry only: the count again',
+    request: queueCount('blurry', blurryOnly),
+  },
+  {
+    name: '205-queues-blurry-reason-page-1',
+    description: 'Blurry only, from the start',
+    request: queuePage('blurry', blurryOnly),
+    saveCursorAs: 'blurry-reason-1',
+  },
+  {
+    name: '206-queues-blurry-reason-page-2',
+    description: 'Blurry only, second page',
+    request: queuePage('blurry', blurryOnly, '@blurry-reason-1'),
+    saveCursorAs: 'blurry-reason-2',
+  },
+  {
+    name: '207-queues-blurry-reason-page-3',
+    description: 'Blurry only, third page',
+    request: queuePage('blurry', blurryOnly, '@blurry-reason-2'),
+    saveCursorAs: 'blurry-reason-3',
+  },
+  {
+    name: '208-queues-blurry-reason-page-4',
+    description: 'Blurry only, the last page as marks leave ten cards: the next cursor is null',
+    request: queuePage('blurry', blurryOnly, '@blurry-reason-3'),
+  },
+  {
+    name: '209-queues-in-spaces-blurry',
+    description: 'Done → Apply: the lookup for the one photo marked for trash',
+    request: () => inSpaces(['blurry-13']),
+  },
+  {
+    name: '210-queues-commit-blurry',
+    description:
+      'Apply on Blurry: the keep made before the filter changed, a favourite and a trash; no completeMonthDay',
+    request: queueCommit('blurry', { trash: ['blurry-13'], favorite: ['blurry-14'], keep: ['blurry-15'] }),
+  },
+  {
+    name: '211-queues-restore-blurry',
+    description: "The toast's Undo restores the trashed photo",
+    request: () => restore(['blurry-13']),
+  },
+  {
+    name: '220-queues-screenshots-count',
+    description: 'Screenshots opens: the count (Screenshots has no filters)',
+    request: queueCount('screenshots'),
+  },
+  {
+    name: '221-queues-screenshots-page-1',
+    description: 'Screenshots: every one fits the first page',
+    request: queuePage('screenshots', {}),
+  },
+  {
+    name: '222-queues-in-spaces-screenshots',
+    description: 'Three screenshots marked for trash in the grid: the lookup',
+    request: () => inSpaces(['shot-1', 'shot-2', 'shot-3']),
+  },
+  {
+    name: '223-queues-commit-screenshots',
+    description: 'Apply on Screenshots: the three trashed',
+    request: queueCommit('screenshots', { trash: ['shot-1', 'shot-2', 'shot-3'] }),
+  },
+  {
+    name: '230-queues-space-hogs-count',
+    description: "Space hogs opens: the count with the web's defaults (videos, 100 MiB)",
+    request: queueCount('space_hogs', hogsDefault),
+  },
+  {
+    name: '231-queues-space-hogs-page-1',
+    description: 'Space hogs: the two large videos, largest first',
+    request: queuePage('space_hogs', hogsDefault),
+  },
+  {
+    name: '232-queues-space-hogs-all-count',
+    description: 'Space hogs filtered to every type from 50 MiB: the count',
+    request: queueCount('space_hogs', hogsAll),
+  },
+  {
+    name: '233-queues-space-hogs-all-page-1',
+    description: 'Space hogs, every type from 50 MiB: the large photo joins the videos',
+    request: queuePage('space_hogs', hogsAll),
+  },
+];
 
 const fixtureCases = (): FixtureCase[] => [
   {
@@ -611,11 +850,15 @@ const fixtureCases = (): FixtureCase[] => [
     description: 'The calendar after 21 June was finished',
     request: calendar,
   },
+  ...queueCases(),
 ];
 
-/** Cursors are chained through the script: `@n` stands for the next-page cursor of the n-th Blurry page. */
+/**
+ * Cursors are chained through the script: `@n` stands for the next-page cursor of the n-th default Blurry page, and
+ * `@name` for the one a case saved with `saveCursorAs`.
+ */
 const cursors = new Map<string, string>();
-const resolveCursor = (contract: Omit<ContractRequest, 'headers'>): Omit<ContractRequest, 'headers'> => {
+const resolveCursor = (contract: CaseRequest): CaseRequest => {
   const cursor = contract.query?.cursor;
   if (typeof cursor === 'string' && cursor.startsWith('@')) {
     const real = cursors.get(cursor);
@@ -659,52 +902,68 @@ describe('mobile cleanup contract', () => {
   });
 
   describe('contract fixtures', () => {
-    it(RECORD ? 'records the script' : 'every scripted case has a fixture', async () => {
-      const cases = fixtureCases();
-      expect(new Set(cases.map(({ name: caseName }) => caseName)).size).toBe(cases.length);
-      expect(cases.map(({ name: caseName }) => caseName)).toEqual(
-        cases.map(({ name: caseName }) => caseName).toSorted(byCodeUnit),
-      );
-      if (!RECORD) {
-        const recorded = new Set(readFixtures().map(({ name: fileName }) => fileName));
-        expect(cases.map(({ name: caseName }) => caseName).filter((caseName) => !recorded.has(caseName))).toEqual([]);
-        return;
-      }
-
-      mkdirSync(FIXTURE_DIR, { recursive: true });
-      const stale = readdirSync(FIXTURE_DIR).filter(
-        (entry) => entry.endsWith('.json') && cases.every(({ name: caseName }) => `${caseName}.json` !== entry),
-      );
-      if (stale.length > 0) {
-        throw new Error(`${stale.join(', ')} not in the script; delete them`);
-      }
-      let page = 0;
-      for (const { name: caseName, description, responseView, request: base } of cases) {
-        const realRequest: ContractRequest = { ...resolveCursor(base), headers: GALLERY_APP_HEADER };
-        const response = await send(realRequest, responseView);
-        if (base.path === '/api/cleanup/queues/blurry' && base.query?.reason === 'all') {
-          page++;
-          const next = (response.body as { nextCursor: string | null }).nextCursor;
-          if (next) {
-            cursors.set(`@${page}`, next);
-          }
-        }
-        writeFileSync(
-          fixturePath(caseName),
-          `${JSON.stringify(toFixture(description, realRequest, response, responseView), null, 2)}\n`,
+    it(
+      RECORD ? 'records the script' : 'every scripted case has a fixture',
+      async () => {
+        const cases = fixtureCases();
+        expect(new Set(cases.map(({ name: caseName }) => caseName)).size).toBe(cases.length);
+        expect(cases.map(({ name: caseName }) => caseName)).toEqual(
+          cases.map(({ name: caseName }) => caseName).toSorted(byCodeUnit),
         );
-      }
-    });
+        if (!RECORD) {
+          const recorded = new Set(readFixtures().map(({ name: fileName }) => fileName));
+          expect(cases.map(({ name: caseName }) => caseName).filter((caseName) => !recorded.has(caseName))).toEqual([]);
+          return;
+        }
 
-    it.skipIf(RECORD)('every fixture matches the server, replayed in order', async () => {
-      const fixtures = readFixtures();
-      expect(fixtures.length).toBeGreaterThan(0);
-      for (const { name: fileName, fixture } of fixtures) {
-        const realRequest = denormalize(fixture.request as unknown as Json) as unknown as ContractRequest;
-        const response = await send(realRequest, fixture.responseView);
-        const actual = toFixture(fixture.description, realRequest, response, fixture.responseView);
-        expect({ fixture: fileName, ...actual }).toEqual({ fixture: fileName, ...fixture });
-      }
-    });
+        mkdirSync(FIXTURE_DIR, { recursive: true });
+        const stale = readdirSync(FIXTURE_DIR).filter(
+          (entry) => entry.endsWith('.json') && cases.every(({ name: caseName }) => `${caseName}.json` !== entry),
+        );
+        if (stale.length > 0) {
+          throw new Error(`${stale.join(', ')} not in the script; delete them`);
+        }
+        let page = 0;
+        for (const { name: caseName, description, responseView, request: lazy, before, saveCursorAs } of cases) {
+          await before?.();
+          const base = typeof lazy === 'function' ? lazy() : lazy;
+          const realRequest: ContractRequest = { ...resolveCursor(base), headers: GALLERY_APP_HEADER };
+          const response = await send(realRequest, responseView);
+          const next = (response.body as { nextCursor?: string | null } | null)?.nextCursor;
+          if (saveCursorAs) {
+            if (next) {
+              cursors.set(`@${saveCursorAs}`, next);
+            }
+          } else if (base.path === '/api/cleanup/queues/blurry' && base.query?.reason === 'all') {
+            page++;
+            if (next) {
+              cursors.set(`@${page}`, next);
+            }
+          }
+          writeFileSync(
+            fixturePath(caseName),
+            `${JSON.stringify(toFixture(description, realRequest, response, responseView), null, 2)}\n`,
+          );
+        }
+      },
+      300_000,
+    );
+
+    it.skipIf(RECORD)(
+      'every fixture matches the server, replayed in order',
+      async () => {
+        const fixtures = readFixtures();
+        expect(fixtures.length).toBeGreaterThan(0);
+        const seeds = new Map(fixtureCases().map(({ name: caseName, before }) => [caseName, before]));
+        for (const { name: fileName, fixture } of fixtures) {
+          await seeds.get(fileName)?.();
+          const realRequest = denormalize(fixture.request as unknown as Json) as unknown as ContractRequest;
+          const response = await send(realRequest, fixture.responseView);
+          const actual = toFixture(fixture.description, realRequest, response, fixture.responseView);
+          expect({ fixture: fileName, ...actual }).toEqual({ fixture: fileName, ...fixture });
+        }
+      },
+      300_000,
+    );
   });
 });

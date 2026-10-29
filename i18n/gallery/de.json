@@ -490,6 +490,7 @@
   "cleanup_explainer_open": "Was ist der Rückblick?",
   "cleanup_explainer_title": "Jeder {date}, alles an einem Ort",
   "cleanup_external_library_warning": "{count, plural, one {# Foto stammt} other {# Fotos stammen}} aus einer externen Bibliothek. Wenn der Server diesen Ordner nur lesen kann, {count, plural, one {taucht es} other {tauchen sie}} beim nächsten Scannen der Bibliothek wieder auf und es wird kein Speicher frei.",
+  "cleanup_finish_apply": "Anwenden",
   "cleanup_finish_apply_and_stop": "Anwenden und vorerst aufhören",
   "cleanup_finish_applying": "Wird angewendet… {done} von {total}",
   "cleanup_finish_day": "Tag abschließen",

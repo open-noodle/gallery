@@ -487,6 +487,7 @@
   "cleanup_explainer_open": "What is Rewind?",
   "cleanup_explainer_title": "Every {date}, all in one place",
   "cleanup_external_library_warning": "{count, plural, one {# photo is} other {# photos are}} from an external library. If the server can only read that folder, {count, plural, one {it comes} other {they come}} back at the next library scan and no space is freed.",
+  "cleanup_finish_apply": "Apply",
   "cleanup_finish_apply_and_stop": "Apply and stop for now",
   "cleanup_finish_applying": "Applying… {done} of {total}",
   "cleanup_finish_day": "Finish day",

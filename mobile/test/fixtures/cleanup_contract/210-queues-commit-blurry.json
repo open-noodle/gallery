@@ -1,0 +1,38 @@
+{
+  "description": "Apply on Blurry: the keep made before the filter changed, a favourite and a trash; no completeMonthDay",
+  "ids": {
+    "49c19b48-ad28-4148-80f3-68cefc4e45c0": "asset:blurry-13",
+    "560131e5-9331-44b4-8831-3a9432056c67": "asset:blurry-15",
+    "a88d8758-5ac6-4f22-8610-bc5597116b03": "asset:blurry-14"
+  },
+  "request": {
+    "body": {
+      "favoriteIds": [
+        "a88d8758-5ac6-4f22-8610-bc5597116b03"
+      ],
+      "keepIds": [
+        "560131e5-9331-44b4-8831-3a9432056c67"
+      ],
+      "queue": "blurry",
+      "trashIds": [
+        "49c19b48-ad28-4148-80f3-68cefc4e45c0"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 1,
+      "kept": 2,
+      "skipped": [],
+      "trashed": [
+        "49c19b48-ad28-4148-80f3-68cefc4e45c0"
+      ]
+    },
+    "status": 200
+  }
+}

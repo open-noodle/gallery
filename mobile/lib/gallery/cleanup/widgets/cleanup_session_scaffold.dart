@@ -56,7 +56,8 @@ class LibraryCleanupSessionMenu {
   final ValueChanged<LibraryCleanupDeckMode> onDeckMode;
   final VoidCallback onHowItWorks;
 
-  /// Swipe or Grid. Without [onView] the session has no grid yet: Grid shows disabled, "coming soon".
+  /// Swipe or Grid: the rewind's and every queue's grid. Without [onView] the session has no grid yet: Grid shows
+  /// disabled, "coming soon", and Swipe stays checked.
   final LibraryCleanupView view;
   final ValueChanged<LibraryCleanupView>? onView;
 
@@ -235,7 +236,7 @@ class _Menu extends StatelessWidget {
         // Swipe or Grid; a session without a grid yet shows it disabled.
         CheckedPopupMenuItem(
           key: const Key('cleanup-menu-swipe'),
-          checked: menu.view == LibraryCleanupView.swipe,
+          checked: menu.onView == null || menu.view == LibraryCleanupView.swipe,
           value: () => menu.onView?.call(LibraryCleanupView.swipe),
           child: Text(t.cleanup_menu_swipe),
         ),

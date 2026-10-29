@@ -501,6 +501,7 @@
   "cleanup_explainer_open": "什麼是回顧？",
   "cleanup_explainer_title": "每年的{date}，匯集一處",
   "cleanup_external_library_warning": "{count} 張照片來自外部媒體庫。如果伺服器對該資料夾只有讀取權限，它們會在下次掃描該媒體庫時重新出現，也不會釋放空間。",
+  "cleanup_finish_apply": "套用",
   "cleanup_finish_apply_and_stop": "套用並暫時停止",
   "cleanup_finish_applying": "正在套用… {done}/{total}",
   "cleanup_finish_day": "完成這一天",

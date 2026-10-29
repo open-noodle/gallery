@@ -488,6 +488,7 @@
   "cleanup_explainer_open": "Cos'è Rivedi?",
   "cleanup_explainer_title": "Ogni {date}, tutto in un unico posto",
   "cleanup_external_library_warning": "{count, plural, one {# foto proviene} other {# foto provengono}} da una libreria esterna. Se il server può solo leggere quella cartella, {count, plural, one {ricomparirà} other {ricompariranno}} alla prossima scansione della libreria e non verrà liberato spazio.",
+  "cleanup_finish_apply": "Applica",
   "cleanup_finish_apply_and_stop": "Applica e fermati per ora",
   "cleanup_finish_applying": "Applicazione… {done} di {total}",
   "cleanup_finish_day": "Completa la giornata",

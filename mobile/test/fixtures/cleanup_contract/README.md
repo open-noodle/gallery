@@ -30,7 +30,7 @@ So two files may hold the same request with different responses (`020-rewind-815
 twice (`023`–`025`: the overview reads the day, then the rewind it opens reads it again). A test serves only the files
 its flow sends. The mobile stand-in serves matching fixtures in file order, **each once**: a request that has no
 unserved fixture left fails the test, like a request that matches none. `rewind_e2e_test.dart` walks `020`–`053`
-through the real rewind screens.
+through the real rewind screens, and `cleanup_queues_e2e_test.dart` walks `200`–`233` through the queue screen.
 
 | Files         | What the app does                                                                                                     |
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -46,6 +46,9 @@ through the real rewind screens.
 | `070`–`073`   | Applies Blurry marks, undoes the trash, then changes the filters                                                      |
 | `100`, `101`  | The details sheet on q2: `GET /assets/{id}` and `GET /albums?assetId=` (read-only; served mid-walk by `rewind_e2e`)  |
 | `110`–`115`   | 21 June in grid mode (`rewind_grid_e2e`): the day, the lookup, one commit with `completeMonthDay`, the calendar again |
+| `200`–`211`   | The queue screen on Blurry: count and pages with the defaults, then blurry only, paging on, apply, undo the trash     |
+| `220`–`223`   | Screenshots: count, one page, three trashed from the grid                                                             |
+| `230`–`233`   | Space hogs: count and page with the web's defaults, then every type from 50 MiB                                       |
 
 ## File format
 
@@ -89,6 +92,10 @@ Seeded values (taken dates, places, sizes, sharpness) are real.
 - 21 June: two photos in 2024 (`r1`, `r2`, Faro) and two in 2019 (`s1` in Braga, `s2`), untouched until `110`. Seeded
   last, so the sizes of the photos above stay as recorded.
 - The calendar request carries `tz=Europe/Lisbon`, the zone the mobile test reports as the device's.
+- Seeded at `200` (its `before` step, in recording and replay alike, so the fixtures before it see the library they
+  recorded): four more blurry photos (`blurry-12` to `blurry-15`, the newest) and an overexposed one (`bright-1`);
+  four screenshots (`shot-1`, `shot-2` phone screens, `shot-3` landscape, `shot-4` with no dimensions); and three
+  large files (`hog-1` 300 MiB and `hog-2` 150 MiB videos, `hog-3` an 80 MiB photo).
 
 ### Fallback views
 
@@ -117,5 +124,5 @@ Headers and auth are not matched.
 ## Limits of the recording stack
 
 The e2e stack runs without machine learning, so only the facts the seed writes (`asset_quality`, sizes, places) are
-real; the quality job's own output is replaced by the seed. Burst, screenshot, space hog and duplicate queues arrive
-with the slices that use them.
+real; the quality job's own output is replaced by the seed. Burst and duplicate queues arrive with the slice that uses
+them.

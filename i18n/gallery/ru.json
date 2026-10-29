@@ -488,6 +488,7 @@
   "cleanup_explainer_open": "Что такое обзор дня?",
   "cleanup_explainer_title": "Каждое {date} — в одном месте",
   "cleanup_external_library_warning": "Фото из внешней библиотеки: {count}. Если у сервера есть доступ к этой папке только на чтение, они вернутся при следующем сканировании библиотеки, и место не освободится.",
+  "cleanup_finish_apply": "Применить",
   "cleanup_finish_apply_and_stop": "Применить и пока остановиться",
   "cleanup_finish_applying": "Применение… {done} из {total}",
   "cleanup_finish_day": "Завершить день",

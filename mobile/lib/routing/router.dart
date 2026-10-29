@@ -14,6 +14,7 @@ import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/cleanup_day_photos.page.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/cleanup_month.page.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/cleanup_overview.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_queue.page.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/cleanup_year.page.dart';
 import 'package:immich_mobile/gallery/cleanup/pages/rewind.page.dart';
 import 'package:immich_mobile/gallery/motion/transitions.dart';
@@ -260,6 +261,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: LibraryCleanupMonthRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupOverviewRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupPlaceholderRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupQueueRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupRewindRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LibraryCleanupDayPhotosRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SlideshowRoute.page, guards: [_authGuard, _duplicateGuard]),
