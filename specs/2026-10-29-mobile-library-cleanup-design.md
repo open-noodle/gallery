@@ -55,7 +55,9 @@ tool.
 - The overview must not wait on secondary data to show today's rewind and its button.
 - No guilt copy or nagging around the streak (same as web).
 - The year view must not ask for taps on tiny day cells (the owner's decision; see Your year).
-- No stutter: a card is never thrown before the one behind it has decoded.
+- No stutter: a card is never thrown before the one behind it has decoded. "Decoded" means the card behind always has a
+  decoded image to show, never a blank or half-drawn one: its preview once that has decoded, its thumbhash (decoded on
+  the device, at once) and thumbnail until then. Throwing itself never waits on the network (see "The deck").
 - A stock Immich server, or a Gallery server without cleanup, must never see a cleanup request beyond the one support
   probe, and the app must show no Cleanup entry for it.
 
@@ -110,7 +112,13 @@ card signal and its filters. Nothing else differs.
 
 - **Top bar, the same everywhere:** ‹ back on the left; the title saying what and where ("29 Oct · 16 of 42",
   "Blurry · 12 of 87", "Bursts · 3 of 24", "Duplicates · 5 of 31"); on the right **Done** with a badge of pending
-  changes, and a ⋯ menu holding Swipe / Grid, swipe / button mode, filters (queues) and "How it works".
+  changes, and a ⋯ menu holding Swipe / Grid, swipe / button mode, filters (queues) and "How it works". The menu is
+  one shape for every cleanup (`LibraryCleanupSessionMenu`: the view, the deck mode, "How it works", and the
+  session's own items), and it never offers a choice that does nothing: the series card has one layout, so Bursts and
+  Duplicates have no swipe / button entry (see "Queues: Bursts and Duplicates").
+- **Swipe / Grid switch** under the top bar, in every cleanup, the rewind included: the same choice as the menu's,
+  drawn by the session screen itself, and shown while loading too so the layout does not jump. Not on the finish
+  screen.
 - **Progress bar under it, the same everywhere:** fills on the gentle spring as cards are decided. In the rewind it is
   split into one segment per year with the current year's label above it ("2019 · 7 years ago"), so the user always
   knows which year they are in and how many are left. In queues whose total is still growing ("so far") the total
@@ -121,12 +129,22 @@ card signal and its filters. Nothing else differs.
   rewind from. "Next day" after finishing replaces the session rather than stacking it, so back never walks through a
   chain of days. Back from "Open in library" returns to the same card in the same state; back from the finish screen
   returns to where the session was opened from.
+- **The iOS back swipe** asks too. Flutter turns the system back swipe off outright for a route a `PopScope` holds
+  (`popGestureEnabled` is false and no pop callback fires, as of Flutter 3.47), so while marks are pending the session
+  screen lays its own edge-swipe strip over the leading edge: a swipe that would have popped the page (past half the
+  screen, or a fling) shows the same Apply / Discard / Keep going prompt as ‹. With nothing pending the system swipe
+  works as usual.
 - **Loading** shows a skeleton of the card stack (or grid) in the real layout with the motion kit's sheen
   (`timeline_skeleton.dart` style), never a spinner on an empty screen. Errors show inline with retry and keep the
   top bar, so back still works.
 - **First time:** the first session ever shows a short overlay over the first card: a hand demonstrates right = keep,
-  left = trash, up = favourite, with one line, "Nothing is deleted until you press Done". Shown once, remembered on the device; "How it works" in the ⋯ menu replays it. It counts as seen as
-  soon as it shows (same rule as the web explainer).
+  left = trash, up = favourite, with one line, "Nothing is deleted until you press Done". Shown once, remembered on the
+  device; "How it works" in the ⋯ menu replays it. It counts as seen as soon as it shows (same rule as the web
+  explainer). Bursts and Duplicates get the series card's own lesson the first time either opens, with its own flag,
+  because its swipes mean other things: right "Keep as set", up "Keep all", left "Trash all" (Duplicates: the hand only
+  nudges left and the label reads "Keep at least one copy"), plus how frames are marked. A session that opens in the
+  grid shows the grid's "Hold a photo for details" hint instead; that hint is one flag for every grid, also seen as
+  soon as it shows.
 
 What each cleanup supplies, and nothing more:
 
@@ -150,7 +168,8 @@ server until the user applies them from Done.
   a crash or a restart loses nothing; reopening restores marks and position with "Restored your marks". Saved marks
   are dropped once applied or discarded, and marks for assets no longer in the day or queue are ignored.
 - **Done** opens the finish screen for every cleanup (mockup `5-grid-and-finish.html`, right): kept, favourited,
-  marked for trash with its size, and how far the user got. Its actions:
+  marked for trash with its size, and how far the user got. It is a phase of the session page, not a route of its own,
+  so back from it returns to the cards, and the session's state is never split across routes. Its actions:
   - **Apply** (queues; "Apply and stop for now" in an unfinished rewind) commits the marks and returns to where the
     session was opened from, with the "Saved" acknowledgement.
   - **Finish day** variants (rewind only; see Rewind).
@@ -181,6 +200,10 @@ One widget, used everywhere a single photo (or a burst series) is decided.
   squishes the button and throws the card in that button's direction with its stamp, exactly as the swipe would, so
   buttons and gestures look and feel the same.
 - **Undo** steps back one card and removes its effect, the card flying back in from where it left.
+- **Ready before it is on top:** the deck decodes the previews of the top card and the next three, and the thumbhashes
+  of the next ten. A card shows its preview only once the preview has decoded (or failed); until then it shows its
+  thumbhash with the thumbnail over it, and the preview fades in when it lands. So a throw never uncovers a blank card,
+  and a throw is never held back waiting for one.
 - **Info strip** on the bottom of the card: the date line (rewind: "2019 · 7 years ago"; queues: the full date), city
   and time, and chips: file size, "In an album" (from `inAlbum`), and "ⓘ Details".
 - **Videos:** the poster with a ▶ badge and the duration; tapping ▶ plays it muted inline (my call). The card can be
@@ -189,7 +212,8 @@ One widget, used everywhere a single photo (or a burst series) is decided.
 - **Button mode:** the photo goes edge to edge, horizontal swipes move between photos without marking, and a floating
   translucent bar holds large labelled buttons: Trash, Favourite, Keep, Undo. Same effects, same info strip and
   details. The swipe / button choice is in the top bar's menu and remembered on the device, one setting for all decks
-  (my call).
+  (my call). The series card has no button mode: its buttons are always under it and its swipes always decide, so
+  both modes would be the same layout, and its menu leaves the choice out.
 
 ### Details sheet
 
@@ -204,7 +228,9 @@ Mockup `2-details.html` (approved by the owner).
 - **Links:** "Open in library" (the normal asset viewer, opened the way the fork's search results open it; back
   returns to the same card in the same state) and "Show that day" (every photo taken that day, not just the cleanup
   ones, in the fork's date-filtered search results view; my call: the main timeline has no jump-to-date, and adding
-  one would mean a new hook in upstream timeline code).
+  one would mean a new hook in upstream timeline code). "Show that day" is a fork page
+  (`LibraryCleanupDayPhotosRoute`) that runs the user's own timeline in the fork's search mode with the date filter set
+  to the photo's wall-clock day.
 - **Everywhere a decision is made, details are one gesture away:** the deck (ⓘ, tap, drag up), every grid (long
   press, with a one-time "Hold a photo for details" hint), the burst and duplicate big frame (ⓘ on the frame), and the
   finish screen's "Review the N first" grid (long press).
@@ -235,7 +261,8 @@ Mockup `2-details.html` (approved by the owner).
 - **Finishing at any point** (the owner's decision):
   - **Done** is always in the top bar and opens the finish screen (mockup `5-grid-and-finish.html`, right): kept,
     favourited, and marked for trash with its size, plus "16 of 42 gone through" when unfinished. Deciding the last
-    card opens the same screen.
+    card in the deck opens the same screen; in the grid it does not, since a tap only steps a tile's mark on and the
+    user may still be cycling it, so Done opens it there.
   - All decided: **"Move N to trash and finish"** (or "Finish day" with nothing to trash) commits trash, favourites
     and keeps and sends `completeMonthDay`, which marks the day reviewed.
   - Unfinished: **"Apply and stop for now"** commits what was marked without `completeMonthDay`, so the day stays
@@ -264,8 +291,8 @@ pressed finish (user-initiated, as the motion rules require), and never for "App
 3. As the ring closes: a success haptic and a burst of confetti from the ring's centre in the app's primary colour and
    the mark colours (a new `GalleryCelebrate.dayComplete` in `celebrate.dart`, built like the existing `favorite`
    burst but larger, ~1 s, more pieces).
-4. The streak line pops (`pop()`) and its number ticks up ("🔥 6-day streak"). On a new longest streak the line reads
-   "New best streak" instead (my call; no other streak copy, no nagging).
+4. The streak line pops (`pop()`) and its number ticks up ("🔥 6-day streak"). No other streak copy, no nagging. (A "New
+   best streak" line was dropped: the calendar response has no longest-streak figure to compare with.)
 5. The "Next" and "Back to Cleanup" buttons rise in last on a short stagger.
 
 Reduced motion: no flight, no confetti, no count-up; the ring and counts show filled, the haptic still plays.
@@ -323,6 +350,8 @@ same **series card** (mockup `3-queues.html`, third screen) so they feel the sam
 - Data: `GET /duplicates` returns every group with full asset info and `suggestedKeepAssetIds`; the count on the
   overview comes from `GET /cleanup/queues/duplicates/count`, as on web. The list is not paged by the server; the deck
   shows it in the server's order.
+- The title counts the groups loaded ("Duplicates · 5 of 31"): the list arrives whole, so that is every group the
+  server has.
 - Header "N copies · date · city"; badge "Suggested"; each filmstrip frame carries its resolution and file size, with
   the largest and the highest resolution highlighted, so copies can be told apart without opening details. The
   details sheet has every field already (the response is a full asset).
@@ -330,8 +359,8 @@ same **series card** (mockup `3-queues.html`, third screen) so they feel the sam
   duplicates means. The card resists (rubber-band) and shows "Keep at least one copy"; to drop a copy, flip its mark.
   This is the only place the left swipe differs, and the reason is shown on the card (my call).
 - Swipe up "keep all" means "not duplicates": `DELETE /duplicates/{id}` dismisses the group without deleting anything.
-- Applying sends `POST /duplicates/resolve` with each accepted group's keep and trash ids, and `DELETE
-  /duplicates/{id}` for each dismissed group. The trash rules in "Trash confirmation" apply (spaces lookup, trash
+- Applying sends `POST /duplicates/resolve` with each accepted group's keep and trash ids, in batches of at most 50
+  groups, and `DELETE /duplicates/{id}` for each dismissed group. The trash rules in "Trash confirmation" apply (spaces lookup, trash
   off). The post-apply undo toast restores the trashed copies with `restoreAssets`; the groups themselves do not come
   back until the server detects them again (stated in the toast).
 - A user without the duplicate permission (an API-key session) sees no Duplicates card.
@@ -361,6 +390,9 @@ Ported from the web (`web/src/lib/gallery/cleanup/cleanup-actions.ts`, `confirmC
 Mockup `4-calendar.html`; the two-step flow is the owner's decision, following the touch flow of the web calendar
 (`CleanupCalendar.svelte`, uncommitted in the `library-cleanup` worktree as of this writing).
 
+- **One look everywhere:** the overview's teaser, the year's cards and the month screen draw their cells with the same
+  helpers (`widgets/cleanup_calendar_bits.dart`): the same days of the month from the 1st and the same colours, so the
+  teaser never disagrees with the screen it opens.
 - **Year:** twelve month cards, three across, scrolling. A month card is the only tap target. Each shows its days as a
   small grid in the web's colours (reviewed green, the web's quartile shades for photos to review, neutral for none,
   today outlined) and "reviewed/days" ("27/31"). The current month is outlined. Days fill from the 1st in seven
@@ -390,16 +422,20 @@ Everything uses the mobile motion kit and its rules (`specs/2026-10-23-mobile-mo
   (`swap.dart`); the badge pops the first time it goes above zero, then stays still. Crossing into a new year in the
   rewind slides the year label in from the right.
 - **Swipe ↔ Grid:** the current card shrinks into its tile in the grid (shared-element flight), the other tiles fade
-  and settle in on a short stagger; Grid → Swipe reverses it from the tapped or first undecided tile. Reduced motion:
-  crossfade.
+  and settle in on a short stagger; Grid → Swipe reverses it from the first undecided tile. Reduced motion:
+  crossfade. The same flight in every cleanup (`widgets/cleanup_view_flight.dart`, on `motion/flight.dart`): the
+  rewind and photo queues fly the photo between card and tile, Bursts and Duplicates fly the big frame between the deck
+  and the series' card in the list.
 - **The deck:** 1:1 drag with slight rotation; the stamp fades in with distance; a throw carries the release velocity
   onto the settle curve; a cancelled drag springs back on the bouncy spring; the card behind grows to full size as the
   top one leaves. Undo flies the card back on the same path.
 - **Marks:** favouriting bursts hearts from the card (`celebrate.dart` `favorite`); the departing card tints red for
   trash, green for keep.
 - **Details sheet:** the photo's shrink follows the sheet's drag position, so it never disagrees with the finger.
-- **Grid:** marks fade in and their badge pops (`pop.dart`); trashing flies tiles into the bar (`removal.dart`) and
-  the grid closes the gap.
+- **Grid:** marks fade in and their badge pops (`pop.dart`), the same mark layer in the rewind grid, the queue grid and
+  "Review the N first". Marks are pending, so nothing leaves the grid when one is made; when marks are applied with
+  the grid on screen (the close prompt's Apply), the trashed tiles fly into Done (`removal.dart`, or dissolve with the
+  trash off) while the grid reflows over the gap.
 - **Series card:** changing the big frame crossfades on `quick`; the filmstrip's current frame outline slides to the
   new thumbnail; flipping a mark fades the ring in and pops its check.
 - **Applying:** "Apply and stop" flies the marks into the Done button; finishing plays "Celebrating a finished day".
@@ -437,6 +473,8 @@ calendar day labels) rather than adding mobile copies.
 - Upstream files get only:
   - `library.page.dart`: one widget line in `_ActionButtonGrid` (the button widget is fork code).
   - `routing/router.dart`: one route registration line per page (and the import). `router.gr.dart` is regenerated.
+    Route arguments are plain strings and ints (the month-day, the queue slug, the hero asset id and thumbhash,
+    "Show that day"'s `yyyy-MM-dd`), so the generated router imports no fork model or API type.
   - `domain/models/store.model.dart`: **one** key in the fork's existing 90000 block, `libraryCleanupPrefs`, holding
     every remembered cleanup choice as one JSON string (swipe/button mode, Swipe/Grid per queue, filters per queue,
     the first-run overlay and hint flags), read and written by `mobile/lib/gallery/cleanup/cleanup_prefs.dart`.
@@ -759,6 +797,11 @@ reviewed.
 **Done when:** full `flutter test`, the full gate and CI pass; the upstream diff report for every upstream file in
 "Constraints" is in the PR description and shows only the listed lines.
 
+**Guard:** `cleanup_session_consistency_test.dart` walks all six cleanups the same way, with and without reduced
+motion: loading (top bar, progress, Swipe / Grid, the deck skeleton, Done waiting), the inline error and Retry, the
+title, the menu (with swipe / button mode only where the deck has both), "How it works", the deck's buttons, details,
+a decision and Undo, the close prompt from ‹ and from the iOS back swipe, and the grid with its details on a hold.
+
 ## Decisions record
 
 - **Queues collect marks until Done, like the rewind** (the owner, 2026-10-29). Rejected: applying each queue action at
@@ -771,6 +814,5 @@ reviewed.
 
 - Exact sizes, spacing, thresholds, velocities, durations and haptic strength within the rules above.
 - Where the Swipe / Grid and swipe / button switches sit in the top bar.
-- Whether the finish screen is a page or a full-height sheet.
 - Video inline playback details (muted, looping or not).
 - Storage keys for the remembered choices.

@@ -63,6 +63,26 @@ Choosing **Keep** (or **Not a problem**) on a photo removes it from that queue f
 
 A keep applies to one queue only. Keeping a photo in Blurry & botched does not hide it from Space hogs or Bursts & series. Keeping a photo in a rewind marks it as seen.
 
+## On the mobile app
+
+The Gallery app has Library Cleanup too. Open the **Library** tab and tap **Cleanup**, under the Favorites, Archived, Shared links and Trash buttons. The button only appears when your server has Library Cleanup.
+
+The Cleanup screen starts with today's rewind and a **Start today's rewind** button. Under it are the queues (Space hogs, Bursts & series, Screenshots, Duplicates and Blurry & botched), the size of your trash, and this month's days; **See all** opens **Your year**.
+
+The rewind and every queue work the same way, one photo at a time:
+
+- **Swipe right** to keep a photo, **left** to mark it for the trash, and **up** to make it a favourite. The buttons under the photo do the same, and **Undo** steps back one photo.
+- Tap the photo, tap **Details**, or drag the strip at the bottom of the photo up to see its date, place, people, albums and camera details. From there you can open it in your library or see every photo taken that day.
+- In **Bursts & series** and **Duplicates**, each card is a whole group. Tap a thumbnail to show it, and tap the large photo to switch it between keep and trash. Swipe right to accept the marks, or up to keep every photo. Swiping left trashes a whole burst; for duplicates it is refused, because at least one copy is always kept.
+- The top bar shows where you are ("Blurry & botched · 12 of 87"). The **⋯** menu switches between **Swipe** and **Grid**, offers **Tap buttons**, where swipes move between photos and large buttons mark them, holds a queue's filters, and replays **How it works**.
+- **Grid** shows many photos at once. In a rewind, tap a photo to step its mark through keep, favourite, trash and none. In a queue, select photos (drag across to select several) and mark them from the bar. Hold a photo for its details.
+
+Nothing is sent to the server while you swipe. Your marks are saved on the phone as you go, so you can close the app and carry on later. The **Done** button counts them and opens a summary, where you can review the photos marked for the trash and apply everything at once. In a rewind you can apply what you have done and stop for now, keep the rest and finish the day, or finish the day once every photo is decided. If you leave with marks you have not applied, the app asks whether to apply them, discard them or keep going.
+
+This is the one difference from the web, where queues act straight away: on a phone every cleanup collects marks until you press **Done**. The trash rules are the same: trashed photos can be restored for a few seconds with **Undo**, and from the trash after that.
+
+**Your year** shows the twelve months with their days in the calendar's colours. Tap a month to see its days large, swipe sideways to change month, and tap a day to see its photos and rewind it.
+
 ## Trash and freeing space
 
 Every photo removed through Cleanup goes to the regular trash. You can restore it from there, and restored photos appear in the queues again.
