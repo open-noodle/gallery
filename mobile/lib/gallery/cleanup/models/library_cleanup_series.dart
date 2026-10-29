@@ -222,6 +222,20 @@ class LibraryCleanupSeriesBook {
   /// Decides [series] as one undo step.
   void decide(String seriesId, LibraryCleanupSeriesDecision decision) => decideMany([seriesId], decision);
 
+  /// A burst swiped up: "Stack instead" turned on and applied, as one undo step that also gives the chip back as it
+  /// was. The frame marks stay, so Undo returns the selection the series had.
+  void stack(String seriesId) {
+    _history.add(
+      _Step(
+        decisions: [MapEntry(seriesId, _decisions[seriesId])],
+        frames: [],
+        instead: [MapEntry(seriesId, _instead.contains(seriesId))],
+      ),
+    );
+    _instead.add(seriesId);
+    _decisions[seriesId] = LibraryCleanupSeriesDecision.stack;
+  }
+
   /// Decides every series in [ids] as one undo step. With [resetFrames] their frames go back to the suggestion and
   /// their "instead" chip off ("Keep the suggestion for all").
   void decideMany(

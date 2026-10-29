@@ -412,6 +412,17 @@ class LibraryCleanupSeriesNotifier extends AutoDisposeFamilyNotifier<LibraryClea
     return true;
   }
 
+  /// A swipe up on a burst: stacks it whatever its frames say, as "Stack instead" and the primary button would
+  /// (pending until Done → Apply). Duplicates have no such swipe: returns false and marks nothing.
+  bool stackSeries(String seriesId) {
+    if (_isDuplicates || _find(seriesId) == null) {
+      return false;
+    }
+    _book.stack(seriesId);
+    _sync();
+    return true;
+  }
+
   /// Skip or a swipe left: moves on and marks nothing. The series comes back next session.
   void skip(String seriesId) {
     if (_find(seriesId) == null) {

@@ -38,10 +38,13 @@ const _frameStep = 40.0;
 const _horizontalThreshold = 0.28;
 const _throwVelocity = 800.0;
 
-/// A vertical drag does nothing (there is no swipe up), so the card follows only part of the finger and springs back.
+/// The share of the card's height a drag up must pass to stack a burst.
+const _upThreshold = 0.16;
+
+/// A vertical drag that decides nothing (down, or up on a duplicate group) follows only part of the finger and springs
+/// back.
 const _verticalFollow = 0.35;
 
-const _stackColor = Color(0xFF6C8CFF);
 const _skipColor = Color(0xFFCFD5E2);
 
 /// The primary button's words, which the swipe-right stamp repeats: "Keep 1 · Trash 5", "Trash all 6", "Stack 6".
@@ -72,7 +75,7 @@ IconData _outcomeIcon(LibraryCleanupSeriesOutcomeKind kind) => switch (kind) {
 /// The stamp's colour: red when it trashes every frame, the stack's blue, else keep's green.
 Color _outcomeColor(LibraryCleanupSeriesOutcomeKind kind) => switch (kind) {
   LibraryCleanupSeriesOutcomeKind.trashAll => libraryCleanupTrashColor,
-  LibraryCleanupSeriesOutcomeKind.stack => _stackColor,
+  LibraryCleanupSeriesOutcomeKind.stack => libraryCleanupStackColor,
   _ => libraryCleanupKeepColor,
 };
 
@@ -728,6 +731,7 @@ class _PickChips extends StatelessWidget {
 class LibraryCleanupSeriesActions {
   const LibraryCleanupSeriesActions({
     required this.apply,
+    required this.stack,
     required this.skip,
     required this.pick,
     required this.flip,
@@ -737,6 +741,9 @@ class LibraryCleanupSeriesActions {
 
   /// Applies a series' selection as its button says; false when refused (a duplicate group that would lose every copy).
   final bool Function(String seriesId) apply;
+
+  /// Bursts' swipe up: stacks the series whatever its frames say; false when refused (a duplicate group).
+  final bool Function(String seriesId) stack;
   final void Function(String seriesId) skip;
   final void Function(String seriesId, LibraryCleanupSeriesPick pick) pick;
   final void Function(String seriesId, String frameId) flip;
@@ -744,8 +751,9 @@ class LibraryCleanupSeriesActions {
   final void Function(LibraryCleanupSeries series, CleanupAssetDto frame) details;
 }
 
-/// The deck's two swipes: right applies the selection (the primary button), left skips.
-enum _Swipe { apply, skip }
+/// The deck's swipes: right applies the selection (the primary button), left skips, and up stacks a burst (as "Stack
+/// instead" and the primary button would).
+enum _Swipe { apply, skip, stack }
 
 class _Flight {
   _Flight({required this.series, required this.stamp, required this.from, required this.to, required this.controller});
@@ -759,8 +767,9 @@ class _Flight {
 
 /// The series deck: the current series on top, the next behind it. Under it: Undo, the primary button, whose label is
 /// what applying the selection does ("Keep 1 · Trash 5", "Trash all 6", "Stack 6"), and Skip. A swipe right on the
-/// card is the primary button and its stamp shows the same words; a swipe left is Skip; there is no swipe up. A
-/// duplicate group with every copy marked for trash cannot be applied: the button is disabled and the card resists.
+/// card is the primary button and its stamp shows the same words; a swipe left is Skip; a swipe up stacks a burst
+/// whatever its frames say, its stamp the stack-mode button's words ("Stack 6"), and does nothing on a duplicate
+/// group. A duplicate group with every copy marked for trash cannot be applied: the button is disabled and the card resists.
 /// Only the top and next series are built, so a series' previews load when it is next or on top.
 class LibraryCleanupSeriesDeck extends ConsumerStatefulWidget {
   const LibraryCleanupSeriesDeck({super.key, required this.state, required this.actions});
@@ -780,6 +789,9 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
   final Set<String> _preloaded = {};
   Size _size = Size.zero;
   _Swipe? _armed;
+
+  /// The way each decided series left, so Undo brings it back from that side.
+  final Map<String, _Swipe> _exits = {};
 
   /// A refused swipe right (every copy trashed) shows "Keep at least one copy" for a moment.
   Timer? _warningTimer;
@@ -841,24 +853,36 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
     if (_size.isEmpty) {
       return null;
     }
+    if (offset.dy < -_size.height * _upThreshold && -offset.dy > offset.dx.abs()) {
+      return _Swipe.stack;
+    }
     if (offset.dx.abs() > _size.width * _horizontalThreshold && offset.dx.abs() >= offset.dy.abs()) {
       return offset.dx > 0 ? _Swipe.apply : _Swipe.skip;
     }
     return null;
   }
 
-  /// Skip always goes; applying is refused for a duplicate group whose every copy is marked for trash.
+  /// Skip always goes; applying is refused for a duplicate group whose every copy is marked for trash; only a burst
+  /// stacks.
   bool _allowed(_Swipe swipe) {
     final top = _top;
-    return top != null && (swipe == _Swipe.skip || _state.canApply(top));
+    return top != null &&
+        switch (swipe) {
+          _Swipe.skip => true,
+          _Swipe.apply => _state.canApply(top),
+          _Swipe.stack => !_duplicates,
+        };
   }
 
-  /// The stamp a swipe shows: the primary button's words for a swipe right, "Skip" for a swipe left.
+  /// The stamp a swipe shows: the primary button's words for a swipe right, "Skip" for a swipe left, and for a swipe
+  /// up the words the button shows in stack mode.
   LibraryCleanupSeriesStamp _stampFor(_Swipe swipe, LibraryCleanupSeries series, double amount) {
     if (swipe == _Swipe.skip) {
       return (text: context.t.skip.toUpperCase(), color: _skipColor, amount: amount);
     }
-    final outcome = _state.outcome(series);
+    final outcome = swipe == _Swipe.stack
+        ? (kind: LibraryCleanupSeriesOutcomeKind.stack, keep: series.assets.length, trash: 0)
+        : _state.outcome(series);
     return (
       text: libraryCleanupSeriesApplyLabel(context, outcome).toUpperCase(),
       color: _outcomeColor(outcome.kind),
@@ -889,7 +913,9 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
       dx *= 0.25;
     }
     _x.value += dx;
-    _y.value += details.delta.dy * _verticalFollow;
+    // A burst follows the finger up fully, since letting go there stacks it.
+    final dy = details.delta.dy;
+    _y.value += _y.value + dy < 0 && _allowed(_Swipe.stack) ? dy : dy * _verticalFollow;
     final armed = _swipeAt(_offset);
     final usable = armed != null && _allowed(armed) ? armed : null;
     if (usable != null && usable != _armed) {
@@ -902,8 +928,14 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
     final velocity = details.velocity.pixelsPerSecond;
     _armed = null;
     var swipe = _swipeAt(_offset);
-    if (swipe == null && velocity.dx.abs() > _throwVelocity && velocity.dx.abs() > velocity.dy.abs()) {
+    if (swipe == null && velocity.dy < -_throwVelocity && -velocity.dy > velocity.dx.abs()) {
+      swipe = _Swipe.stack;
+    } else if (swipe == null && velocity.dx.abs() > _throwVelocity && velocity.dx.abs() > velocity.dy.abs()) {
       swipe = velocity.dx > 0 ? _Swipe.apply : _Swipe.skip;
+    }
+    if (swipe == _Swipe.stack && _duplicates) {
+      // A duplicate group has no swipe up: it springs back with no message.
+      swipe = null;
     }
     if (swipe != null && !_allowed(swipe)) {
       _refuse();
@@ -947,18 +979,28 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
     }
     // The stamp is read before the decision, so the flying card says what was applied.
     final stamp = _stampFor(swipe, top, 1);
+    final done = switch (swipe) {
+      _Swipe.skip => true,
+      _Swipe.apply => widget.actions.apply(top.id),
+      _Swipe.stack => widget.actions.stack(top.id),
+    };
     if (swipe == _Swipe.skip) {
       widget.actions.skip(top.id);
-    } else if (!widget.actions.apply(top.id)) {
+    }
+    if (!done) {
       _refuse();
       _springBack(Offset.zero);
       return;
     }
+    _exits[top.id] = swipe;
     final reduced = GalleryMotion.reduced(context);
     final from = _offset;
-    final direction = swipe == _Swipe.apply ? 1.0 : -1.0;
     final reach = _size.longestSide * 1.3;
-    final to = reduced ? from : Offset(direction * reach + from.dx * 0.2, from.dy * 0.2);
+    final to = reduced
+        ? from
+        : swipe == _Swipe.stack
+        ? Offset(from.dx * 0.2, -reach)
+        : Offset((swipe == _Swipe.apply ? 1.0 : -1.0) * reach + from.dx * 0.2, from.dy * 0.2);
     final distance = (to - from).distance;
     final millis = reduced
         ? GalleryMotion.quick.inMilliseconds
@@ -994,15 +1036,31 @@ class _LibraryCleanupSeriesDeckState extends ConsumerState<LibraryCleanupSeriesD
       unawaited(_fadeIn.forward());
       return;
     }
-    final direction = decision == LibraryCleanupSeriesDecision.skip ? -1.0 : 1.0;
-    final start = direction * _size.longestSide * 1.3;
+    final exit =
+        _exits.remove(series.id) ?? (decision == LibraryCleanupSeriesDecision.skip ? _Swipe.skip : _Swipe.apply);
+    final reach = _size.longestSide * 1.3;
+    if (exit == _Swipe.stack) {
+      _x.value = 0;
+      _y.value = -reach;
+      unawaited(_y.animateWith(SpringSimulation(GalleryMotion.gentle, -reach, 0, 0)));
+      return;
+    }
+    final start = (exit == _Swipe.skip ? -1.0 : 1.0) * reach;
     _x.value = start;
     _y.value = 0;
     unawaited(_x.animateWith(SpringSimulation(GalleryMotion.gentle, start, 0, 0)));
   }
 
   LibraryCleanupSeriesStamp? _stampAt(LibraryCleanupSeries top, Offset offset) {
-    if (_size.isEmpty || offset.dx == 0 || offset.dx.abs() < offset.dy.abs()) {
+    if (_size.isEmpty) {
+      return null;
+    }
+    if (offset.dy < 0 && -offset.dy > offset.dx.abs()) {
+      return _allowed(_Swipe.stack)
+          ? _stampFor(_Swipe.stack, top, (-offset.dy / (_size.height * _upThreshold)).clamp(0.0, 1.0))
+          : null;
+    }
+    if (offset.dx == 0 || offset.dx.abs() < offset.dy.abs()) {
       return null;
     }
     final swipe = _swipeAt(offset) ?? (offset.dx > 0 ? _Swipe.apply : _Swipe.skip);
@@ -1181,7 +1239,7 @@ class _ApplyButton extends StatelessWidget {
     final kind = outcome?.kind ?? LibraryCleanupSeriesOutcomeKind.keepTrash;
     final (background, foreground) = switch (kind) {
       LibraryCleanupSeriesOutcomeKind.trashAll => (libraryCleanupTrashColor, Colors.white),
-      LibraryCleanupSeriesOutcomeKind.stack => (_stackColor, Colors.white),
+      LibraryCleanupSeriesOutcomeKind.stack => (libraryCleanupStackColor, Colors.white),
       _ => (scheme.primary, scheme.onPrimary),
     };
     return GalleryPressable(

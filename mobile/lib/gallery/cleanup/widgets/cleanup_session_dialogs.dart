@@ -47,17 +47,26 @@ Future<LibraryCleanupCloseChoice> showLibraryCleanupCloseGuard(
 
 /// What each swipe does, as the gesture overlay teaches it.
 class LibraryCleanupGestures {
-  const LibraryCleanupGestures({required this.right, required this.left, this.up, this.leftRefused = false, this.hint});
+  const LibraryCleanupGestures({
+    required this.right,
+    required this.left,
+    this.up,
+    this.upColor,
+    this.leftRefused = false,
+    this.hint,
+  });
 
   /// The photo decks: right keep, left trash, up favourite.
   factory LibraryCleanupGestures.photos(BuildContext context) =>
       LibraryCleanupGestures(right: context.t.keep, left: context.t.trash, up: context.t.favorite);
 
   /// The series card (Bursts and Duplicates): tapping frames chooses, right does what the button says, left skips, and
-  /// there is no swipe up. [hint] says how the frames are chosen.
-  factory LibraryCleanupGestures.series(BuildContext context) => LibraryCleanupGestures(
+  /// up stacks a burst (a duplicate group has no swipe up). [hint] says how the frames are chosen.
+  factory LibraryCleanupGestures.series(BuildContext context, {required bool duplicates}) => LibraryCleanupGestures(
     right: context.t.cleanup_series_lesson_right,
     left: context.t.skip,
+    up: duplicates ? null : context.t.stack,
+    upColor: libraryCleanupStackColor,
     hint: context.t.cleanup_series_frames_hint,
   );
 
@@ -66,6 +75,9 @@ class LibraryCleanupGestures {
 
   /// Null: no swipe up, so the lesson shows none.
   final String? up;
+
+  /// The up label's colour; null: favourite's.
+  final Color? upColor;
 
   /// Left decides nothing here: the hand only nudges that way and springs back, and the label is muted.
   final bool leftRefused;
@@ -144,9 +156,7 @@ class _LibraryCleanupGestureOverlayState extends State<LibraryCleanupGestureOver
                 Text(
                   '↑  ${gestures.up}',
                   key: const Key('cleanup-gesture-up'),
-                  style: label.copyWith(
-                    color: widget.gestures == null ? libraryCleanupFavoriteColor : libraryCleanupKeepColor,
-                  ),
+                  style: label.copyWith(color: gestures.upColor ?? libraryCleanupFavoriteColor),
                 ),
                 const SizedBox(height: 20),
               ],

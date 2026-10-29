@@ -21,7 +21,7 @@ import 'rewind_harness.dart';
 // Given three bursts: a (three camera frames, a2 the sharpest), b (three frames found by time and looks, b3 the
 //   sharpest) and c (two camera frames, c1 the sharpest)
 // When a is swiped right on its suggestion ("Keep 1 · Trash 2"), b1's thumbnail tapped to keep it and b applied with
-//   the button ("Keep 2 · Trash 1"), c switched to "Stack instead" and applied ("Stack 2"), and the marks applied once
+//   the button ("Keep 2 · Trash 1"), c swiped up ("Stack 2", the "Stack instead" chip off), and the marks applied once
 // Then the count and one page are asked; nothing else until Apply; then one lookup of the trashed frames, one commit
 //   with every frame of a and b kept or trashed by its mark, and one stack of c with its suggested frame first; the
 //   emptied queue says "All clear", and the toast's Undo restores exactly the trashed frames and brings a back with
@@ -99,11 +99,15 @@ void main() {
     expect(cardText(b, 'cleanup-series-frees'), formatBytes(3201));
     await tap('cleanup-series-apply');
 
-    // c: "Stack instead", then the button, which now says "Stack 2".
-    expect(topCardId(tester), idOf('asset:burst-c1'));
+    // c: "Stack instead" makes the button say "Stack 2"; turned off again, a swipe up stacks it all the same.
+    const c = 'asset:burst-c1';
+    expect(topCardId(tester), idOf(c));
     await tap('cleanup-series-pick-instead');
     expect(textOf(tester, 'cleanup-series-apply-label'), 'Stack 2');
-    await tap('cleanup-series-apply');
+    await tap('cleanup-series-pick-instead');
+    expect(textOf(tester, 'cleanup-series-apply-label'), isNot('Stack 2'));
+    await tester.fling(inCard(c, 'cleanup-series-header'), const Offset(0, -400), 1500);
+    await settle();
     expect(textOf(tester, 'cleanup-session-badge-count'), '3');
     expect(server.served, hasLength(2), reason: 'deciding sends nothing');
 

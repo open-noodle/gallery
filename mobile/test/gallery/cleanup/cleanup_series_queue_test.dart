@@ -24,7 +24,9 @@ import 'rewind_harness.dart';
 //            While a swipe is under way   Then its stamp says the button's words (right) or "SKIP" (left)
 //            When a series is swiped left or Skip pressed   Then it moves on with nothing marked, Undo brings it back,
 //                                     Apply sends nothing for it, and it is back next session
-//            When a series is swiped up   Then nothing happens: the card springs back
+//            When a series is swiped up   Then it is stacked whatever its frames say (pending, sent on Apply as the
+//                                     stack the chip would make), its stamp says the stack-mode button's words, and
+//                                     Undo brings it back with the selection it had
 //            When a chip is tapped   Then the selection changes ("Keep all 3", "Keep 1 · Trash 2", "Stack 3"), the
 //                                     chip shows selected, and nothing is applied; a tapped frame leaves stack mode
 //            When a series is decided and Undo pressed   Then that series is back on top and nothing is pending
@@ -40,6 +42,7 @@ import 'rewind_harness.dart';
 // Duplicates When every copy is marked for trash   Then the button is disabled with "Keep at least one copy", a swipe
 //                                     right resists and says so, and "Not duplicates" turns the button into the
 //                                     dismissal, applied as `DELETE /duplicates/{id}`
+//            When a group is swiped up   Then nothing happens: the card springs back
 //            When ⓘ is tapped   Then only the albums are asked (the copy is already a full asset)
 //            When the trash is off and a copy is marked for trash   Then Apply asks first; cancelling sends nothing
 // Permission Given the duplicates count is refused   Then there is no Duplicates card and no duplicates request
@@ -47,7 +50,7 @@ import 'rewind_harness.dart';
 //                                     Duplicates card, without asking again
 // Overview   When the Bursts or Duplicates quick win is tapped   Then its series queue opens
 // Session    The first series session shows the series card's own gesture lesson (tap frames to choose, right does
-//            what the button says, left skips, no swipe up), seen once shown; How it works replays it; the menu has no
+//            what the button says, left skips, up stacks on Bursts only), seen once shown; How it works replays it; the menu has no
 //            swipe / button choice; Swipe ↔ Grid flies the big frame (reduced motion: nothing flies)
 
 Map<String, Object?> _burst(String id, List<String> frames, {required String suggested}) => {
@@ -112,6 +115,7 @@ class _SeriesLibrary {
   bool countForbidden = false;
   bool listForbidden = false;
   final commits = <Map<String, Object?>>[];
+  final stacks = <List<String>>[];
   final restored = <List<String>>[];
 
   late final server = FakeCleanupServer(_respond);
@@ -136,6 +140,14 @@ class _SeriesLibrary {
         commits.add(body);
         final trash = (body['trashIds']! as List).cast<String>();
         return FakeResponse(commitJson(trashed: trash, kept: (body['keepIds']! as List).length));
+      case 'POST /stacks':
+        final ids = (body['assetIds']! as List).cast<String>();
+        stacks.add(ids);
+        return FakeResponse({
+          'id': 'stack-${stacks.length}',
+          'primaryAssetId': ids.first,
+          'assets': [for (final id in ids) assetJson(id)],
+        });
       case 'POST /trash/restore/assets':
         final ids = (body['ids']! as List).cast<String>();
         restored.add(ids);
@@ -227,23 +239,27 @@ void main() {
     await settle(tester);
   }
 
-  /// Drags the top card sideways by [dx] without letting go, returns the stamp's words, and lets go back in place.
-  Future<String?> stampWhileDragging(WidgetTester tester, String series, double dx) async {
+  /// Drags the top card by [by] without letting go, returns the stamp's words, and lets go back in place.
+  Future<String?> stampWhileDraggingBy(WidgetTester tester, String series, Offset by) async {
     final gesture = await tester.startGesture(tester.getCenter(inCard(series, 'cleanup-series-header')));
     for (var i = 0; i < 6; i++) {
-      await gesture.moveBy(Offset(dx / 6, 0));
+      await gesture.moveBy(by / 6);
       await tester.pump(const Duration(milliseconds: 16));
     }
     final stamp = find.byKey(const Key('cleanup-series-stamp'));
     final text = stamp.evaluate().isEmpty ? null : textOf(tester, 'cleanup-series-stamp');
     for (var i = 0; i < 6; i++) {
-      await gesture.moveBy(Offset(-dx / 6, 0));
+      await gesture.moveBy(-by / 6);
       await tester.pump(const Duration(milliseconds: 16));
     }
     await gesture.up();
     await settle(tester);
     return text;
   }
+
+  /// Drags the top card sideways by [dx]: see [stampWhileDraggingBy].
+  Future<String?> stampWhileDragging(WidgetTester tester, String series, double dx) =>
+      stampWhileDraggingBy(tester, series, Offset(dx, 0));
 
   group('Bursts', () {
     testWidgets('tapping frames changes what the button says; the button and a swipe right apply exactly that', (
@@ -323,12 +339,38 @@ void main() {
       expect(find.byKey(const Key('cleanup-restored')), findsNothing);
     });
 
-    testWidgets('a swipe up does nothing: the card springs back', (tester) async {
+    testWidgets('a swipe up stacks the series whatever its frames say; Undo gives the selection back', (tester) async {
       await open(tester, LibraryCleanupQueue.bursts);
+      await tapKey(tester, 'cleanup-series-thumb-x3');
+      expect(applyLabel(tester), 'Keep 2 · Trash 1');
+      // The stamp says what the button says in stack mode.
+      await pick(tester, 'x1', 'instead');
+      final stackLabel = applyLabel(tester).toUpperCase();
+      await pick(tester, 'x1', 'instead');
+      expect(applyLabel(tester), 'Keep 2 · Trash 1', reason: 'the chip is off again');
+      expect(await stampWhileDraggingBy(tester, 'x1', const Offset(0, -200)), stackLabel);
+      expect(stackLabel, 'STACK 3');
+
       await swipe(tester, 'x1', const Offset(0, -400));
+      expect(topCardId(tester), 'y1');
+      expect(badge(tester), '1', reason: 'pending like every mark');
+      expect(library.stacks, isEmpty, reason: 'sent only on Apply');
+
+      await tapKey(tester, 'cleanup-series-undo');
       expect(topCardId(tester), 'x1');
       expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing);
-      expect(applyLabel(tester), 'Keep 1 · Trash 2');
+      expect(applyLabel(tester), 'Keep 2 · Trash 1', reason: 'the selection it had');
+      expect(chipSelected(tester, 'x1', 'instead'), isFalse);
+      expect(inCard('x1', 'cleanup-series-mark-x3-keep'), findsOneWidget);
+      expect(inCard('x1', 'cleanup-series-mark-x1-trash'), findsOneWidget);
+
+      await swipe(tester, 'x1', const Offset(0, -400));
+      await tapKey(tester, 'cleanup-session-done');
+      await tapKey(tester, 'cleanup-finish-apply');
+      expect(library.stacks, [
+        ['x2', 'x1', 'x3'],
+      ], reason: 'every frame, the suggestion on top');
+      expect(library.commits.expand((commit) => commit['trashIds']! as List), isEmpty, reason: 'nothing trashed');
     });
 
     testWidgets('the chips change the selection and never apply it', (tester) async {
@@ -478,7 +520,7 @@ void main() {
       await open(tester, LibraryCleanupQueue.bursts);
       expect(find.byKey(const Key('cleanup-gesture-overlay')), findsOneWidget);
       expect([overlayText(tester, 'right'), overlayText(tester, 'left')], ['→  Does what the button says', 'Skip  ←']);
-      expect(find.byKey(const Key('cleanup-gesture-up')), findsNothing, reason: 'there is no swipe up');
+      expect(overlayText(tester, 'up'), '↑  Stack', reason: 'up stacks a burst');
       expect(
         overlayText(tester, 'hint'),
         'Tap the photo or a thumbnail to keep or trash it. The button, or a swipe right, does exactly what it says; '
@@ -499,7 +541,7 @@ void main() {
       await open(tester, LibraryCleanupQueue.duplicates);
       expect(overlayText(tester, 'left'), 'Skip  ←');
       expect(overlayText(tester, 'right'), '→  Does what the button says');
-      expect(find.byKey(const Key('cleanup-gesture-up')), findsNothing);
+      expect(find.byKey(const Key('cleanup-gesture-up')), findsNothing, reason: 'a duplicate group has no swipe up');
     });
 
     testWidgets('the menu offers Swipe / Grid but no swipe / button choice: the series card has one layout', (
@@ -582,6 +624,15 @@ void main() {
       expect(library.routes.where((route) => route.contains('/duplicates/') || route.startsWith('POST /dup')), [
         'DELETE /duplicates/d',
       ]);
+    });
+
+    testWidgets('a swipe up does nothing: the card springs back', (tester) async {
+      await open(tester, LibraryCleanupQueue.duplicates);
+      expect(await stampWhileDraggingBy(tester, 'd', const Offset(0, -200)), isNull, reason: 'no stamp');
+      await swipe(tester, 'd', const Offset(0, -400));
+      expect(topCardId(tester), 'd');
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing);
+      expect(applyLabel(tester), 'Keep 1 · Trash 1');
     });
 
     testWidgets('ⓘ asks only for the albums: the copy is already a full asset', (tester) async {

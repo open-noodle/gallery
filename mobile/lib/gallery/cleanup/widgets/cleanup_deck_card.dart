@@ -20,6 +20,9 @@ import 'package:openapi/api.dart';
 const libraryCleanupKeepColor = Color(0xFF2FBF71);
 const libraryCleanupFavoriteColor = Color(0xFFFF4D8D);
 const libraryCleanupTrashColor = Color(0xFFFF5A6A);
+
+/// A burst stacked (the series card's "Stack instead", its button and its swipe up).
+const libraryCleanupStackColor = Color(0xFF6C8CFF);
 const libraryCleanupCardRadius = 22.0;
 
 Color libraryCleanupMarkColor(LibraryCleanupMark mark) => switch (mark) {

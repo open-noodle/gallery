@@ -143,11 +143,10 @@ card signal and its filters. Nothing else differs.
   left = trash, up = favourite, with one line, "Nothing is deleted until you press Done". Shown once, remembered on the
   device; "How it works" in the ⋯ menu replays it. It counts as seen as soon as it shows (same rule as the web
   explainer). Bursts and Duplicates get the series card's own lesson the first time either opens, with its own flag,
-  because its swipes mean other things: right "Does what the button says", left "Skip", no swipe up, plus one line on
-  how frames are chosen (tap the photo or a thumbnail; the button or a swipe right does exactly what it says; a swipe
-  left skips). Both queues show the same lesson. A session that opens in the
-  grid shows the grid's "Hold a photo for details" hint instead; that hint is one flag for every grid, also seen as
-  soon as it shows.
+  because its swipes mean other things: right "Does what the button says", left "Skip", up "Stack" on Bursts only
+  (Duplicates show no up), plus one line on how frames are chosen (tap the photo or a thumbnail; the button or a swipe
+  right does exactly what it says; a swipe left skips). A session that opens in the grid shows the grid's "Hold a
+  photo for details" hint instead; that hint is one flag for every grid, also seen as soon as it shows.
 
 What each cleanup supplies, and nothing more:
 
@@ -352,7 +351,13 @@ what will happen.**
 - **Swipe right on the card is the primary button**; its stamp shows the button's exact words ("KEEP 2 · TRASH 4",
   "TRASH ALL 6", "STACK 6"). When the button is disabled the card rubber-bands and shows "Keep at least one copy".
 - **Swipe left is Skip**, and a Skip button mirrors it: the series moves on with nothing marked and stays in the queue;
-  a skip is not saved, so it comes back next session. **There is no swipe up**: the card springs back.
+  a skip is not saved, so it comes back next session.
+- **Swipe up on a burst is "Stack instead", applied** (the owner, 2026-10-29): the series is stacked whatever its
+  frames say, as if the chip were turned on and the primary button pressed; stacking keeps every frame, so nothing is
+  trashed. While dragging up the stamp shows the words the button shows in stack mode ("STACK 6"); the card throws up
+  and the next series arrives. It is pending like every mark and applied on Done → Apply with the same stack call.
+  Undo brings the series back from above with the selection it had (the chip off again if it was off). The chip and
+  the button are unchanged. **Duplicates have no swipe up**: the card springs back.
 - Undo steps back one series decision, an apply or a skip, and brings that series back on top.
 - Applying sends the same requests for the same selection as before: a selection with every frame kept or trashed
   commits exactly what "Keep all" or "Trash all" used to.
@@ -779,7 +784,8 @@ generated upstream duplicates API; contract fixtures for `GET /duplicates`, `POS
   frame step frames. The chips change the selection and never apply it.
 - The primary button and a swipe right apply exactly the selection the label states ("Trash all N" in red with every
   frame trashed, "Stack N" with Stack instead on); the stamp shows the same words. Skip and a swipe left move on with
-  nothing marked; the series is back next session. A swipe up does nothing. Local undo steps back one series decision.
+  nothing marked; the series is back next session. A swipe up stacks the series whatever its frames say ("STACK N"
+  on the stamp). Local undo steps back one series decision.
   On apply, each sends the same ids and calls the web `BurstGroupCard` sends.
 - The post-apply undo restores the trashed frames, as the web's `restoreGroups` does; kept frames stay kept.
 - Previews of a series load when it is next or on top, not for the whole page.
@@ -787,10 +793,10 @@ generated upstream duplicates API; contract fixtures for `GET /duplicates`, `POS
   applies it (pending until Done → Apply); each row's button shows what is pending.
 
 **End-to-end test:** `cleanup_bursts_e2e_test.dart`: apply one series on its suggestion with a swipe right, tap a
-thumbnail on another and apply it with the button, switch a third to Stack instead and apply, Apply once; the requests
-match the fixtures. `cleanup_duplicates_e2e_test.dart`: apply a group on the suggestion, flip every copy to trash and
-assert the button is disabled, the swipe resists and nothing is sent, keep another copy and apply, switch a third to
-Not duplicates and swipe right, Apply.
+thumbnail on another and apply it with the button, stack a third with a swipe up (the chip off), Apply once; the
+requests match the fixtures. `cleanup_duplicates_e2e_test.dart`: apply a group on the suggestion, flip every copy to
+trash and assert the button is disabled, the swipe resists and nothing is sent, keep another copy and apply, switch a
+third to Not duplicates and swipe right, Apply.
 
 ### Slice 8 — Your year
 
@@ -846,7 +852,11 @@ a decision and Undo, the close prompt from ‹ and from the iOS back swipe, and 
   and swipe up "Keep all" (and their buttons), which silently replaced the frames the user had tapped while swipe
   right "Keep as set" applied them, so nobody could tell what an action would do. Now the selection changes only by
   tapping frames or a chip, one primary action (button or swipe right) applies it under a label that states the
-  outcome, swipe left skips, and there is no swipe up.
+  outcome, swipe left skips, and there is no swipe up (since given to Bursts' stack, below).
+- **Swipe up on a burst stacks it** (the owner's request, 2026-10-29): "Stack instead" applied in one gesture,
+  whatever the frames say, since a stack keeps every frame and loses nothing. It does not reintroduce the problem
+  above: the stamp says "STACK N" before letting go, and Undo restores the selection. Duplicates keep no swipe up
+  (the owner's call); the chip and the primary button are unchanged.
 
 ## Left to the builder
 

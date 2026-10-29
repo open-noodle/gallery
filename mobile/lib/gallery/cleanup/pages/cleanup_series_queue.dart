@@ -282,7 +282,8 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
     );
   }
 
-  /// "How it works", and the first Bursts or Duplicates session: the series card's own gestures. Seen as soon as it
+  /// "How it works", and the first Bursts or Duplicates session: the series card's own gestures (up stacks, on Bursts
+  /// only). Seen as soon as it
   /// shows; a flag of its own, since the photo decks' lesson does not teach these swipes.
   void _showOverlay() {
     setState(() => _overlay = true);
@@ -352,6 +353,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
 
     final actions = LibraryCleanupSeriesActions(
       apply: _session.applySeries,
+      stack: _session.stackSeries,
       skip: _session.skip,
       pick: _session.pick,
       flip: _session.flip,
@@ -433,7 +435,7 @@ class _LibraryCleanupSeriesQueueViewState extends ConsumerState<LibraryCleanupSe
         ),
         overlay: _overlay && phase == _Phase.content && view == LibraryCleanupView.swipe
             ? LibraryCleanupGestureOverlay(
-                gestures: LibraryCleanupGestures.series(context),
+                gestures: LibraryCleanupGestures.series(context, duplicates: _duplicates),
                 onDismiss: () => setState(() => _overlay = false),
               )
             : null,
