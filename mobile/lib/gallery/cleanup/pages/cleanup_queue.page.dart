@@ -10,12 +10,15 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_marks.dart'
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_overview.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_session_state.dart';
+import 'package:immich_mobile/gallery/cleanup/navigation.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
+import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_session.provider.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_details_sheet.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_finish.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_overview_bits.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_queue_card.dart';
@@ -226,6 +229,52 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
     }
   }
 
+  /// "Show that day": every photo taken on the card's (wall-clock) date, in the search results.
+  Future<void> _showDay(CleanupAssetDto asset) async {
+    final DateTime day;
+    try {
+      day = DateTime.parse(asset.localDateTime);
+    } catch (_) {
+      return;
+    }
+    await ref.read(libraryCleanupShowDayProvider)(context, day);
+  }
+
+  /// The details sheet for a queue photo: how long ago and where it sits in the queue ("Photo 3 of 87"). The sheet
+  /// adds the queue's own signal (Blurry's reason and sharpness) from the photo itself.
+  Future<LibraryCleanupMark?> _details(CleanupAssetDto asset, String? heroTag) {
+    final state = ref.read(libraryCleanupSessionProvider(_request));
+    final filters = state.filters ?? LibraryCleanupFilters.defaults(_queue);
+    final total = math.max(ref.read(libraryCleanupQueueTotalProvider(filters)).valueOrNull?.count ?? 0, state.total);
+    final now = ref.read(libraryCleanupClockProvider)();
+    final t = context.t;
+    final index = state.assets.indexWhere((candidate) => candidate.id == asset.id);
+    final taken = DateTime.tryParse(asset.localDateTime);
+    final subtitle = [
+      if (taken != null) t.cleanup_years_ago(count: math.max(now.year - taken.year, 0)),
+      if (index >= 0) t.cleanup_photo_position(index: state.alreadyDone + index + 1, total: total),
+    ].join(' · ');
+    return showLibraryCleanupDetails(
+      context,
+      LibraryCleanupDetailsRequest(
+        asset: asset,
+        subtitle: subtitle.isEmpty ? null : subtitle,
+        heroTag: heroTag,
+        onOpenInLibrary: () => unawaited(_open(asset)),
+        onShowDay: () => unawaited(_showDay(asset)),
+      ),
+    );
+  }
+
+  /// A long press in the grid or on the finish screen: the details sheet, and the mark chosen there applied to the
+  /// photo.
+  Future<void> _gridDetails(CleanupAssetDto asset) async {
+    final mark = await _details(asset, null);
+    if (mark != null && mounted) {
+      _session.mark(asset.id, mark);
+    }
+  }
+
   Future<void> _editFilters() async {
     final current = ref.read(libraryCleanupSessionProvider(_request)).filters ?? LibraryCleanupFilters.defaults(_queue);
     final chosen = await showLibraryCleanupFiltersSheet(context, current);
@@ -282,7 +331,6 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
     final filters = state.filters ?? LibraryCleanupFilters.defaults(_queue);
     final count = ref.watch(libraryCleanupQueueTotalProvider(filters)).valueOrNull;
     final view = prefs.viewFor(_queue);
-    final openDetails = ref.watch(libraryCleanupQueueDetailsProvider);
     for (final asset in state.assets) {
       _seen[asset.id] = asset;
     }
@@ -317,7 +365,6 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
     final total = math.max(count?.count ?? 0, state.total);
     final heroTag = widget.heroAssetId == null ? null : LibraryCleanupHeroTags.queue(_queue);
     final canPop = phase == _Phase.allClear || (phase == _Phase.content && state.pendingCount == 0);
-    void details(CleanupAssetDto asset) => openDetails?.call(context, asset);
 
     final Widget body = switch (phase) {
       _Phase.content =>
@@ -328,12 +375,10 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
                 assets: state.assets,
                 marks: state.marks,
                 onMark: _session.markMany,
-                onDetails: openDetails == null
-                    ? null
-                    : (asset) {
-                        ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
-                        details(asset);
-                      },
+                onDetails: (asset) {
+                  ref.read(libraryCleanupPrefsProvider.notifier).markGridHintSeen();
+                  unawaited(_gridDetails(asset));
+                },
                 onNearEnd: () => unawaited(_session.loadMore()),
                 showHint: !prefs.gridHintSeen,
               )
@@ -347,7 +392,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
                 onUndo: _session.undo,
                 onOpen: (asset) => unawaited(_open(asset)),
                 info: (context, asset) => libraryCleanupQueueCardInfo(context, _queue, asset),
-                onDetails: openDetails == null ? null : details,
+                openDetails: _details,
                 heroTag: heroTag,
               ),
       _Phase.finish => LibraryCleanupFinishView.queue(
@@ -369,6 +414,7 @@ class _LibraryCleanupQueuePageState extends ConsumerState<LibraryCleanupQueuePag
           _stayOnDeck = state.undecided.isEmpty;
         }),
         onRescue: (asset) => _session.keep(asset.id),
+        onDetails: (asset) => unawaited(_gridDetails(asset)),
       ),
       _Phase.allClear => _AllClear(onBack: _leave),
     };

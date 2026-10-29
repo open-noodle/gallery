@@ -75,7 +75,6 @@ void main() {
     WidgetTester tester,
     LibraryCleanupQueue queue, {
     bool trashEnabled = true,
-    bool withDetails = false,
     dynamic directory,
   }) async {
     listenToPlatform(tester);
@@ -83,7 +82,6 @@ void main() {
       library: library,
       directory: directory ?? tempDirectory(),
       trashEnabled: trashEnabled,
-      withDetails: withDetails,
     );
     final router = await pumpQueue(tester, container, queue: queue, requests: () => library.routes.length);
     await settle(tester);
@@ -324,6 +322,62 @@ void main() {
     });
   });
 
+  group('details', () {
+    final sheet = find.byKey(const Key('cleanup-details-sheet'));
+    final photo = find.byKey(const Key('cleanup-details-photo'));
+
+    testWidgets('ⓘ, a tap and an upward drag open it on the card, with the queue\'s signal', (tester) async {
+      library.assetInfo['b1'] = assetInfoJson(
+        'b1',
+        localDateTime: '2023-06-30T10:00:00.000Z',
+        exif: {'make': 'Fujifilm', 'model': 'X-T3'},
+      );
+      await open(tester, LibraryCleanupQueue.blurry);
+
+      await tapKey(tester, 'cleanup-chip-details-b1');
+      expect(sheet, findsOneWidget);
+      expect(textOf(tester, 'cleanup-details-subtitle'), '3 years ago · Photo 1 of 14');
+      expect(textOf(tester, 'cleanup-details-signal-title'), 'Blurry · Sharpness 22');
+      expect(library.routes, containsAll(['GET /assets/b1', 'GET /albums']));
+      await tester.tapAt(tester.getCenter(photo));
+      await settle(tester);
+      expect(sheet, findsNothing);
+
+      await tester.tap(top);
+      await settle(tester);
+      expect(sheet, findsOneWidget);
+      await tester.tapAt(tester.getCenter(photo));
+      await settle(tester);
+
+      await tester.drag(find.byKey(const Key('cleanup-card-info-b1')), const Offset(0, -80));
+      await settle(tester);
+      expect(sheet, findsOneWidget);
+      expect(find.byKey(const Key('cleanup-session-badge-count')), findsNothing, reason: 'the drag only opened it');
+    });
+
+    testWidgets('Trash in the sheet closes it and trashes the card, as the button does', (tester) async {
+      await open(tester, LibraryCleanupQueue.blurry);
+      await tapKey(tester, 'cleanup-chip-details-b1');
+      await tapKey(tester, 'cleanup-details-trash');
+
+      expect(sheet, findsNothing);
+      expect(topCardId(tester), 'b2');
+      expect(badge(tester), '1');
+      expect(library.commits, isEmpty);
+    });
+
+    testWidgets('"Review the N first" on the finish screen: a long press opens the sheet', (tester) async {
+      await open(tester, LibraryCleanupQueue.spaceHogs);
+      await trash(tester);
+      await tapKey(tester, 'cleanup-session-done');
+      await tapKey(tester, 'cleanup-finish-review');
+      await tester.longPress(find.byKey(const Key('cleanup-review-h1')));
+      await settle(tester);
+      expect(sheet, findsOneWidget);
+      expect(library.routes, contains('GET /assets/h1'));
+    });
+  });
+
   group('grid', () {
     Finder tile(String id) => find.byKey(Key('cleanup-grid-tile-$id'));
     bool selected(String id) => find.byKey(Key('cleanup-grid-selected-$id')).evaluate().isNotEmpty;
@@ -383,14 +437,23 @@ void main() {
       expect(aspectOf(tester, 'cleanup-grid-whole-s2'), closeTo(9 / 19.5, 0.01));
     });
 
-    testWidgets('a long press opens the details, and the hint is gone after', (tester) async {
+    testWidgets('a long press opens the details sheet; Keep there marks the tile, and the hint is gone', (
+      tester,
+    ) async {
       await setQueuePrefs(views: {LibraryCleanupQueue.blurry: LibraryCleanupView.grid});
-      await open(tester, LibraryCleanupQueue.blurry, withDetails: true);
+      await open(tester, LibraryCleanupQueue.blurry);
       await tester.longPress(tile('b3'));
       await settle(tester);
-      expect(detailsOpened, ['b3']);
-      expect(selected('b3'), isFalse);
+      expect(find.byKey(const Key('cleanup-details-sheet')), findsOneWidget);
+      expect(library.routes, containsAll(['GET /assets/b3', 'GET /albums']));
+      expect(selected('b3'), isFalse, reason: 'holding selects nothing');
+
+      await tapKey(tester, 'cleanup-details-keep');
+      expect(find.byKey(const Key('cleanup-details-sheet')), findsNothing);
+      expect(marked('b3', 'keep'), isTrue);
+      expect(badge(tester), '1');
       expect(find.byKey(const Key('cleanup-grid-hint')), findsNothing);
+      expect(library.commits, isEmpty);
     });
 
     testWidgets('Swipe / Grid is remembered per queue', (tester) async {

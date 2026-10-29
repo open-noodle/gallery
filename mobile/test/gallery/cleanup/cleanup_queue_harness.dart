@@ -13,12 +13,13 @@ import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_filters.dar
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_overview.providers.dart';
-import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_queue.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/providers/library_cleanup_rewind.providers.dart';
 import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup.repository.dart';
+import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup_details.repository.dart';
 import 'package:immich_mobile/gallery/cleanup/widgets/cleanup_deck_card.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:openapi/api.dart';
 
 import '../../widget_tester_extensions.dart';
 import 'cleanup_overview_harness.dart';
@@ -82,6 +83,11 @@ class QueueLibrary {
   /// Queue slug → its photos, in the server's order.
   final Map<String, List<Map<String, Object?>>> queues;
   final Set<String> inSpaces = {};
+
+  /// The details sheet's answers: `GET /assets/{id}` and `GET /albums?assetId=`. A photo without an entry is a 500,
+  /// which the sheet shows nothing for.
+  final assetInfo = <String, Map<String, Object?>>{};
+  final albumsOf = <String, List<Map<String, Object?>>>{};
   final commits = <Map<String, Object?>>[];
   final restored = <List<String>>[];
 
@@ -189,6 +195,14 @@ class QueueLibrary {
     if (route == 'GET /cleanup/trash') {
       return const FakeResponse({'count': 0, 'bytes': 0});
     }
+    final info = RegExp(r'^GET /assets/([^/]+)$').firstMatch(route);
+    if (info != null) {
+      final found = assetInfo[info.group(1)];
+      return found == null ? const FakeResponse({'message': 'boom'}, 500) : FakeResponse(found);
+    }
+    if (route == 'GET /albums') {
+      return FakeResponse(albumsOf[request.query['assetId']?.single] ?? const <Object>[]);
+    }
     return null;
   }
 
@@ -196,21 +210,17 @@ class QueueLibrary {
   List<Map<String, List<String>>> get pageQueries => [for (final query in pages) Map.of(query)..remove('limit')];
 }
 
-/// Calls of the details hook, by asset id.
-final detailsOpened = <String>[];
-
 /// A container for the queues: [library]'s server (or [repository]), pages of [pageSize], today fixed, saved marks in
-/// [directory], "Open in library" pushing the viewer stand-in, and the details hook recording its calls.
+/// [directory], "Open in library" pushing the viewer stand-in, and the details sheet asking [library]'s server.
 ProviderContainer queueContainer({
   QueueLibrary? library,
   LibraryCleanupRepository? repository,
   required Directory directory,
   bool trashEnabled = true,
   int pageSize = 4,
-  bool withDetails = false,
 }) {
   openedInLibrary.clear();
-  detailsOpened.clear();
+  final client = library?.server.client;
   return cleanupContainer(
     server: library?.server,
     repository: repository,
@@ -228,8 +238,10 @@ ProviderContainer queueContainer({
       libraryCleanupInlineVideoProvider.overrideWithValue(
         (asset) => ColoredBox(key: Key('test-video-${asset.id}'), color: Colors.black),
       ),
-      if (withDetails)
-        libraryCleanupQueueDetailsProvider.overrideWithValue((context, asset) => detailsOpened.add(asset.id)),
+      if (client != null)
+        libraryCleanupDetailsRepositoryProvider.overrideWithValue(
+          LibraryCleanupDetailsRepository(assetsApi: AssetsApi(client), albumsApi: AlbumsApi(client)),
+        ),
     ],
   );
 }

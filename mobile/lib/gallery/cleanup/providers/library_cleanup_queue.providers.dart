@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_filters.dart';
 import 'package:immich_mobile/gallery/cleanup/models/library_cleanup_queue.dart';
@@ -24,10 +23,3 @@ final libraryCleanupQueueTotalProvider = FutureProvider.autoDispose
       ref.watch(libraryCleanupUserIdProvider);
       return ref.watch(libraryCleanupRepositoryProvider).queueCount(filters.queue, filters: filters);
     });
-
-/// Opens the details sheet for a queue photo: a tap on the card, its ⓘ chip, or a long press on a grid tile.
-typedef LibraryCleanupOpenDetails = void Function(BuildContext context, CleanupAssetDto asset);
-
-/// The details sheet (Slice 4) plugs in here; until then there is none, so the card's ⓘ chip is muted and a long press
-/// on a grid tile does nothing.
-final libraryCleanupQueueDetailsProvider = Provider<LibraryCleanupOpenDetails?>((ref) => null);
