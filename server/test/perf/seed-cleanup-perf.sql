@@ -94,13 +94,15 @@ DO $$
 BEGIN
   IF to_regclass('public.asset_quality') IS NOT NULL THEN
     EXECUTE $q$
-      INSERT INTO asset_quality ("assetId", "ownerId", sharpness, brightness, "clippedDark", "clippedBright", "isScreenshot", version)
-      SELECT id, owner_id, exp(5.3 + sqrt(-2 * ln(1 - random())) * cos(2 * pi() * random())), random() * 255, random() * 0.2, random() * 0.2, random() < 0.03, 1
+      INSERT INTO asset_quality ("assetId", "ownerId", sharpness, brightness, "clippedDark", "clippedBright", "isScreenshot", version, "screenshotVersion")
+      SELECT id, owner_id, exp(5.3 + sqrt(-2 * ln(1 - random())) * cos(2 * pi() * random())), random() * 255, random() * 0.2, random() * 0.2, random() < 0.03, 1, 1
       FROM perf_seed WHERE type = 'IMAGE'
     $q$;
+    -- qualityAnalyzedAt lives in the fork side table, not upstream's asset_job_status.
     EXECUTE $q$
-      UPDATE asset_job_status SET "qualityAnalyzedAt" = now()
-      WHERE "assetId" IN (SELECT id FROM perf_seed)
+      INSERT INTO asset_job_status_gallery ("assetId", "qualityAnalyzedAt")
+      SELECT id, now() FROM perf_seed
+      ON CONFLICT ("assetId") DO UPDATE SET "qualityAnalyzedAt" = excluded."qualityAnalyzedAt"
     $q$;
   END IF;
 END

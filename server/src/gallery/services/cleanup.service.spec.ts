@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { AssetStatus, AssetType, AssetVisibility, CleanupQueue, JobName, JobStatus } from 'src/enum.js';
+import { AssetStatus, AssetType, AssetVisibility, CleanupQueue, DatabaseLock, JobName, JobStatus } from 'src/enum.js';
 import { CleanupAssetRow } from 'src/gallery/repositories/cleanup.repository.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import {
@@ -7,6 +7,8 @@ import {
   CLEANUP_BURST_MAX_EXTENSIONS,
   CLEANUP_BURST_MAX_WINDOWS_PER_PAGE,
   CLEANUP_BURST_WINDOW,
+  CLEANUP_QUALITY_VERSION,
+  CLEANUP_SCREENSHOT_VERSION,
   decodeCursor,
   encodeCursor,
 } from 'src/gallery/utils/cleanup.js';
@@ -56,6 +58,36 @@ const serveBurstLibrary = (mocks: ServiceMocks, library: BurstRow[]) =>
 vi.mock('src/gallery/utils/image-quality.js', () => ({ readGreyscalePixels: vi.fn() }));
 
 const thumbnails = (data: Record<string, unknown>) => ({ name: JobName.AssetGenerateThumbnails, data }) as never;
+
+/** An analysed screenshot-named image whose stored row carries the given versions. */
+const analysedImage = (
+  mocks: ServiceMocks,
+  stored: { version: number | null; screenshotVersion: number | null; analysed?: boolean },
+) =>
+  mocks.cleanup.getForQualityAnalysis.mockResolvedValue({
+    id: 'a',
+    ownerId: 'u',
+    type: 'IMAGE',
+    originalFileName: 'Screenshot 2024.jpg',
+    visibility: AssetVisibility.Timeline,
+    deletedAt: null,
+    previewPath: 'upload/p.jpg',
+    make: null,
+    model: null,
+    width: 1,
+    height: 1,
+    version: stored.version,
+    screenshotVersion: stored.screenshotVersion,
+    qualityAnalyzedAt: stored.analysed === false ? null : new Date(),
+  } as never);
+
+/** A readable preview; returns the `ensureLocalFile` spy, so a test can assert the preview was never read. */
+const stagePreview = (sut: CleanupService) => {
+  vi.mocked(readGreyscalePixels).mockResolvedValue({ data: Buffer.alloc(25, 128), width: 5, height: 5 });
+  return vi
+    .spyOn((sut as any).backendMedia, 'ensureLocalFile')
+    .mockResolvedValue({ localPath: '/tmp/x', cleanup: vi.fn() });
+};
 
 describe(CleanupService.name, () => {
   let sut: CleanupService;
@@ -342,7 +374,8 @@ describe(CleanupService.name, () => {
         expect.objectContaining({
           assetId: 'a',
           isScreenshot: false,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
           sharpness: expect.any(Number),
           brightness: expect.any(Number),
         }),
@@ -389,8 +422,111 @@ describe(CleanupService.name, () => {
       } as never);
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Success);
       expect(mocks.cleanup.upsertQuality).toHaveBeenCalledWith(
-        expect.objectContaining({ assetId: 'a', version: 1, sharpness: null, brightness: null }),
+        expect.objectContaining({
+          assetId: 'a',
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+          sharpness: null,
+          brightness: null,
+        }),
       );
+    });
+
+    describe('staleOnly (the "Missing" run and the re-run after a version bump)', () => {
+      it('skips a row whose versions are both current, reading nothing', async () => {
+        const ensureLocalFile = stagePreview(sut);
+        analysedImage(mocks, { version: CLEANUP_QUALITY_VERSION, screenshotVersion: CLEANUP_SCREENSHOT_VERSION });
+        await expect(sut.handleQualityAnalysis({ id: 'a', staleOnly: true })).resolves.toBe(JobStatus.Skipped);
+        expect(ensureLocalFile).not.toHaveBeenCalled();
+        expect(mocks.cleanup.upsertQuality).not.toHaveBeenCalled();
+        expect(mocks.cleanup.updateQualityScreenshot).not.toHaveBeenCalled();
+      });
+
+      it('re-stamps only the screenshot flag, without reading the preview, when only that version is stale', async () => {
+        const ensureLocalFile = stagePreview(sut);
+        analysedImage(mocks, { version: CLEANUP_QUALITY_VERSION, screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 });
+        await expect(sut.handleQualityAnalysis({ id: 'a', staleOnly: true })).resolves.toBe(JobStatus.Success);
+        expect(ensureLocalFile).not.toHaveBeenCalled();
+        expect(mocks.cleanup.upsertQuality).not.toHaveBeenCalled();
+        expect(mocks.cleanup.updateQualityScreenshot).toHaveBeenCalledWith({
+          assetId: 'a',
+          isScreenshot: true,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+        });
+      });
+
+      it.each([
+        [
+          'the pixel version is stale',
+          { version: CLEANUP_QUALITY_VERSION - 1, screenshotVersion: CLEANUP_SCREENSHOT_VERSION },
+        ],
+        [
+          'both versions are stale',
+          { version: CLEANUP_QUALITY_VERSION - 1, screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 },
+        ],
+        ['the asset was never analysed', { version: null, screenshotVersion: null, analysed: false }],
+        [
+          '"All" cleared its stamp',
+          { version: CLEANUP_QUALITY_VERSION, screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1, analysed: false },
+        ],
+      ])('analyses in full and stamps both versions when %s', async (_, stored) => {
+        const ensureLocalFile = stagePreview(sut);
+        analysedImage(mocks, stored);
+        await expect(sut.handleQualityAnalysis({ id: 'a', staleOnly: true })).resolves.toBe(JobStatus.Success);
+        expect(ensureLocalFile).toHaveBeenCalled();
+        expect(mocks.cleanup.updateQualityScreenshot).not.toHaveBeenCalled();
+        expect(mocks.cleanup.upsertQuality).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isScreenshot: true,
+            version: CLEANUP_QUALITY_VERSION,
+            screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+            sharpness: expect.any(Number),
+          }),
+        );
+      });
+
+      // The thumbnail chain passes no staleOnly: its preview is new, so current versions say nothing.
+      it('analyses a current row in full without staleOnly', async () => {
+        const ensureLocalFile = stagePreview(sut);
+        analysedImage(mocks, { version: CLEANUP_QUALITY_VERSION, screenshotVersion: CLEANUP_SCREENSHOT_VERSION });
+        await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Success);
+        expect(ensureLocalFile).toHaveBeenCalled();
+        expect(mocks.cleanup.upsertQuality).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('onBootstrap', () => {
+    beforeEach(() => {
+      mocks.database.withLock.mockImplementation(async (_lock, fn) => fn());
+      mocks.job.searchJobs.mockResolvedValue([]);
+    });
+
+    it('queues the stale-only re-run once when a row is out of date', async () => {
+      mocks.cleanup.hasStaleQualityAnalysis.mockResolvedValue(true);
+      await sut.onBootstrap();
+      expect(mocks.database.withLock).toHaveBeenCalledWith(DatabaseLock.CleanupQualityRerun, expect.any(Function));
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetAnalyzeQualityQueueAll,
+        data: { force: false },
+      });
+    });
+
+    it('queues nothing when every row is current', async () => {
+      mocks.cleanup.hasStaleQualityAnalysis.mockResolvedValue(false);
+      await sut.onBootstrap();
+      expect(mocks.job.searchJobs).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('queues nothing when a queue-all run is already pending (another replica, or an admin)', async () => {
+      mocks.cleanup.hasStaleQualityAnalysis.mockResolvedValue(true);
+      mocks.job.searchJobs.mockResolvedValue([
+        { id: '1', name: JobName.AssetAnalyzeQualityQueueAll, timestamp: 0, data: { force: false } },
+      ]);
+      await sut.onBootstrap();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
 
@@ -421,6 +557,20 @@ describe(CleanupService.name, () => {
   });
 
   describe('handleQualityQueueAll', () => {
+    it('queues stale-only analyses without force, and resets nothing', async () => {
+      mocks.cleanup.streamAssetsForQualityAnalysis.mockReturnValue(
+        (function* () {
+          yield { id: 'a' };
+        })() as never,
+      );
+      await sut.handleQualityQueueAll({ force: false });
+      expect(mocks.cleanup.resetQualityAnalyzedAt).not.toHaveBeenCalled();
+      expect(mocks.cleanup.streamAssetsForQualityAnalysis).toHaveBeenCalledWith(false);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.AssetAnalyzeQuality, data: { id: 'a', staleOnly: true } },
+      ]);
+    });
+
     it('queues in batches and resets on force', async () => {
       mocks.cleanup.streamAssetsForQualityAnalysis.mockReturnValue(
         (function* () {

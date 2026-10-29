@@ -29,6 +29,11 @@ export class AssetQualityTable {
   @Column({ type: 'boolean', default: false })
   isScreenshot!: boolean;
 
+  /** `CLEANUP_QUALITY_VERSION` the pixel scores were computed with. */
   @Column({ type: 'smallint' })
   version!: number;
+
+  /** `CLEANUP_SCREENSHOT_VERSION` `isScreenshot` was computed with. */
+  @Column({ type: 'smallint' })
+  screenshotVersion!: number;
 }

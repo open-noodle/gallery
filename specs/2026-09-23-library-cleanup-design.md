@@ -112,7 +112,8 @@ requires re-running a job.
 | `brightness`                   | real, nullable                     | Mean brightness, 0–255                                                                         |
 | `clippedDark`, `clippedBright` | real, nullable                     | Share of pixels that are near-black (≤ 8) or near-white (≥ 247)                                |
 | `isScreenshot`                 | boolean, not null                  | Set by a heuristic, see below                                                                  |
-| `version`                      | smallint, not null                 | Version of the scoring algorithm. Bumping it makes "Missing" re-analyse the asset              |
+| `version`                      | smallint, not null                 | `CLEANUP_QUALITY_VERSION` the pixel scores were computed with                                  |
+| `screenshotVersion`            | smallint, not null                 | `CLEANUP_SCREENSHOT_VERSION` `isScreenshot` was computed with (`1799600000000`)                |
 
 Indexes: `(ownerId, sharpness)`, and a partial index `(ownerId) WHERE "isScreenshot"`.
 
@@ -217,9 +218,9 @@ shared-space guard its visibility marker.
   to the fork's existing `PetDetection` hook, so uploads are analysed automatically. External-library scans also
   pass through this hook (`source: 'upload'`), so their assets are analysed too.
 - **Admin Jobs card, "Quality analysis":**
-  - **Missing** picks assets where `qualityAnalyzedAt IS NULL`, or whose `asset_quality.version` is older than
-    the current one. Like the classification query, it inner-joins `asset_job_status`. It applies the scope
-    rules and streams the ids.
+  - **Missing** picks assets where `qualityAnalyzedAt IS NULL`, or whose `asset_quality.version` or
+    `screenshotVersion` is older than the current one, and recomputes only the stale part (see "Changing the
+    quality analysis" below). It applies the scope rules and streams the ids.
   - **All** re-runs every asset.
 - **Per image:**
   1. Resolve the **unedited preview**: `withFilePath(eb, AssetFileType.Preview)`, which defaults to
@@ -245,6 +246,37 @@ shared-space guard its visibility marker.
 - **Videos** get only `isScreenshot`, which catches screen recordings. Their sharpness and brightness stay null.
 - **Edited assets are not re-scored.** The score describes the unedited preview, which is the same file other
   analysis jobs read. The thumbnail job for an edit does not chain, and that is accepted for v1.
+
+### Changing the quality analysis
+
+Every `asset_quality` row records which version of the analysis computed it, in two parts, so that a change
+reaches every asset already analysed without anyone having to remember to re-run it:
+
+| Change                                                                                                                                                     | Bump (`src/gallery/utils/cleanup.ts`) | Re-run cost                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| The pixel scores: `readGreyscalePixels`, `CLEANUP_ANALYSIS_SIZE`, `laplacianVariance`, `exposureStats` (sharpness, brightness, clipping)                   | `CLEANUP_QUALITY_VERSION`             | Reads every image's preview again (hours at 500k assets)         |
+| The screenshot rule: `isScreenshotCandidate`, `CLEANUP_SCREENSHOT_PATTERNS`, the mime lookup it is fed                                                     | `CLEANUP_SCREENSHOT_VERSION`          | Metadata only: one row read and one update per asset, no preview |
+| A queue threshold: blurry strictness (`CLEANUP_BLUR_THRESHOLDS`), dark/bright (`CLEANUP_DARK`, `CLEANUP_BRIGHT`), or any other rule in the queue queries | none                                  | none: applied at query time over the stored facts               |
+
+- **The guard.** `src/gallery/utils/cleanup-analysis.pin.spec.ts` pins the output of the screenshot rule over a
+  table of representative assets, and of the scores over fixed pixel buffers plus one decoded preview, each keyed
+  by its version. A change without a bump fails with "the screenshot rule / quality scores changed: bump … and
+  update this expectation"; a bump without new results fails too. Update both together.
+- **Automatic re-run.** At start, the microservices worker (`CleanupService.onBootstrap`, under
+  `DatabaseLock.CleanupQualityRerun` so replicas take turns) asks whether any in-scope row is older than either
+  version: a `limit 1` query, 8 ms at 500k current rows (a parallel scan of `asset_quality` that matches nothing;
+  no index needed). If so, and no queue-all run is already pending, it queues "Missing" once.
+- **Only what is stale is recomputed.** "Missing" queues `staleOnly` jobs: a row whose two versions are current
+  is skipped, a row whose only stale part is the screenshot flag gets `isScreenshot` and `screenshotVersion`
+  rewritten without its preview being read, and anything else is analysed in full and stamped with both
+  versions. The thumbnail chain and **All** analyse in full: their preview may be new.
+- **Results stay visible meanwhile.** The queues read the stored scores whatever their version, so nothing
+  disappears during a re-run; an asset moves queue only when its row is rewritten. The "analysed" figure counts
+  an asset done only when both versions are current, so it drops after a bump and climbs back as the run
+  progresses.
+- **All** on the admin Jobs page still forces a full re-analysis of every asset, whatever the versions say.
+- Never-analysed assets are not what the start-up check looks for (the thumbnail chain and "Missing" handle them),
+  so an instance with nothing to upgrade queues nothing at start.
 
 ### Queue rules (applied at query time, on top of the scope rules)
 

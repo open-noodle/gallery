@@ -17,7 +17,23 @@ export const CLEANUP_BURST_MAX_WINDOWS_PER_PAGE = 8;
 export const CLEANUP_BLUR_THRESHOLDS = { lenient: 25, balanced: 60, strict: 110 } as const;
 export const CLEANUP_DARK = { maxBrightness: 35, minClippedDark: 0.5 } as const;
 export const CLEANUP_BRIGHT = { minClippedBright: 0.4 } as const;
+/**
+ * Versions of the quality analysis, stamped on every `asset_quality` row. Bump one whenever the code it covers
+ * changes what it outputs; `cleanup-analysis.pin.spec.ts` fails until you do. A bump re-runs only the stale part,
+ * automatically at the next server start (`CleanupService.onBootstrap`); see "Changing the quality analysis" in
+ * specs/2026-09-23-library-cleanup-design.md.
+ *
+ * - `CLEANUP_QUALITY_VERSION`: the pixel scores (`sharpness`, `brightness`, `clippedDark`, `clippedBright`):
+ *   `readGreyscalePixels`, `CLEANUP_ANALYSIS_SIZE`, `laplacianVariance`, `exposureStats`. Re-running reads every
+ *   image's preview again.
+ * - `CLEANUP_SCREENSHOT_VERSION`: `isScreenshot`, from metadata only (`isScreenshotCandidate`,
+ *   `CLEANUP_SCREENSHOT_PATTERNS`). Re-running reads no preview.
+ *
+ * Queue thresholds (`CLEANUP_BLUR_THRESHOLDS`, `CLEANUP_DARK`, `CLEANUP_BRIGHT`) apply at query time: changing one
+ * needs no bump and no re-run.
+ */
 export const CLEANUP_QUALITY_VERSION = 1;
+export const CLEANUP_SCREENSHOT_VERSION = 1;
 export const CLEANUP_ANALYSIS_SIZE = 512;
 export const CLEANUP_MAX_IDS = 1000;
 export const CLEANUP_PAGE_LIMIT = { default: 100, max: 500 } as const;

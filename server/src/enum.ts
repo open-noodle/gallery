@@ -1124,6 +1124,7 @@ export enum DatabaseLock {
   VersionCheck = 800,
   HlsSessionCleanup = 850,
   PetRecognitionModelSwitch = 860,
+  CleanupQualityRerun = 870,
 }
 
 export enum MaintenanceAction {

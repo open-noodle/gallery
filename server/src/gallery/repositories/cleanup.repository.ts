@@ -12,6 +12,7 @@ import {
   CLEANUP_BRIGHT,
   CLEANUP_DARK,
   CLEANUP_QUALITY_VERSION,
+  CLEANUP_SCREENSHOT_VERSION,
   CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
   CleanupCursor,
   CleanupStrictnessValue,
@@ -258,6 +259,7 @@ export class CleanupRepository {
         clippedBright: DummyValue.NUMBER,
         isScreenshot: DummyValue.BOOLEAN,
         version: DummyValue.NUMBER,
+        screenshotVersion: DummyValue.NUMBER,
       },
     ],
   })
@@ -270,6 +272,7 @@ export class CleanupRepository {
     clippedBright: number | null;
     isScreenshot: boolean;
     version: number;
+    screenshotVersion: number;
   }): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       await trx
@@ -283,6 +286,7 @@ export class CleanupRepository {
             clippedBright: row.clippedBright,
             isScreenshot: row.isScreenshot,
             version: row.version,
+            screenshotVersion: row.screenshotVersion,
           }),
         )
         .execute();
@@ -295,11 +299,28 @@ export class CleanupRepository {
     });
   }
 
+  /**
+   * Re-stamps only the metadata-derived screenshot flag, leaving the pixel scores and `qualityAnalyzedAt` as they
+   * are: for a row whose pixel version is current but whose screenshot version is stale.
+   */
+  @GenerateSql({
+    params: [{ assetId: DummyValue.UUID, isScreenshot: DummyValue.BOOLEAN, screenshotVersion: DummyValue.NUMBER }],
+  })
+  async updateQualityScreenshot(row: { assetId: string; isScreenshot: boolean; screenshotVersion: number }) {
+    await this.db
+      .updateTable('asset_quality')
+      .set({ isScreenshot: row.isScreenshot, screenshotVersion: row.screenshotVersion })
+      .where('assetId', '=', row.assetId)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getForQualityAnalysis(assetId: string) {
     return this.db
       .selectFrom('asset')
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .leftJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .leftJoin('asset_job_status_gallery', 'asset_job_status_gallery.assetId', 'asset.id')
       .select((eb) => [
         'asset.id',
         'asset.ownerId',
@@ -312,6 +333,9 @@ export class CleanupRepository {
         'asset_exif.model',
         'asset.width',
         'asset.height',
+        'asset_quality.version',
+        'asset_quality.screenshotVersion',
+        'asset_job_status_gallery.qualityAnalyzedAt',
       ])
       .where('asset.id', '=', assetId)
       .executeTakeFirst();
@@ -331,10 +355,36 @@ export class CleanupRepository {
         eb.or([
           eb('asset_job_status_gallery.qualityAnalyzedAt', 'is', null),
           eb('asset_quality.version', '<', CLEANUP_QUALITY_VERSION),
+          eb('asset_quality.screenshotVersion', '<', CLEANUP_SCREENSHOT_VERSION),
         ]),
       );
     }
     return qb.stream();
+  }
+
+  /**
+   * Whether any in-scope asset holds a row analysed with an older `CLEANUP_QUALITY_VERSION` or
+   * `CLEANUP_SCREENSHOT_VERSION`: the boot check behind the automatic re-run after a bump. Never-analysed assets do
+   * not count (the thumbnail job chains their analysis, and "Missing" covers the rest), so a library with nothing
+   * to upgrade never queues anything. It runs once per start. When every row is current it is one parallel scan of
+   * `asset_quality` that matches nothing and never reads `asset`: 8 ms at 500k rows (PostgreSQL 14), so it needs
+   * no index. After a bump the first row matches and it returns at once.
+   */
+  @GenerateSql({ params: [] })
+  async hasStaleQualityAnalysis(): Promise<boolean> {
+    let qb = this.db
+      .selectFrom('asset')
+      .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .select(sql.lit(1).as('one'))
+      .where((eb) =>
+        eb.or([
+          eb('asset_quality.version', '<', CLEANUP_QUALITY_VERSION),
+          eb('asset_quality.screenshotVersion', '<', CLEANUP_SCREENSHOT_VERSION),
+        ]),
+      );
+    qb = withCleanupScope(qb, undefined);
+    const row = await qb.limit(1).executeTakeFirst();
+    return !!row;
   }
 
   @GenerateSql({ params: [] })
@@ -635,6 +685,7 @@ export class CleanupRepository {
               eb.and([
                 eb('asset_job_status_gallery.qualityAnalyzedAt', 'is not', null),
                 eb('asset_quality.version', '>=', CLEANUP_QUALITY_VERSION),
+                eb('asset_quality.screenshotVersion', '>=', CLEANUP_SCREENSHOT_VERSION),
               ]),
               // The quality job skips an image without a preview (nothing to score until the
               // thumbnail job makes one), so it counts as done here; otherwise one image the

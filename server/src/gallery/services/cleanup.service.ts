@@ -3,7 +3,17 @@ import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { AssetStatus, AssetType, AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
+import {
+  AssetStatus,
+  AssetType,
+  AssetVisibility,
+  DatabaseLock,
+  ImmichWorker,
+  JobName,
+  JobStatus,
+  QueueJobStatus,
+  QueueName,
+} from 'src/enum.js';
 import {
   CleanupCalendarResponseDto,
   CleanupCommitDto,
@@ -31,6 +41,7 @@ import {
   CLEANUP_BURST_WINDOW,
   CLEANUP_PAGE_LIMIT,
   CLEANUP_QUALITY_VERSION,
+  CLEANUP_SCREENSHOT_VERSION,
   CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
   CleanupCursor,
   computeStreak,
@@ -467,15 +478,44 @@ export class CleanupService extends BaseService {
     await this.jobRepository.queue({ name: JobName.AssetAnalyzeQuality, data: job.data });
   }
 
+  /**
+   * The automatic re-run after a `CLEANUP_QUALITY_VERSION` / `CLEANUP_SCREENSHOT_VERSION` bump: when any row was
+   * analysed by an older version, queue the "Missing" run once, which re-analyses only the stale part of the stale
+   * rows. The lock serialises the replicas' microservices workers, and a QueueAll already waiting or running (a
+   * replica that got there first, or an admin's click) stops a second one. A rare duplicate is still harmless: its
+   * `staleOnly` jobs skip rows already current.
+   */
+  @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
+  async onBootstrap(): Promise<void> {
+    await this.databaseRepository.withLock(DatabaseLock.CleanupQualityRerun, async () => {
+      if (!(await this.cleanupRepository.hasStaleQualityAnalysis())) {
+        return;
+      }
+
+      const pending = await this.jobRepository.searchJobs(QueueName.QualityAnalysis, {
+        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+      });
+      if (pending.some((job) => job.name === JobName.AssetAnalyzeQualityQueueAll)) {
+        return;
+      }
+
+      this.logger.log(
+        `Quality analysis is out of date (quality v${CLEANUP_QUALITY_VERSION}, screenshot v${CLEANUP_SCREENSHOT_VERSION}); queueing a re-run of the stale assets`,
+      );
+      await this.jobRepository.queue({ name: JobName.AssetAnalyzeQualityQueueAll, data: { force: false } });
+    });
+  }
+
   @OnJob({ name: JobName.AssetAnalyzeQualityQueueAll, queue: QueueName.QualityAnalysis })
   async handleQualityQueueAll({ force }: JobOf<JobName.AssetAnalyzeQualityQueueAll>): Promise<JobStatus> {
     if (force) {
       await this.cleanupRepository.resetQualityAnalyzedAt();
     }
 
-    let batch: Array<{ name: JobName.AssetAnalyzeQuality; data: { id: string } }> = [];
+    // "Missing" re-analyses only what is stale; "All" (force) and the thumbnail chain analyse in full.
+    let batch: Array<{ name: JobName.AssetAnalyzeQuality; data: { id: string; staleOnly?: true } }> = [];
     for await (const { id } of this.cleanupRepository.streamAssetsForQualityAnalysis(!!force)) {
-      batch.push({ name: JobName.AssetAnalyzeQuality, data: { id } });
+      batch.push({ name: JobName.AssetAnalyzeQuality, data: force ? { id } : { id, staleOnly: true } });
       if (batch.length < 1000) {
         continue;
       }
@@ -488,8 +528,14 @@ export class CleanupService extends BaseService {
     return JobStatus.Success;
   }
 
+  /**
+   * Analyses one asset. With `staleOnly` (the "Missing" run, and the automatic re-run after a version bump) it
+   * recomputes only the stale part: nothing when both versions are current, and only the metadata-derived
+   * screenshot flag, without reading the preview, when just `CLEANUP_SCREENSHOT_VERSION` moved. Without it (the
+   * thumbnail chain, whose preview is new, and "All") it analyses in full.
+   */
   @OnJob({ name: JobName.AssetAnalyzeQuality, queue: QueueName.QualityAnalysis })
-  async handleQualityAnalysis({ id }: JobOf<JobName.AssetAnalyzeQuality>): Promise<JobStatus> {
+  async handleQualityAnalysis({ id, staleOnly }: JobOf<JobName.AssetAnalyzeQuality>): Promise<JobStatus> {
     const asset = await this.cleanupRepository.getForQualityAnalysis(id);
     if (!asset || asset.deletedAt) {
       return JobStatus.Skipped;
@@ -503,7 +549,28 @@ export class CleanupService extends BaseService {
       width: asset.width,
       height: asset.height,
     });
-    const base = { assetId: asset.id, ownerId: asset.ownerId, isScreenshot, version: CLEANUP_QUALITY_VERSION };
+
+    const pixelsCurrent =
+      !!asset.qualityAnalyzedAt && asset.version !== null && asset.version >= CLEANUP_QUALITY_VERSION;
+    if (staleOnly && pixelsCurrent) {
+      if (asset.screenshotVersion !== null && asset.screenshotVersion >= CLEANUP_SCREENSHOT_VERSION) {
+        return JobStatus.Skipped;
+      }
+      await this.cleanupRepository.updateQualityScreenshot({
+        assetId: asset.id,
+        isScreenshot,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+      });
+      return JobStatus.Success;
+    }
+
+    const base = {
+      assetId: asset.id,
+      ownerId: asset.ownerId,
+      isScreenshot,
+      version: CLEANUP_QUALITY_VERSION,
+      screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+    };
 
     if (asset.type !== AssetType.Image) {
       await this.cleanupRepository.upsertQuality({

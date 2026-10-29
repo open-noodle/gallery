@@ -11,19 +11,29 @@ insert into
     "clippedDark",
     "clippedBright",
     "isScreenshot",
-    "version"
+    "version",
+    "screenshotVersion"
   )
 values
-  ($1, $2, $3, $4, $5, $6, $7, $8)
+  ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 on conflict ("assetId") do update
 set
-  "sharpness" = $9,
-  "brightness" = $10,
-  "clippedDark" = $11,
-  "clippedBright" = $12,
-  "isScreenshot" = $13,
-  "version" = $14
+  "sharpness" = $10,
+  "brightness" = $11,
+  "clippedDark" = $12,
+  "clippedBright" = $13,
+  "isScreenshot" = $14,
+  "version" = $15,
+  "screenshotVersion" = $16
 rollback
+
+-- CleanupRepository.updateQualityScreenshot
+update "asset_quality"
+set
+  "isScreenshot" = $1,
+  "screenshotVersion" = $2
+where
+  "assetId" = $3
 
 -- CleanupRepository.getForQualityAnalysis
 select
@@ -46,12 +56,34 @@ select
   "asset_exif"."make",
   "asset_exif"."model",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset_quality"."version",
+  "asset_quality"."screenshotVersion",
+  "asset_job_status_gallery"."qualityAnalyzedAt"
 from
   "asset"
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+  left join "asset_quality" on "asset_quality"."assetId" = "asset"."id"
+  left join "asset_job_status_gallery" on "asset_job_status_gallery"."assetId" = "asset"."id"
 where
   "asset"."id" = $1
+
+-- CleanupRepository.hasStaleQualityAnalysis
+select
+  1 as "one"
+from
+  "asset"
+  inner join "asset_quality" on "asset_quality"."assetId" = "asset"."id"
+where
+  (
+    "asset_quality"."version" < $1
+    or "asset_quality"."screenshotVersion" < $2
+  )
+  and "asset"."deletedAt" is null
+  and "asset"."visibility" in ('timeline', 'archive')
+  and "asset"."isOffline" = false
+limit
+  $3
 
 -- CleanupRepository.resetQualityAnalyzedAt
 update "asset_job_status_gallery"
@@ -326,6 +358,7 @@ select
         (
           "asset_job_status_gallery"."qualityAnalyzedAt" is not null
           and "asset_quality"."version" >= $1
+          and "asset_quality"."screenshotVersion" >= $2
         )
         or (
           "asset"."type" = 'IMAGE'
@@ -341,7 +374,7 @@ where
   "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
-  and "asset"."ownerId" = $2
+  and "asset"."ownerId" = $3
 
 -- CleanupRepository.getSpaceHogs
 select

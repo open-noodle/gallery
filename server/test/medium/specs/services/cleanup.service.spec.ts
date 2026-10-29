@@ -1,9 +1,11 @@
 import { Kysely } from 'kysely';
-import { AssetStatus, CleanupQueue } from 'src/enum.js';
+import { AssetStatus, CleanupQueue, JobName, JobStatus } from 'src/enum.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
+import { CLEANUP_QUALITY_VERSION, CLEANUP_SCREENSHOT_VERSION } from 'src/gallery/utils/cleanup.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -37,6 +39,46 @@ const getAssetRow = (ctx: MediumTestContext, id: string) =>
     .select(['id', 'status', 'deletedAt', 'isFavorite'])
     .where('id', '=', id)
     .executeTakeFirst();
+
+/** For the quality-version cases: the real repository and database locks, mocked jobs. */
+const setupVersions = (db: Kysely<DB>) => {
+  const { sut, ctx } = newMediumService(CleanupService, {
+    database: db,
+    real: [CleanupRepository, DatabaseRepository],
+    mock: [JobRepository, LoggingRepository],
+  });
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).searchJobs.mockResolvedValue([]);
+  return { sut, ctx, repo: ctx.get(CleanupRepository) };
+};
+
+const analyse = async (
+  ctx: MediumTestContext,
+  repo: CleanupRepository,
+  userId: string,
+  versions: { version?: number; screenshotVersion?: number; isScreenshot?: boolean } = {},
+) => {
+  const { asset } = await ctx.newAsset({
+    ownerId: userId,
+    originalFileName: 'Screenshot 2024.png',
+    // Thumbnailed: getAnalysedPercent counts an image without a thumbhash as done whatever its row says.
+    thumbhash: Buffer.from('thumbhash'),
+  });
+  await ctx.newJobStatus({ assetId: asset.id });
+  await repo.upsertQuality({
+    assetId: asset.id,
+    ownerId: userId,
+    sharpness: 42,
+    brightness: 100,
+    clippedDark: 0.1,
+    clippedBright: 0.2,
+    isScreenshot: false,
+    version: CLEANUP_QUALITY_VERSION,
+    screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+    ...versions,
+  });
+  return asset;
+};
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
@@ -238,6 +280,57 @@ describe(CleanupService.name, () => {
 
       const res = await sut.getCalendar(auth, 'UTC');
       expect(res.days).toHaveLength(366);
+    });
+  });
+
+  // The automatic re-run after a CLEANUP_*_VERSION bump, and the cheap screenshot-only path it relies on.
+  describe('quality analysis versions', () => {
+    it('queues nothing at start when every row is current', async () => {
+      const { sut, ctx, repo } = setupVersions(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      await analyse(ctx, repo, user.id);
+
+      await sut.onBootstrap();
+
+      expect(ctx.getMock(JobRepository).queue).not.toHaveBeenCalled();
+    });
+
+    it('queues the stale-only re-run once at start when a row is stale', async () => {
+      const { sut, ctx, repo } = setupVersions(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      await analyse(ctx, repo, user.id, { screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 });
+
+      await sut.onBootstrap();
+
+      expect(ctx.getMock(JobRepository).queue).toHaveBeenCalledTimes(1);
+      expect(ctx.getMock(JobRepository).queue).toHaveBeenCalledWith({
+        name: JobName.AssetAnalyzeQualityQueueAll,
+        data: { force: false },
+      });
+    });
+
+    it('re-stamps a screenshot-stale row without touching its pixel scores, and is then done', async () => {
+      const { sut, ctx, repo } = setupVersions(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      const asset = await analyse(ctx, repo, user.id, { screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 });
+      await expect(repo.getAnalysedPercent(user.id, 'all')).resolves.toBe(0);
+
+      await expect(sut.handleQualityAnalysis({ id: asset.id, staleOnly: true })).resolves.toBe(JobStatus.Success);
+
+      const row = await ctx.database
+        .selectFrom('asset_quality')
+        .selectAll()
+        .where('assetId', '=', asset.id)
+        .executeTakeFirstOrThrow();
+      expect(row).toMatchObject({
+        sharpness: 42,
+        brightness: 100,
+        isScreenshot: true,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+      });
+      await expect(repo.getAnalysedPercent(user.id, 'all')).resolves.toBe(100);
+      await expect(repo.hasStaleQualityAnalysis()).resolves.toBe(false);
     });
   });
 });

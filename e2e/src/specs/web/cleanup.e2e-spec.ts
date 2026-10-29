@@ -117,7 +117,7 @@ test.describe('Cleanup Utility', () => {
     for (const asset of [first, second]) {
       // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue.
       await client.query(
-        'INSERT INTO asset_quality ("assetId", "ownerId", sharpness, version) VALUES ($1, $2, 5, 1) ON CONFLICT DO NOTHING',
+        'INSERT INTO asset_quality ("assetId", "ownerId", sharpness, version, "screenshotVersion") VALUES ($1, $2, 5, 1, 1) ON CONFLICT DO NOTHING',
         [asset.id, admin.userId],
       );
     }

@@ -1,7 +1,7 @@
 import { CompiledQuery, Kysely, sql } from 'kysely';
 import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CleanupQueue } from 'src/enum.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
-import { CleanupCursor } from 'src/gallery/utils/cleanup.js';
+import { CLEANUP_QUALITY_VERSION, CLEANUP_SCREENSHOT_VERSION, CleanupCursor } from 'src/gallery/utils/cleanup.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -36,8 +36,13 @@ const setup = (db?: Kysely<DB>) => {
 /** Set by the thumbnail job with the preview; `getAnalysedPercent` treats an image without one as unscorable. */
 const THUMBHASH = Buffer.from('thumbhash');
 
-/** A thumbnailed image that the quality job has scored. */
-const analysedImage = async (ctx: ReturnType<typeof setup>['ctx'], sut: CleanupRepository, userId: string) => {
+/** A thumbnailed image that the quality job has scored (by the current versions unless overridden). */
+const analysedImage = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  sut: CleanupRepository,
+  userId: string,
+  versions: { version?: number; screenshotVersion?: number } = {},
+) => {
   const { asset } = await ctx.newAsset({ ownerId: userId, thumbhash: THUMBHASH });
   await ctx.newJobStatus({ assetId: asset.id });
   await sut.upsertQuality({
@@ -48,7 +53,9 @@ const analysedImage = async (ctx: ReturnType<typeof setup>['ctx'], sut: CleanupR
     clippedDark: 0,
     clippedBright: 0,
     isScreenshot: false,
-    version: 1,
+    version: CLEANUP_QUALITY_VERSION,
+    screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+    ...versions,
   });
   return asset;
 };
@@ -271,7 +278,14 @@ describe(CleanupRepository.name, () => {
       const ids: Record<string, string> = {};
       for (const [name, score] of Object.entries(scores)) {
         const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
-        await sut.upsertQuality({ assetId: asset.id, ownerId: user.id, ...score, isScreenshot: false, version: 1 });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          ...score,
+          isScreenshot: false,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+        });
         ids[name] = asset.id;
       }
       const { asset: unscored } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
@@ -471,7 +485,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { asset: staleVersion } = await ctx.newAsset({ ownerId: user.id });
@@ -484,7 +499,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 0,
+        version: CLEANUP_QUALITY_VERSION - 1,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { library } = await ctx.newLibrary({ ownerId: user.id });
@@ -494,6 +510,19 @@ describe(CleanupRepository.name, () => {
       const ids = await Array.fromAsync(sut.streamAssetsForQualityAnalysis(false), (r) => r.id);
       expect(ids).toEqual(expect.arrayContaining([neverAnalyzed.id, staleVersion.id, external.id]));
       expect(ids).not.toContain(analyzed.id);
+    });
+
+    it('force: false returns a row whose pixel scores are current but whose screenshot flag is stale', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const current = await analysedImage(ctx, sut, user.id);
+      const screenshotStale = await analysedImage(ctx, sut, user.id, {
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1,
+      });
+
+      const ids = await Array.fromAsync(sut.streamAssetsForQualityAnalysis(false), (r) => r.id);
+      expect(ids).toContain(screenshotStale.id);
+      expect(ids).not.toContain(current.id);
     });
 
     it('force: true returns all in-scope assets', async () => {
@@ -509,7 +538,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { library } = await ctx.newLibrary({ ownerId: user.id });
@@ -551,7 +581,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0.1,
         clippedBright: 0.2,
         isScreenshot: true,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const quality = await ctx.database
@@ -585,7 +616,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       await sut.resetQualityAnalyzedAt();
@@ -651,7 +683,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id, thumbhash: THUMBHASH });
       await ctx.newJobStatus({ assetId: assetB.id });
@@ -684,6 +717,20 @@ describe(CleanupRepository.name, () => {
       await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(100);
     });
 
+    it('counts an asset as done only when both the pixel and the screenshot version are current', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id);
+      await analysedImage(ctx, sut, user.id, { version: CLEANUP_QUALITY_VERSION - 1 });
+      await analysedImage(ctx, sut, user.id, { screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 });
+      await analysedImage(ctx, sut, user.id, {
+        version: CLEANUP_QUALITY_VERSION - 1,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1,
+      });
+
+      await expect(sut.getAnalysedPercent(user.id, 'image')).resolves.toBe(25);
+    });
+
     it('still waits for a video, which the job analyses without a preview', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -693,6 +740,42 @@ describe(CleanupRepository.name, () => {
 
       await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(50);
       await expect(sut.getAnalysedPercent(user.id, 'image')).resolves.toBe(100);
+    });
+  });
+
+  describe('hasStaleQualityAnalysis', () => {
+    // Global across users, so each case gets its own database.
+    it('is false when every row is current or nothing was analysed yet', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      await expect(sut.hasStaleQualityAnalysis()).resolves.toBe(false);
+
+      await analysedImage(ctx, sut, user.id);
+      const { asset: neverAnalyzed } = await ctx.newAsset({ ownerId: user.id, thumbhash: THUMBHASH });
+      await ctx.newJobStatus({ assetId: neverAnalyzed.id });
+      await expect(sut.hasStaleQualityAnalysis()).resolves.toBe(false);
+    });
+
+    it('is true for an in-scope row with a stale pixel version', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id, { version: CLEANUP_QUALITY_VERSION - 1 });
+      await expect(sut.hasStaleQualityAnalysis()).resolves.toBe(true);
+    });
+
+    it('is true for an in-scope row with a stale screenshot version', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id, { screenshotVersion: CLEANUP_SCREENSHOT_VERSION - 1 });
+      await expect(sut.hasStaleQualityAnalysis()).resolves.toBe(true);
+    });
+
+    it('ignores stale rows of trashed assets, which the re-run would not reach', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      const trashed = await analysedImage(ctx, sut, user.id, { version: CLEANUP_QUALITY_VERSION - 1 });
+      await sql`update "asset" set "deletedAt" = now() where "id" = ${trashed.id}`.execute(ctx.database);
+      await expect(sut.hasStaleQualityAnalysis()).resolves.toBe(false);
     });
   });
 
@@ -860,7 +943,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: true,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       const { asset: notScreenshot } = await ctx.newAsset({ ownerId: user.id });
       await sut.upsertQuality({
@@ -871,7 +955,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getScreenshots(user.id, { limit: 10 });
@@ -903,7 +988,8 @@ describe(CleanupRepository.name, () => {
           clippedDark: 0,
           clippedBright: 0,
           isScreenshot: true,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
         });
         ids.push(asset.id);
       }
@@ -934,7 +1020,8 @@ describe(CleanupRepository.name, () => {
             clippedDark: 0,
             clippedBright: 0,
             isScreenshot: true,
-            version: 1,
+            version: CLEANUP_QUALITY_VERSION,
+            screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
           });
           rows.push({ id: asset.id, time });
         }
@@ -974,7 +1061,8 @@ describe(CleanupRepository.name, () => {
           clippedDark: 0,
           clippedBright: 0,
           isScreenshot: true,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
         });
         ids.push(asset.id);
       }
@@ -1009,7 +1097,8 @@ describe(CleanupRepository.name, () => {
           clippedDark: 0,
           clippedBright: 0,
           isScreenshot: false,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
         });
         idBySharpness.set(sharpness, asset.id);
       }
@@ -1055,7 +1144,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0.9,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       const { asset: onlyBrightness } = await ctx.newAsset({ ownerId: user.id });
       await sut.upsertQuality({
@@ -1066,7 +1156,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0.1,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       const { asset: onlyClipped } = await ctx.newAsset({ ownerId: user.id });
       await sut.upsertQuality({
@@ -1077,7 +1168,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0.9,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getBlurry(user.id, {
@@ -1101,7 +1193,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0.5,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       const { asset: notBright } = await ctx.newAsset({ ownerId: user.id });
       await sut.upsertQuality({
@@ -1112,7 +1205,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0.1,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getBlurry(user.id, {
@@ -1136,7 +1230,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       await ctx.newAssetFace({ assetId: withVisibleFace.id, isVisible: true, deletedAt: null });
 
@@ -1149,7 +1244,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       await ctx.newAssetFace({ assetId: withDeletedFace.id, isVisible: true, deletedAt: new Date() });
 
@@ -1162,7 +1258,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
       await ctx.newAssetFace({ assetId: withInvisibleFace.id, isVisible: false, deletedAt: null });
 
@@ -1197,7 +1294,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getBlurry(user.id, {
@@ -1224,7 +1322,8 @@ describe(CleanupRepository.name, () => {
           clippedDark: 0,
           clippedBright: 0,
           isScreenshot: true,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
         });
       }
 
@@ -1247,7 +1346,8 @@ describe(CleanupRepository.name, () => {
           clippedDark: 0,
           clippedBright: 0,
           isScreenshot: false,
-          version: 1,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
         });
       }
 
@@ -1295,7 +1395,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: true,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getScreenshots(user.id, { limit: 10 });
@@ -1321,7 +1422,8 @@ describe(CleanupRepository.name, () => {
         clippedDark: 0,
         clippedBright: 0,
         isScreenshot: false,
-        version: 1,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
       });
 
       const { items } = await sut.getBlurry(user.id, {
