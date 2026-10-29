@@ -1,0 +1,47 @@
+{
+  "description": "Blurry, last page: the next cursor is null",
+  "ids": {
+    "7235d2ec-d60c-430d-8bdc-0b987f901edd": "asset:dark-2",
+    "ef496557-2afc-4934-8696-a8271ad80994": "asset:dark-1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry",
+    "query": {
+      "cursor": "eyJ2IjpbIjIwMjMtMDQtMTJUMTA6MDA6MDAuMDAwMDAwWiIsIjcyMzVkMmVjLWQ2MGMtNDMwZC04YmRjLTBiOTg3ZjkwMWVkZCJdfQ",
+      "hideFaces": "true",
+      "limit": "4",
+      "reason": "all",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1018,
+          "height": 1,
+          "id": "ef496557-2afc-4934-8696-a8271ad80994",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-04-11T10:00:00.000Z",
+          "originalFileName": "dark-1.png",
+          "reason": "dark",
+          "sharpness": 300,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": null
+    },
+    "status": 200
+  }
+}
