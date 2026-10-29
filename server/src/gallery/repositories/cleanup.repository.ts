@@ -320,7 +320,8 @@ export class CleanupRepository {
   streamAssetsForQualityAnalysis(force: boolean) {
     let qb = this.db
       .selectFrom('asset')
-      .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
+      // No join on asset_job_status: an upload whose processing never finished has no row there, but it still
+      // counts in getAnalysedPercent, so it must be queued here or the figure stays below 100 for good.
       .leftJoin('asset_job_status_gallery', 'asset_job_status_gallery.assetId', 'asset.id')
       .leftJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
       .select('asset.id');

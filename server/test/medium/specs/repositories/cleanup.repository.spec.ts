@@ -520,6 +520,20 @@ describe(CleanupRepository.name, () => {
       expect(ids).toContain(analyzed.id);
       expect(ids).toContain(external.id);
     });
+
+    // An upload whose processing never finished has no asset_job_status row. It still counts in the "analysed"
+    // figure, so the queue-all job must reach it or the figure stays below 100 for good.
+    it('returns in-scope assets that have no asset_job_status row', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: video } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+      const { asset: image } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+
+      for (const force of [false, true]) {
+        const ids = await Array.fromAsync(sut.streamAssetsForQualityAnalysis(force), (r) => r.id);
+        expect(ids).toEqual(expect.arrayContaining([video.id, image.id]));
+      }
+    });
   });
 
   describe('upsertQuality', () => {

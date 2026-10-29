@@ -452,14 +452,16 @@ export class CleanupService extends BaseService {
     return { assetIds, externalAssetIds };
   }
 
-  // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched; same gate as
-  // PetDetectionService.onJobSuccess: a Success/Skipped thumbnail run for an upload or a notify request.
+  // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched. Unlike pet
+  // detection this follows EVERY Success/Skipped thumbnail run, not only uploads and notify requests: a copy, a
+  // regeneration or the nightly run for missing thumbnails also gives the asset a new preview, and an asset left
+  // unanalysed holds the "analysed" figure below 100 for good. Analysis is idempotent and cheap (a 512px read).
   @OnEvent({ name: 'JobSuccess' })
   async onJobSuccess({ job, response }: ArgOf<'JobSuccess'>) {
     if (response !== JobStatus.Success && response !== JobStatus.Skipped) {
       return;
     }
-    if (job.name !== JobName.AssetGenerateThumbnails || (!job.data.notify && job.data.source !== 'upload')) {
+    if (job.name !== JobName.AssetGenerateThumbnails) {
       return;
     }
     await this.jobRepository.queue({ name: JobName.AssetAnalyzeQuality, data: job.data });
@@ -518,7 +520,18 @@ export class CleanupService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(asset.previewPath);
+    const nullScores = { sharpness: null, brightness: null, clippedDark: null, clippedBright: null };
+    let staged: Awaited<ReturnType<typeof this.backendMedia.ensureLocalFile>>;
+    try {
+      staged = await this.backendMedia.ensureLocalFile(asset.previewPath);
+    } catch (error) {
+      // The job has no retry: without a record here the asset would stay unanalysed for good.
+      this.logger.warn(`Quality analysis could not fetch preview for ${asset.id}: ${error}`);
+      await this.cleanupRepository.upsertQuality({ ...base, ...nullScores });
+      return JobStatus.Success;
+    }
+
+    const { localPath, cleanup } = staged;
     try {
       const { data, width, height } = await readGreyscalePixels(localPath, CLEANUP_ANALYSIS_SIZE);
       await this.cleanupRepository.upsertQuality({

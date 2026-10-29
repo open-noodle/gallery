@@ -55,6 +55,8 @@ const serveBurstLibrary = (mocks: ServiceMocks, library: BurstRow[]) =>
 
 vi.mock('src/gallery/utils/image-quality.js', () => ({ readGreyscalePixels: vi.fn() }));
 
+const thumbnails = (data: Record<string, unknown>) => ({ name: JobName.AssetGenerateThumbnails, data }) as never;
+
 describe(CleanupService.name, () => {
   let sut: CleanupService;
   let mocks: ServiceMocks;
@@ -367,6 +369,54 @@ describe(CleanupService.name, () => {
       await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Success);
       expect(mocks.cleanup.upsertQuality).toHaveBeenCalledWith(expect.objectContaining({ sharpness: null }));
       expect(cleanup).toHaveBeenCalled();
+    });
+    // The job has no retry, so a throw here would leave the asset unanalysed for good and hold the "analysed"
+    // figure below 100.
+    it('records null scores when the preview cannot be fetched', async () => {
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockRejectedValue(new Error('NoSuchKey'));
+      mocks.cleanup.getForQualityAnalysis.mockResolvedValue({
+        id: 'a',
+        ownerId: 'u',
+        type: 'IMAGE',
+        originalFileName: 'a.jpg',
+        visibility: AssetVisibility.Timeline,
+        deletedAt: null,
+        previewPath: 'upload/p.jpg',
+        make: 'x',
+        model: 'y',
+        width: 1,
+        height: 1,
+      } as never);
+      await expect(sut.handleQualityAnalysis({ id: 'a' })).resolves.toBe(JobStatus.Success);
+      expect(mocks.cleanup.upsertQuality).toHaveBeenCalledWith(
+        expect.objectContaining({ assetId: 'a', version: 1, sharpness: null, brightness: null }),
+      );
+    });
+  });
+
+  describe('onJobSuccess', () => {
+    const analyse = { name: JobName.AssetAnalyzeQuality, data: expect.objectContaining({ id: 'a' }) };
+
+    // Every thumbnail run gives the asset a fresh preview: an upload, but also a copy, a regeneration and the
+    // nightly run for missing thumbnails. Gating on upload/notify left the latter unanalysed for good.
+    it('queues quality analysis after every successful or skipped thumbnail run', async () => {
+      for (const data of [{ id: 'a', source: 'upload' }, { id: 'a', notify: true }, { id: 'a' }]) {
+        mocks.job.queue.mockClear();
+        await sut.onJobSuccess({ job: thumbnails(data), response: JobStatus.Success });
+        expect(mocks.job.queue).toHaveBeenCalledWith(analyse);
+      }
+      mocks.job.queue.mockClear();
+      await sut.onJobSuccess({ job: thumbnails({ id: 'a' }), response: JobStatus.Skipped });
+      expect(mocks.job.queue).toHaveBeenCalledWith(analyse);
+    });
+
+    it('ignores failed thumbnail runs and other jobs', async () => {
+      await sut.onJobSuccess({ job: thumbnails({ id: 'a' }), response: JobStatus.Failed });
+      await sut.onJobSuccess({
+        job: { name: JobName.AssetExtractMetadata, data: { id: 'a', source: 'upload' } } as never,
+        response: JobStatus.Success,
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
 
