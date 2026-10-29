@@ -362,10 +362,7 @@ UPDATE "api_key" k
                 'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
-                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
-                -- Post-tag upstream values (passkeys, immich-32194; cluster group admin, immich-32787):
-                -- the tagged release cannot decode them.
-                'passkey.read', 'passkey.update', 'passkey.delete', 'clusterGroup.admin'
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -758,24 +755,13 @@ DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 -- planner tuning.
 ALTER ROLE CURRENT_USER RESET jit;
 
--- Post-tag upstream migrations this branch carries (`upstream.version` is 3.3.5; v3.3.5
--- ships everything up to 1792213725597-AddAssetFaceAssetState):
-
--- 1792511451454-AddPasskeyTable (immich-32194): passkey + auth_challenge tables, the passkey
--- updatedAt trigger and its migration_overrides row.
-DROP TRIGGER IF EXISTS "passkey_updatedAt" ON "passkey";
-DELETE FROM "migration_overrides" WHERE "name" = 'trigger_passkey_updatedAt';
-DROP TABLE IF EXISTS "passkey";
-DROP TABLE IF EXISTS "auth_challenge";
-
--- 1792517020180-AddUpdateIdIndexes (immich-32432): updateId indexes on stack, asset_face, workflow.
-DROP INDEX IF EXISTS "stack_updateId_idx";
-DROP INDEX IF EXISTS "workflow_updateId_idx";
-DROP INDEX IF EXISTS "asset_face_updateId_idx";
-
--- 1792568637987-AddAssetOwnerIdUpdateIdIndex (immich-32624): (ownerId, updateId) index on asset.
-DROP INDEX IF EXISTS "asset_ownerId_updateId_idx";
-
+-- Post-tag upstream migrations this branch carries: none. `upstream.version` is 3.4.0-rc.0, which
+-- ships every upstream migration in this tree.
+--
+-- The 3.3.5 -> 3.4.0-rc.0 bump removed three entries, now shipped by the tag:
+-- 1792511451454-AddPasskeyTable, 1792517020180-AddUpdateIdIndexes and
+-- 1792568637987-AddAssetOwnerIdUpdateIdIndex (with their schema rollbacks), plus the passkey.* and
+-- clusterGroup.admin permission values stripped from API keys.
 -- Before 3.3.5 none needed reversing: on 3.3.1 this branch's upstream migrations were identical to
 -- the tag's. The 3.3.0 -> 3.3.1 bump removed nothing.
 -- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
@@ -940,13 +926,10 @@ DELETE FROM "kysely_migrations"
    -- "corrupted migrations: previously executed migration
    -- 1776735180298-ChangeDurationToInteger is missing". The 1777667825574 row matches
    -- the upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger',
+   '1776735180298-ChangeDurationToInteger'
 
-   -- Post-tag upstream migrations pulled in by rebase, paired with schema rollbacks in step 7
-   -- and kept timestamp-sorted (`upstream.version` is 3.3.5).
-   '1792511451454-AddPasskeyTable',
-   '1792517020180-AddUpdateIdIndexes',
-   '1792568637987-AddAssetOwnerIdUpdateIdIndex'
+   -- Post-tag upstream migrations pulled in by rebase go here, paired with schema rollbacks in
+   -- step 7 and kept timestamp-sorted. None at `upstream.version` 3.4.0-rc.0.
  );
 
 -- Gallery builds since the ledger split record fork migrations in their own table instead. The
