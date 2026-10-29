@@ -366,6 +366,33 @@ const fixtureCases = (): FixtureCase[] => [
     responseView: 'no-cleanup',
     request: calendar,
   },
+  // The overview's secondary loads, on the library as seeded: every quick-win count without filters, Blurry's cover
+  // (the only queue the seed fills), and the trash total.
+  ...(['space_hogs', 'bursts', 'screenshots', 'duplicates', 'blurry'] as const).map((queue, index): FixtureCase => ({
+    name: `${String(12 + index).padStart(3, '0')}-overview-count-${queue.replace('_', '-')}`,
+    description: `The overview's ${queue} count, without filters (as the web hub asks)`,
+    request: { method: 'GET', path: `/api/cleanup/queues/${queue}/count` },
+  })),
+  {
+    name: '017-overview-cover-blurry',
+    description: "The Blurry card's cover: the first photo of the queue, without filters",
+    request: { method: 'GET', path: '/api/cleanup/queues/blurry', query: { limit: '1' } },
+  },
+  {
+    name: '018-overview-trash',
+    description: 'The trash total under the quick wins',
+    request: { method: 'GET', path: '/api/cleanup/trash' },
+  },
+  {
+    name: '019a-overview-rewind-1224-years',
+    description: 'The today card on 24 December, a day reviewed before the script starts: its years',
+    request: { method: 'GET', path: '/api/cleanup/rewind/1224' },
+  },
+  {
+    name: '019b-overview-rewind-1224-2021',
+    description: "The today card on 24 December: the busiest year's photos, for the collage and the city",
+    request: { method: 'GET', path: '/api/cleanup/rewind/1224/2021' },
+  },
   {
     name: '020-rewind-815-years',
     description: 'Rewind of 15 August: the years that have photos, newest first',

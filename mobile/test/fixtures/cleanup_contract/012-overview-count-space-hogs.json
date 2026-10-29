@@ -1,0 +1,18 @@
+{
+  "description": "The overview's space_hogs count, without filters (as the web hub asks)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/space_hogs/count"
+  },
+  "response": {
+    "body": {
+      "bytes": 0,
+      "count": 0
+    },
+    "status": 200
+  }
+}

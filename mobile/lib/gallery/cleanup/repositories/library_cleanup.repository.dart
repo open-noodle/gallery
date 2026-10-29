@@ -97,6 +97,12 @@ class LibraryCleanupRepository {
     );
   }
 
+  /// A queue's first photo, for its card on the overview: one photo, no filters, as the web hub asks.
+  Future<CleanupAssetDto?> queueCover(LibraryCleanupQueue queue) async {
+    final listQueue = queue.listQueue ?? (throw ArgumentError('${queue.name} is not a paged queue'));
+    return _present(await _cleanup.getCleanupQueue(listQueue, limit: 1)).items.firstOrNull;
+  }
+
   Future<CleanupTrashResponseDto> trash() async => _present(await _cleanup.getCleanupTrash());
 
   Future<CleanupCommitResponseDto> commit({

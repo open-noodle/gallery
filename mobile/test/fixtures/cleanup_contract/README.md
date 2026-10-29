@@ -32,6 +32,7 @@ order, **each once**: a request that has no unserved fixture left fails the test
 | Files        | What the app does                                                                                                    |
 | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `010`, `011` | The support probe: the calendar. `011` is the same request on a Gallery server without Library Cleanup (404)         |
+| `012`–`019b` | The overview: each quick-win count without filters, Blurry's cover (`limit=1`), the trash total, and 24 December     |
 | `020`–`022`  | Opens the rewind of 15 August: the years, then each year                                                             |
 | `030`–`032`  | Apply and stop: the in-spaces lookup, one commit with no `completeMonthDay`, the trash undo                          |
 | `040`–`042`  | Reopens the day: the photos decided before are `kept: true`                                                          |
@@ -83,6 +84,9 @@ Seeded values (taken dates, places, sizes, sharpness) are real.
 `responseView: "no-cleanup"` (`011`) is a Gallery server from before Library Cleanup. The recorder sends the request to a
 route this server does not have and shows Nest's 404 under the path the app asked for. The mobile tests serve it alone
 (`include:`), since it records the same request as `010`.
+
+The overview tests (`cleanup_overview_e2e_test.dart`) serve only the fixtures their day needs: `010` or `053` for the
+calendar, the day's years and photos (`019a`, `019b` for 24 December, a reviewed day), and `012`–`018`.
 
 ## Matching rule (for the mobile stand-in server)
 

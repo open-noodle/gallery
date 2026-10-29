@@ -41,12 +41,15 @@ class FakeResponse {
 /// The real generated client over an in-memory HTTP client that records every request and answers from [respond].
 /// A request [respond] has no answer for (null) is a failed test.
 class FakeCleanupServer {
-  FakeCleanupServer(this.respond) {
+  FakeCleanupServer(this.respond, {this.gate}) {
     client = ApiClient(basePath: 'http://cleanup.test/api')..client = MockClient(_handle);
   }
 
   final requests = <SeenRequest>[];
   final FakeResponse? Function(SeenRequest request) respond;
+
+  /// Holds a response back until the future it returns completes (null: answer at once).
+  final Future<void>? Function(SeenRequest request)? gate;
   late final ApiClient client;
 
   Future<http.Response> _handle(http.Request request) async {
@@ -57,6 +60,7 @@ class FakeCleanupServer {
       request.body.isEmpty ? null : jsonDecode(request.body),
     );
     requests.add(seen);
+    await gate?.call(seen);
     final response = respond(seen);
     if (response == null) {
       throw StateError('unexpected request: $seen');

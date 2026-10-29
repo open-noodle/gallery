@@ -1,0 +1,19 @@
+{
+  "description": "The overview's screenshots count, without filters (as the web hub asks)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/screenshots/count"
+  },
+  "response": {
+    "body": {
+      "analysedPercent": 68,
+      "bytes": 0,
+      "count": 0
+    },
+    "status": 200
+  }
+}

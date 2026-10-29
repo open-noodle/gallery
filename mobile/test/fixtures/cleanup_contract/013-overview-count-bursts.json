@@ -1,0 +1,18 @@
+{
+  "description": "The overview's bursts count, without filters (as the web hub asks)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/bursts/count"
+  },
+  "response": {
+    "body": {
+      "bytes": 0,
+      "count": 0
+    },
+    "status": 200
+  }
+}
