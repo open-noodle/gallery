@@ -31,7 +31,7 @@ import 'cleanup_test_utils.dart';
 //   Given the trash is on    Then the trash line shows its size;  Given it is off   Then no line and no trash call
 //   "Could still free" shows only once every count has arrived, and is their sum
 // Pull to refresh   reloads every section
-// Navigation        Start opens the rewind; a quick win and "See all" open their placeholders
+// Navigation        Start opens the rewind; a quick win opens its placeholder; "See all" opens Your year
 // Motion            the sections arrive on a stagger; a pressed card squishes; reduced motion shows everything at once
 
 const _mib = 1024 * 1024;
@@ -401,7 +401,7 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('Start opens the rewind, a quick win and "See all" their placeholders, and back returns', (
+    testWidgets('Start opens the rewind, a quick win its placeholder, "See all" Your year, and back returns', (
       tester,
     ) async {
       await openOverview(tester);
@@ -429,7 +429,15 @@ void main() {
       }
 
       await openAndBack('cleanup-quick-win-space_hogs', 'Space hogs');
-      await openAndBack('cleanup-see-all', 'Your year');
+
+      await tester.ensureVisible(find.byKey(const Key('cleanup-see-all')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('cleanup-see-all')));
+      await settle(tester);
+      expect(find.byKey(const Key('cleanup-year-months')), findsOneWidget);
+      await tester.pageBack();
+      await settle(tester);
+      expect(find.byKey(const Key('cleanup-year-months')), findsNothing);
     });
   });
 

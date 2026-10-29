@@ -530,6 +530,7 @@
   "cleanup_min_size": "最小大小",
   "cleanup_mode_grid": "网格",
   "cleanup_mode_one": "逐张",
+  "cleanup_month_progress": "已检查 {reviewed}/{total} 天 · 还剩 {left} 天",
   "cleanup_move_to_trash": "将 {count} 项移至回收站",
   "cleanup_not_a_problem": "没问题（保留）",
   "cleanup_open_in_library": "在图库中打开",

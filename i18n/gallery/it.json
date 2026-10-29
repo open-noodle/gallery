@@ -526,6 +526,7 @@
   "cleanup_min_size": "Dimensione min.",
   "cleanup_mode_grid": "Griglia",
   "cleanup_mode_one": "Una alla volta",
+  "cleanup_month_progress": "{reviewed} giorni su {total} revisionati · ne mancano {left}",
   "cleanup_move_to_trash": "Sposta {count} nel cestino",
   "cleanup_not_a_problem": "Nessun problema (mantieni)",
   "cleanup_open_in_library": "Apri nella libreria",

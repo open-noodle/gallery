@@ -525,6 +525,7 @@
   "cleanup_min_size": "Min size",
   "cleanup_mode_grid": "Grid",
   "cleanup_mode_one": "One at a time",
+  "cleanup_month_progress": "{reviewed} of {total} days reviewed · {left} to go",
   "cleanup_move_to_trash": "Move {count} to trash",
   "cleanup_not_a_problem": "Not a problem (keep)",
   "cleanup_open_in_library": "Open in library",

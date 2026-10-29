@@ -36,6 +36,7 @@ class CleanupOverviewRouter extends RootStackRouter {
     AutoRoute(page: LibraryCleanupOverviewRoute.page),
     AutoRoute(page: LibraryCleanupPlaceholderRoute.page),
     AutoRoute(page: LibraryCleanupRewindRoute.page),
+    AutoRoute(page: LibraryCleanupYearRoute.page),
   ];
 }
 

@@ -526,6 +526,7 @@
   "cleanup_min_size": "Tamaño mín.",
   "cleanup_mode_grid": "Cuadrícula",
   "cleanup_mode_one": "Una a una",
+  "cleanup_month_progress": "{reviewed} de {total} días revisados · faltan {left}",
   "cleanup_move_to_trash": "Mover {count} a la papelera",
   "cleanup_not_a_problem": "No es un problema (conservar)",
   "cleanup_open_in_library": "Abrir en la biblioteca",

@@ -41,12 +41,18 @@ final libraryCleanupSavedDayMarksProvider = FutureProvider.autoDispose.family<Li
   return ref.watch(libraryCleanupMarksStoreProvider).load(LibraryCleanupMarksStore.rewindKey(userId, monthDay));
 });
 
+/// How many of a date's photos the day sheet on Your year shows.
+const libraryCleanupPreviewSize = 4;
+
 /// What the today card shows after its counts: a few photos, the busiest year's city, and where a saved rewind left
 /// off.
 class LibraryCleanupDayPhotos {
-  const LibraryCleanupDayPhotos({required this.collage, this.city, this.resume});
+  const LibraryCleanupDayPhotos({required this.collage, this.preview = const [], this.city, this.resume});
 
   final List<CleanupAssetDto> collage;
+
+  /// The busiest year's first photos, up to four: the day sheet's thumbnails on Your year.
+  final List<CleanupAssetDto> preview;
 
   /// The busiest year's most common city.
   final String? city;
@@ -74,6 +80,7 @@ final libraryCleanupDayPhotosProvider = FutureProvider.autoDispose.family<Librar
     final assets = await repository.rewindAssets(monthDay, busiest.year);
     return LibraryCleanupDayPhotos(
       collage: assets.take(libraryCleanupCollageSize).toList(),
+      preview: assets.take(libraryCleanupPreviewSize).toList(),
       city: libraryCleanupDominantCity(assets),
     );
   }
@@ -85,6 +92,7 @@ final libraryCleanupDayPhotosProvider = FutureProvider.autoDispose.family<Librar
   final marked = all.where((asset) => !asset.kept && saved[asset.id] != null).length;
   return LibraryCleanupDayPhotos(
     collage: busiestAssets.take(libraryCleanupCollageSize).toList(),
+    preview: busiestAssets.take(libraryCleanupPreviewSize).toList(),
     city: libraryCleanupDominantCity(busiestAssets),
     // Marks for photos no longer in the day are ignored, as the rewind ignores them when it restores.
     resume: marked == 0 ? null : LibraryCleanupResumePoint(decided: kept + marked, total: all.length),

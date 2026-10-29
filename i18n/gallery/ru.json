@@ -526,6 +526,7 @@
   "cleanup_min_size": "Мин. размер",
   "cleanup_mode_grid": "Сетка",
   "cleanup_mode_one": "По одному",
+  "cleanup_month_progress": "Просмотрено дней: {reviewed} из {total} · осталось {left}",
   "cleanup_move_to_trash": "Переместить в корзину ({count})",
   "cleanup_not_a_problem": "Всё в порядке (оставить)",
   "cleanup_open_in_library": "Открыть в библиотеке",

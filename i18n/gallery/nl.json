@@ -526,6 +526,7 @@
   "cleanup_min_size": "Min. grootte",
   "cleanup_mode_grid": "Raster",
   "cleanup_mode_one": "Eén voor één",
+  "cleanup_month_progress": "{reviewed} van {total} dagen beoordeeld · nog {left} te gaan",
   "cleanup_move_to_trash": "{count} naar prullenbak verplaatsen",
   "cleanup_not_a_problem": "Geen probleem (behouden)",
   "cleanup_open_in_library": "Openen in bibliotheek",

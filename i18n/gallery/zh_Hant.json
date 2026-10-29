@@ -539,6 +539,7 @@
   "cleanup_min_size": "最小大小",
   "cleanup_mode_grid": "格狀",
   "cleanup_mode_one": "逐張",
+  "cleanup_month_progress": "已檢查 {reviewed}/{total} 天 · 還剩 {left} 天",
   "cleanup_move_to_trash": "將 {count} 項移至垃圾桶",
   "cleanup_not_a_problem": "沒問題（保留）",
   "cleanup_open_in_library": "在圖庫中開啟",

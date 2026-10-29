@@ -526,6 +526,7 @@
   "cleanup_min_size": "Min. rozmiar",
   "cleanup_mode_grid": "Siatka",
   "cleanup_mode_one": "Pojedynczo",
+  "cleanup_month_progress": "Przejrzane dni: {reviewed} z {total} · zostało {left}",
   "cleanup_move_to_trash": "Przenieś do kosza ({count})",
   "cleanup_not_a_problem": "To nie problem (zachowaj)",
   "cleanup_open_in_library": "Otwórz w bibliotece",

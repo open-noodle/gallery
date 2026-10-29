@@ -526,6 +526,7 @@
   "cleanup_min_size": "Taille min.",
   "cleanup_mode_grid": "Grille",
   "cleanup_mode_one": "Une à une",
+  "cleanup_month_progress": "{reviewed} jours sur {total} vérifiés · encore {left}",
   "cleanup_move_to_trash": "Mettre {count} à la corbeille",
   "cleanup_not_a_problem": "Pas de problème (conserver)",
   "cleanup_open_in_library": "Ouvrir dans la photothèque",

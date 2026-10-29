@@ -45,8 +45,7 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
   /// Days finished in a rewind since this screen was last on top; their teaser cells pop as they turn green.
   final Set<int> _popped = {};
 
-  // The quick wins and "See all" open placeholders until their slices land: the queues in Slices 6 and 7, Your year in
-  // Slice 8.
+  // The quick wins open placeholders until their slices land: the queues in Slices 6 and 7.
   void _open(String title) => context.pushRoute(LibraryCleanupPlaceholderRoute(title: title));
 
   /// Today's rewind; the collage's large photo flies into its first card.
@@ -138,7 +137,7 @@ class _LibraryCleanupOverviewPageState extends ConsumerState<LibraryCleanupOverv
                       days: calendar.days,
                       today: _today,
                       popDays: _popped,
-                      onSeeAll: () => _open(context.t.cleanup_your_year),
+                      onSeeAll: () => context.pushRoute(const LibraryCleanupYearRoute()),
                     ),
             ),
           ],
