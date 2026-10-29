@@ -68,7 +68,7 @@ const MergePersonSchema = z
 
 const ScopedPersonProfileRefSchema = z
   .object({
-    type: z.enum(['person', 'space-person']).describe('Scoped profile type'),
+    type: z.enum(['person', 'space-person']).describe('Scoped profile type').meta({ id: 'ScopedPersonProfileType' }),
     id: z.uuidv4().describe('Scoped profile ID'),
     spaceId: z.uuidv4().optional().describe('Space ID for Space Person refs'),
   })
