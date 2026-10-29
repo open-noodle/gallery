@@ -17,9 +17,9 @@ import { SlideshowState, slideshowStore } from '#lib/stores/slideshow.store.ts';
 import { waitForWebsocketEvent } from '#lib/stores/websocket.ts';
 import { getAssetMediaUrl, getSharedLink, sleep } from '#lib/utils.ts';
 import { downloadUrl } from '#lib/utils.ts';
+import type { OnFavorite } from '#lib/utils/actions.ts';
 import { canEditAsset } from '#lib/utils/asset-editability.ts';
 import { getEditableAssetsWithWarning } from '#lib/utils/asset-utils.ts';
-import type { OnFavorite } from '#lib/utils/actions.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import {
