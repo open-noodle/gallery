@@ -12,6 +12,8 @@ hierarchy and shape, not hex values), in `specs/mockups/2026-10-29-mobile-cleanu
 - `3-queues.html`: Blurry, Screenshots and Bursts in the deck (its year screen is superseded by `4-calendar.html`)
 - `4-calendar.html`: year of month cards, then a zoomed month with the day sheet
 - `5-grid-and-finish.html`: grid mode and the end of a rewind
+- `6-bursts-v2.html`: the series card after testing: frames chosen by taps and chips, one labelled apply, left skips
+  (supersedes the series card's buttons and swipes in `3-queues.html`)
 
 "The owner" is the project owner. Their decisions are marked as theirs; everything marked "my call" is the designer's
 and may be revisited.
@@ -141,8 +143,9 @@ card signal and its filters. Nothing else differs.
   left = trash, up = favourite, with one line, "Nothing is deleted until you press Done". Shown once, remembered on the
   device; "How it works" in the ⋯ menu replays it. It counts as seen as soon as it shows (same rule as the web
   explainer). Bursts and Duplicates get the series card's own lesson the first time either opens, with its own flag,
-  because its swipes mean other things: right "Keep as set", up "Keep all", left "Trash all" (Duplicates: the hand only
-  nudges left and the label reads "Keep at least one copy"), plus how frames are marked. A session that opens in the
+  because its swipes mean other things: right "Does what the button says", left "Skip", no swipe up, plus one line on
+  how frames are chosen (tap the photo or a thumbnail; the button or a swipe right does exactly what it says; a swipe
+  left skips). Both queues show the same lesson. A session that opens in the
   grid shows the grid's "Hold a photo for details" hint instead; that hint is one flag for every grid, also seen as
   soon as it shows.
 
@@ -328,22 +331,43 @@ same **series card** (mockup `3-queues.html`, third screen) so they feel the sam
 
 - A big frame (uncropped, on black) with "frame i of N" and the group's badge on the suggested frame, a header, and a
   filmstrip of every frame below it. ⓘ on the big frame opens the details sheet for the frame shown.
-- Marks start on the suggestion: the suggested frames kept, the rest marked for trash. A chip summarises "Keep 1 ·
-  trash 5 (18 MB)".
-- Tap a filmstrip thumbnail to show it in the big frame; tap the big frame to flip the mark of the frame shown.
-  Horizontal swipes on the big frame step through the frames; swipes anywhere else on the card decide the group.
-- **Swipe right: accept the marks as set. Swipe up: keep all.** Left differs per queue (below). Buttons: Undo, the
-  left action, Keep as set, Keep all, and the queue's extra action. Like every other mark, these are pending until
-  Done → Apply.
-- **Grid mode** for both: a scrolling list of series cards, with "Keep the suggestion for all" for the loaded groups
-  (my call).
+- Marks start on the suggestion: the suggested frames kept, the rest marked for trash. The header shows the size the
+  frames marked for trash would free; the counts are on the button.
+
+**The rule (the owner's decision after testing, 2026-10-29; mockup `6-bursts-v2.html`): the selection changes only by
+tapping frames or a shortcut chip, and one primary action applies the selection, its label always saying exactly
+what will happen.**
+
+- Tap the big frame or a filmstrip thumbnail to flip that frame between keep and trash (a thumbnail also shows it in
+  the big frame). Horizontal swipes on the big frame step through the frames.
+- **Chips** under the filmstrip change the selection and never apply it; the one matching the selection shows
+  selected. Bursts: "★ Best only" (the suggested frame kept, the rest trash), "Keep all", "▤ Stack instead".
+  Duplicates: "Suggested only", "Keep all", "Not duplicates". The last chip is a toggle; while it is on every frame
+  shows kept, and tapping a frame or another chip turns it off (a tapped frame flips from what was shown).
+- **The primary button**, full width between Undo and Skip, reads the live outcome: "✓ Keep 1 · Trash 5", "Keep all
+  6", red "Trash all 6" when every burst frame is marked for trash, "▤ Stack 6" with Stack instead on, "Not duplicates"
+  with that chip on. A duplicate group with every copy marked for trash cannot be applied: the button is disabled and
+  reads "Keep at least one copy". Pressing it applies the selection as shown (pending until Done → Apply, like every
+  mark) and moves to the next series with the deck's throw.
+- **Swipe right on the card is the primary button**; its stamp shows the button's exact words ("KEEP 2 · TRASH 4",
+  "TRASH ALL 6", "STACK 6"). When the button is disabled the card rubber-bands and shows "Keep at least one copy".
+- **Swipe left is Skip**, and a Skip button mirrors it: the series moves on with nothing marked and stays in the queue;
+  a skip is not saved, so it comes back next session. **There is no swipe up**: the card springs back.
+- Undo steps back one series decision, an apply or a skip, and brings that series back on top.
+- Applying sends the same requests for the same selection as before: a selection with every frame kept or trashed
+  commits exactly what "Keep all" or "Trash all" used to.
+- **Grid mode** for both: a scrolling list of series cards, each with its chips and its own apply button (the same
+  label, shown selected while the series is applied; a selection changed after applying is applied as it now stands).
+  "Keep the suggestion for all" sets every loaded series with nothing applied to its suggestion and applies it, so
+  each row's button shows what is pending (my call).
 
 **Bursts** (the web's `BurstGroupCard` behaviour):
 
 - Header "N photos in S s · date · city"; badge "★ Sharpest"; the sharpness bar per frame in the details sheet.
-- **Swipe left: trash the whole series** (my call; the web's resolve already allows zero kept).
-- Extra action: Stack instead ▤ (pending like the rest; applied as a stack). Applying uses the same commit and stack
-  calls the web `BurstGroupCard` uses.
+- Trashing the whole series is allowed (the web's resolve already allows zero kept): tap frames until all are ✕ and
+  the button reads "Trash all N".
+- "Stack instead" ▤ makes the button "Stack N" (pending like the rest; applied as a stack). Applying uses the same
+  commit and stack calls the web `BurstGroupCard` uses.
 
 **Duplicates** (upstream's duplicates API, already in the generated Dart client; no fork endpoint):
 
@@ -355,11 +379,11 @@ same **series card** (mockup `3-queues.html`, third screen) so they feel the sam
 - Header "N copies · date · city"; badge "Suggested"; each filmstrip frame carries its resolution and file size, with
   the largest and the highest resolution highlighted, so copies can be told apart without opening details. The
   details sheet has every field already (the response is a full asset).
-- **Swipe left does not trash every copy**: trashing all copies deletes the photo, which is never what clearing
-  duplicates means. The card resists (rubber-band) and shows "Keep at least one copy"; to drop a copy, flip its mark.
-  This is the only place the left swipe differs, and the reason is shown on the card (my call).
-- Swipe up "keep all" means "not duplicates": `DELETE /duplicates/{id}` dismisses the group without deleting anything.
-- Applying sends `POST /duplicates/resolve` with each accepted group's keep and trash ids, in batches of at most 50
+- **Every copy can never be trashed**: that deletes the photo, which is never what clearing duplicates means. With
+  every copy marked for trash the button is disabled with "Keep at least one copy" and a swipe right resists and says
+  so (my call).
+- "Not duplicates" applied means `DELETE /duplicates/{id}`: the group is dismissed without deleting anything.
+- Applying sends `POST /duplicates/resolve` with each applied group's keep and trash ids, in batches of at most 50
   groups, and `DELETE /duplicates/{id}` for each dismissed group. The trash rules in "Trash confirmation" apply (spaces lookup, trash
   off). The post-apply undo toast restores the trashed copies with `restoreAssets`; the groups themselves do not come
   back until the server detects them again (stated in the toast).
@@ -437,7 +461,10 @@ Everything uses the mobile motion kit and its rules (`specs/2026-10-23-mobile-mo
   the grid on screen (the close prompt's Apply), the trashed tiles fly into Done (`removal.dart`, or dissolve with the
   trash off) while the grid reflows over the gap.
 - **Series card:** changing the big frame crossfades on `quick`; the filmstrip's current frame outline slides to the
-  new thumbnail; flipping a mark fades the ring in and pops its check.
+  new thumbnail; flipping a mark fades the ring in and pops its check. The primary button's label swaps as frames and
+  chips are tapped (`swap.dart`: the new words rise into place). Applying or skipping throws the card as the deck does
+  (right or left), and its stamp shows the button's words or "SKIP"; a vertical drag follows the finger only partly and
+  springs back; a refused swipe right rubber-bands.
 - **Applying:** "Apply and stop" flies the marks into the Done button; finishing plays "Celebrating a finished day".
   The finish screen's rows rise in on a short stagger.
 - **Next day:** the next day's first card slides in from the right as the finished one leaves to the left.
@@ -736,28 +763,34 @@ generated upstream duplicates API; contract fixtures for `GET /duplicates`, `POS
 **Behaviours (Duplicates):**
 - Marks start on `suggestedKeepAssetIds`; each frame shows its resolution and size, the largest and sharpest-resolution
   highlighted.
-- Swipe right accepts the marks; swipe up marks the group dismissed; swipe left rubber-bands with "Keep at least one
-  copy" and marks nothing. Nothing is sent until Done → Apply, which sends `POST /duplicates/resolve` for accepted
-  groups and `DELETE /duplicates/{id}` for dismissed ones.
-- A group whose marks would trash every copy cannot be accepted (Keep as set is disabled with the same message).
+- The primary button (or a swipe right) applies the selection its label states; "Not duplicates" turns it into the
+  dismissal; Skip (or a swipe left) marks nothing. Nothing is sent until Done → Apply, which sends
+  `POST /duplicates/resolve` for applied groups and `DELETE /duplicates/{id}` for dismissed ones.
+- A group whose marks would trash every copy cannot be applied: the button is disabled with "Keep at least one copy"
+  and a swipe right rubber-bands with the same message.
 - Trash follows "Trash confirmation"; the post-apply undo restores the trashed copies and says the groups will not
   come back.
 - No duplicate permission: no Duplicates card on the overview and no duplicates request.
 
 **Behaviours (Bursts):**
-- The suggested frame starts kept, the rest trash; the chip shows the counts and size.
-- Tapping a thumbnail shows it; tapping the big frame flips its mark; horizontal swipes on the big frame step frames.
-- Swipe right accepts the marks as set; left marks every frame for trash; up keeps all; Stack instead marks the series
-  to stack. Local undo steps back one series. On apply, each sends the same ids and calls the web `BurstGroupCard`
-  sends.
+- The suggested frame starts kept, the rest trash; the button shows the counts ("Keep 1 · Trash 5") and the header
+  the size freed.
+- Tapping a thumbnail shows it and flips its mark; tapping the big frame flips its mark; horizontal swipes on the big
+  frame step frames. The chips change the selection and never apply it.
+- The primary button and a swipe right apply exactly the selection the label states ("Trash all N" in red with every
+  frame trashed, "Stack N" with Stack instead on); the stamp shows the same words. Skip and a swipe left move on with
+  nothing marked; the series is back next session. A swipe up does nothing. Local undo steps back one series decision.
+  On apply, each sends the same ids and calls the web `BurstGroupCard` sends.
 - The post-apply undo restores the trashed frames, as the web's `restoreGroups` does; kept frames stay kept.
 - Previews of a series load when it is next or on top, not for the whole page.
-- Grid list: "Keep the suggestion for all" accepts every loaded series on its suggested frame (pending until apply).
+- Grid list: "Keep the suggestion for all" sets every loaded series with nothing applied to its suggested frame and
+  applies it (pending until Done → Apply); each row's button shows what is pending.
 
-**End-to-end test:** `cleanup_bursts_e2e_test.dart`: accept one series as set, change a mark on another, stack a
-third, apply once; the requests match the fixtures. `cleanup_duplicates_e2e_test.dart`: accept a group on the
-suggestion, flip a mark and accept another, dismiss a third, apply; try to trash every copy and assert it cannot be
-accepted and nothing is sent.
+**End-to-end test:** `cleanup_bursts_e2e_test.dart`: apply one series on its suggestion with a swipe right, tap a
+thumbnail on another and apply it with the button, switch a third to Stack instead and apply, Apply once; the requests
+match the fixtures. `cleanup_duplicates_e2e_test.dart`: apply a group on the suggestion, flip every copy to trash and
+assert the button is disabled, the swipe resists and nothing is sent, keep another copy and apply, switch a third to
+Not duplicates and swipe right, Apply.
 
 ### Slice 8 — Your year
 
@@ -809,6 +842,11 @@ a decision and Undo, the close prompt from ‹ and from the iOS back swipe, and 
   and needed server-side undo for keeps and favourites. Accepted cost: the phone's queues differ from the web's, and
   long queues build a pending pile, saved on the device.
 - **Duplicates are in scope** (the owner, 2026-10-29), through upstream's duplicates API with no fork endpoint.
+- **The series card says what it will do** (the owner, after testing, 2026-10-29). Rejected: swipe left "Trash all"
+  and swipe up "Keep all" (and their buttons), which silently replaced the frames the user had tapped while swipe
+  right "Keep as set" applied them, so nobody could tell what an action would do. Now the selection changes only by
+  tapping frames or a chip, one primary action (button or swipe right) applies it under a label that states the
+  outcome, swipe left skips, and there is no swipe up.
 
 ## Left to the builder
 
