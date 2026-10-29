@@ -147,16 +147,26 @@ enum LibraryCleanupApplyStatus {
 
 /// What a trash commit needs the user to confirm first.
 class LibraryCleanupTrashCheck {
-  const LibraryCleanupTrashCheck({required this.trashCount, required this.inSpacesCount, required this.trashEnabled});
+  const LibraryCleanupTrashCheck({
+    required this.trashCount,
+    required this.inSpacesCount,
+    this.externalCount = 0,
+    required this.trashEnabled,
+  });
 
   final int trashCount;
 
   /// Of the photos to trash, how many are also in a shared space (they vanish for its members too).
   final int inSpacesCount;
+
+  /// Of the photos to trash, how many are from an external library (a read-only one brings the file back at its next
+  /// scan, and no space is freed).
+  final int externalCount;
   final bool trashEnabled;
 
-  /// With the trash off the delete is permanent, so the user always confirms; otherwise only for space photos.
-  bool get needsConfirmation => trashCount > 0 && (!trashEnabled || inSpacesCount > 0);
+  /// With the trash off the delete is permanent, so the user always confirms; otherwise only for photos in a space or
+  /// from an external library.
+  bool get needsConfirmation => trashCount > 0 && (!trashEnabled || inSpacesCount > 0 || externalCount > 0);
 }
 
 class LibraryCleanupApplyResult {

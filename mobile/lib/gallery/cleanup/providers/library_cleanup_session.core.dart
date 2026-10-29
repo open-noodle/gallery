@@ -5,8 +5,8 @@ import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup.repos
 import 'package:immich_mobile/gallery/cleanup/repositories/library_cleanup_marks_store.dart';
 import 'package:openapi/api.dart';
 
-/// Asked once a commit has trash in it and the user must confirm (a photo in a shared space, or the trash is off and
-/// the delete is permanent). Resolves to true to go ahead.
+/// Asked once a commit has trash in it and the user must confirm (a photo in a shared space or an external library, or
+/// the trash is off and the delete is permanent). Resolves to true to go ahead.
 typedef LibraryCleanupConfirm = Future<bool> Function(LibraryCleanupTrashCheck check);
 
 /// The part of a session that does not depend on Riverpod: the marks, their saved copy, and committing them. The
@@ -33,12 +33,15 @@ class LibraryCleanupSessionCore {
   /// Saves the marks as they stand (a write per change; the store keeps them in order).
   Future<void> persist() => store.save(storeKey, book);
 
-  /// Asks the server which of [trashIds] are in a shared space. Throws when the lookup fails.
+  /// Asks the server which of [trashIds] are in a shared space or an external library. Throws when the lookup fails.
   Future<LibraryCleanupTrashCheck> checkTrash(List<String> trashIds) async {
-    final inSpaces = trashIds.isEmpty ? const <String>{} : await repository.idsInSpaces(trashIds);
+    final found = trashIds.isEmpty
+        ? (inSpaces: const <String>{}, external: const <String>{})
+        : await repository.trashLookup(trashIds);
     return LibraryCleanupTrashCheck(
       trashCount: trashIds.length,
-      inSpacesCount: inSpaces.length,
+      inSpacesCount: found.inSpaces.length,
+      externalCount: found.external.length,
       trashEnabled: trashEnabled(),
     );
   }

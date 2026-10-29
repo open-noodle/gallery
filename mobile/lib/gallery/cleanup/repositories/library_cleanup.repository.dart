@@ -123,13 +123,17 @@ class LibraryCleanupRepository {
     ),
   );
 
-  /// Which of [assetIds] are in a shared space (the caller's own, in at least one space).
-  Future<Set<String>> idsInSpaces(List<String> assetIds) async {
-    final found = <String>{};
+  /// Which of [assetIds] are in a shared space (the caller's own, in at least one space), and which are from an
+  /// external library. Asked in chunks of [libraryCleanupMaxIds], as the web asks.
+  Future<({Set<String> inSpaces, Set<String> external})> trashLookup(List<String> assetIds) async {
+    final inSpaces = <String>{};
+    final external = <String>{};
     for (final chunk in libraryCleanupChunk(assetIds)) {
-      found.addAll(_present(await _cleanup.getCleanupAssetsInSpaces(CleanupInSpacesDto(assetIds: chunk))).assetIds);
+      final response = _present(await _cleanup.getCleanupAssetsInSpaces(CleanupInSpacesDto(assetIds: chunk)));
+      inSpaces.addAll(response.assetIds);
+      external.addAll(response.externalAssetIds);
     }
-    return found;
+    return (inSpaces: inSpaces, external: external);
   }
 
   /// Takes the trashed assets back out of the trash.

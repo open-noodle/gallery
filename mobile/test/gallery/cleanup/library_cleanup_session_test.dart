@@ -29,6 +29,7 @@ import 'cleanup_test_utils.dart';
 // Failed chunk  When the second request fails   Then the first stays applied, the rest stays pending, and the count says how many went through
 // Trash confirmation
 //   When a trashed photo is in a space    Then the caller is asked first; declining commits nothing and keeps every mark
+//   When a trashed photo is from an external library   Then the caller is asked first, even with the trash on
 //   When the trash is off                 Then the caller is always asked, and no undo is offered
 //   When the lookup fails                 Then nothing is committed
 //   When nothing needs confirming         Then it is not asked
@@ -46,6 +47,9 @@ class DayServer {
 
   /// Ids that are in a shared space.
   final Set<String> inSpaces = {};
+
+  /// Ids from an external library.
+  final Set<String> external = {};
   bool lookupFails = false;
 
   /// Zero-based index of the commit that fails with a 500, or -1.
@@ -74,7 +78,10 @@ class DayServer {
         return const FakeResponse({'message': 'boom'}, 500);
       }
       final asked = ((request.body! as Map)['assetIds'] as List).cast<String>();
-      return FakeResponse({'assetIds': asked.where(inSpaces.contains).toList()});
+      return FakeResponse({
+        'assetIds': asked.where(inSpaces.contains).toList(),
+        'externalAssetIds': asked.where(external.contains).toList(),
+      });
     }
     if (route == 'POST /cleanup/commit') {
       commits.add(request);
@@ -477,6 +484,30 @@ void main() {
       expect(stateOf(container).marks.keys, ['q1']);
     });
 
+    test('a trashed photo from an external library is confirmed first, even with the trash on', () async {
+      final day = DayServer(twoYears())..external.addAll(['q2', 'q3']);
+      final (_, notifier, _) = await open(day);
+      notifier
+        ..trash('q1')
+        ..trash('q2')
+        ..trash('q3');
+      LibraryCleanupTrashCheck? asked;
+
+      final result = await notifier.applyAndStop(
+        confirm: (check) async {
+          asked = check;
+          return false;
+        },
+      );
+
+      expect(
+        [asked!.trashCount, asked!.inSpacesCount, asked!.externalCount, asked!.needsConfirmation],
+        [3, 0, 2, true],
+      );
+      expect(result.status, LibraryCleanupApplyStatus.cancelled);
+      expect(day.commits, isEmpty);
+    });
+
     test('nothing is asked when no trashed photo is in a space and the trash is on', () async {
       final day = DayServer(twoYears());
       final (_, notifier, _) = await open(day);
@@ -517,18 +548,28 @@ void main() {
       expect(day.commits, isEmpty);
     });
 
-    test('the lookup is chunked at 1000 ids', () async {
+    test('the lookup is chunked at 1000 ids, and both counts are summed across the chunks', () async {
       final ids = [for (var i = 1; i <= 1200; i++) 'a$i'];
-      final day = DayServer({
-        2020: [for (final id in ids) assetJson(id)],
-      });
+      final day =
+          DayServer({
+              2020: [for (final id in ids) assetJson(id)],
+            })
+            ..inSpaces.addAll(['a3', 'a1003'])
+            ..external.addAll(['a5', 'a6', 'a1100']);
       final (_, notifier, server) = await open(day);
       notifier.markMany(ids, LibraryCleanupMark.trash);
+      LibraryCleanupTrashCheck? asked;
 
-      await notifier.applyAndStop();
+      await notifier.applyAndStop(
+        confirm: (check) async {
+          asked = check;
+          return false;
+        },
+      );
 
       final lookups = server.requests.where((r) => r.route == 'POST /cleanup/in-spaces');
       expect(lookups.map((r) => ((r.body! as Map)['assetIds'] as List).length), [1000, 200]);
+      expect([asked!.inSpacesCount, asked!.externalCount], [2, 3]);
     });
   });
 

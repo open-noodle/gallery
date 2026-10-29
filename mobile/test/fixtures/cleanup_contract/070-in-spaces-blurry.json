@@ -19,7 +19,8 @@
   },
   "response": {
     "body": {
-      "assetIds": []
+      "assetIds": [],
+      "externalAssetIds": []
     },
     "status": 200
   }

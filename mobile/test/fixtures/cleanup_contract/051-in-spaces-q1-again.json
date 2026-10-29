@@ -19,7 +19,8 @@
     "body": {
       "assetIds": [
         "68a72fed-ca14-473e-8bfe-49b697990dcd"
-      ]
+      ],
+      "externalAssetIds": []
     },
     "status": 200
   }
