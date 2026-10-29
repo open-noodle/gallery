@@ -2,7 +2,7 @@ version: 1
 
 metadata:
   upstream_remote: upstream
-  upstream_branch: main
+  upstream_branch: release/v3.4
   fork_remote: origin
   fork_branch: main
   last_verified_fork_head: 9582a1d2415d5d2f5383ec53f7b426ca26e756cd
