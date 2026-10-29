@@ -349,6 +349,10 @@ Ported from the web (`web/src/lib/gallery/cleanup/cleanup-actions.ts`, `confirmC
 - **Shared spaces:** before any trash commit the app asks `POST /cleanup/in-spaces` which of the ids are in a shared
   space. If any are, the user confirms that they will disappear for the space's members too (with the permanent
   sentence added when the trash is off). If the lookup fails, nothing is trashed and an error toast shows.
+- **External libraries:** the same lookup returns `externalAssetIds`. If any are being trashed, the confirmation adds
+  the web's `cleanup_external_library_warning` sentence (a read-only external library brings the file back at its next
+  scan, and no space is freed). With only external photos and the trash on, that sentence alone is the prompt. The
+  lookup is chunked at `CLEANUP_MAX_IDS` and the counts summed, as on web.
 - Swiping never asks anything; all confirmations happen once, on the finish screen, when the user applies. Cancelling
   a confirmation commits nothing and returns to the finish screen with every mark intact.
 
