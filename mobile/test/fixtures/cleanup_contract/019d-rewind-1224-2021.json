@@ -1,0 +1,35 @@
+{
+  "description": "Start on 24 December's today card: the rewind loads its own photos",
+  "ids": {
+    "41d1fa8d-c3d1-42df-8ed8-45c0a82ff841": "asset:x1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/1224/2021"
+  },
+  "response": {
+    "body": {
+      "assets": [
+        {
+          "city": "Madrid",
+          "duration": null,
+          "fileSize": 1006,
+          "height": 1,
+          "id": "41d1fa8d-c3d1-42df-8ed8-45c0a82ff841",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": true,
+          "localDateTime": "2021-12-24T12:00:00.000Z",
+          "originalFileName": "x1.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ]
+    },
+    "status": 200
+  }
+}

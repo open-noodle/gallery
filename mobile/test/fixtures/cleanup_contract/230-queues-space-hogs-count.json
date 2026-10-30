@@ -1,0 +1,22 @@
+{
+  "description": "Space hogs opens: the count with the web's defaults (videos, 100 MiB)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/space_hogs/count",
+    "query": {
+      "minSize": "104857600",
+      "type": "video"
+    }
+  },
+  "response": {
+    "body": {
+      "bytes": 471859200,
+      "count": 2
+    },
+    "status": 200
+  }
+}

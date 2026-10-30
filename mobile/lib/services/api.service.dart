@@ -42,6 +42,8 @@ class ApiService {
   late SessionsApi sessionsApi;
   late TagsApi tagsApi;
   late SharedSpacesApi sharedSpacesApi;
+  late CleanupApi cleanupApi;
+  late DuplicatesApi duplicatesApi;
   late TimelineApi timelineApi;
 
   ApiService() {
@@ -82,6 +84,8 @@ class ApiService {
     sessionsApi = SessionsApi(_apiClient);
     tagsApi = TagsApi(_apiClient);
     sharedSpacesApi = SharedSpacesApi(_apiClient);
+    cleanupApi = CleanupApi(_apiClient);
+    duplicatesApi = DuplicatesApi(_apiClient);
     timelineApi = TimelineApi(_apiClient);
   }
 
