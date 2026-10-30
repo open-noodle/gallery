@@ -50,7 +50,9 @@ for file in "${check_files[@]}"; do
   if [[ -f "$filepath" ]]; then
     # Exclude known code-internal patterns (function names, class names, CSS classes)
     matches=$(grep -c "$UPSTREAM_NAME" "$filepath" 2>/dev/null || true)
-    allowed=$(grep -cE "(Immich(App|Service|Link)|immich-|bg-immich|getMyImmich|// .*[Ii]mmich)" "$filepath" 2>/dev/null || true)
+    # [A-Za-z0-9_]Immich / Immich[A-Z]: the name inside an identifier (ImmichStateDto,
+    # futoBackupsGetImmichBackupStatus), which branding deliberately leaves as in source.
+    allowed=$(grep -cE "(Immich(App|Service|Link)|immich-|bg-immich|getMyImmich|// .*[Ii]mmich|[A-Za-z0-9_]Immich|Immich[A-Z])" "$filepath" 2>/dev/null || true)
     if [[ "$matches" -gt 0 && "$matches" -gt "$allowed" ]]; then
       echo "  WARN: '$UPSTREAM_NAME' still found in $file ($matches hits, $allowed allowed)"
       EXIT_CODE=1
@@ -59,6 +61,22 @@ for file in "${check_files[@]}"; do
     fi
   fi
 done
+
+# Branding must not turn an OpenAPI identifier into one the client generators reject.
+# Upstream v3.4.0-rc.0 added schema names containing the upstream name (ImmichStateDto);
+# a blanket rewrite made them "Noodle GalleryStateDto" and broke the Dart client build.
+openapi_spec="$REPO_ROOT/open-api/immich-openapi-specs.json"
+if [[ -f "$openapi_spec" ]]; then
+  bad_ids=$(jq -r '(.components.schemas // {} | keys[]), ([.paths[][]? | objects | .operationId // empty][])' "$openapi_spec" \
+    | grep -vE '^[A-Za-z0-9._-]+$' || true)
+  if [[ -n "$bad_ids" ]]; then
+    echo "  WARN: OpenAPI identifiers are no longer valid after branding:"
+    printf '    %s\n' "$bad_ids"
+    EXIT_CODE=1
+  else
+    echo "  OK: OpenAPI schema names and operationIds"
+  fi
+fi
 
 # Check i18n — verify overrides were applied
 i18n_file="$REPO_ROOT/i18n/en.json"
