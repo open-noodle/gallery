@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
   import AppDownloadModal from '$lib/modals/AppDownloadModal.svelte';
   import ObtainiumConfigModal from '$lib/modals/ObtainiumConfigModal.svelte';
   import { Route } from '$lib/route';
   import { Icon, modalManager, Text } from '@immich/ui';
   import {
+    mdiBroom,
     mdiCellphoneArrowDownVariant,
     mdiContentDuplicate,
     mdiCrosshairsGps,
@@ -14,6 +16,7 @@
   import { t } from 'svelte-i18n';
 
   const links = [
+    { href: CleanupRoute.utility(), icon: mdiBroom, label: $t('cleanup') },
     { href: Route.duplicatesUtility(), icon: mdiContentDuplicate, label: $t('review_duplicates') },
     { href: Route.largeFileUtility(), icon: mdiImageSizeSelectLarge, label: $t('review_large_files') },
     { href: Route.geolocationUtility(), icon: mdiCrosshairsGps, label: $t('manage_geolocation') },

@@ -91,6 +91,10 @@
       allText: $t('all'),
       missingText: $t('missing'),
     },
+    [QueueName.QualityAnalysis]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),

@@ -23,7 +23,7 @@ vi.mock('$app/state', async () => {
 
 vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
 
-// The Details panel loads the asset; nothing here is about its rows (suggestion-asset-details.spec.ts is).
+// The Details panel loads the asset; nothing here is about its rows (asset-context/asset-context-details.spec.ts is).
 const getAssetMock = vi.hoisted(() => vi.fn());
 vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
 
@@ -673,7 +673,7 @@ describe('PersonSuggestionReviewModal', () => {
   // #1039 — "this is sometimes difficult to tell if a face is the good person": the reviewer had to
   // right-click and open the photo in a new tab to place it. The context row below the photo does that
   // without leaving the queue. The block's own behaviour is covered in
-  // suggestion-asset-details.spec.ts; these two pin that the MODAL feeds it the right candidate and the
+  // asset-context/asset-context-details.spec.ts; these two pin that the MODAL feeds it the right candidate and the
   // right surface.
   it('shows the current candidate’s date and a link to its photo', async () => {
     reactivePageMock.reset('https://gallery.test/people/p1');

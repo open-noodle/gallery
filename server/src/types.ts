@@ -637,6 +637,11 @@ export type JobItem =
   | { name: JobName.AssetClassifyQueueAll; data: IBaseJob }
   | { name: JobName.AssetClassify; data: IEntityJob }
 
+  // Library Cleanup
+  | { name: JobName.AssetAnalyzeQualityQueueAll; data: IBaseJob }
+  // `staleOnly`: recompute only the parts whose version is stale (CleanupService.handleQualityAnalysis).
+  | { name: JobName.AssetAnalyzeQuality; data: IEntityJob & { staleOnly?: boolean } }
+
   // Face Repair
   | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob };
 

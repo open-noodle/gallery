@@ -4,7 +4,9 @@ import { crossfadeNavigation } from '$lib/gallery/motion/page-transition';
 import { installPressFeedback } from '$lib/gallery/motion/press';
 import { installTilt } from '$lib/gallery/motion/tilt';
 
-export { celebrate, pop } from '$lib/gallery/motion/celebrate';
+export { celebrate, pop, pulse } from '$lib/gallery/motion/celebrate';
+export { countMotion, flipMotion, slideFrom, staggerDelay, type ListMotion } from '$lib/gallery/motion/list';
+export { nameSharedElements, SHARED_ELEMENT_ATTR } from '$lib/gallery/motion/page-transition';
 export { animateRemoval, type RemovalKind, type RemovalTarget } from '$lib/gallery/motion/removal';
 export { duration, ease, spring, springEasing } from '$lib/gallery/motion/tokens';
 
