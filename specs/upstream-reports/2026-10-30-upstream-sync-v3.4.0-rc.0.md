@@ -17,24 +17,24 @@
 
 ## Upstream changes
 
-| SHA | Summary | Area | Risk | Notes |
-| --- | --- | --- | --- | --- |
-| `2e0eb35e93d` | OCR extraction workflow filter (immich-32464) | server, plugins | MEDIUM | `getForAssetV1(assetId, trigger)`; fork #763 favorites test + fork `workflow.service.spec` trigger list updated |
-| `257090aaaed` | onnxruntime 1.31.0 | ML | LOW | uv.lock only; ML gates green |
-| `d31befb8514` | drop star-history from 16 translated READMEs | docs | LOW | fork #940 already drops the whole tail |
-| `cb2ea1e308d` | `getCameraName` avoids duplicate maker (immich-32657) | web, mobile | LOW | merged into the fork's contextual camera filter |
-| `d5918c00420` | `@immich/ui` 0.91.1 | web | MEDIUM | fork patch re-keyed, applies unchanged |
-| `a56303f393e`, `a0c5b32fb8b` | base-image bumps | docker | LOW | Shape H check NOT run (Docker Desktop down); CI `docker.yml` covers it |
-| `323e750eb50` | remove isar reference | mobile | LOW | clean |
-| `56ed326acda` | mobile OCR delete by asset | mobile | LOW | test merged with fork #749/#752 blocks |
-| `be8e4252670` | mobile context search after features load (immich-31800) | mobile | LOW | page is fork-deleted (#654/#758); upstream's new `search_page_test.dart` removed |
-| `0808f24a37c` | oauth claim validation to zod (immich-32373) | server | MEDIUM | `profile` → `rawProfile`; fork S3 profile-picture tests followed |
-| `aeee9be333f` | "f" favorites shortcut in multi-select (immich-31411) | web | **HIGH** | per-user favorites, see below |
-| `5583cd7857a` | normalized face-box matching (immich-32486) | server (replay-owned) | MEDIUM | replayed by hand into the fork's `person.service.ts`, see below |
-| `97af09ca3cb` | pigz database backups (immich-32806) | server | MEDIUM | merged with fork #1226 S3 backup store |
-| `177b57b689b` | **FUTO Backups** (immich-32268) | server, web, docker | **HIGH** | product gate, see below |
-| `2c3fc559ef0` | translations | i18n | LOW | `i18n/*.json` verbatim; two zh_Hant overlay entries now upstream |
-| `81778c8c4a9` | version v3.4.0-rc.0 | all | MEDIUM | carried `release/v3.3` version commits dropped, see below |
+| SHA                          | Summary                                                  | Area                  | Risk     | Notes                                                                                                           |
+| ---------------------------- | -------------------------------------------------------- | --------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `2e0eb35e93d`                | OCR extraction workflow filter (immich-32464)            | server, plugins       | MEDIUM   | `getForAssetV1(assetId, trigger)`; fork #763 favorites test + fork `workflow.service.spec` trigger list updated |
+| `257090aaaed`                | onnxruntime 1.31.0                                       | ML                    | LOW      | uv.lock only; ML gates green                                                                                    |
+| `d31befb8514`                | drop star-history from 16 translated READMEs             | docs                  | LOW      | fork #940 already drops the whole tail                                                                          |
+| `cb2ea1e308d`                | `getCameraName` avoids duplicate maker (immich-32657)    | web, mobile           | LOW      | merged into the fork's contextual camera filter                                                                 |
+| `d5918c00420`                | `@immich/ui` 0.91.1                                      | web                   | MEDIUM   | fork patch re-keyed, applies unchanged                                                                          |
+| `a56303f393e`, `a0c5b32fb8b` | base-image bumps                                         | docker                | LOW      | Shape H check NOT run (Docker Desktop down); CI `docker.yml` covers it                                          |
+| `323e750eb50`                | remove isar reference                                    | mobile                | LOW      | clean                                                                                                           |
+| `56ed326acda`                | mobile OCR delete by asset                               | mobile                | LOW      | test merged with fork #749/#752 blocks                                                                          |
+| `be8e4252670`                | mobile context search after features load (immich-31800) | mobile                | LOW      | page is fork-deleted (#654/#758); upstream's new `search_page_test.dart` removed                                |
+| `0808f24a37c`                | oauth claim validation to zod (immich-32373)             | server                | MEDIUM   | `profile` → `rawProfile`; fork S3 profile-picture tests followed                                                |
+| `aeee9be333f`                | "f" favorites shortcut in multi-select (immich-31411)    | web                   | **HIGH** | per-user favorites, see below                                                                                   |
+| `5583cd7857a`                | normalized face-box matching (immich-32486)              | server (replay-owned) | MEDIUM   | replayed by hand into the fork's `person.service.ts`, see below                                                 |
+| `97af09ca3cb`                | pigz database backups (immich-32806)                     | server                | MEDIUM   | merged with fork #1226 S3 backup store                                                                          |
+| `177b57b689b`                | **FUTO Backups** (immich-32268)                          | server, web, docker   | **HIGH** | product gate, see below                                                                                         |
+| `2c3fc559ef0`                | translations                                             | i18n                  | LOW      | `i18n/*.json` verbatim; two zh_Hant overlay entries now upstream                                                |
+| `81778c8c4a9`                | version v3.4.0-rc.0                                      | all                   | MEDIUM   | carried `release/v3.3` version commits dropped, see below                                                       |
 
 No upstream migrations, no Drift schema change, no FK-registry key touched.
 
@@ -133,25 +133,60 @@ hook), `openapi_patching.dart` (19→20, `backups` default). Everything else unc
 
 ## Local verification
 
-| Check | Result |
-| --- | --- |
-| server build, `tsc`, eslint, prettier | PASS |
-| server unit | PASS (7071; the one failure, the trigger list, fixed) |
-| web `tsc`, svelte-check (666 files), eslint (fresh install, tscompat off), prettier | PASS |
-| web unit | 6730 pass, 1 fail: `global-search-manager` "clears stale status…", passes 3/3 alone, file unchanged this cycle |
-| mobile codegen, `dart analyze --fatal-infos`, format, `flutter test` (3901) | PASS (pinned Flutter 3.47.2) |
-| ML ruff format/check, mypy, pytest | PASS |
-| preflight suite (305), overlay check + tests, autolink check, `.github` prettier | PASS |
-| structural: zero-byte files, retired dirs, duplicate imports, unresolved mobile imports | clean |
-| **medium tests (oracles, ledger, workflow, library), `mise sql`, base-image diff** | **NOT RUN**: Docker Desktop would not start; left to CI |
+| Check                                                                                   | Result                                                                                                         |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| server build, `tsc`, eslint, prettier                                                   | PASS                                                                                                           |
+| server unit                                                                             | PASS (7071; the one failure, the trigger list, fixed)                                                          |
+| web `tsc`, svelte-check (666 files), eslint (fresh install, tscompat off), prettier     | PASS                                                                                                           |
+| web unit                                                                                | 6730 pass, 1 fail: `global-search-manager` "clears stale status…", passes 3/3 alone, file unchanged this cycle |
+| mobile codegen, `dart analyze --fatal-infos`, format, `flutter test` (3901)             | PASS (pinned Flutter 3.47.2)                                                                                   |
+| ML ruff format/check, mypy, pytest                                                      | PASS                                                                                                           |
+| preflight suite (305), overlay check + tests, autolink check, `.github` prettier        | PASS                                                                                                           |
+| structural: zero-byte files, retired dirs, duplicate imports, unresolved mobile imports | clean                                                                                                          |
+| **medium tests (oracles, ledger, workflow, library), `mise sql`, base-image diff**      | **NOT RUN**: Docker Desktop would not start; left to CI                                                        |
 
 ## Follow-ups
 
-- Base-image Shape H check and SQL regeneration: confirm via `docker.yml` and SQL Schema Checks.
+- Base-image Shape H check and SQL regeneration: covered by `docker.yml` and SQL Schema Checks, both green.
+- Revert gate: build a branch RC, then dispatch with `gallery_image` and the `commit-81778c8…` `upstream_image`.
+- Restore-rollback timing on x64 (see Remote CI).
 - FUTO Backups stays dormant; enabling it needs an S3 answer and the hook return-path question above.
 - `global-search-manager` spec flake under full-suite load.
 - Landing blocker unchanged: the ML v2 pet-model check.
 
 ## Remote CI
 
-Pending.
+Branch `rebase/upstream-rolling-v3.4`, force-pushed from `c590dd2f0bd` to `6f019f79900`, dispatched 30 s apart.
+Three more breaks surfaced, each fixed on the branch:
+
+| Commit        | Break                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Shape                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `8c7d3ab0821` | `apply-branding.sh` rewrote every `Immich` in the OpenAPI spec, and rc.0's FUTO Backups schema names and operationIds contain it (`ImmichStateDto`, `futoBackupsGetImmichBackupStatus`). `Noodle GalleryStateDto` fails openapi-generator, so Gallery Mobile Smoke and Gallery Build Mobile both died generating the Dart client. Now whole words only; `verify-branding.sh` fails on any branded schema name or operationId that is no longer a valid identifier (proven: 15 hits with the old sed, 0 with the new). | literal-match tooling   |
+| `6e7515b9a3c` | mobile search contract fixtures for `/server/features` lacked rc.0's `backups`; the stock-Immich key list described 3.3.x.                                                                                                                                                                                                                                                                                                                                                                                            | Shape J                 |
+| `f13275651d8` | `/server/version` at a `3.4.0-rc.0` base reports `prerelease: 0`; the recorder now fixes it with minor and patch.                                                                                                                                                                                                                                                                                                                                                                                                     | —                       |
+| `ec833fad409` | immich-32657's `getCameraName` labels the fixture camera `Canon EOS R5`; the contextual-filter e2e still built `Canon Canon EOS R5` (six cases).                                                                                                                                                                                                                                                                                                                                                                      | zero-conflict, e2e only |
+
+| Workflow                             | Result                                                                   | Commit        |
+| ------------------------------------ | ------------------------------------------------------------------------ | ------------- |
+| Test                                 | GREEN, run 41032445865                                                   | `ec833fad409` |
+| Gallery Build Mobile (iOS + Android) | GREEN, run 41022074149                                                   | `8c7d3ab0821` |
+| Gallery Mobile Smoke                 | GREEN, run 41022014673                                                   | `8c7d3ab0821` |
+| Docker                               | GREEN, run 41021558412 (covers the base-image bump)                      | `6f019f79900` |
+| Static Code Analysis                 | GREEN, run 41021284816                                                   | `6f019f79900` |
+| Gallery Rebase Smoke                 | GREEN                                                                    | `6f019f79900` |
+| Storage Migration Tests / E2E        | GREEN                                                                    | `6f019f79900` |
+| Gallery ML Smoke                     | GREEN                                                                    | `6f019f79900` |
+| Revert-to-Immich Validation          | NOT RUN: needs a branch RC image (`gallery-rc-build.yml`), not yet built | —             |
+
+Commits after `6f019f79900` touch only branding scripts, e2e specs and mobile JSON fixtures.
+
+Failures that did not recur on the next run, recorded rather than accepted:
+
+- Medium Tests (`f13275651d8`): testcontainers could not pull `ghcr.io/immich-app/postgres:14-vectorchord0.4.3`
+  before any test ran. Green on `6f019f79900` and `ec833fad409`.
+- `database-backups.e2e-spec.ts` "rollback to restore point if backup is missing admin", x64 only
+  (`f13275651d8`): the rollback was at 75 % when upstream's 30 s poll ended; the following suite then hit the
+  server mid-restore (404 on sign-up, 401 on reset). The arm twin passed on the same commit. Suspected cause: the
+  fork's larger schema makes the restore slower than upstream's budget. Not confirmed locally (no Docker).
+- Web e2e, one retry each: `global-search` "bare / renders Albums AND Spaces sections together" (`page.goto`
+  ERR_ABORTED) and `spaces-selection-toolbar-person` "viewer selecting a space person's asset".
