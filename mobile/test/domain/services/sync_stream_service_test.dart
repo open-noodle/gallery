@@ -66,6 +66,7 @@ class _RecordingGallerySyncStreamRepository implements GallerySyncStreamReposito
 /// older fork server (no capability signalling) produces.
 ServerFeaturesDto makeServerFeatures({Optional<List<String>?> syncRequestTypes = const Optional.absent()}) =>
     ServerFeaturesDto(
+      backups: false,
       configFile: false,
       duplicateDetection: false,
       email: false,
