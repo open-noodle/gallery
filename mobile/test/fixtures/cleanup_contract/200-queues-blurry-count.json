@@ -1,0 +1,24 @@
+{
+  "description": "Blurry opens: the title's count, with the default filters (four more blurry photos seeded first)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry/count",
+    "query": {
+      "hideFaces": "true",
+      "reason": "all",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "analysedPercent": 70,
+      "bytes": 21150,
+      "count": 16
+    },
+    "status": 200
+  }
+}
