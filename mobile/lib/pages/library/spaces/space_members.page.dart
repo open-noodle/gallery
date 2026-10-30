@@ -3,6 +3,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/spaces/space_member_permissions.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
@@ -20,6 +21,8 @@ class SpaceMembersPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final membersAsync = ref.watch(sharedSpaceMembersProvider(spaceId));
     final currentUser = ref.watch(currentUserProvider);
+    // Null while loading / on error: the helpers then fall back to owner-only, like an older server.
+    final space = ref.watch(sharedSpaceProvider(spaceId)).valueOrNull;
 
     SharedSpaceMemberResponseDto? getCurrentMember(List<SharedSpaceMemberResponseDto> members) {
       return members.where((m) => m.userId == currentUser?.id).firstOrNull;
@@ -86,7 +89,7 @@ class SpaceMembersPage extends HookConsumerWidget {
       }
     }
 
-    void showMemberActions(SharedSpaceMemberResponseDto member, bool isOwner) {
+    void showMemberActions(SharedSpaceMemberResponseDto member, bool isOwner, bool canChangeRoles) {
       unawaited(
         showModalBottomSheet(
           context: context,
@@ -98,7 +101,7 @@ class SpaceMembersPage extends HookConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Text(member.name, style: context.textTheme.titleMedium),
                 ),
-                if (isOwner && member.role != SharedSpaceRole.owner) ...[
+                if (canChangeRoles && member.role != SharedSpaceRole.owner && member.userId != currentUser?.id) ...[
                   ListTile(
                     leading: const Icon(Icons.edit_outlined),
                     title: const Text('Set as Editor'),
@@ -117,6 +120,8 @@ class SpaceMembersPage extends HookConsumerWidget {
                       unawaited(updateRole(member, SharedSpaceRole.viewer));
                     },
                   ),
+                ],
+                if (isOwner && member.role != SharedSpaceRole.owner) ...[
                   const Divider(),
                   ListTile(
                     leading: Icon(Icons.person_remove_outlined, color: Theme.of(ctx).colorScheme.error),
@@ -151,7 +156,7 @@ class SpaceMembersPage extends HookConsumerWidget {
           membersAsync.when(
             data: (members) {
               final currentMember = getCurrentMember(members);
-              if (currentMember?.role == SharedSpaceRole.owner) {
+              if (canAddSpaceMembers(space, currentMember?.role)) {
                 return IconButton(
                   icon: const Icon(Icons.person_add_outlined),
                   onPressed: () async {
@@ -175,10 +180,16 @@ class SpaceMembersPage extends HookConsumerWidget {
         data: (members) {
           final currentMember = getCurrentMember(members);
           final isOwner = currentMember?.role == SharedSpaceRole.owner;
+          final canChangeRoles = canChangeSpaceRoles(space, currentMember?.role);
+          final showSettings = isOwner && space != null;
 
           return ListView.builder(
-            itemCount: members.length,
-            itemBuilder: (context, index) {
+            itemCount: members.length + (showSettings ? 1 : 0),
+            itemBuilder: (context, rawIndex) {
+              if (showSettings && rawIndex == 0) {
+                return SpaceMemberPermissionSettings(spaceId: spaceId, space: space);
+              }
+              final index = showSettings ? rawIndex - 1 : rawIndex;
               final member = members[index];
               return ListTile(
                 leading: CircleAvatar(child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')),
@@ -190,8 +201,10 @@ class SpaceMembersPage extends HookConsumerWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 onTap:
-                    (isOwner && member.role != SharedSpaceRole.owner) || (!isOwner && member.userId == currentUser?.id)
-                    ? () => showMemberActions(member, isOwner)
+                    (canChangeRoles && member.role != SharedSpaceRole.owner && member.userId != currentUser?.id) ||
+                        (isOwner && member.role != SharedSpaceRole.owner) ||
+                        (!isOwner && member.userId == currentUser?.id)
+                    ? () => showMemberActions(member, isOwner, canChangeRoles)
                     : null,
               );
             },

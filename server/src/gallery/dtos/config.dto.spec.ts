@@ -7,7 +7,9 @@ import {
   GalleryFaceSuggestionSchema,
   GalleryMemoriesSchema,
   GalleryPetDetectionSchema,
+  GalleryServerExtension,
   galleryConfigBool,
+  galleryServerDefaults,
 } from 'src/gallery/dtos/config.dto.js';
 
 describe('gallery config fragments', () => {
@@ -15,6 +17,23 @@ describe('gallery config fragments', () => {
     expect(galleryConfigBool.parse('true')).toBe(true);
     expect(galleryConfigBool.parse('false')).toBe(false);
     expect(galleryConfigBool.parse(true)).toBe(true);
+  });
+
+  it('defaults both space-editor member switches to false', () => {
+    expect(galleryServerDefaults).toMatchObject({
+      spaceEditorsCanAddMembers: false,
+      spaceEditorsCanChangeRoles: false,
+    });
+  });
+
+  it('coerces string booleans for the space-editor member switches', () => {
+    expect(
+      z.object({ ...GalleryServerExtension }).parse({
+        spaceEditorsCanAddMembers: 'true',
+        spaceEditorsCanChangeRoles: 'false',
+        mergePeopleAcrossOwners: 'false',
+      }),
+    ).toMatchObject({ spaceEditorsCanAddMembers: true, spaceEditorsCanChangeRoles: false });
   });
 
   it('rejects duplicate classification category names', () => {
@@ -112,6 +131,8 @@ describe('fork config survives schema composition', () => {
 
   it('keeps the fork server flag and job concurrencies', () => {
     expect(parsed.server.mergePeopleAcrossOwners).toBe(false);
+    expect(parsed.server.spaceEditorsCanAddMembers).toBe(false);
+    expect(parsed.server.spaceEditorsCanChangeRoles).toBe(false);
     expect(parsed.job.peopleBackfill).toEqual({ concurrency: 1 });
     expect(parsed.job.petDetection).toEqual({ concurrency: 1 });
     expect(parsed.job.classification).toEqual({ concurrency: 1 });

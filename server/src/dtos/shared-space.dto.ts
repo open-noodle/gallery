@@ -28,6 +28,16 @@ const SharedSpaceUpdateSchema = z
     color: UserAvatarColorSchema.optional().describe('Space color'),
     faceRecognitionEnabled: z.boolean().optional().describe('Enable face recognition for this space'),
     petsEnabled: z.boolean().optional().describe('Show pets in space people list'),
+    editorsCanAddMembers: z
+      .boolean()
+      .nullable()
+      .optional()
+      .describe('Let editors add members (null follows the server setting)'),
+    editorsCanChangeRoles: z
+      .boolean()
+      .nullable()
+      .optional()
+      .describe('Let editors change viewer and editor roles (null follows the server setting)'),
   })
   .meta({ id: 'SharedSpaceUpdateDto' });
 
@@ -76,6 +86,23 @@ const LastContributorSchema = z.object({
   name: z.string(),
 });
 
+const SharedSpaceMemberManagementSchema = z
+  .object({
+    editorsCanAddMembers: z
+      .boolean()
+      .nullable()
+      .describe('Space setting for editors adding members (null follows the server)'),
+    editorsCanChangeRoles: z
+      .boolean()
+      .nullable()
+      .describe('Space setting for editors changing roles (null follows the server)'),
+    serverEditorsCanAddMembers: z.boolean().describe('Server default for editors adding members'),
+    serverEditorsCanChangeRoles: z.boolean().describe('Server default for editors changing roles'),
+    canAddMembers: z.boolean().describe('Whether the current user can add members'),
+    canChangeRoles: z.boolean().describe('Whether the current user can change member roles'),
+  })
+  .meta({ id: 'SharedSpaceMemberManagementDto' });
+
 const SharedSpaceResponseSchema = z
   .object({
     id: z.string().describe('Space ID'),
@@ -101,6 +128,9 @@ const SharedSpaceResponseSchema = z
     newAssetCount: z.int().optional().describe('Number of new assets since last viewed'),
     lastContributor: LastContributorSchema.nullable().optional().describe('Last contributor since last viewed'),
     lastViewedAt: z.string().nullable().optional().describe('When the current user last viewed this space'),
+    memberManagement: SharedSpaceMemberManagementSchema.optional().describe(
+      'Member management permissions for the current user',
+    ),
   })
   .meta({ id: 'SharedSpaceResponseDto' });
 
@@ -321,6 +351,7 @@ export class SharedSpaceMemberCreateDto extends createZodDto(SharedSpaceMemberCr
 export class SharedSpaceMemberUpdateDto extends createZodDto(SharedSpaceMemberUpdateSchema) {}
 export class SharedSpaceMemberResponseDto extends createZodDto(SharedSpaceMemberResponseSchema) {}
 export class SharedSpaceLinkedLibraryDto extends createZodDto(SharedSpaceLinkedLibrarySchema) {}
+export class SharedSpaceMemberManagementDto extends createZodDto(SharedSpaceMemberManagementSchema) {}
 export class SharedSpaceResponseDto extends createZodDto(SharedSpaceResponseSchema) {}
 export class SharedSpaceMemberTimelineDto extends createZodDto(SharedSpaceMemberTimelineSchema) {}
 export class SharedSpaceMemberPreferencesDto extends createZodDto(SharedSpaceMemberPreferencesSchema) {}

@@ -59,9 +59,12 @@
         return $t('spaces_activity_edited_photos', { values: { name, count } });
       }
       case 'member_join': {
-        return $t('spaces_activity_joined_as', {
-          values: { name, role: String(data.role ?? $t('spaces_role_member')) },
-        });
+        const role = String(data.role ?? $t('spaces_role_member'));
+        // Present when the server resolved who added the member; absent for self-joins and deleted inviters.
+        if (typeof data.invitedByName === 'string' && data.invitedByName) {
+          return $t('spaces_activity_added_member_as', { values: { inviter: data.invitedByName, name, role } });
+        }
+        return $t('spaces_activity_joined_as', { values: { name, role } });
       }
       case 'member_leave': {
         return $t('spaces_activity_left_space', { values: { name } });

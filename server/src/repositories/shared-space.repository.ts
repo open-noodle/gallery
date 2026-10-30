@@ -2251,6 +2251,10 @@ export class SharedSpaceRepository {
       this.db
         .selectFrom('shared_space_activity')
         .leftJoin('user', 'user.id', 'shared_space_activity.userId')
+        // The inviter of a member_join, kept as a text comparison so malformed activity data cannot fail a cast.
+        .leftJoin('user as inviter', (join) =>
+          join.on(sql`"inviter"."id"::text`, '=', sql`"shared_space_activity"."data"->>'invitedById'`),
+        )
         .select([
           'shared_space_activity.id',
           'shared_space_activity.type',
@@ -2261,6 +2265,7 @@ export class SharedSpaceRepository {
           'user.email',
           'user.profileImagePath',
           'user.avatarColor',
+          'inviter.name as invitedByName',
         ])
         .where('shared_space_activity.spaceId', '=', spaceId)
         // Drop album link/unlink entries whose album no longer exists (e.g. the abandoned create-flow

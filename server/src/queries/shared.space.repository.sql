@@ -1201,10 +1201,12 @@ select
   "user"."name",
   "user"."email",
   "user"."profileImagePath",
-  "user"."avatarColor"
+  "user"."avatarColor",
+  "inviter"."name" as "invitedByName"
 from
   "shared_space_activity"
   left join "user" on "user"."id" = "shared_space_activity"."userId"
+  left join "user" as "inviter" on "inviter"."id"::text = "shared_space_activity"."data" ->> 'invitedById'
 where
   "shared_space_activity"."spaceId" = $1
   and (
