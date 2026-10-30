@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Put, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { type NextFunction, type Response } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
@@ -7,7 +8,10 @@ import { ApiTag, Permission, RouteKey } from 'src/enum.js';
 import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
-import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
+import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { sendFile } from 'src/utils/file.js';
 import { UUIDParamDto } from 'src/validation.js';
 
 // Mounted before AssetController (see src/gallery/index.ts), so the literal `PUT /assets/favorites` matches before
@@ -15,7 +19,29 @@ import { UUIDParamDto } from 'src/validation.js';
 @ApiTags(ApiTag.Assets)
 @Controller(RouteKey.Asset)
 export class GalleryAssetController {
-  constructor(private service: GalleryAssetService) {}
+  constructor(
+    private service: GalleryAssetService,
+    private spatialScene: SpatialSceneService,
+    private logger: LoggingRepository,
+  ) {}
+
+  @Get(':id/depth')
+  @FileResponse()
+  @Authenticated({ permission: Permission.AssetView, sharedLink: true })
+  @Endpoint({
+    summary: 'View the depth map of a photo',
+    description:
+      'Returns the Spatial Scene depth map of a photo: an 8-bit greyscale PNG, normalised per photo, brighter is nearer. Responds 404 when the photo has none.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async viewAssetDepth(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ) {
+    await sendFile(res, next, () => this.spatialScene.getDepthMap(auth, id), this.logger);
+  }
 
   @Post('editable')
   @Authenticated({ permission: Permission.AssetRead })

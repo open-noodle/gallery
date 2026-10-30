@@ -54,6 +54,8 @@
   import TrimArea from './editor/trim-tool/trim-area.svelte';
   import CropArea from './editor/transform-tool/CropArea.svelte';
   import ImagePanoramaViewer from './ImagePanoramaViewer.svelte';
+  import SpatialSceneViewer from '$lib/gallery/spatial/SpatialSceneViewer.svelte';
+  import { spatialSceneState } from '$lib/gallery/spatial/spatial-scene.svelte';
   import OcrButton from './OcrButton.svelte';
   import PhotoViewer from './PhotoViewer.svelte';
   import SlideshowBar from './SlideshowBar.svelte';
@@ -469,6 +471,9 @@
     if (assetViewerManager.isShowEditor && editManager.selectedTool?.type === EditToolType.Transform) {
       return 'CropArea';
     }
+    if (spatialSceneState.isActive(asset) && !assetViewerManager.isShowEditor) {
+      return 'SpatialSceneViewer';
+    }
     return 'PhotoViewer';
   });
 
@@ -610,6 +615,8 @@
       <TrimArea {asset} />
     {:else if viewerKind === 'CropArea'}
       <CropArea {asset} />
+    {:else if viewerKind === 'SpatialSceneViewer'}
+      <SpatialSceneViewer {asset} />
     {:else if viewerKind === 'PhotoViewer'}
       <PhotoViewer
         cursor={{ ...cursor, current: asset }}

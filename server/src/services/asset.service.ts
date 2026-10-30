@@ -112,6 +112,8 @@ export class AssetService extends BaseService {
         access: this.accessRepository,
         faceIdentity: this.faceIdentityRepository,
         sharedSpace: this.sharedSpaceRepository,
+        spatialScene: this.spatialSceneRepository,
+        getConfig: () => this.getConfig({ withCache: true }),
       },
       { auth, id, spaceId, data, faces: asset.faces ?? [] },
     );

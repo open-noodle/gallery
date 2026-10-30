@@ -5,6 +5,7 @@ import { Readable } from 'node:stream';
 import { text } from 'node:stream/consumers';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, IntegrityReport, JobName, JobStatus, SystemMetadataKey } from 'src/enum.js';
+import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
@@ -23,7 +24,7 @@ let defaultDatabase: Kysely<DB>;
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(IntegrityService, {
     database: db || defaultDatabase,
-    real: [IntegrityRepository, AssetRepository, ConfigRepository, SystemMetadataRepository],
+    real: [IntegrityRepository, AssetRepository, ConfigRepository, SystemMetadataRepository, SpatialSceneRepository],
     mock: [LoggingRepository, EventRepository, StorageRepository, JobRepository],
   });
 };

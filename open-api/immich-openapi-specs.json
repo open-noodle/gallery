@@ -5800,6 +5800,80 @@
         "x-immich-state": "Beta"
       }
     },
+    "/assets/{id}/depth": {
+      "get": {
+        "description": "Returns the Spatial Scene depth map of a photo: an 8-bit greyscale PNG, normalised per photo, brighter is nearer. Responds 404 when the photo has none.",
+        "operationId": "viewAssetDepth",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "View the depth map of a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.view",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/edits": {
       "delete": {
         "description": "Removes all edit actions (crop, rotate, mirror) associated with the specified asset.",
@@ -28704,6 +28778,9 @@
           "smartSearch": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
+          "spatialScene": {
+            "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
+          },
           "thumbnailGeneration": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
@@ -28731,6 +28808,7 @@
           "search",
           "sidecar",
           "smartSearch",
+          "spatialScene",
           "thumbnailGeneration",
           "videoConversion",
           "workflow"
@@ -28862,6 +28940,9 @@
           "petRecognition": {
             "$ref": "#/components/schemas/AdminConfigPetRecognitionDto"
           },
+          "spatialScene": {
+            "$ref": "#/components/schemas/AdminConfigSpatialSceneDto"
+          },
           "urls": {
             "description": "ML service URLs",
             "items": {
@@ -28880,6 +28961,7 @@
           "ocr",
           "petDetection",
           "petRecognition",
+          "spatialScene",
           "urls"
         ],
         "type": "object"
@@ -29374,6 +29456,68 @@
           "port",
           "secure",
           "username"
+        ],
+        "type": "object"
+      },
+      "AdminConfigSpatialSceneDto": {
+        "properties": {
+          "enabled": {
+            "description": "Whether the task is enabled",
+            "type": "boolean"
+          },
+          "maxForegroundRatio": {
+            "description": "Largest share of the photo the subject may cover",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "minBoundarySharpness": {
+            "description": "Minimum depth sharpness along the subject outline for a photo to count as suitable",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "minEdgeDensity": {
+            "description": "Alternatively, the minimum share of the photo made of sharp depth edges",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "minFaceHeight": {
+            "description": "Alternatively, the smallest person or pet face, as a share of the photo height. 0 ignores faces.",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "minForegroundRatio": {
+            "description": "Smallest share of the photo the subject may cover",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "modelName": {
+            "description": "Name of the depth model to use",
+            "minLength": 1,
+            "type": "string"
+          },
+          "offer": {
+            "$ref": "#/components/schemas/SpatialSceneOffer"
+          }
+        },
+        "required": [
+          "enabled",
+          "maxForegroundRatio",
+          "minBoundarySharpness",
+          "minEdgeDensity",
+          "minFaceHeight",
+          "minForegroundRatio",
+          "modelName",
+          "offer"
         ],
         "type": "object"
       },
@@ -31375,6 +31519,10 @@
           "resolvedSpaceId": {
             "description": "Resolved space ID (when server auto-detects space context)",
             "type": "string"
+          },
+          "spatialScene": {
+            "description": "Whether the viewer offers Spatial Scene for this photo: it has a depth map and the admin offers it on every photo, or the photo counts as suitable. Present only on single-asset reads.",
+            "type": "boolean"
           },
           "stack": {
             "allOf": [
@@ -34736,6 +34884,8 @@
           "PetDetection",
           "PetRecognitionQueueAll",
           "PetRecognition",
+          "SpatialSceneQueueAll",
+          "SpatialScene",
           "WorkflowAssetTrigger",
           "IntegrityUntrackedFilesQueueAll",
           "IntegrityUntrackedFiles",
@@ -38693,7 +38843,8 @@
           "editor",
           "storageBackendMigration",
           "classification",
-          "qualityAnalysis"
+          "qualityAnalysis",
+          "spatialScene"
         ],
         "type": "string"
       },
@@ -38876,6 +39027,9 @@
           "smartSearch": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "spatialScene": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "storageBackendMigration": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -38913,6 +39067,7 @@
           "search",
           "sidecar",
           "smartSearch",
+          "spatialScene",
           "storageBackendMigration",
           "storageTemplateMigration",
           "thumbnailGeneration",
@@ -44123,6 +44278,14 @@
           "assetFaceId"
         ],
         "type": "object"
+      },
+      "SpatialSceneOffer": {
+        "description": "Offer Spatial Scene on suitable photos only, or on every photo with a depth map",
+        "enum": [
+          "suitable",
+          "all"
+        ],
+        "type": "string"
       },
       "StackCreateDto": {
         "properties": {

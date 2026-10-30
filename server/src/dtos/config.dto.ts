@@ -41,6 +41,7 @@ import {
   GalleryPetDetectionSchema,
   GalleryPetRecognitionSchema,
   GalleryServerExtension,
+  GallerySpatialSceneSchema,
   GalleryStorageUsageSchema,
   galleryBackupDatabaseDefaults,
   galleryJobDefaults,
@@ -217,6 +218,7 @@ const AdminConfigSchemaWithVisibility = z
         petDetection: AdminConfigJobSettingsSchema,
         classification: AdminConfigJobSettingsSchema,
         qualityAnalysis: AdminConfigJobSettingsSchema,
+        spatialScene: AdminConfigJobSettingsSchema,
       })
       .meta({ id: 'AdminConfigJobDto' }),
     logging: z
@@ -239,6 +241,7 @@ const AdminConfigSchemaWithVisibility = z
         clip: AdminConfigMachineLearningModelSchema.extend(GalleryClipExtension).meta({ id: 'AdminConfigClipDto' }),
         petDetection: GalleryPetDetectionSchema,
         petRecognition: GalleryPetRecognitionSchema,
+        spatialScene: GallerySpatialSceneSchema,
         duplicateDetection: AdminConfigMachineLearningTaskSchema.extend({
           maxDistance: z
             .number()
@@ -662,6 +665,7 @@ export const defaults = Object.freeze<SystemConfig>({
     },
     petDetection: galleryMachineLearningDefaults.petDetection,
     petRecognition: galleryMachineLearningDefaults.petRecognition,
+    spatialScene: galleryMachineLearningDefaults.spatialScene,
     duplicateDetection: {
       enabled: true,
       maxDistance: 0.01,

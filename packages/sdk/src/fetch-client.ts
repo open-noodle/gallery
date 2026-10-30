@@ -204,6 +204,7 @@ export type AdminConfigJobDto = {
     search: AdminConfigJobSettingsDto;
     sidecar: AdminConfigJobSettingsDto;
     smartSearch: AdminConfigJobSettingsDto;
+    spatialScene: AdminConfigJobSettingsDto;
     thumbnailGeneration: AdminConfigJobSettingsDto;
     videoConversion: AdminConfigJobSettingsDto;
     workflow: AdminConfigJobSettingsDto;
@@ -296,6 +297,23 @@ export type AdminConfigPetRecognitionDto = {
     /** Name of the model to use */
     modelName: string;
 };
+export type AdminConfigSpatialSceneDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Largest share of the photo the subject may cover */
+    maxForegroundRatio: number;
+    /** Minimum depth sharpness along the subject outline for a photo to count as suitable */
+    minBoundarySharpness: number;
+    /** Alternatively, the minimum share of the photo made of sharp depth edges */
+    minEdgeDensity: number;
+    /** Alternatively, the smallest person or pet face, as a share of the photo height. 0 ignores faces. */
+    minFaceHeight: number;
+    /** Smallest share of the photo the subject may cover */
+    minForegroundRatio: number;
+    /** Name of the depth model to use */
+    modelName: string;
+    offer: SpatialSceneOffer;
+};
 export type AdminConfigMachineLearningDto = {
     availabilityChecks: AdminConfigMachineLearningAvailabilityChecksDto;
     clip: AdminConfigClipDto;
@@ -306,6 +324,7 @@ export type AdminConfigMachineLearningDto = {
     ocr: AdminConfigOcrDto;
     petDetection: AdminConfigPetDetectionDto;
     petRecognition: AdminConfigPetRecognitionDto;
+    spatialScene: AdminConfigSpatialSceneDto;
     /** ML service URLs */
     urls: string[];
 };
@@ -1804,6 +1823,8 @@ export type AssetResponseDto = {
     resized?: boolean;
     /** Resolved space ID (when server auto-detects space context) */
     resolvedSpaceId?: string;
+    /** Whether the viewer offers Spatial Scene for this photo: it has a depth map and the admin offers it on every photo, or the photo counts as suitable. Present only on single-asset reads. */
+    spatialScene?: boolean;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */
@@ -2368,6 +2389,7 @@ export type QueuesResponseLegacyDto = {
     search: QueueResponseLegacyDto;
     sidecar: QueueResponseLegacyDto;
     smartSearch: QueueResponseLegacyDto;
+    spatialScene: QueueResponseLegacyDto;
     storageBackendMigration: QueueResponseLegacyDto;
     storageTemplateMigration: QueueResponseLegacyDto;
     thumbnailGeneration: QueueResponseLegacyDto;
@@ -6940,6 +6962,24 @@ export function updateAssetAdjust({ id, assetImageAdjustDto }: {
         method: "PUT",
         body: assetImageAdjustDto
     })));
+}
+/**
+ * View the depth map of a photo
+ */
+export function viewAssetDepth({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/assets/${encodeURIComponent(id)}/depth${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Remove edits from an existing asset
@@ -11860,6 +11900,10 @@ export enum LogLevel {
     Error = "error",
     Fatal = "fatal"
 }
+export enum SpatialSceneOffer {
+    Suitable = "suitable",
+    All = "all"
+}
 export enum ReleaseChannel {
     Stable = "stable",
     ReleaseCandidate = "releaseCandidate"
@@ -12299,7 +12343,8 @@ export enum QueueName {
     Editor = "editor",
     StorageBackendMigration = "storageBackendMigration",
     Classification = "classification",
-    QualityAnalysis = "qualityAnalysis"
+    QualityAnalysis = "qualityAnalysis",
+    SpatialScene = "spatialScene"
 }
 export enum QueueCommand {
     Start = "start",
@@ -12409,6 +12454,8 @@ export enum JobName {
     PetDetection = "PetDetection",
     PetRecognitionQueueAll = "PetRecognitionQueueAll",
     PetRecognition = "PetRecognition",
+    SpatialSceneQueueAll = "SpatialSceneQueueAll",
+    SpatialScene = "SpatialScene",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",
     IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
     IntegrityUntrackedFiles = "IntegrityUntrackedFiles",

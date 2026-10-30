@@ -95,6 +95,8 @@ _RFDETR_MODELS = {"rfdetr-nano", "rfdetr-small"}
 
 _PET_RECOGNITION_MODELS = {"pet-recognition-small", "pet-recognition-base", "pet-recognition-large"}
 
+_DEPTH_ANYTHING_MODELS = {"depth-anything-v2-small", "distill-any-depth-small", "distill-any-depth-large"}
+
 SUPPORTED_PROVIDERS = [
     "nv_tensorrt_rtx",
     "CUDAExecutionProvider",
@@ -188,5 +190,8 @@ def get_model_source(model_name: str) -> ModelSource | None:
 
     if cleaned_name in _RFDETR_MODELS:
         return ModelSource.RFDETR
+
+    if cleaned_name in _DEPTH_ANYTHING_MODELS:
+        return ModelSource.DEPTH_ANYTHING
 
     return None
