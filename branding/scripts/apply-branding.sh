@@ -332,8 +332,10 @@ patch_web() {
       "$openapi" > "$tmp"
     chmod 644 "$tmp"
     mv "$tmp" "$openapi"
-    # Replace remaining user-facing "Immich" in API descriptions
-    sed -i "s/Immich/${NAME}/g" "$openapi"
+    # Replace remaining user-facing "Immich" in API descriptions. Whole words only:
+    # schema names and operationIds such as ImmichStateDto must keep the source text,
+    # or the Dart generator rejects the spec (a space is not allowed in a schema name).
+    sed -i "s/\bImmich\b/${NAME}/g" "$openapi"
     echo "  Patched OpenAPI spec"
   fi
 }
