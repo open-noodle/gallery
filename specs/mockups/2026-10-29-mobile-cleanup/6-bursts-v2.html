@@ -1,0 +1,128 @@
+<style>
+  .row{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:290px}
+  .cap{font-size:13px;opacity:.78;text-align:center;line-height:1.45}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:270px;height:560px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:24px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px;font-size:12px}
+  .prog{height:3px;background:#2a2e3a;border-radius:3px;margin:6px 14px}.prog i{display:block;height:100%;width:12%;background:#5b6cff;border-radius:3px}
+  .card{position:absolute;left:12px;right:12px;top:62px;bottom:112px;border-radius:20px;background:#000;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .card.tilt{transform:rotate(5deg) translateX(26px)}
+  .big{position:absolute;left:0;right:0;top:0;height:250px;background-size:cover;background-position:center}
+  .big.x{filter:grayscale(1) brightness(.5)}
+  .badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.6);border-radius:999px;padding:3px 9px;font-size:10px;font-weight:600}
+  .mk{position:absolute;top:10px;right:10px;border-radius:999px;padding:3px 9px;font-size:10px;font-weight:700}
+  .mk.k{background:#2fbf71;color:#04210f}.mk.t{background:#ff5a6a;color:#2a0508}
+  .hint{position:absolute;top:226px;left:0;right:0;text-align:center;font-size:10px;opacity:.8}
+  .head{position:absolute;top:256px;left:10px;right:10px;font-size:10.5px;opacity:.75}
+  .film{position:absolute;top:276px;left:8px;right:8px;display:flex;gap:4px}
+  .film div{flex:1;height:40px;border-radius:6px;background-size:cover;background-position:center;position:relative}
+  .film .x{filter:grayscale(1) brightness(.45)}
+  .film .x:after{content:'✕';position:absolute;inset:0;display:grid;place-items:center;color:#ff5a6a;font-size:13px;font-weight:800}
+  .film .k{outline:2px solid #2fbf71}
+  .film .k:after{content:'✓';position:absolute;right:2px;bottom:1px;font-size:10px;background:#2fbf71;color:#04210f;border-radius:50%;width:13px;height:13px;display:grid;place-items:center;font-weight:800}
+  .film .cur{box-shadow:0 0 0 2px #fff}
+  .chips{position:absolute;top:326px;left:8px;right:8px;display:flex;gap:5px}
+  .chips span{font-size:9.5px;border:1px solid #2f3340;border-radius:999px;padding:3px 7px;opacity:.9}
+  .chips span.on{border-color:#7b8cff;color:#b9c2ff}
+  .bar{position:absolute;left:12px;right:12px;bottom:18px;display:flex;gap:8px;align-items:center}
+  .undo{width:40px;height:40px;border-radius:50%;background:#1a1d25;border:1.5px solid #2a2e3a;display:grid;place-items:center}
+  .primary{flex:1;height:46px;border-radius:23px;background:#5b6cff;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:12.5px}
+  .primary small{font-weight:500;opacity:.85}
+  .skip{width:54px;height:40px;border-radius:20px;background:#1a1d25;border:1.5px solid #2a2e3a;display:grid;place-items:center;font-size:10.5px}
+  .stamp{position:absolute;top:96px;left:50%;transform:translateX(-50%) rotate(-8deg);border:2.5px solid #2fbf71;color:#2fbf71;font-weight:800;font-size:13px;padding:4px 9px;border-radius:8px;background:rgba(0,0,0,.45);white-space:nowrap}
+  .stamp.skip2{border-color:#9aa3b5;color:#cfd5e2}
+  .tbl{border-collapse:collapse;margin:26px auto 0;font-size:13px;max-width:760px}
+  .tbl td,.tbl th{border-bottom:1px solid rgba(127,127,127,.25);padding:7px 10px;text-align:left;vertical-align:top}
+  .tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.6}
+</style>
+
+<h2>Bursts, rethought: you pick frames, one button applies your pick</h2>
+<p class="subtitle">The only way to change the selection is tapping frames (or a shortcut chip). The big button always says exactly what will happen, and updates as you tap.</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹</span><b>Bursts · 3 of 24</b><span>⋯</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card">
+        <div class="big" style="background-image:url(https://picsum.photos/seed/bu3/500/400)"></div>
+        <div class="badge">★ Sharpest · 3 of 6</div><div class="mk k">KEEP</div>
+        <div class="hint">Tap the photo or a frame to keep / trash it</div>
+        <div class="head">6 photos in 2 s · 8 Aug 2022 · Kraków</div>
+        <div class="film">
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu1/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu2/100)"></div>
+          <div class="k cur" style="background-image:url(https://picsum.photos/seed/bu3/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu4/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu5/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu6/100)"></div>
+        </div>
+        <div class="chips"><span class="on">★ Best only</span><span>Keep all</span><span>▤ Stack instead</span></div>
+      </div>
+      <div class="bar"><div class="undo">↶</div><div class="primary">✓ Keep 1 · Trash 5</div><div class="skip">Skip</div></div>
+    </div>
+    <div class="cap"><b>1 · Arrives with the suggestion</b>The sharpest frame is kept, the rest are marked for trash, and the button says so: "Keep 1 · Trash 5". If that's right, one tap (or swipe right) and you're on the next burst.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹</span><b>Bursts · 3 of 24</b><span>⋯</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card">
+        <div class="big" style="background-image:url(https://picsum.photos/seed/bu5/500/400)"></div>
+        <div class="badge">Frame 5 of 6</div><div class="mk k">KEEP</div>
+        <div class="hint">Tap the photo or a frame to keep / trash it</div>
+        <div class="head">6 photos in 2 s · 8 Aug 2022 · Kraków</div>
+        <div class="film">
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu1/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu2/100)"></div>
+          <div class="k" style="background-image:url(https://picsum.photos/seed/bu3/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu4/100)"></div>
+          <div class="k cur" style="background-image:url(https://picsum.photos/seed/bu5/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu6/100)"></div>
+        </div>
+        <div class="chips"><span>★ Best only</span><span>Keep all</span><span>▤ Stack instead</span></div>
+      </div>
+      <div class="bar"><div class="undo">↶</div><div class="primary">✓ Keep 2 · Trash 4</div><div class="skip">Skip</div></div>
+    </div>
+    <div class="cap"><b>2 · You tap a frame</b>Frame 5 flips to KEEP. The button now reads "Keep 2 · Trash 4": your own pick, nothing else. The chips are shortcuts that change the selection, never apply it.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹</span><b>Bursts · 3 of 24</b><span>⋯</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card tilt">
+        <div class="big" style="background-image:url(https://picsum.photos/seed/bu5/500/400)"></div>
+        <div class="stamp">KEEP 2 · TRASH 4</div>
+        <div class="head">6 photos in 2 s · 8 Aug 2022 · Kraków</div>
+        <div class="film">
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu1/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu2/100)"></div>
+          <div class="k" style="background-image:url(https://picsum.photos/seed/bu3/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu4/100)"></div>
+          <div class="k" style="background-image:url(https://picsum.photos/seed/bu5/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu6/100)"></div>
+        </div>
+      </div>
+      <div class="bar"><div class="undo">↶</div><div class="primary">✓ Keep 2 · Trash 4</div><div class="skip">Skip</div></div>
+    </div>
+    <div class="cap"><b>3 · Swipe right = the button</b>The stamp repeats the button's exact words, so a swipe can never surprise you. Swipe left = Skip (decide later, nothing marked). No swipe up.</div>
+  </div>
+</div>
+
+<table class="tbl">
+  <tr><th>Gesture / control</th><th>Now (confusing)</th><th>Proposed</th></tr>
+  <tr><td>Tap a frame or the photo</td><td>Flips that frame</td><td>Flips that frame (the only way to change your pick, plus the chips)</td></tr>
+  <tr><td>Swipe right / big button</td><td>"Keep as set"</td><td>Apply <b>your pick</b>; the label says the counts: "Keep 2 · Trash 4"</td></tr>
+  <tr><td>Swipe left</td><td>"Trash all" (ignores your pick)</td><td><b>Skip</b>: move on, nothing marked, burst stays in the queue</td></tr>
+  <tr><td>Swipe up</td><td>"Keep all" (ignores your pick)</td><td>Nothing (springs back)</td></tr>
+  <tr><td>Keep all / Best only / Stack</td><td>Buttons that commit at once</td><td>Chips that <b>change the selection</b> (Stack switches the button to "▤ Stack 6")</td></tr>
+  <tr><td>Trash every frame</td><td>"Trash all" button</td><td>Tap frames until all are ✕: the button reads "Trash all 6" in red (Duplicates: refused, "Keep at least one copy")</td></tr>
+</table>
+<p class="subtitle" style="text-align:center;margin-top:14px">Duplicates get the identical card: same chips (Suggested only / Keep all / "Not duplicates" instead of Stack), same button, same Skip.</p>

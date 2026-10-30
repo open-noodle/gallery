@@ -183,6 +183,76 @@ void main() {
     expect(find.byKey(const Key('gallery-celebrate')), findsNothing);
   });
 
+  testWidgets('a copy flies to the given target instead of the last press', (tester) async {
+    final grid = _Grid();
+    await tester.pumpWidget(_app(grid));
+    await tester.tapAt(const Offset(700, 550));
+    await tester.pump();
+
+    GalleryRemoval.send(['a'], target: const Offset(40, 700));
+    await tester.pump();
+    grid.shown.value = ['b'];
+    await tester.pump();
+    await tester.pump();
+    final start = tester.getCenter(_copyOf('a'));
+    await tester.pump(const Duration(milliseconds: 530));
+    const target = Offset(40, 700);
+    final late = tester.getCenter(_copyOf('a'));
+    expect((late - target).distance, lessThan((start - target).distance / 4));
+    expect((late - target).distance, lessThan((late - const Offset(700, 550)).distance));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a tile known only by its remote id can be removed', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              GalleryMotionHost.attach(Overlay.of(context, rootOverlay: true));
+              return const SizedBox(
+                width: 100,
+                height: 100,
+                child: GalleryTile(
+                  remoteId: 'x',
+                  child: ColoredBox(key: Key('photo-x'), color: Colors.red),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    expect(GalleryTile.live('x'), hasLength(1));
+    GalleryRemoval.dissolve(['x']);
+    await tester.pump();
+    expect(_copyOf('x'), findsOneWidget);
+  });
+
+  testWidgets('a finished day bursts confetti from the given point for about a second, never with reduced motion', (
+    tester,
+  ) async {
+    final grid = _Grid();
+    await tester.pumpWidget(_app(grid));
+    GalleryCelebrate.dayComplete(origin: const Offset(200, 300), colors: const [Colors.green, Colors.red]);
+    await tester.pump();
+    expect(find.byKey(const Key('gallery-celebrate-day')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('gallery-celebrate-day')), findsOneWidget, reason: 'larger and longer than a heart');
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    expect(find.byKey(const Key('gallery-celebrate-day')), findsNothing);
+
+    GalleryMotionHost.debugReset();
+    // A fresh tree, so the host attaches again, now under reduced motion.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_app(_Grid(), reduceMotion: true));
+    expect(GalleryMotionHost.overlay, isNotNull);
+    GalleryCelebrate.dayComplete(origin: const Offset(200, 300), colors: const [Colors.green]);
+    await tester.pump();
+    expect(find.byKey(const Key('gallery-celebrate-day')), findsNothing);
+  });
+
   testWidgets('without an attached overlay nothing happens', (tester) async {
     GalleryMotionHost.debugReset();
     GalleryRemoval.send(['a']);

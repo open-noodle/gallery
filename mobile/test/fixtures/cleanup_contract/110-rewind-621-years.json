@@ -1,0 +1,26 @@
+{
+  "description": "Rewind of 21 June: the years, newest first",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/621"
+  },
+  "response": {
+    "body": {
+      "years": [
+        {
+          "count": 2,
+          "year": 2024
+        },
+        {
+          "count": 2,
+          "year": 2019
+        }
+      ]
+    },
+    "status": 200
+  }
+}

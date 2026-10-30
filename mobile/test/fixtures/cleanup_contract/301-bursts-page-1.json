@@ -1,0 +1,173 @@
+{
+  "description": "Bursts: the first page, every series in it, oldest first",
+  "ids": {
+    "32ebde2b-2ce5-4cc8-81bf-422221205346": "asset:burst-a3",
+    "46015f77-1fa8-4ad2-8fa7-49287adf0b8f": "asset:burst-c2",
+    "6a754b60-536c-4346-8914-8c92f00e619a": "asset:burst-a2",
+    "9c44cefb-9c25-418b-8752-9b7aa07c8b05": "asset:burst-a1",
+    "a6d4c87f-60ec-4281-8a66-778183f7afc8": "asset:burst-b3",
+    "beca956a-fada-4e68-82ef-e8fb26aa087c": "asset:burst-c1",
+    "cbde695d-e55d-4e95-8330-8c1aa62a30a4": "asset:burst-b2",
+    "cfff90cd-cb5c-44bd-8a5e-214cde64abe5": "asset:burst-b1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/bursts",
+    "query": {
+      "limit": "4"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [
+        {
+          "assets": [
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3100,
+              "height": 1,
+              "id": "9c44cefb-9c25-418b-8752-9b7aa07c8b05",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-01T10:00:00.000Z",
+              "originalFileName": "burst-a1.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            },
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3101,
+              "height": 1,
+              "id": "6a754b60-536c-4346-8914-8c92f00e619a",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-01T10:00:01.000Z",
+              "originalFileName": "burst-a2.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            },
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3102,
+              "height": 1,
+              "id": "32ebde2b-2ce5-4cc8-81bf-422221205346",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-01T10:00:02.000Z",
+              "originalFileName": "burst-a3.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            }
+          ],
+          "groupId": "9c44cefb-9c25-418b-8752-9b7aa07c8b05",
+          "source": "burstId",
+          "suggestedKeepId": "6a754b60-536c-4346-8914-8c92f00e619a"
+        },
+        {
+          "assets": [
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3200,
+              "height": 1,
+              "id": "cfff90cd-cb5c-44bd-8a5e-214cde64abe5",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-02T10:00:00.000Z",
+              "originalFileName": "burst-b1.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            },
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3201,
+              "height": 1,
+              "id": "cbde695d-e55d-4e95-8330-8c1aa62a30a4",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-02T10:00:01.000Z",
+              "originalFileName": "burst-b2.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            },
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3202,
+              "height": 1,
+              "id": "a6d4c87f-60ec-4281-8a66-778183f7afc8",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-02T10:00:02.000Z",
+              "originalFileName": "burst-b3.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            }
+          ],
+          "groupId": "cfff90cd-cb5c-44bd-8a5e-214cde64abe5",
+          "source": "timeWindow",
+          "suggestedKeepId": "a6d4c87f-60ec-4281-8a66-778183f7afc8"
+        },
+        {
+          "assets": [
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3300,
+              "height": 1,
+              "id": "beca956a-fada-4e68-82ef-e8fb26aa087c",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-03T10:00:00.000Z",
+              "originalFileName": "burst-c1.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            },
+            {
+              "city": null,
+              "duration": null,
+              "fileSize": 3301,
+              "height": 1,
+              "id": "46015f77-1fa8-4ad2-8fa7-49287adf0b8f",
+              "inAlbum": false,
+              "isFavorite": false,
+              "kept": false,
+              "localDateTime": "2023-09-03T10:00:01.000Z",
+              "originalFileName": "burst-c2.png",
+              "thumbhash": "thumbhash",
+              "type": "IMAGE",
+              "width": 1
+            }
+          ],
+          "groupId": "beca956a-fada-4e68-82ef-e8fb26aa087c",
+          "source": "burstId",
+          "suggestedKeepId": "beca956a-fada-4e68-82ef-e8fb26aa087c"
+        }
+      ],
+      "items": [],
+      "nextCursor": null
+    },
+    "status": 200
+  }
+}

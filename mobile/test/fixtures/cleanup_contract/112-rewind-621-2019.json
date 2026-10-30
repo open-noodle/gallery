@@ -1,0 +1,51 @@
+{
+  "description": "Rewind 21 June 2019",
+  "ids": {
+    "944f8108-2e6e-45f2-8411-fb340cec8547": "asset:s1",
+    "cdb6c0ff-a23e-4d71-83cc-acf18552a56a": "asset:s2"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/621/2019"
+  },
+  "response": {
+    "body": {
+      "assets": [
+        {
+          "city": "Braga",
+          "duration": null,
+          "fileSize": 1022,
+          "height": 1,
+          "id": "944f8108-2e6e-45f2-8411-fb340cec8547",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2019-06-21T10:00:00.000Z",
+          "originalFileName": "s1.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1023,
+          "height": 1,
+          "id": "cdb6c0ff-a23e-4d71-83cc-acf18552a56a",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2019-06-21T12:00:00.000Z",
+          "originalFileName": "s2.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ]
+    },
+    "status": 200
+  }
+}

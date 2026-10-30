@@ -1,0 +1,1853 @@
+{
+  "description": "The calendar after the day was finished: 15 August is reviewed",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/calendar",
+    "query": {
+      "tz": "Europe/Lisbon"
+    }
+  },
+  "response": {
+    "body": {
+      "days": [
+        {
+          "assetCount": 0,
+          "monthDay": 101,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 102,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 103,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 104,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 105,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 106,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 107,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 108,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 109,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 110,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 111,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 112,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 113,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 114,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 115,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 116,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 117,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 118,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 119,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 120,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 121,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 122,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 123,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 124,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 125,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 126,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 127,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 128,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 129,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 130,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 131,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 201,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 202,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 203,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 204,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 205,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 206,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 207,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 208,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 209,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 210,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 211,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 212,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 213,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 214,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 215,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 216,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 217,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 218,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 219,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 220,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 221,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 222,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 223,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 224,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 225,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 226,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 227,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 228,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 229,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 301,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 302,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 303,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 304,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 305,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 306,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 307,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 308,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 309,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 310,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 311,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 312,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 313,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 314,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 315,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 316,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 317,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 318,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 319,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 320,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 321,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 322,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 323,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 324,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 325,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 326,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 327,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 328,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 329,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 330,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 331,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 401,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 402,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 403,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 404,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 405,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 406,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 407,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 408,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 409,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 410,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 411,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 412,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 413,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 414,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 415,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 416,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 417,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 418,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 419,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 420,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 421,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 422,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 423,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 424,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 425,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 426,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 427,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 428,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 429,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 430,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 501,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 502,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 503,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 504,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 505,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 506,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 507,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 508,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 509,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 510,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 511,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 512,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 513,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 514,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 515,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 516,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 517,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 518,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 519,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 520,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 521,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 522,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 523,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 524,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 525,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 526,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 527,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 528,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 529,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 530,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 531,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 601,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 602,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 603,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 604,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 605,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 606,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 607,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 608,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 609,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 610,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 611,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 612,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 613,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 614,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 615,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 616,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 617,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 618,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 619,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 620,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 4,
+          "monthDay": 621,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 622,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 623,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 624,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 625,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 626,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 627,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 628,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 629,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 630,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 701,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 702,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 703,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 704,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 705,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 706,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 707,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 708,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 709,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 710,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 711,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 712,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 713,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 714,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 715,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 716,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 717,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 718,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 719,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 720,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 721,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 722,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 723,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 724,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 725,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 726,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 727,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 728,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 729,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 730,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 731,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 801,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 802,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 803,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 804,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 805,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 806,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 807,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 808,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 809,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 810,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 811,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 812,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 813,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 814,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 4,
+          "monthDay": 815,
+          "reviewedAt": "2000-01-01T00:00:00.000Z"
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 816,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 817,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 818,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 819,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 820,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 821,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 822,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 823,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 824,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 825,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 826,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 827,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 828,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 829,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 830,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 831,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 901,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 902,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 903,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 904,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 905,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 906,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 907,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 908,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 909,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 910,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 911,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 912,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 913,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 914,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 915,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 916,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 917,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 918,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 919,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 920,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 921,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 922,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 923,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 924,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 925,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 926,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 927,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 928,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 929,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 930,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1001,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1002,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1003,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1004,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1005,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1006,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1007,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1008,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1009,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1010,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1011,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1012,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1013,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1014,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1015,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1016,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1017,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1018,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1019,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1020,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1021,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1022,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1023,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1024,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1025,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1026,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1027,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1028,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1029,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1030,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1031,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1101,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1102,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1103,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1104,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1105,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1106,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1107,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1108,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1109,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1110,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1111,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1112,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1113,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1114,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1115,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1116,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1117,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1118,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1119,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1120,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1121,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1122,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1123,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1124,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1125,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1126,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1127,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1128,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1129,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1130,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1201,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1202,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1203,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1204,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1205,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1206,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1207,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1208,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1209,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1210,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1211,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1212,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1213,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1214,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1215,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1216,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1217,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1218,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1219,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1220,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1221,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1222,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1223,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 1,
+          "monthDay": 1224,
+          "reviewedAt": "2000-01-01T00:00:00.000Z"
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1225,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1226,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1227,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1228,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1229,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1230,
+          "reviewedAt": null
+        },
+        {
+          "assetCount": 0,
+          "monthDay": 1231,
+          "reviewedAt": null
+        }
+      ],
+      "daysReviewed": 2,
+      "streak": 1
+    },
+    "status": 200
+  }
+}
