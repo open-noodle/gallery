@@ -915,6 +915,7 @@ DELETE FROM "kysely_migrations"
   '1798800000000-RestoreAssetIsFavoriteProjection',
   '1798900000000-MoveVideoTrimToSidecar',
   '1799000000000-AddAssetImageAdjustTable',
+  '1799100000000-AddSharedSpaceEditorMemberPermissions',
   '1799500000000-AddCleanupTables',
   '1799600000000-AddAssetQualityScreenshotVersion',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was

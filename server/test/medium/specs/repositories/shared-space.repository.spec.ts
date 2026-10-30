@@ -1419,6 +1419,53 @@ describe(SharedSpaceRepository.name, () => {
       });
     });
 
+    it('should resolve the inviter name for member_join rows', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser({ name: 'Joiner' });
+      const { user: inviter } = await ctx.newUser({ name: 'Anna Inviter' });
+      const { space } = await ctx.newSharedSpace({ createdById: inviter.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: inviter.id, role: 'editor' });
+
+      await sut.logActivity({
+        spaceId: space.id,
+        userId: user.id,
+        type: 'member_join',
+        data: { role: 'viewer', invitedById: inviter.id },
+      });
+
+      const [activity] = await sut.getActivities(space.id);
+
+      expect(activity.invitedByName).toBe('Anna Inviter');
+    });
+
+    it('should return a null inviter name without invitedById or for an unknown id', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'editor' });
+
+      await sut.logActivity({ spaceId: space.id, userId: user.id, type: 'member_join', data: { role: 'viewer' } });
+      await sut.logActivity({
+        spaceId: space.id,
+        userId: user.id,
+        type: 'member_join',
+        data: { role: 'viewer', invitedById: 'not-a-uuid' },
+      });
+      await sut.logActivity({
+        spaceId: space.id,
+        userId: user.id,
+        type: 'member_join',
+        data: { role: 'viewer', invitedById: '00000000-0000-4000-8000-000000000000' },
+      });
+
+      const activities = await sut.getActivities(space.id);
+
+      expect(activities).toHaveLength(3);
+      for (const activity of activities) {
+        expect(activity.invitedByName).toBeNull();
+      }
+    });
+
     it('should paginate with limit and offset', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

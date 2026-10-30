@@ -160,6 +160,12 @@ export const GalleryServerExtension = {
   mergePeopleAcrossOwners: galleryConfigBool.describe(
     "Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation.",
   ),
+  spaceEditorsCanAddMembers: galleryConfigBool.describe(
+    'Let editors of a shared space add members (as viewers). A space owner can override this per space.',
+  ),
+  spaceEditorsCanChangeRoles: galleryConfigBool.describe(
+    'Let editors of a shared space switch members between viewer and editor. A space owner can override this per space.',
+  ),
 };
 
 export const galleryJobDefaults = {
@@ -181,7 +187,11 @@ export const galleryBackupDatabaseDefaults = {
   s3: { enabled: false },
 };
 
-export const galleryServerDefaults = { mergePeopleAcrossOwners: false };
+export const galleryServerDefaults = {
+  mergePeopleAcrossOwners: false,
+  spaceEditorsCanAddMembers: false,
+  spaceEditorsCanChangeRoles: false,
+};
 
 export const galleryTopLevelDefaults = {
   // CLIP text->image distances sit far higher than the image->image thresholds used elsewhere

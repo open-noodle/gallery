@@ -56,6 +56,11 @@ const expectNoSharedSpaceFaceIdentityRootJobs = (mocks: ServiceMocks) => {
 };
 
 /** Helper to build a joined member result (member + user fields from the repo join). */
+const mockServerConfig = (mocks: ServiceMocks, add: boolean, roles: boolean) =>
+  mocks.systemMetadata.get.mockResolvedValue({
+    server: { spaceEditorsCanAddMembers: add, spaceEditorsCanChangeRoles: roles },
+  });
+
 const makeMemberResult = (overrides: any = {}) => ({
   ...factory.sharedSpaceMember(),
   name: 'Test User',
@@ -320,6 +325,62 @@ type SpaceMergeAuthorizerFn = (plan: {
   repointedOwnerIds: string[];
   unrepairableSpaceCollapseIds: string[];
 }) => Promise<void>;
+
+type EditorSetupOptions = {
+  callerRole?: SharedSpaceRole;
+  targetRole?: SharedSpaceRole;
+  add?: boolean | null;
+  roles?: boolean | null;
+  server?: [boolean, boolean];
+};
+
+const setupEditorManagement = (mocks: ServiceMocks, opts: EditorSetupOptions) => {
+  const auth = factory.auth();
+  const spaceId = newUuid();
+  const targetId = newUuid();
+  const space = factory.sharedSpace({
+    id: spaceId,
+    createdById: newUuid(),
+    editorsCanAddMembers: opts.add ?? null,
+    editorsCanChangeRoles: opts.roles ?? null,
+  });
+  mockServerConfig(mocks, ...(opts.server ?? [false, false]));
+  mocks.sharedSpace.getById.mockResolvedValue(space);
+  mocks.sharedSpace.getLinkedAlbumIds.mockResolvedValue([]);
+  mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+  const target = opts.targetRole ? makeMemberResult({ spaceId, userId: targetId, role: opts.targetRole }) : undefined;
+  let added = false;
+  mocks.sharedSpace.getMember.mockImplementation((_space: string, userId: string) => {
+    if (userId === auth.user.id) {
+      return Promise.resolve(makeMemberResult({ spaceId, userId, role: opts.callerRole ?? SharedSpaceRole.Editor }));
+    }
+    if (userId === targetId) {
+      return Promise.resolve(
+        target ?? (added ? makeMemberResult({ spaceId, userId, role: SharedSpaceRole.Viewer }) : undefined),
+      );
+    }
+    return Promise.resolve(void 0);
+  });
+  mocks.sharedSpace.addMember.mockImplementation(() => {
+    added = true;
+    return Promise.resolve(factory.sharedSpaceMember());
+  });
+  mocks.sharedSpace.updateMember.mockResolvedValue(factory.sharedSpaceMember());
+  return { auth, spaceId, targetId };
+};
+
+const inviterActivityRow = (type: string, invitedByName: string | null) => ({
+  id: newUuid(),
+  type,
+  data: { role: 'viewer', invitedById: newUuid() },
+  createdAt: new Date('2026-03-10T12:00:00Z'),
+  userId: newUuid(),
+  name: 'Ben',
+  email: 'ben@example.com',
+  profileImagePath: '',
+  avatarColor: null,
+  invitedByName,
+});
 
 describe(SharedSpaceService.name, () => {
   let sut: SharedSpaceService;
@@ -1761,6 +1822,304 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].name).toBe('Owner');
       expect(result[1].name).toBe('Viewer');
       expect(result[2].name).toBe('Editor');
+    });
+  });
+
+  describe('member management settings', () => {
+    it('lets an owner set editorsCanAddMembers', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue({ ...space, editorsCanAddMembers: true });
+
+      const result = await sut.update(auth, space.id, { editorsCanAddMembers: true });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
+        space.id,
+        expect.objectContaining({ editorsCanAddMembers: true }),
+      );
+      expect(result.memberManagement?.editorsCanAddMembers).toBe(true);
+      expect(result.memberManagement?.canAddMembers).toBe(true);
+    });
+
+    it('lets an owner reset a setting to null', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ editorsCanChangeRoles: true });
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue({ ...space, editorsCanChangeRoles: null });
+
+      await sut.update(auth, space.id, { editorsCanChangeRoles: null });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
+        space.id,
+        expect.objectContaining({ editorsCanChangeRoles: null }),
+      );
+    });
+
+    describe.each([
+      ['editorsCanAddMembers: null', { editorsCanAddMembers: null }],
+      ['editorsCanAddMembers: true', { editorsCanAddMembers: true }],
+      ['editorsCanChangeRoles: false', { editorsCanChangeRoles: false }],
+      ['editorsCanChangeRoles: null', { editorsCanChangeRoles: null }],
+      ['a name together with editorsCanAddMembers', { name: 'New', editorsCanAddMembers: false }],
+    ])('rejects an editor sending %s', (_label, dto) => {
+      it('throws Forbidden and writes nothing', async () => {
+        const auth = factory.auth();
+        const space = factory.sharedSpace();
+        mocks.sharedSpace.getMember.mockResolvedValue(
+          makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor }),
+        );
+        mocks.sharedSpace.getById.mockResolvedValue(space);
+
+        await expect(sut.update(auth, space.id, dto)).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reports an editor permission inherited from the server on get', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ editorsCanAddMembers: null, editorsCanChangeRoles: null });
+      mockServerConfig(mocks, true, false);
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.memberManagement).toEqual({
+        editorsCanAddMembers: null,
+        editorsCanChangeRoles: null,
+        serverEditorsCanAddMembers: true,
+        serverEditorsCanChangeRoles: false,
+        canAddMembers: true,
+        canChangeRoles: false,
+      });
+    });
+
+    it('reports no permissions to a viewer on get', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ editorsCanAddMembers: true, editorsCanChangeRoles: true });
+      mockServerConfig(mocks, true, true);
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.memberManagement?.canAddMembers).toBe(false);
+      expect(result.memberManagement?.canChangeRoles).toBe(false);
+      expect(result.memberManagement?.serverEditorsCanAddMembers).toBe(true);
+    });
+
+    it('reports each space with the caller role in that space, reading config once', async () => {
+      const auth = factory.auth();
+      const asEditor = factory.sharedSpace({ editorsCanAddMembers: true });
+      const asViewer = factory.sharedSpace({ editorsCanAddMembers: true });
+      mockServerConfig(mocks, false, false);
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([asEditor, asViewer]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getMember.mockImplementation((spaceId: string) =>
+        Promise.resolve(
+          makeMemberResult({
+            spaceId,
+            userId: auth.user.id,
+            role: spaceId === asEditor.id ? SharedSpaceRole.Editor : SharedSpaceRole.Viewer,
+            lastViewedAt: null,
+          }),
+        ),
+      );
+
+      const result = await sut.getAll(auth);
+
+      expect(result.map((s) => s.memberManagement?.canAddMembers)).toEqual([true, false]);
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the owner block from create', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ createdById: auth.user.id });
+      mocks.sharedSpace.create.mockResolvedValue(space);
+      mocks.sharedSpace.addMember.mockResolvedValue(factory.sharedSpaceMember());
+
+      const result = await sut.create(auth, { name: 'Test Space' });
+
+      expect(result.memberManagement?.canAddMembers).toBe(true);
+      expect(result.memberManagement?.canChangeRoles).toBe(true);
+    });
+  });
+
+  describe('editor member management', () => {
+    describe('addMember', () => {
+      it('lets a permitted editor add a viewer when the role is omitted', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { add: true });
+        await sut.addMember(auth, spaceId, { userId: targetId });
+        expect(mocks.sharedSpace.addMember).toHaveBeenCalledWith({
+          spaceId,
+          userId: targetId,
+          role: SharedSpaceRole.Viewer,
+        });
+      });
+
+      it('lets an editor add when only the server switch is on', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { server: [true, false] });
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).resolves.toBeDefined();
+      });
+
+      it('records the editor as the inviter', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { add: true });
+        await sut.addMember(auth, spaceId, { userId: targetId });
+        expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: SharedSpaceActivityType.MemberJoin,
+            data: expect.objectContaining({ invitedById: auth.user.id }),
+          }),
+        );
+      });
+
+      it('lets an editor add an editor only with both permissions', async () => {
+        const both = setupEditorManagement(mocks, { add: true, roles: true });
+        await expect(
+          sut.addMember(both.auth, both.spaceId, { userId: both.targetId, role: SharedSpaceRole.Editor }),
+        ).resolves.toBeDefined();
+
+        const addOnly = setupEditorManagement(mocks, { add: true, roles: false });
+        await expect(
+          sut.addMember(addOnly.auth, addOnly.spaceId, { userId: addOnly.targetId, role: SharedSpaceRole.Editor }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('rejects an editor adding an owner even with both permissions', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { add: true, roles: true });
+        await expect(
+          sut.addMember(auth, spaceId, { userId: targetId, role: SharedSpaceRole.Owner }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.addMember).not.toHaveBeenCalled();
+      });
+
+      it('answers 403, not 400, when an editor without permission adds an existing member', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          add: false,
+          targetRole: SharedSpaceRole.Viewer,
+        });
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('answers 400 when a permitted editor adds an existing member', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          add: true,
+          targetRole: SharedSpaceRole.Viewer,
+        });
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('rejects a viewer even when both switches are on', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          callerRole: SharedSpaceRole.Viewer,
+          add: true,
+          roles: true,
+        });
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.addMember).not.toHaveBeenCalled();
+      });
+
+      it('reads the server switch fresh on every call', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { server: [false, false] });
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).rejects.toBeInstanceOf(ForbiddenException);
+        mockServerConfig(mocks, true, false);
+        await expect(sut.addMember(auth, spaceId, { userId: targetId })).resolves.toBeDefined();
+      });
+    });
+
+    describe('updateMember', () => {
+      it('lets a permitted editor change a viewer to an editor', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          roles: true,
+          targetRole: SharedSpaceRole.Viewer,
+        });
+        await sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Editor });
+        expect(mocks.sharedSpace.updateMember).toHaveBeenCalledWith(spaceId, targetId, {
+          role: SharedSpaceRole.Editor,
+        });
+      });
+
+      it('rejects an editor changing an owner', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          roles: true,
+          targetRole: SharedSpaceRole.Owner,
+        });
+        await expect(
+          sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Viewer }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.updateMember).not.toHaveBeenCalled();
+      });
+
+      it('rejects an editor promoting someone to owner', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          roles: true,
+          targetRole: SharedSpaceRole.Editor,
+        });
+        await expect(sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Owner })).rejects.toBeInstanceOf(
+          ForbiddenException,
+        );
+        expect(mocks.sharedSpace.updateMember).not.toHaveBeenCalled();
+      });
+
+      it('answers 400 when a permitted editor changes their own role', async () => {
+        const { auth, spaceId } = setupEditorManagement(mocks, { roles: true });
+        await expect(
+          sut.updateMember(auth, spaceId, auth.user.id, { role: SharedSpaceRole.Viewer }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('answers 403 when an editor without permission changes their own role', async () => {
+        const { auth, spaceId } = setupEditorManagement(mocks, { roles: false });
+        await expect(
+          sut.updateMember(auth, spaceId, auth.user.id, { role: SharedSpaceRole.Viewer }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('answers 403, not 400, when an editor without permission targets a non-member', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, { roles: false });
+        await expect(
+          sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Viewer }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('rejects a viewer even when the switch is on', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          callerRole: SharedSpaceRole.Viewer,
+          roles: true,
+          targetRole: SharedSpaceRole.Viewer,
+        });
+        await expect(
+          sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Editor }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('leaves the owner path unchanged: an owner can promote to owner', async () => {
+        const { auth, spaceId, targetId } = setupEditorManagement(mocks, {
+          callerRole: SharedSpaceRole.Owner,
+          targetRole: SharedSpaceRole.Editor,
+        });
+        await sut.updateMember(auth, spaceId, targetId, { role: SharedSpaceRole.Owner });
+        expect(mocks.sharedSpace.updateMember).toHaveBeenCalled();
+      });
     });
   });
 
@@ -3541,6 +3900,7 @@ describe(SharedSpaceService.name, () => {
           email: 'pierre@test.com',
           profileImagePath: '/path/to/img',
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
 
@@ -3574,6 +3934,7 @@ describe(SharedSpaceService.name, () => {
           email: 'w@test.com',
           profileImagePath: null,
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
       mocks.sharedSpace.getAlbumNamesByIds.mockResolvedValue([{ id: 'album-1', albumName: 'USA Trip' }]);
@@ -3597,6 +3958,7 @@ describe(SharedSpaceService.name, () => {
           email: 'w@test.com',
           profileImagePath: null,
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
       mocks.sharedSpace.getAlbumNamesByIds.mockResolvedValue([]); // album no longer exists
@@ -3613,6 +3975,34 @@ describe(SharedSpaceService.name, () => {
       await sut.getActivities(factory.auth(), 'space-1', { limit: 10, offset: 20 });
 
       expect(mocks.sharedSpace.getActivities).toHaveBeenCalledWith('space-1', 10, 20);
+    });
+  });
+
+  describe('getActivities inviter name', () => {
+    it('copies invitedByName into data for member_join', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ userId: auth.user.id }));
+      mocks.sharedSpace.getActivities.mockResolvedValue([
+        inviterActivityRow(SharedSpaceActivityType.MemberJoin, 'Anna'),
+      ] as any);
+
+      const [activity] = await sut.getActivities(auth, newUuid(), {});
+
+      expect(activity.data.invitedByName).toBe('Anna');
+    });
+
+    it('adds nothing when the name is null or the type is not member_join', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ userId: auth.user.id }));
+      mocks.sharedSpace.getActivities.mockResolvedValue([
+        inviterActivityRow(SharedSpaceActivityType.MemberJoin, null),
+        inviterActivityRow(SharedSpaceActivityType.MemberRoleChange, 'Anna'),
+      ] as any);
+
+      const result = await sut.getActivities(auth, newUuid(), {});
+
+      expect(result[0].data).not.toHaveProperty('invitedByName');
+      expect(result[1].data).not.toHaveProperty('invitedByName');
     });
   });
 

@@ -29295,6 +29295,14 @@
           "publicUsers": {
             "description": "Public users",
             "type": "boolean"
+          },
+          "spaceEditorsCanAddMembers": {
+            "description": "Let editors of a shared space add members (as viewers). A space owner can override this per space.",
+            "type": "boolean"
+          },
+          "spaceEditorsCanChangeRoles": {
+            "description": "Let editors of a shared space switch members between viewer and editor. A space owner can override this per space.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -42182,6 +42190,45 @@
         ],
         "type": "object"
       },
+      "SharedSpaceMemberManagementDto": {
+        "properties": {
+          "canAddMembers": {
+            "description": "Whether the current user can add members",
+            "type": "boolean"
+          },
+          "canChangeRoles": {
+            "description": "Whether the current user can change member roles",
+            "type": "boolean"
+          },
+          "editorsCanAddMembers": {
+            "description": "Space setting for editors adding members (null follows the server)",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "editorsCanChangeRoles": {
+            "description": "Space setting for editors changing roles (null follows the server)",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "serverEditorsCanAddMembers": {
+            "description": "Server default for editors adding members",
+            "type": "boolean"
+          },
+          "serverEditorsCanChangeRoles": {
+            "description": "Server default for editors changing roles",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canAddMembers",
+          "canChangeRoles",
+          "editorsCanAddMembers",
+          "editorsCanChangeRoles",
+          "serverEditorsCanAddMembers",
+          "serverEditorsCanChangeRoles"
+        ],
+        "type": "object"
+      },
       "SharedSpaceMemberMetadataContributionDto": {
         "properties": {
           "sharePersonMetadata": {
@@ -42580,6 +42627,10 @@
             "minimum": -9007199254740991,
             "type": "integer"
           },
+          "memberManagement": {
+            "$ref": "#/components/schemas/SharedSpaceMemberManagementDto",
+            "description": "Member management permissions for the current user"
+          },
           "members": {
             "description": "Space members (summary)",
             "items": {
@@ -42679,6 +42730,16 @@
             "description": "Space description",
             "maxLength": 500,
             "type": "string"
+          },
+          "editorsCanAddMembers": {
+            "description": "Let editors add members (null follows the server setting)",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "editorsCanChangeRoles": {
+            "description": "Let editors change viewer and editor roles (null follows the server setting)",
+            "nullable": true,
+            "type": "boolean"
           },
           "faceRecognitionEnabled": {
             "description": "Enable face recognition for this space",

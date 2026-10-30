@@ -34,8 +34,9 @@ final sharedSpacesProvider = FutureProvider<List<SharedSpaceResponseDto>>((ref) 
   return repository.getAll();
 });
 
-// ignore: unused-code
-final sharedSpaceProvider = FutureProvider.family<SharedSpaceResponseDto, String>((ref, id) async {
+// autoDispose: the members page gates on this space's member-management permissions, which an admin or owner can
+// change while the app runs, so each visit fetches them fresh instead of reusing the first visit's answer.
+final sharedSpaceProvider = FutureProvider.autoDispose.family<SharedSpaceResponseDto, String>((ref, id) async {
   final repository = ref.watch(sharedSpaceApiRepositoryProvider);
   return repository.get(id);
 });

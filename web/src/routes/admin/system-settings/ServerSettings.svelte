@@ -2,6 +2,7 @@
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import SettingInputField from '$lib/components/shared-components/settings/SettingInputField.svelte';
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
+  import SpaceMemberManagementSettings from '$lib/gallery/components/admin/space-member-management-settings.svelte';
   import { SettingInputFieldType } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
@@ -47,6 +48,7 @@
           bind:checked={configToEdit.server.mergePeopleAcrossOwners}
         />
 
+        <SpaceMemberManagementSettings bind:server={configToEdit.server} {disabled} />
         <div class="ms-4">
           <SettingButtonsRow bind:configToEdit keys={['server']} {disabled} />
         </div>
