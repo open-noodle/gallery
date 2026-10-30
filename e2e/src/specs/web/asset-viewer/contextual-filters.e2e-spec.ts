@@ -51,13 +51,29 @@ Must run AFTER metadata extraction has drained, or the extraction job overwrites
 const setAssetGeo = (accessToken: string, id: string, latitude: number, longitude: number) =>
   updateAssets({ assetBulkUpdateDto: { ids: [id], latitude, longitude } }, { headers: asBearerAuth(accessToken) });
 
+/**
+The camera name as the DetailPanel shows it: web's `getCameraName` (`web/src/lib/utils/camera-utils.ts`, from
+immich-32657), which drops the make when the model already starts with it (`Canon` / `Canon EOS R5` → `Canon EOS R5`).
+*/
+const cameraName = (make: string, model: string) => {
+  if (!make || !model) {
+    return make || model;
+  }
+  const lowerModel = model.toLowerCase();
+  const modelIncludesMake = make
+    .toLowerCase()
+    .split(/\s+/)
+    .some((word) => lowerModel.startsWith(word) && !/\w/.test(lowerModel[word.length] ?? ''));
+  return modelIncludesMake ? model : `${make} ${model}`;
+};
+
 /** The camera as the DetailPanel labels it — read back from the SERVER, not hard-coded. */
 const readCamera = async (accessToken: string, id: string) => {
   const info = await getAssetInfo({ id }, { headers: asBearerAuth(accessToken) });
   const make = info.exifInfo?.make ?? '';
   const model = info.exifInfo?.model ?? '';
   expect(make, 'the fixture must carry camera EXIF, or every camera assertion here is vacuous').not.toBe('');
-  return { make, model, label: [make, model].filter(Boolean).join(' ') };
+  return { make, model, label: cameraName(make, model) };
 };
 
 /**
@@ -153,7 +169,7 @@ test.describe('Asset viewer contextual filters', () => {
     make = info.exifInfo?.make ?? '';
     model = info.exifInfo?.model ?? '';
     expect(make, 'the fixture must have camera EXIF for this suite to mean anything').not.toBe('');
-    cameraLabel = [make, model].filter(Boolean).join(' ');
+    cameraLabel = cameraName(make, model);
 
     const person = await utils.createSpacePerson(spaceId, 'Alice', admin.userId, assetId);
     spacePersonId = person.spacePersonId;
