@@ -59,3 +59,11 @@ from
   "asset_spatial_scene"
 where
   "assetId" = $1::uuid
+
+-- SpatialSceneRepository.getPathsByPaths
+select
+  "path"
+from
+  "asset_spatial_scene"
+where
+  "path" in $1

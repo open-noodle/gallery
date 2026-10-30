@@ -325,6 +325,10 @@ export class IntegrityService extends BaseService {
       trackedPaths.add(thumbnailPath.normalize('NFC'));
     }
 
+    for (const { path } of await this.spatialSceneRepository.getPathsByPaths(lookupPaths)) {
+      trackedPaths.add(path.normalize('NFC'));
+    }
+
     const untrackedFiles = [...new Set(paths)].filter((path) => !trackedPaths.has(path.normalize('NFC')));
 
     if (untrackedFiles.length > 0) {

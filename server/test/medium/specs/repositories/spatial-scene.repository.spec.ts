@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetFileType, AssetType, AssetVisibility } from 'src/enum.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -141,6 +142,20 @@ describe(SpatialSceneRepository.name, () => {
       await expect(migration.updateDepthMapPath(onDisk.id, '/elsewhere.png', 'moved.png')).resolves.toBe(false);
       await expect(migration.updateDepthMapPath(onDisk.id, scene(onDisk.id).path, 'moved.png')).resolves.toBe(true);
       await expect(sut.get(onDisk.id)).resolves.toMatchObject({ path: 'moved.png' });
+    });
+  });
+
+  describe('integrity check', () => {
+    it('counts depth maps as tracked files, so the untracked-file report leaves them alone', async () => {
+      const { ctx, user, sut } = await setup();
+      const integrity = new IntegrityRepository(defaultDatabase);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const depthMap = scene(asset.id).path;
+      const orphan = `/thumbs/${asset.id}_orphan.png`;
+      await sut.upsert(scene(asset.id));
+
+      await expect(sut.getPathsByPaths([depthMap, orphan])).resolves.toEqual([{ path: depthMap }]);
+      await expect(integrity.getTrackedPaths([depthMap, orphan])).resolves.toEqual([{ path: depthMap }]);
     });
   });
 });

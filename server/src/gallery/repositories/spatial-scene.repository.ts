@@ -75,6 +75,12 @@ export class SpatialSceneRepository {
       .executeTakeFirst();
   }
 
+  /** The depth maps among `paths`, for IntegrityService: they sit in the thumbnail folder the untracked-file scan walks. */
+  @GenerateSql({ params: [DummyValue.STRING] })
+  getPathsByPaths(paths: string[]) {
+    return this.db.selectFrom('asset_spatial_scene').select('path').where('path', 'in', paths).execute();
+  }
+
   async upsert(row: Insertable<AssetSpatialSceneTable>): Promise<void> {
     const { assetId: _, ...update } = row;
     await this.db
