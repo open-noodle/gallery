@@ -28,6 +28,7 @@
     QueueName.PetDetection,
     QueueName.PetRecognition,
     QueueName.Classification,
+    QueueName.QualityAnalysis,
     QueueName.SpatialScene,
   ];
 
@@ -60,6 +61,7 @@
     [QueueName.IntegrityCheck]: $t('integrity_checks'),
     [QueueName.StorageBackendMigration]: 'Storage Backend Migration',
     [QueueName.Classification]: 'Auto-Classification',
+    [QueueName.QualityAnalysis]: $t('admin.quality_analysis_job'),
     [QueueName.SpatialScene]: $t('admin.machine_learning_spatial_scene'),
   });
 </script>

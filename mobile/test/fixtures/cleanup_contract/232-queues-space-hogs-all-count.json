@@ -1,0 +1,22 @@
+{
+  "description": "Space hogs filtered to every type from 50 MiB: the count",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/space_hogs/count",
+    "query": {
+      "minSize": "52428800",
+      "type": "all"
+    }
+  },
+  "response": {
+    "body": {
+      "bytes": 555745280,
+      "count": 3
+    },
+    "status": 200
+  }
+}

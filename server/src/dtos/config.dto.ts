@@ -217,6 +217,7 @@ const AdminConfigSchemaWithVisibility = z
         peopleBackfill: AdminConfigJobSettingsSchema,
         petDetection: AdminConfigJobSettingsSchema,
         classification: AdminConfigJobSettingsSchema,
+        qualityAnalysis: AdminConfigJobSettingsSchema,
         spatialScene: AdminConfigJobSettingsSchema,
       })
       .meta({ id: 'AdminConfigJobDto' }),

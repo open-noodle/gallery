@@ -1,0 +1,88 @@
+{
+  "description": "Screenshots: every one fits the first page",
+  "ids": {
+    "0b3f6de1-9c15-404e-8291-cd9a2b3baeb9": "asset:shot-2",
+    "a578ec9f-b72e-4450-89af-4dde31f067bc": "asset:shot-1",
+    "ea783980-7455-42d7-8a90-082199387d89": "asset:shot-4",
+    "f856a6d8-6871-455a-8f9f-98b1b64e3383": "asset:shot-3"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/screenshots",
+    "query": {
+      "limit": "4"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 2000,
+          "height": 2532,
+          "id": "a578ec9f-b72e-4450-89af-4dde31f067bc",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-07-04T10:00:00.000Z",
+          "originalFileName": "shot-1.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1170
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 2000,
+          "height": 2532,
+          "id": "0b3f6de1-9c15-404e-8291-cd9a2b3baeb9",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-07-03T10:00:00.000Z",
+          "originalFileName": "shot-2.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1170
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 2000,
+          "height": 1170,
+          "id": "f856a6d8-6871-455a-8f9f-98b1b64e3383",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-07-02T10:00:00.000Z",
+          "originalFileName": "shot-3.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 2532
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 2000,
+          "height": null,
+          "id": "ea783980-7455-42d7-8a90-082199387d89",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-07-01T10:00:00.000Z",
+          "originalFileName": "shot-4.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": null
+        }
+      ],
+      "nextCursor": null
+    },
+    "status": 200
+  }
+}

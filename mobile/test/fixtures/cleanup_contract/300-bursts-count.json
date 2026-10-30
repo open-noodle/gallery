@@ -1,0 +1,18 @@
+{
+  "description": "Bursts opens: the title's count (the series are seeded first)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/bursts/count"
+  },
+  "response": {
+    "body": {
+      "bytes": 15902,
+      "count": 3
+    },
+    "status": 200
+  }
+}

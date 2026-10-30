@@ -530,7 +530,7 @@ features:
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
         - server/src/schema/migrations-gallery/1799000000000-AddAssetImageAdjustTable.ts
-        - server/src/schema/migrations-gallery/1799100000000-AddAssetSpatialSceneTable.ts
+        - server/src/schema/migrations-gallery/1799700000000-AddAssetSpatialSceneTable.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:

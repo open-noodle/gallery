@@ -6,10 +6,12 @@ import { LibraryManifestController } from 'src/controllers/library-manifest.cont
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
+import { CleanupController } from 'src/gallery/controllers/cleanup.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -22,6 +24,7 @@ import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repos
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -60,6 +63,7 @@ import { UserGroupService } from 'src/services/user-group.service.js';
 // keep running before same-priority upstream ones, e.g. before SystemConfigService's ConfigUpdate clears the cache.
 export const galleryControllers = [
   ClassificationController,
+  CleanupController,
   FaceRepairAdminController,
   FaceSuggestionController,
   GalleryAlbumController,
@@ -95,6 +99,7 @@ export const galleryRepositories = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  CleanupRepository,
   SpatialSceneRepository,
 ];
 
@@ -104,6 +109,7 @@ export const galleryServices = [
   BackupStoreResolver,
   AssetVisibilityTransitionService,
   ClassificationService,
+  CleanupService,
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,

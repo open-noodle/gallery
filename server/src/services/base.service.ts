@@ -6,6 +6,7 @@ import { SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -177,6 +178,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  CleanupRepository,
   SpatialSceneRepository,
 ] as const;
 
@@ -265,6 +267,7 @@ export class BaseService {
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
     protected imageAdjustRepository: ImageAdjustRepository,
+    protected cleanupRepository: CleanupRepository,
     protected spatialSceneRepository: SpatialSceneRepository,
   ) {
     this.logger.setContext(this.constructor.name);
@@ -381,6 +384,7 @@ export class BaseService {
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
       ctx.imageAdjustRepository,
+      ctx.cleanupRepository,
       ctx.spatialSceneRepository,
     );
 

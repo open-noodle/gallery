@@ -29,6 +29,9 @@
 --   * Asset duplicate checksums
 --   * Library sync state (library_audit, library_user, library.createId)
 --   * Storage migration history
+--   * Library Cleanup progress: keep decisions (cleanup_decision), reviewed
+--     dates (cleanup_day_review) and quality-analysis scores (asset_quality,
+--     asset_job_status_gallery.qualityAnalyzedAt)
 --
 -- Assets you uploaded through Gallery are preserved as long as they are stored
 -- in Immich-native rows (asset, asset_exif, asset_face, etc.). If an asset
@@ -362,7 +365,8 @@ UPDATE "api_key" k
                 'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
-                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
+                'cleanup.read', 'cleanup.update'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -503,6 +507,10 @@ DROP TABLE IF EXISTS "asset_job_status_gallery" CASCADE;
 DROP TABLE IF EXISTS "asset_video_trim" CASCADE;
 DROP TABLE IF EXISTS "asset_image_adjust" CASCADE;
 
+-- Library Cleanup (specs/2026-09-23-library-cleanup-design.md)
+DROP TABLE IF EXISTS "cleanup_decision" CASCADE;
+DROP TABLE IF EXISTS "cleanup_day_review" CASCADE;
+DROP TABLE IF EXISTS "asset_quality" CASCADE;
 -- Spatial Scene depth maps. Immich has no equivalent; the <assetId>_depth.png
 -- files stay in the thumbnails folder, where Immich never reads them.
 DROP TABLE IF EXISTS "asset_spatial_scene" CASCADE;
@@ -556,6 +564,10 @@ ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
 -- Databases from before 1798200000000-DropLibraryCreateId.
 DROP INDEX IF EXISTS "library_createId_idx";
+-- Library Cleanup indexes on Immich tables.
+DROP INDEX IF EXISTS "asset_localMonthDay_idx";
+DROP INDEX IF EXISTS "asset_cleanup_localDateTime_idx";
+DROP INDEX IF EXISTS "asset_exif_fileSizeInByte_idx";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
 -- 1791000000000-RepointFaceReviewToPersonGroup added this unique index to make option M's
 -- one-person-per-group invariant a database fact. It lives on the upstream `person` table, so
@@ -646,6 +658,9 @@ DELETE FROM "migration_overrides"
    'index_shared_space_album_folder_nested_name_key',
    'index_shared_space_album_folder_root_name_key',
    'function_shared_space_album_folder_delete_audit',
+   'index_asset_localMonthDay_idx',
+   'index_asset_cleanup_localDateTime_idx',
+   'index_asset_quality_ownerId_screenshot_idx',
    'trigger_asset_library_delete_audit',
    'trigger_classification_category_updatedAt',
    'trigger_face_identity_face_updatedAt',
@@ -887,6 +902,7 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  '1793400000000-AddCleanupTables',
   -- #763 per-user favorites. Renumbered off 1784000000000/1784100000000 during the v3.2.0 rebase:
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
@@ -902,7 +918,9 @@ DELETE FROM "kysely_migrations"
   '1798800000000-RestoreAssetIsFavoriteProjection',
   '1798900000000-MoveVideoTrimToSidecar',
   '1799000000000-AddAssetImageAdjustTable',
-  '1799100000000-AddAssetSpatialSceneTable',
+  '1799500000000-AddCleanupTables',
+  '1799600000000-AddAssetQualityScreenshotVersion',
+  '1799700000000-AddAssetSpatialSceneTable',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1019,6 +1037,7 @@ BEGIN
        'person_identity',
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',
+       'cleanup_decision', 'cleanup_day_review', 'asset_quality',
        'gallery_migrations', 'gallery_migrations_lock'
      );
   IF fork_tables_left > 0 THEN
