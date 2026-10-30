@@ -548,6 +548,7 @@ const send = async (actor: Actor, contract: ContractRequest) => {
 
 /** `/server/features` of stock Immich at the base version: upstream's ServerFeaturesDto keys only. */
 const UPSTREAM_FEATURE_KEYS = new Set([
+  'backups',
   'configFile',
   'duplicateDetection',
   'email',
