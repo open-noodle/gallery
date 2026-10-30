@@ -397,7 +397,9 @@ const personFactory = (person?: Partial<Person>): Person => ({
   ...person,
 });
 
-const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
+type SharedSpaceRow = SharedSpace & { editorsCanAddMembers: boolean | null; editorsCanChangeRoles: boolean | null };
+
+const sharedSpaceFactory = (data: Partial<SharedSpaceRow> = {}): SharedSpaceRow => ({
   id: newUuid(),
   name: 'Test Space',
   description: null,
@@ -407,6 +409,8 @@ const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
   thumbnailCropY: null,
   faceRecognitionEnabled: true,
   petsEnabled: true,
+  editorsCanAddMembers: null,
+  editorsCanChangeRoles: null,
   lastActivityAt: null,
   createdAt: newDate(),
   updatedAt: newDate(),
