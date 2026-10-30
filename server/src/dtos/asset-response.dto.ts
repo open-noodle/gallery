@@ -1,6 +1,7 @@
 import { Selectable, ShallowDehydrateObject, SqlBool } from 'kysely';
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
+import type { MaybeDehydrated } from 'src/types.js';
 import { AssetFace, AssetFile, Exif, Stack, Tag, User } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
@@ -17,7 +18,7 @@ import {
   AssetVisibilitySchema,
   ChecksumAlgorithm,
 } from 'src/enum.js';
-import type { MaybeDehydrated } from 'src/types.js';
+import { GalleryAssetResponseExtension } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { hexOrBufferToBase64 } from 'src/utils/bytes.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
@@ -120,6 +121,7 @@ export const AssetResponseSchema = SanitizedAssetResponseSchema.extend(
       .describe(
         'Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check.',
       ),
+    ...GalleryAssetResponseExtension,
   }).shape,
 ).meta({ id: 'AssetResponseDto' });
 
