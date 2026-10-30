@@ -148,7 +148,6 @@ hook), `openapi_patching.dart` (19→20, `backups` default). Everything else unc
 ## Follow-ups
 
 - Base-image Shape H check and SQL regeneration: covered by `docker.yml` and SQL Schema Checks, both green.
-- Revert gate: build a branch RC, then dispatch with `gallery_image` and the `commit-81778c8…` `upstream_image`.
 - Restore-rollback timing on x64 (see Remote CI).
 - FUTO Backups stays dormant; enabling it needs an S3 answer and the hook return-path question above.
 - `global-search-manager` spec flake under full-suite load.
@@ -166,17 +165,17 @@ Three more breaks surfaced, each fixed on the branch:
 | `f13275651d8` | `/server/version` at a `3.4.0-rc.0` base reports `prerelease: 0`; the recorder now fixes it with minor and patch.                                                                                                                                                                                                                                                                                                                                                                                                     | —                       |
 | `ec833fad409` | immich-32657's `getCameraName` labels the fixture camera `Canon EOS R5`; the contextual-filter e2e still built `Canon Canon EOS R5` (six cases).                                                                                                                                                                                                                                                                                                                                                                      | zero-conflict, e2e only |
 
-| Workflow                             | Result                                                                   | Commit        |
-| ------------------------------------ | ------------------------------------------------------------------------ | ------------- |
-| Test                                 | GREEN, run 41032445865                                                   | `ec833fad409` |
-| Gallery Build Mobile (iOS + Android) | GREEN, run 41022074149                                                   | `8c7d3ab0821` |
-| Gallery Mobile Smoke                 | GREEN, run 41022014673                                                   | `8c7d3ab0821` |
-| Docker                               | GREEN, run 41021558412 (covers the base-image bump)                      | `6f019f79900` |
-| Static Code Analysis                 | GREEN, run 41021284816                                                   | `6f019f79900` |
-| Gallery Rebase Smoke                 | GREEN                                                                    | `6f019f79900` |
-| Storage Migration Tests / E2E        | GREEN                                                                    | `6f019f79900` |
-| Gallery ML Smoke                     | GREEN                                                                    | `6f019f79900` |
-| Revert-to-Immich Validation          | NOT RUN: needs a branch RC image (`gallery-rc-build.yml`), not yet built | —             |
+| Workflow                             | Result                                                                                                                           | Commit        |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Test                                 | GREEN, run 41032445865                                                                                                           | `ec833fad409` |
+| Gallery Build Mobile (iOS + Android) | GREEN, run 41022074149                                                                                                           | `8c7d3ab0821` |
+| Gallery Mobile Smoke                 | GREEN, run 41022014673                                                                                                           | `8c7d3ab0821` |
+| Docker                               | GREEN, run 41021558412 (covers the base-image bump)                                                                              | `6f019f79900` |
+| Static Code Analysis                 | GREEN, run 41021284816                                                                                                           | `6f019f79900` |
+| Gallery Rebase Smoke                 | GREEN                                                                                                                            | `6f019f79900` |
+| Storage Migration Tests / E2E        | GREEN                                                                                                                            | `6f019f79900` |
+| Gallery ML Smoke                     | GREEN                                                                                                                            | `6f019f79900` |
+| Revert-to-Immich Validation          | GREEN, run 41037014569 (`gallery_image` `gallery-server:rolling-v34-rc6`, `upstream_image` `immich-server:commit-81778c8c4a9e…`) | `ca08393ef95` |
 
 Commits after `6f019f79900` touch only branding scripts, e2e specs and mobile JSON fixtures.
 
@@ -190,3 +189,12 @@ Failures that did not recur on the next run, recorded rather than accepted:
   fork's larger schema makes the restore slower than upstream's budget. Not confirmed locally (no Docker).
 - Web e2e, one retry each: `global-search` "bare / renders Albums AND Spaces sections together" (`page.goto`
   ERR_ABORTED) and `spaces-selection-toolbar-person` "viewer selecting a space person's asset".
+
+## Staging
+
+`rolling-v34-rc6` (server and ML, built from `ca08393ef95`) pinned on staging (infra-gitops `9fd7cdf` ML, `2f64785`
+server), replacing `rolling-v34-rc4`. Live-DB parity: 0 orphans; `1790900000000-SplitSharedPersonGroups` and
+`1792568637987-AddAssetOwnerIdUpdateIdIndex` ran, no schema drift on either worker. `/server/version` answers 5.9.0 to a
+Gallery client and 3.4.0-rc.0 to a stock one; a CLIP text request from the server pod returns embeddings. Pre-deploy
+dump `~/gallery-backups/staging-pre-rolling-v34-rc6-2026-10-30.dump` (124 tables, sha256 checked); rollback is a
+restore of that dump.
