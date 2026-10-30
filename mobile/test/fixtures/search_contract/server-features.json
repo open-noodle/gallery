@@ -11,6 +11,7 @@
   },
   "response": {
     "body": {
+      "backups": false,
       "configFile": false,
       "duplicateDetection": false,
       "email": false,
