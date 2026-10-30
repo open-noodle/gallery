@@ -264,12 +264,22 @@ features:
       - clip-relevance-threshold
       - system-config-caching
       - prometheus-metrics
+      - spatial-scene
     risk: high
     domains: [server, ml, database]
     owned_paths:
       - machine-learning/immich_ml/models/pet_detection/**
       - machine-learning/immich_ml/models/pet_recognition/**
       - machine-learning/immich_ml/models/gallery_hosted.py
+      - machine-learning/immich_ml/models/depth_estimation/**
+      - machine-learning/depth-model-export/**
+      - server/src/gallery/services/spatial-scene.service.ts
+      - server/src/gallery/repositories/spatial-scene.repository.ts
+      - server/src/gallery/utils/spatial-scene.ts
+      - server/src/gallery/dtos/spatial-scene.dto.ts
+      - server/src/schema/tables/asset-spatial-scene.table.ts
+      - web/src/lib/gallery/spatial/**
+      - web/src/lib/gallery/admin/SpatialSceneSettings.svelte
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
@@ -289,11 +299,12 @@ features:
       - server/src/utils/**
       - server/test/**
     database:
-      tables: [person, shared_spaces, system_config, asset_duplicate_checksums]
+      tables: [person, shared_spaces, system_config, asset_duplicate_checksums, asset_spatial_scene]
       migration_globs:
         - server/src/schema/migrations-gallery/*Pet*.ts
         - server/src/schema/migrations-gallery/*Classification*.ts
         - server/src/schema/migrations-gallery/*Duplicate*.ts
+        - server/src/schema/migrations-gallery/*SpatialScene*.ts
     required_checks: [ci-invariants-check]
 
   mobile-app-and-branding:
@@ -519,6 +530,7 @@ features:
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
         - server/src/schema/migrations-gallery/1799000000000-AddAssetImageAdjustTable.ts
+        - server/src/schema/migrations-gallery/1799100000000-AddAssetSpatialSceneTable.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
