@@ -3,20 +3,26 @@ import { AssetController } from 'src/controllers/asset.controller.js';
 import { controllers } from 'src/controllers/index.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
+import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { factory } from 'test/small.factory.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(GalleryAssetController.name, () => {
   let ctx: ControllerContext;
   const service = mockBaseService(GalleryAssetService);
+  const spatialScene = mockBaseService(SpatialSceneService);
 
   beforeAll(async () => {
-    ctx = await controllerSetup(GalleryAssetController, [{ provide: GalleryAssetService, useValue: service }]);
+    ctx = await controllerSetup(GalleryAssetController, [
+      { provide: GalleryAssetService, useValue: service },
+      { provide: SpatialSceneService, useValue: spatialScene },
+    ]);
     return () => ctx.close();
   });
 
   beforeEach(() => {
     service.resetAllMocks();
+    spatialScene.resetAllMocks();
     ctx.reset();
   });
 
@@ -72,6 +78,25 @@ describe(GalleryAssetController.name, () => {
         .send({ startTime: 1.5, endTime: 3 });
       expect(status).toBe(200);
       expect(service.setTrim).toHaveBeenCalledWith(undefined, id, { startTime: 1.5, endTime: 3 });
+    });
+  });
+
+  describe('GET /assets/:id/depth', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/depth`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a valid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).get('/assets/not-a-uuid/depth');
+      expect(status).toBe(400);
+      expect(spatialScene.getDepthMap).not.toHaveBeenCalled();
+    });
+
+    it('should ask the service for the depth map', async () => {
+      const id = factory.uuid();
+      await request(ctx.getHttpServer()).get(`/assets/${id}/depth`);
+      expect(spatialScene.getDepthMap).toHaveBeenCalledWith(undefined, id);
     });
   });
 
