@@ -54,6 +54,16 @@ describe(MachineLearningRepository.name, () => {
       maxDistance: 0.55,
       minFaces: 1,
     },
+    spatialScene: {
+      enabled: false,
+      modelName: 'depth-anything-v2-small',
+      offer: 'suitable' as const,
+      minBoundarySharpness: 0.03,
+      minEdgeDensity: 0.02,
+      minForegroundRatio: 0.01,
+      maxForegroundRatio: 0.75,
+      minFaceHeight: 0.03,
+    },
   };
 
   const setupConfig = () => {

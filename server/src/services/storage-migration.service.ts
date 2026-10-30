@@ -190,6 +190,21 @@ export class StorageMigrationService extends BaseService {
       }
     }
 
+    // Stream Spatial Scene depth maps, which move with the previews they were made from
+    if (fileTypes.previews) {
+      for await (const row of this.storageMigrationRepository.streamDepthMaps(direction)) {
+        await enqueue({
+          entityType: 'asset',
+          entityId: row.assetId,
+          fileType: 'depthMap',
+          sourcePath: row.path,
+          batchId,
+          direction,
+          deleteSource,
+        });
+      }
+    }
+
     // Stream encoded videos
     if (fileTypes.encodedVideos) {
       for await (const row of this.storageMigrationRepository.streamEncodedVideos(direction)) {
@@ -392,6 +407,9 @@ export class StorageMigrationService extends BaseService {
       case 'asset': {
         if (fileType === 'encodedVideo') {
           return this.storageMigrationRepository.updateAssetEncodedVideoPath(entityId, oldPath, newPath);
+        }
+        if (fileType === 'depthMap') {
+          return this.storageMigrationRepository.updateDepthMapPath(entityId, oldPath, newPath);
         }
         return this.storageMigrationRepository.updateAssetOriginalPath(entityId, oldPath, newPath);
       }

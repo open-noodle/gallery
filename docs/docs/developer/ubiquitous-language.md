@@ -16,7 +16,7 @@ This page names the major Gallery concepts, so a discussion can start in product
 | **Domain service**           | Server business logic that enforces rules, access, side effects, jobs, and response shaping.              | Backend component, handler      |
 | **Persistence layer**        | Typed database access and schema definitions around Postgres.                                             | DB stuff, query code            |
 | **Job pipeline**             | Redis/BullMQ-backed background work for media processing, ML, cleanup, migration, and notifications.      | Worker magic, queue stuff       |
-| **Machine learning service** | The Python service that hosts ONNX models for CLIP, face recognition, OCR, and pet detection/recognition. | AI server, model box            |
+| **Machine learning service** | The Python service that hosts ONNX models for CLIP, faces, OCR, pet detection/recognition and depth maps. | AI server, model box            |
 | **Storage layer**            | The disk/S3 abstraction that writes, reads, serves, deletes, and migrates media files.                    | Filesystem code, S3 code        |
 | **Realtime layer**           | Websocket and audit/update-id infrastructure that lets clients react to server-side changes.              | Socket code, sync code          |
 | **Generated SDK**            | The OpenAPI-generated client used by web, mobile, CLI, and tests to call the server.                      | API wrapper, SDK stuff          |

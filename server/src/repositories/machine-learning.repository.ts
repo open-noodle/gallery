@@ -15,6 +15,7 @@ export enum ModelTask {
   SEARCH = 'clip',
   OCR = 'ocr',
   PET_DETECTION = 'pet-detection',
+  DEPTH_ESTIMATION = 'depth-estimation',
 }
 
 export enum ModelType {
@@ -24,6 +25,7 @@ export enum ModelType {
   TEXTUAL = 'textual',
   VISUAL = 'visual',
   OCR = 'ocr',
+  DEPTH = 'depth',
 }
 
 export type ModelPayload = { imagePath: string } | { text: string };
@@ -92,8 +94,25 @@ export type PetDetectionRequest = {
   };
 };
 
+// Gallery: Spatial Scene depth map (specs/2026-10-29-spatial-scene-design.md). `depth` is a base64 8-bit PNG.
+export type DepthEstimation = {
+  depth: string;
+  width: number;
+  height: number;
+  boundarySharpness: number;
+  edgeDensity: number;
+  foregroundRatio: number;
+  focus: number;
+};
+export type DepthEstimationRequest = { [ModelTask.DEPTH_ESTIMATION]: { [ModelType.DEPTH]: ModelOptions } };
+
 export type MachineLearningRequest =
-  ClipVisualRequest | ClipTextualRequest | FacialRecognitionRequest | OcrRequest | PetDetectionRequest;
+  | ClipVisualRequest
+  | ClipTextualRequest
+  | FacialRecognitionRequest
+  | OcrRequest
+  | PetDetectionRequest
+  | DepthEstimationRequest;
 export type TextEncodingOptions = ModelOptions & { language?: string };
 
 @Injectable()
@@ -324,6 +343,16 @@ export class MachineLearningRepository {
       // `pets.filter(...)` — an absent response key is treated as "no pets detected".
       pets: response[ModelTask.PET_DETECTION] ?? [],
     };
+  }
+
+  async estimateDepth(imagePath: string, { modelName }: ModelOptions): Promise<DepthEstimation> {
+    const request: DepthEstimationRequest = { [ModelTask.DEPTH_ESTIMATION]: { [ModelType.DEPTH]: { modelName } } };
+    const response = await this.predict<{ [ModelTask.DEPTH_ESTIMATION]?: DepthEstimation }>({ imagePath }, request);
+    const depth = response[ModelTask.DEPTH_ESTIMATION];
+    if (!depth) {
+      throw new Error('Machine learning service returned no depth map; it may predate Spatial Scene');
+    }
+    return depth;
   }
 
   private async getFormData(payload: ModelPayload, config: MachineLearningRequest): Promise<FormData> {

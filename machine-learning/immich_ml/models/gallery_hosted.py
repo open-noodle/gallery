@@ -32,10 +32,15 @@ class GalleryHostedModel[O: Options](InferenceModel[O]):
             f"{GALLERY_HF_ORG}/{self.model_name}",
             cache_dir=self.cache_dir,
             local_dir=self.cache_dir,
-            ignore_patterns=_IGNORED_PATTERNS.get(self.model_format, []),
+            ignore_patterns=self.ignore_patterns,
         )
         if not self.cached:  # as upstream: this is what sends an RKNN/ARMNN model back to ONNX
             raise FileNotFoundError(f"Model file not found: {self.model_path}")
+
+    @property
+    def ignore_patterns(self) -> list[str]:
+        """Repository files this install never loads, left undownloaded. A model that ships variants extends this."""
+        return _IGNORED_PATTERNS.get(self.model_format, [])
 
     @property
     def _cache_dir_default(self) -> Path:
