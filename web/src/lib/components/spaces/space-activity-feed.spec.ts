@@ -49,6 +49,25 @@ describe('SpaceActivityFeed', () => {
     expect(screen.getByTestId('activity-item-act-2')).toBeInTheDocument();
   });
 
+  it('should name the inviter when member_join carries invitedByName', () => {
+    const activities = [
+      makeActivity({
+        id: 'act-4',
+        type: 'member_join',
+        userName: 'Ben',
+        data: { role: 'viewer', invitedByName: 'Anna' },
+      }),
+    ];
+    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(screen.getByTestId('activity-item-act-4')).toHaveTextContent('Anna added Ben as viewer');
+  });
+
+  it('should fall back to the joined-as line when member_join has no invitedByName', () => {
+    const activities = [makeActivity({ id: 'act-5', type: 'member_join', userName: 'Ben', data: { role: 'viewer' } })];
+    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(screen.getByTestId('activity-item-act-5')).toHaveTextContent('Ben joined as viewer');
+  });
+
   it('should render space_rename event with compact styling', () => {
     const activities = [
       makeActivity({

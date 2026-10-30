@@ -60,6 +60,22 @@ class SharedSpaceApiRepository extends ApiRepository {
     return await checkNull(_api.updateSpace(id, dto));
   }
 
+  /// Sets one of the per-space member-management overrides (`editorsCanAddMembers` /
+  /// `editorsCanChangeRoles`). [value] `null` resets it to the server default, so it is sent as an
+  /// explicit JSON null (`Optional.present(null)`), unlike [update] where null means "unchanged".
+  Future<SharedSpaceResponseDto> updateMemberPermission(
+    String spaceId, {
+    required String field,
+    required bool? value,
+  }) async {
+    final dto = switch (field) {
+      'editorsCanAddMembers' => SharedSpaceUpdateDto(editorsCanAddMembers: Optional.present(value)),
+      'editorsCanChangeRoles' => SharedSpaceUpdateDto(editorsCanChangeRoles: Optional.present(value)),
+      _ => throw ArgumentError.value(field, 'field'),
+    };
+    return await checkNull(_api.updateSpace(spaceId, dto));
+  }
+
   Future<void> delete(String id) async {
     await _api.removeSpace(id);
   }

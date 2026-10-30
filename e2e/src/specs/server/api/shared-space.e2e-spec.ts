@@ -1,4 +1,13 @@
-import { AssetMediaResponseDto, AssetVisibility, LoginResponseDto, SharedSpaceRole, updateAssets } from '@immich/sdk';
+import {
+  AdminConfigDto,
+  AssetMediaResponseDto,
+  AssetVisibility,
+  getConfig,
+  LoginResponseDto,
+  SharedSpaceRole,
+  updateAssets,
+  updateConfig,
+} from '@immich/sdk';
 import { authHeaders, forEachActor, type Actor } from 'src/actors.js';
 import { createUserDto } from 'src/fixtures.js';
 import { errorDto } from 'src/responses.js';
@@ -13,6 +22,13 @@ function currentMonthBucketString(): string {
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
   return `${yyyy}-${mm}-01`;
+}
+
+/** A space owned by `ownerToken`'s user with `editorId` as an editor. */
+async function createSpaceWithEditor(ownerToken: string, editorId: string, name: string) {
+  const space = await utils.createSpace(ownerToken, { name });
+  await utils.addSpaceMember(ownerToken, space.id, { userId: editorId, role: SharedSpaceRole.Editor });
+  return space;
 }
 
 describe('/shared-spaces', () => {
@@ -566,6 +582,108 @@ describe('/shared-spaces', () => {
         .get(`/shared-spaces/${space.id}/members`)
         .set('Authorization', `Bearer ${user1.accessToken}`);
       expect(members).toContainEqual(expect.objectContaining({ userId: user1.userId, role: SharedSpaceRole.Owner }));
+    });
+  });
+
+  // One HTTP path per operation for the opt-in editor member management: proves the admin config and the
+  // controller wiring that the medium role matrix (shared-space-member-management-role-matrix.spec.ts) bypasses.
+  describe('editor member management (opt-in)', () => {
+    let baseConfig: AdminConfigDto;
+
+    const setServerSwitches = (spaceEditorsCanAddMembers: boolean, spaceEditorsCanChangeRoles: boolean) =>
+      updateConfig(
+        {
+          adminConfigDto: {
+            ...baseConfig,
+            server: { ...baseConfig.server, spaceEditorsCanAddMembers, spaceEditorsCanChangeRoles },
+          },
+        },
+        { headers: asBearerAuth(admin.accessToken) },
+      );
+
+    beforeAll(async () => {
+      baseConfig = await getConfig({ headers: asBearerAuth(admin.accessToken) });
+    });
+
+    afterAll(async () => {
+      await updateConfig({ adminConfigDto: baseConfig }, { headers: asBearerAuth(admin.accessToken) });
+    });
+
+    it('lets an editor add a member as a viewer once the admin turns the server setting on', async () => {
+      await setServerSwitches(true, false);
+      const space = await createSpaceWithEditor(user1.accessToken, user2.userId, 'Editor Adds Member');
+
+      const { status, body } = await request(app)
+        .post(`/shared-spaces/${space.id}/members`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ userId: user3.userId });
+
+      expect(status).toBe(201);
+      expect(body).toEqual(expect.objectContaining({ userId: user3.userId, role: SharedSpaceRole.Viewer }));
+    });
+
+    it('rejects the editor once the owner turns the space setting off', async () => {
+      await setServerSwitches(true, false);
+      const space = await createSpaceWithEditor(user1.accessToken, user2.userId, 'Owner Overrides Off');
+
+      const patch = await request(app)
+        .patch(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ editorsCanAddMembers: false });
+      expect(patch.status).toBe(200);
+      expect(patch.body.memberManagement).toEqual(expect.objectContaining({ editorsCanAddMembers: false }));
+
+      const { status } = await request(app)
+        .post(`/shared-spaces/${space.id}/members`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ userId: user3.userId });
+
+      expect(status).toBe(403);
+    });
+
+    it('rejects an editor changing the space setting', async () => {
+      await setServerSwitches(true, true);
+      const space = await createSpaceWithEditor(user1.accessToken, user2.userId, 'Editor Changes Setting');
+
+      const { status } = await request(app)
+        .patch(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ editorsCanAddMembers: null });
+
+      expect(status).toBe(403);
+    });
+
+    it('lets an editor switch a viewer to editor with both server settings on', async () => {
+      await setServerSwitches(true, true);
+      const space = await createSpaceWithEditor(user1.accessToken, user2.userId, 'Editor Changes Role');
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user3.userId });
+
+      const { status, body } = await request(app)
+        .patch(`/shared-spaces/${space.id}/members/${user3.userId}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ role: SharedSpaceRole.Editor });
+
+      expect(status).toBe(200);
+      expect(body).toEqual(expect.objectContaining({ userId: user3.userId, role: SharedSpaceRole.Editor }));
+    });
+
+    it('reports the effective permissions to the editor on GET', async () => {
+      await setServerSwitches(true, false);
+      const space = await createSpaceWithEditor(user1.accessToken, user2.userId, 'Editor Reads Permissions');
+
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body.memberManagement).toEqual({
+        editorsCanAddMembers: null,
+        editorsCanChangeRoles: null,
+        serverEditorsCanAddMembers: true,
+        serverEditorsCanChangeRoles: false,
+        canAddMembers: true,
+        canChangeRoles: false,
+      });
     });
   });
 
