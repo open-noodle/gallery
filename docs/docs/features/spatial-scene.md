@@ -84,13 +84,14 @@ together.
 ### How long it takes
 
 These are times per photo on a CPU, with the machine learning service's default of two threads
-per model. The Apple M2 figures are measured; the NAS figures are an estimate.
+per model. The Apple M2 and Intel Core i7-7700K figures are measured (the i7 as a 4-core virtual
+machine, timing the whole job from preview to stored depth map); the NAS figures are an estimate.
 
-| Model                     | Apple M2 | Typical NAS processor (estimate) |
-| ------------------------- | -------- | -------------------------------- |
-| `depth-anything-v2-small` | ~1.8 s   | 2–5 s                            |
-| `distill-any-depth-small` | ~1.8 s   | 2–5 s                            |
-| `distill-any-depth-large` | ~11 s    | Too slow to be useful            |
+| Model                     | Apple M2 | Intel Core i7-7700K | Typical NAS processor (estimate) |
+| ------------------------- | -------- | ------------------- | -------------------------------- |
+| `depth-anything-v2-small` | ~1.8 s   | ~1.9 s              | 2–5 s                            |
+| `distill-any-depth-small` | ~1.8 s   | Not measured        | 2–5 s                            |
+| `distill-any-depth-large` | ~11 s    | Not measured        | Too slow to be useful            |
 
 For comparison, [Pet Detection](/features/pet-detection) takes about 0.04 seconds per photo. New
 uploads add one depth map each, which is rarely noticeable. Processing an existing library is
