@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/cleanup/widgets/library_cleanup_button.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/local_album_thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
@@ -92,6 +93,7 @@ class _ActionButtonGrid extends ConsumerWidget {
                     : const SizedBox.shrink(),
               ],
             ),
+            const LibraryCleanupButton(),
           ],
         ),
       ),

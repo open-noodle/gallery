@@ -1,0 +1,51 @@
+{
+  "description": "Rewind 15 August 2022",
+  "ids": {
+    "7ef9dfdd-5b85-4cb6-81ca-28d8b6b7d87c": "asset:p1",
+    "e91544b4-cef5-4912-88f6-2f362347ef49": "asset:p2"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/815/2022"
+  },
+  "response": {
+    "body": {
+      "assets": [
+        {
+          "city": "Lisbon",
+          "duration": null,
+          "fileSize": 1001,
+          "height": 1,
+          "id": "7ef9dfdd-5b85-4cb6-81ca-28d8b6b7d87c",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2022-08-15T09:00:00.000Z",
+          "originalFileName": "p1.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": "Lisbon",
+          "duration": null,
+          "fileSize": 1002,
+          "height": 1,
+          "id": "e91544b4-cef5-4912-88f6-2f362347ef49",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2022-08-15T15:00:00.000Z",
+          "originalFileName": "p2.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ]
+    },
+    "status": 200
+  }
+}

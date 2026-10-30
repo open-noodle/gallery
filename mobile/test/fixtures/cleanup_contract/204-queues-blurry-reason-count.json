@@ -1,0 +1,24 @@
+{
+  "description": "The filter changed to blurry only: the count again",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry/count",
+    "query": {
+      "hideFaces": "true",
+      "reason": "blurry",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "analysedPercent": 70,
+      "bytes": 17113,
+      "count": 13
+    },
+    "status": 200
+  }
+}

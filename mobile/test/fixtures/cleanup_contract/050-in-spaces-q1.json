@@ -1,0 +1,27 @@
+{
+  "description": "Before trashing q1: it is in a shared space",
+  "ids": {
+    "68a72fed-ca14-473e-8bfe-49b697990dcd": "asset:q1"
+  },
+  "request": {
+    "body": {
+      "assetIds": [
+        "68a72fed-ca14-473e-8bfe-49b697990dcd"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/in-spaces"
+  },
+  "response": {
+    "body": {
+      "assetIds": [
+        "68a72fed-ca14-473e-8bfe-49b697990dcd"
+      ],
+      "externalAssetIds": []
+    },
+    "status": 200
+  }
+}

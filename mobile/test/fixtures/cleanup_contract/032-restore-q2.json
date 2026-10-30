@@ -1,0 +1,24 @@
+{
+  "description": "Undo of the trash: restores exactly the trashed ids",
+  "ids": {
+    "816fe8ca-0ed2-4d29-8f14-c3e7033874c3": "asset:q2"
+  },
+  "request": {
+    "body": {
+      "ids": [
+        "816fe8ca-0ed2-4d29-8f14-c3e7033874c3"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/trash/restore/assets"
+  },
+  "response": {
+    "body": {
+      "count": 1
+    },
+    "status": 200
+  }
+}

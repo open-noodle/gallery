@@ -1,0 +1,28 @@
+{
+  "description": "The toast's Undo restores the trashed frames only; the kept ones stay kept",
+  "ids": {
+    "32ebde2b-2ce5-4cc8-81bf-422221205346": "asset:burst-a3",
+    "9c44cefb-9c25-418b-8752-9b7aa07c8b05": "asset:burst-a1",
+    "cbde695d-e55d-4e95-8330-8c1aa62a30a4": "asset:burst-b2"
+  },
+  "request": {
+    "body": {
+      "ids": [
+        "9c44cefb-9c25-418b-8752-9b7aa07c8b05",
+        "32ebde2b-2ce5-4cc8-81bf-422221205346",
+        "cbde695d-e55d-4e95-8330-8c1aa62a30a4"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/trash/restore/assets"
+  },
+  "response": {
+    "body": {
+      "count": 3
+    },
+    "status": 200
+  }
+}

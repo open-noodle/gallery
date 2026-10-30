@@ -23,6 +23,8 @@ enum StoreKey<T> {
   searchPeopleSort<String>._(90003),
   searchPlacesSort<String>._(90004),
   searchPeopleType<String>._(90005),
+  // Library Cleanup's remembered choices, one JSON string (lib/gallery/cleanup/cleanup_prefs.dart).
+  libraryCleanupPrefs<String>._(90007),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

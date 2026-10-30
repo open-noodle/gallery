@@ -1,0 +1,41 @@
+{
+  "description": "Finish 21 June: r1 trashed and r2 kept (\"Keep all remaining\") in the grid, s1 favourited and s2 kept in the deck",
+  "ids": {
+    "0b711e2a-7ef3-4c05-8441-4ab53c9a588f": "asset:r2",
+    "84ab20d8-6760-42cf-8cb5-ebc3767839f8": "asset:r1",
+    "944f8108-2e6e-45f2-8411-fb340cec8547": "asset:s1",
+    "cdb6c0ff-a23e-4d71-83cc-acf18552a56a": "asset:s2"
+  },
+  "request": {
+    "body": {
+      "completeMonthDay": 621,
+      "favoriteIds": [
+        "944f8108-2e6e-45f2-8411-fb340cec8547"
+      ],
+      "keepIds": [
+        "0b711e2a-7ef3-4c05-8441-4ab53c9a588f",
+        "cdb6c0ff-a23e-4d71-83cc-acf18552a56a"
+      ],
+      "queue": "rewind",
+      "trashIds": [
+        "84ab20d8-6760-42cf-8cb5-ebc3767839f8"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 1,
+      "kept": 3,
+      "skipped": [],
+      "trashed": [
+        "84ab20d8-6760-42cf-8cb5-ebc3767839f8"
+      ]
+    },
+    "status": 200
+  }
+}

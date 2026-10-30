@@ -1,0 +1,29 @@
+{
+  "description": "Three screenshots marked for trash in the grid: the lookup",
+  "ids": {
+    "0b3f6de1-9c15-404e-8291-cd9a2b3baeb9": "asset:shot-2",
+    "a578ec9f-b72e-4450-89af-4dde31f067bc": "asset:shot-1",
+    "f856a6d8-6871-455a-8f9f-98b1b64e3383": "asset:shot-3"
+  },
+  "request": {
+    "body": {
+      "assetIds": [
+        "a578ec9f-b72e-4450-89af-4dde31f067bc",
+        "0b3f6de1-9c15-404e-8291-cd9a2b3baeb9",
+        "f856a6d8-6871-455a-8f9f-98b1b64e3383"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/in-spaces"
+  },
+  "response": {
+    "body": {
+      "assetIds": [],
+      "externalAssetIds": []
+    },
+    "status": 200
+  }
+}

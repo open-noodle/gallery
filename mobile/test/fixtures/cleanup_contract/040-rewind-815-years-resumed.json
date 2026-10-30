@@ -1,0 +1,26 @@
+{
+  "description": "The rewind reopened: same years",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/815"
+  },
+  "response": {
+    "body": {
+      "years": [
+        {
+          "count": 2,
+          "year": 2022
+        },
+        {
+          "count": 3,
+          "year": 2020
+        }
+      ]
+    },
+    "status": 200
+  }
+}

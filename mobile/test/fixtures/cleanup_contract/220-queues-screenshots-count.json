@@ -1,0 +1,19 @@
+{
+  "description": "Screenshots opens: the count (Screenshots has no filters)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/screenshots/count"
+  },
+  "response": {
+    "body": {
+      "analysedPercent": 66,
+      "bytes": 8000,
+      "count": 4
+    },
+    "status": 200
+  }
+}

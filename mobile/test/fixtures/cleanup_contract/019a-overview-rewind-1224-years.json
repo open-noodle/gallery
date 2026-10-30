@@ -1,0 +1,22 @@
+{
+  "description": "The today card on 24 December, a day reviewed before the script starts: its years",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/1224"
+  },
+  "response": {
+    "body": {
+      "years": [
+        {
+          "count": 1,
+          "year": 2021
+        }
+      ]
+    },
+    "status": 200
+  }
+}

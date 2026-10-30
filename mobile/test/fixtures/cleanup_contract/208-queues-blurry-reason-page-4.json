@@ -1,0 +1,47 @@
+{
+  "description": "Blurry only, the last page as marks leave ten cards: the next cursor is null",
+  "ids": {
+    "344e576a-6655-466e-8d07-06f5c53b22f2": "asset:blurry-11",
+    "9cfee146-415c-41a4-830a-0e93d3d94261": "asset:blurry-10"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry",
+    "query": {
+      "cursor": "eyJ2IjpbIjIwMjMtMDUtMTBUMTA6MDA6MDAuMDAwMDAwWiIsIjljZmVlMTQ2LTQxNWMtNDFhNC04MzBhLTBlOTNkM2Q5NDI2MSJdfQ",
+      "hideFaces": "true",
+      "limit": "4",
+      "reason": "blurry",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1017,
+          "height": 1,
+          "id": "344e576a-6655-466e-8d07-06f5c53b22f2",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-09T10:00:00.000Z",
+          "originalFileName": "blurry-11.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": null
+    },
+    "status": 200
+  }
+}

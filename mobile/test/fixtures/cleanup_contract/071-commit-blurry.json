@@ -1,0 +1,41 @@
+{
+  "description": "Apply on the Blurry queue: queue blurry, no completeMonthDay",
+  "ids": {
+    "08aca177-934d-4efc-8c8f-ee547ba234f1": "asset:blurry-04",
+    "65872e7f-2930-4856-8df2-4fe2b1327c04": "asset:blurry-01",
+    "6e85dfee-fde9-4c89-857c-dc73bb797e3f": "asset:blurry-03",
+    "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe": "asset:blurry-02"
+  },
+  "request": {
+    "body": {
+      "favoriteIds": [
+        "6e85dfee-fde9-4c89-857c-dc73bb797e3f"
+      ],
+      "keepIds": [
+        "08aca177-934d-4efc-8c8f-ee547ba234f1"
+      ],
+      "queue": "blurry",
+      "trashIds": [
+        "65872e7f-2930-4856-8df2-4fe2b1327c04",
+        "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 1,
+      "kept": 2,
+      "skipped": [],
+      "trashed": [
+        "65872e7f-2930-4856-8df2-4fe2b1327c04",
+        "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe"
+      ]
+    },
+    "status": 200
+  }
+}
