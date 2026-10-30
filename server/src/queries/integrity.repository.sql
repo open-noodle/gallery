@@ -86,6 +86,13 @@ from
   "person"
 where
   "person"."thumbnailPath" in $3
+union
+select
+  "asset_spatial_scene"."path" as "path"
+from
+  "asset_spatial_scene"
+where
+  "asset_spatial_scene"."path" in $4
 
 -- IntegrityRepository.getAssetCount
 select

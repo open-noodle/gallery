@@ -96,6 +96,10 @@
       allText: $t('all'),
       missingText: $t('missing'),
     },
+    [QueueName.SpatialScene]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),
