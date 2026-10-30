@@ -8,6 +8,7 @@ from .models.base import InferenceEntry, InferenceModel
 from .models.clip.textual import BaseCLIPTextualEncoder, MClipTextualEncoder, OpenClipTextualEncoder
 from .models.clip.visual import OpenClipVisualEncoder
 from .models.constants import get_model_source
+from .models.depth_estimation import DepthEstimator
 from .models.facial_recognition.detection import FaceDetector
 from .models.facial_recognition.recognition import FaceRecognizer
 from .models.ocr.detection import TextDetector
@@ -15,6 +16,7 @@ from .models.ocr.recognition import TextRecognizer
 from .models.pet_detection import PetDetector
 from .models.pet_recognition import PetRecognizer
 from .schemas import (
+    DepthEstimationOptions,
     FaceDetectionOptions,
     FaceRecognitionOptions,
     ModelSource,
@@ -73,6 +75,13 @@ class PetDetection:
     recognition: Slot[PetRecognitionOptions] | None = None
 
 
+# Gallery: monocular depth for Spatial Scene.
+@with_config(STRICT)
+@dataclass(frozen=True)
+class DepthEstimation:
+    depth: Slot[DepthEstimationOptions] | None = None
+
+
 @with_config(STRICT)
 @dataclass(frozen=True)
 class PipelineRequest:
@@ -82,6 +91,9 @@ class PipelineRequest:
     )
     ocr: Ocr = field(default_factory=Ocr)
     pet_detection: Annotated[PetDetection, Field(alias="pet-detection")] = field(default_factory=PetDetection)
+    depth_estimation: Annotated[DepthEstimation, Field(alias="depth-estimation")] = field(
+        default_factory=DepthEstimation
+    )
 
     def entries(self) -> Iterator[InferenceEntry[Any]]:
         if (visual := self.clip.visual) is not None:
@@ -100,3 +112,5 @@ class PipelineRequest:
             yield pets.entry(PetDetector)
         if (pet_embedding := self.pet_detection.recognition) is not None:
             yield pet_embedding.entry(PetRecognizer)
+        if (depth := self.depth_estimation.depth) is not None:
+            yield depth.entry(DepthEstimator)

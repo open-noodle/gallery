@@ -920,6 +920,7 @@ export enum QueueName {
   StorageBackendMigration = 'storageBackendMigration',
   Classification = 'classification',
   QualityAnalysis = 'qualityAnalysis',
+  SpatialScene = 'spatialScene',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -1030,6 +1031,10 @@ export enum JobName {
   // Pet Recognition
   PetRecognitionQueueAll = 'PetRecognitionQueueAll',
   PetRecognition = 'PetRecognition',
+
+  // Spatial Scene
+  SpatialSceneQueueAll = 'SpatialSceneQueueAll',
+  SpatialScene = 'SpatialScene',
 
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',

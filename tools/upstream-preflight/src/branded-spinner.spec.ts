@@ -52,6 +52,7 @@ const SWAPPED_SET = [
   'routes/(user)/memories/+page.svelte',
   'lib/modals/SpaceLinkAlbumModal.svelte',
   'lib/modals/SpaceLinkLibraryModal.svelte',
+  'lib/gallery/spatial/SpatialSceneViewer.svelte',
 ];
 
 // Matches both import forms used in this codebase:

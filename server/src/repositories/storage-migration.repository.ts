@@ -55,6 +55,16 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  /** Spatial Scene depth maps (specs/2026-10-29-spatial-scene-design.md): derived from the preview, so they move with it. */
+  streamDepthMaps(direction: StorageMigrationDirection) {
+    return this.db
+      .selectFrom('asset_spatial_scene')
+      .select(['assetId', 'path'])
+      .$if(direction === 'toS3', (qb) => qb.where('path', 'like', '/%'))
+      .$if(direction === 'toDisk', (qb) => qb.where('path', 'not like', '/%'))
+      .stream();
+  }
+
   streamPersonThumbnails(direction: StorageMigrationDirection) {
     return this.db
       .selectFrom('person')
@@ -93,7 +103,7 @@ export class StorageMigrationRepository {
     const pathFilter = direction === 'toS3' ? 'like' : ('not like' as const);
     const pathPattern = '/%';
 
-    const [originals, assetFiles, encodedVideos, personThumbnails, profileImages] = await Promise.all([
+    const [originals, assetFiles, depthMaps, encodedVideos, personThumbnails, profileImages] = await Promise.all([
       this.db
         .selectFrom('asset')
         .select((eb) => eb.fn.countAll<number>().as('count'))
@@ -108,6 +118,12 @@ export class StorageMigrationRepository {
           eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.FullSize).as('fullsize'),
           eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Sidecar).as('sidecars'),
         ])
+        .where('path', pathFilter, pathPattern)
+        .executeTakeFirstOrThrow(),
+
+      this.db
+        .selectFrom('asset_spatial_scene')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
         .where('path', pathFilter, pathPattern)
         .executeTakeFirstOrThrow(),
 
@@ -136,7 +152,8 @@ export class StorageMigrationRepository {
     return {
       originals: originals.count,
       thumbnails: assetFiles.thumbnails,
-      previews: assetFiles.previews,
+      // depth maps move with the previews they were made from
+      previews: Number(assetFiles.previews) + Number(depthMaps.count),
       fullsize: assetFiles.fullsize,
       sidecars: assetFiles.sidecars,
       encodedVideos: encodedVideos.count,
@@ -175,6 +192,17 @@ export class StorageMigrationRepository {
       .updateTable('asset_file')
       .set({ path: newPath })
       .where('id', '=', fileId)
+      .where('path', '=', oldPath)
+      .executeTakeFirst();
+
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  async updateDepthMapPath(assetId: string, oldPath: string, newPath: string): Promise<boolean> {
+    const result = await this.db
+      .updateTable('asset_spatial_scene')
+      .set({ path: newPath })
+      .where('assetId', '=', assetId)
       .where('path', '=', oldPath)
       .executeTakeFirst();
 

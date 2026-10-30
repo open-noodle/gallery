@@ -7,6 +7,7 @@ import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetImageAdjustTable } from 'src/schema/tables/asset-image-adjust.table.js';
 import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
 import { AssetQualityTable } from 'src/schema/tables/asset-quality.table.js';
+import { AssetSpatialSceneTable } from 'src/schema/tables/asset-spatial-scene.table.js';
 import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
 import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';
 import { CleanupDecisionTable } from 'src/schema/tables/cleanup-decision.table.js';
@@ -65,6 +66,7 @@ export const galleryTables = [
   AssetFavoriteTable,
   AssetFavoriteAuditTable,
   AssetImageAdjustTable,
+  AssetSpatialSceneTable,
   AssetJobStatusGalleryTable,
   AssetVideoTrimTable,
   FaceIdentityTable,
@@ -122,6 +124,7 @@ export interface GalleryDB {
   asset_favorite: AssetFavoriteTable;
   asset_favorite_audit: AssetFavoriteAuditTable;
   asset_image_adjust: AssetImageAdjustTable;
+  asset_spatial_scene: AssetSpatialSceneTable;
   asset_job_status_gallery: AssetJobStatusGalleryTable;
   asset_video_trim: AssetVideoTrimTable;
   face_identity: FaceIdentityTable;

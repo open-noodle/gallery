@@ -15,6 +15,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PluginRepository } from 'src/repositories/plugin.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
@@ -51,6 +52,10 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
         // so the harness must wire SharedSpaceRepository (real: no-op for the non-space assets used here).
         SharedSpaceRepository,
         StorageRepository,
+        // Spatial Scene: AssetService.get() (which update() returns through) reads the system config to
+        // decide the asset's spatialScene flag, so the plugin-host AssetService needs the metadata repo.
+        // Real: the empty system_metadata table yields the defaults, where Spatial Scene is off.
+        SystemMetadataRepository,
         UserRepository,
         WorkflowRepository,
       ],

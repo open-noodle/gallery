@@ -109,6 +109,12 @@ export class IntegrityRepository {
           .select((eb) => eb.ref('person.thumbnailPath').$castTo<string>().as('path'))
           .where('person.thumbnailPath', 'in', paths),
       )
+      .union((eb) =>
+        eb
+          .selectFrom('asset_spatial_scene')
+          .select('asset_spatial_scene.path as path')
+          .where('asset_spatial_scene.path', 'in', paths),
+      )
       .execute();
   }
 

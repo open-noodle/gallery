@@ -13,6 +13,7 @@
   import { getAlbumAssetActions } from '#lib/services/album.service.ts';
   import { getGlobalActions } from '#lib/services/app.service.ts';
   import { getAssetActions } from '#lib/services/asset.service.ts';
+  import { getSpatialSceneActions } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
   import { getPersonAssetActions } from '#lib/services/person.service.ts';
   import { getStackActions } from '#lib/services/stack.service.ts';
   import { getSharedLink, withoutIcons } from '#lib/utils.ts';
@@ -93,6 +94,7 @@
     getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }),
   );
   const StackActions = $derived(getStackActions($t, stack, asset));
+  const SpatialActions = $derived(getSpatialSceneActions($t, asset));
   const sharedLink = getSharedLink();
 </script>
 
@@ -132,6 +134,8 @@
     <ActionButton action={Actions.ZoomOut} />
     <ActionButton action={Actions.PlayMotionPhoto} />
     <ActionButton action={Actions.StopMotionPhoto} />
+    <ActionButton action={SpatialActions.ShowSpatialScene} />
+    <ActionButton action={SpatialActions.HideSpatialScene} />
     <ActionButton action={Actions.Copy} />
     <ActionButton action={Actions.SharedLinkDownload} />
     <ActionButton action={Actions.Info} />

@@ -261,6 +261,13 @@ seed() {
     INSERT INTO asset_face (\"assetId\", \"personGroupId\") SELECT '$photo_a', \"personGroupId\" FROM p;
   " >/dev/null
 
+  # A Spatial Scene depth map, also from the ML pipeline: the revert drops the row and leaves the file.
+  psql_q "
+    INSERT INTO asset_spatial_scene (\"assetId\", path, width, height, \"boundarySharpness\", \"edgeDensity\",
+                                     \"foregroundRatio\", focus, \"modelName\")
+    VALUES ('$photo_a', '/data/thumbs/${photo_a}_depth.png', 518, 686, 0.05, 0.03, 0.4, 0.6, 'depth-anything-v2-small');
+  " >/dev/null
+
   # A workflow with a Gallery plugin step, which the stock round trip must keep.
   api POST /workflows "$owner" \
     "{\"trigger\":\"AssetCreate\",\"name\":\"Round trip\",\"steps\":[{\"method\":\"gallery-core#addToSpace\",\"config\":{\"spaceIds\":[\"$space\"]}}]}" \
@@ -407,6 +414,7 @@ gallery_assert() {
     "$([ "$(api GET "/assets/$VIDEO" "$owner" | jq -r .duration)" -lt "$ORIGINAL_DURATION" ] && echo yes)" yes
   check gallery 'pet kept' "$(psql_q "SELECT count(*) FROM person WHERE name = 'Revert Pet'")" 1
   check gallery 'pet recognition kept' "$(psql_q "SELECT count(*) FROM pet_search")" 1
+  check gallery 'depth map kept' "$(psql_q "SELECT count(*) FROM asset_spatial_scene WHERE \"assetId\" = '$PHOTO_A'")" 1
   check gallery 'rule memory kept' "$(psql_q "SELECT count(*) FROM memory WHERE type = 'rule'")" 1
   check gallery 'plugin row kept' "$(psql_q "SELECT id FROM plugin WHERE name = 'gallery-core' AND enabled")" "$(cat "$STATE_DIR/plugin-id")"
   check gallery 'plugin workflow step kept' "$(psql_q "
@@ -492,6 +500,7 @@ assert() {
   check assert 'adjusted photo no longer edited' "$(psql_q "SELECT \"isEdited\" FROM asset WHERE id = '$PHOTO_A'")" f
   check assert 'adjusted files unreferenced' "$(psql_q "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$PHOTO_A' AND \"isEdited\"")" 0
   check assert 'adjusted thumbhash cleared' "$(psql_q "SELECT thumbhash IS NULL FROM asset WHERE id = '$PHOTO_A'")" t
+  check assert 'depth maps removed' "$(psql_q "SELECT to_regclass('public.asset_spatial_scene') IS NULL")" t
 
   check assert 'space link keeps own photo' "$(status GET "/assets/$PHOTO_A?key=$MIXED_LINK")" 200
   check assert "space link stops serving the member's photo" "$(status GET "/assets/$MEMBER_PHOTO?key=$MIXED_LINK")" 400
