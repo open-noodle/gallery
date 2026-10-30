@@ -1,0 +1,38 @@
+{
+  "description": "Apply and stop: trash, favourite and keep ids, and no completeMonthDay",
+  "ids": {
+    "7ef9dfdd-5b85-4cb6-81ca-28d8b6b7d87c": "asset:p1",
+    "816fe8ca-0ed2-4d29-8f14-c3e7033874c3": "asset:q2",
+    "e91544b4-cef5-4912-88f6-2f362347ef49": "asset:p2"
+  },
+  "request": {
+    "body": {
+      "favoriteIds": [
+        "e91544b4-cef5-4912-88f6-2f362347ef49"
+      ],
+      "keepIds": [
+        "7ef9dfdd-5b85-4cb6-81ca-28d8b6b7d87c"
+      ],
+      "queue": "rewind",
+      "trashIds": [
+        "816fe8ca-0ed2-4d29-8f14-c3e7033874c3"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 1,
+      "kept": 2,
+      "skipped": [],
+      "trashed": [
+        "816fe8ca-0ed2-4d29-8f14-c3e7033874c3"
+      ]
+    },
+    "status": 200
+  }
+}

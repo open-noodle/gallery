@@ -74,6 +74,9 @@ class SearchContractServer {
 
 const _absent = Object();
 
+/// The body of a request that had none, for the stand-ins that match fixtures the same way.
+const contractNoBody = _absent;
+
 class ContractFixture {
   final String name;
   final String method;
@@ -111,12 +114,9 @@ class ContractFixture {
   }
 }
 
-List<ContractFixture> loadContractFixtures() {
-  final files =
-      Directory(
-          SearchContractServer.fixtureDir,
-        ).listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList()
-        ..sort((a, b) => a.path.compareTo(b.path));
+List<ContractFixture> loadContractFixtures([String dir = SearchContractServer.fixtureDir]) {
+  final files = Directory(dir).listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList()
+    ..sort((a, b) => a.path.compareTo(b.path));
   return [
     for (final file in files)
       () {
