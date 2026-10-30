@@ -1,0 +1,115 @@
+<!doctype html><html><head><meta charset="utf-8"><title>rewind-day</title></head><body style="background:#0f1012;margin:0;padding:24px">
+<style>
+  .gx { --bg:#0f1012; --card:#18191c; --card2:#1f2024; --line:#2a2b30; --mut:#8b8e96; --txt:#eceef2; --pri:#adcbfa; --ok:#4ade80; --bad:#f87171; --pink:#ec4899;
+        background:var(--bg); color:var(--txt); font:14px/1.4 Inter,system-ui,sans-serif; border-radius:14px; padding:24px; position:relative; }
+  .gx * { box-sizing:border-box; }
+  .gx .mut { color:var(--mut); }
+  .gx .row { display:flex; gap:12px; align-items:center; }
+  .gx .card { background:var(--card); border:1px solid var(--line); border-radius:18px; }
+  .gx .btn { background:var(--pri); color:#0b1630; border-radius:999px; padding:9px 16px; font-weight:600; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; }
+  .gx .btn.danger { background:#7f1d1d; color:#fecaca; }
+  .gx .ghost { border:1px solid var(--line); border-radius:999px; padding:6px 12px; color:var(--txt); font-size:13px; white-space:nowrap; }
+  .gx img { display:block; object-fit:cover; }
+  .gx h1 { font-size:28px; margin:0; letter-spacing:-.02em; }
+  .gx .seg { display:inline-flex; background:var(--card2); border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .gx .seg span { padding:5px 12px; border-radius:999px; font-size:12px; color:var(--mut); }
+  .gx .seg span.on { background:#2e3138; color:var(--txt); }
+  .gx .bar { height:6px; border-radius:99px; background:#26282e; overflow:hidden; }
+  .gx .bar div { height:100%; width:31%; background:linear-gradient(90deg,#22c55e,var(--ok)); border-radius:99px; }
+  .gx .year { margin-top:26px; }
+  .gx .yh { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .gx .yh b { font-size:20px; letter-spacing:-.01em; }
+  .gx .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .gx .t { position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden; }
+  .gx .t img { width:100%; height:100%; }
+  .gx .t.keep { box-shadow:inset 0 0 0 3px var(--ok); }
+  .gx .t.fav { box-shadow:inset 0 0 0 3px var(--pink); }
+  .gx .t.trash img { filter:grayscale(1) brightness(.45); }
+  .gx .t .badge { position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; color:#fff; }
+  .gx .t.trash .lbl { position:absolute; inset:0; display:grid; place-items:center; font-size:11px; font-weight:700; letter-spacing:.08em; color:#fecaca; }
+  .gx .explain { display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:start; padding:16px 18px; background:linear-gradient(135deg,#1c2433,#18191c 70%); }
+  .gx .steps { display:flex; gap:18px; margin-top:10px; flex-wrap:wrap; }
+  .gx .steps span { display:inline-flex; gap:6px; align-items:center; font-size:12.5px; color:#cdd0d6; }
+  .gx .dot { width:18px; height:18px; border-radius:50%; display:inline-grid; place-items:center; font-size:10px; color:#fff; font-weight:700; }
+  .gx kbd { font:11px ui-monospace,monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:0 5px; color:var(--txt); background:var(--card2); }
+  .gx .dock { position:sticky; bottom:0; margin-top:26px; display:flex; align-items:center; gap:14px; padding:10px 12px 10px 18px; border-radius:999px; background:rgba(28,29,33,.85); backdrop-filter:blur(14px); border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.55); }
+  .gx .stack { position:relative; width:64px; height:52px; flex:none; }
+  .gx .stack img { position:absolute; width:44px; height:44px; border-radius:10px; border:2px solid var(--card); }
+</style>
+
+<h2>Rewind: October 28</h2>
+<p class="subtitle">What you see after pressing "Start today's rewind". The blue card explains what Rewind is the first time you open it, and you can dismiss it. Photos are grouped by year, newest first, and the floating bar at the bottom keeps the counts and actions in reach.</p>
+
+<div class="gx">
+  <div class="row" style="justify-content:space-between; align-items:flex-end">
+    <div>
+      <div class="mut" style="font-size:13px">‹ Cleanup</div>
+      <h1 style="margin-top:4px">October 28</h1>
+      <div class="mut">42 photos · taken on this day in 6 different years</div>
+    </div>
+    <div class="row">
+      <span class="ghost">‹ Oct 27</span>
+      <span class="ghost">Oct 29 ›</span>
+      <span class="seg"><span class="on">Grid</span><span>One at a time</span></span>
+    </div>
+  </div>
+
+  <div class="card explain" style="margin-top:18px">
+    <div class="stack">
+      <img src="https://picsum.photos/seed/r2016/100/100" style="left:0; top:6px; rotate:-8deg">
+      <img src="https://picsum.photos/seed/r2019/100/100" style="left:10px; top:2px; rotate:3deg">
+      <img src="https://picsum.photos/seed/r2024/100/100" style="left:20px; top:0">
+    </div>
+    <div>
+      <b style="font-size:15px">Every October 28, all in one place</b>
+      <div style="color:#cdd0d6; margin-top:3px; max-width:620px">
+        Rewind gathers the photos you took on this date in every past year, from 2016 to last year. Go through them once and keep what matters. Come back tomorrow for the next date, and the whole library gets tidied a little each day.
+      </div>
+      <div class="steps">
+        <span><i class="dot" style="background:#22c55e">✓</i> Keep <kbd>K</kbd></span>
+        <span><i class="dot" style="background:var(--pink)">♥</i> Favourite <kbd>F</kbd></span>
+        <span><i class="dot" style="background:#dc2626">✕</i> Mark for trash <kbd>Del</kbd></span>
+        <span class="mut">Nothing is deleted until you press <b style="color:var(--txt)">Move to trash</b>.</span>
+      </div>
+    </div>
+    <span class="mut" style="font-size:18px; line-height:1">×</span>
+  </div>
+
+  <div style="margin-top:18px">
+    <div class="row" style="justify-content:space-between; font-size:12px; margin-bottom:6px"><span><b>13</b> of 42 reviewed</span><span class="mut">5 kept · 2 favourites · 6 for trash (48 MB)</span></div>
+    <div class="bar"><div></div></div>
+  </div>
+
+  <div class="year">
+    <div class="yh"><b>2024</b><span class="mut">4 years ago · Berlin · 9 photos</span><span style="margin-left:auto" class="ghost">Keep the rest</span></div>
+    <div class="grid">
+      <div class="t keep"><img src="https://picsum.photos/seed/a1/200/200"><span class="badge" style="background:#22c55e">✓</span></div>
+      <div class="t keep"><img src="https://picsum.photos/seed/a2/200/200"><span class="badge" style="background:#22c55e">✓</span></div>
+      <div class="t trash"><img src="https://picsum.photos/seed/a3/200/200"><span class="lbl">TRASH</span></div>
+      <div class="t fav"><img src="https://picsum.photos/seed/a4/200/200"><span class="badge" style="background:var(--pink)">♥</span></div>
+      <div class="t trash"><img src="https://picsum.photos/seed/a5/200/200"><span class="lbl">TRASH</span></div>
+      <div class="t keep"><img src="https://picsum.photos/seed/a6/200/200"><span class="badge" style="background:#22c55e">✓</span></div>
+      <div class="t" style="outline:3px solid var(--pri); outline-offset:2px"><img src="https://picsum.photos/seed/a7/200/200"></div>
+    </div>
+  </div>
+
+  <div class="year">
+    <div class="yh"><b>2019</b><span class="mut">7 years ago · Lisbon · 18 photos</span><span style="margin-left:auto" class="ghost">Keep the rest</span></div>
+    <div class="grid">
+      <div class="t"><img src="https://picsum.photos/seed/b1/200/200"></div>
+      <div class="t"><img src="https://picsum.photos/seed/b2/200/200"></div>
+      <div class="t trash"><img src="https://picsum.photos/seed/b3/200/200"><span class="lbl">TRASH</span></div>
+      <div class="t"><img src="https://picsum.photos/seed/b4/200/200"></div>
+      <div class="t"><img src="https://picsum.photos/seed/b5/200/200"></div>
+      <div class="t"><img src="https://picsum.photos/seed/b6/200/200"></div>
+      <div class="t"><img src="https://picsum.photos/seed/b7/200/200"></div>
+    </div>
+  </div>
+
+  <div class="dock">
+    <span class="mut" style="font-size:12px">Click a photo to cycle Keep → ♥ → Trash · double-click to open · <kbd>?</kbd> shortcuts</span>
+    <span style="margin-left:auto" class="btn danger">Move 6 to trash</span>
+    <span class="btn">Finish day ✓</span>
+  </div>
+</div>
+</body></html>
