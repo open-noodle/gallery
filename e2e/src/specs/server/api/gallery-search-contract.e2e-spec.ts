@@ -539,9 +539,10 @@ const send = async (actor: Actor, contract: ContractRequest) => {
     delete (body as { stale?: boolean }).stale;
   }
   // The version moves with every release (Gallery) and rebase (the Immich base a stock client sees); only the major
-  // decides anything in a client (Gallery 5+ against stock Immich below 5), so minor and patch are fixed.
+  // decides anything in a client (Gallery 5+ against stock Immich below 5), so minor, patch and prerelease are fixed
+  // (a base such as 3.4.0-rc.0 reports prerelease 0, a final release null).
   if (path === '/server/version' && body && typeof body === 'object') {
-    Object.assign(body, { minor: 0, patch: 0 });
+    Object.assign(body, { minor: 0, patch: 0, prerelease: null });
   }
   return { status, body: body as Json };
 };
