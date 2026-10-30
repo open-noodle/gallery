@@ -24,6 +24,25 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+  <!-- Camera Bubble: the floating control over camera apps. SYSTEM_ALERT_WINDOW is a normal
+       user-granted toggle (Settings > Display over other apps), not a restricted permission.
+       PACKAGE_USAGE_STATS is optional — without it, the bubble falls back to filtering on the
+       camera id alone. -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+  <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+    tools:ignore="ProtectedPermissions" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <!-- Camera Bubble: restart the bubble after a reboot, if the setting is on. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <!-- Android 11+ package visibility: without this, queryIntentActivities returns nothing and
+       the bubble cannot tell which apps are cameras. -->
+  <queries>
+    <intent>
+      <action android:name="android.media.action.STILL_IMAGE_CAMERA" />
+    </intent>
+  </queries>
+
   <application android:label="Noodle Gallery" android:name=".ImmichApp" android:usesCleartextTraffic="true"
     android:icon="@mipmap/ic_launcher" android:requestLegacyExternalStorage="true"
     android:largeHeap="true" android:enableOnBackInvokedCallback="false" android:allowBackup="false"
@@ -37,6 +56,34 @@
       android:enabled="@bool/enable_system_foreground_service_default"
       android:exported="false"
       android:foregroundServiceType="dataSync|shortService" />
+
+    <activity
+      android:name=".camerabubble.CameraBubblePickerActivity"
+      android:theme="@style/CameraBubbleTheme"
+      android:exported="false"
+      android:launchMode="singleTask"
+      android:excludeFromRecents="true"
+      android:configChanges="orientation|screenSize|keyboardHidden|uiMode|density|smallestScreenSize|screenLayout"
+      android:windowSoftInputMode="adjustResize"
+      android:taskAffinity="" />
+
+    <service
+      android:name=".camerabubble.CameraBubbleOverlayService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Displays a floating control over camera apps so new photos can be added to albums and spaces as they are taken." />
+    </service>
+
+    <receiver
+      android:name=".camerabubble.CameraBubbleRestoreReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
 
     <meta-data
       android:name="com.google.firebase.messaging.default_notification_icon"

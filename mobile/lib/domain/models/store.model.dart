@@ -29,6 +29,12 @@ enum StoreKey<T> {
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
 
+  // Camera Bubble (Android): routes new photos into spaces and albums as they are taken.
+  // `cameraBubbleSessions` is a JSON list of {targetIds, from, to} windows — a photo is routed by
+  // which window its capture time falls in, not by whatever is selected when it finishes uploading.
+  cameraBubbleSelection<String>._(90009),
+  cameraBubbleSessions<String>._(90010),
+
   syncMigrationStatus<String>._(1013),
 
   // Legacy keys that have been migrated to the new metadata store
