@@ -76,6 +76,7 @@ Immich's AI covers faces and basic CLIP search. Pets go undetected, memories sho
 - [Memories Archive](https://opennoodle.de/features/memories-archive) is a Memories page of its own, with search, an All/Saved filter and retention controls. ([Docs](https://docs.opennoodle.de/features/memories))
 - [Smarter Memories](https://opennoodle.de/features/smarter-memories) adds recent-trip recaps found from location clusters, plus birthday memories that adapt to each person's photo history. ([Docs](https://docs.opennoodle.de/features/memories))
 - [Pet Detection](https://opennoodle.de/features/pet-detection) uses RF-DETR to find cats and dogs, and surfaces them alongside people. ([Docs](https://docs.opennoodle.de/features/pet-detection))
+- Spatial Scene makes photos look three-dimensional: the subject stands out and the background shifts behind it as you move the pointer or tilt your phone, like the option of the same name in Apple Photos. ([Docs](https://docs.opennoodle.de/features/spatial-scene))
 - [Video Duplicate Detection](https://opennoodle.de/features/video-duplicate-detection) averages CLIP embeddings across sampled frames, so it catches duplicate videos even after re-encoding or resizing. ([Docs](https://docs.opennoodle.de/features/video-duplicate-detection))
 
 ### Media management and migration
@@ -233,6 +234,7 @@ That's it. To switch back to upstream Immich later, flip the two image names bac
 | **Auto-Classification**                      | No     | Yes |
 | **Video Duplicate Detection**                | No     | Yes |
 | **Pet Detection**                            | Yes    | Yes |
+| **Spatial Scene**                            | No     | Yes |
 | **Google Photos Import**                     | No     | Yes |
 | **Image Editing & Video Trimming**           | No     | Yes |
 | **S3-Compatible Storage**                    | Yes    | Yes |

@@ -235,6 +235,9 @@ describe(StorageMigrationService.name, () => {
           },
         ]),
       );
+      mocks.storageMigration.streamDepthMaps.mockReturnValue(
+        makeStream([{ assetId: 'asset-1', path: '/usr/src/app/upload/thumbs/user/ab/cd/asset-1_depth.png' }]),
+      );
       mocks.storageMigration.streamEncodedVideos.mockReturnValue(
         makeStream([
           {
@@ -265,7 +268,17 @@ describe(StorageMigrationService.name, () => {
 
       // Verify the jobs were queued
       const queuedJobs = mocks.job.queueAll.mock.calls.flat().flat();
-      expect(queuedJobs).toHaveLength(5);
+      expect(queuedJobs).toHaveLength(6);
+      expect(queuedJobs).toContainEqual(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            entityType: 'asset',
+            entityId: 'asset-1',
+            fileType: 'depthMap',
+            sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/asset-1_depth.png',
+          }),
+        }),
+      );
       expect(queuedJobs[0]).toEqual(
         expect.objectContaining({
           name: JobName.StorageBackendMigrationSingle,
@@ -304,6 +317,7 @@ describe(StorageMigrationService.name, () => {
       expect(result).toBe(JobStatus.Success);
       expect(mocks.storageMigration.streamOriginals).toHaveBeenCalledWith('toS3');
       expect(mocks.storageMigration.streamAssetFiles).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.streamDepthMaps).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamEncodedVideos).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamPersonThumbnails).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamProfileImages).not.toHaveBeenCalled();
@@ -312,6 +326,7 @@ describe(StorageMigrationService.name, () => {
     it('should stream asset files for selected thumbnail types only', async () => {
       mocks.storageMigration.streamOriginals.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamAssetFiles.mockReturnValue(makeStream([]));
+      mocks.storageMigration.streamDepthMaps.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamEncodedVideos.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamProfileImages.mockReturnValue(makeStream([]));
@@ -334,6 +349,7 @@ describe(StorageMigrationService.name, () => {
         AssetFileType.Thumbnail,
         AssetFileType.Preview,
       ]);
+      expect(mocks.storageMigration.streamDepthMaps).toHaveBeenCalledWith('toS3');
     });
   });
 
@@ -544,6 +560,31 @@ describe(StorageMigrationService.name, () => {
         encodedVideoJob.sourcePath,
         'encoded-video/user/ab/cd/video.mp4',
       );
+    });
+
+    it('should update the depth map path for depthMap file type', async () => {
+      const depthMapJob = {
+        ...baseJob,
+        fileType: 'depthMap',
+        sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/asset-1_depth.png',
+      };
+
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.exists.mockResolvedValue(false);
+      mockDiskBackend.get.mockResolvedValue({ stream: Readable.from([]) });
+      mockS3Backend.put.mockResolvedValue(void 0);
+      mocks.storageMigration.updateDepthMapPath.mockResolvedValue(true);
+      mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+      const result = await sut.handleMigration(depthMapJob);
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.storageMigration.updateDepthMapPath).toHaveBeenCalledWith(
+        'asset-1',
+        depthMapJob.sourcePath,
+        'thumbs/user/ab/cd/asset-1_depth.png',
+      );
+      expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
     });
 
     it('should update asset file path for assetFile entity type', async () => {

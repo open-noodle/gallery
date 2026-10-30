@@ -135,6 +135,52 @@ export const GalleryPetRecognitionSchema = z
   })
   .meta({ id: 'AdminConfigPetRecognitionDto' });
 
+// Admin-only for the same reason as GalleryPetDetectionSchema. Clients learn whether a photo is offered from
+// `spatialScene` on the asset itself, decided against these thresholds when it is opened
+// (specs/2026-10-29-spatial-scene-design.md, "Deciding which photos to offer it on").
+export const GallerySpatialSceneSchema = z
+  .object({
+    enabled: z.boolean().describe('Whether the task is enabled'),
+    modelName: z.string().min(1).describe('Name of the depth model to use'),
+    offer: z
+      .enum(['suitable', 'all'])
+      .describe('Offer Spatial Scene on suitable photos only, or on every photo with a depth map')
+      .meta({ id: 'SpatialSceneOffer' }),
+    minBoundarySharpness: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe('Minimum depth sharpness along the subject outline for a photo to count as suitable'),
+    minEdgeDensity: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe('Alternatively, the minimum share of the photo made of sharp depth edges'),
+    minForegroundRatio: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe('Smallest share of the photo the subject may cover'),
+    maxForegroundRatio: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe('Largest share of the photo the subject may cover'),
+    minFaceHeight: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe('Alternatively, the smallest person or pet face, as a share of the photo height. 0 ignores faces.'),
+  })
+  .meta({ id: 'AdminConfigSpatialSceneDto' });
+
+export type SpatialSceneConfig = z.infer<typeof GallerySpatialSceneSchema>;
+
 export const GalleryFaceSuggestionSchema = z
   .object({
     enabled: z.boolean().describe('Whether face suggestions are enabled'),
@@ -166,6 +212,7 @@ export const galleryJobDefaults = {
   [QueueName.PeopleBackfill]: { concurrency: 1 },
   [QueueName.PetDetection]: { concurrency: 1 },
   [QueueName.Classification]: { concurrency: 1 },
+  [QueueName.SpatialScene]: { concurrency: 1 },
 };
 
 export const galleryMachineLearningDefaults = {
@@ -173,6 +220,16 @@ export const galleryMachineLearningDefaults = {
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+  spatialScene: {
+    enabled: false,
+    modelName: 'depth-anything-v2-small',
+    offer: 'suitable' as const,
+    minBoundarySharpness: 0.03,
+    minEdgeDensity: 0.02,
+    minForegroundRatio: 0.01,
+    maxForegroundRatio: 0.75,
+    minFaceHeight: 0.03,
+  },
 };
 
 export const galleryBackupDatabaseDefaults = {

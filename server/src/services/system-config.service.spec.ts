@@ -79,6 +79,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.IntegrityCheck]: { concurrency: 1 },
     [QueueName.Editor]: { concurrency: 2 },
     [QueueName.Classification]: { concurrency: 1 },
+    [QueueName.SpatialScene]: { concurrency: 1 },
   },
   backup: {
     database: {
@@ -183,6 +184,16 @@ const updatedConfig = Object.freeze<SystemConfig>({
       modelName: 'pet-recognition-base',
       maxDistance: 0.55,
       minFaces: 1,
+    },
+    spatialScene: {
+      enabled: false,
+      modelName: 'depth-anything-v2-small',
+      offer: 'suitable',
+      minBoundarySharpness: 0.03,
+      minEdgeDensity: 0.02,
+      minForegroundRatio: 0.01,
+      maxForegroundRatio: 0.75,
+      minFaceHeight: 0.03,
     },
   },
   map: {

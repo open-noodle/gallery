@@ -39,6 +39,7 @@
         "asset_favorite_assetId_fkey",
         "asset_image_adjust_assetId_fkey",
         "asset_job_status_gallery_assetId_fkey",
+        "asset_spatial_scene_assetId_fkey",
         "asset_video_trim_assetId_fkey",
         "shared_space_asset_assetId_fkey",
         "shared_space_face_match_backfill_target_assetId_fkey",

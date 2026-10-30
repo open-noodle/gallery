@@ -28,6 +28,7 @@
     QueueName.PetDetection,
     QueueName.PetRecognition,
     QueueName.Classification,
+    QueueName.SpatialScene,
   ];
 
   function isSystemConfigJobDto(jobName: string): jobName is keyof AdminConfigJobDto {
@@ -59,6 +60,7 @@
     [QueueName.IntegrityCheck]: $t('integrity_checks'),
     [QueueName.StorageBackendMigration]: 'Storage Backend Migration',
     [QueueName.Classification]: 'Auto-Classification',
+    [QueueName.SpatialScene]: $t('admin.machine_learning_spatial_scene'),
   });
 </script>
 

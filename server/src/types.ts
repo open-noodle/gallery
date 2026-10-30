@@ -592,6 +592,10 @@ export type JobItem =
   | { name: JobName.PetRecognitionQueueAll; data: INightlyJob }
   | { name: JobName.PetRecognition; data: IPetRecognitionJob }
 
+  // Spatial Scene
+  | { name: JobName.SpatialSceneQueueAll; data: IBaseJob }
+  | { name: JobName.SpatialScene; data: IEntityJob }
+
   // Workflow
   | { name: JobName.WorkflowAssetTrigger; data: { workflowId: string; assetId: string } }
 

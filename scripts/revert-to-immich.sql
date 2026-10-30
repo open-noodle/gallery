@@ -503,6 +503,10 @@ DROP TABLE IF EXISTS "asset_job_status_gallery" CASCADE;
 DROP TABLE IF EXISTS "asset_video_trim" CASCADE;
 DROP TABLE IF EXISTS "asset_image_adjust" CASCADE;
 
+-- Spatial Scene depth maps. Immich has no equivalent; the <assetId>_depth.png
+-- files stay in the thumbnails folder, where Immich never reads them.
+DROP TABLE IF EXISTS "asset_spatial_scene" CASCADE;
+
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
 --
@@ -898,6 +902,7 @@ DELETE FROM "kysely_migrations"
   '1798800000000-RestoreAssetIsFavoriteProjection',
   '1798900000000-MoveVideoTrimToSidecar',
   '1799000000000-AddAssetImageAdjustTable',
+  '1799100000000-AddAssetSpatialSceneTable',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1010,6 +1015,7 @@ BEGIN
        'asset_job_status_gallery',
        'asset_video_trim',
        'asset_image_adjust',
+       'asset_spatial_scene',
        'person_identity',
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',

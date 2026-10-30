@@ -34,6 +34,7 @@ import {
   mdiTable,
   mdiTagFaces,
   mdiTagMultipleOutline,
+  mdiCubeOutline,
   mdiTrashCanOutline,
   mdiTrayFull,
   mdiVideo,
@@ -329,6 +330,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       icon: mdiTagMultipleOutline,
       title: 'Auto-Classification',
       subtitle: 'Automatically classify and tag photos',
+    },
+    [QueueName.SpatialScene]: {
+      icon: mdiCubeOutline,
+      title: $t('admin.machine_learning_spatial_scene'),
+      subtitle: $t('admin.spatial_scene_job_description'),
     },
   };
 

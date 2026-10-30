@@ -2,9 +2,12 @@ import { ForbiddenException } from '@nestjs/common';
 import type { ShallowDehydrateObject } from 'kysely';
 import type { AssetFace } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
+import type { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
 import type { LinkedSpacePerson, SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { Permission } from 'src/enum.js';
+import { isSpatialSceneEnabled, isSpatialSceneOffered } from 'src/gallery/utils/spatial-scene.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { checkAccess } from 'src/utils/access.js';
@@ -15,13 +18,15 @@ type AssetResponseOverlayDependencies = {
   access: AccessRepository;
   faceIdentity: FaceIdentityRepository;
   sharedSpace: SharedSpaceRepository;
+  spatialScene: SpatialSceneRepository;
+  getConfig: () => Promise<SystemConfig>;
 };
 
 /**
  * Fork overlay on GET /assets/:id (AssetService.get), applied after upstream maps the asset: space-scoped people
  * (named in `spaceId`, or the space the server finds for the viewer), the owner's identity-resolved names and
- * birthdays, hidden-people filtering for album and partner viewers, and `canEdit`. Shared-link sessions are left as
- * upstream returns them.
+ * birthdays, hidden-people filtering for album and partner viewers, `canEdit`, and `spatialScene`. Shared-link sessions
+ * get only `spatialScene`; the rest is left as upstream returns them.
  */
 export const applyAssetResponseOverlay = async (
   deps: AssetResponseOverlayDependencies,
@@ -39,6 +44,9 @@ export const applyAssetResponseOverlay = async (
     faces: ShallowDehydrateObject<AssetFace>[];
   },
 ): Promise<void> => {
+  // Before the shared-link return: a link viewer may open the depth map like any other view of the photo.
+  data.spatialScene = await resolveSpatialScene(deps, id, faces);
+
   if (auth.sharedLink) {
     return;
   }
@@ -96,6 +104,19 @@ export const applyAssetResponseOverlay = async (
   // mapAsset — it has no AuthDto and feeds list endpoints, where this would be N+1.
   const editable = await checkAccess(deps.access, { auth, permission: Permission.AssetUpdate, ids: [id] });
   data.canEdit = editable.has(id);
+};
+
+const resolveSpatialScene = async (
+  deps: AssetResponseOverlayDependencies,
+  id: string,
+  faces: ShallowDehydrateObject<AssetFace>[],
+): Promise<boolean> => {
+  const { machineLearning } = await deps.getConfig();
+  if (!isSpatialSceneEnabled(machineLearning)) {
+    return false;
+  }
+  const scene = await deps.spatialScene.get(id);
+  return !!scene && isSpatialSceneOffered(scene, machineLearning.spatialScene, faces);
 };
 
 const applyResolvedPersonMetadata = async (

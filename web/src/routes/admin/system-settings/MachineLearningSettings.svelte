@@ -6,6 +6,7 @@
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import { SettingInputFieldType } from '$lib/constants';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import SpatialSceneSettings from '$lib/gallery/admin/SpatialSceneSettings.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
   import { Button, IconButton, modalManager, Text } from '@immich/ui';
@@ -532,6 +533,8 @@
           />
         </div>
       </SettingAccordion>
+
+      <SpatialSceneSettings bind:configToEdit {config} {disabled} />
       <SettingButtonsRow bind:configToEdit keys={['machineLearning']} {disabled} {onBeforeSave} />
     </form>
   </div>

@@ -25,6 +25,7 @@ class ModelTask(StrEnum):
     SEARCH = "clip"
     OCR = "ocr"
     PET_DETECTION = "pet-detection"
+    DEPTH_ESTIMATION = "depth-estimation"
 
 
 class ModelType(StrEnum):
@@ -32,6 +33,7 @@ class ModelType(StrEnum):
     RECOGNITION = "recognition"
     TEXTUAL = "textual"
     VISUAL = "visual"
+    DEPTH = "depth"
 
 
 class ModelFormat(StrEnum):
@@ -47,6 +49,7 @@ class ModelSource(StrEnum):
     PADDLE = "paddle"
     PET_RECOGNITION = "pet-recognition"
     RFDETR = "rfdetr"
+    DEPTH_ANYTHING = "depth-anything"
 
 
 class ModelOrganization(StrEnum):
@@ -146,6 +149,16 @@ class RecognizedPet(TypedDict):
 PetRecognitionOutput = list[RecognizedPet]
 
 
+class DepthEstimationOutput(TypedDict):
+    depth: str  # base64 PNG, 8-bit greyscale, 255 = nearest
+    width: int
+    height: int
+    boundarySharpness: float
+    edgeDensity: float
+    foregroundRatio: float
+    focus: float
+
+
 class Options:
     __pydantic_config__ = ConfigDict(extra="ignore")  # so that an older service ignores an option a newer server adds
 
@@ -188,6 +201,11 @@ class PetDetectionOptions(Options):
 
 @dataclass(frozen=True)
 class PetRecognitionOptions(Options):
+    pass
+
+
+@dataclass(frozen=True)
+class DepthEstimationOptions(Options):
     pass
 
 

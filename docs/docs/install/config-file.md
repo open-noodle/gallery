@@ -176,6 +176,16 @@ The default configuration looks like this:
       "minFaces": 1,
       "modelName": "pet-recognition-base"
     },
+    "spatialScene": {
+      "enabled": false,
+      "maxForegroundRatio": 0.75,
+      "minBoundarySharpness": 0.03,
+      "minEdgeDensity": 0.02,
+      "minFaceHeight": 0.03,
+      "minForegroundRatio": 0.01,
+      "modelName": "depth-anything-v2-small",
+      "offer": "suitable"
+    },
     "urls": ["http://immich-machine-learning:3003"]
   },
   "map": {
@@ -337,6 +347,10 @@ See the [Auto-Classification docs](/features/auto-classification) for the full f
 `machineLearning.petRecognition.modelName` is destructive to change: every model has its own embedding space, so switching it **deletes all pet people and their embeddings and reprocesses the library**. The admin UI asks you to confirm first. Editing this file does not, so the purge just happens on the next start.
 
 If pet detection is disabled at that moment, nothing is rebuilt: the reprocess is deferred until detection is enabled again. See [Pet Recognition](/features/pet-recognition).
+:::
+
+:::note Spatial Scene
+`machineLearning.spatialScene.offer` is `suitable` (offer the **Spatial** button only on photos with a clear subject) or `all`. The threshold fields decide what counts as suitable and are applied each time a photo is opened, so changing them needs no reprocessing. Changing `modelName` recomputes every depth map. See [Spatial Scene](/features/spatial-scene).
 :::
 
 :::note Legacy `petDetection.modelName` values
