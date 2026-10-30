@@ -1,0 +1,101 @@
+{
+  "description": "Blurry, third page",
+  "ids": {
+    "2634eb93-ae83-4af9-82bf-51020bba7c7e": "asset:blurry-09",
+    "344e576a-6655-466e-8d07-06f5c53b22f2": "asset:blurry-11",
+    "7235d2ec-d60c-430d-8bdc-0b987f901edd": "asset:dark-2",
+    "9cfee146-415c-41a4-830a-0e93d3d94261": "asset:blurry-10",
+    "f7b0b8d5-3473-4523-81c4-2b95d42ae62f": "asset:blurry-08"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry",
+    "query": {
+      "cursor": "eyJ2IjpbIjIwMjMtMDUtMTJUMTA6MDA6MDAuMDAwMDAwWiIsImY3YjBiOGQ1LTM0NzMtNDUyMy04MWM0LTJiOTVkNDJhZTYyZiJdfQ",
+      "hideFaces": "true",
+      "limit": "4",
+      "reason": "all",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1015,
+          "height": 1,
+          "id": "2634eb93-ae83-4af9-82bf-51020bba7c7e",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-11T10:00:00.000Z",
+          "originalFileName": "blurry-09.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1016,
+          "height": 1,
+          "id": "9cfee146-415c-41a4-830a-0e93d3d94261",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-10T10:00:00.000Z",
+          "originalFileName": "blurry-10.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1017,
+          "height": 1,
+          "id": "344e576a-6655-466e-8d07-06f5c53b22f2",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-09T10:00:00.000Z",
+          "originalFileName": "blurry-11.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1019,
+          "height": 1,
+          "id": "7235d2ec-d60c-430d-8bdc-0b987f901edd",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-04-12T10:00:00.000Z",
+          "originalFileName": "dark-2.png",
+          "reason": "dark",
+          "sharpness": 300,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": "eyJ2IjpbIjIwMjMtMDQtMTJUMTA6MDA6MDAuMDAwMDAwWiIsIjcyMzVkMmVjLWQ2MGMtNDMwZC04YmRjLTBiOTg3ZjkwMWVkZCJdfQ"
+    },
+    "status": 200
+  }
+}

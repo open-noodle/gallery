@@ -1,0 +1,52 @@
+{
+  "description": "The details sheet opens on q2: the albums it is in",
+  "ids": {
+    "08b9a1e0-f911-48af-8535-98ed8e450e3b": "user:me",
+    "816fe8ca-0ed2-4d29-8f14-c3e7033874c3": "asset:q2",
+    "ddd5587e-0d4b-4eab-8df8-cf612f0b52d6": "album:summer"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/albums",
+    "query": {
+      "assetId": "816fe8ca-0ed2-4d29-8f14-c3e7033874c3"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "albumName": "Summer",
+        "albumThumbnailAssetId": "816fe8ca-0ed2-4d29-8f14-c3e7033874c3",
+        "albumUsers": [
+          {
+            "role": "owner",
+            "user": {
+              "avatarColor": "orange",
+              "email": "admin@immich.cloud",
+              "id": "08b9a1e0-f911-48af-8535-98ed8e450e3b",
+              "name": "Immich Admin",
+              "profileChangedAt": "2000-01-01T00:00:00.000Z",
+              "profileImagePath": ""
+            }
+          }
+        ],
+        "assetCount": 1,
+        "createdAt": "2000-01-01T00:00:00.000Z",
+        "description": "",
+        "endDate": "2020-08-15T00:00:00.000Z",
+        "hasSharedLink": false,
+        "id": "ddd5587e-0d4b-4eab-8df8-cf612f0b52d6",
+        "isActivityEnabled": true,
+        "lastModifiedAssetTimestamp": "2000-01-01T00:00:00.000Z",
+        "order": "desc",
+        "shared": false,
+        "startDate": "2020-08-15T00:00:00.000Z",
+        "updatedAt": "2000-01-01T00:00:00.000Z"
+      }
+    ],
+    "status": 200
+  }
+}

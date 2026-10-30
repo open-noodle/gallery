@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mobile cleanup mockup: 5-grid-and-finish</title><style>body{background:#f4f5f8;font-family:system-ui,sans-serif;padding:24px;color:#14161c}h2{margin:0 0 4px}.subtitle{opacity:.7;margin:0 0 20px}.options{display:none}</style></head><body>
+<style>
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:290px}
+  .cap{font-size:13px;opacity:.75;text-align:center;line-height:1.4}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:270px;height:560px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:26px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px;font-size:12px}
+  .seg{display:flex;background:#1a1d25;border-radius:999px;padding:2px;font-size:10px;margin:6px 14px 0;width:max-content}
+  .seg span{padding:4px 12px;border-radius:999px}.seg .on{background:#5b6cff}
+  .tools{display:flex;justify-content:space-between;font-size:10px;opacity:.75;padding:8px 14px 4px}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:0 10px}
+  .t{position:relative;aspect-ratio:9/16;border-radius:8px;background-size:cover;background-position:top;background-color:#1a1d25}
+  .t.sel{outline:2.5px solid #5b6cff;outline-offset:-2.5px;filter:brightness(.75)}
+  .t.sel:after{content:'✓';position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:#5b6cff;font-size:11px;display:grid;place-items:center}
+  .t.kept:after{content:'Kept';position:absolute;bottom:4px;left:4px;font-size:8px;background:#2fbf71;border-radius:999px;padding:1px 5px}
+  .bar{position:absolute;left:10px;right:10px;bottom:16px;background:rgba(30,33,42,.9);backdrop-filter:blur(10px);border-radius:18px;padding:9px 10px;display:flex;justify-content:space-between;align-items:center;font-size:11px}
+  .btn{border-radius:999px;padding:7px 11px;font-weight:600;font-size:11px}
+  .danger{background:#ff5a6a;color:#1a0a0c}.ghost{border:1px solid #3a3e4a}
+  .done{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding:60px 20px 0;text-align:center}
+  .ring{width:110px;height:110px;border-radius:50%;background:conic-gradient(#2fbf71 0 100%);display:grid;place-items:center;box-shadow:0 0 40px #2fbf7155}
+  .ring div{width:94px;height:94px;border-radius:50%;background:#0d0f14;display:grid;place-items:center;font-size:34px}
+  .sum{display:flex;gap:8px;margin:18px 0 6px}
+  .sum div{background:#171a22;border-radius:12px;padding:8px 10px;font-size:10px;min-width:58px}
+  .sum b{display:block;font-size:17px}
+  .cta{width:100%;background:#5b6cff;border-radius:999px;padding:11px;font-weight:600;font-size:13px;margin-top:14px}
+  .sub{width:100%;border:1px solid #2f3340;border-radius:999px;padding:10px;font-size:12px;margin-top:8px}
+</style>
+
+<h2>Many at once, or one by one</h2>
+<p class="subtitle">Every queue gets a Swipe / Grid switch at the top. Same marks, same commit. The switch is remembered per queue.</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>Screenshots · 312</b><span>⚙</span></div>
+      <div class="seg"><span>Swipe</span><span class="on">Grid</span></div>
+      <div class="tools"><span>Tap to select · hold for details</span><span style="color:#9fb0ff">Select all</span></div>
+      <div class="grid">
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s1/200/360)"></div>
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s2/200/360)"></div>
+        <div class="t kept" style="background-image:url(https://picsum.photos/seed/s3/200/360)"></div>
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s4/200/360)"></div>
+        <div class="t" style="background-image:url(https://picsum.photos/seed/s5/200/360)"></div>
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s6/200/360)"></div>
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s7/200/360)"></div>
+        <div class="t" style="background-image:url(https://picsum.photos/seed/s8/200/360)"></div>
+        <div class="t sel" style="background-image:url(https://picsum.photos/seed/s9/200/360)"></div>
+      </div>
+      <div class="bar"><span><b>6 selected</b><br><span style="opacity:.6">4.8 MB</span></span><span style="display:flex;gap:6px"><span class="btn ghost">Keep</span><span class="btn danger">Trash 6</span></span></div>
+    </div>
+    <div class="cap"><b>Grid mode (Blurry, Screenshots, Space hogs)</b>Tap tiles to select, drag across to select a run (like the photo timeline). Hold a tile to open the same details sheet. Screenshots keep their tall shape. Trash shows an undo toast, as on web.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="done">
+        <div class="ring"><div>✓</div></div>
+        <div style="font-size:20px;font-weight:700;margin-top:16px">29 October, done</div>
+        <div style="font-size:12px;opacity:.6">42 photos from 6 years · 🔥 6-day streak</div>
+        <div class="sum">
+          <div><b style="color:#2fbf71">30</b>kept</div>
+          <div><b style="color:#ff4d8d">4</b>favorited</div>
+          <div><b style="color:#ff5a6a">8</b>to trash<br>37 MB</div>
+        </div>
+        <div class="cta">Move 8 to trash and finish</div>
+        <div class="sub">Review the 8 first</div>
+        <div style="font-size:11px;opacity:.55;margin-top:20px">Next: 30 October · 18 photos</div>
+      </div>
+    </div>
+    <div class="cap"><b>End of a rewind</b>The marks you made, nothing deleted yet. One button commits and marks the day reviewed (confetti, ring fills). "Review the 8 first" shows only the trash pile, to rescue any. Then an offer for the next day, or back to Cleanup.</div>
+  </div>
+</div>
+
+</body></html>

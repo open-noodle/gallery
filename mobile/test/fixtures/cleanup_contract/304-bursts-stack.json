@@ -1,0 +1,139 @@
+{
+  "description": "Apply on Bursts: the third series stacked instead, its suggested frame first (the web's stack call)",
+  "ids": {
+    "08b9a1e0-f911-48af-8535-98ed8e450e3b": "user:me",
+    "395cea77-8781-4602-80e3-001571704b05": "stack:burst-c",
+    "46015f77-1fa8-4ad2-8fa7-49287adf0b8f": "asset:burst-c2",
+    "beca956a-fada-4e68-82ef-e8fb26aa087c": "asset:burst-c1"
+  },
+  "request": {
+    "body": {
+      "assetIds": [
+        "beca956a-fada-4e68-82ef-e8fb26aa087c",
+        "46015f77-1fa8-4ad2-8fa7-49287adf0b8f"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/stacks"
+  },
+  "response": {
+    "body": {
+      "assets": [
+        {
+          "checksum": "/ZyCtcg4c/SJgt3lV3vOQO5cgPU=",
+          "createdAt": "2000-01-01T00:00:00.000Z",
+          "duplicateId": null,
+          "duration": null,
+          "exifInfo": {
+            "city": null,
+            "country": null,
+            "dateTimeOriginal": "2023-09-03T10:00:00+00:00",
+            "description": "",
+            "exifImageHeight": 1,
+            "exifImageWidth": 1,
+            "exposureTime": null,
+            "fNumber": null,
+            "fileSizeInByte": 3300,
+            "focalLength": null,
+            "iso": null,
+            "latitude": null,
+            "lensModel": null,
+            "longitude": null,
+            "make": null,
+            "model": null,
+            "modifyDate": "2023-09-03T10:00:00+00:00",
+            "orientation": null,
+            "projectionType": null,
+            "rating": null,
+            "state": null,
+            "timeZone": "UTC"
+          },
+          "fileCreatedAt": "2023-09-03T10:00:00+00:00",
+          "fileModifiedAt": "2023-09-03T10:00:00+00:00",
+          "hasMetadata": true,
+          "height": 1,
+          "id": "beca956a-fada-4e68-82ef-e8fb26aa087c",
+          "isArchived": false,
+          "isEdited": false,
+          "isFavorite": false,
+          "isOffline": false,
+          "isTrashed": false,
+          "libraryId": null,
+          "livePhotoVideoId": null,
+          "localDateTime": "2023-09-03T10:00:00+00:00",
+          "originalFileName": "burst-c1.png",
+          "originalMimeType": "image/png",
+          "originalPath": "originalPath",
+          "ownerId": "08b9a1e0-f911-48af-8535-98ed8e450e3b",
+          "people": [],
+          "resized": true,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "updatedAt": "2000-01-01T00:00:00.000Z",
+          "visibility": "timeline",
+          "width": 1
+        },
+        {
+          "checksum": "eyL+IVL3P9r4QoWXXPMJRsWhQpQ=",
+          "createdAt": "2000-01-01T00:00:00.000Z",
+          "duplicateId": null,
+          "duration": null,
+          "exifInfo": {
+            "city": null,
+            "country": null,
+            "dateTimeOriginal": "2023-09-03T10:00:01+00:00",
+            "description": "",
+            "exifImageHeight": 1,
+            "exifImageWidth": 1,
+            "exposureTime": null,
+            "fNumber": null,
+            "fileSizeInByte": 3301,
+            "focalLength": null,
+            "iso": null,
+            "latitude": null,
+            "lensModel": null,
+            "longitude": null,
+            "make": null,
+            "model": null,
+            "modifyDate": "2023-09-03T10:00:01+00:00",
+            "orientation": null,
+            "projectionType": null,
+            "rating": null,
+            "state": null,
+            "timeZone": "UTC"
+          },
+          "fileCreatedAt": "2023-09-03T10:00:01+00:00",
+          "fileModifiedAt": "2023-09-03T10:00:01+00:00",
+          "hasMetadata": true,
+          "height": 1,
+          "id": "46015f77-1fa8-4ad2-8fa7-49287adf0b8f",
+          "isArchived": false,
+          "isEdited": false,
+          "isFavorite": false,
+          "isOffline": false,
+          "isTrashed": false,
+          "libraryId": null,
+          "livePhotoVideoId": null,
+          "localDateTime": "2023-09-03T10:00:01+00:00",
+          "originalFileName": "burst-c2.png",
+          "originalMimeType": "image/png",
+          "originalPath": "originalPath",
+          "ownerId": "08b9a1e0-f911-48af-8535-98ed8e450e3b",
+          "people": [],
+          "resized": true,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "updatedAt": "2000-01-01T00:00:00.000Z",
+          "visibility": "timeline",
+          "width": 1
+        }
+      ],
+      "id": "395cea77-8781-4602-80e3-001571704b05",
+      "primaryAssetId": "beca956a-fada-4e68-82ef-e8fb26aa087c"
+    },
+    "status": 201
+  }
+}

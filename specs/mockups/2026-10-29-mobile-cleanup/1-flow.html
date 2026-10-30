@@ -1,0 +1,164 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mobile cleanup mockup: 1-flow</title><style>body{background:#f4f5f8;font-family:system-ui,sans-serif;padding:24px;color:#14161c}h2{margin:0 0 4px}.subtitle{opacity:.7;margin:0 0 20px}.options{display:none}</style></head><body>
+<style>
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:300px}
+  .cap{font-size:13px;opacity:.75;text-align:center;line-height:1.4}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:270px;height:560px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:26px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8}
+  .pad{padding:0 14px}
+  .h1{font-size:22px;font-weight:700;margin:8px 0 2px}
+  .muted{opacity:.6;font-size:11px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .lbtn{background:#1a1d25;border-radius:14px;padding:10px;font-size:12px;display:flex;gap:8px;align-items:center}
+  .lbtn.hl{background:linear-gradient(135deg,#3a4cff33,#8a5cff33);outline:1.5px solid #7b8cff}
+  .ic{width:22px;height:22px;border-radius:7px;background:#2a2e3a;display:grid;place-items:center;font-size:12px}
+  .sec{font-size:13px;font-weight:600;margin:14px 0 6px}
+  .ph{background-size:cover;background-position:center;border-radius:10px}
+  .hero{border-radius:20px;overflow:hidden;position:relative;height:230px;margin-top:10px}
+  .hero .c{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:3px;height:100%}
+  .hero .c div:first-child{grid-row:span 2}
+  .hero .ov{position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(5,6,10,.92));display:flex;flex-direction:column;justify-content:flex-end;padding:14px}
+  .eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9fb0ff}
+  .big{font-size:19px;font-weight:700;margin:3px 0}
+  .cta{margin-top:9px;background:#5b6cff;border-radius:999px;padding:10px;text-align:center;font-weight:600;font-size:13px}
+  .qw{display:flex;gap:8px;overflow:hidden}
+  .qc{min-width:92px;height:110px;border-radius:14px;position:relative;overflow:hidden;background-size:cover;background-position:center}
+  .qc span{position:absolute;left:0;right:0;bottom:0;padding:6px;font-size:10px;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+  .qc span b{display:block;font-size:11px}
+  .strip{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+  .strip i{width:9px;height:9px;border-radius:2px;background:#2a2e3a}
+  .strip i.g{background:#2fbf71}.strip i.p1{background:#3b4a9e}.strip i.p2{background:#5b6cff}.strip i.t{outline:1.5px solid #fff}
+  /* rewind card */
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px;font-size:12px}
+  .prog{height:3px;background:#2a2e3a;border-radius:3px;margin:6px 14px}
+  .prog i{display:block;height:100%;width:38%;background:#5b6cff;border-radius:3px}
+  .card{position:absolute;left:14px;right:14px;top:66px;bottom:118px;border-radius:22px;background-size:cover;background-position:center;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .card.back{transform:scale(.94) translateY(12px);opacity:.55;filter:brightness(.7)}
+  .card.tilt{transform:rotate(-7deg) translateX(-30px)}
+  .meta{position:absolute;left:0;right:0;bottom:0;padding:12px;border-radius:0 0 22px 22px;background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:11px}
+  .meta b{font-size:15px;display:block}
+  .chip{display:inline-block;background:rgba(255,255,255,.14);backdrop-filter:blur(6px);border-radius:999px;padding:2px 7px;font-size:10px;margin:4px 3px 0 0}
+  .stamp{position:absolute;top:18px;right:16px;border:2.5px solid #ff5a6a;color:#ff5a6a;font-weight:800;font-size:16px;padding:2px 8px;border-radius:8px;transform:rotate(12deg);letter-spacing:.05em}
+  .edge{position:absolute;top:50%;font-size:10px;opacity:.5}
+  .acts{position:absolute;left:0;right:0;bottom:22px;display:flex;justify-content:center;gap:16px;align-items:center}
+  .ab{width:50px;height:50px;border-radius:50%;background:#1a1d25;display:grid;place-items:center;font-size:20px;border:1.5px solid #2a2e3a}
+  .ab.s{width:40px;height:40px;font-size:15px}
+  .ab.del{color:#ff5a6a}.ab.keep{color:#2fbf71}.ab.fav{color:#ff4d8d}
+  .bar{position:absolute;left:12px;right:12px;bottom:18px;background:rgba(30,33,42,.85);backdrop-filter:blur(10px);border-radius:20px;padding:8px;display:flex;justify-content:space-around;font-size:10px;text-align:center}
+  .bar div{display:flex;flex-direction:column;gap:3px;align-items:center}
+  .bar .g{font-size:18px}
+  .tog{font-size:10px;background:#1a1d25;border-radius:999px;padding:3px 8px}
+</style>
+
+<h2>First pass: Library → Cleanup → today's rewind</h2>
+<p class="subtitle">Placeholder photos. Tell me what's wrong; click a rewind mode if one already feels right.</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="pad">
+        <div class="h1">Library</div>
+        <div class="grid2">
+          <div class="lbtn"><div class="ic">♡</div>Favorites</div>
+          <div class="lbtn"><div class="ic">▣</div>Archived</div>
+          <div class="lbtn"><div class="ic">🔗</div>Shared links</div>
+          <div class="lbtn"><div class="ic">🗑</div>Trash</div>
+          <div class="lbtn hl" style="grid-column:span 2"><div class="ic">✦</div><div>Cleanup<div class="muted">Today: 42 photos from 6 years</div></div></div>
+        </div>
+        <div class="sec">Spaces</div>
+        <div class="ph" style="height:70px;background-image:url(https://picsum.photos/seed/sp1/400/200)"></div>
+        <div class="sec">People</div>
+        <div style="display:flex;gap:8px">
+          <div class="ph" style="width:46px;height:46px;border-radius:50%;background-image:url(https://picsum.photos/seed/p1/100)"></div>
+          <div class="ph" style="width:46px;height:46px;border-radius:50%;background-image:url(https://picsum.photos/seed/p2/100)"></div>
+          <div class="ph" style="width:46px;height:46px;border-radius:50%;background-image:url(https://picsum.photos/seed/p3/100)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>1 · Library entry</b>A Cleanup button next to Favorites/Trash, carrying today's count so it invites a tap.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="pad">
+        <div style="display:flex;justify-content:space-between;align-items:end">
+          <div><div class="h1">Cleanup</div><div class="muted">🔥 5-day streak · 61 of 366 days</div></div>
+          <div class="muted" style="text-align:right">Could free<br><b style="font-size:13px;opacity:1">12.4 GB</b></div>
+        </div>
+        <div class="hero">
+          <div class="c">
+            <div class="ph" style="border-radius:0;background-image:url(https://picsum.photos/seed/r1/400/500)"></div>
+            <div class="ph" style="border-radius:0;background-image:url(https://picsum.photos/seed/r2/300)"></div>
+            <div class="ph" style="border-radius:0;background-image:url(https://picsum.photos/seed/r3/300)"></div>
+          </div>
+          <div class="ov">
+            <div class="eyebrow">Today · 29 October</div>
+            <div class="big">42 photos from 6 years</div>
+            <div class="muted" style="opacity:.75">About 3 min · 2019 in Lisbon has the most</div>
+            <div class="cta">Start today's rewind</div>
+          </div>
+        </div>
+        <div class="sec">Quick wins</div>
+        <div class="qw">
+          <div class="qc" style="background-image:url(https://picsum.photos/seed/q1/200/240?blur=3)"><span><b>Blurry</b>87 · 1.2 GB</span></div>
+          <div class="qc" style="background-image:url(https://picsum.photos/seed/q2/200/240)"><span><b>Screenshots</b>312 · 640 MB</span></div>
+          <div class="qc" style="background-image:url(https://picsum.photos/seed/q3/200/240)"><span><b>Bursts</b>24 series</span></div>
+        </div>
+        <div class="sec" style="display:flex;justify-content:space-between">Your year <span class="muted">See all ›</span></div>
+        <div class="strip">
+          <i class="g"></i><i class="g"></i><i class="p2"></i><i class="p1"></i><i></i><i class="g"></i><i class="p2"></i><i class="p1"></i><i class="g"></i><i class="g"></i><i class="p1"></i><i class="t p2"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>2 · Cleanup overview</b>Today's rewind is the hero with one button. Quick wins scroll sideways underneath. The year sits at the bottom; "See all" opens the full calendar.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>29 Oct · 16 of 42</b><span class="tog">Swipe ▾</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card back" style="background-image:url(https://picsum.photos/seed/r4/400/600)"></div>
+      <div class="card tilt" style="background-image:url(https://picsum.photos/seed/r1/400/600)">
+        <div class="stamp" style="left:16px;right:auto;transform:rotate(-12deg)">TRASH</div>
+        <div class="meta"><b>2019 · 7 years ago</b>Lisbon · 18:42<br><span class="chip">4.2 MB</span><span class="chip">In 2 albums</span><span class="chip">ⓘ Details</span></div>
+      </div>
+      <div class="acts">
+        <div class="ab s">↶</div>
+        <div class="ab del">✕</div>
+        <div class="ab fav">♥</div>
+        <div class="ab keep">✓</div>
+        <div class="ab s">⤢</div>
+      </div>
+    </div>
+    <div class="cap"><b>3a · Rewind, swipe mode</b>Cards stack. Drag left → TRASH stamp, right → KEEP, up → ♥. The buttons below do the same for one-handed tapping. ↶ undo, ⤢ open in the library.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>29 Oct · 16 of 42</b><span class="tog">Buttons ▾</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card" style="top:66px;bottom:96px;left:0;right:0;border-radius:0;background-image:url(https://picsum.photos/seed/r1/400/600)">
+        <div class="meta" style="border-radius:0;bottom:0"><b>2019 · 7 years ago</b>Lisbon · 18:42<br><span class="chip">4.2 MB</span><span class="chip">In 2 albums</span><span class="chip">ⓘ Details</span></div>
+      </div>
+      <div class="bar">
+        <div><span class="g" style="color:#ff5a6a">🗑</span>Trash</div>
+        <div><span class="g" style="color:#ff4d8d">♥</span>Favorite</div>
+        <div><span class="g" style="color:#2fbf71">✓</span>Keep</div>
+        <div><span class="g">↶</span>Undo</div>
+      </div>
+    </div>
+    <div class="cap"><b>3b · Rewind, button mode</b>Edge-to-edge photo, swipe sideways only to move between photos, a floating bar of big labelled buttons. Same marks, same info.</div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:28px">
+  <div class="option" data-choice="swipe" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>Swipe mode as the default</h3><p>Buttons mode available from the toggle</p></div></div>
+  <div class="option" data-choice="buttons" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>Buttons mode as the default</h3><p>Swipe mode available from the toggle</p></div></div>
+</div>
+
+</body></html>

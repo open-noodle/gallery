@@ -1,0 +1,99 @@
+{
+  "description": "Blurry, first page, default filters",
+  "ids": {
+    "08aca177-934d-4efc-8c8f-ee547ba234f1": "asset:blurry-04",
+    "65872e7f-2930-4856-8df2-4fe2b1327c04": "asset:blurry-01",
+    "6e85dfee-fde9-4c89-857c-dc73bb797e3f": "asset:blurry-03",
+    "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe": "asset:blurry-02"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry",
+    "query": {
+      "hideFaces": "true",
+      "limit": "4",
+      "reason": "all",
+      "strictness": "balanced"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1007,
+          "height": 1,
+          "id": "65872e7f-2930-4856-8df2-4fe2b1327c04",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-19T10:00:00.000Z",
+          "originalFileName": "blurry-01.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1008,
+          "height": 1,
+          "id": "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-18T10:00:00.000Z",
+          "originalFileName": "blurry-02.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1009,
+          "height": 1,
+          "id": "6e85dfee-fde9-4c89-857c-dc73bb797e3f",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-17T10:00:00.000Z",
+          "originalFileName": "blurry-03.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1010,
+          "height": 1,
+          "id": "08aca177-934d-4efc-8c8f-ee547ba234f1",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-16T10:00:00.000Z",
+          "originalFileName": "blurry-04.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": "eyJ2IjpbIjIwMjMtMDUtMTZUMTA6MDA6MDAuMDAwMDAwWiIsIjA4YWNhMTc3LTkzNGQtNGVmYy04YzhmLWVlNTQ3YmEyMzRmMSJdfQ"
+    },
+    "status": 200
+  }
+}

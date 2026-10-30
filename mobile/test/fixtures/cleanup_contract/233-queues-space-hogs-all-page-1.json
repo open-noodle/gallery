@@ -1,0 +1,74 @@
+{
+  "description": "Space hogs, every type from 50 MiB: the large photo joins the videos",
+  "ids": {
+    "78aec6f6-3c83-4422-834e-fe64f631eba0": "asset:hog-2",
+    "82b81aee-118e-4743-8132-8a4d3fd83c80": "asset:hog-3",
+    "8562403c-3440-4897-84c4-856cad32c952": "asset:hog-1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/space_hogs",
+    "query": {
+      "limit": "4",
+      "minSize": "52428800",
+      "type": "all"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 314572800,
+          "height": 1,
+          "id": "8562403c-3440-4897-84c4-856cad32c952",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-08-01T10:00:00.000Z",
+          "originalFileName": "hog-1.png",
+          "thumbhash": "thumbhash",
+          "type": "VIDEO",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 157286400,
+          "height": 1,
+          "id": "78aec6f6-3c83-4422-834e-fe64f631eba0",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-08-02T10:00:00.000Z",
+          "originalFileName": "hog-2.png",
+          "thumbhash": "thumbhash",
+          "type": "VIDEO",
+          "width": 1
+        },
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 83886080,
+          "height": 1,
+          "id": "82b81aee-118e-4743-8132-8a4d3fd83c80",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-08-03T10:00:00.000Z",
+          "originalFileName": "hog-3.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": null
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "description": "Before trashing r1, marked in the grid: not in a shared space",
+  "ids": {
+    "84ab20d8-6760-42cf-8cb5-ebc3767839f8": "asset:r1"
+  },
+  "request": {
+    "body": {
+      "assetIds": [
+        "84ab20d8-6760-42cf-8cb5-ebc3767839f8"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/in-spaces"
+  },
+  "response": {
+    "body": {
+      "assetIds": [],
+      "externalAssetIds": []
+    },
+    "status": 200
+  }
+}

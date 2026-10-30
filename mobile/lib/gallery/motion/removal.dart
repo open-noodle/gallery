@@ -25,13 +25,14 @@ abstract final class GalleryRemoval {
   /// How long copies wait for their tiles to leave before giving up.
   static const armedFor = Duration(seconds: 6);
 
-  /// Trash, archive, unarchive: each photo lifts, then arcs into the button that was pressed.
-  static void send(Iterable<String> remoteIds) => _run(remoteIds, _Kind.send);
+  /// Trash, archive, unarchive: each photo lifts, then arcs into the button that was pressed, or into [target] (in
+  /// overlay coordinates) when given.
+  static void send(Iterable<String> remoteIds, {Offset? target}) => _run(remoteIds, _Kind.send, target: target);
 
   /// Permanent delete: each photo loses its colour, blurs and dissolves where it stood.
   static void dissolve(Iterable<String> remoteIds) => _run(remoteIds, _Kind.dissolve);
 
-  static void _run(Iterable<String> remoteIds, _Kind kind) {
+  static void _run(Iterable<String> remoteIds, _Kind kind, {Offset? target}) {
     final overlay = GalleryMotionHost.overlay;
     final overlayBox = GalleryMotionHost.overlayBox;
     if (overlay == null || overlayBox == null) {
@@ -60,8 +61,8 @@ abstract final class GalleryRemoval {
     );
     final flying = copies.take(maxCopies).toList(growable: false);
 
-    final target = kind == _Kind.send
-        ? GalleryMotionHost.lastPointerDown ?? Offset(overlayBox.size.width / 2, overlayBox.size.height - 48)
+    final to = kind == _Kind.send
+        ? target ?? GalleryMotionHost.lastPointerDown ?? Offset(overlayBox.size.width / 2, overlayBox.size.height - 48)
         : null;
 
     late final OverlayEntry entry;
@@ -70,7 +71,7 @@ abstract final class GalleryRemoval {
         key: const Key('gallery-removal'),
         kind: kind,
         copies: flying,
-        target: target,
+        target: to,
         reduced: GalleryMotionHost.reduced,
         onDone: () {
           entry

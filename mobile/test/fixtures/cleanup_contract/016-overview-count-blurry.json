@@ -1,0 +1,19 @@
+{
+  "description": "The overview's blurry count, without filters (as the web hub asks)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry/count"
+  },
+  "response": {
+    "body": {
+      "analysedPercent": 56,
+      "bytes": 13169,
+      "count": 13
+    },
+    "status": 200
+  }
+}

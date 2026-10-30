@@ -11,6 +11,12 @@ import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_day_photos.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_month.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_overview.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_queue.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/cleanup_year.page.dart';
+import 'package:immich_mobile/gallery/cleanup/pages/rewind.page.dart';
 import 'package:immich_mobile/gallery/motion/transitions.dart';
 import 'package:immich_mobile/models/folder/recursive_folder.model.dart';
 import 'package:immich_mobile/models/shared_link/shared_link.model.dart';
@@ -251,6 +257,12 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: AssetTroubleshootRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DownloadInfoRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: CleanupPreviewRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupYearRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupMonthRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupOverviewRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupQueueRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupRewindRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: LibraryCleanupDayPhotosRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SlideshowRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: MemoryListRoute.page, guards: [_authGuard, _duplicateGuard]),
     // required to handle all deeplinks in deep_link.service.dart

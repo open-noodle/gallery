@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mobile cleanup mockup: 4-calendar</title><style>body{background:#f4f5f8;font-family:system-ui,sans-serif;padding:24px;color:#14161c}h2{margin:0 0 4px}.subtitle{opacity:.7;margin:0 0 20px}.options{display:none}</style></head><body>
+<style>
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:290px}
+  .cap{font-size:13px;opacity:.75;text-align:center;line-height:1.4}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:270px;height:560px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:26px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:4px 14px;font-size:13px}
+  .months{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:6px 12px}
+  .m{background:#161920;border-radius:12px;padding:7px;font-size:10px}
+  .m.cur{outline:1.5px solid #7b8cff}
+  .m.tap{background:#222844;transform:scale(.96)}
+  .m .h{display:flex;justify-content:space-between;margin-bottom:4px}
+  .m .h span{opacity:.55;font-size:9px}
+  .d{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .d i{aspect-ratio:1;border-radius:2px;background:#22252e}
+  .g{background:#2fbf71!important}.p1{background:#34407f!important}.p2{background:#5b6cff!important}.p3{background:#8f9bff!important}.t{outline:1.5px solid #fff}
+  .big{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:4px 14px}
+  .big i{aspect-ratio:1;border-radius:9px;background:#22252e;font-style:normal;font-size:11px;display:grid;place-items:center;font-weight:600}
+  .big i.sel{outline:2px solid #fff;outline-offset:1px}
+  .legend{font-size:9px;opacity:.6;padding:8px 14px}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:#171a22;border-radius:20px 20px 0 0;padding:10px 14px 18px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
+  .grab{width:36px;height:4px;border-radius:2px;background:#3a3e4a;margin:0 auto 8px}
+  .thumbs{display:flex;gap:4px;margin:8px 0}.thumbs div{flex:1;height:44px;border-radius:6px;background-size:cover}
+  .cta{margin-top:6px;background:#5b6cff;border-radius:999px;padding:9px;text-align:center;font-weight:600;font-size:12px}
+  .stat{font-size:11px;opacity:.6;padding:0 14px 6px}
+</style>
+
+<h2>Your year: tap a month, then a day</h2>
+<p class="subtitle">Follows the touch flow on the web calendar (uncommitted in the library-cleanup worktree).</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹</span><b>Your year</b><span style="opacity:.6;font-size:11px">61 / 366</span></div>
+      <div class="months">
+        <div class="m"><div class="h">Jan<span>4/31</span></div><div class="d"><i class="g"></i><i class="g"></i><i class="p1"></i><i class="p2"></i><i></i><i class="g"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p2"></i><i class="g"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p3"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i></i><i class="p1"></i><i class="p1"></i></div></div>
+        <div class="m"><div class="h">Feb<span>2/29</span></div><div class="d"><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i><i class="p1"></i><i class="g"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p3"></i><i class="g"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i></i></div></div>
+        <div class="m"><div class="h">Mar<span>0/31</span></div><div class="d"><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i></div></div>
+        <div class="m"><div class="h">Apr<span>1/30</span></div><div class="d"><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i class="g"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i></div></div>
+        <div class="m"><div class="h">May<span>0/31</span></div><div class="d"><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i></div></div>
+        <div class="m"><div class="h">Jun<span>0/30</span></div><div class="d"><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i class="p3"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i></div></div>
+        <div class="m" style="opacity:.5"><div class="h">Jul<span>…</span></div><div class="d"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="m" style="opacity:.5"><div class="h">Aug<span>…</span></div><div class="d"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="m" style="opacity:.5"><div class="h">Sep<span>…</span></div><div class="d"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="m cur tap"><div class="h"><b>Oct</b><span>27/31</span></div><div class="d"><i class="g"></i><i class="g"></i><i class="g"></i><i class="p1"></i><i class="g"></i><i class="g"></i><i class="p2"></i><i class="g"></i><i class="g"></i><i></i><i class="g"></i><i class="g"></i><i class="p1"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="p3"></i><i class="g"></i><i class="g"></i><i></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="t p2"></i><i class="p1"></i><i class="p2"></i></div></div>
+      </div>
+      <div class="legend">The whole month card is the tap target. Today's month is outlined. "27/31" = days reviewed.</div>
+    </div>
+    <div class="cap"><b>1 · Year</b>Twelve month cards, three across, scrolling. No day is tappable here, only months.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹ Year</span><b>October</b><span>‹ &nbsp; ›</span></div>
+      <div class="stat">27 of 31 days reviewed · 4 to go</div>
+      <div class="big">
+        <i class="g">1</i><i class="g">2</i><i class="g">3</i><i class="p1">4</i><i class="g">5</i><i class="g">6</i><i class="p2">7</i>
+        <i class="g">8</i><i class="g">9</i><i>10</i><i class="g">11</i><i class="g">12</i><i class="p1">13</i><i class="g">14</i>
+        <i class="g">15</i><i class="g">16</i><i class="g">17</i><i class="p3 sel">18</i><i class="g">19</i><i class="g">20</i><i>21</i>
+        <i class="g">22</i><i class="g">23</i><i class="g">24</i><i class="g">25</i><i class="g">26</i><i class="g">27</i><i class="g">28</i>
+        <i class="t p2">29</i><i class="p1">30</i><i class="p2">31</i>
+      </div>
+      <div class="legend">■ reviewed &nbsp; ■ to review (brighter = more photos) &nbsp; □ none</div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div style="font-size:10px;color:#9fb0ff;letter-spacing:.06em">18 OCTOBER</div>
+        <div style="font-weight:700;font-size:15px">63 photos from 8 years</div>
+        <div style="font-size:11px;opacity:.6">About 4 min · 2017 in Porto has the most</div>
+        <div class="thumbs"><div style="background-image:url(https://picsum.photos/seed/c1/100)"></div><div style="background-image:url(https://picsum.photos/seed/c2/100)"></div><div style="background-image:url(https://picsum.photos/seed/c3/100)"></div><div style="background-image:url(https://picsum.photos/seed/c4/100)"></div></div>
+        <div class="cta">Rewind this day</div>
+      </div>
+    </div>
+    <div class="cap"><b>2 · Month, zoomed</b>The month card grows into this screen (one morph). Big numbered days, about 32 pt each, easy to hit. Swipe sideways or use ‹ › for the next month. Tapping a day opens its preview sheet. Tapping another day swaps the sheet in place.</div>
+  </div>
+</div>
+
+</body></html>

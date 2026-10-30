@@ -1,0 +1,26 @@
+{
+  "description": "Undo of the Blurry trash",
+  "ids": {
+    "65872e7f-2930-4856-8df2-4fe2b1327c04": "asset:blurry-01",
+    "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe": "asset:blurry-02"
+  },
+  "request": {
+    "body": {
+      "ids": [
+        "65872e7f-2930-4856-8df2-4fe2b1327c04",
+        "f6f5ffca-46a0-4f1d-87bb-e8e4df2a96fe"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/trash/restore/assets"
+  },
+  "response": {
+    "body": {
+      "count": 2
+    },
+    "status": 200
+  }
+}

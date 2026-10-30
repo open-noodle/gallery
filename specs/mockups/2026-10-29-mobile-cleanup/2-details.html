@@ -1,0 +1,91 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mobile cleanup mockup: 2-details</title><style>body{background:#f4f5f8;font-family:system-ui,sans-serif;padding:24px;color:#14161c}h2{margin:0 0 4px}.subtitle{opacity:.7;margin:0 0 20px}.options{display:none}</style></head><body>
+<style>
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:300px}
+  .cap{font-size:13px;opacity:.75;text-align:center;line-height:1.4}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:270px;height:560px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:26px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8;position:relative;z-index:3}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px;font-size:12px}
+  .prog{height:3px;background:#2a2e3a;border-radius:3px;margin:6px 14px}.prog i{display:block;height:100%;width:38%;background:#5b6cff;border-radius:3px}
+  .card{position:absolute;left:14px;right:14px;top:66px;bottom:118px;border-radius:22px;background-size:cover;background-position:center;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .meta{position:absolute;left:0;right:0;bottom:0;padding:12px;border-radius:0 0 22px 22px;background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:11px}
+  .meta b{font-size:15px;display:block}
+  .chip{display:inline-block;background:rgba(255,255,255,.14);border-radius:999px;padding:2px 7px;font-size:10px;margin:4px 3px 0 0}
+  .chip.on{background:#5b6cff;box-shadow:0 0 0 3px #5b6cff55}
+  .acts{position:absolute;left:0;right:0;bottom:22px;display:flex;justify-content:center;gap:16px;align-items:center}
+  .ab{width:50px;height:50px;border-radius:50%;background:#1a1d25;display:grid;place-items:center;font-size:20px;border:1.5px solid #2a2e3a}
+  .ab.s{width:40px;height:40px;font-size:15px}
+  .del{color:#ff5a6a}.keep{color:#2fbf71}.fav{color:#ff4d8d}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:#171a22;border-radius:22px 22px 0 0;padding:10px 14px 0;box-shadow:0 -14px 40px rgba(0,0,0,.6);z-index:2}
+  .grab{width:36px;height:4px;border-radius:2px;background:#3a3e4a;margin:0 auto 10px}
+  .r{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #22252e;font-size:11.5px}
+  .r .i{width:22px;text-align:center;opacity:.7;font-size:13px}
+  .r small{display:block;opacity:.55;font-size:10px;margin-top:1px}
+  .ppl{display:flex;gap:6px;margin-top:4px}.ppl div{width:26px;height:26px;border-radius:50%;background-size:cover}
+  .map{height:56px;border-radius:10px;background:linear-gradient(135deg,#1f3a2f,#22324a);margin-top:5px;position:relative}
+  .map:after{content:'📍';position:absolute;left:55%;top:30%;font-size:14px}
+  .sact{position:sticky;bottom:0;display:flex;gap:6px;padding:10px 0 16px;background:#171a22}
+  .sact div{flex:1;border-radius:12px;background:#22252e;text-align:center;padding:8px 0;font-size:10px}
+  .sact div span{display:block;font-size:16px}
+  .lnk{display:flex;gap:6px;margin:8px 0 2px}.lnk div{flex:1;text-align:center;font-size:11px;border:1px solid #2f3340;border-radius:999px;padding:6px}
+  .mini{position:absolute;left:14px;right:14px;top:34px;height:150px;border-radius:16px;background-size:cover;background-position:center}
+</style>
+
+<h2>Tapping ⓘ Details on a photo</h2>
+<p class="subtitle">A sheet slides up from the bottom. The photo stays visible above it, and you can still act on it without closing the sheet.</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>29 Oct · 16 of 42</b><span style="font-size:10px">Swipe ▾</span></div>
+      <div class="prog"><i></i></div>
+      <div class="card" style="background-image:url(https://picsum.photos/seed/r1/400/600)">
+        <div class="meta"><b>2019 · 7 years ago</b>Lisbon · 18:42<br><span class="chip">4.2 MB</span><span class="chip">In 2 albums</span><span class="chip on">ⓘ Details</span></div>
+      </div>
+      <div class="acts"><div class="ab s">↶</div><div class="ab del">✕</div><div class="ab fav">♥</div><div class="ab keep">✓</div><div class="ab s">⤢</div></div>
+    </div>
+    <div class="cap"><b>1 · On the card</b>Tap ⓘ Details, or drag the card's info strip upwards. Tapping the photo itself does the same (my guess: a tap is free because swipes take the drags).</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="mini" style="background-image:url(https://picsum.photos/seed/r1/400/600)"></div>
+      <div class="sheet" style="top:196px">
+        <div class="grab"></div>
+        <div style="font-weight:700;font-size:15px">Sunday 29 October 2019, 18:42</div>
+        <div style="font-size:11px;opacity:.6">7 years ago · photo 16 of 42 today</div>
+        <div class="r"><div class="i">📍</div><div style="flex:1">Lisbon, Portugal<small>Alfama</small><div class="map"></div></div></div>
+        <div class="r"><div class="i">👥</div><div>People<div class="ppl"><div style="background-image:url(https://picsum.photos/seed/p1/60)"></div><div style="background-image:url(https://picsum.photos/seed/p2/60)"></div></div></div></div>
+        <div class="r"><div class="i">◫</div><div>Albums<small>Portugal 2019 · Family</small></div></div>
+        <div class="sact"><div class="del"><span>✕</span>Trash</div><div class="fav"><span>♥</span>Favorite</div><div class="keep"><span>✓</span>Keep</div></div>
+      </div>
+    </div>
+    <div class="cap"><b>2 · Half open</b>The photo shrinks to the top (one smooth morph). The most useful facts first: when, where, who, which albums. Keep / Favorite / Trash stay pinned at the bottom. Picking one closes the sheet and moves to the next card.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="sheet" style="top:30px;border-radius:22px 22px 0 0">
+        <div class="grab"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:48px;height:48px;border-radius:10px;background:url(https://picsum.photos/seed/r1/100) center/cover"></div>
+          <div><div style="font-weight:700;font-size:14px">29 Oct 2019, 18:42</div><div style="font-size:11px;opacity:.6">Lisbon, Portugal</div></div>
+        </div>
+        <div class="r"><div class="i">📷</div><div>Fujifilm X-T3 · XF 23mm f/2<small>f/2.8 · 1/250 s · ISO 400 · 23 mm</small></div></div>
+        <div class="r"><div class="i">🖼</div><div>DSCF4821.JPG<small>6240 × 4160 · 26 MP · 4.2 MB</small></div></div>
+        <div class="r"><div class="i">👥</div><div>Anna, Tomás</div></div>
+        <div class="r"><div class="i">◫</div><div>Portugal 2019 · Family</div></div>
+        <div class="r"><div class="i">◌</div><div>Sharpness 81 / 100<small>Only on Blurry and Bursts: the queue's own signal</small></div></div>
+        <div class="lnk"><div>⤢ Open in library</div><div>⧉ Show that day</div></div>
+        <div class="sact"><div class="del"><span>✕</span>Trash</div><div class="fav"><span>♥</span>Favorite</div><div class="keep"><span>✓</span>Keep</div></div>
+      </div>
+    </div>
+    <div class="cap"><b>3 · Fully open</b>Drag the sheet up for the rest: camera and exposure, file name, size, and the queue's signal. "Open in library" opens the normal viewer. "Show that day" jumps the timeline to that date. Back returns to this card.</div>
+  </div>
+</div>
+
+</body></html>

@@ -1,0 +1,45 @@
+{
+  "description": "Apply on Bursts: both accepted series in one commit, each frame kept or trashed by its mark (the web's resolve)",
+  "ids": {
+    "32ebde2b-2ce5-4cc8-81bf-422221205346": "asset:burst-a3",
+    "6a754b60-536c-4346-8914-8c92f00e619a": "asset:burst-a2",
+    "9c44cefb-9c25-418b-8752-9b7aa07c8b05": "asset:burst-a1",
+    "a6d4c87f-60ec-4281-8a66-778183f7afc8": "asset:burst-b3",
+    "cbde695d-e55d-4e95-8330-8c1aa62a30a4": "asset:burst-b2",
+    "cfff90cd-cb5c-44bd-8a5e-214cde64abe5": "asset:burst-b1"
+  },
+  "request": {
+    "body": {
+      "favoriteIds": [],
+      "keepIds": [
+        "6a754b60-536c-4346-8914-8c92f00e619a",
+        "cfff90cd-cb5c-44bd-8a5e-214cde64abe5",
+        "a6d4c87f-60ec-4281-8a66-778183f7afc8"
+      ],
+      "queue": "bursts",
+      "trashIds": [
+        "9c44cefb-9c25-418b-8752-9b7aa07c8b05",
+        "32ebde2b-2ce5-4cc8-81bf-422221205346",
+        "cbde695d-e55d-4e95-8330-8c1aa62a30a4"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 0,
+      "kept": 3,
+      "skipped": [],
+      "trashed": [
+        "9c44cefb-9c25-418b-8752-9b7aa07c8b05",
+        "32ebde2b-2ce5-4cc8-81bf-422221205346",
+        "cbde695d-e55d-4e95-8330-8c1aa62a30a4"
+      ]
+    },
+    "status": 200
+  }
+}

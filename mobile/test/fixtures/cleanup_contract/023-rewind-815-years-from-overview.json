@@ -1,0 +1,26 @@
+{
+  "description": "Start on the today card: the rewind loads its own years, after the overview's (nothing has changed yet)",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/815"
+  },
+  "response": {
+    "body": {
+      "years": [
+        {
+          "count": 2,
+          "year": 2022
+        },
+        {
+          "count": 3,
+          "year": 2020
+        }
+      ]
+    },
+    "status": 200
+  }
+}

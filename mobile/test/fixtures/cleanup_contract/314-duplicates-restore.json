@@ -1,0 +1,28 @@
+{
+  "description": "The toast's Undo restores the trashed copies; the groups do not come back",
+  "ids": {
+    "6aaaf6ae-e860-439e-809e-0e22209c206e": "asset:dup-b2",
+    "e11cba40-76f1-47e6-843d-e4c881a05534": "asset:dup-b1",
+    "f194097c-95f9-474e-838c-43971cc8a7f4": "asset:dup-a1"
+  },
+  "request": {
+    "body": {
+      "ids": [
+        "f194097c-95f9-474e-838c-43971cc8a7f4",
+        "e11cba40-76f1-47e6-843d-e4c881a05534",
+        "6aaaf6ae-e860-439e-809e-0e22209c206e"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/trash/restore/assets"
+  },
+  "response": {
+    "body": {
+      "count": 3
+    },
+    "status": 200
+  }
+}

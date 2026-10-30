@@ -1,0 +1,42 @@
+{
+  "description": "The Blurry card's cover: the first photo of the queue, without filters",
+  "ids": {
+    "65872e7f-2930-4856-8df2-4fe2b1327c04": "asset:blurry-01"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/queues/blurry",
+    "query": {
+      "limit": "1"
+    }
+  },
+  "response": {
+    "body": {
+      "groups": [],
+      "items": [
+        {
+          "city": null,
+          "duration": null,
+          "fileSize": 1007,
+          "height": 1,
+          "id": "65872e7f-2930-4856-8df2-4fe2b1327c04",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2023-05-19T10:00:00.000Z",
+          "originalFileName": "blurry-01.png",
+          "reason": "blurry",
+          "sharpness": 5,
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ],
+      "nextCursor": "eyJ2IjpbIjIwMjMtMDUtMTlUMTA6MDA6MDAuMDAwMDAwWiIsIjY1ODcyZTdmLTI5MzAtNDg1Ni04ZGYyLTRmZTJiMTMyN2MwNCJdfQ"
+    },
+    "status": 200
+  }
+}

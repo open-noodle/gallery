@@ -1,0 +1,25 @@
+{
+  "description": "Done → Apply: the lookup for the one photo marked for trash",
+  "ids": {
+    "49c19b48-ad28-4148-80f3-68cefc4e45c0": "asset:blurry-13"
+  },
+  "request": {
+    "body": {
+      "assetIds": [
+        "49c19b48-ad28-4148-80f3-68cefc4e45c0"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/in-spaces"
+  },
+  "response": {
+    "body": {
+      "assetIds": [],
+      "externalAssetIds": []
+    },
+    "status": 200
+  }
+}

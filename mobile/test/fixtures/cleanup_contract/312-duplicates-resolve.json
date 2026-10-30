@@ -1,0 +1,55 @@
+{
+  "description": "Apply on Duplicates: both accepted groups in one resolve, each copy kept or trashed by its mark",
+  "ids": {
+    "6aaaf6ae-e860-439e-809e-0e22209c206e": "asset:dup-b2",
+    "c02125e1-48fd-43a9-8ea8-2ba9e0d5e7bd": "duplicate:b",
+    "cfd8f987-ffaf-4b9a-8a7b-7b84895b9802": "asset:dup-b3",
+    "e11cba40-76f1-47e6-843d-e4c881a05534": "asset:dup-b1",
+    "f194097c-95f9-474e-838c-43971cc8a7f4": "asset:dup-a1",
+    "f2db1359-7b87-4d5e-84d0-09b9896491cc": "duplicate:a",
+    "fea5f667-af2e-4f13-84e8-dba094948d65": "asset:dup-a2"
+  },
+  "request": {
+    "body": {
+      "groups": [
+        {
+          "duplicateId": "f2db1359-7b87-4d5e-84d0-09b9896491cc",
+          "keepAssetIds": [
+            "fea5f667-af2e-4f13-84e8-dba094948d65"
+          ],
+          "trashAssetIds": [
+            "f194097c-95f9-474e-838c-43971cc8a7f4"
+          ]
+        },
+        {
+          "duplicateId": "c02125e1-48fd-43a9-8ea8-2ba9e0d5e7bd",
+          "keepAssetIds": [
+            "cfd8f987-ffaf-4b9a-8a7b-7b84895b9802"
+          ],
+          "trashAssetIds": [
+            "e11cba40-76f1-47e6-843d-e4c881a05534",
+            "6aaaf6ae-e860-439e-809e-0e22209c206e"
+          ]
+        }
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/duplicates/resolve"
+  },
+  "response": {
+    "body": [
+      {
+        "id": "f2db1359-7b87-4d5e-84d0-09b9896491cc",
+        "success": true
+      },
+      {
+        "id": "c02125e1-48fd-43a9-8ea8-2ba9e0d5e7bd",
+        "success": true
+      }
+    ],
+    "status": 200
+  }
+}

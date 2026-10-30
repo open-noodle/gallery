@@ -1,0 +1,24 @@
+{
+  "description": "The toast's Undo restores the trashed photo",
+  "ids": {
+    "49c19b48-ad28-4148-80f3-68cefc4e45c0": "asset:blurry-13"
+  },
+  "request": {
+    "body": {
+      "ids": [
+        "49c19b48-ad28-4148-80f3-68cefc4e45c0"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/trash/restore/assets"
+  },
+  "response": {
+    "body": {
+      "count": 1
+    },
+    "status": 200
+  }
+}

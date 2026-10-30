@@ -9,9 +9,14 @@ import 'package:immich_mobile/gallery/motion/pressable.dart';
 /// work exactly as before.
 class GalleryTile extends StatefulWidget {
   final BaseAsset? asset;
+
+  /// The remote id when there is no [BaseAsset] (a cleanup photo, which comes from the server only).
+  final String? remoteId;
   final Widget child;
 
-  const GalleryTile({super.key, required this.asset, required this.child});
+  const GalleryTile({super.key, this.asset, this.remoteId, required this.child});
+
+  String? get _id => remoteId ?? asset?.remoteId;
 
   /// Tiles currently mounted for [remoteId]. The same photo can be in several timelines at once.
   static Iterable<GalleryTileHandle> live(String remoteId) => _live[remoteId] ?? const [];
@@ -50,7 +55,7 @@ class _GalleryTileState extends State<GalleryTile> implements GalleryTileHandle 
   @override
   void didUpdateWidget(GalleryTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.asset?.remoteId != widget.asset?.remoteId) {
+    if (oldWidget._id != widget._id) {
       _unregister();
       _register();
     }
@@ -69,7 +74,7 @@ class _GalleryTileState extends State<GalleryTile> implements GalleryTileHandle 
   }
 
   void _register() {
-    final id = widget.asset?.remoteId;
+    final id = widget._id;
     if (id != null) {
       (GalleryTile._live[id] ??= {}).add(this);
       _registeredId = id;

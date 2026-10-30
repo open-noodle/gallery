@@ -1,0 +1,38 @@
+{
+  "description": "Keep the rest and finish day: completeMonthDay on the one and only request",
+  "ids": {
+    "5dc981e9-86ac-4ed9-867c-65d4c8ceba7f": "asset:q3",
+    "68a72fed-ca14-473e-8bfe-49b697990dcd": "asset:q1",
+    "816fe8ca-0ed2-4d29-8f14-c3e7033874c3": "asset:q2"
+  },
+  "request": {
+    "body": {
+      "completeMonthDay": 815,
+      "favoriteIds": [],
+      "keepIds": [
+        "816fe8ca-0ed2-4d29-8f14-c3e7033874c3",
+        "5dc981e9-86ac-4ed9-867c-65d4c8ceba7f"
+      ],
+      "queue": "rewind",
+      "trashIds": [
+        "68a72fed-ca14-473e-8bfe-49b697990dcd"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "POST",
+    "path": "/api/cleanup/commit"
+  },
+  "response": {
+    "body": {
+      "favorited": 0,
+      "kept": 2,
+      "skipped": [],
+      "trashed": [
+        "68a72fed-ca14-473e-8bfe-49b697990dcd"
+      ]
+    },
+    "status": 200
+  }
+}
