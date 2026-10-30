@@ -43,11 +43,15 @@ type PageProps = {
   };
 };
 
-function renderPage(role: SharedSpaceRole, members = [member({ role })], options: { currentUserId?: string } = {}) {
+function renderPage(
+  role: SharedSpaceRole,
+  members = [member({ role })],
+  options: { currentUserId?: string; space?: SharedSpaceResponseDto } = {},
+) {
   mockAuthManager.user = { id: options.currentUserId ?? 'u1', isAdmin: false };
   const props: PageProps = {
     data: {
-      space: space(),
+      space: options.space ?? space(),
       members,
       linkedAlbums: [],
     },
@@ -82,6 +86,103 @@ describe('Members tab', () => {
     expect(screen.queryByTestId('members-activity')).not.toBeInTheDocument();
     // The Members page must not fetch activities anymore — that's the Activity tab's job.
     expect(sdkMock.getSpaceActivities).not.toHaveBeenCalled();
+  });
+
+  describe('member management by editors', () => {
+    const management = (o: Partial<NonNullable<SharedSpaceResponseDto['memberManagement']>> = {}) => ({
+      editorsCanAddMembers: null,
+      editorsCanChangeRoles: null,
+      serverEditorsCanAddMembers: false,
+      serverEditorsCanChangeRoles: false,
+      canAddMembers: false,
+      canChangeRoles: false,
+      ...o,
+    });
+    const roster = [
+      member({ userId: 'o1', role: SharedSpaceRole.Owner, name: 'Olivia' }),
+      member({ userId: 'u1', role: SharedSpaceRole.Editor, name: 'Me' }),
+      member({ userId: 'u2', role: SharedSpaceRole.Viewer, name: 'Ann' }),
+    ];
+
+    it('shows the permission settings to an owner, labelled with the server default', () => {
+      renderPage(SharedSpaceRole.Owner, [member(), member({ userId: 'u2', role: SharedSpaceRole.Editor })], {
+        space: space({ memberManagement: management({ canAddMembers: true, canChangeRoles: true }) }),
+      });
+      expect(screen.getByTestId('member-permission-settings')).toBeInTheDocument();
+      const triggers = within(screen.getByTestId('member-permission-settings'))
+        .getAllByTestId('role-select')
+        .map((select) => within(select).getAllByRole('button')[0]);
+      expect(triggers).toHaveLength(2);
+      for (const trigger of triggers) {
+        expect(trigger).toHaveTextContent('spaces_member_permission_server_default_off');
+      }
+    });
+
+    it('gives an owner today’s screen and no settings when memberManagement is absent', () => {
+      renderPage(SharedSpaceRole.Owner, [member(), member({ userId: 'u2', role: SharedSpaceRole.Editor })]);
+      expect(screen.queryByTestId('member-permission-settings')).not.toBeInTheDocument();
+      expect(screen.getByTestId('members-invite')).toBeInTheDocument();
+      expect(screen.getAllByTestId('role-select')).toHaveLength(1);
+    });
+
+    it('shows the invite button to an editor who can add members, but no settings', () => {
+      renderPage(SharedSpaceRole.Editor, roster, {
+        space: space({ memberManagement: management({ canAddMembers: true }) }),
+      });
+      expect(screen.getByTestId('members-invite')).toBeInTheDocument();
+      expect(screen.queryByTestId('member-permission-settings')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('role-select')).not.toBeInTheDocument();
+    });
+
+    it('shows the role select to an editor who can change roles only for non-owner, non-self rows, without remove', () => {
+      renderPage(SharedSpaceRole.Editor, roster, {
+        space: space({ memberManagement: management({ canChangeRoles: true }) }),
+      });
+      expect(screen.queryByTestId('members-invite')).not.toBeInTheDocument();
+      const selects = screen.getAllByTestId('role-select');
+      expect(selects).toHaveLength(1);
+      expect(within(selects[0]).getAllByRole('button')[0]).toHaveTextContent('role_viewer');
+      expect(screen.queryByTestId('role-option-remove')).not.toBeInTheDocument();
+    });
+
+    it('shows neither control to a plain editor', () => {
+      renderPage(SharedSpaceRole.Editor, roster, { space: space({ memberManagement: management() }) });
+      expect(screen.queryByTestId('members-invite')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('role-select')).not.toBeInTheDocument();
+    });
+
+    it('shows neither control to a viewer', () => {
+      const viewerRoster = [
+        member({ userId: 'o1', role: SharedSpaceRole.Owner, name: 'Olivia' }),
+        member({ userId: 'u1', role: SharedSpaceRole.Viewer, name: 'Me' }),
+      ];
+      renderPage(SharedSpaceRole.Viewer, viewerRoster, { space: space({ memberManagement: management() }) });
+      expect(screen.queryByTestId('members-invite')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('role-select')).not.toBeInTheDocument();
+    });
+
+    it('gives an editor nothing when memberManagement is absent (older server)', () => {
+      renderPage(SharedSpaceRole.Editor, roster);
+      expect(screen.queryByTestId('members-invite')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('role-select')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('member-permission-settings')).not.toBeInTheDocument();
+    });
+
+    it('saves a changed setting through updateSpace and revalidates', async () => {
+      renderPage(SharedSpaceRole.Owner, [member(), member({ userId: 'u2', role: SharedSpaceRole.Editor })], {
+        space: space({ memberManagement: management({ canAddMembers: true, canChangeRoles: true }) }),
+      });
+      const { invalidateAll } = await import('$app/navigation');
+      const settings = screen.getByTestId('member-permission-settings');
+      await fireEvent.click(within(settings).getAllByTestId('role-option-on')[0]);
+      await waitFor(() =>
+        expect(sdkMock.updateSpace).toHaveBeenCalledWith({
+          id: 's1',
+          sharedSpaceUpdateDto: { editorsCanAddMembers: true },
+        }),
+      );
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+    });
   });
 
   describe('role Select vs RoleBadge rendering', () => {
