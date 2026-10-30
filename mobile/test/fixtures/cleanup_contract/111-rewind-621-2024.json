@@ -1,0 +1,51 @@
+{
+  "description": "Rewind 21 June 2024",
+  "ids": {
+    "0b711e2a-7ef3-4c05-8441-4ab53c9a588f": "asset:r2",
+    "84ab20d8-6760-42cf-8cb5-ebc3767839f8": "asset:r1"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/rewind/621/2024"
+  },
+  "response": {
+    "body": {
+      "assets": [
+        {
+          "city": "Faro",
+          "duration": null,
+          "fileSize": 1020,
+          "height": 1,
+          "id": "84ab20d8-6760-42cf-8cb5-ebc3767839f8",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2024-06-21T09:00:00.000Z",
+          "originalFileName": "r1.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        },
+        {
+          "city": "Faro",
+          "duration": null,
+          "fileSize": 1021,
+          "height": 1,
+          "id": "0b711e2a-7ef3-4c05-8441-4ab53c9a588f",
+          "inAlbum": false,
+          "isFavorite": false,
+          "kept": false,
+          "localDateTime": "2024-06-21T18:00:00.000Z",
+          "originalFileName": "r2.png",
+          "thumbhash": "thumbhash",
+          "type": "IMAGE",
+          "width": 1
+        }
+      ]
+    },
+    "status": 200
+  }
+}
