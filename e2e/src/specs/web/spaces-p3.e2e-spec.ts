@@ -51,7 +51,8 @@ test.describe('Spaces P3 — Activity Feed, Members Tab, New-Since-Last-Visit', 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}/activity`);
 
-      await expect(page.getByTestId('space-activity')).toContainText('joined as');
+      // An added member's join names who added them.
+      await expect(page.getByTestId('space-activity')).toContainText(`${admin.name} added User Two as viewer`);
     });
   });
 

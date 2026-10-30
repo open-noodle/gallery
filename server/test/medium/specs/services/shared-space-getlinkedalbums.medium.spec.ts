@@ -4,11 +4,13 @@ import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
@@ -26,7 +28,9 @@ const setup = () => {
       AlbumRepository,
       AlbumUserRepository,
       AssetRepository,
+      ConfigRepository,
       SharedSpaceRepository,
+      SystemMetadataRepository,
       UserRepository,
     ],
     mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
