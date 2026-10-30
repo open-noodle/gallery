@@ -157,6 +157,5 @@ Each depth map is a small PNG image, typically 50 to 120 KB, stored with the pho
 (on S3 too, if you use [S3 storage](/features/s3-storage)). It is deleted with the photo.
 A storage migration between disk and S3 moves the depth maps along with the previews.
 
-If you [switch back to Immich](/guides/switch-back-to-immich), the depth maps stay in the
-thumbnails folder, where Immich ignores them. They are named `<asset id>_depth.png` and can be
-deleted safely.
+If you [switch back](/guides/switch-back-to-immich), the depth maps stay in the thumbnails
+folder, where they are ignored. They are named `<asset id>_depth.png` and can be deleted safely.
