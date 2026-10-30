@@ -14,6 +14,7 @@ import { Duplex, Readable, Writable } from 'node:stream';
 import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -340,6 +341,7 @@ export type ServiceOverrides = {
   gallerySync: GallerySyncRepository;
   videoTrim: VideoTrimRepository;
   imageAdjust: ImageAdjustRepository;
+  cleanup: CleanupRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -462,6 +464,8 @@ export const getMocks = () => {
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { strict: false }),
     imageAdjust: automock(ImageAdjustRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    cleanup: automock(CleanupRepository, { args: [, loggerMock], strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -557,6 +561,7 @@ export const newTestService = <T extends BaseService>(
     overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
     overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
     overrides.imageAdjust || (mocks.imageAdjust as As<ImageAdjustRepository>),
+    overrides.cleanup || (mocks.cleanup as As<CleanupRepository>),
   );
 
   return {

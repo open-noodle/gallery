@@ -1,0 +1,98 @@
+<!doctype html><html><head><meta charset="utf-8"><title>hub-combined-v2</title></head><body style="background:#0f1012;margin:0;padding:24px">
+<style>
+  .gx { --bg:#0f1012; --card:#18191c; --card2:#1f2024; --line:#2a2b30; --mut:#8b8e96; --txt:#eceef2; --pri:#adcbfa; --ok:#4ade80;
+        background:var(--bg); color:var(--txt); font:14px/1.4 Inter,system-ui,sans-serif; border-radius:14px; padding:24px; }
+  .gx * { box-sizing:border-box; }
+  .gx .mut { color:var(--mut); }
+  .gx .row { display:flex; gap:14px; align-items:center; }
+  .gx .card { background:var(--card); border:1px solid var(--line); border-radius:18px; }
+  .gx .btn { background:var(--pri); color:#0b1630; border-radius:999px; padding:10px 18px; font-weight:600; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; }
+  .gx img { display:block; object-fit:cover; }
+  .gx h1 { font-size:26px; margin:0; letter-spacing:-.02em; }
+  .gx .big { font-size:30px; font-weight:700; letter-spacing:-.02em; }
+  .gx .pill { font-size:12px; padding:3px 10px; border-radius:999px; background:#4ade8018; color:var(--ok); border:1px solid #4ade8040; }
+  .gx .q { position:relative; border-radius:16px; overflow:hidden; aspect-ratio:4/3; }
+  .gx .q img { width:100%; height:100%; }
+  .gx .q .ov { position:absolute; inset:0; background:linear-gradient(180deg,transparent 35%,rgba(0,0,0,.82)); display:flex; flex-direction:column; justify-content:flex-end; padding:12px; }
+  .gx .q b { font-size:15px } .gx .q small { color:#d6d8de }
+  .gx .months { display:grid; grid-template-columns:repeat(12,1fr); gap:10px; }
+  .gx .mon .name { font-size:11px; color:var(--mut); margin-bottom:5px; }
+  .gx .mon .name.cur { color:var(--txt); font-weight:600; }
+  .gx .mini { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .gx .mini i { aspect-ratio:1; border-radius:2px; background:#26282e; }
+  .gx .mini i.e { background:transparent; }
+  .gx .mini i.p1 { background:#34507f } .gx .mini i.p2 { background:#5d86cf } .gx .mini i.p3 { background:var(--pri) }
+  .gx .mini i.o { background:var(--ok) }
+  .gx .mini i.now { outline:1.5px solid #fff; outline-offset:1px; }
+  .gx .legend { display:flex; gap:14px; font-size:12px; color:var(--mut); margin-top:12px; }
+  .gx .legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+</style>
+
+<h2>A + B's calendar</h2>
+<p class="subtitle">A's banner and quick-win cards, with B's months, now in one compact row of 12. Each square is that date across all your years, in rows of 7 from the 1st. Dates with more photos are brighter, reviewed ones are green, and today has a ring. Hover any day to preview it in the banner.</p>
+
+<div class="gx">
+  <div class="row" style="justify-content:space-between">
+    <div><h1>Cleanup</h1><div class="mut">🔥 4-day streak · 22 of 366 days reviewed</div></div>
+    <span class="pill">Could still free 3.2 GB</span>
+  </div>
+
+  <div class="card" style="margin-top:18px; padding:20px; display:grid; grid-template-columns:1.1fr 1fr; gap:22px; align-items:center; background:linear-gradient(135deg,#1c2433,#18191c 60%)">
+    <div style="display:grid; grid-template-columns:2fr 1fr 1fr; grid-template-rows:96px 96px; gap:6px">
+      <img src="https://picsum.photos/seed/beach1/400/400" style="grid-row:span 2; width:100%; height:100%; border-radius:14px">
+      <img src="https://picsum.photos/seed/dog2/200/200" style="width:100%; height:100%; border-radius:10px">
+      <img src="https://picsum.photos/seed/city3/200/200" style="width:100%; height:100%; border-radius:10px">
+      <img src="https://picsum.photos/seed/food4/200/200" style="width:100%; height:100%; border-radius:10px">
+      <div style="border-radius:10px; background:#2a2c33; display:grid; place-items:center; font-weight:600">+38</div>
+    </div>
+    <div>
+      <div class="mut" style="font-size:12px; text-transform:uppercase; letter-spacing:.08em">Today · October 28</div>
+      <div class="big" style="margin:6px 0">42 photos from 6 years</div>
+      <div class="mut" style="margin-bottom:16px">About 3 minutes. 2019 in Lisbon has the most.</div>
+      <span class="btn">▶ Start today's rewind</span>
+    </div>
+  </div>
+
+  <div style="margin:22px 0 10px; display:flex; justify-content:space-between"><b>Quick wins</b><span class="mut">Trash · 0 B</span></div>
+  <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px">
+    <div class="q"><img src="https://picsum.photos/seed/video5/400/300"><div class="ov"><b>Space hogs</b><small>12 files · −2.1 GB</small></div></div>
+    <div class="q"><img src="https://picsum.photos/seed/burst6/400/300"><div class="ov"><b>Bursts</b><small>31 series · −640 MB</small></div></div>
+    <div class="q"><img src="https://picsum.photos/seed/blur7/400/300" style="filter:blur(2px)"><div class="ov"><b>Blurry</b><small>87 photos · −410 MB</small></div></div>
+    <div class="q"><img src="https://picsum.photos/seed/shot8/400/300" style="filter:grayscale(.6)"><div class="ov"><b>Screenshots</b><small>204 · −90 MB</small></div></div>
+  </div>
+
+  <div class="card" style="margin-top:22px; padding:18px 20px">
+    <div style="display:flex; justify-content:space-between; margin-bottom:12px"><b>Your year</b><span class="mut" style="font-size:12px">Pick any day to rewind it</span></div>
+    <div class="months" id="months"></div>
+    <div class="legend">
+      <span><i style="background:#26282e"></i>No photos</span>
+      <span><i style="background:#34507f"></i><i style="background:#5d86cf;margin-left:-3px"></i><i style="background:#adcbfa;margin-left:-3px"></i>Photos to review</span>
+      <span><i style="background:#4ade80"></i>Reviewed</span>
+      <span><i style="background:transparent;outline:1.5px solid #fff"></i>Today</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const m = document.getElementById('months');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const len = [31,29,31,30,31,30,31,31,30,31,30,31];
+    const first = [0,0,0,0,0,0,0,0,0,0,0,0];
+    names.forEach((n, k) => {
+      const box = document.createElement('div'); box.className = 'mon';
+      box.innerHTML = `<div class="name ${k === 9 ? 'cur' : ''}">${n}</div>`;
+      const g = document.createElement('div'); g.className = 'mini';
+      for (let e = 0; e < first[k]; e++) { const i = document.createElement('i'); i.className = 'e'; g.appendChild(i); }
+      for (let d = 0; d < len[k]; d++) {
+        const i = document.createElement('i');
+        const r = Math.abs((Math.sin((k * 31 + d) * 7.13) * 9999) % 1);
+        i.className = (k < 2 || (k === 9 && d < 27)) && r > 0.35 ? 'o' : ['', 'p1', 'p2', 'p3'][Math.floor(r * 4)];
+        if (k === 9 && d === 27) i.className += ' now';
+        g.appendChild(i);
+      }
+      box.appendChild(g); m.appendChild(box);
+    });
+  })();
+</script>
+</body></html>

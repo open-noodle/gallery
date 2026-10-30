@@ -165,3 +165,15 @@ export const pop = (element: Element): void => {
     composite: 'add',
   });
 };
+
+/** Swells an element once to draw the eye to it: a button that just became useful. */
+export const pulse = (element: Element): void => {
+  if (typeof element.animate !== 'function' || prefersReducedMotion()) {
+    return;
+  }
+  element.animate([{ scale: 1 }, { scale: 1.08 }, { scale: 1 }], {
+    duration: spring.snappy.duration,
+    easing: ease.standard,
+    composite: 'add',
+  });
+};

@@ -37,3 +37,16 @@ export const TimeBucketSizeSchema = z
   .enum(TimeBucketSize)
   .describe('Timeline bucket granularity')
   .meta({ id: 'TimeBucketSize' });
+
+// Library Cleanup (specs/2026-09-23-library-cleanup-design.md)
+export enum CleanupQueue {
+  Rewind = 'rewind',
+  SpaceHogs = 'space_hogs',
+  Bursts = 'bursts',
+  Screenshots = 'screenshots',
+  Blurry = 'blurry',
+}
+
+export enum CleanupDecisionType {
+  Keep = 'keep',
+}
