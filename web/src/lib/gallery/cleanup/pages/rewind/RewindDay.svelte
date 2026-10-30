@@ -1,0 +1,890 @@
+<script lang="ts">
+  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
+  import { beforeNavigate, goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { shortcuts } from '$lib/actions/shortcut';
+  import OnEvents from '$lib/components/OnEvents.svelte';
+  import { cleanupShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
+  import RewindOneAtATime from '$lib/gallery/cleanup/RewindOneAtATime.svelte';
+  import RewindYearSection from '$lib/gallery/cleanup/RewindYearSection.svelte';
+  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
+  import { RewindSession, type RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
+  import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import { slideMotion } from '$lib/components/filter-panel/motion';
+  import RewindDayDone from '$lib/gallery/cleanup/RewindDayDone.svelte';
+  import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
+  import { explainerSeen, tapHintDone } from '$lib/gallery/cleanup/explainer-seen';
+  import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+  import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
+  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '$lib/gallery/motion';
+  import CleanupFinishButton from '$lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
+  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
+  import { Route } from '$lib/route';
+  import { getByteUnitString } from '$lib/utils/byte-units';
+  import { animateCleanupRemoval, confirmCleanupTrash, showRemovedToast } from '$lib/gallery/cleanup/cleanup-actions';
+  import {
+    browserTimeZone,
+    burstMemberIds,
+    dominantCity,
+    monthDayLabel,
+    monthDayShortLabel,
+    nextUnreviewedDay,
+    shiftMonthDay,
+  } from '$lib/gallery/cleanup/cleanup';
+  import { handleError } from '$lib/utils/handle-error';
+  import { navigate } from '$lib/utils/navigation';
+  import {
+    AssetMediaSize,
+    AssetTypeEnum,
+    commitCleanup,
+    getCleanupCalendar,
+    getCleanupRewindAssets,
+    type CleanupAssetDto,
+    type CleanupRewindYearDto,
+  } from '@immich/sdk';
+  import { Breadcrumbs, Button, Heading, IconButton, isModalOpen, modalManager, toastManager } from '@immich/ui';
+  import { mdiInformationOutline, mdiKeyboard, mdiSlashForward, mdiUndo } from '@mdi/js';
+  import { onMount, tick } from 'svelte';
+  import { locale, t } from 'svelte-i18n';
+  import { Tween } from 'svelte/motion';
+  import { fade, slide } from 'svelte/transition';
+
+  type Props = {
+    monthDay: number;
+    years: CleanupRewindYearDto[];
+    firstYear?: { year: number; assets: CleanupAssetDto[] };
+    title: string;
+  };
+
+  let { monthDay, years: initialYears, firstYear, title }: Props = $props();
+
+  type Mode = 'grid' | 'one';
+  type LoadedYear = { year: number; assets: CleanupAssetDto[] };
+
+  const MODE_KEY = 'cleanup.rewind.mode';
+  const UP_NEXT = 8;
+  const TILE_SELECTOR = '[data-testid^="cleanup-rewind-tile-"]';
+
+  const readMode = (): Mode => {
+    try {
+      return localStorage.getItem(MODE_KEY) === 'one' ? 'one' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  };
+
+  // The page keys this component on the date, so props are only read once.
+  // svelte-ignore state_referenced_locally
+  let years = $state(initialYears.map((year) => ({ ...year })));
+  // svelte-ignore state_referenced_locally
+  let loaded = $state<LoadedYear[]>(firstYear ? [firstYear] : []);
+  let loadingYear = $state(false);
+  let sentinelVisible = $state(false);
+  // Set when a year fails to load, so the loader does not retry in a loop. Scrolling the sentinel
+  // back into view, or switching mode, tries again.
+  let loadBlocked = $state(false);
+  let hideReviewed = $state(true);
+  let mode = $state<Mode>(readMode());
+  let bypassGuard = false;
+  // The explainer opens by itself on this browser's first rewind only; the info button reopens it.
+  let explainerOpen = $state(!explainerSeen.get());
+  // True while the Space check for a trash commit is in flight, so a second press cannot start another.
+  let checkingSpaces = $state(false);
+  // Touch screens get a one-line "how to mark" hint until the first finished day.
+  let showTapHint = $state(!tapHintDone.get());
+
+  type DaySummary = {
+    kept: number;
+    favorites: number;
+    trashed: number;
+    freedBytes: number;
+    streak?: number;
+    next?: number;
+  };
+  // Set once the day is finished: the success card shows and waits for Next day or Back to Cleanup.
+  let done = $state<DaySummary | null>(null);
+
+  // svelte-ignore state_referenced_locally
+  const session = new RewindSession(monthDay, (dto) => commitCleanup({ cleanupCommitDto: dto }));
+
+  const lang = $derived($locale ?? 'en');
+  const currentYear = new Date().getFullYear();
+  const total = $derived(years.reduce((sum, year) => sum + year.count, 0));
+  const assetById = $derived(new Map(loaded.flatMap(({ assets }) => assets).map((asset) => [asset.id, asset])));
+  const sections = $derived(
+    loaded.map(({ year, assets }) => ({
+      year,
+      count: years.find((y) => y.year === year)?.count ?? assets.length,
+      city: dominantCity(assets),
+      // "Hide reviewed" hides photos kept on an earlier visit, unless they carry a mark from this one.
+      visible: hideReviewed ? assets.filter((asset) => !asset.kept || session.marks.has(asset.id)) : assets,
+    })),
+  );
+  const flat = $derived(sections.flatMap(({ visible }) => visible));
+  // Measured over every loaded photo, not only the visible ones, so hiding a kept shot does not
+  // stop its burst neighbour from being hinted.
+  // The Bursts queue groups images only, so a video must not make a neighbouring photo a burst.
+  const burstIds = $derived(
+    burstMemberIds(loaded.flatMap(({ assets }) => assets).filter(({ type }) => type === AssetTypeEnum.Image)),
+  );
+  const unloadedCount = $derived(
+    years.filter(({ year }) => loaded.every((l) => l.year !== year)).reduce((sum, year) => sum + year.count, 0),
+  );
+  const reviewed = $derived(
+    [...assetById.values()].filter((asset) => asset.kept || session.marks.has(asset.id)).length,
+  );
+  const trashBytes = $derived(
+    [...session.marks]
+      .filter(([, mark]) => mark === 'trash')
+      .reduce((sum, [id]) => sum + (assetById.get(id)?.fileSize ?? 0), 0),
+  );
+  const trashBytesShown = Tween.of(() => trashBytes, countMotion());
+  const focusedIndex = $derived(flat.findIndex((asset) => asset.id === session.focusedId));
+  const current = $derived(focusedIndex === -1 ? flat[0] : flat[focusedIndex]);
+  const busy = $derived(session.progress !== null || checkingSpaces);
+  const dayLabel = $derived(monthDayLabel(monthDay, lang));
+  const finishLabel = $derived($t('cleanup_finish_day_named', { values: { date: dayLabel } }));
+  const previousDay = $derived(shiftMonthDay(monthDay, -1));
+  const nextDay = $derived(shiftMonthDay(monthDay, 1));
+
+  // More years are needed once the grid sentinel scrolls into view, or once one-at-a-time mode
+  // gets close to the end of what is loaded.
+  const needsMore = $derived(
+    mode === 'grid' ? sentinelVisible : flat.length - Math.max(focusedIndex, 0) <= UP_NEXT + 1,
+  );
+
+  const loadNextYear = async () => {
+    const next = years.find(({ year }) => loaded.every((l) => l.year !== year));
+    if (!next || loadingYear) {
+      return;
+    }
+    loadingYear = true;
+    try {
+      const { assets } = await getCleanupRewindAssets({ monthDay, year: next.year });
+      loaded.push({ year: next.year, assets });
+    } catch (error) {
+      handleError(error, $t('errors.failed_to_load_assets'));
+      loadBlocked = true;
+    } finally {
+      loadingYear = false;
+    }
+  };
+
+  $effect(() => {
+    if (needsMore && !loadingYear && !loadBlocked && unloadedCount > 0) {
+      void loadNextYear();
+    }
+  });
+
+  $effect(() => {
+    if (session.focusedId === null && flat.length > 0) {
+      session.focusedId = flat[0].id;
+    }
+  });
+
+  const observeSentinel = (node: HTMLElement) => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        sentinelVisible = entry.isIntersecting;
+        if (entry.isIntersecting) {
+          loadBlocked = false;
+        }
+      },
+      { rootMargin: '400px' },
+    );
+    observer.observe(node);
+    return { destroy: () => observer.disconnect() };
+  };
+
+  const setMode = (next: Mode) => {
+    mode = next;
+    loadBlocked = false;
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Remembering the mode is a convenience only.
+    }
+  };
+
+  const tileFor = (id: string) =>
+    document.querySelector<HTMLElement>(`[data-testid="cleanup-rewind-tile-${CSS.escape(id)}"]`);
+
+  const focusAsset = async (id: string | undefined) => {
+    if (!id) {
+      return;
+    }
+    session.focusedId = id;
+    if (mode === 'grid') {
+      await tick();
+      const tile = tileFor(id);
+      tile?.focus({ preventScroll: true });
+      tile?.scrollIntoView({ block: 'nearest' });
+    }
+  };
+
+  const step = (delta: number) => {
+    if (flat.length === 0) {
+      return;
+    }
+    const from = focusedIndex === -1 ? 0 : focusedIndex;
+    void focusAsset(flat[Math.min(Math.max(from + delta, 0), flat.length - 1)]?.id);
+  };
+
+  // Up and down pick the tile in the next row whose centre is closest, so they follow the grid
+  // across year sections whatever the column count.
+  const stepRow = (direction: 1 | -1) => {
+    if (mode === 'one') {
+      step(direction);
+      return;
+    }
+    const tiles = [...document.querySelectorAll<HTMLElement>(TILE_SELECTOR)];
+    const currentTile = session.focusedId ? tileFor(session.focusedId) : undefined;
+    if (!currentTile) {
+      step(0);
+      return;
+    }
+    const origin = currentTile.getBoundingClientRect();
+    const centre = origin.left + origin.width / 2;
+    const rows = tiles
+      .map((tile) => ({ tile, rect: tile.getBoundingClientRect() }))
+      .filter(({ rect }) => (direction === 1 ? rect.top >= origin.bottom - 1 : rect.bottom <= origin.top + 1));
+    if (rows.length === 0) {
+      return;
+    }
+    const rowTop =
+      direction === 1 ? Math.min(...rows.map(({ rect }) => rect.top)) : Math.max(...rows.map(({ rect }) => rect.top));
+    const distance = ({ rect }: (typeof rows)[number]) => Math.abs(rect.left + rect.width / 2 - centre);
+    let target: (typeof rows)[number] | undefined;
+    for (const candidate of rows) {
+      if (Math.abs(candidate.rect.top - rowTop) < 2 && (!target || distance(candidate) < distance(target))) {
+        target = candidate;
+      }
+    }
+    void focusAsset(target?.tile.dataset.assetId);
+  };
+
+  const markCurrent = (kind: RewindMark) => {
+    if (!current) {
+      return;
+    }
+    session.mark(current.id, kind);
+    if (kind === 'fav') {
+      celebrate('favorite');
+    }
+    step(1);
+  };
+
+  const onKeepRemaining = (year: number) => {
+    const section = sections.find((s) => s.year === year);
+    if (!section) {
+      return;
+    }
+    session.markMany(
+      section.visible.filter((asset) => !asset.kept && !session.marks.has(asset.id)).map((asset) => asset.id),
+      'keep',
+    );
+  };
+
+  const openAsset = async (id: string | undefined) => {
+    if (!id) {
+      return;
+    }
+    session.focusedId = id;
+    await navigate({ targetRoute: 'current', assetId: id });
+  };
+
+  // A double-click first registers as one click, which cycled the mark; take that back before opening.
+  const onTileOpen = (id: string) => {
+    session.undo();
+    void openAsset(id);
+  };
+
+  const removeAssets = (ids: string[]) => {
+    const removed = new Set(ids);
+    for (const section of loaded) {
+      const before = section.assets.length;
+      section.assets = section.assets.filter((asset) => !removed.has(asset.id));
+      const year = years.find((y) => y.year === section.year);
+      if (year) {
+        year.count -= before - section.assets.length;
+      }
+    }
+    if (session.focusedId && removed.has(session.focusedId)) {
+      session.focusedId = flat.find((asset) => !removed.has(asset.id))?.id ?? null;
+    }
+  };
+
+  const reinsertAssets = (assets: CleanupAssetDto[]) => {
+    for (const asset of assets) {
+      const year = Number(asset.localDateTime.slice(0, 4));
+      const section = loaded.find((l) => l.year === year);
+      if (!section || section.assets.some((a) => a.id === asset.id)) {
+        continue;
+      }
+      // Same order as the server: capture time, then id.
+      section.assets = [...section.assets, asset].sort(
+        (a, b) => a.localDateTime.localeCompare(b.localDateTime) || a.id.localeCompare(b.id),
+      );
+      const entry = years.find((y) => y.year === year);
+      if (entry) {
+        entry.count++;
+      }
+    }
+  };
+
+  const showSkippedToast = (skipped: number) => {
+    if (skipped > 0) {
+      toastManager.warning($t('cleanup_skipped_count', { values: { count: skipped } }));
+    }
+  };
+
+  const trashMarkedIds = () => [...session.marks].filter(([, mark]) => mark === 'trash').map(([id]) => id);
+
+  /**
+   * Trashing a photo that is also in a shared space removes it for the space's members too, and
+   * with the server's trash turned off the delete is permanent, so the user confirms either first.
+   * Resolves to false when they cancel or the check fails; nothing has been committed then, and
+   * the marks stay.
+   */
+  const confirmTrash = async () => {
+    const ids = trashMarkedIds();
+    if (ids.length === 0) {
+      return true;
+    }
+    checkingSpaces = true;
+    try {
+      return await confirmCleanupTrash(ids);
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_delete_assets'));
+      return false;
+    } finally {
+      checkingSpaces = false;
+    }
+  };
+
+  const onMoveToTrash = async () => {
+    if (busy || session.counts.trash === 0) {
+      return;
+    }
+    if (!(await confirmTrash())) {
+      return;
+    }
+    try {
+      const { trashed, skipped } = await session.commitTrash();
+      const removed = trashed.map((id) => assetById.get(id)).filter((asset) => asset !== undefined);
+      animateCleanupRemoval(trashed);
+      removeAssets(trashed);
+      showRemovedToast(trashed, () => reinsertAssets(removed));
+      showSkippedToast(skipped);
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_delete_assets'));
+    }
+  };
+
+  const onFinishDay = async () => {
+    // Same guard as the Finish button: a date with no photos cannot be completed (Shift+Enter
+    // reaches here without the button's `disabled`).
+    if (busy || total === 0 || done) {
+      return;
+    }
+    if (!(await confirmTrash())) {
+      return;
+    }
+    // Counted before the commit clears the marks. Unmarked photos are left as they are, so they do
+    // not count as kept.
+    const counts = { ...session.counts };
+    const freedBytes = trashBytes;
+    let trashedCount: number;
+    try {
+      const { trashed, skipped } = await session.finishDay();
+      const removed = trashed.map((id) => assetById.get(id)).filter((asset) => asset !== undefined);
+      trashedCount = trashed.length;
+      finishedDay.set(monthDay);
+      tapHintDone.set();
+      showTapHint = false;
+      animateCleanupRemoval(trashed);
+      removeAssets(trashed);
+      showRemovedToast(trashed, () => reinsertAssets(removed));
+      showSkippedToast(skipped);
+    } catch (error) {
+      handleError(error, $t('cleanup_finish_day_failed'));
+      return;
+    }
+
+    let next: number | undefined;
+    let streak: number | undefined;
+    try {
+      const calendar = await getCleanupCalendar({ tz: browserTimeZone() });
+      next = nextUnreviewedDay(calendar.days, monthDay);
+      streak = calendar.streak;
+    } catch {
+      // The card still shows; without a next date it offers only the way back to the hub.
+    }
+    done = {
+      kept: counts.keep,
+      favorites: counts.fav,
+      trashed: trashedCount,
+      freedBytes: trashedCount > 0 ? freedBytes : 0,
+      streak,
+      next,
+    };
+  };
+
+  const goToNextDay = async () => {
+    if (done?.next === undefined) {
+      return;
+    }
+    rewindDirection.set(1);
+    await goto(CleanupRoute.rewind({ monthDay: done.next }));
+  };
+
+  const goToHub = async () => {
+    await goto(CleanupRoute.utility());
+  };
+
+  const onAssetsDelete = (ids: string[]) => {
+    for (const id of ids) {
+      session.marks.delete(id);
+    }
+    removeAssets(ids);
+  };
+
+  // Opening and closing the viewer stays on this date, so only leaving the date is guarded.
+  beforeNavigate((navigation) => {
+    if (bypassGuard || !session.hasUncommitted || navigation.willUnload) {
+      return;
+    }
+    const to = navigation.to;
+    if (to?.route.id === page.route.id && to?.params?.monthDay === String(monthDay)) {
+      return;
+    }
+    const { type, delta } = navigation;
+    navigation.cancel();
+    if (!to) {
+      return;
+    }
+    void (async () => {
+      const confirmed = await modalManager.showDialog({
+        title: $t('cleanup_unsaved_marks_title'),
+        prompt: $t('cleanup_unsaved_marks_body'),
+        confirmText: $t('leave'),
+        confirmColor: 'danger',
+      });
+      if (!confirmed) {
+        return;
+      }
+      bypassGuard = true;
+      // A cancelled back/forward leaves the history where it was, so replay the same step rather
+      // than pushing a new entry on top of it.
+      if (type === 'popstate' && delta) {
+        history.go(delta);
+      } else {
+        await goto(to.url, { replaceState: type === 'popstate' });
+      }
+    })();
+  });
+
+  const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!session.hasUncommitted) {
+      return;
+    }
+    event.preventDefault();
+    // Browsers that predate preventDefault() here only prompt when returnValue is set; the compat
+    // rule flags the (deprecated but universally supported) property itself.
+    // eslint-disable-next-line tscompat/tscompat
+    event.returnValue = '';
+  };
+
+  const openCurrentInNewTab = () => {
+    if (current) {
+      open(Route.viewAsset({ id: current.id }), '_blank', 'noopener');
+    }
+  };
+
+  const baseLegend = [
+    { keys: ['K'], label: 'cleanup_shortcut_keep' },
+    { keys: ['F'], label: 'favorite' },
+    { keys: ['Delete'], label: 'trash' },
+    { keys: ['←', '→'], label: 'cleanup_shortcut_move' },
+    { keys: ['Space'], label: 'cleanup_shortcut_open' },
+    { keys: ['Z'], label: 'undo' },
+    { keys: ['Shift+Enter'], label: 'cleanup_shortcut_finish' },
+  ] as const;
+  const legend = $derived(
+    mode === 'one' ? [...baseLegend, { keys: ['O'], label: 'cleanup_open_in_new_tab' } as const] : baseLegend,
+  );
+
+  const showShortcuts = () =>
+    modalManager.show(ShortcutsModal, {
+      shortcuts: {
+        general: [],
+        actions: legend.map(({ keys, label }) => ({ key: [...keys], action: $t(label) })),
+      },
+    });
+
+  onMount(() => {
+    if (explainerOpen) {
+      explainerSeen.set();
+    }
+  });
+
+  let root = $state<HTMLElement>();
+  let daySections = $state<HTMLElement>();
+  // Stepping to the next or previous date slides its photos in from that side.
+  onMount(() => {
+    const direction = rewindDirection.take();
+    if (direction !== 0 && daySections?.animate) {
+      daySections.animate(slideFrom(direction, 24), { duration: duration.slow, easing: ease.settle });
+    }
+  });
+
+  // "Move to trash" swells once when it first has something to do, then stays still.
+  let previousTrashCount = 0;
+  $effect(() => {
+    const count = session.counts.trash;
+    if (previousTrashCount === 0 && count > 0) {
+      const button = root?.querySelector('[data-testid="cleanup-move-to-trash"]');
+      if (button) {
+        pulse(button);
+      }
+    }
+    previousTrashCount = count;
+  });
+
+  onMount(() => {
+    if (mode === 'grid' && session.focusedId) {
+      tileFor(session.focusedId)?.focus({ preventScroll: true });
+    }
+  });
+</script>
+
+<svelte:window onbeforeunload={onBeforeUnload} />
+<svelte:document
+  use:shortcuts={cleanupShortcuts(
+    {
+      keep: () => markCurrent('keep'),
+      favorite: () => markCurrent('fav'),
+      trash: () => markCurrent('trash'),
+      left: () => step(-1),
+      right: () => step(1),
+      up: () => stepRow(-1),
+      down: () => stepRow(1),
+      open: () => void openAsset(current?.id),
+      undo: () => session.undo(),
+      finish: () => void onFinishDay(),
+      openInNewTab: mode === 'one' ? openCurrentInNewTab : undefined,
+    },
+    // Off while the viewer, any modal (the leave confirmation, the shortcuts list) or the success card is open.
+    () => assetViewerManager.isViewing || isModalOpen() || done !== null,
+  )}
+/>
+
+<OnEvents {onAssetsDelete} />
+
+{#if done}
+  <RewindDayDone
+    date={dayLabel}
+    kept={done.kept}
+    favorites={done.favorites}
+    trashed={done.trashed}
+    freedBytes={done.freedBytes}
+    streak={done.streak}
+    nextDate={done.next === undefined ? undefined : monthDayLabel(done.next, lang)}
+    onNext={() => void goToNextDay()}
+    onHub={() => void goToHub()}
+  />
+{/if}
+
+<div
+  bind:this={root}
+  class="mx-auto w-full max-w-7xl px-2 pt-2 md:px-4 pointer-coarse:pb-24"
+  data-testid="cleanup-rewind"
+>
+  <header class="mb-4 flex flex-wrap items-end gap-3">
+    <div class="min-w-0">
+      <Breadcrumbs
+        items={[
+          { title: $t('utilities'), href: Route.utilities() },
+          { title: $t('cleanup'), href: CleanupRoute.utility() },
+          { title },
+        ]}
+        separator={mdiSlashForward}
+        class="text-muted"
+      />
+      <div class="mt-1.5 flex items-center gap-3">
+        {#if flat.length > 0}
+          <div class="relative h-11 w-14 shrink-0" data-shared-element="cleanup-day-photos" aria-hidden="true">
+            {#each flat.slice(0, 3).reverse() as photo, index (photo.id)}
+              <img
+                src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail, cacheKey: photo.thumbhash })}
+                alt=""
+                draggable="false"
+                class="absolute size-10 rounded-lg border-2 border-light object-cover shadow-sm"
+                style:left="{index * 7}px"
+                style:rotate="{(index - 2) * 5}deg"
+              />
+            {/each}
+          </div>
+        {/if}
+        <Heading
+          size="large"
+          tag="h2"
+          class="tracking-tight"
+          data-testid="cleanup-rewind-heading"
+          data-shared-element="cleanup-day-title"
+        >
+          {monthDayLabel(monthDay, lang)}
+        </Heading>
+        <IconButton
+          icon={mdiInformationOutline}
+          shape="round"
+          variant="ghost"
+          color="secondary"
+          size="small"
+          class="transition-[rotate] duration-(--motion-base) ease-(--ease-settle) {explainerOpen ? 'rotate-15' : ''}"
+          aria-label={$t('cleanup_explainer_open')}
+          aria-expanded={explainerOpen}
+          data-testid="cleanup-rewind-info"
+          onclick={() => (explainerOpen = !explainerOpen)}
+        />
+      </div>
+      <p class="mt-1 text-sm text-muted tabular-nums" data-testid="cleanup-rewind-subtitle">
+        {$t('cleanup_rewind_subtitle', { values: { count: total, years: years.length } })}
+      </p>
+    </div>
+
+    <div class="ms-auto flex flex-wrap items-center gap-2">
+      <div class="inline-flex rounded-full border bg-light p-0.5" role="group">
+        {#each [{ value: 'grid', label: 'cleanup_mode_grid' }, { value: 'one', label: 'cleanup_mode_one' }] as const as option (option.value)}
+          <button
+            type="button"
+            class="rounded-full px-3 py-1 text-xs font-semibold transition-colors {mode === option.value
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted hover:text-dark'}"
+            aria-pressed={mode === option.value}
+            data-testid="cleanup-mode-{option.value}"
+            onclick={() => setMode(option.value)}
+          >
+            {$t(option.label)}
+          </button>
+        {/each}
+      </div>
+      <Button
+        href={CleanupRoute.rewind({ monthDay: previousDay })}
+        size="small"
+        variant="ghost"
+        color="secondary"
+        shape="round"
+        title={$t('previous')}
+        onclick={() => rewindDirection.set(-1)}
+        data-testid="cleanup-rewind-previous"
+      >
+        ‹ {monthDayShortLabel(previousDay, lang)}
+      </Button>
+      <Button
+        href={CleanupRoute.rewind({ monthDay: nextDay })}
+        size="small"
+        variant="ghost"
+        color="secondary"
+        shape="round"
+        title={$t('next')}
+        onclick={() => rewindDirection.set(1)}
+        data-testid="cleanup-rewind-next"
+      >
+        {monthDayShortLabel(nextDay, lang)} ›
+      </Button>
+    </div>
+  </header>
+
+  {#if explainerOpen}
+    <div class="mb-4" in:slide={slideMotion(prefersReducedMotion())} out:slide={slideMotion(prefersReducedMotion())}>
+      <div transition:fade={{ duration: prefersReducedMotion() ? 0 : 160 }}>
+        <RewindExplainer {monthDay} assets={flat} onClose={() => (explainerOpen = false)} />
+      </div>
+    </div>
+  {/if}
+
+  <div class="mb-1.5 flex flex-wrap items-center gap-3">
+    <div class="min-w-50 flex-1">
+      <div class="flex flex-wrap justify-between gap-x-3 text-xs tabular-nums">
+        <span data-testid="cleanup-rewind-progress">
+          <FormatMessage key="cleanup_reviewed_progress" values={{ done: reviewed, total }}>
+            {#snippet children({ tag, message })}
+              {#if tag === 'b'}<b>{message}</b>{:else}{message}{/if}
+            {/snippet}
+          </FormatMessage>
+        </span>
+        <span class="text-muted" data-testid="cleanup-rewind-summary">
+          {$t('cleanup_marks_summary', {
+            values: {
+              keep: session.counts.keep,
+              fav: session.counts.fav,
+              trash: session.counts.trash,
+              size: getByteUnitString(Math.round(trashBytesShown.current), lang),
+              left: Math.max(total - reviewed, 0),
+            },
+          })}
+        </span>
+      </div>
+      <div
+        class="mt-1 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={reviewed}
+      >
+        <div
+          data-testid="cleanup-rewind-progress-bar"
+          data-complete={total > 0 && reviewed >= total ? 'true' : undefined}
+          class="h-full rounded-full bg-linear-to-r from-success to-success-400 transition-[width,box-shadow] duration-(--spring-gentle-duration) ease-(--spring-gentle) data-[complete=true]:shadow-[0_0_14px_var(--color-success)]"
+          style:width="{total > 0 ? (reviewed / total) * 100 : 0}%"
+        ></div>
+      </div>
+    </div>
+    <label
+      class="inline-flex cursor-pointer items-center gap-2 rounded-full border bg-light px-3 py-1 text-xs font-medium"
+    >
+      <input type="checkbox" class="accent-primary" bind:checked={hideReviewed} data-testid="cleanup-hide-reviewed" />
+      {$t('cleanup_hide_reviewed')}
+    </label>
+  </div>
+
+  {#if showTapHint && mode === 'grid'}
+    <p
+      class="mb-2 hidden rounded-xl bg-primary/10 px-3 py-2 text-xs text-primary pointer-coarse:block"
+      data-testid="cleanup-rewind-tap-hint"
+    >
+      {$t('cleanup_tap_hint')}
+    </p>
+  {/if}
+
+  <div bind:this={daySections}>
+    {#if mode === 'grid'}
+      {#if total === 0}
+        <p class="py-16 text-center text-muted">{$t('no_assets_to_show')}</p>
+      {/if}
+      {#each sections as section (section.year)}
+        <RewindYearSection
+          year={section.year}
+          yearsAgo={currentYear - section.year}
+          count={section.count}
+          city={section.city}
+          assets={section.visible}
+          marks={session.marks}
+          focusedId={session.focusedId}
+          onCycle={(id) => {
+            session.focusedId = id;
+            session.cycle(id);
+          }}
+          onOpen={onTileOpen}
+          {onKeepRemaining}
+        />
+      {/each}
+      {#if unloadedCount > 0}
+        <div use:observeSentinel class="grid place-items-center py-6" data-testid="cleanup-rewind-sentinel">
+          <span class="h-3 w-40 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></span>
+        </div>
+      {:else if total > 0}
+        <!-- The end of the day's photos: finish here, without scrolling back up to a button. -->
+        <div
+          class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed px-4 py-6 text-center"
+          data-testid="cleanup-rewind-end"
+        >
+          <p class="text-sm text-muted">{$t('cleanup_end_of_day', { values: { date: dayLabel } })}</p>
+          <CleanupFinishButton label={finishLabel} disabled={busy} loading={busy} onclick={() => void onFinishDay()} />
+        </div>
+      {/if}
+    {:else}
+      <RewindOneAtATime
+        asset={current}
+        mark={current ? session.marks.get(current.id) : undefined}
+        index={Math.max(focusedIndex, 0) + 1}
+        total={flat.length}
+        upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
+        marks={session.marks}
+        inBurst={current ? burstIds.has(current.id) : false}
+        onTrash={() => markCurrent('trash')}
+        onSkip={() => step(1)}
+        onFavorite={() => markCurrent('fav')}
+        onKeep={() => markCurrent('keep')}
+        onSelect={(id) => void focusAsset(id)}
+        onOpen={(id) => void openAsset(id)}
+      />
+    {/if}
+  </div>
+
+  <div
+    class="sticky bottom-3 z-10 my-5 flex flex-wrap items-center gap-3.5 rounded-3xl border bg-light/85 px-4 py-2.5 text-xs shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md pointer-coarse:fixed pointer-coarse:inset-x-3 pointer-coarse:bottom-[max(0.75rem,env(safe-area-inset-bottom))] pointer-coarse:my-0 pointer-coarse:gap-2 pointer-coarse:px-3"
+    data-motion-reveal
+    data-testid="cleanup-rewind-actionbar"
+  >
+    <!-- Touch screens have no keyboard, so the legend only shows with a mouse or trackpad. -->
+    <div class="hidden flex-wrap items-center gap-3 text-muted pointer-fine:flex">
+      {#each legend as item (item.label)}
+        <span class="inline-flex items-center gap-1">
+          {#each item.keys as key (key)}
+            <kbd class="rounded-[5px] border border-b-2 bg-light px-1.5 font-mono text-[11px] text-dark">{key}</kbd>
+          {/each}
+          {$t(item.label)}
+        </span>
+      {/each}
+      <IconButton
+        shape="round"
+        variant="ghost"
+        color="secondary"
+        size="small"
+        icon={mdiKeyboard}
+        aria-label={$t('show_keyboard_shortcuts')}
+        title={$t('show_keyboard_shortcuts')}
+        onclick={showShortcuts}
+      />
+    </div>
+    <div
+      class="flex w-full items-center justify-end gap-2 pointer-fine:ms-auto pointer-fine:w-auto pointer-fine:flex-wrap"
+    >
+      <span class="hidden text-muted tabular-nums pointer-fine:inline">
+        {$t('cleanup_marked_for_trash', { values: { count: session.counts.trash } })}
+      </span>
+      <!-- Phones have no Z key, so Undo is a button, with the counts beside it. -->
+      <IconButton
+        class="pointer-fine:hidden"
+        shape="round"
+        variant="ghost"
+        color="secondary"
+        size="small"
+        icon={mdiUndo}
+        aria-label={$t('undo')}
+        disabled={!session.hasUncommitted}
+        onclick={() => session.undo()}
+        data-testid="cleanup-rewind-undo"
+      />
+      <span class="min-w-0 flex-1 truncate text-muted tabular-nums pointer-fine:hidden">
+        {$t('cleanup_bar_summary', {
+          values: { kept: session.counts.keep + session.counts.fav, trash: session.counts.trash },
+        })}
+      </span>
+      <!-- Finishing trashes the marked photos too, so phones keep only the Finish button. -->
+      <Button
+        class="hidden pointer-fine:inline-flex"
+        size="small"
+        color="danger"
+        disabled={busy || session.counts.trash === 0}
+        loading={busy}
+        onclick={() => void onMoveToTrash()}
+        data-testid="cleanup-move-to-trash"
+      >
+        {$t('cleanup_move_to_trash', { values: { count: session.counts.trash } })}
+      </Button>
+      <CleanupFinishButton
+        label={finishLabel}
+        size="small"
+        disabled={busy || total === 0}
+        loading={busy}
+        onclick={() => void onFinishDay()}
+        testId="cleanup-finish-day"
+      />
+    </div>
+  </div>
+</div>

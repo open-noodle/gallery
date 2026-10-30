@@ -1,0 +1,173 @@
+<!doctype html><html><head><meta charset="utf-8"><title>cleanup bursts mockup</title></head><body style="background:#0f1012;margin:0;padding:24px">
+<style>
+  .gx { --bg:#0f1012; --card:#18191c; --card2:#1f2024; --line:#2a2b30; --mut:#8b8e96; --txt:#eceef2; --pri:#adcbfa; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24;
+        background:var(--bg); color:var(--txt); font:14px/1.4 Inter,system-ui,sans-serif; border-radius:14px; padding:22px; }
+  .gx * { box-sizing:border-box; }
+  .gx .mut { color:var(--mut); }
+  .gx .row { display:flex; gap:12px; align-items:center; }
+  .gx .card { background:var(--card); border:1px solid var(--line); border-radius:18px; }
+  .gx .btn { background:var(--pri); color:#0b1630; border-radius:999px; padding:9px 16px; font-weight:600; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; font-size:13px; }
+  .gx .ghost { border:1px solid var(--line); border-radius:999px; padding:7px 13px; color:var(--txt); font-size:13px; white-space:nowrap; }
+  .gx kbd { font:11px ui-monospace,monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:0 5px; background:var(--card2); color:var(--txt); }
+  /* A burst = the same scene with small shifts; some frames soft. */
+  .gx .f { position:relative; overflow:hidden; border-radius:12px; background:#000; }
+  .gx .f img { width:100%; height:100%; object-fit:cover; display:block; }
+  .gx .f.trash img { filter:grayscale(1) brightness(.45); }
+  .gx .f.keep { box-shadow:inset 0 0 0 3px var(--ok); }
+  .gx .f.cur { outline:3px solid var(--pri); outline-offset:2px; }
+  .gx .tag { position:absolute; left:6px; top:6px; font-size:10px; font-weight:700; padding:2px 6px; border-radius:6px; background:var(--warn); color:#1a1300; letter-spacing:.04em; }
+  .gx .chk { position:absolute; right:6px; top:6px; width:20px; height:20px; border-radius:50%; background:var(--ok); color:#06210f; display:grid; place-items:center; font-size:12px; font-weight:800; }
+  .gx .x { position:absolute; inset:0; display:grid; place-items:center; color:#fecaca; font-size:10px; font-weight:800; letter-spacing:.1em; }
+  .gx .meter { height:4px; border-radius:9px; background:#2a2c33; overflow:hidden; margin-top:5px; }
+  .gx .meter i { display:block; height:100%; background:var(--ok); }
+</style>
+
+<h2>Bursts & series: three ways to see the frames bigger</h2>
+<p class="subtitle">All three keep today's logic: the sharpest frame is suggested, you pick the frames to keep, the rest go to trash, or you stack the series instead. They differ in how big the frames get and how many series you see at once.</p>
+
+<div class="options">
+
+<!-- A: hero + filmstrip inline -->
+<div class="option" data-choice="a" onclick="toggleSelect(this)">
+  <div class="letter">A</div>
+  <div class="content" style="width:100%">
+    <h3>Big frame + filmstrip, in the list</h3>
+    <p>Each series shows its current frame large, with the whole series as a filmstrip underneath. Hovering or using ← → swaps the big frame, so you compare at full size. The list still scrolls through every series.</p>
+    <div class="gx" style="margin-top:12px">
+      <div class="card" style="padding:16px">
+        <div class="row" style="justify-content:space-between; margin-bottom:12px">
+          <div><b style="font-size:16px">8 photos · 4 seconds</b> <span class="mut">· 12 Aug 2023, 14:02 · Lisbon</span></div>
+          <div class="row" style="gap:8px"><span class="ghost">Keep all</span><span class="ghost">Stack instead</span><span class="btn">Keep 2 · trash 6</span></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 220px; gap:14px">
+          <div class="f" style="aspect-ratio:3/2"><img src="https://picsum.photos/id/1025/900/600" style="object-position:48% 50%"><span class="tag">★ SHARPEST</span><span class="chk">✓</span>
+            <div style="position:absolute; left:10px; bottom:10px; background:rgba(0,0,0,.6); border-radius:8px; padding:4px 8px; font-size:12px">Frame 3 of 8 · 14:02:01.4</div></div>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px">
+            <div class="card" style="padding:12px; background:var(--card2)">
+              <div class="mut" style="font-size:11px">SHARPNESS</div>
+              <div>Frame 3 <span class="mut">· best</span><div class="meter"><i style="width:96%"></i></div></div>
+              <div style="margin-top:6px">Frame 5<div class="meter"><i style="width:81%"></i></div></div>
+              <div style="margin-top:6px">Frame 1<div class="meter"><i style="width:44%; background:var(--warn)"></i></div></div>
+            </div>
+            <div class="mut">Click the big photo or press <kbd>K</kbd> to keep this frame. <kbd>←</kbd><kbd>→</kbd> change frame.</div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:10px">
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=2" style="object-position:30% 50%"><span class="x">TRASH</span></div>
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=1" style="object-position:38% 50%"><span class="x">TRASH</span></div>
+          <div class="f keep cur" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300" style="object-position:48% 50%"><span class="chk">✓</span></div>
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=1" style="object-position:55% 48%"><span class="x">TRASH</span></div>
+          <div class="f keep" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300" style="object-position:60% 52%"><span class="chk">✓</span></div>
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=2" style="object-position:66% 50%"><span class="x">TRASH</span></div>
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=3" style="object-position:72% 46%"><span class="x">TRASH</span></div>
+          <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/300/300?blur=1" style="object-position:80% 50%"><span class="x">TRASH</span></div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px; margin-top:12px; opacity:.6"><span class="mut">Next series: 5 photos · 2 seconds…</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- B: focus mode one series at a time -->
+<div class="option" data-choice="b" onclick="toggleSelect(this)">
+  <div class="letter">B</div>
+  <div class="content" style="width:100%">
+    <h3>Focus mode: one series at a time</h3>
+    <p>Like rewind's one-at-a-time mode: one series fills the screen with a filmstrip, and confirming moves straight to the next. The fastest way through 31 series; the list view stays available as the default.</p>
+    <div class="gx" style="margin-top:12px; background:#0b0c0e">
+      <div class="row" style="justify-content:space-between">
+        <div class="row"><span class="ghost">‹ Bursts</span><b>Series 3 of 31</b><span class="mut">· saves 640 MB in total</span></div>
+        <span class="mut" style="font-size:12px">12 Aug 2023 · Lisbon · 8 photos in 4 s</span>
+      </div>
+      <div style="height:5px; border-radius:9px; background:#26282e; margin:12px 0 16px"><div style="width:9%; height:100%; background:var(--ok); border-radius:9px"></div></div>
+      <div class="f" style="aspect-ratio:16/9; max-height:420px; margin:0 auto"><img src="https://picsum.photos/id/1025/1280/720" style="object-position:48% 50%"><span class="tag" style="font-size:12px; padding:4px 8px">★ SHARPEST</span>
+        <span style="position:absolute; left:50%; bottom:14px; translate:-50% 0; display:flex; gap:10px">
+          <span class="btn" style="background:var(--ok); color:#06210f">✓ Keep this frame <kbd>K</kbd></span>
+        </span>
+        <span style="position:absolute; left:12px; top:50%; translate:0 -50%; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,.55); display:grid; place-items:center; font-size:20px">‹</span>
+        <span style="position:absolute; right:12px; top:50%; translate:0 -50%; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,.55); display:grid; place-items:center; font-size:20px">›</span>
+      </div>
+      <div style="display:flex; gap:6px; justify-content:center; margin-top:12px">
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=2" style="object-position:30% 50%"></div>
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=1" style="object-position:38% 50%"></div>
+        <div class="f keep cur" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150" style="object-position:48% 50%"></div>
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=1" style="object-position:55% 48%"></div>
+        <div class="f keep" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150" style="object-position:60% 52%"></div>
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=2" style="object-position:66% 50%"></div>
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=3" style="object-position:72% 46%"></div>
+        <div class="f trash" style="width:76px; height:56px"><img src="https://picsum.photos/id/1025/200/150?blur=1" style="object-position:80% 50%"></div>
+      </div>
+      <div class="row" style="justify-content:center; margin-top:16px; gap:10px">
+        <span class="ghost">Keep all</span><span class="ghost">Stack instead</span><span class="ghost">Skip</span>
+        <span class="btn">Keep 2 · trash 6 → next <kbd style="background:transparent;color:#0b1630;border-color:#0b163055">Enter</kbd></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- C: side-by-side compare -->
+<div class="option" data-choice="c" onclick="toggleSelect(this)">
+  <div class="letter">C</div>
+  <div class="content" style="width:100%">
+    <h3>Side-by-side compare</h3>
+    <p>The suggested best frame sits on the left and the frame you're looking at on the right, both large, with a zoom that stays in sync so you can check eyes or text at 100%. Good for picking between near-identical frames.</p>
+    <div class="gx" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between; margin-bottom:12px">
+        <div><b>8 photos · 4 seconds</b> <span class="mut">· 12 Aug 2023 · Lisbon</span></div>
+        <div class="row" style="gap:8px"><span class="ghost">🔍 Zoom 100%</span><span class="ghost">Stack instead</span><span class="btn">Keep 2 · trash 6</span></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+        <div>
+          <div class="f keep" style="aspect-ratio:4/3"><img src="https://picsum.photos/id/1025/800/600" style="object-position:48% 40%; transform:scale(1.6)"><span class="tag">★ SHARPEST</span><span class="chk">✓</span></div>
+          <div class="mut" style="font-size:12px; margin-top:6px">Frame 3 · suggested · kept</div>
+        </div>
+        <div>
+          <div class="f trash" style="aspect-ratio:4/3"><img src="https://picsum.photos/id/1025/800/600?blur=1" style="object-position:55% 40%; transform:scale(1.6)"><span class="x" style="font-size:13px">TRASH</span></div>
+          <div class="mut" style="font-size:12px; margin-top:6px">Frame 4 · slightly soft · <kbd>K</kbd> keep instead · <kbd>←</kbd><kbd>→</kbd> next frame</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:10px">
+        <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=2" style="object-position:30% 50%"></div>
+        <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=1" style="object-position:38% 50%"></div>
+        <div class="f keep" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200" style="object-position:48% 50%"></div>
+        <div class="f trash cur" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=1" style="object-position:55% 48%"></div>
+        <div class="f keep" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200" style="object-position:60% 52%"></div>
+        <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=2" style="object-position:66% 50%"></div>
+        <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=3" style="object-position:72% 46%"></div>
+        <div class="f trash" style="aspect-ratio:1"><img src="https://picsum.photos/id/1025/200/200?blur=1" style="object-position:80% 50%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<h3 style="margin-top:28px">And in every option: open any frame to see it with its details</h3>
+<p class="subtitle">Each frame gets an expand button (and Space on the focused frame). It opens the same photo window as the Blurry and Screenshots queues: the photo large, its details, and a link to open it in a new tab. Inside a series, ← → step through that series' frames and K / Delete keep or trash the frame shown.</p>
+<div class="gx">
+  <div class="card" style="display:grid; grid-template-columns:1fr 300px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.6)">
+    <div style="position:relative; background:#000; min-height:420px; display:grid; place-items:center">
+      <img src="https://picsum.photos/id/1025/1000/700" style="width:100%; height:100%; object-fit:contain; display:block">
+      <span class="tag" style="font-size:12px; padding:4px 8px">★ SHARPEST</span>
+      <span style="position:absolute; left:12px; top:50%; translate:0 -50%; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,.55); display:grid; place-items:center; font-size:20px">‹</span>
+      <span style="position:absolute; right:12px; top:50%; translate:0 -50%; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,.55); display:grid; place-items:center; font-size:20px">›</span>
+      <span style="position:absolute; left:12px; bottom:12px; background:rgba(0,0,0,.6); border-radius:8px; padding:4px 8px; font-size:12px">Frame 3 of 8</span>
+    </div>
+    <div style="padding:18px; display:flex; flex-direction:column; gap:14px">
+      <div class="row" style="justify-content:space-between"><b style="font-size:15px">Frame 3</b><span class="mut" style="font-size:18px">×</span></div>
+      <div style="font-size:13px; display:grid; gap:9px">
+        <div>📅 Sat 12 Aug 2023, 14:02:01</div>
+        <div>📍 Lisbon, Portugal</div>
+        <div>📷 Pixel 7 · f/1.9 · 1/500 s · ISO 50</div>
+        <div>🖼 PXL_20230812_140201.jpg · 4080×3072 · 3.4 MB</div>
+        <div>👤 Pierre, Anna</div>
+        <div>📚 In album "Portugal 2023"</div>
+        <div><span class="mut" style="font-size:11px">SHARPNESS</span><div class="meter"><i style="width:96%"></i></div><span class="mut" style="font-size:12px">Sharpest of the 8</span></div>
+      </div>
+      <div class="row" style="gap:8px; flex-wrap:wrap"><span class="ghost">↗ Open in new tab <kbd>O</kbd></span><span class="ghost">Open in viewer</span></div>
+      <div class="row" style="gap:8px; margin-top:auto"><span class="btn" style="background:var(--ok); color:#06210f">✓ Keep <kbd>K</kbd></span><span class="btn" style="background:#7f1d1d; color:#fecaca">Trash <kbd>Del</kbd></span></div>
+      <div class="mut" style="font-size:11.5px"><kbd>←</kbd><kbd>→</kbd> frames · <kbd>Esc</kbd> close</div>
+    </div>
+  </div>
+</div>
+</body></html>
