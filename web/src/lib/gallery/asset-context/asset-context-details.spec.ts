@@ -1,5 +1,5 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import SuggestionAssetDetails from '#lib/gallery/people/suggestion-asset-details.svelte';
+import SuggestionAssetDetails from '#lib/gallery/asset-context/asset-context-details.svelte';
 import type { AlbumResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/svelte';
