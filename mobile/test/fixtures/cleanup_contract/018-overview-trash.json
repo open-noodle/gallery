@@ -1,0 +1,18 @@
+{
+  "description": "The trash total under the quick wins",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/trash"
+  },
+  "response": {
+    "body": {
+      "bytes": 0,
+      "count": 0
+    },
+    "status": 200
+  }
+}

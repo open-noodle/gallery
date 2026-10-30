@@ -1,0 +1,126 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mobile cleanup mockup: 3-queues</title><style>body{background:#f4f5f8;font-family:system-ui,sans-serif;padding:24px;color:#14161c}h2{margin:0 0 4px}.subtitle{opacity:.7;margin:0 0 20px}.options{display:none}</style></head><body>
+<style>
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:290px}
+  .cap{font-size:13px;opacity:.75;text-align:center;line-height:1.4}
+  .cap b{opacity:1;display:block;font-size:14px;margin-bottom:2px}
+  .phone{width:260px;height:540px;border-radius:38px;background:#0d0f14;border:8px solid #1d2028;position:relative;overflow:hidden;color:#eef0f5;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .sb{height:26px;font-size:11px;display:flex;justify-content:space-between;padding:6px 18px 0;opacity:.8}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px;font-size:12px}
+  .prog{height:3px;background:#2a2e3a;border-radius:3px;margin:6px 14px}
+  .prog i{display:block;height:100%;background:#5b6cff;border-radius:3px}
+  .card{position:absolute;left:14px;right:14px;top:66px;bottom:100px;border-radius:22px;background-size:cover;background-position:center;box-shadow:0 12px 30px rgba(0,0,0,.5);overflow:hidden}
+  .card.back{transform:scale(.94) translateY(12px);opacity:.5;filter:brightness(.7)}
+  .meta{position:absolute;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,rgba(0,0,0,.88));font-size:11px}
+  .meta b{font-size:14px;display:block}
+  .chip{display:inline-block;background:rgba(255,255,255,.14);border-radius:999px;padding:2px 7px;font-size:10px;margin:4px 3px 0 0}
+  .sig{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);border-radius:999px;padding:4px 9px;font-size:10px;font-weight:600}
+  .acts{position:absolute;left:0;right:0;bottom:22px;display:flex;justify-content:center;gap:14px;align-items:center}
+  .ab{width:46px;height:46px;border-radius:50%;background:#1a1d25;display:grid;place-items:center;font-size:18px;border:1.5px solid #2a2e3a}
+  .ab.s{width:36px;height:36px;font-size:14px}
+  .del{color:#ff5a6a}.keep{color:#2fbf71}.fav{color:#ff4d8d}
+  .bar{height:5px;border-radius:3px;background:#2a2e3a;margin-top:5px;width:120px}.bar i{display:block;height:100%;border-radius:3px}
+  .film{position:absolute;left:10px;right:10px;bottom:6px;display:flex;gap:4px}
+  .film div{flex:1;height:36px;border-radius:6px;background-size:cover;background-position:center;position:relative}
+  .film .x{filter:grayscale(1) brightness(.55)}
+  .film .k{outline:2px solid #2fbf71}
+  .film .cur{outline:2px solid #fff}
+  .cal{padding:0 12px}
+  .months{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px}
+  .m{font-size:9px;opacity:.7}
+  .m .d{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:3px}
+  .m .d i{aspect-ratio:1;border-radius:2px;background:#22252e}
+  .g{background:#2fbf71!important}.p1{background:#34407f!important}.p2{background:#5b6cff!important}.p3{background:#8f9bff!important}.t{outline:1.5px solid #fff}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:#171a22;border-radius:20px 20px 0 0;padding:12px 14px 20px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
+  .grab{width:36px;height:4px;border-radius:2px;background:#3a3e4a;margin:0 auto 10px}
+  .thumbs{display:flex;gap:4px;margin:8px 0}.thumbs div{flex:1;height:44px;border-radius:6px;background-size:cover}
+  .cta{margin-top:6px;background:#5b6cff;border-radius:999px;padding:9px;text-align:center;font-weight:600;font-size:12px}
+</style>
+
+<h2>Every queue in the same deck</h2>
+<p class="subtitle">Same gestures, same buttons, same info strip. Each queue adds only its own signal on the card.</p>
+
+<div class="row">
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>Blurry · 12 of 87</b><span>⚙</span></div>
+      <div class="prog"><i style="width:14%"></i></div>
+      <div class="card back" style="background-image:url(https://picsum.photos/seed/b2/400/600?blur=4)"></div>
+      <div class="card" style="background-image:url(https://picsum.photos/seed/b1/400/600?blur=3)">
+        <div class="sig">◌ Blurry</div>
+        <div class="meta"><b>12 Mar 2021</b>Berlin · 21:05
+          <div class="bar"><i style="width:22%;background:#ff9f43"></i></div><span style="font-size:9px;opacity:.7">Sharpness 22 / 100</span><br>
+          <span class="chip">3.1 MB</span><span class="chip">ⓘ Details</span></div>
+      </div>
+      <div class="acts"><div class="ab s">↶</div><div class="ab del">✕</div><div class="ab fav">♥</div><div class="ab keep">✓</div><div class="ab s">⤢</div></div>
+    </div>
+    <div class="cap"><b>Blurry</b>The reason (Blurry, Too dark, Too bright) as a badge, plus a sharpness bar. ⚙ holds the strictness and reason filters from web.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>Screenshots · 40 of 312</b><span>⚙</span></div>
+      <div class="prog"><i style="width:13%"></i></div>
+      <div class="card" style="background:#1a1d25">
+        <div style="position:absolute;left:50%;top:10px;bottom:70px;transform:translateX(-50%);aspect-ratio:9/19.5;border-radius:12px;background:url(https://picsum.photos/seed/s1/300/650) center/cover"></div>
+        <div class="sig">▭ Screenshot</div>
+        <div class="meta"><b>3 Jun 2023</b>14:12 · 1170×2532<br><span class="chip">820 KB</span><span class="chip">ⓘ Details</span></div>
+      </div>
+      <div class="acts"><div class="ab s">↶</div><div class="ab del">✕</div><div class="ab fav">♥</div><div class="ab keep">✓</div><div class="ab s">⤢</div></div>
+    </div>
+    <div class="cap"><b>Screenshots</b>Shown whole, never cropped, so you can read them. Same swipes.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>✕</span><b>Bursts · 3 of 24</b><span>⚙</span></div>
+      <div class="prog"><i style="width:12%"></i></div>
+      <div class="card" style="background:#000">
+        <div style="position:absolute;inset:0 0 50px;background:url(https://picsum.photos/seed/bu3/400/500) center/cover"></div>
+        <div class="sig">★ Sharpest · frame 3 of 6</div>
+        <div class="meta" style="bottom:48px"><b>8 Aug 2022 · 6 photos in 2 s</b>Kraków<br><span class="chip">Keep 1 · trash 5 (18 MB)</span></div>
+        <div class="film">
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu1/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu2/100)"></div>
+          <div class="k cur" style="background-image:url(https://picsum.photos/seed/bu3/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu4/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu5/100)"></div>
+          <div class="x" style="background-image:url(https://picsum.photos/seed/bu6/100)"></div>
+        </div>
+      </div>
+      <div class="acts"><div class="ab s">↶</div><div class="ab del" style="font-size:11px;width:56px;border-radius:23px">all ✕</div><div class="ab keep" style="font-size:11px;width:70px;border-radius:23px">✓ as set</div><div class="ab s">▤</div></div>
+    </div>
+    <div class="cap"><b>Bursts: one card per series</b>Big frame plus a filmstrip. The sharpest frame starts kept, the rest marked for trash. Tap a thumbnail to flip its mark. Swipe right accepts the marks as set. Swipe left trashes the whole series. ▤ = stack instead.</div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>●●●</span></div>
+      <div class="top"><span>‹</span><b>Your year</b><span style="opacity:.6">61 / 366</span></div>
+      <div class="cal">
+        <div class="months">
+          <div class="m">Jan<div class="d"><i class="g"></i><i class="g"></i><i class="p1"></i><i class="p2"></i><i></i><i class="g"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p2"></i><i class="g"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p3"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i></div></div>
+          <div class="m">Feb<div class="d"><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i><i class="p1"></i><i class="g"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p3"></i><i class="g"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i></div></div>
+          <div class="m">Mar<div class="d"><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i></div></div>
+          <div class="m" style="opacity:1;font-weight:700">Oct<div class="d"><i class="g"></i><i class="g"></i><i class="g"></i><i class="p1"></i><i class="g"></i><i class="g"></i><i class="p2"></i><i class="g"></i><i class="g"></i><i></i><i class="g"></i><i class="g"></i><i class="p1"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="p3"></i><i class="g"></i><i class="g"></i><i></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="t p2"></i></div></div>
+          <div class="m">Nov<div class="d"><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i></div></div>
+          <div class="m">Dec<div class="d"><i class="p2"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p1"></i><i class="p1"></i><i class="p2"></i><i class="p1"></i><i></i><i class="p1"></i><i class="p3"></i><i class="p1"></i><i class="p3"></i><i class="p3"></i><i class="p1"></i><i></i><i class="p1"></i></div></div>
+        </div>
+        <div style="font-size:9px;opacity:.6;margin-top:8px">■ reviewed &nbsp; ■ photos to review (darker = fewer) &nbsp; □ none</div>
+      </div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div style="font-size:10px;color:#9fb0ff;letter-spacing:.06em">18 OCTOBER</div>
+        <div style="font-weight:700;font-size:15px">63 photos from 8 years</div>
+        <div class="thumbs"><div style="background-image:url(https://picsum.photos/seed/c1/100)"></div><div style="background-image:url(https://picsum.photos/seed/c2/100)"></div><div style="background-image:url(https://picsum.photos/seed/c3/100)"></div><div style="background-image:url(https://picsum.photos/seed/c4/100)"></div></div>
+        <div class="cta">Rewind this day</div>
+      </div>
+    </div>
+    <div class="cap"><b>Your year</b>The full calendar on its own screen. Tapping a day slides up a preview sheet with its photos and "Rewind this day", so you can browse before committing.</div>
+  </div>
+</div>
+
+</body></html>

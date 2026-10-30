@@ -1,0 +1,21 @@
+{
+  "description": "The same probe on a Gallery server without Library Cleanup: 404",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "cleanup-contract"
+    },
+    "method": "GET",
+    "path": "/api/cleanup/calendar",
+    "query": {
+      "tz": "Europe/Lisbon"
+    }
+  },
+  "response": {
+    "body": {
+      "message": "Cannot GET /api/cleanup/calendar?tz=Europe%2FLisbon"
+    },
+    "status": 404
+  },
+  "responseView": "no-cleanup"
+}
