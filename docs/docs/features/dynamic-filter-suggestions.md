@@ -36,7 +36,7 @@ A filter section only appears when it can change what you are looking at.
 
 A section holding an active filter is never hidden or greyed, so you can always undo a selection.
 
-The mobile app follows the same rules in its search mode, which opens from the search button: a filter chip or Filters section that could never filter anything is hidden, and one that your current filters have emptied is greyed out and cannot be tapped.
+The mobile app follows the same rules in its search mode, which opens from the search button: a filter chip or Filters section that could never filter anything is hidden, and one that your current filters have emptied is greyed out and cannot be tapped. See [Searching in the Mobile App](/features/mobile-search).
 
 ## Orphaned selections
 
