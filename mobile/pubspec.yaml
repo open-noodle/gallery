@@ -63,6 +63,7 @@ dependencies:
   punycode: ^1.0.0
   scroll_date_picker: ^3.8.0
   scrollable_positioned_list: ^0.3.8
+  sensors_plus: ^7.1.1
   share_handler: ^0.0.25
   share_plus: ^10.1.4
   sliver_tools: ^0.2.12
@@ -128,6 +129,8 @@ flutter:
   assets:
     - assets/
     - assets/feature_message/
+  shaders:
+    - shaders/spatial_scene.frag
   fonts:
     - family: GoogleSans
       fonts:

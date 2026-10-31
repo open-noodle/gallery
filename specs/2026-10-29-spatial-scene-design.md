@@ -6,7 +6,8 @@
 ## Summary
 
 Apple Photos (iOS 26) offers **Spatial Scene** on suitable photos: a button that turns an ordinary 2D photo into a
-3D-looking scene whose layers shift as the phone is tilted. Gallery gains the same option on the web.
+3D-looking scene whose layers shift as the phone is tilted. Gallery gains the same option on the web and in the mobile
+app.
 
 A monocular depth model runs once per photo at upload, alongside face detection, OCR and pet detection. Its output, a
 small greyscale depth map, is stored next to the asset's thumbnails, together with a few numbers describing how well the
@@ -14,7 +15,7 @@ photo separates into foreground and background. The asset viewer offers a **Spat
 test (or on every photo, if the admin chooses), and renders the parallax in a WebGL shader driven by the pointer, the
 device's tilt or a gentle idle sway.
 
-v1 is web-only and does no generative fill. The cost of that is visible stretching at the edges of the subject when the
+v1 shipped on the web; the mobile app followed (see Mobile app). Neither does generative fill. The cost of that is visible stretching at the edges of the subject when the
 scene moves. v1 keeps it small by limiting the movement and keeping the subject still. Filling the hidden background
 is phase 2.
 
@@ -26,7 +27,7 @@ is phase 2.
 | Offered only on photos it judges suitable (clear subject)                       | Same, from depth-map statistics; admin can offer it on all    |
 | Gyroscope-driven parallax in Photos and on the Lock Screen                      | Pointer on desktop, gyroscope on phone browsers, idle sway    |
 | Generative fill of the background revealed behind the subject                   | Not in v1: edge dilation and limited movement (phase 2: fill) |
-| iPhone app                                                                      | Web only (mobile app is phase 3)                              |
+| iPhone app                                                                      | Web, then the Gallery mobile app (iOS and Android)            |
 
 This is **not** Apple's _spatial photos_ (stereo HEIC pairs captured by an iPhone 15 Pro or later for Vision Pro).
 Displaying those would be a separate feature: they already contain both views and need no depth model.
@@ -43,7 +44,6 @@ Displaying those would be a separate feature: they already contain both views an
 
 **Non-goals (v1)**
 
-- Mobile app support.
 - Generative or learned fill of revealed background.
 - Videos, panoramas (equirectangular / `.insp`) and spatial (stereo) HEIC.
 - Exporting a spatial scene as a video or Live Photo.
@@ -289,6 +289,10 @@ them.
   already receives, so it needs no extra query. The field is declared once, as an extension of `AssetResponseDto` in a fork
   DTO. Stock clients ignore unknown fields, and the timeline's bulk responses stay unchanged, so the cost is one join on
   a call the viewer already makes.
+- **`spatialScene` in `GET /server/features`**, optional, true when the feature is enabled (`isSpatialSceneEnabled`).
+  Spread into `ServerFeaturesSchema` from the fork DTO and into `getFeatures` from `src/gallery/utils/spatial-scene.ts`.
+  The mobile app reads it before asking for any asset's flag, because its viewer does not otherwise call
+  `GET /assets/{id}`.
 
 ### Config
 
@@ -352,6 +356,48 @@ A single WebGL2 full-screen quad samples the preview image and the depth map:
 The preview image (not the original) is the colour source: it is already loaded by the viewer, and the depth map's
 resolution would not do justice to an original anyway.
 
+## Mobile app
+
+### Placement
+
+- **Flag.** The app's local database is filled by sync, which carries no `spatialScene`. So the viewer asks
+  `GET /server/features` at most every five minutes (`spatialSceneEnabledProvider`), and only when that says the feature is
+  on, `GET /assets/{id}` for each photo shown (`spatialSceneOfferedProvider`), the same endpoint the people strip uses for
+  assets the viewer does not own. A server that predates the feature flag, or a stock Immich server whose features do not
+  decode, counts as off, and the app makes no per-photo request.
+- **Toggle.** `SpatialSceneToggleButton`, a round button beside the OCR toggle in the viewer's bottom bar (one line in
+  `bottom_bar.widget.dart`). The state is `spatialSceneAssetProvider`, the remote id of the photo the view is on, like the
+  web's `spatialSceneState`.
+- **Viewer.** `SpatialSceneOverlay`, one `Positioned.fill` line in `asset_page.widget.dart`'s stack, right above the photo.
+  It renders nothing unless its photo is the active one. It ignores touches, so swiping, tapping for the controls and
+  dragging up for the details keep working, and swiping to another photo leaves the view. If the preview or the map
+  fails to load, it shows a toast and returns to the photo.
+- Everything else lives in `mobile/lib/gallery/spatial/` and `mobile/shaders/spatial_scene.frag`.
+
+### Rendering
+
+The web viewer's pipeline, ported one to one: `depth.dart` is `depth.ts` (`subjectDepth`, `dilate`, the spring), with
+the same tests, and `spatial_scene.frag` is the same fragment shader in Flutter's runtime-effect GLSL, compiled by
+`impellerc` for Metal, Vulkan and GLES. The preview and the depth map load through `RemoteImageProvider`, so they use the
+app's HTTP client, auth headers and client certificates; the map is filtered in an isolate.
+
+- **Input.** Tilt, from the accelerometer's gravity vector via `sensors_plus` (`tilt.dart`): roll and pitch relative to
+  how the phone was held when the view opened, smoothed, with the web's 20° range. Gravity gives the tilt without the
+  gyroscope's drift. Finger drag is not used, because the viewer's swipe and drag gestures own the touch.
+- **Idle sway** after 2.5 s in which the tilt changes less than 3% of the range, which a held phone always does. Off when
+  the system asks for reduced motion (`MediaQuery.disableAnimations`).
+- **iOS purpose string.** `sensors_plus` links `CMAltimeter`, so `Info.plist` carries `NSMotionUsageDescription`. Reading
+  the accelerometer shows no permission prompt.
+
+### Version pairings
+
+| App            | Server                         | What the viewer does                                                     |
+| -------------- | ------------------------------ | ------------------------------------------------------------------------ |
+| With the toggle | With the features flag         | Offers it on photos the server marks                                     |
+| With the toggle | Gallery from before the flag   | No button, no extra requests                                             |
+| With the toggle | Stock Immich                   | No button, no extra requests                                             |
+| Without it      | Any                            | Unchanged: the new features field is optional and ignored                |
+
 ## Layering compliance
 
 | Rule                                 | How this design meets it                                                                                     |
@@ -360,7 +406,7 @@ resolution would not do justice to an original anyway.
 | 2. Stock Immich keeps working        | New endpoint and an ignored extra field only; no sync stream changes.                                         |
 | 3. Switching back stays safe         | `revert-to-immich.sql` drops the table; `down()` drops it too (derived data, regenerated by the backfill). Leftover `_depth.png` files are inert. |
 | 4. Prefer Immich's code              | Reuses the ML `/predict` pipeline, the job queue, `backendMedia` and the thumbnail path scheme.              |
-| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension. |
+| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension each for the asset and the server features. Mobile: one button line, one overlay line, the shader and dependency in `pubspec.yaml`, the purpose string. |
 
 ## i18n
 
@@ -380,6 +426,10 @@ into `i18n/gallery/en.json` and the nine maintained locales in the same commit.
   seeding a row.
 - **Web:** `SpatialSceneViewer` falls back cleanly without WebGL2; the button follows `asset.spatialScene`; the flag
   clears on navigation.
+- **Mobile:** `depth_test.dart` mirrors `depth.spec.ts`; `tilt_test.dart` covers roll, pitch, the rest position and the
+  clamp; the provider test covers each pairing above (feature off, flag absent, stock server, photo not marked, read
+  failure); the widget test opens and closes the view from the button, keeps it off another photo, closes it on a load
+  failure, and draws a scene with the real shader.
 
 ## Roadmap
 
@@ -393,8 +443,7 @@ into `i18n/gallery/en.json` and the nine maintained locales in the same commit.
   stored as `<assetId>_depth_bg.webp`; the shader composites two layers. Candidates: OpenCV Telea inpainting (cheap,
   CPU, smeary) and LaMa in ONNX (much better, realistically GPU-only, `gallery-ml:*-cuda`). Diffusion inpainting matches
   Apple but only as an opt-in for GPU installs.
-- **Phase 3: mobile.** Flutter `FragmentShader` port of the same shader, `sensors_plus` for tilt, and a way to get the
-  flag and the map to the app (from the asset-info endpoint, as the people strip does for non-owned assets).
+- **Phase 3: mobile.** Done: see Mobile app.
 
 ## Open questions
 

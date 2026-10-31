@@ -161,8 +161,15 @@ describe(ServerService.name, () => {
         localTakenRange: true,
         searchOptions: true,
         searchFavoritesAcrossSpaces: true,
+        spatialScene: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
+    });
+
+    it('should report spatialScene enabled when the admin turns it on', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { spatialScene: { enabled: true } } });
+      const features = await sut.getFeatures();
+      expect(features.spatialScene).toBe(true);
     });
 
     it('should report peopleStatistics enabled when IMMICH_PEOPLE_STATISTICS_ENABLED is set', async () => {

@@ -3915,6 +3915,8 @@ export type ServerFeaturesDto = {
     smartSearch: boolean;
     /** Whether smart search has an active relevance cutoff (clip.maxDistance) */
     smartSearchHasCutoff: boolean;
+    /** Whether Spatial Scene is enabled, so single-asset reads may set spatialScene. Absent on older servers. */
+    spatialScene?: boolean;
     /** Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating. */
     syncRequestTypes?: string[];
     /** Whether trash feature is enabled */
