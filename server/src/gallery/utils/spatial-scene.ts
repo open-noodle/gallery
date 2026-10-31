@@ -9,6 +9,11 @@ import { StorageFolder } from 'src/enum.js';
 export const isSpatialSceneEnabled = (machineLearning: { enabled: boolean; spatialScene: { enabled: boolean } }) =>
   machineLearning.enabled && machineLearning.spatialScene.enabled;
 
+// Spread into ServerService.getFeatures. The mobile app asks for an asset's spatialScene flag only when this is set.
+export const spatialSceneServerFeatures = (machineLearning: Parameters<typeof isSpatialSceneEnabled>[0]) => ({
+  spatialScene: isSpatialSceneEnabled(machineLearning),
+});
+
 /**
  * Where a photo's depth map lives on the given backend: an absolute path on disk, a relative key on S3, which is the
  * form MediaService.persistFile stores for thumbnails. Deterministic, so the AssetDelete handler can find the file
