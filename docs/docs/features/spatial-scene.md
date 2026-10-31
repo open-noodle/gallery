@@ -43,7 +43,7 @@ while the scene is showing. Tap the button again, or move to another photo, to r
 normal view.
 
 The button only appears when the app is connected to a Gallery server that has Spatial Scene
-turned on. An older Gallery server, or Immich, shows no button.
+turned on. A server without Spatial Scene shows no button.
 
 ### Idle sway and reduced motion
 
