@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/spatial/spatial_scene.providers.dart';
@@ -72,9 +73,63 @@ void main() {
   });
 
   test('treats a stock Immich server, whose features do not decode, as off', () async {
-    when(() => server.getServerFeatures()).thenThrow(ApiException(500, 'missing required keys'));
+    // the generated DTO null-checks each required key, so a stock server's features throw an Error, not an Exception
+    when(() => server.getServerFeatures()).thenThrow(TypeError());
     expect(await offered('a'), isFalse);
     verifyNever(() => assets.getAssetInfo(any()));
+  });
+
+  group('asking again', () {
+    /// The offer for photo 'a' as an open viewer sees it, after [time] has passed.
+    bool? offeredAfter(FakeAsync async, Duration time) {
+      async.elapse(time);
+      async.flushMicrotasks();
+      return container.read(spatialSceneOfferedProvider('a')).valueOrNull;
+    }
+
+    test('retries soon after the request itself failed', () {
+      fakeAsync((async) {
+        var calls = 0;
+        final features = _MockServerFeatures();
+        when(() => features.spatialScene).thenReturn(const Optional.present(true));
+        when(() => server.getServerFeatures()).thenAnswer((_) async {
+          if (calls++ == 0) {
+            throw ApiException(400, 'Socket operation failed: GET /server/features');
+          }
+          return features;
+        });
+        assetSays('a', const Optional.present(true));
+        final subscription = container.listen(spatialSceneOfferedProvider('a'), (_, _) {});
+
+        expect(offeredAfter(async, Duration.zero), isFalse);
+        expect(offeredAfter(async, spatialSceneRetry), isTrue);
+        subscription.close();
+      });
+    });
+
+    test('keeps a stock server off for the full recheck period', () {
+      fakeAsync((async) {
+        when(() => server.getServerFeatures()).thenThrow(TypeError());
+        final subscription = container.listen(spatialSceneOfferedProvider('a'), (_, _) {});
+
+        expect(offeredAfter(async, spatialSceneRetry * 2), isFalse);
+        verify(() => server.getServerFeatures()).called(1);
+        subscription.close();
+      });
+    });
+
+    test('notices the admin turning it on while the viewer stays open', () {
+      fakeAsync((async) {
+        serverSays(const Optional.present(false));
+        assetSays('a', const Optional.present(true));
+        final subscription = container.listen(spatialSceneOfferedProvider('a'), (_, _) {});
+        expect(offeredAfter(async, Duration.zero), isFalse);
+
+        serverSays(const Optional.present(true));
+        expect(offeredAfter(async, spatialSceneRecheck), isTrue);
+        subscription.close();
+      });
+    });
   });
 
   test('does not offer it when the photo cannot be read', () async {

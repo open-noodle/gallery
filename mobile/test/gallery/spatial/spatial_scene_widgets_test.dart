@@ -108,11 +108,7 @@ void main() {
   });
 
   testWidgets('closes again when the depth map cannot be loaded', (tester) async {
-    final container = await pumpViewer(
-      tester,
-      offered: true,
-      textures: () => Future.error(Exception('404')),
-    );
+    final container = await pumpViewer(tester, offered: true, textures: () => Future.error(Exception('404')));
     await tester.tap(find.byIcon(Icons.view_in_ar_outlined));
     await tester.pump();
     await tester.pump(Durations.long2);

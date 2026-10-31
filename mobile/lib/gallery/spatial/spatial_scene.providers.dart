@@ -15,19 +15,37 @@ import 'package:openapi/api.dart';
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md, "Phase 3: mobile"). The local database carries no
 // spatialScene flag, so the viewer asks the server for it, and only when the server says the feature is on.
 
+/// How long an answer from the server stands before the viewer asks again, so turning the feature on or off in the
+/// admin settings reaches an open app without a request on every swipe.
+const spatialSceneRecheck = Duration(minutes: 5);
+
+/// How soon the viewer asks again after the request itself failed (offline, timed out, or held back while iOS waits
+/// for the Local Network permission), so one failure does not hide the button for minutes.
+const spatialSceneRetry = Duration(seconds: 30);
+
 /// `spatialScene` in `GET /server/features`. False on a server that predates it, and on stock Immich, whose features
-/// do not decode into the Gallery DTO. Kept for a few minutes rather than for the session, so turning the feature on
-/// or off in the admin settings reaches an open app, without a request on every swipe.
+/// do not decode into the Gallery DTO.
 final spatialSceneEnabledProvider = FutureProvider.autoDispose<bool>((ref) async {
-  final link = ref.keepAlive();
-  final expiry = Timer(const Duration(minutes: 5), link.close);
-  ref.onDispose(expiry.cancel);
+  var enabled = false;
+  var askAgainIn = spatialSceneRecheck;
   try {
     final features = await ref.watch(apiServiceProvider).serverInfoApi.getServerFeatures();
-    return features?.spatialScene.orElse(null) == true;
+    enabled = features?.spatialScene.orElse(null) == true;
+  } on Exception {
+    // The request failed. A response that does not decode throws an Error instead, and stands as an answer.
+    askAgainIn = spatialSceneRetry;
   } catch (_) {
-    return false;
+    // A stock Immich server: its features lack keys the Gallery DTO requires.
   }
+  // Re-run on a timer rather than only expire: the open viewer keeps listening, so an expiring cache alone would hold
+  // the first answer for as long as the viewer stays open.
+  final link = ref.keepAlive();
+  final timer = Timer(askAgainIn, () {
+    link.close();
+    ref.invalidateSelf();
+  });
+  ref.onDispose(timer.cancel);
+  return enabled;
 });
 
 /// Whether the viewer offers Spatial Scene for the remote asset [assetId]: `spatialScene` on `GET /assets/{id}`,

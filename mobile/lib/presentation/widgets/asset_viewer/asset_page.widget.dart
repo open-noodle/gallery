@@ -493,7 +493,13 @@ class _AssetPageState extends ConsumerState<AssetPage> {
                     remoteThumbnailSize: thumbnailSize,
                   ),
                 ),
-                Positioned.fill(child: SpatialSceneOverlay(asset: displayAsset)),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: viewportWidth,
+                  height: viewportHeight,
+                  child: SpatialSceneOverlay(asset: displayAsset),
+                ),
                 if (showingOcr && displayAsset.width != null && displayAsset.height != null)
                   Positioned.fill(
                     child: OcrOverlay(

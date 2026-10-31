@@ -361,14 +361,15 @@ resolution would not do justice to an original anyway.
 ### Placement
 
 - **Flag.** The app's local database is filled by sync, which carries no `spatialScene`. So the viewer asks
-  `GET /server/features` at most every five minutes (`spatialSceneEnabledProvider`), and only when that says the feature is
+  `GET /server/features` every five minutes while it is open, or 30 seconds after the request itself failed (`spatialSceneEnabledProvider`), and only when that says the feature is
   on, `GET /assets/{id}` for each photo shown (`spatialSceneOfferedProvider`), the same endpoint the people strip uses for
   assets the viewer does not own. A server that predates the feature flag, or a stock Immich server whose features do not
   decode, counts as off, and the app makes no per-photo request.
 - **Toggle.** `SpatialSceneToggleButton`, a round button beside the OCR toggle in the viewer's bottom bar (one line in
   `bottom_bar.widget.dart`). The state is `spatialSceneAssetProvider`, the remote id of the photo the view is on, like the
   web's `spatialSceneState`.
-- **Viewer.** `SpatialSceneOverlay`, one `Positioned.fill` line in `asset_page.widget.dart`'s stack, right above the photo.
+- **Viewer.** `SpatialSceneOverlay`, one `Positioned` in `asset_page.widget.dart`'s stack, right above the photo and sized
+  to the viewport like it (the stack is taller: the details sheet sits below the photo).
   It renders nothing unless its photo is the active one. It ignores touches, so swiping, tapping for the controls and
   dragging up for the details keep working, and swiping to another photo leaves the view. If the preview or the map
   fails to load, it shows a toast and returns to the photo.
@@ -394,8 +395,8 @@ app's HTTP client, auth headers and client certificates; the map is filtered in 
 | App            | Server                         | What the viewer does                                                     |
 | -------------- | ------------------------------ | ------------------------------------------------------------------------ |
 | With the toggle | With the features flag         | Offers it on photos the server marks                                     |
-| With the toggle | Gallery from before the flag   | No button, no extra requests                                             |
-| With the toggle | Stock Immich                   | No button, no extra requests                                             |
+| With the toggle | Gallery from before the flag   | No button; one features request every five minutes, none per photo       |
+| With the toggle | Stock Immich                   | No button; one features request every five minutes, none per photo       |
 | Without it      | Any                            | Unchanged: the new features field is optional and ignored                |
 
 ## Layering compliance
