@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/spatial/spatial_scene_toggle_button.widget.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/presentation/actions/delete.action.dart';
 import 'package:immich_mobile/presentation/actions/edit_asset.action.dart';
@@ -94,6 +95,7 @@ class ViewerBottomBar extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (asset.isImage) OcrToggleButton(asset: asset),
+                          if (asset.isImage) SpatialSceneToggleButton(asset: asset),
                           if (asset.isVideo) VideoControls(videoPlayerName: asset.id),
                           if (!isReadonlyModeEnabled)
                             ImmichColorOverride(
