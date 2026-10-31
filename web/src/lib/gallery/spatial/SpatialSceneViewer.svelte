@@ -73,6 +73,9 @@ void main() {
       const image = new Image();
       image.addEventListener('load', () => resolve(image));
       image.addEventListener('error', () => reject(new Error(`Could not load ${src}`)));
+      // Both images are read back (getImageData, texImage2D). S3 in redirect mode serves them from the
+      // bucket's origin, and an image loaded without CORS would taint the canvas and throw there.
+      image.crossOrigin = 'anonymous';
       image.src = src;
     });
 
@@ -226,8 +229,9 @@ void main() {
         resize();
         loading = false;
         frame = requestAnimationFrame(draw);
-      } catch {
+      } catch (error) {
         if (!disposed) {
+          console.error('Spatial Scene failed to load', error);
           toastManager.danger($t('spatial_scene_unavailable'));
           spatialSceneState.hide();
         }
