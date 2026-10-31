@@ -115,6 +115,8 @@ describe('/server', () => {
         // false on the e2e stack, which runs the disk storage backend. The admin UI uses this to hide
         // the database-backup S3 options, which cannot apply without an S3 backend.
         s3Storage: false,
+        // off on the e2e stack: Spatial Scene ships disabled
+        spatialScene: false,
         // The full list mirrors the SyncRequestType enum; pin the fork's space-album types,
         // which mobile's sync gate opens on (capability signalling).
         syncRequestTypes: expect.arrayContaining([
