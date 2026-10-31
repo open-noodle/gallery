@@ -6,32 +6,49 @@ or tilt your phone. It is Gallery's take on the Spatial Scene option in Apple Ph
 
 Gallery estimates how far away each part of the photo is, once, when the photo is uploaded. That
 estimate, a small greyscale **depth map**, is stored on your server next to the photo's
-thumbnails. Your browser does the rest: it shifts the near and far parts of the photo by
+thumbnails. Your browser or the Gallery app does the rest: it shifts the near and far parts of the photo by
 different amounts as you move. Nothing is sent to any outside service.
 
 Spatial Scene is **disabled by default**. It is the most demanding of Gallery's machine learning
 features, so read [Model Options](#model-options) before you turn it on.
 
-:::note Web only for now
-This release supports Spatial Scene in the web app, including phone and tablet browsers. The
-Gallery mobile app does not show it yet.
-:::
+Spatial Scene works in the web app, including phone and tablet browsers, and in the Gallery
+mobile app.
 
 ## Viewing a Spatial Scene
 
-1. Open a photo in the web app.
+### In the web app
+
+1. Open a photo.
 2. Press **Spatial** in the top bar. It only appears on photos Spatial Scene is offered for (see
    [Which photos get it](#which-photos-get-it)).
 3. Move the pointer over the photo, or drag on a touch screen. On a phone or tablet you can also
    tilt the device. iPhones and iPads ask for permission to use motion first.
 
-If you leave it alone, the scene sways gently on its own after a few seconds. If your system is
-set to reduce motion, it stays still until you move it.
-
 Press **Spatial** again, or move to another photo, to return to the normal view.
 
 The button does not appear in browsers without WebGL 2, which the effect needs. Every current
 desktop and mobile browser has it.
+
+### In the mobile app
+
+1. Open a photo.
+2. Tap the round button with the cube icon, next to the text recognition (OCR) button. Like the
+   web button, it only appears on photos Spatial Scene is offered for.
+3. Tilt your phone. The scene follows how far you lean it from the way you held it when the scene
+   opened. The app reads the tilt from the phone's motion sensor and needs no extra permission.
+
+Swiping to the next photo, tapping for the controls and dragging up for the details work as usual
+while the scene is showing. Tap the button again, or move to another photo, to return to the
+normal view.
+
+The button only appears when the app is connected to a Gallery server that has Spatial Scene
+turned on. An older Gallery server, or Immich, shows no button.
+
+### Idle sway and reduced motion
+
+If you leave the scene alone, it sways gently on its own after a few seconds. If your system is
+set to reduce motion, it stays still until you move the pointer or tilt the device.
 
 ## Which photos get it
 
