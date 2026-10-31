@@ -9,49 +9,24 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/spatial/depth.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:openapi/api.dart';
 
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md, "Phase 3: mobile"). The local database carries no
-// spatialScene flag, so the viewer asks the server for it, and only when the server says the feature is on.
+// spatialScene flag, so the viewer asks the server for it per photo, and only when the server's features say it is on.
 
-/// How long an answer from the server stands before the viewer asks again, so turning the feature on or off in the
-/// admin settings reaches an open app without a request on every swipe.
-const spatialSceneRecheck = Duration(minutes: 5);
-
-/// How soon the viewer asks again after the request itself failed (offline, timed out, or held back while iOS waits
-/// for the Local Network permission), so one failure does not hide the button for minutes.
-const spatialSceneRetry = Duration(seconds: 30);
-
-/// `spatialScene` in `GET /server/features`. False on a server that predates it, and on stock Immich, whose features
-/// do not decode into the Gallery DTO.
-final spatialSceneEnabledProvider = FutureProvider.autoDispose<bool>((ref) async {
-  var enabled = false;
-  var askAgainIn = spatialSceneRecheck;
-  try {
-    final features = await ref.watch(apiServiceProvider).serverInfoApi.getServerFeatures();
-    enabled = features?.spatialScene.orElse(null) == true;
-  } on Exception {
-    // The request failed. A response that does not decode throws an Error instead, and stands as an answer.
-    askAgainIn = spatialSceneRetry;
-  } catch (_) {
-    // A stock Immich server: its features lack keys the Gallery DTO requires.
-  }
-  // Re-run on a timer rather than only expire: the open viewer keeps listening, so an expiring cache alone would hold
-  // the first answer for as long as the viewer stays open.
-  final link = ref.keepAlive();
-  final timer = Timer(askAgainIn, () {
-    link.close();
-    ref.invalidateSelf();
-  });
-  ref.onDispose(timer.cancel);
-  return enabled;
-});
+/// `spatialScene` in `GET /server/features`, as the app's server info holds it: loaded at sign-in and reloaded when the
+/// socket connects or the server announces a config change, so the admin turning the feature on or off reaches an open
+/// app. False until the features load, on a server that predates the flag, and on stock Immich.
+final spatialSceneEnabledProvider = Provider<bool>(
+  (ref) => ref.watch(serverInfoProvider.select((info) => info.serverFeatures.spatialScene)),
+);
 
 /// Whether the viewer offers Spatial Scene for the remote asset [assetId]: `spatialScene` on `GET /assets/{id}`,
 /// which the server sets only for a photo with a depth map that the admin's offer setting allows.
 final spatialSceneOfferedProvider = FutureProvider.autoDispose.family<bool, String>((ref, assetId) async {
-  if (!await ref.watch(spatialSceneEnabledProvider.future)) {
+  if (!ref.watch(spatialSceneEnabledProvider)) {
     return false;
   }
   try {
