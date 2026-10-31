@@ -21,6 +21,8 @@ abstract class ServerFeatures with _$ServerFeatures {
     // Fork capability signal: the server reads takenAfter/takenBefore as a wall-clock range with an
     // exclusive end (`GET /server/features` → `localTakenRange`). False on servers that predate it.
     @Default(false) bool localTakenRange,
+    // Fork: Spatial Scene is on (`GET /server/features` → `spatialScene`). False on servers that predate it.
+    @Default(false) bool spatialScene,
   }) = _ServerFeatures;
 
   factory ServerFeatures.fromDto(ServerFeaturesDto dto) => ServerFeatures(
@@ -32,5 +34,6 @@ abstract class ServerFeatures with _$ServerFeatures {
     smartSearch: dto.smartSearch,
     syncRequestTypes: dto.syncRequestTypes.orElse(null)?.toSet(),
     localTakenRange: dto.localTakenRange.orElse(null) ?? false,
+    spatialScene: dto.spatialScene.orElse(null) ?? false,
   );
 }

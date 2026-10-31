@@ -16,6 +16,7 @@ import {
   UsageByUserDto,
 } from 'src/dtos/server.dto.js';
 import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum.js';
+import { spatialSceneServerFeatures } from 'src/gallery/utils/spatial-scene.js';
 import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -155,6 +156,7 @@ export class ServerService extends BaseService {
       localTakenRange: true,
       searchOptions: true,
       searchFavoritesAcrossSpaces: true,
+      ...spatialSceneServerFeatures(machineLearning),
     };
   }
 

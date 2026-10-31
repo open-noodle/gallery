@@ -41213,6 +41213,10 @@
             "description": "Whether smart search has an active relevance cutoff (clip.maxDistance)",
             "type": "boolean"
           },
+          "spatialScene": {
+            "description": "Whether Spatial Scene is enabled, so single-asset reads may set spatialScene. Absent on older servers.",
+            "type": "boolean"
+          },
           "syncRequestTypes": {
             "description": "Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating.",
             "items": {

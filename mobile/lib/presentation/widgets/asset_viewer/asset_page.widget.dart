@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/scroll_extensions.dart';
+import 'package:immich_mobile/gallery/spatial/spatial_scene_overlay.widget.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_details.widget.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_stack.provider.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_stack.widget.dart';
@@ -491,6 +492,13 @@ class _AssetPageState extends ConsumerState<AssetPage> {
                     localFilePath: viewIntentFilePath,
                     remoteThumbnailSize: thumbnailSize,
                   ),
+                ),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: viewportWidth,
+                  height: viewportHeight,
+                  child: SpatialSceneOverlay(asset: displayAsset),
                 ),
                 if (showingOcr && displayAsset.width != null && displayAsset.height != null)
                   Positioned.fill(

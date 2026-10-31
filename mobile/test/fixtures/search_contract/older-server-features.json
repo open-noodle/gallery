@@ -30,6 +30,7 @@
       "sidecar": true,
       "smartSearch": false,
       "smartSearchHasCutoff": false,
+      "spatialScene": false,
       "syncRequestTypes": [
         "AlbumsV1",
         "AlbumsV2",

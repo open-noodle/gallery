@@ -266,7 +266,7 @@ features:
       - prometheus-metrics
       - spatial-scene
     risk: high
-    domains: [server, ml, database]
+    domains: [server, ml, database, mobile]
     owned_paths:
       - machine-learning/immich_ml/models/pet_detection/**
       - machine-learning/immich_ml/models/pet_recognition/**
@@ -280,6 +280,8 @@ features:
       - server/src/schema/tables/asset-spatial-scene.table.ts
       - web/src/lib/gallery/spatial/**
       - web/src/lib/gallery/admin/SpatialSceneSettings.svelte
+      - mobile/lib/gallery/spatial/**
+      - mobile/shaders/spatial_scene.frag
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts

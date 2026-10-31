@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import type { SemVer } from 'semver';
 import { ExtraModel, HistoryBuilder } from 'src/decorators.js';
+import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { isoDatetimeToDate } from 'src/validation.js';
 
 const ServerPingResponseSchema = z
@@ -176,6 +177,7 @@ const ServerFeaturesSchema = z
       .describe(
         'Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.',
       ),
+    ...SpatialSceneServerFeatures,
   })
   .meta({ id: 'ServerFeaturesDto' });
 

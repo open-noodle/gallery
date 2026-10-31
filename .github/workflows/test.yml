@@ -250,7 +250,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run linter
-        run: pnpm lint
+        # The package script's --concurrency 6 gets the hosted runner killed mid-lint
+        # ("runner has received a shutdown signal"); 4 workers stays within its memory.
+        run: pnpm exec eslint . --max-warnings 0 --concurrency 4
         if: ${{ !cancelled() }}
 
   web-unit-tests:
