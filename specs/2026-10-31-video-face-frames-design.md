@@ -386,24 +386,35 @@ Storage: one JPEG of about 200 to 400 KB per video face.
 ## Testing
 
 - Unit (`video-faces.spec.ts`): timestamp planning (interval, cuts, budget stretch, trim window, short clips); quality;
-  tracking (same person across frames, two people in one frame, continuity relaxation, late entry, merge of a person
-  seen apart, no merge of co-occurring tracks); embedding averaging; re-scan matching (embedding, poster position).
+  tracking (same person across frames, two people in one frame, continuity relaxation by position, a small face that
+  drifted off its old box, late entry, merge of a person seen apart, no merge of co-occurring tracks); embedding
+  averaging; re-scan matching (embedding, poster position); per-person confidence and the 20 px floor; the sharper-view
+  plan, re-finding and sighting merge; tiles and their merge; widened crops for small faces.
 - Unit (`video-face-detector.spec.ts`, through `PersonService.handleDetectFaces`): feature-off, photo and unreadable
   video pass-through to upstream; sampling, trim and scene cuts; one face per person with its best frame stored;
   re-scan (named face kept by embedding with its person thumbnail redone, poster face matched by position and
   re-recognised, unmatched unnamed face and its frame dropped, unmatched named face kept, pets and manual faces
   untouched); forced runs; only best frames kept; the Missing job adds unsampled videos only while the setting is
-  on, and Reset and Refresh add nothing; a fallback to the poster is stamped.
+  on, and Reset and Refresh add nothing; a fallback to the poster is stamped; tiled detection; the sharper view taken
+  from a nearby frame, never someone else's face or the same looks elsewhere, with frames shared between people;
+  progress and finish log lines.
 - Unit (`video-face.service.spec.ts`, `gallery-face.controller.spec.ts`): frame folder
   cleanup on delete, the face crop route's source, access and not-found cases, route permission and UUID validation.
 - Unit: `getFaceThumbnailSource` returns the frame for a video face and the preview otherwise; the person-thumbnail
   hook.
-- Medium (to do; needs a database): `VideoFaceRepository.apply` (insert, update, delete, embedding and frame upserts
-  in one transaction), cascade from `asset_face`, `streamForBackfill`, integrity path lookup. The `@GenerateSql`
-  query docs (`mise sql`) also need regenerating against a database.
-- Web: `zoomImageToBase64` uses the route for video faces, never for photos, and falls back on failure; the settings
-  component's enable and disable states, and its absence against an older server.
-- Manual: a phone clip with a person entering late, a cut-heavy edited clip, a 30-minute video, a trimmed video, and
+- Medium (`test/medium/specs/repositories/video-face.repository.spec.ts`): `getForDetect` (trim, live faces with
+  embedding, frame and pet flag, trashed video); `apply` (insert, a kept face moved with its embedding replaced, a
+  dropped face's frame row cascading, and a failed re-scan writing nothing); the frame and representative-face lookups;
+  `streamUnsampled` and `markSampled` (videos only, visible, through face detection, not yet sampled; other columns of
+  the job status row kept). `schema-drift.spec.ts` passes with the new table.
+- Web: `zoomImageToBase64` uses the route for video faces, never for photos, falls back on failure, and asks for a new
+  crop when a refresh moved the face (the route lets the browser cache a crop, so the face's box is in the URL); the
+  settings component's enable and disable states, and its absence against an older server.
+- Manual, on a test instance with real phone clips: a 320 x 240 clip whose clearer people scored under 0.7 in every
+  frame (found by per-person confidence; two tiny people at 10 to 17 px dropped by the floor instead of split across
+  several faces); a 1080p clip of 23 to 28 px faces (wider crops; three of seven best views replaced by sharper ones
+  nearby, each checked to be the same person); a 9-second HDR crowd clip (no one found before; 7 with per-person
+  confidence; 24 with tiled detection, in 70 s instead of 16 s). Still to try: a 30-minute video, a trimmed video and
   an S3-backed instance.
 
 ## Phase 2: sightings in the assign UI
@@ -415,7 +426,11 @@ needs no change to the stored data.
 ## Open questions
 
 - Should the scene-cut threshold (0.3) be configurable? It stays a constant until a video shows it needs tuning.
-- Short tracks: a person seen in one sampled frame becomes a face, as in a photo. If that proves noisy, require two
-  sightings for videos longer than a few intervals.
+- Short tracks: a person seen in one sampled frame becomes a face, as in a photo, if the detector was confident and
+  the face is at least 20 px. If that proves noisy, require two sightings for videos longer than a few intervals.
+- A head turn can split one person in two: on the 320 x 240 clip, one man's two views a second apart in the same place
+  were 0.76 apart, as far as two different people usually are. Merging on position alone would also merge one person
+  stepping out and another stepping into the same spot, which hides a person under another's name. The split costs
+  the user one extra assignment, so it stays until real libraries show it is common.
 - A dedicated queue would keep a long video from holding a face-detection slot for minutes. That costs upstream queue
   registrations, so it waits until it is needed.
