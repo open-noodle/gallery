@@ -129,6 +129,15 @@ export interface EnvData {
     };
   };
 
+  backupS3: {
+    bucket?: string;
+    region: string;
+    endpoint?: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    prefix?: string;
+  };
+
   workers: ImmichWorker[];
 
   plugins: {
@@ -380,6 +389,15 @@ const getEnv = (): EnvData => {
         presignedUrlExpiry: dto.IMMICH_S3_PRESIGNED_URL_EXPIRY || 3600,
         serveMode: (dto.IMMICH_S3_SERVE_MODE as 'redirect' | 'proxy') || 'redirect',
       },
+    },
+
+    backupS3: {
+      bucket: dto.IMMICH_BACKUP_S3_BUCKET,
+      region: dto.IMMICH_BACKUP_S3_REGION || 'us-east-1',
+      endpoint: dto.IMMICH_BACKUP_S3_ENDPOINT,
+      accessKeyId: dto.IMMICH_BACKUP_S3_ACCESS_KEY_ID,
+      secretAccessKey: dto.IMMICH_BACKUP_S3_SECRET_ACCESS_KEY,
+      prefix: dto.IMMICH_BACKUP_S3_PREFIX,
     },
 
     telemetry: {

@@ -49,6 +49,7 @@ final Map<String, Map<String, Object?>> openApiPatches = {
   // A raw map rather than the generated DTO: `enabled` is nullable there, and these are the
   // server-side defaults an older server would have behaved as (backups stay on local disk).
   'AdminConfigDatabaseBackupDto': {
+    'destination': 'local',
     's3': const {'enabled': false},
   },
   'SearchAssetResponseDto': {'nextCursor': null},

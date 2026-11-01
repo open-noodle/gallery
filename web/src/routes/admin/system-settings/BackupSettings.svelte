@@ -7,7 +7,7 @@
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
-  import { Link, Text } from '@immich/ui';
+  import { Button, Link, Text } from '@immich/ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
@@ -20,6 +20,12 @@
     { text: $t('interval.night_at_twoam'), value: '0 02 * * *' },
     { text: $t('interval.day_at_onepm'), value: '0 13 * * *' },
     { text: $t('interval.hours', { values: { hours: 6 } }), value: '0 */6 * * *' },
+  ]);
+
+  const backupDestinationOptions = $derived([
+    { text: $t('admin.backup_destination_local'), value: 'local' },
+    { text: $t('admin.backup_destination_cloud'), value: 'cloud' },
+    { text: $t('admin.backup_destination_both'), value: 'both' },
   ]);
 </script>
 
@@ -72,21 +78,36 @@
           isEdited={configToEdit.backup.database.keepLastAmount !== config.backup.database.keepLastAmount}
         />
 
-        <!-- Gallery-fork: offered only on the S3 storage backend, which is where the bucket, credentials,
-             region and endpoint these objects are written with come from; the key prefix is fixed at
-             `backups/`. There is nothing to configure beyond the switch, and the group is absent rather
-             than disabled when it cannot apply. -->
-        {#if featureFlagsManager.value.s3Storage}
-          <hr />
+        <hr />
 
-          <SettingSwitch
-            title={$t('admin.backup_s3_enabled')}
-            subtitle={$t('admin.backup_s3_enabled_description')}
-            {disabled}
-            bind:checked={configToEdit.backup.database.s3.enabled}
-          />
+        <SettingSelect
+          options={backupDestinationOptions}
+          disabled={disabled ||
+            !configToEdit.backup.database.enabled ||
+            configToEdit.backup.database.destination === undefined}
+          name="backup-destination"
+          label={$t('admin.backup_destination')}
+          desc={$t('admin.backup_destination_description')}
+          isEdited={configToEdit.backup.database.destination !== config.backup.database.destination}
+          bind:value={configToEdit.backup.database.destination}
+          onSelect={() => (configToEdit.backup.database.s3.enabled = false)}
+        />
 
-          <Text size="small" color="muted">{$t('admin.backup_s3_credentials_hint')}</Text>
+        {#if configToEdit.backup.database.destination === 'cloud' && configToEdit.backup.database.s3.enabled}
+          <Text size="small" color="muted">{$t('admin.backup_destination_legacy_hint')}</Text>
+        {:else if configToEdit.backup.database.destination !== undefined && configToEdit.backup.database.destination !== 'local'}
+          <Text size="small" color="muted">{$t('admin.backup_destination_cloud_hint')}</Text>
+        {/if}
+
+        {#if configToEdit.backup.database.destination === 'cloud' && configToEdit.backup.database.s3.enabled}
+          <Button
+            size="small"
+            color="secondary"
+            disabled={disabled || !configToEdit.backup.database.enabled}
+            onclick={() => (configToEdit.backup.database.s3.enabled = false)}
+          >
+            {$t('admin.backup_destination_use_independent')}
+          </Button>
         {/if}
 
         <SettingButtonsRow {disabled} bind:configToEdit keys={['backup']} />
