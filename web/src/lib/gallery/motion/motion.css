@@ -197,7 +197,10 @@
   z-index: 1;
 }
 
+/* The photo growing sits above one still shrinking back (z-index 1), whichever comes first in the page,
+ * so moving to the next photo never leaves the last one painted over it. Same at each raised ancestor. */
 [data-thumbnail-focus-container]:not([data-selected]):hover > div {
+  z-index: 2;
   scale: 1.1;
   box-shadow: 0 18px 40px -10px rgb(0 0 0 / 0.55);
   transition:
@@ -216,6 +219,11 @@ section[data-group]:has([data-thumbnail-focus-container]:not([data-selected]):is
 
 .timeline-month:has([data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling])) {
   z-index: 1;
+}
+
+section[data-group]:has([data-thumbnail-focus-container]:not([data-selected]):hover),
+.timeline-month:has([data-thumbnail-focus-container]:not([data-selected]):hover) {
+  z-index: 2;
 }
 
 /* A photo in a day's first row grows up toward the day's date; the date moves up by the same amount
