@@ -202,7 +202,13 @@
 [data-thumbnail-focus-container]:not([data-selected]):hover > div {
   z-index: 2;
   scale: 1.1;
-  box-shadow: 0 18px 40px -10px rgb(0 0 0 / 0.55);
+  /* Three layers read as a raised card: a tight contact shadow at the edge, a mid shadow, and a wide soft
+   * one falling below. A hairline light edge keeps the outline in dark mode. */
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.18),
+    0 3px 6px rgb(0 0 0 / 0.5),
+    0 12px 24px -2px rgb(0 0 0 / 0.55),
+    0 32px 64px -6px rgb(0 0 0 / 0.85);
   transition:
     scale 600ms var(--ease-settle),
     box-shadow var(--motion-base) var(--ease-settle);
