@@ -19,8 +19,10 @@ export const JUST_PRESSED_MS = 700;
 /**
  * Never animated. Maps position their markers with their own transforms, and a marker that grows under
  * the cursor moves its hit area, so hover flickers on and off and the marker is hard to click.
+ * ImageCarousel's scroll buttons (the memory lane arrows: @immich/ui markup, matched by its sticky
+ * button layer) shimmered under the bouncy grow the same way the filter chips did, so they stay still.
  */
-const NO_MOTION = '[data-no-press], .maplibregl-map';
+const NO_MOTION = '[data-no-press], .maplibregl-map, section.overflow-x-scroll > .sticky';
 
 /** Hover grows buttons only; rows in menus and lists, tabs and checkboxes highlight instead. */
 const HOVERABLE = 'button, [role="button"], [data-press]';

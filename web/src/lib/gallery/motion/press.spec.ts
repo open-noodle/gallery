@@ -108,6 +108,15 @@ describe('installPressFeedback', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
+  it('leaves the image carousel scroll buttons alone, on press and on hover', () => {
+    document.body.innerHTML =
+      '<section class="overflow-x-scroll"><div class="sticky"><div><button id="next">›</button></div></div></section>';
+    const next = document.querySelector('#next')!;
+    press(next);
+    next.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+
   it('leaves surfaces larger than a control alone', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 800 } as DOMRect);
     document.body.innerHTML = '<button>backdrop</button>';
