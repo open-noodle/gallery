@@ -28175,11 +28175,24 @@
         ],
         "type": "object"
       },
+      "AdminConfigDatabaseBackupDestinationDto": {
+        "default": "local",
+        "description": "Where scheduled database backups are stored",
+        "enum": [
+          "local",
+          "cloud",
+          "both"
+        ],
+        "type": "string"
+      },
       "AdminConfigDatabaseBackupDto": {
         "properties": {
           "cronExpression": {
             "description": "Cron expression",
             "type": "string"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/AdminConfigDatabaseBackupDestinationDto"
           },
           "enabled": {
             "description": "Enabled",
@@ -28206,7 +28219,7 @@
       "AdminConfigDatabaseBackupS3Dto": {
         "properties": {
           "enabled": {
-            "description": "Upload scheduled database backups to S3",
+            "description": "Deprecated: use the database backup destination setting",
             "type": "boolean"
           }
         },

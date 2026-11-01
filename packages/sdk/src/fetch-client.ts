@@ -55,12 +55,13 @@ export type ActivityStatisticsResponseDto = {
     likes: number;
 };
 export type AdminConfigDatabaseBackupS3Dto = {
-    /** Upload scheduled database backups to S3 */
+    /** Deprecated: use the database backup destination setting */
     enabled?: boolean;
 };
 export type AdminConfigDatabaseBackupDto = {
     /** Cron expression */
     cronExpression: string;
+    destination?: AdminConfigDatabaseBackupDestinationDto;
     /** Enabled */
     enabled: boolean;
     /** Keep last amount */
@@ -11825,6 +11826,11 @@ export enum UserAvatarColor {
     Orange = "orange",
     Gray = "gray",
     Amber = "amber"
+}
+export enum AdminConfigDatabaseBackupDestinationDto {
+    Local = "local",
+    Cloud = "cloud",
+    Both = "both"
 }
 export enum Action {
     Tag = "tag",

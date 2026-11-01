@@ -30,6 +30,8 @@ export const migrateLegacyPetDetectionModel = (config: SystemConfig): SystemConf
 // overload instead.
 const LEGACY_SUGGESTION_PATH: string = 'machineLearning.facialRecognition.suggestionMaxDistance';
 const SUGGESTIONS_PATH: string = 'machineLearning.facialRecognition.suggestions';
+const LEGACY_BACKUP_S3_PATH: string = 'backup.database.s3.enabled';
+const BACKUP_DESTINATION_PATH: string = 'backup.database.destination';
 
 /**
  * Folds the pre-rename `facialRecognition.suggestionMaxDistance` sentinel into the nested
@@ -61,6 +63,25 @@ export const foldLegacyFaceSuggestionConfig = (partial: unknown): unknown => {
   }
 
   return folded;
+};
+
+/**
+ * Preserves the old S3-backup setting when the destination selector is introduced. Existing settings keep
+ * their previous remote-only behavior until an administrator explicitly chooses a new destination.
+ */
+export const migrateLegacyDatabaseBackupDestination = (partial: unknown): unknown => {
+  const legacyEnabled = isObject(partial) && get(partial, LEGACY_BACKUP_S3_PATH);
+  if (
+    !isObject(partial) ||
+    (legacyEnabled !== true && legacyEnabled !== 'true') ||
+    get(partial, BACKUP_DESTINATION_PATH) !== undefined
+  ) {
+    return partial;
+  }
+
+  const migrated = cloneDeep(partial);
+  set(migrated, BACKUP_DESTINATION_PATH, 'cloud');
+  return migrated;
 };
 
 const SUGGESTIONS_MAX_DISTANCE_PATH: string = 'machineLearning.facialRecognition.suggestions.maxDistance';

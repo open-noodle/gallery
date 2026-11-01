@@ -48,6 +48,12 @@ const resetEnv = () => {
     'IMMICH_S3_SECRET_ACCESS_KEY',
     'IMMICH_S3_PRESIGNED_URL_EXPIRY',
     'IMMICH_S3_SERVE_MODE',
+    'IMMICH_BACKUP_S3_BUCKET',
+    'IMMICH_BACKUP_S3_REGION',
+    'IMMICH_BACKUP_S3_ENDPOINT',
+    'IMMICH_BACKUP_S3_ACCESS_KEY_ID',
+    'IMMICH_BACKUP_S3_SECRET_ACCESS_KEY',
+    'IMMICH_BACKUP_S3_PREFIX',
   ]) {
     delete process.env[env];
   }
@@ -144,6 +150,37 @@ describe('getEnv', () => {
     it('should validate DB_SSL_MODE', () => {
       process.env.DB_SSL_MODE = 'invalid';
       expect(() => getEnv()).toThrow(/\[DB_SSL_MODE\] Invalid option: expected one of/);
+    });
+
+    describe('backup S3', () => {
+      it('uses the default region and optional credentials', () => {
+        expect(getEnv().backupS3).toEqual({
+          bucket: undefined,
+          region: 'us-east-1',
+          endpoint: undefined,
+          accessKeyId: undefined,
+          secretAccessKey: undefined,
+          prefix: undefined,
+        });
+      });
+
+      it('maps independent S3 environment variables', () => {
+        process.env.IMMICH_BACKUP_S3_BUCKET = 'backups';
+        process.env.IMMICH_BACKUP_S3_REGION = 'eu-central-1';
+        process.env.IMMICH_BACKUP_S3_ENDPOINT = 'http://minio:9000';
+        process.env.IMMICH_BACKUP_S3_ACCESS_KEY_ID = 'key';
+        process.env.IMMICH_BACKUP_S3_SECRET_ACCESS_KEY = 'secret';
+        process.env.IMMICH_BACKUP_S3_PREFIX = 'gallery/instance';
+
+        expect(getEnv().backupS3).toEqual({
+          bucket: 'backups',
+          region: 'eu-central-1',
+          endpoint: 'http://minio:9000',
+          accessKeyId: 'key',
+          secretAccessKey: 'secret',
+          prefix: 'gallery/instance',
+        });
+      });
     });
 
     it('should accept a valid DB_SSL_MODE', () => {

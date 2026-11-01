@@ -227,6 +227,21 @@ Additional machine learning parameters can be tuned from the admin UI.
 If you use `IMMICH_S3_SERVE_MODE=redirect`, configure bucket CORS for your Gallery origins before switching an existing deployment over. Without that, redirected media can display but canvas-based workflows such as editing, face crops, and copy-to-clipboard can fail. For the required CORS policy and rollout steps, see the [S3-Compatible Storage](/features/s3-storage) guide.
 :::
 
+## Database Backup S3 Storage
+
+These optional variables configure an independent S3-compatible destination for scheduled database backups. They
+work regardless of `IMMICH_STORAGE_BACKEND`; see [Remote Database Backups](/administration/remote-database-backups)
+for destination choices, retention, and restore behavior.
+
+| Variable                             | Description                                                                |   Default   | Containers | Workers                         |
+| :----------------------------------- | :------------------------------------------------------------------------- | :---------: | :--------- | :------------------------------ |
+| `IMMICH_BACKUP_S3_BUCKET`            | Bucket for database backups; required for `cloud` and `both` destinations  |             | server     | api, microservices, maintenance |
+| `IMMICH_BACKUP_S3_REGION`            | AWS region or S3-compatible provider region                                | `us-east-1` | server     | api, microservices, maintenance |
+| `IMMICH_BACKUP_S3_ENDPOINT`          | Custom endpoint URL for S3-compatible services                             |             | server     | api, microservices, maintenance |
+| `IMMICH_BACKUP_S3_ACCESS_KEY_ID`     | Access key ID; omit with the secret to use the AWS SDK credential provider |             | server     | api, microservices, maintenance |
+| `IMMICH_BACKUP_S3_SECRET_ACCESS_KEY` | Secret access key; set together with the access key ID                     |             | server     | api, microservices, maintenance |
+| `IMMICH_BACKUP_S3_PREFIX`            | Required, instance-specific object prefix, such as `gallery/production`    |             | server     | api, microservices, maintenance |
+
 ## Prometheus
 
 | Variable                   | Description                                                                                                                                               | Default | Containers | Workers            |

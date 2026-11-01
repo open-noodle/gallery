@@ -7,6 +7,7 @@ import { DatabaseLock, SystemMetadataKey } from 'src/enum.js';
 import {
   deriveSuggestionBand,
   foldLegacyFaceSuggestionConfig,
+  migrateLegacyDatabaseBackupDestination,
   migrateLegacyPetDetectionModel,
 } from 'src/gallery/utils/config-migrations.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -86,7 +87,7 @@ const buildConfig = async (repos: RepoDeps) => {
   const rawPartial = configFile
     ? await loadFromFile(repos, configFile)
     : await metadataRepo.get(SystemMetadataKey.SystemConfig);
-  const partial = foldLegacyFaceSuggestionConfig(rawPartial);
+  const partial = migrateLegacyDatabaseBackupDestination(foldLegacyFaceSuggestionConfig(rawPartial));
 
   // merge with defaults. Enumerate the user-supplied partial WITHOUT emptyObjectsAsLeaves: an empty
   // object in the partial must yield no path so it can't `set` over (and wipe) a populated default

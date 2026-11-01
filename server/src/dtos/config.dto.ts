@@ -33,6 +33,7 @@ import {
   VideoContainerSchema,
 } from 'src/enum.js';
 import {
+  GalleryBackupDestinationSchema,
   GalleryBackupS3Schema,
   GalleryClassificationSchema,
   GalleryClipExtension,
@@ -173,6 +174,7 @@ const AdminConfigSchemaWithVisibility = z
             enabled: configBool.describe('Enabled'),
             cronExpression: cronExpressionSchema,
             keepLastAmount: z.int().min(1).describe('Keep last amount'),
+            destination: GalleryBackupDestinationSchema,
             s3: GalleryBackupS3Schema,
           })
           .meta({ id: 'AdminConfigDatabaseBackupDto' }),

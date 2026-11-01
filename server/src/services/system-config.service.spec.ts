@@ -87,6 +87,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
       enabled: true,
       cronExpression: '0 02 * * *',
       keepLastAmount: 14,
+      destination: 'local',
       s3: { enabled: false },
     },
   },
