@@ -9,6 +9,7 @@ import { UserGroupController } from 'src/controllers/user-group.controller.js';
 import { CleanupController } from 'src/gallery/controllers/cleanup.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { GalleryFaceController } from 'src/gallery/controllers/gallery-face.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
@@ -22,6 +23,7 @@ import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maint
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
@@ -33,6 +35,7 @@ import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.servic
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
+import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
@@ -68,6 +71,7 @@ export const galleryControllers = [
   FaceSuggestionController,
   GalleryAlbumController,
   GalleryAssetController,
+  GalleryFaceController,
   GalleryMapController,
   GalleryPeopleController,
   GallerySearchController,
@@ -101,6 +105,7 @@ export const galleryRepositories = [
   ImageAdjustRepository,
   CleanupRepository,
   SpatialSceneRepository,
+  VideoFaceRepository,
 ];
 
 export const galleryServices = [
@@ -127,4 +132,5 @@ export const galleryServices = [
   StorageMigrationService,
   StorageUsageService,
   UserGroupService,
+  VideoFaceService,
 ];

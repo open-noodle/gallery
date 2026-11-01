@@ -333,9 +333,36 @@ describe('getFaceCropTransform', () => {
 });
 
 describe(zoomImageToBase64.name, () => {
+  beforeEach(() => {
+    // A server without the face crop route, so video faces fall back to cropping the poster thumbnail.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("uses the server's crop of a video face, cut from its best frame, when the server has one", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['jpeg'], { type: 'image/jpeg' })));
+    vi.stubGlobal('fetch', fetchMock);
+    const imageSpy = vi.fn();
+    vi.stubGlobal('Image', imageSpy);
+
+    const crop = await zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Video, undefined);
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/faces/face-1/thumbnail'));
+    expect(crop).toMatch(/^data:image\/jpeg;base64,/);
+    expect(imageSpy).not.toHaveBeenCalled();
+  });
+
+  it('never asks the server for a photo face, which is cropped from the full image on screen', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Image, undefined);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('sets anonymous CORS before loading video thumbnails and face crop images', async () => {

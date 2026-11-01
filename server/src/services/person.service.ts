@@ -517,6 +517,7 @@ export class PersonService extends BaseService {
         })),
       );
     }
+    await this.videoFaces.queueMissing(machineLearning, force);
 
     if (force === undefined) {
       await this.jobRepository.queue({ name: JobName.PersonCleanup });
@@ -540,6 +541,11 @@ export class PersonService extends BaseService {
 
     if (asset.visibility === AssetVisibility.Hidden) {
       return JobStatus.Skipped;
+    }
+
+    const videoResult = await this.videoFaces.detect(id, machineLearning, force);
+    if (videoResult) {
+      return videoResult;
     }
 
     const { imageHeight, imageWidth, faces } = await this.machineLearningRepository.detectFaces(

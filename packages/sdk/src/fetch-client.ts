@@ -254,6 +254,16 @@ export type AdminConfigFaceSuggestionDto = {
     /** Maximum embedding distance for a face to be surfaced as a suggestion on a named person */
     maxDistance: number;
 };
+export type AdminConfigVideoFacesDto = {
+    /** Detect video faces in frames sampled across the whole video */
+    enabled?: boolean;
+    /** Frame budget per video. Past it the interval is stretched, so the whole video is still covered. */
+    maxFrames: number;
+    /** Seconds between sampled frames */
+    sampleInterval: number;
+    /** Also sample a frame just after every scene cut */
+    sceneDetection?: boolean;
+};
 export type AdminConfigFacialRecognitionDto = {
     /** Whether the task is enabled */
     enabled: boolean;
@@ -266,6 +276,7 @@ export type AdminConfigFacialRecognitionDto = {
     /** Name of the model to use */
     modelName: string;
     suggestions: AdminConfigFaceSuggestionDto;
+    video: AdminConfigVideoFacesDto;
 };
 export type AdminConfigOcrDto = {
     /** Whether the task is enabled */
@@ -7740,6 +7751,19 @@ export function reassignFacesById({ id, faceDto }: {
         method: "PUT",
         body: faceDto
     })));
+}
+/**
+ * Get face thumbnail
+ */
+export function getAssetFaceThumbnail({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/faces/${encodeURIComponent(id)}/thumbnail`, {
+        ...opts
+    }));
 }
 /**
  * Get filtered map markers

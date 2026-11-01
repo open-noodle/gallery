@@ -18,7 +18,10 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
   job: '/src/routes/admin/system-settings/JobSettings.svelte',
   'external-library': '/src/routes/admin/system-settings/LibrarySettings.svelte',
   logging: '/src/routes/admin/system-settings/LoggingSettings.svelte',
-  'machine-learning': '/src/routes/admin/system-settings/MachineLearningSettings.svelte',
+  'machine-learning': [
+    '/src/routes/admin/system-settings/MachineLearningSettings.svelte',
+    '/src/lib/gallery/components/admin/video-face-settings.svelte',
+  ],
   classification: '/src/routes/admin/system-settings/ClassificationSettings.svelte',
   location: '/src/routes/admin/system-settings/MapSettings.svelte',
   metadata: '/src/routes/admin/system-settings/MetadataSettings.svelte',

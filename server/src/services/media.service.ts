@@ -629,7 +629,8 @@ export class MediaService extends BaseService {
       return JobStatus.Failed;
     }
 
-    const { x1, y1, x2, y2, oldWidth, oldHeight, exifOrientation, previewPath, originalPath } = data;
+    const { x1, y1, x2, y2, oldWidth, oldHeight, exifOrientation, originalPath } = data;
+    const previewPath = await this.backendMedia.getPersonThumbnailSource({ ownerId, personGroupId }, data);
 
     // For S3 assets, download to local temp files for processing
     await using originalLocal = await this.backendMedia.ensureLocalFile(originalPath);

@@ -7,6 +7,7 @@
   import { SettingInputFieldType } from '$lib/constants';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import SpatialSceneSettings from '$lib/gallery/admin/SpatialSceneSettings.svelte';
+  import VideoFaceSettings from '$lib/gallery/components/admin/video-face-settings.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
   import { Button, IconButton, modalManager, Text } from '@immich/ui';
@@ -331,6 +332,8 @@
             isEdited={configToEdit.machineLearning.facialRecognition.minFaces !==
               config.machineLearning.facialRecognition.minFaces}
           />
+
+          <VideoFaceSettings bind:configToEdit {config} {disabled} />
         </div>
       </SettingAccordion>
 

@@ -2201,6 +2201,29 @@ describe(MediaService.name, () => {
       });
     });
 
+    it("should use the representative face's best frame for a video sampled across the whole video", async () => {
+      const person = PersonFactory.create();
+      const framePath = '/data/thumbs/user-id/as/se/asset-id_faces/face-id.jpeg';
+
+      mocks.person.getDataForThumbnailGenerationJob.mockResolvedValue(personThumbnailStub.videoThumbnail);
+      mocks.videoFace.getRepresentativeFramePath.mockResolvedValue(framePath);
+      mocks.media.generateThumbnail.mockResolvedValue();
+      mocks.media.decodeImage.mockResolvedValue({
+        data: Buffer.from(''),
+        info: { width: 1000, height: 1000 } as OutputInfo,
+      });
+
+      await expect(
+        sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.videoFace.getRepresentativeFramePath).toHaveBeenCalledWith({
+        ownerId: person.ownerId,
+        personGroupId: person.personGroupId,
+      });
+      expect(mocks.media.decodeImage).toHaveBeenCalledWith(framePath, expect.anything());
+    });
+
     it('should use preview path if video', async () => {
       const person = PersonFactory.create();
 

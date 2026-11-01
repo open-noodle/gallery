@@ -17,9 +17,11 @@ import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maint
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
+import { VideoFaceDetector } from 'src/gallery/utils/video-face-detector.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -180,6 +182,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   ImageAdjustRepository,
   CleanupRepository,
   SpatialSceneRepository,
+  VideoFaceRepository,
 ] as const;
 
 @Injectable()
@@ -188,6 +191,7 @@ export class BaseService {
   protected identityMergePropagationService: IdentityMergePropagationService;
   protected faceAssignmentService: FaceAssignmentService;
   protected backendMedia: BackendMediaServer;
+  protected videoFaces: VideoFaceDetector;
 
   constructor(
     protected logger: LoggingRepository,
@@ -269,6 +273,7 @@ export class BaseService {
     protected imageAdjustRepository: ImageAdjustRepository,
     protected cleanupRepository: CleanupRepository,
     protected spatialSceneRepository: SpatialSceneRepository,
+    protected videoFaceRepository: VideoFaceRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -301,6 +306,19 @@ export class BaseService {
       assetRepository,
       mediaRepository,
       storageRepository,
+      videoFaceRepository,
+      getConfig: (options) => this.getConfig(options),
+    });
+    this.videoFaces = new VideoFaceDetector({
+      assetRepository,
+      cryptoRepository,
+      faceIdentityRepository,
+      jobRepository,
+      machineLearningRepository,
+      mediaRepository,
+      videoFaceRepository,
+      backendMedia: this.backendMedia,
+      logger: this.logger,
       getConfig: (options) => this.getConfig(options),
     });
   }
@@ -386,6 +404,7 @@ export class BaseService {
       ctx.imageAdjustRepository,
       ctx.cleanupRepository,
       ctx.spatialSceneRepository,
+      ctx.videoFaceRepository,
     );
 
     service.logger.setContext(BaseService.name);

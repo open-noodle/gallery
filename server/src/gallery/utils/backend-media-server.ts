@@ -3,13 +3,14 @@ import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { AssetFileType, AssetType, CacheControl, ImageFormat } from 'src/enum.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -35,6 +36,7 @@ type BackendMediaServerDependencies = {
   assetRepository: AssetRepository;
   mediaRepository: MediaRepository;
   storageRepository: StorageRepository;
+  videoFaceRepository: VideoFaceRepository;
   getConfig: (options: { withCache: boolean }) => Promise<SystemConfig>;
 };
 
@@ -150,7 +152,16 @@ export class BackendMediaServer {
     return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
   }
 
-  async getFaceThumbnailSource(assetId: string): Promise<string | null> {
+  /**
+   * The image a face's box refers to: the best frame of a video face sampled across the whole video
+   * (specs/2026-10-31-video-face-frames-design.md), else the asset's preview, else its thumbnail.
+   */
+  async getFaceThumbnailSource({ id, assetId }: { id: string; assetId: string }): Promise<string | null> {
+    const framePath = await this.deps.videoFaceRepository.getFramePath(id);
+    if (framePath) {
+      return framePath;
+    }
+
     const preview = await this.deps.assetRepository.getForThumbnail(assetId, AssetFileType.Preview, false);
     if (preview.path) {
       return preview.path;
@@ -158,6 +169,17 @@ export class BackendMediaServer {
 
     const thumbnail = await this.deps.assetRepository.getForThumbnail(assetId, AssetFileType.Thumbnail, false);
     return thumbnail.path ?? null;
+  }
+
+  /** The person thumbnail's source for a video: its representative face's best frame, when it has one. */
+  async getPersonThumbnailSource(
+    { ownerId, personGroupId }: { ownerId: string; personGroupId: string },
+    { type, previewPath }: { type: AssetType; previewPath: string | null },
+  ): Promise<string | null> {
+    if (type !== AssetType.Video) {
+      return previewPath;
+    }
+    return (await this.deps.videoFaceRepository.getRepresentativeFramePath({ ownerId, personGroupId })) ?? previewPath;
   }
 
   async generateFaceThumbnailResponse(face: AssetFace, sourcePath: string): Promise<ImmichMediaResponse> {
