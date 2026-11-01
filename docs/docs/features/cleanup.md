@@ -47,13 +47,13 @@ The header shows your streak: the number of consecutive days, ending today or ye
 
 Each queue page acts immediately. After you trash photos from a queue, a notification offers **Undo** for a few seconds.
 
-| Queue                | What it contains                                                                                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Space hogs**       | Your largest files, biggest first. You can show videos, photos or both, and set a minimum size (100 MiB by default). A live photo's size includes its video part.                                                                           |
-| **Bursts & series**  | Groups of photos taken within about two seconds of each other: camera bursts, and shots of the same moment that look nearly identical. Gallery suggests the sharpest photo to keep. You can keep one, keep all, or stack the group instead. |
-| **Screenshots**      | Screenshots and screen recordings. They are recognised by file name, or, for files with no camera information, by being a PNG or having a very wide or tall shape.                                                                          |
-| **Blurry & botched** | Photos that look out of focus, too dark or overexposed. A strictness setting (lenient, balanced or strict) controls how blurry a photo must be to appear. Photos with faces are hidden by default.                                          |
-| **Duplicates**       | The number of duplicates found, with a link to the existing [Duplicates utility](./duplicates-utility.md).                                                                                                                                  |
+| Queue                | What it contains                                                                                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Space hogs**       | Your largest files, biggest first. You can show videos, photos or both, and set a minimum size (100 MiB by default). A live photo's size includes its video part.                                                                                     |
+| **Bursts & series**  | Groups of photos taken within about two seconds of each other: camera bursts, and shots of the same moment that look nearly identical. Gallery suggests the sharpest photo to keep. You can keep one, keep all, or stack the group instead.           |
+| **Screenshots**      | Screenshots and screen recordings. They are recognised by file name, or, for files with no camera information, by being a PNG or having a very wide or tall shape.                                                                                    |
+| **Blurry & botched** | Photos that look out of focus, too dark or overexposed. A strictness setting (lenient, balanced or strict) controls how blurry a photo must be to appear. Photos with faces are hidden by default, and screenshots are left to the Screenshots queue. |
+| **Duplicates**       | The number of duplicates found, with a link to the existing [Duplicates utility](./duplicates-utility.md).                                                                                                                                            |
 
 The Screenshots and Blurry & botched queues depend on a background analysis of your photos. Until it has finished, those queues show how much of your library has been analysed so far.
 
