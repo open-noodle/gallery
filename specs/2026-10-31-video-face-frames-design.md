@@ -98,7 +98,10 @@ in time order:
 - A detection joins the track whose centroid (the normalised mean of its embeddings) or latest sighting is nearest by
   cosine distance, if that distance is under `facialRecognition.maxDistance` (default 0.5, the threshold recognition
   already uses to tie faces to a person).
-- If the track was also seen in the previous sample and the boxes overlap (IoU > 0.3), the threshold is relaxed by 0.1.
+- If the track was also seen in the previous sample and the face is still where it was (its centre within one face of
+  the old centre, at no more than twice or half the size), the threshold is relaxed by 0.1. An overlap test (IoU > 0.3)
+  came first, and split a 10 px face in a 320 x 240 clip into three people: a second's drift of half its width left the
+  boxes overlapping by 16 %, while faces that small have embeddings 0.51-0.54 apart.
   A person turning their head between two samples is still the same track.
 - Two detections in one frame never join the same track: each frame is matched one-to-one, best pairs first.
 - A detection that matches no track starts a new one.
@@ -114,7 +117,10 @@ video frame on its own, that loses people. On a 320 x 240 test clip, two people 
 one frame only. In a video, being found again and again is evidence a photo cannot offer.
 
 So frames are searched at a lower score, `VIDEO_FACE_LOW_SCORE` (0.45, or the admin's minimum if that is lower), and
-after tracking each person is judged as a whole (`acceptTrack`). A track is kept when either:
+after tracking each person is judged as a whole (`acceptTrack`). A track whose largest face is under 20 px across
+(short side, frame pixels) is dropped first, however confident the detector was. On the same clip, two people sitting
+side by side at 10 to 17 px were each kept as several confident faces, and even the widened crop could not show which
+of the two a face was, so they only added people nobody could name. Otherwise a track is kept when either:
 
 - its best sighting reaches `minScore`, as a photo face must; or
 - it was seen in at least 3 sampled frames, with a median score of at least 0.45 and a median face of at least 32 px.
@@ -302,7 +308,7 @@ Every sampled video logs one line when it starts and one when it finishes, at `l
 
 ```
 Sampling 1800 frames across 1h of video <id> (about every 2s, 3 scene cuts)
-Found 4 people (of 6 candidates) in 1800 frames of video <id> in 21m, 30s (2 new, 1 kept, 1 removed)
+Found 4 faces in 1800 frames of video <id> in 21m, 30s: 2 added, 1 updated, 1 deleted, 2 dropped as too small or unsure
 ```
 
 A video sampled from 100 frames or more also logs its progress every 10%, with an estimate of the time left, worked

@@ -120,7 +120,7 @@ describe('FaceTracker', () => {
     expect(tracks.find((track) => track.centroid[2] > 0.9)?.sightings.map(({ t }) => t)).toEqual([61]);
   });
 
-  it('accepts a looser match when the face overlaps where the track just was', () => {
+  it('accepts a looser match when the face is where the track just was', () => {
     // 0.55 from alice: too far on appearance alone at 0.5, close enough with the continuity relaxation.
     const drifted = normalize([0.45, 0.893, 0, 0]);
 
@@ -133,6 +133,21 @@ describe('FaceTracker', () => {
     elsewhere.addFrame(1, 0, [detection(alice, box(100))]);
     elsewhere.addFrame(3, 1, [detection(drifted, box(900))]);
     expect(elsewhere.finish()).toHaveLength(2);
+  });
+
+  it('accepts a looser match for a small face that drifted off its old box', () => {
+    // A 12 px face 6 px to the side overlaps its old box by an IoU of 0.18, and is too noisy to match on looks alone.
+    const drifted = normalize([0.45, 0.893, 0, 0]);
+
+    const tracker = new FaceTracker(0.5);
+    tracker.addFrame(1, 0, [detection(alice, box(50, 60, 12))]);
+    tracker.addFrame(2, 1, [detection(drifted, box(44, 64, 11))]);
+    expect(tracker.finish()).toHaveLength(1);
+
+    const resized = new FaceTracker(0.5);
+    resized.addFrame(1, 0, [detection(alice, box(50, 60, 12))]);
+    resized.addFrame(2, 1, [detection(drifted, box(44, 60, 30))]);
+    expect(resized.finish()).toHaveLength(2);
   });
 
   it('merges two tracks of one person seen apart, but not two people seen together', () => {
@@ -285,6 +300,11 @@ describe('acceptTrack', () => {
     expect(
       acceptTrack(trackOf({ score: 0.6, size: 20 }, { score: 0.6, size: 20 }, { score: 0.6, size: 20 }), 0.7),
     ).toBe(false);
+  });
+
+  it('drops a face too small to recognise however confident the detector was', () => {
+    expect(acceptTrack(trackOf({ score: 0.73, size: 12 }), 0.7)).toBe(false);
+    expect(acceptTrack(trackOf({ score: 0.73, size: 12 }, { score: 0.6, size: 20 }), 0.7)).toBe(true);
   });
 
   it('never asks more of a consistent face than an admin who lowered the photo threshold', () => {

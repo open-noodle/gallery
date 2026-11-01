@@ -72,6 +72,8 @@ const humanDuration = (ms: number) =>
     .rescale()
     .toHuman({ unitDisplay: 'narrow' });
 
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
 const roundBox = ({ x1, y1, x2, y2 }: BoundingBox) => ({
   x1: Math.round(x1),
   y1: Math.round(y1),
@@ -251,9 +253,10 @@ export class VideoFaceDetector {
         force,
       });
       this.deps.logger.log(
-        `Found ${tracks.length} people (of ${candidates.length} candidates) in ${times.length} frames of video ${id} in ` +
-          `${humanDuration(Date.now() - startedAt)} (${added} new, ${kept} kept, ${removed} removed` +
-          `${unreadable > 0 ? `, ${unreadable} frames unreadable` : ''})`,
+        `Found ${plural(tracks.length, 'face')} in ${times.length} frames of video ${id} in ` +
+          `${humanDuration(Date.now() - startedAt)}: ${added} added, ${kept} updated, ${removed} deleted, ` +
+          `${candidates.length - tracks.length} dropped as too small or unsure` +
+          (unreadable > 0 ? `, ${plural(unreadable, 'frame')} unreadable` : ''),
       );
     } finally {
       await rm(tempDir, { recursive: true, force: true });

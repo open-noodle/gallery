@@ -6,9 +6,13 @@ import type { BoundingBox } from 'src/repositories/machine-learning.repository.j
 /** Bumped when sampling or tracking changes enough that videos should be rescanned. */
 export const VIDEO_FACE_SAMPLER_VERSION = 2;
 
-/** Relaxation of the distance threshold for a detection that overlaps the track's box in the previous sample. */
+/**
+ * Relaxation of the distance threshold for a detection where the track was in the previous sample: its centre within
+ * one face of the old centre, at no more than twice or half the size. A box overlap test would miss small faces, which
+ * a second's drift moves off their old box while their embeddings are at their noisiest.
+ */
 const CONTINUITY_RELAXATION = 0.1;
-const CONTINUITY_IOU = 0.3;
+const CONTINUITY_MAX_SIZE_RATIO = 2;
 
 /** Sightings averaged into a face's embedding. */
 const EMBEDDING_SIGHTINGS = 3;
@@ -35,6 +39,12 @@ const SHORT_CLIP_INTERVAL = 1;
 export const VIDEO_FACE_LOW_SCORE = 0.45;
 const CONSISTENT_SIGHTINGS = 3;
 const CONSISTENT_MIN_FACE = 32;
+
+/**
+ * A person whose largest face is narrower than this (short side, frame px) is dropped however confident the detector
+ * was: no crop of it, even widened, shows who it is, so it would only add a person nobody can name.
+ */
+const MIN_FACE = 20;
 
 /** Faces smaller than this (longest side, frame px) are cropped with surrounding context: up to 2.5x at half of it. */
 const CONTEXT_FACE_SIZE = 80;
@@ -150,8 +160,8 @@ type MutableTrack = FaceTrack & { sum: number[]; last: Sighting };
 
 /**
  * Groups detections into one track per person, frame by frame in time order. A detection joins the nearest track
- * by embedding (its centroid or its latest sighting), with a looser threshold when it overlaps where that track was in
- * the previous sample. Each frame is matched one-to-one, so two faces in one frame are never the same person.
+ * by embedding (its centroid or its latest sighting), with a looser threshold when it is where that track was in the
+ * previous sample. Each frame is matched one-to-one, so two faces in one frame are never the same person.
  */
 export class FaceTracker {
   private tracks: MutableTrack[] = [];
@@ -167,8 +177,7 @@ export class FaceTracker {
           cosineDistance(detection.embedding, track.centroid),
           cosineDistance(detection.embedding, track.last.embedding),
         );
-        const continuous =
-          track.last.frameIndex === frameIndex - 1 && iou(detection.box, track.last.box) > CONTINUITY_IOU;
+        const continuous = track.last.frameIndex === frameIndex - 1 && nearby(detection.box, track.last.box);
         const threshold = this.maxDistance + (continuous ? CONTINUITY_RELAXATION : 0);
         if (distance < threshold) {
           pairs.push({ detection: detectionIndex, track: trackIndex, distance });
@@ -248,6 +257,14 @@ export class FaceTracker {
     return new Set(this.tracks.map((track) => track.best.frameIndex));
   }
 }
+
+const nearby = (a: BoundingBox, b: BoundingBox) => {
+  const sizeA = Math.max(a.x2 - a.x1, a.y2 - a.y1);
+  const sizeB = Math.max(b.x2 - b.x1, b.y2 - b.y1);
+  const larger = Math.max(sizeA, sizeB);
+  const drift = Math.hypot((a.x1 + a.x2 - b.x1 - b.x2) / 2, (a.y1 + a.y2 - b.y1 - b.y2) / 2);
+  return drift <= larger && larger <= Math.min(sizeA, sizeB) * CONTINUITY_MAX_SIZE_RATIO;
+};
 
 const coOccur = (a: FaceTrack, b: FaceTrack) => {
   const frames = new Set(a.sightings.map((sighting) => sighting.frameIndex));
@@ -357,16 +374,22 @@ const median = (values: number[]) => {
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 };
 
-/** Whether a track is a person worth keeping: confident once, or consistent across frames (see VIDEO_FACE_LOW_SCORE). */
+/**
+ * Whether a track is a person worth keeping: large enough to recognise (MIN_FACE), and confident once or consistent
+ * across frames (see VIDEO_FACE_LOW_SCORE).
+ */
 export const acceptTrack = (track: FaceTrack, minScore: number): boolean => {
-  if (Math.max(...track.sightings.map((sighting) => sighting.score)) >= minScore) {
+  const sizes = track.sightings.map(({ box }) => Math.min(box.x2 - box.x1, box.y2 - box.y1));
+  if (Math.max(...sizes) < MIN_FACE) {
+    return false;
+  }
+  const scores = track.sightings.map((sighting) => sighting.score);
+  if (Math.max(...scores) >= minScore) {
     return true;
   }
   if (track.sightings.length < CONSISTENT_SIGHTINGS) {
     return false;
   }
-  const scores = track.sightings.map((sighting) => sighting.score);
-  const sizes = track.sightings.map(({ box }) => Math.min(box.x2 - box.x1, box.y2 - box.y1));
   return median(scores) >= Math.min(minScore, VIDEO_FACE_LOW_SCORE) && median(sizes) >= CONSISTENT_MIN_FACE;
 };
 

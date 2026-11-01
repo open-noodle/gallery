@@ -493,7 +493,7 @@ describe('VideoFaceDetector', () => {
       expect(loggedMessages(mocks).filter((message) => message.includes('video asset-id'))).toEqual([
         'Sampling 33 frames across 1m, 6s of video asset-id (about every 2s, 0 scene cuts)',
         expect.stringMatching(
-          /^Found 2 people \(of 2 candidates\) in 33 frames of video asset-id in \d+s \(2 new, 0 kept, 0 removed\)$/,
+          /^Found 2 faces in 33 frames of video asset-id in \d+s: 2 added, 0 updated, 0 deleted, 0 dropped as too small or unsure$/,
         ),
       ]);
     });
@@ -532,7 +532,7 @@ describe('VideoFaceDetector', () => {
       await sut.handleDetectFaces({ id: 'asset-id' });
 
       expect(loggedMessages(mocks)).toContainEqual(
-        expect.stringMatching(/\(1 new, 0 kept, 0 removed, 1 frames unreadable\)$/),
+        expect.stringMatching(/: 1 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, 1 frame unreadable$/),
       );
     });
   });
