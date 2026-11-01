@@ -1,6 +1,7 @@
 import {
   AssetOrder,
   AssetTypeEnum,
+  LocationPresence,
   type SmartSearchDto,
   type SmartSearchFacetsDto,
   type SmartSearchFacetsResponseDto,
@@ -48,6 +49,7 @@ export const QUERY_MODE_FILTER_HANDLING = {
   model: 'sent',
   lensModel: 'sent',
   state: 'sent',
+  locationPresence: 'sent',
   albumId: 'sent',
   ownerId: 'sent',
   ocr: 'sent',
@@ -104,6 +106,10 @@ export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearch
   }
   if (filters.state) {
     params.state = filters.state;
+  }
+  if (filters.locationPresence) {
+    params.locationPresence =
+      filters.locationPresence === 'noGps' ? LocationPresence.NoGps : LocationPresence.NoPlaceName;
   }
   if (filters.lensModel) {
     params.lensModel = filters.lensModel;
@@ -205,5 +211,7 @@ export function mapSmartSearchFacetsToFilterSuggestions(
     hasFavorites: facets.hasFavorites,
     hasAssetsInAlbum: facets.hasAssetsInAlbum,
     hasAssetsNotInAlbum: facets.hasAssetsNotInAlbum,
+    hasNoGpsAssets: facets.hasNoGpsAssets,
+    hasNoPlaceNameAssets: facets.hasNoPlaceNameAssets,
   };
 }

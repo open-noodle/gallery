@@ -36,6 +36,8 @@
       "hasAssetsInAlbum": true,
       "hasAssetsNotInAlbum": true,
       "hasFavorites": true,
+      "hasNoGpsAssets": true,
+      "hasNoPlaceNameAssets": false,
       "hasUnnamedPeople": false,
       "mediaTypes": [
         "IMAGE",

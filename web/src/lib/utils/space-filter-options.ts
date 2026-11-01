@@ -26,6 +26,9 @@ export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState)
   if (filters.state) {
     base.state = filters.state;
   }
+  if (filters.locationPresence) {
+    base.locationPresence = filters.locationPresence;
+  }
   if (filters.ownerId) {
     base.ownerId = filters.ownerId;
   }

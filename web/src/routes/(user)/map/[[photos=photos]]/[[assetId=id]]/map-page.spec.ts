@@ -430,6 +430,25 @@ describe('Map page filters are URL-backed', () => {
     expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
   });
 
+  // A link copied from /photos (or a hand-edited URL) can carry locationPresence. The map renders
+  // no row for it and no builder ever forwards it (map plots asset_exif.latitude IS NOT NULL —
+  // map.repository.ts:187), so surviving hydration would be an active filter that is invisible and
+  // unremovable — exactly the failure the panel's orphan rules exist to prevent elsewhere.
+  // getActiveFilterCount counts the location group off `city || country || state || locationPresence`
+  // (filter-panel.ts), so if the drop at hydrate time is ever removed, this becomes an active filter
+  // and the (real, unmocked) ActiveFiltersBar renders — the assertion below then fails.
+  it('drops a locationPresence carried in the URL — the map offers no row for it and forwards it nowhere', async () => {
+    mockPage.url = new URL('https://gallery.test/map?locationPresence=noGps');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
+    const [options] = sdkMock.getFilteredMapMarkers.mock.calls.at(-1) as [Record<string, unknown>];
+    expect(options.locationPresence).toBeUndefined();
+  });
+
   // NB: the panel stub's `filter-panel-set-year` is deliberately NOT used here. It sets only the
   // transient selectedYear, which encodeFilterParams does not emit — so the rebuilt URL would be
   // identical, the no-op guard would fire, and goto would never be called. Use a stub button that
