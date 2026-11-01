@@ -157,9 +157,14 @@ const dropClicked = () => {
   clicked = undefined;
 };
 
-/** A plain click or Enter on a thumbnail opens the viewer, unless photos are being selected. */
+/**
+ * A plain click or Enter on a thumbnail opens the viewer, unless photos are being selected or the click
+ * landed on a control inside it (the select circle), which never opens it: a copy put up then stayed on
+ * the page until CLICK_MAX_AGE_MS dropped it. Not links: a hovered thumbnail is covered by one.
+ */
 const opensViewer = (event: Event) =>
   !document.querySelector('#control-bar') &&
+  !(event.target instanceof Element && event.target.closest('button, input, [role="checkbox"]')) &&
   (event instanceof KeyboardEvent
     ? event.key === 'Enter'
     : event instanceof MouseEvent && event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey);
