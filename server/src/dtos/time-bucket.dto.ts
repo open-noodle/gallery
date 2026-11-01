@@ -9,6 +9,7 @@ import {
   TimeBucketSize,
   TimeBucketSizeSchema,
 } from 'src/enum.js';
+import { GalleryTimeBucketExtension } from 'src/gallery/dtos/time-bucket.dto.js';
 import { boundedTextFilter, stringToBool } from 'src/validation.js';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -129,6 +130,7 @@ const TimeBucketQueryBaseSchema = z
       .describe('Bounding box coordinates as west,south,east,north (WGS84)')
       .meta({ example: '11.075683,49.416711,11.117589,49.454875' }),
   })
+  .extend(GalleryTimeBucketExtension)
   .meta({ id: 'TimeBucketDto' });
 
 const TimeBucketSchema = TimeBucketQueryBaseSchema;

@@ -45,6 +45,9 @@ import '../table/remote/shared_space_album_hidden.dart';
 --      governs only the space's own Photos tab (design doc §2, §6.1).
 --   3. Local assets not yet backed up.
 --
+-- #1038 library view (:library_view, NULL for both): 'personal' keeps only the caller's own assets
+-- that have no space path at all, plus local assets; 'spaces' keeps only source 2.
+--
 -- #1041 "hide from my timeline" (design doc §3, §6.3): for an asset the
 -- viewer OWNS, it disappears from their own timeline only when EVERY path it
 -- has into a space the viewer belongs to is a path the viewer has hidden —
@@ -53,7 +56,7 @@ import '../table/remote/shared_space_album_hidden.dart';
 -- hidden via the member flag). A single VISIBLE path re-admits the asset,
 -- which the sibling OR arms below already provide for free — so the owner
 -- arm only needs to subtract assets that have NO other, visible path.
-spaceMergedAsset(:current_user_id AS TEXT):
+spaceMergedAsset(:current_user_id AS TEXT, :library_view AS TEXT OR NULL):
 SELECT
 	rae.id as remote_id,
 	(SELECT lae.id FROM local_asset_entity lae WHERE lae.checksum = rae.checksum LIMIT 1) as local_id,
@@ -91,7 +94,7 @@ WHERE
 			-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
 			-- what enforces that; correlating the legs to :current_user_id is not enough,
 			-- because they would still be ANDed against every row in :user_ids.
-			(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+			(:library_view IS NULL AND rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
 			OR (
 				rae.owner_id = :current_user_id
 				AND NOT EXISTS (
@@ -124,6 +127,15 @@ WHERE
 							)
 						)
 				)
+				AND :library_view IS NOT 'spaces'
+				AND (
+					:library_view IS NULL
+					OR (
+						NOT EXISTS (SELECT 1 FROM shared_space_asset_entity ssa WHERE ssa.asset_id = rae.id)
+						AND NOT EXISTS (SELECT 1 FROM shared_space_library_entity ssl WHERE ssl.library_id = rae.library_id)
+						AND NOT EXISTS (SELECT 1 FROM shared_space_album_asset_entity ssaa WHERE ssaa.asset_id = rae.id)
+					)
+				)
 			)
 		)
 		OR EXISTS (
@@ -132,6 +144,7 @@ WHERE
 			WHERE ssa.asset_id = rae.id
 				AND ssm.user_id = :current_user_id
 				AND ssm.show_in_timeline = 1
+				AND :library_view IS NOT 'personal'
 		)
 		OR EXISTS (
 			SELECT 1 FROM shared_space_library_entity ssl
@@ -139,6 +152,7 @@ WHERE
 			WHERE ssl.library_id = rae.library_id
 				AND ssm.user_id = :current_user_id
 				AND ssm.show_in_timeline = 1
+				AND :library_view IS NOT 'personal'
 		)
 		OR EXISTS (
 			SELECT 1 FROM shared_space_album_asset_entity ssaa
@@ -153,6 +167,7 @@ WHERE
 				)
 				AND ssm.user_id = :current_user_id
 				AND ssm.show_in_timeline = 1
+				AND :library_view IS NOT 'personal'
 		)
 	)
 	AND (
@@ -193,6 +208,7 @@ FROM
 WHERE NOT EXISTS (
 	SELECT 1 FROM remote_asset_entity rae WHERE rae.checksum = lae.checksum AND rae.owner_id IN :user_ids
 )
+AND :library_view IS NOT 'spaces'
 AND EXISTS (
 	SELECT 1 FROM local_album_asset_entity laa
 	INNER JOIN local_album_entity la on laa.album_id = la.id
@@ -206,7 +222,7 @@ AND NOT EXISTS (
 ORDER BY created_at DESC
 LIMIT $limit;
 
-spaceMergedBucket(:group_by AS INTEGER, :current_user_id AS TEXT):
+spaceMergedBucket(:group_by AS INTEGER, :current_user_id AS TEXT, :library_view AS TEXT OR NULL):
 SELECT
 	COUNT(*) as asset_count,
 	bucket_date
@@ -240,7 +256,7 @@ FROM
 				-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
 				-- what enforces that; correlating the legs to :current_user_id is not enough,
 				-- because they would still be ANDed against every row in :user_ids.
-				(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+				(:library_view IS NULL AND rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
 				OR (
 					rae.owner_id = :current_user_id
 					AND NOT EXISTS (
@@ -273,6 +289,15 @@ FROM
 								)
 							)
 					)
+					AND :library_view IS NOT 'spaces'
+					AND (
+						:library_view IS NULL
+						OR (
+							NOT EXISTS (SELECT 1 FROM shared_space_asset_entity ssa WHERE ssa.asset_id = rae.id)
+							AND NOT EXISTS (SELECT 1 FROM shared_space_library_entity ssl WHERE ssl.library_id = rae.library_id)
+							AND NOT EXISTS (SELECT 1 FROM shared_space_album_asset_entity ssaa WHERE ssaa.asset_id = rae.id)
+						)
+					)
 				)
 			)
 			OR EXISTS (
@@ -281,6 +306,7 @@ FROM
 				WHERE ssa.asset_id = rae.id
 					AND ssm.user_id = :current_user_id
 					AND ssm.show_in_timeline = 1
+					AND :library_view IS NOT 'personal'
 			)
 			OR EXISTS (
 				SELECT 1 FROM shared_space_library_entity ssl
@@ -288,6 +314,7 @@ FROM
 				WHERE ssl.library_id = rae.library_id
 					AND ssm.user_id = :current_user_id
 					AND ssm.show_in_timeline = 1
+					AND :library_view IS NOT 'personal'
 			)
 			OR EXISTS (
 				SELECT 1 FROM shared_space_album_asset_entity ssaa
@@ -302,6 +329,7 @@ FROM
 					)
 					AND ssm.user_id = :current_user_id
 					AND ssm.show_in_timeline = 1
+					AND :library_view IS NOT 'personal'
 			)
 		)
 		AND (
@@ -321,6 +349,7 @@ FROM
 	WHERE NOT EXISTS (
 		SELECT 1 FROM remote_asset_entity rae WHERE rae.checksum = lae.checksum AND rae.owner_id IN :user_ids
 	)
+	AND :library_view IS NOT 'spaces'
 	AND EXISTS (
 		SELECT 1 FROM local_album_asset_entity laa
 		INNER JOIN local_album_entity la on laa.album_id = la.id

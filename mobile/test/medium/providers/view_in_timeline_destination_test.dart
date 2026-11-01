@@ -3,6 +3,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/infrastructure/repositories/shared_space.repository.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_destination.dart';
@@ -96,6 +98,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           driftProvider.overrideWithValue(ctx.db),
+          libraryViewProvider.overrideWith(_LibraryView.new),
           currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(_userService(user), user)),
         ],
       );
@@ -155,6 +158,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           driftProvider.overrideWithValue(ctx.db),
+          libraryViewProvider.overrideWith(_LibraryView.new),
           sharedSpaceRepositoryProvider.overrideWithValue(_ThrowingSharedSpaceRepository(ctx.db)),
           currentUserProvider.overrideWith(
             (ref) => _StubCurrentUserNotifier(_userService(_user(viewer.id)), _user(viewer.id)),
@@ -185,6 +189,14 @@ void main() {
 }
 
 class _MockUserService extends Mock implements UserService {}
+
+class _LibraryView extends LibraryViewNotifier {
+  @override
+  LibraryViewMode build() => LibraryViewMode.both;
+
+  @override
+  Future<void> set(LibraryViewMode view) async => state = view;
+}
 
 UserService _userService(UserDto? user) {
   final service = _MockUserService();

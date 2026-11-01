@@ -2,6 +2,7 @@
   import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
   import ScopedSearchButton from '$lib/components/search/scoped-search-button.svelte';
   import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
+  import LibraryViewControl from '$lib/gallery/library-view/LibraryViewControl.svelte';
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
   import type { Snippet } from 'svelte';
   import { twMerge } from 'tailwind-merge';
@@ -23,6 +24,8 @@
     // icon that silently searched the whole library from inside them would be a lie.
     showSearchButton?: boolean;
     onSearch?: () => void;
+    // The /photos library view (#1038), shown at every viewport.
+    showLibraryView?: boolean;
   }
 
   let {
@@ -38,17 +41,19 @@
     onExpandFilters,
     showSearchButton = false,
     onSearch,
+    showLibraryView = false,
   }: Props = $props();
 
   const searchButtonVisible = $derived(showSearchButton && onSearch !== undefined);
 </script>
 
-{#if showGrouping || showFilters || (showFilterButton && onExpandFilters) || searchButtonVisible}
+{#if showLibraryView || showGrouping || showFilters || (showFilterButton && onExpandFilters) || searchButtonVisible}
   <!--
     Root display is responsive-by-intent:
     - showFilters → `flex` (visible on ALL sizes, so the chip bar still shows on mobile)
     - showFilterButton && onExpandFilters → `flex` (visible on ALL sizes, so a collapsed panel is
       always reopenable — the panel's own collapse control has no breakpoint gate, #752 launch review F3)
+    - showLibraryView → `flex` (the view changes what the timeline holds, at every size)
     - grouping-only → `hidden md:flex` (desktop-only, matching today's behavior)
     `bg-transparent` keeps the toolbar a hairline surface on the content background (never the old gray band).
     A caller MAY pass `class="hidden md:flex"` to force desktop-only even when showFilters is true
@@ -59,11 +64,11 @@
       // pointer-fine:pe-15 (60px) reserves the timeline Scrubber's DESKTOP_WIDTH on the right so the
       // bar's right-aligned actions (Clear all, Add-all-to-collection) don't sit under the scrubber and
       // stay fully clickable. Matches Scrubber's own `pointer: coarse` gate (no scrubber margin on touch).
-      'shrink-0 items-center gap-3 bg-transparent py-2 pe-4 dark:bg-transparent pointer-fine:pe-15',
+      'shrink-0 flex-wrap items-center gap-3 bg-transparent py-2 pe-4 dark:bg-transparent pointer-fine:pe-15',
       // The compact filter button leads the row when shown — tighten the leading inset so it sits
       // closer to the edge; grouping-only usages keep the standard ps-4.
       showFilterButton ? 'ps-2' : 'ps-4',
-      showFilters || (showFilterButton && onExpandFilters) ? 'flex' : 'hidden md:flex',
+      showLibraryView || showFilters || (showFilterButton && onExpandFilters) ? 'flex' : 'hidden md:flex',
       className,
     )}
     data-testid="filter-toolbar-root"
@@ -74,6 +79,12 @@
            permanently strands small screens (#752 launch review F3). -->
       <div class="flex items-center" data-testid="filter-toolbar-reopen">
         <FilterToggleButton active={filterActive} onExpand={onExpandFilters} />
+      </div>
+    {/if}
+
+    {#if showLibraryView}
+      <div class="flex items-center" data-testid="filter-toolbar-library-view">
+        <LibraryViewControl />
       </div>
     {/if}
 
@@ -106,7 +117,8 @@
           aria-hidden="true"
         ></span>
       {/if}
-      <div class="min-w-0 flex-1">
+      <!-- Wraps to its own line rather than shrinking out of sight. -->
+      <div class="min-w-48 flex-1">
         {@render filters?.()}
       </div>
     {/if}

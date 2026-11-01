@@ -12,6 +12,7 @@ import {
 } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import z from 'zod';
+import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
@@ -166,7 +167,7 @@ export interface SearchAlbumOptions {
   albumAccessIsBoundary?: boolean;
 }
 
-export interface SearchSpaceOptions {
+export interface SearchSpaceOptions extends LibraryViewOptions {
   spaceId?: string;
   spacePersonIds?: string[];
   timelineSpaceIds?: string[];

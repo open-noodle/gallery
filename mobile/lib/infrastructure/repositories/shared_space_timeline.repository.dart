@@ -18,10 +18,23 @@ class SharedSpaceTimelineRepository {
     String currentUserId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+    LibraryViewMode libraryView = LibraryViewMode.both,
   }) => (
-    bucketSource: () => _watchMainBucket(userIds, currentUserId, groupBy: groupBy, temporalScope: temporalScope),
-    assetSource: (offset, count) =>
-        _getMainBucketAssets(userIds, currentUserId, offset: offset, count: count, temporalScope: temporalScope),
+    bucketSource: () => _watchMainBucket(
+      userIds,
+      currentUserId,
+      groupBy: groupBy,
+      temporalScope: temporalScope,
+      libraryView: libraryView,
+    ),
+    assetSource: (offset, count) => _getMainBucketAssets(
+      userIds,
+      currentUserId,
+      offset: offset,
+      count: count,
+      temporalScope: temporalScope,
+      libraryView: libraryView,
+    ),
     origin: TimelineOrigin.main,
   );
 
@@ -30,17 +43,29 @@ class SharedSpaceTimelineRepository {
     String currentUserId, {
     GroupAssetsBy groupBy = GroupAssetsBy.day,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+    required LibraryViewMode libraryView,
   }) {
     if (groupBy == GroupAssetsBy.none) {
       throw UnsupportedError("GroupAssetsBy.none is not supported for watchMainBucket");
     }
 
     if (!temporalScope.isEmpty) {
-      return _watchScopedMainBucket(userIds, currentUserId, groupBy: groupBy, temporalScope: temporalScope);
+      return _watchScopedMainBucket(
+        userIds,
+        currentUserId,
+        groupBy: groupBy,
+        temporalScope: temporalScope,
+        libraryView: libraryView,
+      );
     }
 
     return _db.sharedSpaceTimelineDrift
-        .spaceMergedBucket(userIds: userIds, currentUserId: currentUserId, groupBy: groupBy.index)
+        .spaceMergedBucket(
+          userIds: userIds,
+          currentUserId: currentUserId,
+          groupBy: groupBy.index,
+          libraryView: libraryView.queryValue,
+        )
         .map((row) {
           final date = row.bucketDate.truncateDate(groupBy);
           return TimeBucket(date: date, assetCount: row.assetCount);
@@ -54,6 +79,7 @@ class SharedSpaceTimelineRepository {
     required int offset,
     required int count,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+    required LibraryViewMode libraryView,
   }) {
     if (!temporalScope.isEmpty) {
       return _getScopedMainBucketAssets(
@@ -62,11 +88,17 @@ class SharedSpaceTimelineRepository {
         offset: offset,
         count: count,
         temporalScope: temporalScope,
+        libraryView: libraryView,
       );
     }
 
     return _db.sharedSpaceTimelineDrift
-        .spaceMergedAsset(userIds: userIds, currentUserId: currentUserId, limit: (_) => Limit(count, offset))
+        .spaceMergedAsset(
+          userIds: userIds,
+          currentUserId: currentUserId,
+          libraryView: libraryView.queryValue,
+          limit: (_) => Limit(count, offset),
+        )
         .map(
           (row) => row.remoteId != null && row.ownerId != null
               ? RemoteAsset(
@@ -117,9 +149,10 @@ class SharedSpaceTimelineRepository {
     String currentUserId, {
     required GroupAssetsBy groupBy,
     required TimelineTemporalScope temporalScope,
+    required LibraryViewMode libraryView,
   }) {
     final query = _db.customSelect(
-      _scopedMainBucketSql(userIds, groupBy),
+      _scopedMainBucketSql(userIds, groupBy, libraryView),
       variables: _scopedMainVariables(userIds, currentUserId, temporalScope),
       readsFrom: {
         _db.remoteAssetEntity,
@@ -149,10 +182,11 @@ class SharedSpaceTimelineRepository {
     required int offset,
     required int count,
     required TimelineTemporalScope temporalScope,
+    required LibraryViewMode libraryView,
   }) {
     return _db
         .customSelect(
-          _scopedMainAssetSql(userIds),
+          _scopedMainAssetSql(userIds, libraryView),
           variables: [
             ..._scopedMainVariables(userIds, currentUserId, temporalScope),
             Variable<int>(count),
@@ -1374,7 +1408,11 @@ List<Variable<Object>> _scopedMainVariables(
 
 // Same ownership and Space predicate as spaceMergedAsset/spaceMergedBucket in
 // shared_space_timeline.drift (album-link leg and the #1041 owner hide included); keep them in step.
-String _scopedMainRemoteWhere(List<String> userIds) {
+/// The `:library_view` value of shared_space_timeline.drift as an SQL literal (an enum name, never user input).
+String _sqlLibraryView(LibraryViewMode view) => view.queryValue == null ? 'NULL' : "'${view.queryValue}'";
+
+String _scopedMainRemoteWhere(List<String> userIds, LibraryViewMode libraryView) {
+  final view = _sqlLibraryView(libraryView);
   final userIdsSql = _sqlPlaceholders(userIds.length, start: 4);
   return '''
 rae.deleted_at IS NULL
@@ -1383,7 +1421,7 @@ AND COALESCE(STRFTIME('%Y-%m-%d', rae.local_date_time), STRFTIME('%Y-%m-%d', rae
 AND COALESCE(STRFTIME('%Y-%m-%d', rae.local_date_time), STRFTIME('%Y-%m-%d', rae.created_at, 'localtime')) <= ?3
 AND (
   (
-    (rae.owner_id IN ($userIdsSql) AND rae.owner_id != ?1)
+    ($view IS NULL AND rae.owner_id IN ($userIdsSql) AND rae.owner_id != ?1)
     OR (
       rae.owner_id = ?1
       AND NOT EXISTS (
@@ -1416,6 +1454,15 @@ AND (
             )
           )
       )
+      AND $view IS NOT 'spaces'
+      AND (
+        $view IS NULL
+        OR (
+          NOT EXISTS (SELECT 1 FROM shared_space_asset_entity ssa WHERE ssa.asset_id = rae.id)
+          AND NOT EXISTS (SELECT 1 FROM shared_space_library_entity ssl WHERE ssl.library_id = rae.library_id)
+          AND NOT EXISTS (SELECT 1 FROM shared_space_album_asset_entity ssaa WHERE ssaa.asset_id = rae.id)
+        )
+      )
     )
   )
   OR EXISTS (
@@ -1424,6 +1471,7 @@ AND (
     WHERE ssa.asset_id = rae.id
       AND ssm.user_id = ?1
       AND ssm.show_in_timeline = 1
+      AND $view IS NOT 'personal'
   )
   OR EXISTS (
     SELECT 1 FROM shared_space_library_entity ssl
@@ -1431,6 +1479,7 @@ AND (
     WHERE ssl.library_id = rae.library_id
       AND ssm.user_id = ?1
       AND ssm.show_in_timeline = 1
+      AND $view IS NOT 'personal'
   )
   OR EXISTS (
     SELECT 1 FROM shared_space_album_asset_entity ssaa
@@ -1445,6 +1494,7 @@ AND (
       )
       AND ssm.user_id = ?1
       AND ssm.show_in_timeline = 1
+      AND $view IS NOT 'personal'
   )
 )
 AND (
@@ -1455,10 +1505,11 @@ AND (
 ''';
 }
 
-String _scopedMainLocalWhere(List<String> userIds) {
+String _scopedMainLocalWhere(List<String> userIds, LibraryViewMode libraryView) {
   final userIdsSql = _sqlPlaceholders(userIds.length, start: 4);
   return '''
-STRFTIME('%Y-%m-%d', lae.created_at, 'localtime') >= ?2
+${_sqlLibraryView(libraryView)} IS NOT 'spaces'
+AND STRFTIME('%Y-%m-%d', lae.created_at, 'localtime') >= ?2
 AND STRFTIME('%Y-%m-%d', lae.created_at, 'localtime') <= ?3
 AND NOT EXISTS (
   SELECT 1 FROM remote_asset_entity rae WHERE rae.checksum = lae.checksum AND rae.owner_id IN ($userIdsSql)
@@ -1476,7 +1527,7 @@ AND NOT EXISTS (
 ''';
 }
 
-String _scopedMainBucketSql(List<String> userIds, GroupAssetsBy groupBy) {
+String _scopedMainBucketSql(List<String> userIds, GroupAssetsBy groupBy, LibraryViewMode libraryView) {
   final remoteBucketDate = switch (groupBy) {
     GroupAssetsBy.day || GroupAssetsBy.auto =>
       "COALESCE(STRFTIME('%Y-%m-%d', rae.local_date_time), STRFTIME('%Y-%m-%d', rae.created_at, 'localtime'))",
@@ -1498,18 +1549,18 @@ FROM (
   SELECT $remoteBucketDate AS bucket_date
   FROM remote_asset_entity rae
   LEFT JOIN stack_entity se ON rae.stack_id = se.id
-  WHERE ${_scopedMainRemoteWhere(userIds)}
+  WHERE ${_scopedMainRemoteWhere(userIds, libraryView)}
   UNION ALL
   SELECT $localBucketDate AS bucket_date
   FROM local_asset_entity lae
-  WHERE ${_scopedMainLocalWhere(userIds)}
+  WHERE ${_scopedMainLocalWhere(userIds, libraryView)}
 )
 GROUP BY bucket_date
 ORDER BY bucket_date DESC
 ''';
 }
 
-String _scopedMainAssetSql(List<String> userIds) {
+String _scopedMainAssetSql(List<String> userIds, LibraryViewMode libraryView) {
   return '''
 SELECT *
 FROM (
@@ -1538,7 +1589,7 @@ FROM (
     0 AS playback_style
   FROM remote_asset_entity rae
   LEFT JOIN stack_entity se ON rae.stack_id = se.id
-  WHERE ${_scopedMainRemoteWhere(userIds)}
+  WHERE ${_scopedMainRemoteWhere(userIds, libraryView)}
   UNION ALL
   SELECT
     NULL AS remote_id,
@@ -1564,7 +1615,7 @@ FROM (
     0 AS is_edited,
     lae.playback_style
   FROM local_asset_entity lae
-  WHERE ${_scopedMainLocalWhere(userIds)}
+  WHERE ${_scopedMainLocalWhere(userIds, libraryView)}
 )
 ORDER BY created_at DESC
 LIMIT ?${userIds.length + 4} OFFSET ?${userIds.length + 5}

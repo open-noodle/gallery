@@ -25,6 +25,8 @@ enum StoreKey<T> {
   searchPeopleType<String>._(90005),
   // Library Cleanup's remembered choices, one JSON string (lib/gallery/cleanup/cleanup_prefs.dart).
   libraryCleanupPrefs<String>._(90007),
+  // The Photos tab's library view (lib/gallery/library_view.provider.dart, #1038).
+  photosLibraryView<String>._(90008),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
