@@ -142,7 +142,15 @@ const canAnimate = () => typeof Element.prototype.animate === 'function' && !pre
 
 // ── Opening ──────────────────────────────────────────────────────────────
 
-let clicked: (Shot & { flyer?: HTMLDivElement }) | undefined;
+interface Clicked extends Shot {
+  flyer: HTMLDivElement;
+  /** The photo's width over height. */
+  ratio: number;
+  /** Set once the flight has started, before the viewer could measure where the photo goes. */
+  flight?: { animation: Animation; target: Box; startedAt: number };
+}
+
+let clicked: Clicked | undefined;
 
 const dropClicked = () => {
   clicked?.flyer?.remove();
@@ -168,9 +176,50 @@ const recordThumbnail = (event: Event) => {
   // The copy goes up at once: the timeline hides as soon as the route changes, while the viewer is
   // still loading, and the copy covers that gap. If no viewer claims it, it goes away.
   const flyer = createFlyer(image.currentSrc, rect, previewOf(image.currentSrc));
-  const shot = { assetId, rect: rect.toJSON() as Box, src: image.currentSrc, at: performance.now(), flyer };
+  const ratio =
+    image.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : rect.width / rect.height;
+  const shot: Clicked = {
+    assetId,
+    rect: rect.toJSON() as Box,
+    src: image.currentSrc,
+    at: performance.now(),
+    flyer,
+    ratio,
+  };
   clicked = shot;
   setTimeout(() => clicked === shot && dropClicked(), CLICK_MAX_AGE_MS);
+};
+
+/** Where the viewer will most likely draw the photo: fitted into the window, centred. */
+export const estimateTarget = (ratio: number, viewport?: { width: number; height: number }): Box => {
+  const { width: viewWidth, height: viewHeight } = viewport ?? { width: innerWidth, height: innerHeight };
+  const width = Math.min(viewWidth, viewHeight * ratio);
+  const height = width / ratio;
+  return { left: (viewWidth - width) / 2, top: (viewHeight - height) / 2, width, height };
+};
+
+const startFlight = (shot: Clicked) => {
+  if (shot.flight) {
+    return;
+  }
+  const target = estimateTarget(shot.ratio);
+  placeFlyer(shot.flyer, target);
+  const animation = shot.flyer.animate(
+    [{ transform: transformBetween(shot.rect, target) }, { transform: 'none' }],
+    flight(),
+  );
+  shot.flight = { animation, target, startedAt: performance.now() };
+};
+
+/**
+ * setupMotion's `beforeNavigate`: the router heading for the clicked photo is the signal that the click
+ * opens the viewer (pickers reuse the same thumbnails to select), and it comes well before the viewer has
+ * loaded, so the flight starts now, toward an estimate. zoomIn corrects course once the viewer measured.
+ */
+export const viewerZoomBeforeNavigate = (navigation: { to: { params: Record<string, string> | null } | null }) => {
+  if (clicked && navigation.to?.params?.assetId === clicked.assetId && canAnimate()) {
+    startFlight(clicked);
+  }
 };
 
 const zoomIn = async (assetId: string) => {
@@ -203,12 +252,31 @@ const zoomIn = async (assetId: string) => {
     flyer.remove();
     return;
   }
-  // Lay the copy out at the photo's final size (sharp when it lands), drawn over the thumbnail to start.
-  placeFlyer(flyer, to);
   box.style.visibility = 'hidden';
-  await flyer
-    .animate([{ transform: transformBetween(from.rect, to) }, { transform: 'none' }], flight())
-    .finished.catch(() => {});
+  const started = from.flight;
+  const off = (a: Box, b: Box) =>
+    Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height);
+  if (!started) {
+    // Lay the copy out at the photo's final size (sharp when it lands), drawn over the thumbnail to start.
+    placeFlyer(flyer, to);
+    await flyer
+      .animate([{ transform: transformBetween(from.rect, to) }, { transform: 'none' }], flight())
+      .finished.catch(() => {});
+  } else if (off(started.target, to) > 2) {
+    // The estimate missed (an open info panel, say): glide from wherever the copy is now to the real spot.
+    const current = flyer.getBoundingClientRect();
+    started.animation.cancel();
+    placeFlyer(flyer, to);
+    const remaining = Math.max(180, spring.snappy.duration - (performance.now() - started.startedAt));
+    await flyer
+      .animate([{ transform: transformBetween(current, to) }, { transform: 'none' }], {
+        duration: remaining,
+        easing: ease.settle,
+      })
+      .finished.catch(() => {});
+  } else {
+    await started.animation.finished.catch(() => {});
+  }
   // Hand over once the viewer's own sharp image is in: the copy, sharpened on the way, stays on top until
   // then and fades out over an identical photo. Any input hands over at once.
   await viewerSharp(box, 1200);
