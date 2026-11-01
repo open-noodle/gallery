@@ -81,6 +81,8 @@ Shared Spaces are handled, and the upgrade and on/off behaviour.
 
 Face detection sends the generated preview image to the machine learning service for processing. The service checks if it has the relevant model downloaded and downloads it if not. The image is decoded, pre-processed and passed to the face detection model (with hardware acceleration if configured). The bounding boxes and scores outputted from this model are used to crop and preprocess the image once again to be passed to a facial recognition model (also accelerated if configured). The embeddings from the recognition model, together with the bounding boxes and scores from the face detection model, are then sent back to the server to be added to the database. The embeddings in particular are indexed so they can be searched quickly during facial recognition clustering.
 
+For a video, this uses only its poster frame, unless [Faces in Videos](video-faces.md) is turned on.
+
 ## How Facial Recognition Works
 
 The facial recognition algorithm we use is derived from [DBSCAN](https://www.youtube.com/watch?v=RDZUdRSDOok), a popular clustering algorithm. It essentially treats each detected face as a point in a graph and aims to group points that are close to each other.
