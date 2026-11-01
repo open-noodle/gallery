@@ -1,4 +1,5 @@
 import { Reflector } from '@nestjs/core';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MaintenanceModule } from 'src/app.module.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
@@ -6,7 +7,12 @@ import { S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { StorageFolder } from 'src/enum.js';
-import { BACKUP_PREFIX, BackupStoreResolver, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
+import {
+  BACKUP_PREFIX,
+  BackupStoreResolver,
+  validateBackupDestinationConfig,
+  validateBackupS3Config,
+} from 'src/gallery/utils/backup-store.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
@@ -39,9 +45,24 @@ describe('BackupStoreResolver', () => {
 
   const withS3Config = (s3: { enabled?: boolean }) =>
     mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { s3 } } });
+  const withDestination = (destination: 'local' | 'cloud' | 'both', s3?: { enabled?: boolean }) =>
+    mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { destination, s3: s3 ?? { enabled: false } } } });
 
   const onS3 = (bucket = 'media') =>
     mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3: { bucket } as never } }));
+  const onBackupS3 = (overrides: { bucket?: string; prefix?: string; secretAccessKey?: string } = {}) =>
+    mocks.config.getEnv.mockReturnValue(
+      mockEnvData({
+        backupS3: {
+          bucket: overrides.bucket ?? 'backup-bucket',
+          region: 'eu-central-1',
+          endpoint: 'http://minio:9000',
+          accessKeyId: 'backup-key',
+          secretAccessKey: overrides.secretAccessKey ?? 'backup-secret',
+          prefix: overrides.prefix ?? 'gallery/instance-a',
+        },
+      }),
+    );
 
   beforeEach(() => {
     mocks = getMocks();
@@ -67,7 +88,7 @@ describe('BackupStoreResolver', () => {
     const store = await sut.resolve();
 
     await expect(store.staging.getReadableUrl('backups/one.sql.gz')).resolves.toBe(
-      `${StorageCore.getMediaLocation()}/backups/one.sql.gz`,
+      join(StorageCore.getMediaLocation(), 'backups', 'one.sql.gz'),
     );
   });
 
@@ -90,6 +111,74 @@ describe('BackupStoreResolver', () => {
 
       expect(defaults.backup.database.s3.enabled).toBe(false);
       expect(store.remote).toBeUndefined();
+    });
+
+    describe('independent cloud destination', () => {
+      it('resolves cloud and both destinations without requiring the media backend to use S3', async () => {
+        withDestination('both');
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            backupS3: {
+              bucket: 'backup-bucket',
+              region: 'eu-central-1',
+              endpoint: 'http://minio:9000',
+              accessKeyId: 'backup-key',
+              secretAccessKey: 'backup-secret',
+              prefix: 'gallery/instance-a/',
+            },
+          }),
+        );
+
+        const store = await sut.resolve();
+
+        expect(store.destination).toBe('both');
+        expect(store.remote?.bucket).toBe('backup-bucket');
+        expect(store.remote?.prefix).toBe('gallery/instance-a/');
+        expect(store.remoteKey('backup.sql.gz')).toBe('gallery/instance-a/backup.sql.gz');
+        expect(store.key('backup.sql.gz')).toBe('backups/backup.sql.gz');
+        expect(sut.built).toEqual([
+          {
+            bucket: 'backup-bucket',
+            region: 'eu-central-1',
+            endpoint: 'http://minio:9000',
+            accessKeyId: 'backup-key',
+            secretAccessKey: 'backup-secret',
+            presignedUrlExpiry: 3600,
+            serveMode: 'proxy',
+          },
+        ]);
+      });
+
+      it('rejects cloud destinations without a bucket or unique prefix', async () => {
+        withDestination('cloud');
+        onBackupS3({ bucket: 'backup-bucket', prefix: '  ' });
+
+        await expect(sut.resolve()).rejects.toThrow(/IMMICH_BACKUP_S3_BUCKET or IMMICH_BACKUP_S3_PREFIX/);
+      });
+
+      it('rejects incomplete static credentials', async () => {
+        withDestination('cloud');
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            backupS3: {
+              bucket: 'backup-bucket',
+              region: 'us-east-1',
+              accessKeyId: 'backup-key',
+              secretAccessKey: undefined,
+              prefix: 'gallery/instance-a',
+            },
+          }),
+        );
+
+        await expect(sut.resolve()).rejects.toThrow(/Set both IMMICH_BACKUP_S3_ACCESS_KEY_ID/);
+      });
+
+      it('rejects object prefixes containing parent-directory segments', async () => {
+        withDestination('cloud');
+        onBackupS3({ prefix: 'gallery/../other' });
+
+        await expect(sut.resolve()).rejects.toThrow(/without "\.\." segments/);
+      });
     });
 
     it('leaves the remote unset when the storage backend is not s3, and warns', async () => {
@@ -254,6 +343,18 @@ describe('BackupStoreResolver', () => {
       expect(store.remote?.bucket).toBe('other-media');
     });
 
+    it('rebuilds the independent cloud client when its secret changes', async () => {
+      withDestination('cloud');
+      onBackupS3();
+      await sut.resolve();
+
+      onBackupS3({ secretAccessKey: 'rotated-secret' });
+      await sut.resolve();
+
+      expect(sut.built).toHaveLength(2);
+      expect(sut.built[1].secretAccessKey).toBe('rotated-secret');
+    });
+
     it('reads the config fresh on every resolve, so an admin edit applies without a restart', async () => {
       withS3Config({ enabled: false });
       const offStore = await sut.resolve();
@@ -269,11 +370,81 @@ describe('BackupStoreResolver', () => {
 const configWith = (enabled: boolean) =>
   ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
+const destinationConfig = (destination: 'local' | 'cloud' | 'both', legacyS3 = false) =>
+  ({
+    backup: {
+      database: { ...defaults.backup.database, destination, s3: { enabled: legacyS3 } },
+    },
+  }) as SystemConfig;
+
 describe('validateBackupS3Config', () => {
   it('refuses a save that turns S3 backups on while the storage backend is disk', () => {
     expect(() => validateBackupS3Config(configWith(true), configWith(false), { storage: { backend: 'disk' } })).toThrow(
       /S3 storage backend/,
     );
+  });
+
+  describe('validateBackupDestinationConfig', () => {
+    const env = {
+      storage: { backend: 'disk' as const, s3: { bucket: '' } },
+      backupS3: {
+        bucket: 'backup-bucket',
+        prefix: 'gallery/instance-a',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+      },
+    };
+
+    it('allows selecting local backups without cloud settings', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('local'), destinationConfig('local'), {
+          ...env,
+          backupS3: { ...env.backupS3, bucket: undefined, prefix: undefined },
+        }),
+      ).not.toThrow();
+    });
+
+    it('requires an independent cloud target when moving from local to cloud', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('cloud'), destinationConfig('local'), {
+          ...env,
+          backupS3: { ...env.backupS3, bucket: undefined },
+        }),
+      ).toThrow(/IMMICH_BACKUP_S3_BUCKET and a unique IMMICH_BACKUP_S3_PREFIX/);
+    });
+
+    it('rejects unsafe object prefixes before saving the destination', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('cloud'), destinationConfig('local'), {
+          ...env,
+          backupS3: { ...env.backupS3, prefix: 'gallery/../other' },
+        }),
+      ).toThrow(/without "\.\." segments/);
+    });
+
+    it('validates a new independent target when switching legacy cloud backups to both', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('both'), destinationConfig('cloud', true), {
+          ...env,
+          backupS3: { ...env.backupS3, prefix: undefined },
+        }),
+      ).toThrow(/IMMICH_BACKUP_S3_BUCKET and a unique IMMICH_BACKUP_S3_PREFIX/);
+    });
+
+    it('allows switching legacy cloud backups to both when the independent target is configured', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('both'), destinationConfig('cloud', true), env),
+      ).not.toThrow();
+    });
+
+    it('does not revalidate an already selected independent target during unrelated saves', () => {
+      expect(() =>
+        validateBackupDestinationConfig(destinationConfig('cloud'), destinationConfig('cloud'), {
+          ...env,
+          backupS3: { ...env.backupS3, bucket: undefined },
+        }),
+      ).not.toThrow();
+    });
   });
 
   it('allows turning S3 backups on on the s3 storage backend', () => {
