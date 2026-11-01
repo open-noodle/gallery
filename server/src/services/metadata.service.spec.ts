@@ -2976,7 +2976,71 @@ describe(MetadataService.name, () => {
 
       await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { TagsList: ['tag1', 'tag2'] });
+            expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { TagsList: ['tag1', 'tag2'] });
+    });
+
+    it('should export faces to sidecar when face export is enabled', async () => {
+      const asset = factory.jobAssets.sidecarWrite();
+      asset.exifInfo.orientation = '1';
+      asset.exifInfo.exifImageWidth = 1000;
+      asset.exifInfo.exifImageHeight = 800;
+
+      sut['getConfig'] = vi.fn().mockResolvedValue({
+        metadata: { faces: { import: false, export: true } },
+      } as any);
+
+      mocks.person.getFacesForSidecar.mockResolvedValue([
+        {
+          name: 'Alice',
+          boundingBoxX1: 100,
+          boundingBoxY1: 200,
+          boundingBoxX2: 300,
+          boundingBoxY2: 400,
+          imageWidth: 1000,
+          imageHeight: 800,
+        },
+      ]);
+
+      mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue([]);
+      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
+
+      await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.metadata.writeTags).toHaveBeenCalledWith(
+        asset.files[0].path,
+        {},
+        expect.arrayContaining([
+          '-overwrite_original',
+          '-RegionInfo=',
+          '-RegionAppliedToDimensionsW=1000',
+          '-RegionAppliedToDimensionsH=800',
+          '-RegionAppliedToDimensionsUnit=pixel',
+          '-RegionAreaX+=0.2',
+          '-RegionAreaY+=0.375',
+          '-RegionAreaW+=0.2',
+          '-RegionAreaH+=0.25',
+          '-RegionAreaUnit+=normalized',
+          '-RegionType+=Face',
+          '-RegionName+=Alice',
+        ]),
+      );
+    });
+
+    it('should not export faces when face export is disabled', async () => {
+      const asset = factory.jobAssets.sidecarWrite();
+      asset.exifInfo.rating = 5;
+
+      sut['getConfig'] = vi.fn().mockResolvedValue({
+        metadata: { faces: { import: false, export: false } },
+      } as any);
+
+      mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
+
+      await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.person.getFacesForSidecar).not.toHaveBeenCalled();
+      expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { Rating: 5 });
     });
   });
 

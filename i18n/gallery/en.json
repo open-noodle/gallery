@@ -372,6 +372,8 @@
     "memory_type_trip_anniversary_setting_description": "Resurface a past trip on the anniversary of its first day.",
     "memory_type_video_moments_setting": "Video moments",
     "memory_type_video_moments_setting_description": "Surface videos from this month in a past year.",
+    "metadata_faces_export_setting": "Enable face export",
+    "metadata_faces_export_setting_description": "Export face regions to MWG-rs compliant XMP sidecars",
     "people_backfill_job": "People identity maintenance",
     "people_backfill_job_description": "Repair and recalculate identity-backed people links, shared-space people inheritance, and related people metadata. This is normally automatic and safe to rerun.",
     "pet_detection_job_description": "Detect cats and dogs in photos",
