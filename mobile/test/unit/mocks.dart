@@ -154,7 +154,6 @@ class ServiceMocks {
     _stubUserService();
     _stubPartnerService();
     _stubAssetService();
-    _stubActionService();
     _stubRemoteAlbumService();
     _stubCleanupService();
     _stubTagApi();
@@ -191,10 +190,6 @@ class ServiceMocks {
     when(asset.delete).thenAnswer((_) async {});
     when(asset.applyEdits).thenAnswer((_) async {});
     when(asset.deleteLocal).thenAnswer((_) async => 0);
-  }
-
-  void _stubActionService() {
-    when(action.removeFromSpace).thenAnswer((_) async => 0);
   }
 
   void _stubRemoteAlbumService() {
@@ -391,10 +386,7 @@ extension type const AssetServiceStub(MockAssetService service) implements Stub<
       () => service.deleteLocal(any(), trash: any(named: 'trash'));
 }
 
-extension type const ActionServiceStub(MockActionService service) implements Stub<MockActionService> {
-  Future<int> Function() get removeFromSpace =>
-      () => service.removeFromSpace(any(), any());
-}
+extension type const ActionServiceStub(MockActionService service) implements Stub<MockActionService> {}
 
 extension type const RemoteAlbumServiceStub(MockRemoteAlbumService service) implements Stub<MockRemoteAlbumService> {
   Future<int> Function() get removeAssets =>

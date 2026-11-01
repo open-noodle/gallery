@@ -107,6 +107,7 @@ describe('updateSpaceDetails', () => {
     await expect(updateSpaceDetails('space-1', dto)).resolves.toBe(true);
 
     expect(updateSpace).toHaveBeenCalledWith({ id: 'space-1', sharedSpaceUpdateDto: dto });
+    expect(emitSpy).toHaveBeenCalledWith('SpaceUpdate', { spaceId: 'space-1' });
     expect(toastManager.primary).toHaveBeenCalledOnce();
   });
 
@@ -126,6 +127,7 @@ describe('updateSpaceDetails', () => {
     await expect(updateSpaceDetails('space-1', dto)).resolves.toBe(false);
 
     expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
+    expect(emitSpy).not.toHaveBeenCalledWith('SpaceUpdate', expect.anything());
     expect(toastManager.primary).not.toHaveBeenCalled();
   });
 });

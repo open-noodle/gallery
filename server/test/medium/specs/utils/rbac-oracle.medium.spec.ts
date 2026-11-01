@@ -16,6 +16,7 @@ import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dt
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -844,6 +845,23 @@ describe('viewer-scope RBAC oracle', () => {
               .toSorted((a, b) => a.stack.localeCompare(b.stack)),
         ),
       };
+    }
+    expect(result).toMatchSnapshot();
+  });
+  it('spaces showing each asset (thumbnail badge)', async () => {
+    const sut = world.ctx.getService(GalleryAssetService);
+    const assetIds = Object.values(world.assets);
+    const result: Record<string, unknown> = {};
+    for (const [actor, auth] of Object.entries(world.actors)) {
+      result[actor] = await attempt(
+        () => sut.getSpaces(auth, { assetIds }),
+        ({ assets }) =>
+          Object.fromEntries(
+            assets
+              .map(({ assetId, spaceIds }) => [name(assetId), sorted(spaceIds.map((id) => name(id)))] as const)
+              .toSorted(([a], [b]) => a.localeCompare(b)),
+          ),
+      );
     }
     expect(result).toMatchSnapshot();
   });

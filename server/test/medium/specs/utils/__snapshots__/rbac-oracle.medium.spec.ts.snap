@@ -11738,6 +11738,134 @@ exports[`viewer-scope RBAC oracle > shared links 1`] = `
 }
 `;
 
+exports[`viewer-scope RBAC oracle > spaces showing each asset (thumbnail badge) 1`] = `
+{
+  "albumEditor": {},
+  "albumLink": {},
+  "albumViewer": {},
+  "individualLink": {},
+  "owner": {
+    "albumSpaceAsset": [
+      "space",
+    ],
+    "contributedAsset": [
+      "space",
+    ],
+    "editorAsset": [
+      "space",
+    ],
+    "libraryAsset": [
+      "space",
+    ],
+    "petAsset": [
+      "space",
+    ],
+    "spaceArchived": [
+      "space",
+    ],
+    "spaceAsset": [
+      "space",
+    ],
+  },
+  "ownerElevated": {
+    "albumSpaceAsset": [
+      "space",
+    ],
+    "contributedAsset": [
+      "space",
+    ],
+    "editorAsset": [
+      "space",
+    ],
+    "libraryAsset": [
+      "space",
+    ],
+    "petAsset": [
+      "space",
+    ],
+    "spaceArchived": [
+      "space",
+    ],
+    "spaceAsset": [
+      "space",
+    ],
+  },
+  "partner": {},
+  "spaceAlbumLink": {},
+  "spaceEditor": {
+    "albumSpaceAsset": [
+      "space",
+    ],
+    "contributedAsset": [
+      "space",
+    ],
+    "editorAsset": [
+      "space",
+    ],
+    "libraryAsset": [
+      "space",
+    ],
+    "petAsset": [
+      "space",
+    ],
+    "spaceArchived": [
+      "space",
+    ],
+    "spaceAsset": [
+      "space",
+    ],
+  },
+  "spaceLink": {},
+  "spaceViewer": {
+    "albumSpaceAsset": [
+      "space",
+    ],
+    "contributedAsset": [
+      "space",
+    ],
+    "editorAsset": [
+      "space",
+    ],
+    "libraryAsset": [
+      "space",
+    ],
+    "petAsset": [
+      "space",
+    ],
+    "spaceArchived": [
+      "space",
+    ],
+    "spaceAsset": [
+      "space",
+    ],
+  },
+  "spaceViewerOff": {
+    "albumSpaceAsset": [
+      "space",
+    ],
+    "contributedAsset": [
+      "space",
+    ],
+    "editorAsset": [
+      "space",
+    ],
+    "libraryAsset": [
+      "space",
+    ],
+    "petAsset": [
+      "space",
+    ],
+    "spaceArchived": [
+      "space",
+    ],
+    "spaceAsset": [
+      "space",
+    ],
+  },
+  "stranger": {},
+}
+`;
+
 exports[`viewer-scope RBAC oracle > tags 1`] = `
 {
   "albumEditor": {

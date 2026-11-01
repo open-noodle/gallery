@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
+import 'package:immich_mobile/gallery/space_removal.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
-import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/toast.provider.dart';
 import 'package:immich_mobile/utils/error_handler.dart';
 
@@ -29,7 +29,7 @@ class RemoveFromSpaceAction extends AssetActionBuilder {
 
     return .new(
       icon: Icons.remove_circle_outline,
-      label: 'Remove from space',
+      label: context.t.remove_from_space,
       onAction: () => _removeFromSpace(context, ref),
     );
   }
@@ -37,29 +37,23 @@ class RemoveFromSpaceAction extends AssetActionBuilder {
   Future<void> _removeFromSpace(BuildContext context, WidgetRef ref) async {
     final toastService = ref.read(toastServiceProvider);
     final clearSelection = ref.read(clearSelectionProvider(source));
-    final notifier = ref.read(actionProvider.notifier);
-    // Resolved up front, before the `await` below: this key takes no
-    // arguments, and reading `context` after an async gap would need a
-    // mounted check (the old widget did exactly that). The old widget
-    // resolved this same key via `.t(context: context)`; `context.t.x` is
-    // the equivalent idiom used by the other action.dart files.
-    final errorMessage = context.t.scaffold_body_error_occurred;
+    final assetIds = ref.read(assetsActionProvider(source)).remote().map((asset) => asset.id).toList();
 
+    SpaceRemoval? removal;
     try {
-      final result = await notifier.removeFromSpace(source, spaceId);
-
-      // Selection clearing and onComplete fire unconditionally, matching the
-      // behaviour of the widget this replaces.
-      clearSelection();
-      onComplete?.call();
-
-      if (result.success) {
-        await toastService.success('${result.count} photos removed from space');
-      } else {
-        await toastService.error(errorMessage);
-      }
+      removal = await ref.read(spaceRemovalServiceProvider).remove(spaceId, assetIds);
     } catch (error, stack) {
+      // Shows the server's message, or a generic one.
       handleError(error, stack: stack, description: 'Failed to remove assets from space');
     }
+
+    // Selection clearing and onComplete fire whatever the outcome, as before.
+    clearSelection();
+    onComplete?.call();
+    if (removal == null) {
+      return;
+    }
+
+    await showSpaceRemovalToast(toastService, removal);
   }
 }
