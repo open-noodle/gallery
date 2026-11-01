@@ -114,9 +114,18 @@ test.describe('Cleanup Utility', () => {
       utils.createAsset(admin.accessToken),
     ]);
     const client = await utils.connectDatabase();
+    // The quality job runs at the end of each upload's thumbnail chain and writes its own row, flagging the PNG
+    // upload as a screenshot (which Blurry leaves out). Wait for it, so the scores below are not overwritten.
+    const analysed = async () => {
+      const { rows } = await client.query<{ count: string }>(
+        'SELECT count(*) FROM asset_quality WHERE "assetId" = ANY($1)',
+        [[first.id, second.id]],
+      );
+      return rows[0].count;
+    };
+    await expect.poll(analysed, { timeout: 30_000 }).toBe('2');
     for (const asset of [first, second]) {
-      // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue. The analysis job may
-      // have written the row already, flagging the PNG upload as a screenshot (which Blurry leaves out): overwrite it.
+      // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue.
       await client.query(
         `INSERT INTO asset_quality ("assetId", "ownerId", sharpness, "isScreenshot", version, "screenshotVersion")
          VALUES ($1, $2, 5, false, 1, 1)
