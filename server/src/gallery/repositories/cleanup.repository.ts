@@ -183,13 +183,18 @@ const mapCleanupAssetRow = <T extends { fileSize: unknown; isFavorite: unknown; 
   kept: Boolean(row.kept),
 });
 
-/** The three Blurry predicates, driven by the strictness/threshold constants from Task 1. */
+/**
+ * The three Blurry predicates, driven by the strictness/threshold constants from Task 1. A screenshot meets none of
+ * them: a light-mode screen clips white over most of the frame and a dark-mode one is mostly black, so the exposure
+ * rules would flag ordinary screenshots as overexposed or too dark. Screenshots have their own queue.
+ */
 const blurryExpressions = (strictness: CleanupStrictnessValue) => {
   const threshold = CLEANUP_BLUR_THRESHOLDS[strictness];
+  const photo = sql`not asset_quality."isScreenshot"`;
   return {
-    isBlurry: sql<boolean>`asset_quality.sharpness < ${threshold}`,
-    isDark: sql<boolean>`(asset_quality.brightness < ${CLEANUP_DARK.maxBrightness} and asset_quality."clippedDark" > ${CLEANUP_DARK.minClippedDark})`,
-    isBright: sql<boolean>`asset_quality."clippedBright" > ${CLEANUP_BRIGHT.minClippedBright}`,
+    isBlurry: sql<boolean>`(${photo} and asset_quality.sharpness < ${threshold})`,
+    isDark: sql<boolean>`(${photo} and asset_quality.brightness < ${CLEANUP_DARK.maxBrightness} and asset_quality."clippedDark" > ${CLEANUP_DARK.minClippedDark})`,
+    isBright: sql<boolean>`(${photo} and asset_quality."clippedBright" > ${CLEANUP_BRIGHT.minClippedBright})`,
   };
 };
 
