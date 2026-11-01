@@ -2,12 +2,12 @@ import { AlbumSpaceAssetAuditTable } from 'src/schema/tables/album-space-asset-a
 import { AlbumSpaceAssetTable } from 'src/schema/tables/album-space-asset.table.js';
 import { AssetDuplicateChecksumTable } from 'src/schema/tables/asset-duplicate-checksum.table.js';
 import { AssetFaceCreatorTable } from 'src/schema/tables/asset-face-creator.table.js';
+import { AssetFaceVideoFrameTable } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
 import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetImageAdjustTable } from 'src/schema/tables/asset-image-adjust.table.js';
 import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
 import { AssetQualityTable } from 'src/schema/tables/asset-quality.table.js';
-import { AssetFaceVideoFrameTable } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { AssetSpatialSceneTable } from 'src/schema/tables/asset-spatial-scene.table.js';
 import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
 import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';

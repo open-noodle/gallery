@@ -35,8 +35,8 @@ import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.servic
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
-import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
+import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';

@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { controllers } from 'src/controllers/index.js';
 import { FaceController } from 'src/controllers/face.controller.js';
+import { controllers } from 'src/controllers/index.js';
 import { Permission } from 'src/enum.js';
 import { GalleryFaceController } from 'src/gallery/controllers/gallery-face.controller.js';
 import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
