@@ -988,7 +988,8 @@ class SharedSpaceTimelineRepository {
         row.id.isIn(assetIds) &
         _remoteWithinTemporalScope(row, temporalScope),
     groupBy: groupBy,
-    origin: TimelineOrigin.person,
+    // Every photo here is in the space: a space timeline, which the space badge leaves alone.
+    origin: TimelineOrigin.remoteSpace,
   );
 
   Stream<List<Bucket>> _watchPlaceBucket(
