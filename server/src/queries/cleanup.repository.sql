@@ -213,12 +213,19 @@ select
       and "cleanup_decision"."queue" = 'rewind'
   ) as "kept",
   case
-    when asset_quality.sharpness < $2 then 'blurry'
     when (
-      asset_quality.brightness < $3
+      not asset_quality."isScreenshot"
+      and asset_quality.sharpness < $2
+    ) then 'blurry'
+    when (
+      not asset_quality."isScreenshot"
+      and asset_quality.brightness < $3
       and asset_quality."clippedDark" > $4
     ) then 'dark'
-    when asset_quality."clippedBright" > $5 then 'bright'
+    when (
+      not asset_quality."isScreenshot"
+      and asset_quality."clippedBright" > $5
+    ) then 'bright'
     else null
   end as "reason"
 from
@@ -565,12 +572,19 @@ select
     'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
   ) as "cursorT",
   case
-    when asset_quality.sharpness < $1 then 'blurry'
     when (
-      asset_quality.brightness < $2
+      not asset_quality."isScreenshot"
+      and asset_quality.sharpness < $1
+    ) then 'blurry'
+    when (
+      not asset_quality."isScreenshot"
+      and asset_quality.brightness < $2
       and asset_quality."clippedDark" > $3
     ) then 'dark'
-    when asset_quality."clippedBright" > $4 then 'bright'
+    when (
+      not asset_quality."isScreenshot"
+      and asset_quality."clippedBright" > $4
+    ) then 'bright'
     else null
   end as "reason"
 from
@@ -580,12 +594,19 @@ from
 where
   "asset"."type" = 'IMAGE'
   and (
-    asset_quality.sharpness < $5
+    (
+      not asset_quality."isScreenshot"
+      and asset_quality.sharpness < $5
+    )
     or (
-      asset_quality.brightness < $6
+      not asset_quality."isScreenshot"
+      and asset_quality.brightness < $6
       and asset_quality."clippedDark" > $7
     )
-    or asset_quality."clippedBright" > $8
+    or (
+      not asset_quality."isScreenshot"
+      and asset_quality."clippedBright" > $8
+    )
   )
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
