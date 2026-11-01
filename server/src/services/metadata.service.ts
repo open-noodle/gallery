@@ -37,7 +37,8 @@ import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { mergeTimeZone } from 'src/utils/date.js';
 import { parseDurationToSeconds } from 'src/utils/duration.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
-import { batched, isFaceImportEnabled } from 'src/utils/misc.js';
+import { toMwgExifToolArgs, toMwgRegionInfo } from 'src/gallery/utils/face-region.util.js';
+import { batched, isFaceExportEnabled, isFaceImportEnabled } from 'src/utils/misc.js';
 import { upsertTags } from 'src/utils/tag.js';
 import { Tasks } from 'src/utils/tasks.js';
 
@@ -554,12 +555,43 @@ export class MetadataService extends BaseService {
       isUndefined,
     );
 
-    if (Object.keys(exif).length === 0) {
+    const { metadata } = await this.getConfig({ withCache: true });
+    let writeArgs: string[] | undefined;
+
+    if (isFaceExportEnabled(metadata)) {
+      const faces = await this.personRepository.getFacesForSidecar(id);
+      if (faces.length > 0) {
+        const orientation = asset.exifInfo.orientation ? Number(asset.exifInfo.orientation) : undefined;
+        const dimensions =
+          asset.exifInfo.exifImageWidth && asset.exifInfo.exifImageHeight
+            ? { width: asset.exifInfo.exifImageWidth, height: asset.exifInfo.exifImageHeight }
+            : undefined;
+
+        const regionInfo = toMwgRegionInfo(
+          faces.map((f) => ({
+            ...f,
+            name: f.name || '',
+          })),
+          orientation,
+          dimensions,
+        );
+
+        if (regionInfo) {
+          writeArgs = toMwgExifToolArgs(regionInfo);
+        }
+      }
+    }
+
+    if (Object.keys(exif).length === 0 && (!writeArgs || writeArgs.length === 0)) {
       return JobStatus.Skipped;
     }
 
     if (isDiskPath(sidecarPath)) {
-      await this.metadataRepository.writeTags(sidecarPath, exif);
+      if (writeArgs) {
+        await this.metadataRepository.writeTags(sidecarPath, exif, writeArgs);
+      } else {
+        await this.metadataRepository.writeTags(sidecarPath, exif);
+      }
     } else {
       // S3 mode: work against a local temp file, then always upload the result to S3.
       // If an existing sidecar is in S3, download it first so we preserve its contents;
@@ -583,7 +615,11 @@ export class MetadataService extends BaseService {
         };
       }
       try {
+        if (writeArgs) {
+        await this.metadataRepository.writeTags(localSidecar.localPath, exif, writeArgs);
+      } else {
         await this.metadataRepository.writeTags(localSidecar.localPath, exif);
+      }
         const stream = this.storageRepository.createPlainReadStream(localSidecar.localPath);
         await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
       } finally {

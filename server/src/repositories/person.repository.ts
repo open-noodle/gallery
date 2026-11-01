@@ -1832,4 +1832,32 @@ export class PersonRepository {
       .orderBy('person.ownerId')
       .execute();
   }
+
+  getFacesForSidecar(assetId: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.personGroupId', '=', 'asset_face.personGroupId')
+          .onRef('person.ownerId', '=', 'asset.ownerId'),
+      )
+      .select([
+        'person.name',
+        'asset_face.boundingBoxX1',
+        'asset_face.boundingBoxY1',
+        'asset_face.boundingBoxX2',
+        'asset_face.boundingBoxY2',
+        'asset_face.imageWidth',
+        'asset_face.imageHeight',
+      ])
+      .where('asset_face.assetId', '=', assetId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('person.name', 'is not', null)
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .orderBy('asset_face.boundingBoxX1', 'asc')
+      .execute();
+  }
 }

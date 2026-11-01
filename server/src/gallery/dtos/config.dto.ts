@@ -193,6 +193,10 @@ export const GalleryFaceSuggestionSchema = z
   })
   .meta({ id: 'AdminConfigFaceSuggestionDto' });
 
+export const GalleryMetadataFacesExtension = {
+  export: galleryConfigBool.default(false).describe('Export face regions to MWG-rs compliant XMP sidecars'),
+};
+
 export const GalleryClipExtension = {
   maxDistance: z
     .number()
@@ -237,6 +241,10 @@ export const galleryMachineLearningDefaults = {
     maxForegroundRatio: 0.75,
     minFaceHeight: 0.03,
   },
+};
+
+export const galleryMetadataFacesDefaults = {
+  export: false,
 };
 
 export const galleryBackupDatabaseDefaults = {
