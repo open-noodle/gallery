@@ -349,6 +349,8 @@
     "machine_learning_video_faces_scene_detection_description": "在剪辑过的视频中，同时检查每个新镜头的开头，以免漏掉短镜头。",
     "machine_learning_video_faces_setting": "在整个视频中检测人脸",
     "machine_learning_video_faces_setting_description": "从整个视频中抽取的帧里查找人脸，而不只是第一帧，并以最清晰的画面显示每个人。新视频会自动以这种方式扫描。要扫描之前处理过的视频，请以“缺失”运行“人脸检测”任务；你设置的名称会保留。",
+    "machine_learning_video_faces_tiled_detection": "查找小人脸（人群）",
+    "machine_learning_video_faces_tiled_detection_description": "同时将每个高分辨率帧分成四个相互重叠的部分进行搜索，以找到人群中的小人脸。耗时约为原来的五倍。",
     "memories_settings": "回忆",
     "memories_settings_description": "管理已生成的回忆记录",
     "memory_person_throwback_dormancy_setting": "人物回忆沉寂期",

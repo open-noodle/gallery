@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Esamina anche l’inizio di ogni nuova inquadratura nei video montati, così le inquadrature brevi non vengono perse.",
     "machine_learning_video_faces_setting": "Rileva i volti in tutto il video",
     "machine_learning_video_faces_setting_description": "Cerca i volti in fotogrammi presi da tutto il video invece che solo dal primo, e mostra ogni persona nella sua inquadratura più nitida. I nuovi video vengono analizzati così automaticamente. Per analizzare i video elaborati in precedenza, avvia il job \"Rilevamento volti\" con \"Mancanti\"; i nomi che hai assegnato restano.",
+    "machine_learning_video_faces_tiled_detection": "Trova i volti piccoli (folle)",
+    "machine_learning_video_faces_tiled_detection_description": "Cerca anche in ogni fotogramma ad alta risoluzione diviso in quattro quarti sovrapposti, così vengono trovati i volti piccoli, come le persone in una folla. Richiede circa cinque volte più tempo.",
     "memories_settings": "Ricordi",
     "memories_settings_description": "Gestisci la cronologia dei ricordi generati",
     "memory_person_throwback_dormancy_setting": "Inattività per i ricordi di una persona",

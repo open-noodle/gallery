@@ -63,7 +63,9 @@ when it lives in S3), not on the encoded playback copy, which may be heavily com
 Timestamps come from two sources, merged and de-duplicated:
 
 1. **An even interval**, every `sampleInterval` seconds (default 2), starting half an interval in so a 1-second clip
-   still gets a frame.
+   still gets a frame. A clip of a minute or less is sampled at least once a second whatever the setting
+   (`sampleIntervalFor`): on test clips of 9 to 23 seconds, 5 to 12 frames gave each person too few chances to be seen
+   clearly, and per-person confidence (below) needs several sightings to work.
 2. **Scene cuts**, when `sceneDetection` is on (default). One ffmpeg pass decodes keyframes only (`-skip_frame nokey`)
    through `select='gt(scene,0.3)'` and reports their times, at a fraction of the cost of a full decode. A sample is
    added just after each cut, so a shot shorter than the interval is still looked at. This only sees cuts the encoder
@@ -103,6 +105,23 @@ in time order:
 
 A final pass merges two tracks whose centroids are within `maxDistance` and which never appear in the same frame. This
 catches a person first seen in profile and later frontally.
+
+### Per-person confidence
+
+A photo face is kept when the detector scores it at least `facialRecognition.minScore` (default 0.7). Applied to each
+video frame on its own, that loses people. On a 320 x 240 test clip, two people clearly on screen, with faces of 60 to
+109 px, scored 0.37 to 0.59 in every frame for seconds at a time and were never found, while a third crossed 0.7 in
+one frame only. In a video, being found again and again is evidence a photo cannot offer.
+
+So frames are searched at a lower score, `VIDEO_FACE_LOW_SCORE` (0.45, or the admin's minimum if that is lower), and
+after tracking each person is judged as a whole (`acceptTrack`). A track is kept when either:
+
+- its best sighting reaches `minScore`, as a photo face must; or
+- it was seen in at least 3 sampled frames, with a median score of at least 0.45 and a median face of at least 32 px.
+
+The size floor matters for crowds. A crowd shot yields dozens of consistent 13 to 25 px faces, too small to recognise
+or to name, which would otherwise fill the People list. The finish log line reports how many candidate tracks were
+found and how many were kept.
 
 ## Picking the best view
 
@@ -217,6 +236,19 @@ The detector stamps every video it handles, faces or not, and also a video it fa
 stream, so Missing does not queue the same video on every run. `VideoFaceDetector.queueMissing` adds these jobs from
 one call at the end of `PersonService.handleQueueDetectFaces`, only for `force: false` and only while the setting is on.
 
+## Tiled detection
+
+The face detector letterboxes every image to 640 x 640 before it looks (`FACE_DETECTION_SIZE`). A 1080p frame is shrunk
+to a third, so a 30 px face in a crowd reaches the detector at about 10 px, around the smallest it can find at all. On a
+test crowd clip, the detector saw 5 to 40 faces per frame, all 13 to 38 px, with only a few reaching 0.7 in any frame.
+
+With `tiledDetection` on (off by default), a frame whose long edge is over 960 px is searched five times: whole, and
+as four quarters that overlap by 15 % of their size (`planTiles`; on a 1080p frame, 1104 x 621 tiles sharing a 288 px
+band). Each quarter reaches the detector at about twice the size the whole frame does. Boxes found in a quarter are moved
+into frame pixels and merged with the whole-frame finds, keeping the more confident of any two that overlap by an IoU over
+0.4 (`mergeDetections`). The whole frame is still searched for faces larger than the overlap band, which a quarter's edge
+could cut in two. It costs about five times the detection work, which is why it is a separate setting.
+
 ## Serving crops
 
 `BackendMediaServer.getFaceThumbnailSource` takes the face instead of the asset id, and returns the face's stored frame
@@ -226,6 +258,14 @@ best frame with no change in their own logic.
 
 `MediaService.handleGeneratePersonThumbnail` (upstream) takes its video input from one fork call that returns the
 representative face's frame, falling back to the preview.
+
+A small face cut from its best frame is cropped with its surroundings (`widenSmallFace`). Under 80 px on its longest
+side, the crop region is widened around the face's centre by a factor that rises from 1 at 80 px to 2.5 at 40 px and
+below, so a 25 px face is shown with its hair, head and shoulders instead of as an upscaled smudge. That is the
+difference between recognising someone and guessing. Only the crop is widened. The box stored on the face stays the
+face, because recognition, the face overlays and stock Immich all read it as one. Both crop paths apply it: the
+person thumbnail, through the region `getPersonThumbnailSource` returns, and every face-keyed crop, when the source
+`getFaceThumbnailSource` chose is the face's frame. Photo faces and unsampled video faces are cropped as before.
 
 A new fork route, `GET /faces/{id}/thumbnail`, serves a face-keyed crop to anyone holding `FaceRead` on the face's
 asset. That is the permission upstream's `GET /faces?id=` already checks, so no access rule is added. The crop
@@ -249,6 +289,7 @@ the assign panel. Photos keep their in-browser crop from the full image already 
 | `sampleInterval` | `2`     | 0.5 to 60 s | Seconds between sampled frames                           |
 | `sceneDetection` | `true`  |             | Also sample just after every scene cut                   |
 | `maxFrames`      | `1800`  | 10 to 10000 | Frame budget per video; the interval stretches to fit it |
+| `tiledDetection` | `false` |             | Also search large frames as four overlapping quarters    |
 
 Off by default, like the fork's other heavier ML jobs (pet detection, Spatial Scene), so a fresh install behaves as
 upstream until an admin opts in. Admin-only. The admin UI is `web/src/lib/gallery/components/admin/video-face-settings.svelte`,
@@ -261,21 +302,21 @@ Every sampled video logs one line when it starts and one when it finishes, at `l
 
 ```
 Sampling 1800 frames across 1h of video <id> (about every 2s, 3 scene cuts)
-Found 4 people in 1800 frames of video <id> in 21m, 30s (2 new, 1 kept, 1 removed)
+Found 4 people (of 6 candidates) in 1800 frames of video <id> in 21m, 30s (2 new, 1 kept, 1 removed)
 ```
 
 A video sampled from 100 frames or more also logs its progress every 10%, with an estimate of the time left, worked
 out from the average time per frame so far:
 
 ```
-Video faces 40% done (720 of 1800 frames, 3 people so far), estimated 12m, 54s remaining for video <id>
+Video faces 40% done (720 of 1800 frames, 5 faces tracked so far), estimated 12m, 54s remaining for video <id>
 ```
 
 This follows transcoding's progress lines (`MediaRepository.transcode`), with two differences. They are at `log`
 level, not `debug`, because a long video can hold a face detection slot for tens of minutes and default-level logs
 would otherwise show nothing until it finished. And short videos log no progress at all, so a library of phone clips
-adds two lines per video, not twelve. "People so far" counts tracks before the final merge, so it can be higher than
-the finished count.
+adds two lines per video, not twelve. "Faces tracked so far" counts every candidate track before the final merge and
+per-person confidence, so it is usually higher than the number of people found.
 
 ## Cost
 

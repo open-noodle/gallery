@@ -2224,6 +2224,31 @@ describe(MediaService.name, () => {
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(framePath, expect.anything());
     });
 
+    it('should crop a small video face from its best frame with its surroundings', async () => {
+      const person = PersonFactory.create();
+      mocks.person.getDataForThumbnailGenerationJob.mockResolvedValue({
+        ...personThumbnailStub.videoThumbnail,
+        x1: 100,
+        y1: 100,
+        x2: 120,
+        y2: 120,
+      });
+      mocks.videoFace.getRepresentativeFramePath.mockResolvedValue(
+        '/data/thumbs/user-id/as/se/asset-id_faces/face-id.jpeg',
+      );
+      mocks.media.generateThumbnail.mockResolvedValue();
+      mocks.media.decodeImage.mockResolvedValue({
+        data: Buffer.from(''),
+        info: { width: 1000, height: 1000 } as OutputInfo,
+      });
+
+      await sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId });
+
+      // A 20 px face is cropped as a 50 px region (2.5x) around its centre, not as the face alone.
+      const [, options] = mocks.media.generateThumbnail.mock.calls[0];
+      expect(options.edits).toEqual([{ action: 'crop', parameters: { x: 207, y: 152, width: 136, height: 136 } }]);
+    });
+
     it('should use preview path if video', async () => {
       const person = PersonFactory.create();
 

@@ -68,6 +68,28 @@ describe(VideoFaceService.name, () => {
       expect(mocks.videoFace.getFramePath).toHaveBeenCalledWith('face-1');
     });
 
+    it('crops a small sampled video face with its surroundings', async () => {
+      const small = {
+        ...face,
+        imageWidth: 1920,
+        imageHeight: 1080,
+        boundingBoxX1: 500,
+        boundingBoxY1: 300,
+        boundingBoxX2: 526,
+        boundingBoxY2: 330,
+      };
+      mocks.person.getFaceByIdOnLiveAsset.mockResolvedValue(small as any);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.videoFace.getFramePath.mockResolvedValue('/data/thumbs/owner/as/se/asset-1_faces/face-1.jpeg');
+
+      await expectCropFrom('/data/thumbs/owner/as/se/asset-1_faces/face-1.jpeg');
+
+      // The 26 x 30 px face is cropped from a 65 x 75 px region around it.
+      const [, options] = mocks.media.generateThumbnail.mock.calls[0];
+      const crop = (options.edits as { parameters: { width: number } }[])[0].parameters;
+      expect(crop.width).toBeGreaterThanOrEqual(75);
+    });
+
     it('crops any other face from the preview, as the person-keyed crops do', async () => {
       mocks.person.getFaceByIdOnLiveAsset.mockResolvedValue(face as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));

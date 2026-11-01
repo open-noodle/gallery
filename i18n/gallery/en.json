@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Also look at the start of every new shot in edited videos, so short shots are not missed.",
     "machine_learning_video_faces_setting": "Detect faces across the whole video",
     "machine_learning_video_faces_setting_description": "Look for faces in frames sampled throughout each video instead of only its first frame, and show each person from their sharpest view. New videos are scanned this way automatically. To scan videos processed earlier, run the Face Detection job with Missing; names you have given are kept.",
+    "machine_learning_video_faces_tiled_detection": "Find small faces (crowds)",
+    "machine_learning_video_faces_tiled_detection_description": "Also search each high-resolution frame as four overlapping quarters, so small faces such as people in a crowd are found. Takes about five times as long.",
     "memories_settings": "Memories",
     "memories_settings_description": "Manage generated memory history",
     "memory_person_throwback_dormancy_setting": "Person throwback dormancy",

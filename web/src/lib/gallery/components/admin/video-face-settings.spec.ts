@@ -13,7 +13,16 @@ const makeConfig = (
       enabled: true,
       facialRecognition: {
         enabled: recognition,
-        ...(video && { video: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800, ...video } }),
+        ...(video && {
+          video: {
+            enabled: false,
+            sampleInterval: 2,
+            sceneDetection: true,
+            maxFrames: 1800,
+            tiledDetection: false,
+            ...video,
+          },
+        }),
       },
     },
   }) as unknown as AdminConfigDto;

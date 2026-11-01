@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Prüft in geschnittenen Videos zusätzlich den Anfang jeder neuen Einstellung, damit kurze Einstellungen nicht übersehen werden.",
     "machine_learning_video_faces_setting": "Gesichter im ganzen Video erkennen",
     "machine_learning_video_faces_setting_description": "Sucht Gesichter in Bildern aus dem gesamten Video statt nur im ersten Bild und zeigt jede Person in ihrer schärfsten Ansicht. Neue Videos werden automatisch so gescannt. Um früher verarbeitete Videos zu scannen, starte den Job „Gesichtserfassung“ mit „Fehlende“; von dir vergebene Namen bleiben erhalten.",
+    "machine_learning_video_faces_tiled_detection": "Kleine Gesichter finden (Menschenmengen)",
+    "machine_learning_video_faces_tiled_detection_description": "Durchsucht jedes hochauflösende Bild zusätzlich in vier sich überlappenden Vierteln, damit auch kleine Gesichter wie Personen in einer Menschenmenge gefunden werden. Dauert etwa fünfmal so lange.",
     "memories_settings": "Erinnerungen",
     "memories_settings_description": "Verlauf der generierten Erinnerungen verwalten",
     "memory_person_throwback_dormancy_setting": "Ruhezeit für Personenrückblicke",

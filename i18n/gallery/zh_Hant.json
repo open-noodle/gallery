@@ -351,6 +351,8 @@
     "machine_learning_video_faces_scene_detection_description": "在剪輯過的影片中，同時檢查每個新鏡頭的開頭，以免漏掉短鏡頭。",
     "machine_learning_video_faces_setting": "在整部影片中偵測臉孔",
     "machine_learning_video_faces_setting_description": "從整部影片中擷取的畫格裡尋找臉孔，而不只是第一個畫格，並以最清晰的畫面顯示每個人。新影片會自動以這種方式掃描。若要掃描先前處理過的影片，請以「排入未處理」執行「臉孔偵測」工作；你設定的名稱會保留。",
+    "machine_learning_video_faces_tiled_detection": "尋找小臉孔（人群）",
+    "machine_learning_video_faces_tiled_detection_description": "同時將每個高解析度畫格分成四個相互重疊的部分進行搜尋，以找到人群中的小臉孔。耗時約為原來的五倍。",
     "maintenance_integrity_checksum_mismatch_refresh_job": "刷新檢查碼不符報告",
     "maintenance_integrity_missing_file_refresh_job": "刷新缺失檔案報告",
     "maintenance_integrity_untracked_file_refresh_job": "刷新未追蹤檔案報告",

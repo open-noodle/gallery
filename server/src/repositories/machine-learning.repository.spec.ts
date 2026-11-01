@@ -35,7 +35,7 @@ describe(MachineLearningRepository.name, () => {
       maxDistance: 0.5,
       minFaces: 1,
       suggestions: { enabled: false, maxDistance: 0.7 },
-      video: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800 },
+      video: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800, tiledDetection: false },
     },
     ocr: {
       enabled: false,

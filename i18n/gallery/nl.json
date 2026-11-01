@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Bekijkt in gemonteerde video's ook het begin van elk nieuw shot, zodat korte shots niet worden gemist.",
     "machine_learning_video_faces_setting": "Gezichten in de hele video herkennen",
     "machine_learning_video_faces_setting_description": "Zoekt gezichten in beelden uit de hele video in plaats van alleen het eerste beeld, en toont elke persoon in het scherpste beeld. Nieuwe video's worden automatisch zo gescand. Start de taak 'Gezichtsdetectie' met 'Missend' om eerder verwerkte video's te scannen; namen die je hebt gegeven blijven behouden.",
+    "machine_learning_video_faces_tiled_detection": "Kleine gezichten vinden (menigtes)",
+    "machine_learning_video_faces_tiled_detection_description": "Doorzoekt elk beeld met hoge resolutie ook als vier overlappende kwarten, zodat kleine gezichten zoals mensen in een menigte worden gevonden. Duurt ongeveer vijf keer zo lang.",
     "memories_settings": "Herinneringen",
     "memories_settings_description": "Beheer de geschiedenis van gegenereerde herinneringen",
     "memory_person_throwback_dormancy_setting": "Inactiviteit voor persoonsherinneringen",

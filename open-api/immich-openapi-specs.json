@@ -29714,6 +29714,10 @@
           "sceneDetection": {
             "description": "Also sample a frame just after every scene cut",
             "type": "boolean"
+          },
+          "tiledDetection": {
+            "description": "Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work.",
+            "type": "boolean"
           }
         },
         "required": [

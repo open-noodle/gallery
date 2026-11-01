@@ -18,6 +18,9 @@ const face = (embedding: number[], x1: number, size = 150, score = 0.9) => ({
   score,
 });
 
+/** A face the detector is unsure of: below the photo threshold, above the low one. */
+const unsure = (x1: number, score: number, size = 60) => face(alice, x1, size, score);
+
 const videoConfig = {
   machineLearning: {
     facialRecognition: { video: { enabled: true, sampleInterval: 2, sceneDetection: false, maxFrames: 1800 } },
@@ -79,7 +82,7 @@ describe('VideoFaceDetector', () => {
     mocks.videoFace.getForDetect.mockResolvedValue(video() as any);
     mocks.videoFace.getPeopleRepresentedBy.mockResolvedValue([]);
     mocks.media.probe.mockResolvedValue({
-      format: { duration: 6, bitrate: 0 },
+      format: { duration: 66, bitrate: 0 },
       videoStreams: [{ index: 0, width: 1920, height: 1080 } as any],
       audioStreams: [],
     });
@@ -98,9 +101,14 @@ describe('VideoFaceDetector', () => {
     });
     vi.spyOn(VideoFrameReader.prototype, 'getDimensions').mockResolvedValue({ width: 1920, height: 1080 });
     vi.spyOn(VideoFrameReader.prototype, 'measureSharpness').mockResolvedValue(300);
+    vi.spyOn(VideoFrameReader.prototype, 'extractTile').mockImplementation(async (_frame, output) => {
+      await writeFile(output, 'tile');
+    });
+    // Frames nobody is set up to appear in are empty.
+    mocks.machineLearning.detectFaces.mockResolvedValue({ imageWidth: 1920, imageHeight: 1080, faces: [] });
   });
 
-  /** One ML response per sampled frame, in order (6 s at a 2 s interval samples 1, 3 and 5). */
+  /** ML responses for the first sampled frames, in order (66 s at a 2 s interval samples 1, 3, 5, ... 65). */
   const framesShow = (...frames: ReturnType<typeof face>[][]) => {
     for (const faces of frames) {
       mocks.machineLearning.detectFaces.mockResolvedValueOnce({ imageWidth: 1920, imageHeight: 1080, faces });
@@ -178,8 +186,8 @@ describe('VideoFaceDetector', () => {
 
     await expect(sut.handleDetectFaces({ id: 'asset-id' })).resolves.toBe(JobStatus.Success);
 
-    expect(VideoFrameReader.prototype.extractFrame).toHaveBeenCalledTimes(3);
-    expect(sampledTimes()).toEqual([1, 3, 5]);
+    expect(VideoFrameReader.prototype.extractFrame).toHaveBeenCalledTimes(33);
+    expect(sampledTimes().slice(0, 3)).toEqual([1, 3, 5]);
     expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalledWith('/data/thumbs/preview.jpeg', expect.anything());
     expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
 
@@ -235,7 +243,8 @@ describe('VideoFaceDetector', () => {
 
     await sut.handleDetectFaces({ id: 'asset-id' });
 
-    expect(sampledTimes()).toEqual([3]);
+    // Two seconds is a short clip, sampled every second.
+    expect(sampledTimes()).toEqual([2.5, 3.5]);
   });
 
   it('adds a sample after each scene cut when scene detection is on', async () => {
@@ -364,6 +373,117 @@ describe('VideoFaceDetector', () => {
     });
   });
 
+  it('samples a short clip at least once a second', async () => {
+    mocks.media.probe.mockResolvedValue({
+      format: { duration: 6, bitrate: 0 },
+      videoStreams: [{ index: 0, width: 1920, height: 1080 } as any],
+      audioStreams: [],
+    });
+
+    await sut.handleDetectFaces({ id: 'asset-id' });
+
+    expect(sampledTimes()).toEqual([0.5, 1.5, 2.5, 3.5, 4.5, 5.5]);
+  });
+
+  describe('per-person confidence', () => {
+    it('searches frames below the photo threshold', async () => {
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ minScore: 0.45 }),
+      );
+    });
+
+    it('keeps a person never confident in one frame but seen consistently', async () => {
+      framesShow([unsure(100, 0.5)], [unsure(104, 0.55)], [unsure(108, 0.48)], [unsure(112, 0.6)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toHaveLength(1);
+    });
+
+    it('drops a low-confidence face seen only once or twice', async () => {
+      framesShow([unsure(100, 0.6)], [unsure(104, 0.6)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([]);
+    });
+
+    it('drops a consistent low-confidence face too small to recognise', async () => {
+      framesShow([unsure(100, 0.6, 20)], [unsure(104, 0.6, 20)], [unsure(108, 0.6, 20)], [unsure(112, 0.6, 20)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([]);
+    });
+  });
+
+  describe('tiled detection', () => {
+    beforeEach(() => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          facialRecognition: {
+            video: { ...videoConfig.machineLearning.facialRecognition.video, tiledDetection: true },
+          },
+        },
+      });
+      mocks.media.probe.mockResolvedValue({
+        format: { duration: 66, bitrate: 0 },
+        videoStreams: [{ index: 0, width: 1920, height: 1080 } as any],
+        audioStreams: [],
+      });
+      mocks.videoFace.getForDetect.mockResolvedValue(video() as any);
+    });
+
+    it('searches the whole frame and four overlapping quarters, with boxes moved into frame pixels', async () => {
+      // Whole frame: nothing. Bottom-right quarter: a face at (100, 100) of the quarter.
+      mocks.machineLearning.detectFaces
+        .mockResolvedValueOnce({ imageWidth: 1920, imageHeight: 1080, faces: [] })
+        .mockResolvedValueOnce({ imageWidth: 1104, imageHeight: 621, faces: [] })
+        .mockResolvedValueOnce({ imageWidth: 1104, imageHeight: 621, faces: [] })
+        .mockResolvedValueOnce({ imageWidth: 1104, imageHeight: 621, faces: [] })
+        .mockResolvedValueOnce({ imageWidth: 1104, imageHeight: 621, faces: [face(alice, 100)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(VideoFrameReader.prototype.extractTile).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
+        left: 816,
+        top: 459,
+        width: 1104,
+        height: 621,
+      });
+      // 33 frames, each searched whole and as four quarters.
+      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledTimes(33 * 5);
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([
+        expect.objectContaining({ boundingBoxX1: 916, boundingBoxY1: 759 }),
+      ]);
+    });
+
+    it('counts a face found both whole and in a quarter once', async () => {
+      const whole = face(alice, 100);
+      mocks.machineLearning.detectFaces
+        .mockResolvedValueOnce({ imageWidth: 1920, imageHeight: 1080, faces: [whole] })
+        .mockResolvedValueOnce({ imageWidth: 1104, imageHeight: 621, faces: [face(alice, 102)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const { frames } = mocks.videoFace.apply.mock.calls[0][0];
+      expect(frames).toHaveLength(1);
+      expect(frames[0].sightings).toHaveLength(1);
+    });
+
+    it('does not tile a frame already small enough for the detector', async () => {
+      vi.mocked(VideoFrameReader.prototype.getDimensions).mockResolvedValue({ width: 640, height: 480 });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(VideoFrameReader.prototype.extractTile).not.toHaveBeenCalled();
+      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledTimes(33);
+    });
+  });
+
   describe('logging', () => {
     it('logs only a start and a finish line for a short video', async () => {
       framesShow([face(alice, 100, 60)], [face(alice, 120, 200)], [face(alice, 140, 80), face(bob, 900)]);
@@ -371,8 +491,10 @@ describe('VideoFaceDetector', () => {
       await sut.handleDetectFaces({ id: 'asset-id' });
 
       expect(loggedMessages(mocks).filter((message) => message.includes('video asset-id'))).toEqual([
-        'Sampling 3 frames across 6s of video asset-id (about every 2s, 0 scene cuts)',
-        expect.stringMatching(/^Found 2 people in 3 frames of video asset-id in \d+s \(2 new, 0 kept, 0 removed\)$/),
+        'Sampling 33 frames across 1m, 6s of video asset-id (about every 2s, 0 scene cuts)',
+        expect.stringMatching(
+          /^Found 2 people \(of 2 candidates\) in 33 frames of video asset-id in \d+s \(2 new, 0 kept, 0 removed\)$/,
+        ),
       ]);
     });
 
@@ -393,7 +515,7 @@ describe('VideoFaceDetector', () => {
       const progress = loggedMessages(mocks).filter((message) => message.startsWith('Video faces'));
       expect(progress).toHaveLength(9);
       expect(progress[0]).toMatch(
-        /^Video faces 10% done \(20 of 200 frames, 1 people so far\), estimated \S+ remaining for video asset-id$/,
+        /^Video faces 10% done \(20 of 200 frames, 1 faces tracked so far\), estimated \S+ remaining for video asset-id$/,
       );
       expect(progress.at(-1)).toMatch(/^Video faces 90% done \(180 of 200 frames/);
     });

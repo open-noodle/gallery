@@ -21,10 +21,15 @@ import {
   type Detection,
   type ExistingVideoFace,
   FaceTracker,
+  VIDEO_FACE_LOW_SCORE,
   VIDEO_FACE_SAMPLER_VERSION,
+  acceptTrack,
   matchExistingFaces,
+  mergeDetections,
   parseEmbedding,
   planSampleTimes,
+  planTiles,
+  sampleIntervalFor,
   serializeEmbedding,
   sightingQuality,
   trackEmbedding,
@@ -144,18 +149,20 @@ export class VideoFaceDetector {
         this.deps.logger.warn(`Scene detection failed for video ${id}, sampling at intervals only: ${error}`);
       }
     }
-    const times = planSampleTimes({
-      start,
-      end,
-      interval: options.sampleInterval,
-      maxFrames: options.maxFrames,
-      cuts,
-    });
-    const interval = Math.max(options.sampleInterval, (end - start) / options.maxFrames);
+    const sampleInterval = sampleIntervalFor(end - start, options.sampleInterval);
+    const times = planSampleTimes({ start, end, interval: sampleInterval, maxFrames: options.maxFrames, cuts });
+    const interval = Math.max(sampleInterval, (end - start) / options.maxFrames);
     this.deps.logger.log(
       `Sampling ${times.length} frames across ${humanDuration((end - start) * 1000)} of video ${id} ` +
-        `(about every ${Math.round(interval * 10) / 10}s, ${cuts.length} scene cuts)`,
+        `(about every ${Math.round(interval * 10) / 10}s, ${cuts.length} scene cuts` +
+        `${options.tiledDetection ? ', tiled' : ''})`,
     );
+    // Frames are searched at a lower score than photos; acceptTrack then keeps a person who was either confident once
+    // or consistent across frames.
+    const detectOptions = {
+      ...facialRecognition,
+      minScore: Math.min(facialRecognition.minScore, VIDEO_FACE_LOW_SCORE),
+    };
     const startedAt = Date.now();
 
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-video-faces-'));
@@ -187,7 +194,7 @@ export class VideoFaceDetector {
         const remaining = humanDuration((elapsed / done) * (times.length - done));
         this.deps.logger.log(
           `Video faces ${reportedPercent}% done (${done} of ${times.length} frames, ` +
-            `${tracker.peopleSoFar()} people so far), estimated ${remaining} remaining for video ${id}`,
+            `${tracker.peopleSoFar()} faces tracked so far), estimated ${remaining} remaining for video ${id}`,
         );
       };
 
@@ -203,7 +210,7 @@ export class VideoFaceDetector {
         }
 
         frameSize ??= await this.frames.getDimensions(path);
-        const { faces } = await this.deps.machineLearningRepository.detectFaces(path, facialRecognition);
+        const faces = await this.detectInFrame(path, frameSize, detectOptions, !!options.tiledDetection);
         const detections: Detection[] = [];
         for (const { boundingBox, embedding, score } of faces) {
           const sharpness = await this.frames.measureSharpness(path, boundingBox, frameSize);
@@ -236,14 +243,15 @@ export class VideoFaceDetector {
         return;
       }
 
-      const tracks = tracker.finish();
+      const candidates = tracker.finish();
+      const tracks = candidates.filter((track) => acceptTrack(track, facialRecognition.minScore));
       const { added, kept, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
         maxDistance: facialRecognition.maxDistance,
         start,
         force,
       });
       this.deps.logger.log(
-        `Found ${tracks.length} people in ${times.length} frames of video ${id} in ` +
+        `Found ${tracks.length} people (of ${candidates.length} candidates) in ${times.length} frames of video ${id} in ` +
           `${humanDuration(Date.now() - startedAt)} (${added} new, ${kept} kept, ${removed} removed` +
           `${unreadable > 0 ? `, ${unreadable} frames unreadable` : ''})`,
       );
@@ -252,6 +260,43 @@ export class VideoFaceDetector {
     }
 
     return JobStatus.Success;
+  }
+
+  /**
+   * The faces in one frame. With tiled detection, a frame larger than the detector's input is also searched as four
+   * overlapping quarters, which show small faces at about twice the size, and the finds are merged; the whole frame is
+   * still searched too, for faces larger than the overlap between quarters.
+   */
+  private async detectInFrame(
+    path: string,
+    frameSize: { width: number; height: number },
+    options: SystemConfig['machineLearning']['facialRecognition'],
+    tiled: boolean,
+  ) {
+    const { faces } = await this.deps.machineLearningRepository.detectFaces(path, options);
+    const tiles = tiled ? planTiles(frameSize) : [];
+    if (tiles.length === 0) {
+      return faces;
+    }
+
+    const found = [...faces];
+    for (const [index, tile] of tiles.entries()) {
+      const tilePath = `${path}.tile-${index}.jpeg`;
+      try {
+        await this.frames.extractTile(path, tilePath, tile);
+        const { faces: tileFaces } = await this.deps.machineLearningRepository.detectFaces(tilePath, options);
+        for (const face of tileFaces) {
+          const { x1, y1, x2, y2 } = face.boundingBox;
+          found.push({
+            ...face,
+            boundingBox: { x1: x1 + tile.left, y1: y1 + tile.top, x2: x2 + tile.left, y2: y2 + tile.top },
+          });
+        }
+      } finally {
+        await unlink(tilePath).catch(() => {});
+      }
+    }
+    return mergeDetections(found);
   }
 
   private async applyTracks(

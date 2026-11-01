@@ -263,6 +263,8 @@ export type AdminConfigVideoFacesDto = {
     sampleInterval: number;
     /** Also sample a frame just after every scene cut */
     sceneDetection?: boolean;
+    /** Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work. */
+    tiledDetection?: boolean;
 };
 export type AdminConfigFacialRecognitionDto = {
     /** Whether the task is enabled */

@@ -4,7 +4,7 @@ import type { BoundingBox } from 'src/repositories/machine-learning.repository.j
 // detections are the same person, which view of them is best, and which existing face a new one replaces.
 
 /** Bumped when sampling or tracking changes enough that videos should be rescanned. */
-export const VIDEO_FACE_SAMPLER_VERSION = 1;
+export const VIDEO_FACE_SAMPLER_VERSION = 2;
 
 /** Relaxation of the distance threshold for a detection that overlaps the track's box in the previous sample. */
 const CONTINUITY_RELAXATION = 0.1;
@@ -20,6 +20,34 @@ const SHARPNESS_SCALE = 150;
 /** An old single-frame face matches a sighting this early in the video, at this overlap, as the poster comes from there. */
 const POSTER_WINDOW_SECONDS = 3;
 const POSTER_IOU = 0.5;
+
+/** Clips up to this long are sampled at least once a second, so a short clip still gives each person a few chances. */
+const SHORT_CLIP_SECONDS = 60;
+const SHORT_CLIP_INTERVAL = 1;
+
+/**
+ * Per-person confidence. Frames are searched at this lower detector score, and a person is kept when their best frame
+ * reaches the configured minimum score, as a photo face must, or when they are seen again and again: in at least
+ * `CONSISTENT_SIGHTINGS` frames, with a median score of at least this one and a median face of at least
+ * `CONSISTENT_MIN_FACE` px. A face detected at 0.5 in ten frames in a row is almost certainly real; the size floor keeps
+ * a crowd of faces too small to recognise out of the People list.
+ */
+export const VIDEO_FACE_LOW_SCORE = 0.45;
+const CONSISTENT_SIGHTINGS = 3;
+const CONSISTENT_MIN_FACE = 32;
+
+/** Faces smaller than this (longest side, frame px) are cropped with surrounding context: up to 2.5x at half of it. */
+const CONTEXT_FACE_SIZE = 80;
+const CONTEXT_MAX_FACTOR = 2.5;
+
+/** Tiled detection: frames with a long edge above this are also searched as four overlapping quarters. */
+const TILE_MIN_LONG_EDGE = 960;
+const TILE_OVERLAP = 0.15;
+const TILE_MERGE_IOU = 0.4;
+
+/** The sampling interval for a span: at least once a second for a short clip, else the configured one. */
+export const sampleIntervalFor = (span: number, interval: number) =>
+  span <= SHORT_CLIP_SECONDS ? Math.min(interval, SHORT_CLIP_INTERVAL) : interval;
 
 export type SamplePlanOptions = {
   start: number;
@@ -321,4 +349,83 @@ const scaleBox = (
   const x = to.width / from.imageWidth;
   const y = to.height / from.imageHeight;
   return { x1: box.x1 * x, y1: box.y1 * y, x2: box.x2 * x, y2: box.y2 * y };
+};
+
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+};
+
+/** Whether a track is a person worth keeping: confident once, or consistent across frames (see VIDEO_FACE_LOW_SCORE). */
+export const acceptTrack = (track: FaceTrack, minScore: number): boolean => {
+  if (Math.max(...track.sightings.map((sighting) => sighting.score)) >= minScore) {
+    return true;
+  }
+  if (track.sightings.length < CONSISTENT_SIGHTINGS) {
+    return false;
+  }
+  const scores = track.sightings.map((sighting) => sighting.score);
+  const sizes = track.sightings.map(({ box }) => Math.min(box.x2 - box.x1, box.y2 - box.y1));
+  return median(scores) >= Math.min(minScore, VIDEO_FACE_LOW_SCORE) && median(sizes) >= CONSISTENT_MIN_FACE;
+};
+
+export type Tile = { left: number; top: number; width: number; height: number };
+
+/**
+ * Four overlapping quarters of a frame, for tiled detection: the detector shrinks its input to 640 px, so a quarter of
+ * a 1080p frame shows each face at about twice the size the whole frame does. Empty for a frame small enough already.
+ * The overlap lets a face cut by one quarter's edge appear whole in its neighbour.
+ */
+export const planTiles = ({ width, height }: { width: number; height: number }): Tile[] => {
+  if (Math.max(width, height) <= TILE_MIN_LONG_EDGE) {
+    return [];
+  }
+  const tileWidth = Math.round((width / 2) * (1 + TILE_OVERLAP));
+  const tileHeight = Math.round((height / 2) * (1 + TILE_OVERLAP));
+  const tiles: Tile[] = [];
+  for (const top of [0, height - tileHeight]) {
+    for (const left of [0, width - tileWidth]) {
+      tiles.push({ left, top, width: tileWidth, height: tileHeight });
+    }
+  }
+  return tiles;
+};
+
+/**
+ * One list of detections from the whole frame and its tiles, boxes in frame pixels. Where two overlap they are the
+ * same face found twice, and the more confident one is kept.
+ */
+export const mergeDetections = <T extends { boundingBox: BoundingBox; score: number }>(detections: T[]): T[] => {
+  const kept: T[] = [];
+  for (const detection of [...detections].sort((a, b) => b.score - a.score)) {
+    if (kept.every((other) => iou(other.boundingBox, detection.boundingBox) <= TILE_MERGE_IOU)) {
+      kept.push(detection);
+    }
+  }
+  return kept;
+};
+
+/**
+ * The region a small video face is cropped from: the face box widened around its centre, by up to 2.5x for a face half
+ * of CONTEXT_FACE_SIZE or smaller, so the crop shows head, hair and shoulders instead of an upscaled smudge. A face at
+ * CONTEXT_FACE_SIZE or larger is returned unchanged. The box stored on the face is never widened, only the crop.
+ */
+export const widenSmallFace = (box: BoundingBox, frame: { width: number; height: number }): BoundingBox => {
+  const side = Math.max(box.x2 - box.x1, box.y2 - box.y1);
+  if (!(side > 0) || side >= CONTEXT_FACE_SIZE) {
+    return box;
+  }
+  const smallness = Math.min(1, (CONTEXT_FACE_SIZE - side) / (CONTEXT_FACE_SIZE / 2));
+  const factor = 1 + (CONTEXT_MAX_FACTOR - 1) * smallness;
+  const centreX = (box.x1 + box.x2) / 2;
+  const centreY = (box.y1 + box.y2) / 2;
+  const halfWidth = ((box.x2 - box.x1) * factor) / 2;
+  const halfHeight = ((box.y2 - box.y1) * factor) / 2;
+  return {
+    x1: Math.max(0, Math.round(centreX - halfWidth)),
+    y1: Math.max(0, Math.round(centreY - halfHeight)),
+    x2: Math.min(frame.width, Math.round(centreX + halfWidth)),
+    y2: Math.min(frame.height, Math.round(centreY + halfHeight)),
+  };
 };

@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "W zmontowanych filmach sprawdza też początek każdego nowego ujęcia, aby nie pominąć krótkich ujęć.",
     "machine_learning_video_faces_setting": "Wykrywaj twarze w całym filmie",
     "machine_learning_video_faces_setting_description": "Szuka twarzy w klatkach pobranych z całego filmu zamiast tylko z pierwszej klatki i pokazuje każdą osobę w jej najostrzejszym ujęciu. Nowe filmy są skanowane w ten sposób automatycznie. Aby zeskanować wcześniej przetworzone filmy, uruchom zadanie „Wykrywanie twarzy” z opcją „Brakujące”; nadane nazwy zostają zachowane.",
+    "machine_learning_video_faces_tiled_detection": "Znajduj małe twarze (tłumy)",
+    "machine_learning_video_faces_tiled_detection_description": "Przeszukuje też każdą klatkę w wysokiej rozdzielczości jako cztery nachodzące na siebie ćwiartki, aby znaleźć małe twarze, np. osoby w tłumie. Trwa około pięć razy dłużej.",
     "memories_settings": "Wspomnienia",
     "memories_settings_description": "Zarządzaj historią wygenerowanych wspomnień",
     "memory_person_throwback_dormancy_setting": "Okres nieobecności dla wspomnień o osobie",

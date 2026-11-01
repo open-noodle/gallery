@@ -65,4 +65,11 @@
     disabled={off}
     isEdited={video.maxFrames !== saved?.maxFrames}
   />
+
+  <SettingSwitch
+    title={$t('admin.machine_learning_video_faces_tiled_detection')}
+    subtitle={$t('admin.machine_learning_video_faces_tiled_detection_description')}
+    bind:checked={configToEdit.machineLearning.facialRecognition.video.tiledDetection}
+    disabled={off}
+  />
 {/if}

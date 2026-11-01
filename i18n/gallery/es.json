@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Revisa también el inicio de cada nuevo plano en los vídeos editados, para no perder los planos cortos.",
     "machine_learning_video_faces_setting": "Detectar caras en todo el vídeo",
     "machine_learning_video_faces_setting_description": "Busca caras en fotogramas tomados de todo el vídeo en lugar de solo el primero, y muestra a cada persona en su vista más nítida. Los vídeos nuevos se analizan así automáticamente. Para analizar los vídeos procesados antes, ejecuta la tarea «Detección de caras» con «Faltante»; los nombres que hayas puesto se conservan.",
+    "machine_learning_video_faces_tiled_detection": "Encontrar caras pequeñas (multitudes)",
+    "machine_learning_video_faces_tiled_detection_description": "Busca también en cada fotograma de alta resolución dividido en cuatro cuartos superpuestos, para encontrar caras pequeñas como las de una multitud. Tarda unas cinco veces más.",
     "memories_settings": "Recuerdos",
     "memories_settings_description": "Gestiona el historial de recuerdos generados",
     "memory_person_throwback_dormancy_setting": "Inactividad para recuerdos de una persona",

@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   type Detection,
   FaceTracker,
+  acceptTrack,
   matchExistingFaces,
+  mergeDetections,
   normalize,
   planSampleTimes,
+  planTiles,
+  sampleIntervalFor,
   sightingQuality,
   trackEmbedding,
+  widenSmallFace,
 } from 'src/gallery/utils/video-faces.js';
 
 // Two people far apart in embedding space, and a slightly different view of each.
@@ -235,5 +240,118 @@ describe('matchExistingFaces', () => {
     ];
 
     expect(matchExistingFaces(existing, tracker.finish(), { maxDistance: 0.5, frame, start: 0 }).size).toBe(0);
+  });
+});
+
+describe('sampleIntervalFor', () => {
+  it('samples a clip of a minute or less at least once a second', () => {
+    expect(sampleIntervalFor(23, 2)).toBe(1);
+    expect(sampleIntervalFor(60, 2)).toBe(1);
+    expect(sampleIntervalFor(23, 0.5)).toBe(0.5);
+  });
+
+  it('keeps the configured interval for longer videos', () => {
+    expect(sampleIntervalFor(61, 2)).toBe(2);
+  });
+});
+
+/** One person's track, one sighting per frame, each with the given score and face size. */
+const trackOf = (...sightings: { score: number; size?: number }[]) => {
+  const tracker = new FaceTracker(0.5);
+  for (const [index, { score, size = 60 }] of sightings.entries()) {
+    tracker.addFrame(index, index, [{ ...detection(alice, box(100, 100, size)), score }]);
+  }
+  return tracker.finish()[0];
+};
+
+describe('acceptTrack', () => {
+  it('keeps a person confident in at least one frame, as a photo face would be', () => {
+    expect(acceptTrack(trackOf({ score: 0.72 }), 0.7)).toBe(true);
+  });
+
+  it('keeps a person seen consistently in three or more frames, never confident in one', () => {
+    expect(acceptTrack(trackOf({ score: 0.5 }, { score: 0.55 }, { score: 0.47 }), 0.7)).toBe(true);
+  });
+
+  it('drops a low-confidence face seen fewer than three times', () => {
+    expect(acceptTrack(trackOf({ score: 0.6 }, { score: 0.6 }), 0.7)).toBe(false);
+  });
+
+  it('drops a face whose typical score is below the low threshold', () => {
+    expect(acceptTrack(trackOf({ score: 0.46 }, { score: 0.4 }, { score: 0.41 }), 0.7)).toBe(false);
+  });
+
+  it('drops a consistent face too small to recognise', () => {
+    expect(
+      acceptTrack(trackOf({ score: 0.6, size: 20 }, { score: 0.6, size: 20 }, { score: 0.6, size: 20 }), 0.7),
+    ).toBe(false);
+  });
+
+  it('never asks more of a consistent face than an admin who lowered the photo threshold', () => {
+    expect(acceptTrack(trackOf({ score: 0.42 }, { score: 0.42 }, { score: 0.42 }), 0.4)).toBe(true);
+  });
+});
+
+describe('planTiles', () => {
+  it('splits a 1080p frame into four quarters that overlap', () => {
+    const tiles = planTiles({ width: 1920, height: 1080 });
+
+    expect(tiles).toEqual([
+      { left: 0, top: 0, width: 1104, height: 621 },
+      { left: 816, top: 0, width: 1104, height: 621 },
+      { left: 0, top: 459, width: 1104, height: 621 },
+      { left: 816, top: 459, width: 1104, height: 621 },
+    ]);
+    // Neighbours share a band wider than a typical face, so one cut by an edge is whole in the other.
+    expect(tiles[0].width - tiles[1].left).toBe(288);
+  });
+
+  it('does not tile a frame the detector already sees at full size', () => {
+    expect(planTiles({ width: 960, height: 540 })).toEqual([]);
+    expect(planTiles({ width: 320, height: 240 })).toEqual([]);
+  });
+});
+
+describe('mergeDetections', () => {
+  it('keeps the more confident of two finds of the same face, and every distinct face', () => {
+    const merged = mergeDetections([
+      { boundingBox: box(100), score: 0.6 },
+      { boundingBox: box(104), score: 0.8 },
+      { boundingBox: box(600), score: 0.5 },
+    ]);
+
+    expect(merged).toEqual([
+      { boundingBox: box(104), score: 0.8 },
+      { boundingBox: box(600), score: 0.5 },
+    ]);
+  });
+});
+
+describe('widenSmallFace', () => {
+  const frame = { width: 1920, height: 1080 };
+
+  it('crops a tiny face 2.5 times wider, around its centre', () => {
+    expect(widenSmallFace({ x1: 500, y1: 300, x2: 526, y2: 330 }, frame)).toEqual({
+      x1: 481,
+      y1: 278,
+      x2: 546,
+      y2: 353,
+    });
+  });
+
+  it('widens less as the face grows, and not at all from 80 px', () => {
+    const medium = widenSmallFace({ x1: 500, y1: 300, x2: 560, y2: 360 }, frame);
+    expect(medium.x2 - medium.x1).toBe(105);
+    expect(widenSmallFace({ x1: 500, y1: 300, x2: 580, y2: 400 }, frame)).toEqual({
+      x1: 500,
+      y1: 300,
+      x2: 580,
+      y2: 400,
+    });
+  });
+
+  it('stays inside the frame', () => {
+    expect(widenSmallFace({ x1: 0, y1: 0, x2: 20, y2: 20 }, frame)).toMatchObject({ x1: 0, y1: 0 });
+    expect(widenSmallFace({ x1: 1900, y1: 1060, x2: 1920, y2: 1080 }, frame)).toMatchObject({ x2: 1920, y2: 1080 });
   });
 });

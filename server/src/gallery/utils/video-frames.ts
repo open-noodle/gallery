@@ -114,6 +114,15 @@ export class VideoFrameReader {
     return sumOfSquares / data.length - mean * mean;
   }
 
+  /** One region of a frame as its own JPEG, for tiled detection. */
+  async extractTile(
+    framePath: string,
+    output: string,
+    tile: { left: number; top: number; width: number; height: number },
+  ): Promise<void> {
+    await sharp(framePath, { failOn: 'error' }).extract(tile).jpeg({ quality: 95 }).toFile(output);
+  }
+
   async getDimensions(framePath: string): Promise<{ width: number; height: number }> {
     const { width = 0, height = 0 } = await sharp(framePath).metadata();
     return { width, height };

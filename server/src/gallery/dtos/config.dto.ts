@@ -205,6 +205,9 @@ export const GalleryVideoFacesSchema = z
       .min(10)
       .max(10_000)
       .describe('Frame budget per video. Past it the interval is stretched, so the whole video is still covered.'),
+    tiledDetection: galleryConfigBool.describe(
+      'Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work.',
+    ),
   })
   .meta({ id: 'AdminConfigVideoFacesDto' });
 
@@ -247,7 +250,7 @@ export const galleryJobDefaults = {
 export const galleryMachineLearningDefaults = {
   clipMaxDistance: 0,
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
-  videoFaces: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800 },
+  videoFaces: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800, tiledDetection: false },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   spatialScene: {

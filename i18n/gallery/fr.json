@@ -348,6 +348,8 @@
     "machine_learning_video_faces_scene_detection_description": "Examine aussi le début de chaque nouveau plan dans les vidéos montées, pour ne pas manquer les plans courts.",
     "machine_learning_video_faces_setting": "Détecter les visages dans toute la vidéo",
     "machine_learning_video_faces_setting_description": "Recherche les visages dans des images prélevées tout au long de chaque vidéo, et pas seulement dans la première, puis montre chaque personne sous son angle le plus net. Les nouvelles vidéos sont analysées ainsi automatiquement. Pour analyser les vidéos traitées auparavant, lancez la tâche « Détection des visages » avec « Manquant » ; les noms que vous avez attribués sont conservés.",
+    "machine_learning_video_faces_tiled_detection": "Trouver les petits visages (foules)",
+    "machine_learning_video_faces_tiled_detection_description": "Analyse aussi chaque image haute résolution en quatre quarts qui se chevauchent, afin de trouver les petits visages, comme les personnes dans une foule. Prend environ cinq fois plus de temps.",
     "memories_settings": "Souvenirs",
     "memories_settings_description": "Gérer l'historique des souvenirs générés",
     "memory_person_throwback_dormancy_setting": "Inactivité pour les souvenirs de personne",
