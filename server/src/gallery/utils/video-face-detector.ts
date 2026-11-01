@@ -1,3 +1,4 @@
+import { Duration } from 'luxon';
 import { mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -52,6 +53,19 @@ export const videoFaceFrameFolder = (asset: { id: string; ownerId: string }, bac
     ? StorageCore.getNestedPath(StorageFolder.Thumbnails, asset.ownerId, folderName)
     : StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, asset.ownerId, folderName);
 };
+
+/**
+ * A video sampled from at least this many frames logs its progress every 10%, as transcoding does: one this long can
+ * hold a face detection slot for many minutes, and without it a busy job looks like a stuck one. Shorter videos log
+ * only their start and finish, so a library of phone clips does not flood the log.
+ */
+const PROGRESS_MIN_FRAMES = 100;
+const PROGRESS_STEP_PERCENT = 10;
+
+const humanDuration = (ms: number) =>
+  Duration.fromMillis(Math.max(1000, Math.round(ms / 1000) * 1000))
+    .rescale()
+    .toHuman({ unitDisplay: 'narrow' });
 
 const roundBox = ({ x1, y1, x2, y2 }: BoundingBox) => ({
   x1: Math.round(x1),
@@ -137,6 +151,12 @@ export class VideoFaceDetector {
       maxFrames: options.maxFrames,
       cuts,
     });
+    const interval = Math.max(options.sampleInterval, (end - start) / options.maxFrames);
+    this.deps.logger.log(
+      `Sampling ${times.length} frames across ${humanDuration((end - start) * 1000)} of video ${id} ` +
+        `(about every ${Math.round(interval * 10) / 10}s, ${cuts.length} scene cuts)`,
+    );
+    const startedAt = Date.now();
 
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-video-faces-'));
     try {
@@ -155,12 +175,30 @@ export class VideoFaceDetector {
         }
       };
 
+      let reportedPercent = 0;
+      let unreadable = 0;
+      const reportProgress = (done: number) => {
+        const percent = Math.floor((done / times.length) * 100);
+        if (times.length < PROGRESS_MIN_FRAMES || done === 0 || percent < reportedPercent + PROGRESS_STEP_PERCENT) {
+          return;
+        }
+        reportedPercent = percent - (percent % PROGRESS_STEP_PERCENT);
+        const elapsed = Date.now() - startedAt;
+        const remaining = humanDuration((elapsed / done) * (times.length - done));
+        this.deps.logger.log(
+          `Video faces ${reportedPercent}% done (${done} of ${times.length} frames, ` +
+            `${tracker.peopleSoFar()} people so far), estimated ${remaining} remaining for video ${id}`,
+        );
+      };
+
       // The next frame is extracted while the ML service works on this one.
       let next = times.length > 0 ? extract(0) : undefined;
       for (const [index, t] of times.entries()) {
+        reportProgress(index);
         const path = await next;
         next = index + 1 < times.length ? extract(index + 1) : undefined;
         if (!path) {
+          unreadable++;
           continue;
         }
 
@@ -199,12 +237,16 @@ export class VideoFaceDetector {
       }
 
       const tracks = tracker.finish();
-      this.deps.logger.debug(`${tracks.length} people found in ${times.length} sampled frames of video ${id}`);
-      await this.applyTracks(asset, tracks, framePaths, frameSize, {
+      const { added, kept, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
         maxDistance: facialRecognition.maxDistance,
         start,
         force,
       });
+      this.deps.logger.log(
+        `Found ${tracks.length} people in ${times.length} frames of video ${id} in ` +
+          `${humanDuration(Date.now() - startedAt)} (${added} new, ${kept} kept, ${removed} removed` +
+          `${unreadable > 0 ? `, ${unreadable} frames unreadable` : ''})`,
+      );
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
@@ -288,7 +330,6 @@ export class VideoFaceDetector {
     await this.deps.videoFaceRepository.apply(changes);
     if (changes.deleteIds.length > 0) {
       await this.deps.faceIdentityRepository.unlinkFaces(changes.deleteIds);
-      this.deps.logger.log(`Removed ${changes.deleteIds.length} faces no longer found in video ${asset.id}`);
     }
     for (const { framePath } of removed) {
       if (!framePath) {
@@ -301,7 +342,6 @@ export class VideoFaceDetector {
 
     const jobs: JobItem[] = [];
     if (toRecognize.length > 0) {
-      this.deps.logger.log(`Detected ${changes.insert.length} new faces in video ${asset.id}`);
       if (force) {
         jobs.push({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
       } else {
@@ -322,5 +362,7 @@ export class VideoFaceDetector {
 
     await this.deps.videoFaceRepository.markSampled(asset.id);
     await this.deps.assetRepository.upsertJobStatus({ assetId: asset.id, facesRecognizedAt: new Date() });
+
+    return { added: changes.insert.length, kept: changes.update.length, removed: changes.deleteIds.length };
   }
 }

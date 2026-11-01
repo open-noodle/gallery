@@ -210,6 +210,11 @@ export class FaceTracker {
     return this.tracks.map(({ sightings, best, centroid }) => ({ sightings, best, centroid }));
   }
 
+  /** People found so far, before the final merge: what progress reports. */
+  peopleSoFar(): number {
+    return this.tracks.length;
+  }
+
   /** Every track's current best sighting, so a frame that is nobody's best can be deleted early. */
   bestFrameIndexes(): Set<number> {
     return new Set(this.tracks.map((track) => track.best.frameIndex));

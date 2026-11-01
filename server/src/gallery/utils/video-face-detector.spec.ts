@@ -52,6 +52,9 @@ const existingFace = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
+/** Everything logged at the `log` level, in order. */
+const loggedMessages = (mocks: ServiceMocks): string[] => mocks.logger.log.mock.calls.map(([message]) => message);
+
 /** The times the detector extracted frames at, in order. */
 const sampledTimes = () => vi.mocked(VideoFrameReader.prototype.extractFrame).mock.calls.map((call) => call[2]);
 
@@ -358,6 +361,57 @@ describe('VideoFaceDetector', () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognitionQueueAll, data: { force: true } },
       ]);
+    });
+  });
+
+  describe('logging', () => {
+    it('logs only a start and a finish line for a short video', async () => {
+      framesShow([face(alice, 100, 60)], [face(alice, 120, 200)], [face(alice, 140, 80), face(bob, 900)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(loggedMessages(mocks).filter((message) => message.includes('video asset-id'))).toEqual([
+        'Sampling 3 frames across 6s of video asset-id (about every 2s, 0 scene cuts)',
+        expect.stringMatching(/^Found 2 people in 3 frames of video asset-id in \d+s \(2 new, 0 kept, 0 removed\)$/),
+      ]);
+    });
+
+    it('logs progress every 10% for a long video, as transcoding does', async () => {
+      mocks.media.probe.mockResolvedValue({
+        format: { duration: 400, bitrate: 0 },
+        videoStreams: [{ index: 0, width: 1920, height: 1080 } as any],
+        audioStreams: [],
+      });
+      mocks.machineLearning.detectFaces.mockResolvedValue({
+        imageWidth: 1920,
+        imageHeight: 1080,
+        faces: [face(alice, 100)],
+      });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const progress = loggedMessages(mocks).filter((message) => message.startsWith('Video faces'));
+      expect(progress).toHaveLength(9);
+      expect(progress[0]).toMatch(
+        /^Video faces 10% done \(20 of 200 frames, 1 people so far\), estimated \S+ remaining for video asset-id$/,
+      );
+      expect(progress.at(-1)).toMatch(/^Video faces 90% done \(180 of 200 frames/);
+    });
+
+    it('counts frames that could not be read in the finish line', async () => {
+      vi.mocked(VideoFrameReader.prototype.extractFrame).mockImplementation(async (_input, output, t) => {
+        if (t === 3) {
+          throw new Error('decode error');
+        }
+        await writeFile(output, `frame at ${t}`);
+      });
+      framesShow([face(alice, 100)], []);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(loggedMessages(mocks)).toContainEqual(
+        expect.stringMatching(/\(1 new, 0 kept, 0 removed, 1 frames unreadable\)$/),
+      );
     });
   });
 

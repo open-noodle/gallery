@@ -255,6 +255,28 @@ upstream until an admin opts in. Admin-only. The admin UI is `web/src/lib/galler
 rendered with one line at the end of the facial recognition section and indexed for settings search. It hides itself
 against an older server that sends no `video` block.
 
+## Logging
+
+Every sampled video logs one line when it starts and one when it finishes, at `log` level:
+
+```
+Sampling 1800 frames across 1h of video <id> (about every 2s, 3 scene cuts)
+Found 4 people in 1800 frames of video <id> in 21m, 30s (2 new, 1 kept, 1 removed)
+```
+
+A video sampled from 100 frames or more also logs its progress every 10%, with an estimate of the time left, worked
+out from the average time per frame so far:
+
+```
+Video faces 40% done (720 of 1800 frames, 3 people so far), estimated 12m, 54s remaining for video <id>
+```
+
+This follows transcoding's progress lines (`MediaRepository.transcode`), with two differences. They are at `log`
+level, not `debug`, because a long video can hold a face detection slot for tens of minutes and default-level logs
+would otherwise show nothing until it finished. And short videos log no progress at all, so a library of phone clips
+adds two lines per video, not twelve. "People so far" counts tracks before the final merge, so it can be higher than
+the finished count.
+
 ## Cost
 
 Per sampled frame: one ffmpeg seek and decode (about 0.1 to 0.5 s for 4K HEVC in software), one ML detection and
