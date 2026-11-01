@@ -1218,6 +1218,52 @@ describe(CleanupRepository.name, () => {
       expect(items.map((i) => i.id)).toEqual([bright.id]);
     });
 
+    it('leaves screenshots to the Screenshots queue, whatever their scores', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const d = new Date('2020-09-23T09:00:00Z');
+      // A light-mode app screenshot clips white over most of the frame; a dark-mode one is mostly black.
+      const scores = {
+        bright: { sharpness: 1500, brightness: 240, clippedDark: 0, clippedBright: 0.9 },
+        dark: { sharpness: 1500, brightness: 10, clippedDark: 0.9, clippedBright: 0 },
+        blurry: { sharpness: 10, brightness: 120, clippedDark: 0, clippedBright: 0 },
+      };
+      const screenshotIds: string[] = [];
+      for (const score of Object.values(scores)) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          ...score,
+          isScreenshot: true,
+          version: CLEANUP_QUALITY_VERSION,
+          screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+        });
+        screenshotIds.push(asset.id);
+      }
+      const { asset: photo } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
+      await sut.upsertQuality({
+        assetId: photo.id,
+        ownerId: user.id,
+        ...scores.bright,
+        isScreenshot: false,
+        version: CLEANUP_QUALITY_VERSION,
+        screenshotVersion: CLEANUP_SCREENSHOT_VERSION,
+      });
+
+      for (const reason of ['all', 'blurry', 'dark', 'bright'] as const) {
+        const { items } = await sut.getBlurry(user.id, { limit: 10, strictness: 'strict', reason, hideFaces: false });
+        expect(items.map((i) => i.id)).toEqual(reason === 'all' || reason === 'bright' ? [photo.id] : []);
+      }
+      await expect(sut.countQueue(user.id, 'blurry', { hideFaces: false })).resolves.toMatchObject({ count: 1 });
+
+      const rows = await sut.getRewindAssets(user.id, 923, 2020);
+      for (const id of screenshotIds) {
+        expect(rows.find((r) => r.id === id)!.reason).toBeUndefined();
+      }
+      expect(rows.find((r) => r.id === photo.id)!.reason).toBe('bright');
+    });
+
     it('hideFaces excludes only an asset with a visible, non-deleted face', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
