@@ -43,6 +43,7 @@
   } from '@immich/sdk';
   import { CommandPaletteDefaultProvider } from '@immich/ui';
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { useViewerZoom } from '$lib/gallery/motion/viewer-zoom';
   import type { SwipeCustomEvent } from 'svelte-gestures';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
@@ -117,6 +118,7 @@
   let previewStackedAsset: AssetResponseDto | undefined = $state();
   let stack: StackResponseDto | undefined = $state();
   const asset = $derived(previewStackedAsset ?? cursor.current);
+  useViewerZoom(() => asset.id);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
   // Slice 8 gap closure: the SAME rule DetailPanel.svelte's People row uses for `asset` — see

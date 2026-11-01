@@ -22,13 +22,15 @@ by taste.
 | Selecting a photo                          | Spring + layout            | Photo shrinks into its frame on the gentle spring; the check pops                                         | `motion.css`                                      |
 | Something appearing (modal, menu, popover) | Keyframes                  | Modals rise 32px from 82% on the bouncy spring; menus grow from 85% out of their trigger (`--bits-floating-transform-origin`) | `motion.css`                                   |
 | Hovering a button                          | Spring                     | Grows ~5px (`hoverScale`, 1.02–1.1) on the bouncy spring; mouse only; menu rows, tabs and checkboxes highlight instead | `press.ts`, site-wide |
-| Hovering a timeline photo                  | Keyframes (transition)     | The photo zooms 10% inside its frame (not while selected)                                                | `motion.css`                                      |
+| Hovering a timeline photo                  | Keyframes (transition)     | The photo, its gradient and icons lift 10% out of the grid over their neighbours with a shadow (not while selected). The clipping/stacking ancestors (image grid, day section, month) are raised while hovered and while it shrinks back. A photo at the scroll area's edge grows only toward the open side | `motion.css`, `thumbnail-lift.ts`                 |
 | Hovering a card                            | Spring                     | Picture lifts 8px and grows 4% with a deeper shadow; the card rises above its neighbours                  | `motion.css`, `data-motion-lift`                  |
 | Hovering a sidebar item                    | Spring                     | Pill fades in; icon grows 25% and tilts 8° on the bouncy spring                                          | `motion.css`                                      |
+| Hovering a memory card                     | Spring                     | The card grows 4% down and sideways from a fixed top edge (every list of them clips above, and a gap to make room was rejected), tilts toward the mouse with a pointer-following glare and a deep shadow; colour deepens and the title floats up | `motion.css`, `tilt.ts`, `data-motion-memory`     |
 | Hovering Explore places / people          | Keyframes (transition)     | Place photos zoom 12% inside their frame and brighten; avatars grow 8% on the bouncy spring               | `motion.css` (matched by link target)             |
 | Expanding a sidebar group (Spaces, Albums) | Spring + keyframes         | Children fade and drop 16px into place; the chevron turns on the snappy spring                           | `motion.css`                                      |
 | Selecting photos (selection bar)           | Spring                     | The selection bar fades and drops 16px in over the top bar on the bouncy spring                          | `motion.css`                                      |
 | Changing section                           | Layout transition          | View Transition: old page fades and sinks to 98%, new one rises 28px; sidebar and top bar held still      | `page-transition.ts`, `motion.css`                |
+| Opening / closing a photo                  | Layout transition (FLIP)   | A copy of the image flies from the thumbnail into the viewer and back on a fast ease-out (no overshoot: the photo never draws bigger than it is). The sharp preview fades in over the thumbnail during the flight, and the copy hands over once the viewer's own sharp image has loaded. Thumbnail off screen: the viewer fades | `viewer-zoom.ts`                                  |
 | Trashing / archiving / restoring photos    | SVG-style path + physics   | Each photo lifts (anticipation), then arcs along a Bézier into the sidebar link it went to, which gulps   | `removal.ts`                                      |
 | Deleting permanently / emptying trash      | Shader-style               | Photos lose colour, blur and dissolve where they stood                                                    | `removal.ts`                                      |
 | Favoriting                                 | Particles                  | A ring and seven small hearts burst from the button                                                       | `celebrate.ts`                                    |
@@ -95,6 +97,11 @@ console.log(Math.round(T * 1000), `linear(${Array.from({ length: n + 1 }, (_, i)
 7. **Hands off library-positioned elements.** Map markers are placed by MapLibre's own transforms, and a
    marker that grows under the cursor moves its hit area, so hover flickers and clicks miss. Nothing
    inside `.maplibregl-map` gets press or hover motion; markers keep upstream's own hover zoom.
+   The same holds for anything that moves under the cursor: a hover that translates its own hit area
+   away flickers on and off at the edge. Grow instead, or move an inner element.
+   Small controls with a 1px rounded border (the filter panel's year and month chips) shimmer under the
+   bouncy hover grow: the border is redrawn at a new fractional scale every frame of the wobble. They
+   already show hover by colour, so they carry `data-no-hover-grow` (press squish kept).
 8. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
    the fork-owned `gallery-theme.css`. Upstream components are reached by stable hooks they already
    expose (bits-ui `data-*-content`/`data-state`, `data-thumbnail-focus-container`, `data-testid`,
@@ -113,6 +120,7 @@ Each upstream file carries one import and one call:
 | `lib/services/asset.service.ts` `handleFavorite`             | `celebrate('favorite')`                       |
 | `lib/services/trash.service.ts` empty / restore all          | `animateRemoval('visible', 'delete' \| 'restore')` |
 | `routes/(user)/trash/.../RestoreAction.svelte`               | `animateRemoval(ids, 'restore')`              |
+| `lib/components/asset-viewer/AssetViewer.svelte`             | `useViewerZoom(() => asset.id)`               |
 
 `deleteAssets` is the single path for trashing from the timeline, the Delete key, the gallery grid and
 the asset viewer, so one hook covers all four. The fork-owned command-palette handlers
@@ -130,9 +138,13 @@ once so they don't sit under their own animation.
 - Modal and menu exits are instant: bits-ui unmounts content on close, so a CSS exit would need
   `forceMount` in @immich/ui.
 - Toasts keep @immich/ui's own fly-in.
-- Opening a photo from the timeline is not a shared-element zoom yet. It is the strongest next
-  candidate (View Transition with a `view-transition-name` on the clicked thumbnail and the viewer
-  image), but needs care with the viewer's own zoom and swipe.
+- Opening and closing a photo is a FLIP with a copy of the image (`viewer-zoom.ts`), not a View
+  Transition: the timeline stays mounted under the viewer, and snapshotting it stalls the open. Positions
+  are read while they exist: the timeline is hidden while the viewer is open, so the thumbnail is recorded
+  on click; the viewer's photo is gone before its teardown runs, so it is recorded on every input that
+  could close it, into a hidden, pre-decoded standby copy (a copy made at close paints a black frame
+  while decoding). The photo box is found through AdaptiveImage's markup classes; if upstream changes
+  them, the viewer falls back to a plain fade.
 - "Add to album / space" could reuse the throw once the picker shows the destination.
 - Timeline reflow after a removal jumps rather than FLIPs, because the virtualised layout re-positions
   absolutely; animating it belongs in the timeline manager, not a hook.
