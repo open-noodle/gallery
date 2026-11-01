@@ -197,9 +197,18 @@
   z-index: 1;
 }
 
+/* The photo growing sits above one still shrinking back (z-index 1), whichever comes first in the page,
+ * so moving to the next photo never leaves the last one painted over it. Same at each raised ancestor. */
 [data-thumbnail-focus-container]:not([data-selected]):hover > div {
+  z-index: 2;
   scale: 1.1;
-  box-shadow: 0 18px 40px -10px rgb(0 0 0 / 0.55);
+  /* Three layers read as a raised card: a tight contact shadow at the edge, a mid shadow, and a wide soft
+   * one falling below. A hairline light edge keeps the outline in dark mode. */
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.18),
+    0 3px 6px rgb(0 0 0 / 0.5),
+    0 12px 24px -2px rgb(0 0 0 / 0.55),
+    0 32px 64px -6px rgb(0 0 0 / 0.85);
   transition:
     scale 600ms var(--ease-settle),
     box-shadow var(--motion-base) var(--ease-settle);
@@ -216,6 +225,11 @@ section[data-group]:has([data-thumbnail-focus-container]:not([data-selected]):is
 
 .timeline-month:has([data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling])) {
   z-index: 1;
+}
+
+section[data-group]:has([data-thumbnail-focus-container]:not([data-selected]):hover),
+.timeline-month:has([data-thumbnail-focus-container]:not([data-selected]):hover) {
+  z-index: 2;
 }
 
 /* A photo in a day's first row grows up toward the day's date; the date moves up by the same amount
