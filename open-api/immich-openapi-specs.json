@@ -9104,6 +9104,64 @@
         "x-immich-state": "Stable"
       }
     },
+    "/faces/{id}/thumbnail": {
+      "get": {
+        "description": "Retrieve a crop of one face. A video face sampled across the whole video is cut from its best frame.",
+        "operationId": "getAssetFaceThumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get face thumbnail",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.read",
+        "x-immich-state": "Stable"
+      }
+    },
     "/gallery/map/markers": {
       "get": {
         "description": "Retrieve map markers with rich content filtering (people, camera, tags, etc.)",
@@ -28561,6 +28619,9 @@
           },
           "suggestions": {
             "$ref": "#/components/schemas/AdminConfigFaceSuggestionDto"
+          },
+          "video": {
+            "$ref": "#/components/schemas/AdminConfigVideoFacesDto"
           }
         },
         "required": [
@@ -28569,7 +28630,8 @@
           "minFaces",
           "minScore",
           "modelName",
-          "suggestions"
+          "suggestions",
+          "video"
         ],
         "type": "object"
       },
@@ -29627,6 +29689,40 @@
         },
         "required": [
           "deleteDelay"
+        ],
+        "type": "object"
+      },
+      "AdminConfigVideoFacesDto": {
+        "properties": {
+          "enabled": {
+            "description": "Detect video faces in frames sampled across the whole video",
+            "type": "boolean"
+          },
+          "maxFrames": {
+            "description": "Frame budget per video. Past it the interval is stretched, so the whole video is still covered.",
+            "maximum": 10000,
+            "minimum": 10,
+            "type": "integer"
+          },
+          "sampleInterval": {
+            "description": "Seconds between sampled frames",
+            "format": "double",
+            "maximum": 60,
+            "minimum": 0.5,
+            "type": "number"
+          },
+          "sceneDetection": {
+            "description": "Also sample a frame just after every scene cut",
+            "type": "boolean"
+          },
+          "tiledDetection": {
+            "description": "Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxFrames",
+          "sampleInterval"
         ],
         "type": "object"
       },

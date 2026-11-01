@@ -193,6 +193,31 @@ export const GalleryFaceSuggestionSchema = z
   })
   .meta({ id: 'AdminConfigFaceSuggestionDto' });
 
+// Video face detection across the whole video (specs/2026-10-31-video-face-frames-design.md). Admin-only, off by
+// default like the fork's other heavier ML jobs, so a fresh install detects video faces as upstream does.
+export const GalleryVideoFacesSchema = z
+  .object({
+    enabled: galleryConfigBool.describe('Detect video faces in frames sampled across the whole video'),
+    sampleInterval: z.number().meta({ format: 'double' }).min(0.5).max(60).describe('Seconds between sampled frames'),
+    sceneDetection: galleryConfigBool.describe('Also sample a frame just after every scene cut'),
+    maxFrames: z
+      .int()
+      .min(10)
+      .max(10_000)
+      .describe('Frame budget per video. Past it the interval is stretched, so the whole video is still covered.'),
+    tiledDetection: galleryConfigBool.describe(
+      'Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work.',
+    ),
+  })
+  .meta({ id: 'AdminConfigVideoFacesDto' });
+
+export type VideoFacesConfig = z.infer<typeof GalleryVideoFacesSchema>;
+
+export const GalleryFacialRecognitionExtension = {
+  suggestions: GalleryFaceSuggestionSchema,
+  video: GalleryVideoFacesSchema,
+};
+
 export const GalleryClipExtension = {
   maxDistance: z
     .number()
@@ -225,6 +250,7 @@ export const galleryJobDefaults = {
 export const galleryMachineLearningDefaults = {
   clipMaxDistance: 0,
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
+  videoFaces: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800, tiledDetection: false },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   spatialScene: {
@@ -237,6 +263,11 @@ export const galleryMachineLearningDefaults = {
     maxForegroundRatio: 0.75,
     minFaceHeight: 0.03,
   },
+};
+
+export const galleryFacialRecognitionDefaults = {
+  suggestions: galleryMachineLearningDefaults.faceSuggestions,
+  video: galleryMachineLearningDefaults.videoFaces,
 };
 
 export const galleryBackupDatabaseDefaults = {

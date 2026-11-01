@@ -33,6 +33,7 @@ import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maint
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { PersonSidecarFields, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -695,6 +696,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case VideoTrimRepository:
     case ImageAdjustRepository:
     case SpatialSceneRepository:
+    case VideoFaceRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -790,6 +792,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case VideoTrimRepository:
     case ImageAdjustRepository:
     case SpatialSceneRepository:
+    case VideoFaceRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:

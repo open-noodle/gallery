@@ -143,7 +143,7 @@ export class GalleryPeopleService extends BaseService {
     }
 
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [face.assetId] });
-    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face);
     if (!sourcePath) {
       throw new NotFoundException();
     }

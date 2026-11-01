@@ -26,6 +26,7 @@ import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maint
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
@@ -338,6 +339,7 @@ export type ServiceOverrides = {
   imageAdjust: ImageAdjustRepository;
   cleanup: CleanupRepository;
   spatialScene: SpatialSceneRepository;
+  videoFace: VideoFaceRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -460,6 +462,7 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     cleanup: automock(CleanupRepository, { args: [, loggerMock], strict: false }),
     spatialScene: automock(SpatialSceneRepository, { strict: false }),
+    videoFace: automock(VideoFaceRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -554,6 +557,7 @@ export const newTestService = <T extends BaseService>(
     overrides.imageAdjust || (mocks.imageAdjust as As<ImageAdjustRepository>),
     overrides.cleanup || (mocks.cleanup as As<CleanupRepository>),
     overrides.spatialScene || (mocks.spatialScene as As<SpatialSceneRepository>),
+    overrides.videoFace || (mocks.videoFace as As<VideoFaceRepository>),
   );
 
   return {

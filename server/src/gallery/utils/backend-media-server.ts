@@ -3,13 +3,16 @@ import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
+import type { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { AssetFileType, AssetType, CacheControl, ImageFormat } from 'src/enum.js';
+import { widenSmallFace } from 'src/gallery/utils/video-faces.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -35,6 +38,7 @@ type BackendMediaServerDependencies = {
   assetRepository: AssetRepository;
   mediaRepository: MediaRepository;
   storageRepository: StorageRepository;
+  videoFaceRepository: VideoFaceRepository;
   getConfig: (options: { withCache: boolean }) => Promise<SystemConfig>;
 };
 
@@ -150,7 +154,16 @@ export class BackendMediaServer {
     return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
   }
 
-  async getFaceThumbnailSource(assetId: string): Promise<string | null> {
+  /**
+   * The image a face's box refers to: the best frame of a video face sampled across the whole video
+   * (specs/2026-10-31-video-face-frames-design.md), else the asset's preview, else its thumbnail.
+   */
+  async getFaceThumbnailSource({ id, assetId }: { id: string; assetId: string }): Promise<string | null> {
+    const framePath = await this.deps.videoFaceRepository.getFramePath(id);
+    if (framePath) {
+      return framePath;
+    }
+
     const preview = await this.deps.assetRepository.getForThumbnail(assetId, AssetFileType.Preview, false);
     if (preview.path) {
       return preview.path;
@@ -160,8 +173,34 @@ export class BackendMediaServer {
     return thumbnail.path ?? null;
   }
 
+  /**
+   * The person thumbnail's source and crop region. For a video whose representative face was sampled across the whole
+   * video, that is the face's best frame, with a small face widened to show its surroundings (widenSmallFace).
+   * Otherwise the preview and the face box, as upstream crops them.
+   */
+  async getPersonThumbnailSource(
+    { ownerId, personGroupId }: { ownerId: string; personGroupId: string },
+    data: { type: AssetType; previewPath: string | null; oldWidth: number; oldHeight: number } & BoundingBox,
+  ): Promise<{ previewPath: string | null } & BoundingBox> {
+    const { type, previewPath, oldWidth, oldHeight, x1, y1, x2, y2 } = data;
+    const framePath =
+      type === AssetType.Video
+        ? await this.deps.videoFaceRepository.getRepresentativeFramePath({ ownerId, personGroupId })
+        : undefined;
+    if (!framePath) {
+      return { previewPath, x1, y1, x2, y2 };
+    }
+    return { previewPath: framePath, ...widenSmallFace({ x1, y1, x2, y2 }, { width: oldWidth, height: oldHeight }) };
+  }
+
   async generateFaceThumbnailResponse(face: AssetFace, sourcePath: string): Promise<ImmichMediaResponse> {
     const { image } = await this.deps.getConfig({ withCache: true });
+    const faceBox = { x1: face.boundingBoxX1, y1: face.boundingBoxY1, x2: face.boundingBoxX2, y2: face.boundingBoxY2 };
+    // A video face cut from its best frame is widened when small, as its person thumbnail is.
+    const isVideoFrame = sourcePath === (await this.deps.videoFaceRepository.getFramePath(face.id));
+    const cropBox = isVideoFrame
+      ? widenSmallFace(faceBox, { width: face.imageWidth, height: face.imageHeight })
+      : faceBox;
     const source = await this.ensureLocalFile(sourcePath);
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-thumbnail-'));
     const outputPath = join(tempDir, 'thumbnail.jpeg');
@@ -187,12 +226,7 @@ export class BackendMediaServer {
                 old: { width: face.imageWidth, height: face.imageHeight },
                 new: { width: decoded.info.width, height: decoded.info.height },
               },
-              {
-                x1: face.boundingBoxX1,
-                y1: face.boundingBoxY1,
-                x2: face.boundingBoxX2,
-                y2: face.boundingBoxY2,
-              },
+              cropBox,
             ),
           },
         ],

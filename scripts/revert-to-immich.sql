@@ -514,6 +514,9 @@ DROP TABLE IF EXISTS "asset_quality" CASCADE;
 -- Spatial Scene depth maps. Immich has no equivalent; the <assetId>_depth.png
 -- files stay in the thumbnails folder, where Immich never reads them.
 DROP TABLE IF EXISTS "asset_spatial_scene" CASCADE;
+-- Best frames of video faces. The faces stay in asset_face; the <assetId>_faces/
+-- folders stay in the thumbnails folder, where Immich never reads them.
+DROP TABLE IF EXISTS "asset_face_video_frame" CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
@@ -922,6 +925,7 @@ DELETE FROM "kysely_migrations"
   '1799500000000-AddCleanupTables',
   '1799600000000-AddAssetQualityScreenshotVersion',
   '1799700000000-AddAssetSpatialSceneTable',
+  '1799800000000-AddAssetFaceVideoFrameTable',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1035,6 +1039,7 @@ BEGIN
        'asset_video_trim',
        'asset_image_adjust',
        'asset_spatial_scene',
+       'asset_face_video_frame',
        'person_identity',
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',

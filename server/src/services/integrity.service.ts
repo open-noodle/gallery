@@ -325,7 +325,10 @@ export class IntegrityService extends BaseService {
       trackedPaths.add(thumbnailPath.normalize('NFC'));
     }
 
-    for (const { path } of await this.spatialSceneRepository.getPathsByPaths(lookupPaths)) {
+    for (const { path } of [
+      ...(await this.spatialSceneRepository.getPathsByPaths(lookupPaths)),
+      ...(await this.videoFaceRepository.getPathsByPaths(lookupPaths)),
+    ]) {
       trackedPaths.add(path.normalize('NFC'));
     }
 

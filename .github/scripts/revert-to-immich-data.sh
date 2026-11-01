@@ -268,6 +268,18 @@ seed() {
     VALUES ('$photo_a', '/data/thumbs/${photo_a}_depth.png', 518, 686, 0.05, 0.03, 0.4, 0.6, 'depth-anything-v2-small');
   " >/dev/null
 
+  # A video face sampled across the whole video: the revert drops its best-frame row and keeps the face, which a
+  # stock server crops from the video's poster.
+  psql_q "
+    WITH f AS (INSERT INTO asset_face (\"assetId\", \"imageWidth\", \"imageHeight\", \"boundingBoxX1\", \"boundingBoxY1\",
+                                       \"boundingBoxX2\", \"boundingBoxY2\")
+               VALUES ('$video', 160, 120, 41, 31, 81, 71) RETURNING id)
+    INSERT INTO asset_face_video_frame (\"faceId\", path, \"timeSeconds\", quality, version)
+    SELECT id, '/data/thumbs/${video}_faces/' || id || '.jpeg', 2.5, 0.4, 2 FROM f;
+    INSERT INTO asset_job_status_gallery (\"assetId\", \"videoFacesSampledAt\") VALUES ('$video', now())
+    ON CONFLICT (\"assetId\") DO UPDATE SET \"videoFacesSampledAt\" = now();
+  " >/dev/null
+
   # A workflow with a Gallery plugin step, which the stock round trip must keep.
   api POST /workflows "$owner" \
     "{\"trigger\":\"AssetCreate\",\"name\":\"Round trip\",\"steps\":[{\"method\":\"gallery-core#addToSpace\",\"config\":{\"spaceIds\":[\"$space\"]}}]}" \
@@ -415,6 +427,8 @@ gallery_assert() {
   check gallery 'pet kept' "$(psql_q "SELECT count(*) FROM person WHERE name = 'Revert Pet'")" 1
   check gallery 'pet recognition kept' "$(psql_q "SELECT count(*) FROM pet_search")" 1
   check gallery 'depth map kept' "$(psql_q "SELECT count(*) FROM asset_spatial_scene WHERE \"assetId\" = '$PHOTO_A'")" 1
+  check gallery 'video face frame kept' "$(psql_q "
+    SELECT count(*) FROM asset_face_video_frame v JOIN asset_face f ON f.id = v.\"faceId\" WHERE f.\"assetId\" = '$VIDEO'")" 1
   check gallery 'rule memory kept' "$(psql_q "SELECT count(*) FROM memory WHERE type = 'rule'")" 1
   check gallery 'plugin row kept' "$(psql_q "SELECT id FROM plugin WHERE name = 'gallery-core' AND enabled")" "$(cat "$STATE_DIR/plugin-id")"
   check gallery 'plugin workflow step kept' "$(psql_q "
@@ -501,6 +515,9 @@ assert() {
   check assert 'adjusted files unreferenced' "$(psql_q "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$PHOTO_A' AND \"isEdited\"")" 0
   check assert 'adjusted thumbhash cleared' "$(psql_q "SELECT thumbhash IS NULL FROM asset WHERE id = '$PHOTO_A'")" t
   check assert 'depth maps removed' "$(psql_q "SELECT to_regclass('public.asset_spatial_scene') IS NULL")" t
+  check assert 'video face frames removed' "$(psql_q "SELECT to_regclass('public.asset_face_video_frame') IS NULL")" t
+  check assert 'video face kept' "$(psql_q "
+    SELECT count(*) FROM asset_face WHERE \"assetId\" = '$VIDEO' AND \"boundingBoxX1\" = 41 AND \"deletedAt\" IS NULL")" 1
 
   check assert 'space link keeps own photo' "$(status GET "/assets/$PHOTO_A?key=$MIXED_LINK")" 200
   check assert "space link stops serving the member's photo" "$(status GET "/assets/$MEMBER_PHOTO?key=$MIXED_LINK")" 400

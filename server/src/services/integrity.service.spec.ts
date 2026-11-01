@@ -24,6 +24,7 @@ describe(IntegrityService.name, () => {
       mocks.integrityReport.getAssetPathsByPaths.mockResolvedValue([]);
       mocks.integrityReport.getPersonThumbnailPathsByPaths.mockResolvedValue([]);
       mocks.spatialScene.getPathsByPaths.mockResolvedValue([]);
+      mocks.videoFace.getPathsByPaths.mockResolvedValue([]);
     });
 
     it('should not report a Spatial Scene depth map in the thumbnail folder', async () => {
@@ -34,6 +35,17 @@ describe(IntegrityService.name, () => {
       await sut.handleUntrackedFiles({ type: 'asset_file', paths: [depthMap] });
 
       expect(mocks.spatialScene.getPathsByPaths).toHaveBeenCalledWith([depthMap]);
+      expect(mocks.integrityReport.create).not.toHaveBeenCalled();
+    });
+
+    it('should not report the best frame of a video face in the thumbnail folder', async () => {
+      const frame = '/data/thumbs/user-id/as/se/asset-id_faces/face-id.jpeg';
+      mocks.integrityReport.getAssetFilePathsByPaths.mockResolvedValue([]);
+      mocks.videoFace.getPathsByPaths.mockResolvedValue([{ path: frame }]);
+
+      await sut.handleUntrackedFiles({ type: 'asset_file', paths: [frame] });
+
+      expect(mocks.videoFace.getPathsByPaths).toHaveBeenCalledWith([frame]);
       expect(mocks.integrityReport.create).not.toHaveBeenCalled();
     });
 

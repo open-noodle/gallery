@@ -1,4 +1,5 @@
 import { AssetTypeEnum } from '@immich/sdk';
+import { fetchVideoFaceCrop } from '$lib/gallery/people/video-face-crop';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
 import { PeopleSortBy } from '$lib/stores/preferences.store';
 import { createUrl, getAssetMediaUrl } from '$lib/utils';
@@ -230,6 +231,10 @@ export const zoomImageToBase64 = async (
   if (assetType === AssetTypeEnum.Image) {
     image = photoViewer;
   } else if (assetType === AssetTypeEnum.Video) {
+    const serverCrop = await fetchVideoFaceCrop(face);
+    if (serverCrop) {
+      return serverCrop;
+    }
     const data = getAssetMediaUrl({ id: assetId });
     const img: HTMLImageElement = new Image();
     img.crossOrigin = 'anonymous';
