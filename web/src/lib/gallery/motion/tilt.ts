@@ -6,8 +6,10 @@ import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
  * angle lives in two CSS variables that motion.css turns into a transform, so leaving the card lets
  * the transition settle it back flat.
  */
-const GROUP = "[data-motion-lift-group], [data-testid='album-card']";
+const GROUP = "[data-motion-lift-group], [data-testid='album-card'], [data-motion-memory]";
 const PICTURE = "[data-motion-lift]:not([data-motion-lift='flat']), img.aspect-square";
+/** Memory cards tilt as a whole: the card is its own picture. */
+const SELF_PICTURE = '[data-motion-memory]';
 
 /** Degrees at the card's edge. */
 export const MAX_TILT = 7;
@@ -19,12 +21,20 @@ export const tiltFor = (rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
   return { rotateY: dx * 2 * MAX_TILT, rotateX: -dy * 2 * MAX_TILT };
 };
 
+/** Where the pointer sits inside a rect, in percent, for effects that follow it (the memory card glare). */
+export const pointerPercent = (rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, x: number, y: number) => ({
+  x: Math.min(100, Math.max(0, ((x - rect.left) / rect.width) * 100)),
+  y: Math.min(100, Math.max(0, ((y - rect.top) / rect.height) * 100)),
+});
+
 let current: HTMLElement | undefined;
 let frame = 0;
 
 const reset = (picture: HTMLElement) => {
   picture.style.removeProperty('--gallery-tilt-x');
   picture.style.removeProperty('--gallery-tilt-y');
+  picture.style.removeProperty('--gallery-pointer-x');
+  picture.style.removeProperty('--gallery-pointer-y');
 };
 
 const onPointerMove = (event: PointerEvent) => {
@@ -32,7 +42,7 @@ const onPointerMove = (event: PointerEvent) => {
     return;
   }
   const group = event.target.closest<HTMLElement>(GROUP);
-  const picture = group?.querySelector<HTMLElement>(PICTURE) ?? undefined;
+  const picture = (group?.matches(SELF_PICTURE) ? group : group?.querySelector<HTMLElement>(PICTURE)) ?? undefined;
   if (current && current !== picture) {
     reset(current);
     current = undefined;
@@ -44,9 +54,13 @@ const onPointerMove = (event: PointerEvent) => {
   const { clientX, clientY } = event;
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
-    const { rotateX, rotateY } = tiltFor(picture.getBoundingClientRect(), clientX, clientY);
+    const rect = picture.getBoundingClientRect();
+    const { rotateX, rotateY } = tiltFor(rect, clientX, clientY);
+    const pointer = pointerPercent(rect, clientX, clientY);
     picture.style.setProperty('--gallery-tilt-x', `${rotateX.toFixed(2)}deg`);
     picture.style.setProperty('--gallery-tilt-y', `${rotateY.toFixed(2)}deg`);
+    picture.style.setProperty('--gallery-pointer-x', `${pointer.x.toFixed(1)}%`);
+    picture.style.setProperty('--gallery-pointer-y', `${pointer.y.toFixed(1)}%`);
   });
 };
 

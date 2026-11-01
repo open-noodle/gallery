@@ -171,14 +171,62 @@
   transition-timing-function: var(--spring-bouncy);
 }
 
-/* Hovering a timeline photo draws it a little closer inside its frame (the frame clips it). Selected
- * photos already sit shrunk in their frame, so they stay still. */
-[data-thumbnail-focus-container] img {
-  transition: scale 600ms var(--ease-settle);
+/* Hovering a timeline photo lifts it out of the grid, over its neighbours. The thumbnail's one child
+ * layer holds the photo, the hover gradient and the icons, so they all grow together (scaling only the
+ * <img> left the gradient painting a dark block over the photo's old box). Selected photos already sit
+ * shrunk in their frame, so they stay still.
+ *
+ * The frame's overflow-hidden never clipped that layer (the frame is not positioned and the layer is
+ * absolute), so the photo always spilled out; what decided whether it covered a neighbour was paint
+ * order. Each ancestor that clips or stacks is lifted while one of its photos is hovered: the image
+ * grid (overflow-clip), the day section (contain: paint, a stacking context) and the month block
+ * (transform, a stacking context).
+ *
+ * The raise outlives the hover: thumbnail-lift.ts keeps `data-motion-settling` on the photo while it
+ * shrinks back (400ms, SETTLE_MS), so it settles into place smoothly instead of being clipped and buried
+ * the moment the cursor leaves. */
+[data-thumbnail-focus-container] > div {
+  /* Set by thumbnail-lift.ts on entering: photos at the scroll area's edge grow only toward the open side. */
+  transform-origin: var(--gallery-lift-origin, center);
+  transition:
+    scale 400ms var(--ease-settle),
+    box-shadow 400ms var(--ease-settle);
 }
 
-[data-thumbnail-focus-container]:not([data-selected]):hover img {
+[data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling]) > div {
+  z-index: 1;
+}
+
+[data-thumbnail-focus-container]:not([data-selected]):hover > div {
   scale: 1.1;
+  box-shadow: 0 18px 40px -10px rgb(0 0 0 / 0.55);
+  transition:
+    scale 600ms var(--ease-settle),
+    box-shadow var(--motion-base) var(--ease-settle);
+}
+
+[data-image-grid]:has([data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling])) {
+  overflow: visible;
+}
+
+section[data-group]:has([data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling])) {
+  contain: layout style;
+  z-index: 1;
+}
+
+.timeline-month:has([data-thumbnail-focus-container]:not([data-selected]):is(:hover, [data-motion-settling])) {
+  z-index: 1;
+}
+
+/* A photo in a day's first row grows up toward the day's date; the date moves up by the same amount
+ * (`--gallery-title-lift`, set by thumbnail-lift.ts) so the gap between them holds. Only while set: a
+ * translate at rest would make every date row a stacking context. */
+section[data-group] > div:first-child {
+  transition: translate 500ms var(--ease-settle);
+}
+
+section[data-group][data-motion-title-lift] > div:first-child {
+  translate: 0 calc(-1 * var(--gallery-title-lift));
 }
 
 /* The check pops when a press selects something. `data-just-pressed` is set by press.ts for a
@@ -278,6 +326,93 @@ a[href*='/people/']:not(:has([data-motion-lift])) img.rounded-full {
 
 a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
   scale: 1.08;
+}
+
+/* Memory cards (memory lane, Memories, Explore): the card grows toward you, tilts toward the mouse
+ * (tilt.ts) with a glare that follows the pointer, casts a deep shadow, the photo's colour deepens and
+ * the title floats up. Upstream's MemoryCard carries one attribute, `data-motion-memory`.
+ *
+ * The top edge stays put: every list of memory cards clips above them (the memory lane scrolls sideways;
+ * on the photos page it is the first thing in the timeline's scroll area, under the toolbar; the
+ * Memories page's first row sits under its header), so anything rising past the top edge is cut off.
+ * The card grows down and sideways instead, over its neighbours, and the tilt pivots on that top edge.
+ * 4% keeps the outer columns of the Memories grid inside its scroll area's 8px padding. Since the card
+ * only grows, nothing moves away from the cursor, so the hover cannot flicker at an edge. */
+[data-motion-memory] {
+  transform-origin: center top;
+  transition:
+    scale var(--spring-gentle-duration) var(--spring-gentle),
+    transform var(--motion-slow) var(--ease-settle),
+    box-shadow var(--motion-slow) var(--ease-settle);
+}
+
+[data-motion-memory] > img {
+  transition: filter var(--motion-slow) var(--ease-settle);
+}
+
+[data-motion-memory] > div.bottom-2 {
+  transition: translate var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+[data-motion-memory]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--gallery-pointer-x, 50%) var(--gallery-pointer-y, 0%),
+    rgb(255 255 255 / 0.45),
+    transparent 60%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-standard);
+}
+
+[data-motion-memory]:hover {
+  z-index: 1;
+  scale: 1.04;
+  transform: perspective(800px) rotateX(var(--gallery-tilt-x, 0deg)) rotateY(var(--gallery-tilt-y, 0deg));
+  box-shadow: 0 32px 48px -16px rgb(0 0 0 / 0.6);
+}
+
+[data-motion-memory]:hover::after {
+  opacity: 1;
+}
+
+[data-motion-memory]:hover > img {
+  filter: saturate(1.3) contrast(1.05);
+}
+
+[data-motion-memory]:hover > div.bottom-2 {
+  translate: 0 -6px;
+}
+
+[data-motion-memory]:active {
+  scale: 1.01;
+}
+
+/* The memory lane clips below too: room for the grown card and its shadow, given back with a negative
+ * margin (what follows paints over that band, so it takes no space). The end cards grow inward so the
+ * scroller does not cut them sideways. */
+section:has(> div > [data-motion-memory]) {
+  padding-bottom: 40px;
+  margin-bottom: -40px;
+}
+
+/* The strip's scroll buttons (ImageCarousel's sticky layer, z-1) stay above a hovered card (also z-1, but
+ * later in the page), so it is always clear there are more memories. */
+section:has(> div > [data-motion-memory]) > .sticky {
+  z-index: 2;
+}
+
+section > div > [data-motion-memory]:first-child {
+  transform-origin: left top;
+}
+
+section > div > [data-motion-memory]:last-child {
+  transform-origin: right top;
 }
 
 /* Sidebar groups (Spaces, Albums): children slide down into place and the chevron turns, instead of
@@ -401,13 +536,21 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
     animation: none;
   }
 
-  [data-thumbnail-focus-container]:not([data-selected]):hover img,
+  [data-thumbnail-focus-container]:not([data-selected]):hover > div,
   a[href*='city=']:hover .overflow-hidden > img.object-cover,
   a[href*='/people/']:hover img.rounded-full {
     scale: none;
   }
 
   :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
+    transform: none;
+  }
+
+  [data-motion-memory]:hover,
+  [data-motion-memory]:active,
+  [data-motion-memory]:hover > div.bottom-2 {
+    translate: none;
+    scale: none;
     transform: none;
   }
 

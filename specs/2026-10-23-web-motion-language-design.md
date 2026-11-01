@@ -22,9 +22,10 @@ by taste.
 | Selecting a photo                          | Spring + layout            | Photo shrinks into its frame on the gentle spring; the check pops                                         | `motion.css`                                      |
 | Something appearing (modal, menu, popover) | Keyframes                  | Modals rise 32px from 82% on the bouncy spring; menus grow from 85% out of their trigger (`--bits-floating-transform-origin`) | `motion.css`                                   |
 | Hovering a button                          | Spring                     | Grows ~5px (`hoverScale`, 1.02–1.1) on the bouncy spring; mouse only; menu rows, tabs and checkboxes highlight instead | `press.ts`, site-wide |
-| Hovering a timeline photo                  | Keyframes (transition)     | The photo zooms 10% inside its frame (not while selected)                                                | `motion.css`                                      |
+| Hovering a timeline photo                  | Keyframes (transition)     | The photo, its gradient and icons lift 10% out of the grid over their neighbours with a shadow (not while selected). The clipping/stacking ancestors (image grid, day section, month) are raised while hovered and while it shrinks back. A photo at the scroll area's edge grows only toward the open side | `motion.css`, `thumbnail-lift.ts`                 |
 | Hovering a card                            | Spring                     | Picture lifts 8px and grows 4% with a deeper shadow; the card rises above its neighbours                  | `motion.css`, `data-motion-lift`                  |
 | Hovering a sidebar item                    | Spring                     | Pill fades in; icon grows 25% and tilts 8° on the bouncy spring                                          | `motion.css`                                      |
+| Hovering a memory card                     | Spring                     | The card grows 4% down and sideways from a fixed top edge (every list of them clips above, and a gap to make room was rejected), tilts toward the mouse with a pointer-following glare and a deep shadow; colour deepens and the title floats up | `motion.css`, `tilt.ts`, `data-motion-memory`     |
 | Hovering Explore places / people          | Keyframes (transition)     | Place photos zoom 12% inside their frame and brighten; avatars grow 8% on the bouncy spring               | `motion.css` (matched by link target)             |
 | Expanding a sidebar group (Spaces, Albums) | Spring + keyframes         | Children fade and drop 16px into place; the chevron turns on the snappy spring                           | `motion.css`                                      |
 | Selecting photos (selection bar)           | Spring                     | The selection bar fades and drops 16px in over the top bar on the bouncy spring                          | `motion.css`                                      |
@@ -95,6 +96,11 @@ console.log(Math.round(T * 1000), `linear(${Array.from({ length: n + 1 }, (_, i)
 7. **Hands off library-positioned elements.** Map markers are placed by MapLibre's own transforms, and a
    marker that grows under the cursor moves its hit area, so hover flickers and clicks miss. Nothing
    inside `.maplibregl-map` gets press or hover motion; markers keep upstream's own hover zoom.
+   The same holds for anything that moves under the cursor: a hover that translates its own hit area
+   away flickers on and off at the edge. Grow instead, or move an inner element.
+   Small controls with a 1px rounded border (the filter panel's year and month chips) shimmer under the
+   bouncy hover grow: the border is redrawn at a new fractional scale every frame of the wobble. They
+   already show hover by colour, so they carry `data-no-hover-grow` (press squish kept).
 8. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
    the fork-owned `gallery-theme.css`. Upstream components are reached by stable hooks they already
    expose (bits-ui `data-*-content`/`data-state`, `data-thumbnail-focus-container`, `data-testid`,

@@ -6,6 +6,8 @@ import { duration, ease, prefersReducedMotion, spring, springEasing } from '$lib
  * components get it without being edited.
  *
  * Opt a custom element in with `data-press`, or out with `data-no-press` (on it or any ancestor).
+ * `data-no-hover-grow` keeps the press but drops the hover grow: small bordered chips that already
+ * show hover by colour shimmer as the bouncy grow redraws their 1px border at a new scale every frame.
  * Everything inside a map is out.
  */
 export const PRESSABLE =
@@ -22,7 +24,8 @@ const NO_MOTION = '[data-no-press], .maplibregl-map';
 
 /** Hover grows buttons only; rows in menus and lists, tabs and checkboxes highlight instead. */
 const HOVERABLE = 'button, [role="button"], [data-press]';
-const NOT_HOVERABLE = '[role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"]';
+const NOT_HOVERABLE =
+  '[role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"], [data-no-hover-grow]';
 
 /** Elements larger than this (px²) are surfaces, not controls: a squish would read as the page lurching. */
 const MAX_AREA = 600 * 200;
