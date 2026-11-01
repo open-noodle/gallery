@@ -82,6 +82,16 @@ describe('installPressFeedback', () => {
     expect(animate.mock.calls[1][0].at(-1)).toEqual({ scale: 1 });
   });
 
+  it('keeps the press but skips the hover grow on data-no-hover-grow', () => {
+    document.body.innerHTML = '<button data-no-hover-grow id="chip">2022</button>';
+    const chip = document.querySelector('#chip')!;
+    chip.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).not.toHaveBeenCalled();
+
+    press(chip);
+    expect(animate).toHaveBeenCalledTimes(1);
+  });
+
   it('leaves disabled and opted-out controls alone', () => {
     document.body.innerHTML = '<button disabled>a</button><div data-no-press><button>b</button></div>';
     for (const button of document.querySelectorAll('button')) {
@@ -95,6 +105,15 @@ describe('installPressFeedback', () => {
     const marker = document.querySelector('#marker')!;
     press(marker);
     marker.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('leaves the image carousel scroll buttons alone, on press and on hover', () => {
+    document.body.innerHTML =
+      '<section class="overflow-x-scroll"><div class="sticky"><div><button id="next">›</button></div></div></section>';
+    const next = document.querySelector('#next')!;
+    press(next);
+    next.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
     expect(animate).not.toHaveBeenCalled();
   });
 
