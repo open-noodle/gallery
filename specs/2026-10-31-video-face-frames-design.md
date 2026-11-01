@@ -381,6 +381,10 @@ Storage: one JPEG of about 200 to 400 KB per video face.
   - `web/src/lib/utils/people-utils.ts`: one call to `fetchVideoFaceCrop` in the video branch of `zoomImageToBase64`;
   - `web/src/routes/admin/system-settings/MachineLearningSettings.svelte`: the settings component's import and render.
 - `asset_job_status_gallery` (a fork table) gains `videoFacesSampledAt`.
+- The migration's `down()` drops `asset_face_video_frame` and `videoFacesSampledAt` rather than moving them back:
+  both are derived, and there is nowhere older to move them. The faces themselves are `asset_face` rows and stay, with
+  the caveat under Version pairings for a build that crops from the poster. Upgrading again leaves those videos
+  unstamped, so face detection's Missing job samples them afresh and matches the existing faces, names included.
 - `asset_face` keeps Immich's meaning: one face of one person in one asset, with a box in the stated image space.
 
 ## Testing
