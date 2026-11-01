@@ -356,6 +356,19 @@ describe(zoomImageToBase64.name, () => {
     expect(imageSpy).not.toHaveBeenCalled();
   });
 
+  it('asks for a new crop when a refresh moved the face, so the browser never shows the old frame', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => new Response(new Blob(['jpeg'], { type: 'image/jpeg' })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Video, undefined);
+    await zoomImageToBase64(makeFace({ boundingBoxX1: 1010 }), 'asset-1', AssetTypeEnum.Video, undefined);
+    await zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Video, undefined);
+
+    const [first, moved, again] = fetchMock.mock.calls.map(([url]) => url);
+    expect(moved).not.toBe(first);
+    expect(again).toBe(first);
+  });
+
   it('never asks the server for a photo face, which is cropped from the full image on screen', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

@@ -231,7 +231,7 @@ export const zoomImageToBase64 = async (
   if (assetType === AssetTypeEnum.Image) {
     image = photoViewer;
   } else if (assetType === AssetTypeEnum.Video) {
-    const serverCrop = await fetchVideoFaceCrop(face.id);
+    const serverCrop = await fetchVideoFaceCrop(face);
     if (serverCrop) {
       return serverCrop;
     }
