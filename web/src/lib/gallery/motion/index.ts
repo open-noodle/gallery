@@ -4,6 +4,7 @@ import { crossfadeNavigation } from '$lib/gallery/motion/page-transition';
 import { installPressFeedback } from '$lib/gallery/motion/press';
 import { installThumbnailLift } from '$lib/gallery/motion/thumbnail-lift';
 import { installTilt } from '$lib/gallery/motion/tilt';
+import { installViewerZoom } from '$lib/gallery/motion/viewer-zoom';
 
 export { celebrate, pop, pulse } from '$lib/gallery/motion/celebrate';
 export { countMotion, flipMotion, slideFrom, staggerDelay, type ListMotion } from '$lib/gallery/motion/list';
@@ -20,10 +21,12 @@ export const setupMotion = (): void => {
     const uninstallPress = installPressFeedback();
     const uninstallTilt = installTilt();
     const uninstallThumbnailLift = installThumbnailLift();
+    const uninstallViewerZoom = installViewerZoom();
     return () => {
       uninstallPress();
       uninstallTilt();
       uninstallThumbnailLift();
+      uninstallViewerZoom();
     };
   });
   onNavigate(crossfadeNavigation);

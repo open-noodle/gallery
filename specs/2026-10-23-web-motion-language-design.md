@@ -30,6 +30,7 @@ by taste.
 | Expanding a sidebar group (Spaces, Albums) | Spring + keyframes         | Children fade and drop 16px into place; the chevron turns on the snappy spring                           | `motion.css`                                      |
 | Selecting photos (selection bar)           | Spring                     | The selection bar fades and drops 16px in over the top bar on the bouncy spring                          | `motion.css`                                      |
 | Changing section                           | Layout transition          | View Transition: old page fades and sinks to 98%, new one rises 28px; sidebar and top bar held still      | `page-transition.ts`, `motion.css`                |
+| Opening / closing a photo                  | Layout transition (FLIP)   | A copy of the image flies from the thumbnail into the viewer and back on a fast ease-out (no overshoot: the photo never draws bigger than it is). The sharp preview fades in over the thumbnail during the flight, and the copy hands over once the viewer's own sharp image has loaded. Thumbnail off screen: the viewer fades | `viewer-zoom.ts`                                  |
 | Trashing / archiving / restoring photos    | SVG-style path + physics   | Each photo lifts (anticipation), then arcs along a Bézier into the sidebar link it went to, which gulps   | `removal.ts`                                      |
 | Deleting permanently / emptying trash      | Shader-style               | Photos lose colour, blur and dissolve where they stood                                                    | `removal.ts`                                      |
 | Favoriting                                 | Particles                  | A ring and seven small hearts burst from the button                                                       | `celebrate.ts`                                    |
@@ -119,6 +120,7 @@ Each upstream file carries one import and one call:
 | `lib/services/asset.service.ts` `handleFavorite`             | `celebrate('favorite')`                       |
 | `lib/services/trash.service.ts` empty / restore all          | `animateRemoval('visible', 'delete' \| 'restore')` |
 | `routes/(user)/trash/.../RestoreAction.svelte`               | `animateRemoval(ids, 'restore')`              |
+| `lib/components/asset-viewer/AssetViewer.svelte`             | `useViewerZoom(() => asset.id)`               |
 
 `deleteAssets` is the single path for trashing from the timeline, the Delete key, the gallery grid and
 the asset viewer, so one hook covers all four. The fork-owned command-palette handlers
@@ -136,9 +138,13 @@ once so they don't sit under their own animation.
 - Modal and menu exits are instant: bits-ui unmounts content on close, so a CSS exit would need
   `forceMount` in @immich/ui.
 - Toasts keep @immich/ui's own fly-in.
-- Opening a photo from the timeline is not a shared-element zoom yet. It is the strongest next
-  candidate (View Transition with a `view-transition-name` on the clicked thumbnail and the viewer
-  image), but needs care with the viewer's own zoom and swipe.
+- Opening and closing a photo is a FLIP with a copy of the image (`viewer-zoom.ts`), not a View
+  Transition: the timeline stays mounted under the viewer, and snapshotting it stalls the open. Positions
+  are read while they exist: the timeline is hidden while the viewer is open, so the thumbnail is recorded
+  on click; the viewer's photo is gone before its teardown runs, so it is recorded on every input that
+  could close it, into a hidden, pre-decoded standby copy (a copy made at close paints a black frame
+  while decoding). The photo box is found through AdaptiveImage's markup classes; if upstream changes
+  them, the viewer falls back to a plain fade.
 - "Add to album / space" could reuse the throw once the picker shows the destination.
 - Timeline reflow after a removal jumps rather than FLIPs, because the virtualised layout re-positions
   absolutely; animating it belongs in the timeline manager, not a hook.
