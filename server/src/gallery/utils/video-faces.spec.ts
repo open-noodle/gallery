@@ -3,15 +3,19 @@ import {
   type Detection,
   FaceTracker,
   acceptTrack,
+  findAgain,
+  isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
   normalize,
   planSampleTimes,
+  planSharpenTimes,
   planTiles,
   sampleIntervalFor,
   sightingQuality,
   trackEmbedding,
   widenSmallFace,
+  withSighting,
 } from 'src/gallery/utils/video-faces.js';
 
 // Two people far apart in embedding space, and a slightly different view of each.
@@ -309,6 +313,48 @@ describe('acceptTrack', () => {
 
   it('never asks more of a consistent face than an admin who lowered the photo threshold', () => {
     expect(acceptTrack(trackOf({ score: 0.42 }, { score: 0.42 }, { score: 0.42 }), 0.4)).toBe(true);
+  });
+});
+
+/** A one-sighting track for alice at `t`, in a 60 px box at x = 100. */
+const trackAt = (t: number) => {
+  const tracker = new FaceTracker(0.5);
+  tracker.addFrame(t, 0, [detection(alice, box(100, 100, 60))]);
+  return tracker.finish()[0];
+};
+
+describe('sharper view', () => {
+  it('plans four frames around each best sample, shared, inside the span and not already sampled', () => {
+    expect(planSharpenTimes([trackAt(1), trackAt(1)], { start: 0, end: 10, sampled: [1, 3] })).toEqual([
+      0.5, 0.75, 1.25, 1.5,
+    ]);
+    expect(planSharpenTimes([trackAt(0.25)], { start: 0, end: 10, sampled: [0.25, 0.5] })).toEqual([0, 0.75]);
+    expect(planSharpenTimes([trackAt(9.75)], { start: 0, end: 10, sampled: [] })).toEqual([9.25, 9.5]);
+  });
+
+  it('matches an extra frame only to the tracks it was planned for', () => {
+    expect(isSharpenTimeFor(1.5, 1)).toBe(true);
+    expect(isSharpenTimeFor(0.5, 1)).toBe(true);
+    expect(isSharpenTimeFor(1.75, 1)).toBe(false);
+  });
+
+  it('finds the same person where they were, never someone else or the same looks elsewhere', () => {
+    const track = trackAt(1);
+    const near = detection(aliceTurned, box(110, 105, 64));
+
+    expect(findAgain(track, [detection(bob, box(110, 105, 64)), near], 0.5)).toBe(near);
+    expect(findAgain(track, [detection(alice, box(900, 100, 60))], 0.5)).toBeUndefined();
+    expect(findAgain(track, [detection(bob, box(100, 100, 60))], 0.5)).toBeUndefined();
+  });
+
+  it('adds a sighting in time order, as the best view only when it is better', () => {
+    const track = trackAt(1);
+    const better = { ...detection(alice, box(100), 0.9), t: 0.75, frameIndex: 5 };
+    const worse = { ...detection(alice, box(100), 0.1), t: 1.25, frameIndex: 6 };
+
+    expect(withSighting(track, better).best).toBe(better);
+    expect(withSighting(track, better).sightings.map(({ t }) => t)).toEqual([0.75, 1]);
+    expect(withSighting(track, worse).best).toBe(track.best);
   });
 });
 

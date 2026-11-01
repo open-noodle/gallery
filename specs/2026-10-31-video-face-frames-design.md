@@ -142,6 +142,21 @@ sharpness = 1 − exp(−laplacianVariance / 150)     (on the greyscale face, re
 The track's best sighting supplies the face's box and frame. Its embedding is the normalised mean of its three
 best-quality sightings. Averaging a few good views gives recognition a steadier signal than any single frame.
 
+### A sharper view near the best sample
+
+Samples a second or more apart can land on a moment when someone is mid-turn or blurred by motion, with a clearer
+moment a quarter of a second away. On a 1080p test clip every kept face was 23 to 28 px wide and every best view
+measured soft, and two of the seven crops could not be told apart. So after tracking, for the people kept, the
+detector looks at a few more frames: 0.25 s and 0.5 s either side of each person's best sample (`planSharpenTimes`),
+inside the span and not at a time already sampled. People best seen at the same moment share those frames, so a crowd
+shot costs four extra frames, not four per person.
+
+Each extra frame is searched like a sample (tiled too when tiled detection is on). A person is found in it by the
+tracker's continuity rule (`findAgain`): where their best view was, and within the relaxed distance of their looks,
+the closest in looks when several qualify. A find of higher quality becomes their best view and is added to their
+sightings (`withSighting`), so it can also join the averaged embedding. The pass picks a better view of someone already
+found. It never adds a person, drops one or merges two, because only tracks that were already kept are looked for.
+
 ## What is stored
 
 **`asset_face`** keeps Immich's meaning: one row per person per video, `sourceType = machine-learning`. Its box and
@@ -308,7 +323,7 @@ Every sampled video logs one line when it starts and one when it finishes, at `l
 
 ```
 Sampling 1800 frames across 1h of video <id> (about every 2s, 3 scene cuts)
-Found 4 faces in 1800 frames of video <id> in 21m, 30s: 2 added, 1 updated, 1 deleted, 2 dropped as too small or unsure
+Found 4 faces in 1800 frames of video <id> in 21m, 30s: 2 added, 1 updated, 1 deleted, 2 dropped as too small or unsure, 3 sharper views from 16 extra frames
 ```
 
 A video sampled from 100 frames or more also logs its progress every 10%, with an estimate of the time left, worked
@@ -331,6 +346,9 @@ recognition call (about 0.1 to 0.3 s on CPU, much less on a GPU), and a sharp cr
 video at the default interval is 60 frames, well under a minute of work. A one-hour video uses the full 1800-frame
 budget: tens of minutes on a CPU-only server, in the background, on the face-detection queue. That is comparable to
 transcoding it. The admin can trade coverage for time with `sampleInterval` and `maxFrames`.
+
+The search for sharper views adds at most four frames per kept person, fewer when people share a best moment: about
+25 frames for a 23-second clip with seven people, and a rounding error on an hour-long video.
 
 Storage: one JPEG of about 200 to 400 KB per video face.
 

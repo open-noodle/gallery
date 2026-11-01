@@ -14,6 +14,12 @@ export const VIDEO_FACE_SAMPLER_VERSION = 2;
 const CONTINUITY_RELAXATION = 0.1;
 const CONTINUITY_MAX_SIZE_RATIO = 2;
 
+/**
+ * Offsets (seconds) from a person's best sample at which a sharper view is looked for. A sample a second apart can
+ * catch someone mid-turn or blurred, with a clearer moment a quarter of a second away.
+ */
+const SHARPEN_OFFSETS = [-0.5, -0.25, 0.25, 0.5];
+
 /** Sightings averaged into a face's embedding. */
 const EMBEDDING_SIGHTINGS = 3;
 
@@ -282,6 +288,65 @@ const mergeTracks = (a: MutableTrack, b: MutableTrack): MutableTrack => {
     centroid: normalize(sum),
   };
 };
+
+const roundTime = (t: number) => Math.round(t * 1000) / 1000;
+
+/**
+ * The extra frames that may hold a sharper view of the kept people: a few around each one's best sample, inside the
+ * span, and not ones already sampled. People best seen at the same moment share them, so a crowd shot costs four
+ * frames, not four per person.
+ */
+export const planSharpenTimes = (
+  tracks: FaceTrack[],
+  { start, end, sampled }: { start: number; end: number; sampled: number[] },
+): number[] => {
+  const taken = new Set(sampled.map((t) => roundTime(t)));
+  const times = new Set<number>();
+  for (const track of tracks) {
+    for (const offset of SHARPEN_OFFSETS) {
+      const t = roundTime(track.best.t + offset);
+      if (t >= start && t < end && !taken.has(t)) {
+        times.add(t);
+      }
+    }
+  }
+  return [...times].sort((a, b) => a - b);
+};
+
+/** Whether an extra frame at `t` is one planSharpenTimes chose for a track whose best sample was at `bestT`. */
+export const isSharpenTimeFor = (t: number, bestT: number) =>
+  Math.abs(t - bestT) <= Math.max(...SHARPEN_OFFSETS.map((offset) => Math.abs(offset))) + 0.001;
+
+/**
+ * The track's person among an extra frame's detections, by the tracker's continuity rule: where their best view was
+ * and close enough in looks with the relaxation. The closest in looks when several qualify, as in a crowd.
+ */
+export const findAgain = (track: FaceTrack, detections: Detection[], maxDistance: number): Detection | undefined => {
+  let found: Detection | undefined;
+  let foundDistance = maxDistance + CONTINUITY_RELAXATION;
+  for (const detection of detections) {
+    if (!nearby(detection.box, track.best.box)) {
+      continue;
+    }
+    const distance = Math.min(
+      cosineDistance(detection.embedding, track.centroid),
+      cosineDistance(detection.embedding, track.best.embedding),
+    );
+    if (distance >= foundDistance) {
+      continue;
+    }
+    found = detection;
+    foundDistance = distance;
+  }
+  return found;
+};
+
+/** The track with one more sighting, which becomes its best view when it is better. */
+export const withSighting = (track: FaceTrack, sighting: Sighting): FaceTrack => ({
+  ...track,
+  sightings: [...track.sightings, sighting].sort((a, b) => a.t - b.t),
+  best: sighting.quality > track.best.quality ? sighting : track.best,
+});
 
 /** The normalised mean of a track's best few sightings: steadier for recognition than any one frame. */
 export const trackEmbedding = (track: FaceTrack): number[] => {

@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetType, AssetVisibility, JobName, JobStatus, SourceType } from 'src/enum.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
@@ -108,6 +108,15 @@ describe('VideoFaceDetector', () => {
     mocks.machineLearning.detectFaces.mockResolvedValue({ imageWidth: 1920, imageHeight: 1080, faces: [] });
   });
 
+  /** ML responses by frame time, for frames at any time (the extra frames looked at for a sharper view included). */
+  const framesAt = (faces: Record<number, ReturnType<typeof face>[]>) => {
+    mocks.machineLearning.detectFaces.mockImplementation(async (path) => {
+      const frame = await readFile(path, 'utf8');
+      const t = Number(frame.replace('frame at ', ''));
+      return { imageWidth: 1920, imageHeight: 1080, faces: faces[t] ?? [] };
+    });
+  };
+
   /** ML responses for the first sampled frames, in order (66 s at a 2 s interval samples 1, 3, 5, ... 65). */
   const framesShow = (...frames: ReturnType<typeof face>[][]) => {
     for (const faces of frames) {
@@ -186,8 +195,10 @@ describe('VideoFaceDetector', () => {
 
     await expect(sut.handleDetectFaces({ id: 'asset-id' })).resolves.toBe(JobStatus.Success);
 
-    expect(VideoFrameReader.prototype.extractFrame).toHaveBeenCalledTimes(33);
+    // 33 samples, then four frames around each person's best sample for a sharper view, which find nothing here.
+    expect(VideoFrameReader.prototype.extractFrame).toHaveBeenCalledTimes(41);
     expect(sampledTimes().slice(0, 3)).toEqual([1, 3, 5]);
+    expect(sampledTimes().slice(33)).toEqual([2.5, 2.75, 3.25, 3.5, 4.5, 4.75, 5.25, 5.5]);
     expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalledWith('/data/thumbs/preview.jpeg', expect.anything());
     expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
 
@@ -454,8 +465,8 @@ describe('VideoFaceDetector', () => {
         width: 1104,
         height: 621,
       });
-      // 33 frames, each searched whole and as four quarters.
-      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledTimes(33 * 5);
+      // 33 samples and 4 frames around alice's best for a sharper view, each searched whole and as four quarters.
+      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledTimes((33 + 4) * 5);
       expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([
         expect.objectContaining({ boundingBoxX1: 916, boundingBoxY1: 759 }),
       ]);
@@ -493,7 +504,7 @@ describe('VideoFaceDetector', () => {
       expect(loggedMessages(mocks).filter((message) => message.includes('video asset-id'))).toEqual([
         'Sampling 33 frames across 1m, 6s of video asset-id (about every 2s, 0 scene cuts)',
         expect.stringMatching(
-          /^Found 2 faces in 33 frames of video asset-id in \d+s: 2 added, 0 updated, 0 deleted, 0 dropped as too small or unsure$/,
+          /^Found 2 faces in 33 frames of video asset-id in \d+s: 2 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, 0 sharper views from 8 extra frames$/,
         ),
       ]);
     });
@@ -515,7 +526,7 @@ describe('VideoFaceDetector', () => {
       const progress = loggedMessages(mocks).filter((message) => message.startsWith('Video faces'));
       expect(progress).toHaveLength(9);
       expect(progress[0]).toMatch(
-        /^Video faces 10% done \(20 of 200 frames, 1 faces tracked so far\), estimated \S+ remaining for video asset-id$/,
+        /^Video faces 10% done \(20 of 200 frames, 1 face tracked so far\), estimated \S+ remaining for video asset-id$/,
       );
       expect(progress.at(-1)).toMatch(/^Video faces 90% done \(180 of 200 frames/);
     });
@@ -532,8 +543,53 @@ describe('VideoFaceDetector', () => {
       await sut.handleDetectFaces({ id: 'asset-id' });
 
       expect(loggedMessages(mocks)).toContainEqual(
-        expect.stringMatching(/: 1 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, 1 frame unreadable$/),
+        expect.stringMatching(
+          /: 1 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, .*, 1 frame unreadable$/,
+        ),
       );
+    });
+  });
+
+  describe('sharper view', () => {
+    it('takes a sharper view of a person from a frame near their best sample', async () => {
+      framesAt({ 1: [face(alice, 100, 60)], 3: [face(alice, 100, 50)], 1.25: [face(alice, 104, 110)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(sampledTimes().slice(33)).toEqual([0.5, 0.75, 1.25, 1.5]);
+      const { insert, frames } = mocks.videoFace.apply.mock.calls[0][0];
+      expect(insert).toEqual([expect.objectContaining({ boundingBoxX1: 104, boundingBoxX2: 214 })]);
+      expect(frames[0].timeSeconds).toBe(1.25);
+      expect(frames[0].sightings?.map(({ t }) => t)).toEqual([1, 1.25, 3]);
+      expect(backend.put).toHaveBeenCalledWith(expect.any(String), Buffer.from('frame at 1.25'), expect.anything());
+      expect(loggedMessages(mocks)).toContainEqual(expect.stringMatching(/, 1 sharper view from 4 extra frames$/));
+    });
+
+    it('never takes someone else, or the same looks somewhere else in the frame', async () => {
+      framesAt({ 1: [face(alice, 100, 60)], 1.25: [face(bob, 100, 110)], 1.5: [face(alice, 900, 110)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const { frames } = mocks.videoFace.apply.mock.calls[0][0];
+      expect(frames).toHaveLength(1);
+      expect(frames[0].timeSeconds).toBe(1);
+      expect(frames[0].sightings).toHaveLength(1);
+    });
+
+    it('keeps the sampled view when the frames around it are no better', async () => {
+      framesAt({ 1: [face(alice, 100, 110)], 1.25: [face(alice, 100, 60)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].frames[0].timeSeconds).toBe(1);
+    });
+
+    it('looks once at the frames around a moment several people are best seen in', async () => {
+      framesAt({ 1: [face(alice, 100), face(bob, 900)] });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(VideoFrameReader.prototype.extractFrame).toHaveBeenCalledTimes(33 + 4);
     });
   });
 

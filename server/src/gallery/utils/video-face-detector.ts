@@ -24,15 +24,19 @@ import {
   VIDEO_FACE_LOW_SCORE,
   VIDEO_FACE_SAMPLER_VERSION,
   acceptTrack,
+  findAgain,
+  isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
   parseEmbedding,
   planSampleTimes,
+  planSharpenTimes,
   planTiles,
   sampleIntervalFor,
   serializeEmbedding,
   sightingQuality,
   trackEmbedding,
+  withSighting,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
@@ -173,15 +177,29 @@ export class VideoFaceDetector {
       const framePaths = new Map<number, string>();
       let frameSize: { width: number; height: number } | undefined;
 
-      const extract = async (index: number) => {
+      const extract = async (index: number, t: number) => {
         const path = join(tempDir, `${index}.jpeg`);
         try {
-          await this.frames.extractFrame(original.localPath, path, times[index], { ffmpeg, videoStream });
+          await this.frames.extractFrame(original.localPath, path, t, { ffmpeg, videoStream });
           return path;
         } catch (error) {
-          this.deps.logger.debug(`Could not extract frame at ${times[index]}s of video ${id}: ${error}`);
+          this.deps.logger.debug(`Could not extract frame at ${t}s of video ${id}: ${error}`);
           return;
         }
+      };
+      const detectionsIn = async (path: string, size: { width: number; height: number }) => {
+        const faces = await this.detectInFrame(path, size, detectOptions, !!options.tiledDetection);
+        const detections: Detection[] = [];
+        for (const { boundingBox, embedding, score } of faces) {
+          const sharpness = await this.frames.measureSharpness(path, boundingBox, size);
+          detections.push({
+            box: boundingBox,
+            score,
+            embedding: parseEmbedding(embedding),
+            quality: sightingQuality({ score, box: boundingBox, sharpness }),
+          });
+        }
+        return detections;
       };
 
       let reportedPercent = 0;
@@ -196,34 +214,23 @@ export class VideoFaceDetector {
         const remaining = humanDuration((elapsed / done) * (times.length - done));
         this.deps.logger.log(
           `Video faces ${reportedPercent}% done (${done} of ${times.length} frames, ` +
-            `${tracker.peopleSoFar()} faces tracked so far), estimated ${remaining} remaining for video ${id}`,
+            `${plural(tracker.peopleSoFar(), 'face')} tracked so far), estimated ${remaining} remaining for video ${id}`,
         );
       };
 
       // The next frame is extracted while the ML service works on this one.
-      let next = times.length > 0 ? extract(0) : undefined;
+      let next = times.length > 0 ? extract(0, times[0]) : undefined;
       for (const [index, t] of times.entries()) {
         reportProgress(index);
         const path = await next;
-        next = index + 1 < times.length ? extract(index + 1) : undefined;
+        next = index + 1 < times.length ? extract(index + 1, times[index + 1]) : undefined;
         if (!path) {
           unreadable++;
           continue;
         }
 
         frameSize ??= await this.frames.getDimensions(path);
-        const faces = await this.detectInFrame(path, frameSize, detectOptions, !!options.tiledDetection);
-        const detections: Detection[] = [];
-        for (const { boundingBox, embedding, score } of faces) {
-          const sharpness = await this.frames.measureSharpness(path, boundingBox, frameSize);
-          detections.push({
-            box: boundingBox,
-            score,
-            embedding: parseEmbedding(embedding),
-            quality: sightingQuality({ score, box: boundingBox, sharpness }),
-          });
-        }
-        tracker.addFrame(t, index, detections);
+        tracker.addFrame(t, index, await detectionsIn(path, frameSize));
         framePaths.set(index, path);
 
         // Only the frames someone is best seen in are kept, so the folder never holds the whole video.
@@ -247,6 +254,35 @@ export class VideoFaceDetector {
 
       const candidates = tracker.finish();
       const tracks = candidates.filter((track) => acceptTrack(track, facialRecognition.minScore));
+
+      // A few frames around each kept person's best sample, for a sharper view than the once-a-second samples caught.
+      // The person is found again by where they were and how they look, so this picks a better view of someone already
+      // found and never adds or merges anyone.
+      const sharpenTimes = planSharpenTimes(tracks, { start, end, sampled: times });
+      const bestTimes = tracks.map((track) => track.best.t);
+      const sharpened = new Set<number>();
+      for (const [offset, t] of sharpenTimes.entries()) {
+        const frameIndex = times.length + offset;
+        const path = await extract(frameIndex, t);
+        if (!path) {
+          continue;
+        }
+
+        const detections = await detectionsIn(path, frameSize);
+        for (const [trackIndex, track] of tracks.entries()) {
+          if (!isSharpenTimeFor(t, bestTimes[trackIndex])) {
+            continue;
+          }
+          const found = findAgain(track, detections, facialRecognition.maxDistance);
+          if (!found || found.quality <= track.best.quality) {
+            continue;
+          }
+          tracks[trackIndex] = withSighting(track, { ...found, t, frameIndex });
+          framePaths.set(frameIndex, path);
+          sharpened.add(trackIndex);
+        }
+      }
+
       const { added, kept, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
         maxDistance: facialRecognition.maxDistance,
         start,
@@ -255,7 +291,8 @@ export class VideoFaceDetector {
       this.deps.logger.log(
         `Found ${plural(tracks.length, 'face')} in ${times.length} frames of video ${id} in ` +
           `${humanDuration(Date.now() - startedAt)}: ${added} added, ${kept} updated, ${removed} deleted, ` +
-          `${candidates.length - tracks.length} dropped as too small or unsure` +
+          `${candidates.length - tracks.length} dropped as too small or unsure, ` +
+          `${plural(sharpened.size, 'sharper view')} from ${plural(sharpenTimes.length, 'extra frame')}` +
           (unreadable > 0 ? `, ${plural(unreadable, 'frame')} unreadable` : ''),
       );
     } finally {
