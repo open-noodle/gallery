@@ -115,9 +115,12 @@ test.describe('Cleanup Utility', () => {
     ]);
     const client = await utils.connectDatabase();
     for (const asset of [first, second]) {
-      // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue.
+      // Sharpness 5 is below every strictness threshold, so both land in the Blurry queue. The analysis job may
+      // have written the row already, flagging the PNG upload as a screenshot (which Blurry leaves out): overwrite it.
       await client.query(
-        'INSERT INTO asset_quality ("assetId", "ownerId", sharpness, version, "screenshotVersion") VALUES ($1, $2, 5, 1, 1) ON CONFLICT DO NOTHING',
+        `INSERT INTO asset_quality ("assetId", "ownerId", sharpness, "isScreenshot", version, "screenshotVersion")
+         VALUES ($1, $2, 5, false, 1, 1)
+         ON CONFLICT ("assetId") DO UPDATE SET sharpness = 5, "isScreenshot" = false`,
         [asset.id, admin.userId],
       );
     }
