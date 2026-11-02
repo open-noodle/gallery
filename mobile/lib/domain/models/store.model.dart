@@ -25,6 +25,8 @@ enum StoreKey<T> {
   searchPeopleType<String>._(90005),
   // Library Cleanup's remembered choices, one JSON string (lib/gallery/cleanup/cleanup_prefs.dart).
   libraryCleanupPrefs<String>._(90007),
+  // Data Saver video's "on mobile data" switch (lib/gallery/video/data_saver_video.dart).
+  dataSaverVideoOnMobileData<bool>._(90008),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

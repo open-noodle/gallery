@@ -1191,6 +1191,8 @@
   "setting_nav_show_spaces": "Show Spaces in the navigation bar",
   "setting_nav_show_spaces_subtitle": "Replaces the Albums tab. Albums stays available from the Library tab.",
   "setting_nav_title": "Navigation",
+  "setting_video_viewer_data_saver_subtitle": "Stream a smaller copy of videos when not on Wi-Fi",
+  "setting_video_viewer_data_saver_title": "Data Saver on mobile data",
   "shared_link_album_includes_contributed_assets": "This album is in a shared space. Photos other members contributed to it are included in the link and become publicly visible to anyone who has the URL.",
   "shared_link_excludes_other_owners": "{count, plural, one {# selected photo is owned by another member and will not be included} other {# selected photos are owned by other members and will not be included}}",
   "shared_link_includes_contributed_assets": "{count, plural, one {# photo in this link was contributed by another member. Creating the link makes it publicly visible to anyone who has the URL.} other {# photos in this link were contributed by other members. Creating the link makes them publicly visible to anyone who has the URL.}}",
