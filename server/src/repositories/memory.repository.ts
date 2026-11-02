@@ -309,9 +309,12 @@ export class MemoryRepository implements IBulkAsset {
     dto: MemorySearchDto,
     hiddenScope?: TimelineHiddenScope,
     visibleSpaceIds: string[] = [],
+    types?: MemoryType[],
   ) {
     return (
       this.accessibleSearchBuilder(userId, dto)
+        // Before the limit, so a page holds `size` memories the client can decode.
+        .$if(types !== undefined, (qb) => qb.where('memory.type', 'in', types!))
         .select((eb) =>
           jsonArrayFrom(
             eb

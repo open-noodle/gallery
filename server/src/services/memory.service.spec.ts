@@ -1437,7 +1437,13 @@ describe(MemoryService.name, () => {
 
       // #1041: the viewer's hidden scope (§6.2) and the visible spaces carrying §3's rescue arm.
       expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'memories');
-      expect(mocks.memory.searchAccessible).toHaveBeenCalledWith(auth.user.id, dto, nothingHidden, []);
+      expect(mocks.memory.searchAccessible).toHaveBeenCalledWith(
+        auth.user.id,
+        dto,
+        nothingHidden,
+        [],
+        [MemoryType.OnThisDay, MemoryType.Rule],
+      );
     });
 
     it('should only return assets the user can access', async () => {
@@ -1621,25 +1627,20 @@ describe(MemoryService.name, () => {
   });
 
   describe('stock clients', () => {
-    it('should not list rule memories to a stock client', async () => {
+    // In SQL, before the page limit, so a page holds `size` memories the client can decode.
+    it('should ask the repository for on-this-day memories only for a stock client', async () => {
       const userId = newUuid();
-      const asset = AssetFactory.create();
-      const onThisDay = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
-      const rule = MemoryFactory.from({
-        ownerId: userId,
-        type: MemoryType.Rule,
-        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
-      })
-        .asset(asset)
-        .build();
-      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(onThisDay), getForMemory(rule)]);
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.memory.searchAccessible.mockResolvedValue([]);
 
-      const stock = await sut.search(stockAuth(userId), {});
-      expect(stock.map(({ id }) => id)).toEqual([onThisDay.id]);
+      await sut.search(stockAuth(userId), { size: 10, page: 1 });
 
-      const gallery = await sut.search(factory.auth({ user: { id: userId } }), {});
-      expect(gallery.map(({ id }) => id)).toEqual([onThisDay.id, rule.id]);
+      expect(mocks.memory.searchAccessible).toHaveBeenCalledWith(
+        userId,
+        { size: 10, page: 1 },
+        nothingHidden,
+        [],
+        [MemoryType.OnThisDay],
+      );
     });
 
     it('should not return a rule memory by id to a stock client', async () => {

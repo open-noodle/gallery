@@ -543,7 +543,14 @@ export class MemoryService extends BaseService {
 
   async search(auth: AuthDto, dto: MemorySearchDto) {
     const { hiddenScope, visibleSpaceIds } = await this.resolveViewerScope(auth, 'memories');
-    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto, hiddenScope, visibleSpaceIds);
+    // Gallery: a stock or third-party client gets only the memory types it can decode, as on sync.
+    const memories = await this.memoryRepository.searchAccessible(
+      auth.user.id,
+      dto,
+      hiddenScope,
+      visibleSpaceIds,
+      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient),
+    );
     const assetIds = memories.flatMap((memory) => memory.assets.map((asset) => asset.id));
     const allowedAssetIds = await this.checkAccess({ auth, permission: Permission.AssetView, ids: assetIds });
 
@@ -551,10 +558,7 @@ export class MemoryService extends BaseService {
     const availableTypes = getAdminAvailableMemoryTypeKeys(config.memories);
     const userTypes = getPreferences((await this.userRepository.getMetadata(auth.user.id)) ?? []).memories.types;
 
-    // Gallery: a stock or third-party client gets only the memory types it can decode, as on sync.
-    const clientTypes = GallerySyncStreams.syncedMemoryTypes(!auth.stockClient);
     return memories
-      .filter((memory) => clientTypes.includes(memory.type))
       .filter((memory) => this.isMemoryTypeVisible(memory, availableTypes, userTypes))
       .map((memory) => ({
         ...memory,
