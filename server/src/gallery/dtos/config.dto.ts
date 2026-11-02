@@ -277,9 +277,11 @@ export const galleryConfigPaths = [
   ...Object.keys(galleryTopLevelDefaults),
   ...Object.keys(galleryJobDefaults).map((key) => `job.${key}`),
   ...Object.keys(galleryServerDefaults).map((key) => `server.${key}`),
+  ...Object.keys(galleryBackupDatabaseDefaults).map((key) => `backup.database.${key}`),
   ...Object.keys(GalleryClipExtension).map((key) => `machineLearning.clip.${key}`),
   'machineLearning.petDetection',
   'machineLearning.petRecognition',
+  'machineLearning.spatialScene',
   'machineLearning.facialRecognition.suggestions',
   'nightlyTasks.clusterNewPets',
 ];

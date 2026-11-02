@@ -89,6 +89,7 @@ const deleteBlock = sql.slice(deleteBlockStart, deleteBlockEnd);
 const forkDefaultObjects = new Set<unknown>([
   ...Object.values(forkConfig.galleryJobDefaults),
   ...Object.values(forkConfig.galleryTopLevelDefaults),
+  ...Object.values(forkConfig.galleryBackupDatabaseDefaults),
   ...Object.values(forkConfig.galleryMachineLearningDefaults).filter((value) => typeof value === 'object'),
 ]);
 const forkConfigPaths: string[] = [
@@ -240,6 +241,14 @@ describe('revert-to-immich.sql', () => {
     const strip = sql.slice(sql.indexOf('UPDATE "system_metadata"'));
     const missing = forkConfigPaths.filter((path) => !strip.includes(`#- '{${path.replaceAll('.', ',')}}'`));
     expect(missing).toEqual([]);
+  });
+
+  // The same list lets PUT /system-config accept an upstream-shaped body (upstream-config-body.interceptor.ts).
+  it('lists every fork config path in galleryConfigPaths', () => {
+    const legacy = 'machineLearning.facialRecognition.suggestionMaxDistance';
+    expect(forkConfigPaths.filter((path) => path !== legacy && !forkConfig.galleryConfigPaths.includes(path))).toEqual(
+      [],
+    );
   });
 
   it('strips the fork memory type map out of user preferences', () => {
