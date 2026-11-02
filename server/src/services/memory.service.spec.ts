@@ -201,7 +201,7 @@ describe(MemoryService.name, () => {
         dto,
         nothingHidden,
         [],
-        [MemoryType.OnThisDay, MemoryType.Rule],
+        [MemoryType.OnThisDay, MemoryType.Rule, MemoryType.Birthday],
       );
     });
 
@@ -403,7 +403,7 @@ describe(MemoryService.name, () => {
 
   describe('stock clients', () => {
     // In SQL, before the page limit, so a page holds `size` memories the client can decode.
-    it('should ask the repository for on-this-day memories only for a stock client', async () => {
+    it('should ask the repository for the upstream memory types only for a stock client', async () => {
       const userId = newUuid();
       mocks.memory.searchAccessible.mockResolvedValue([]);
 
@@ -414,7 +414,7 @@ describe(MemoryService.name, () => {
         { size: 10, page: 1 },
         nothingHidden,
         [],
-        [MemoryType.OnThisDay],
+        [MemoryType.OnThisDay, MemoryType.Birthday],
       );
     });
 
@@ -432,27 +432,23 @@ describe(MemoryService.name, () => {
       await expect(sut.get(factory.auth({ user: { id: userId } }), rule.id)).resolves.toMatchObject({ id: rule.id });
     });
     // OD-3: upstream lists birthday memories to every client; only a Gallery app older than 5.8.0 cannot decode one.
+    // The types are filtered in SQL, before the page limit (MemoryRepository.searchAccessible).
     it('should list a birthday memory to stock clients and current Gallery clients, not to an older Gallery app', async () => {
       const userId = newUuid();
-      const asset = AssetFactory.create();
-      const onThisDay = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
-      const birthday = MemoryFactory.from({
-        ownerId: userId,
-        type: MemoryType.Birthday,
-        data: { personId: newUuid(), personName: 'Alice', year: 1990 },
-      })
-        .asset(asset)
-        .build();
-      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(onThisDay), getForMemory(birthday)]);
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-
-      const ids = async (auth: ReturnType<typeof factory.auth>) => {
-        const memories = await sut.search(auth, {});
-        return memories.map(({ id }) => id);
+      mocks.memory.searchAccessible.mockResolvedValue([]);
+      const types = async (auth: ReturnType<typeof factory.auth>) => {
+        mocks.memory.searchAccessible.mockClear();
+        await sut.search(auth, {});
+        return mocks.memory.searchAccessible.mock.calls[0][4];
       };
-      await expect(ids(stockAuth(userId))).resolves.toEqual([onThisDay.id, birthday.id]);
-      await expect(ids(factory.auth({ user: { id: userId } }))).resolves.toEqual([onThisDay.id, birthday.id]);
-      await expect(ids(legacyAppAuth(userId))).resolves.toEqual([onThisDay.id]);
+
+      await expect(types(stockAuth(userId))).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Birthday]);
+      await expect(types(factory.auth({ user: { id: userId } }))).resolves.toEqual([
+        MemoryType.OnThisDay,
+        MemoryType.Rule,
+        MemoryType.Birthday,
+      ]);
+      await expect(types(legacyAppAuth(userId))).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule]);
     });
 
     it('should return a birthday memory by id to a stock client', async () => {

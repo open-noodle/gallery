@@ -12,9 +12,9 @@ import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.co
 import { GalleryClusterGroupController } from 'src/gallery/controllers/gallery-cluster-group.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
-import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { GalleryServerController } from 'src/gallery/controllers/gallery-server.controller.js';
 import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
+import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
@@ -40,8 +40,8 @@ import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
-import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
+import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';

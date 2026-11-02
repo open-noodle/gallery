@@ -1,13 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import type {
-  SyncAssetExifV1,
-  SyncAssetV1,
-  SyncAssetV2,
-  SyncItem,
-  SyncStackDeleteV1,
-  SyncStackV1,
-} from 'src/dtos/sync.dto.js';
+import type { SyncAssetExifV1, SyncAssetV1, SyncAssetV2, SyncItem } from 'src/dtos/sync.dto.js';
 import { ExtraModel } from 'src/decorators.js';
 import { SyncEntityType, SyncRequestType, SyncRequestTypeSchema } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -20,6 +13,8 @@ import { isoDatetimeToDate } from 'src/validation.js';
 type SyncAlbumV2 = SyncItem[SyncEntityType.AlbumV2];
 type SyncAlbumDeleteV1 = SyncItem[SyncEntityType.AlbumDeleteV1];
 type SyncAlbumToAssetV1 = SyncItem[SyncEntityType.AlbumToAssetV1];
+type SyncStackV1 = SyncItem[SyncEntityType.StackV1];
+type SyncStackDeleteV1 = SyncItem[SyncEntityType.StackDeleteV1];
 type SyncAlbumToAssetDeleteV1 = SyncItem[SyncEntityType.AlbumToAssetDeleteV1];
 
 // #763: asset_favorite is its own synced entity (design doc §4.3) — caller-scoped (no userId in
