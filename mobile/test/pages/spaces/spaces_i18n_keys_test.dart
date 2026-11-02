@@ -63,7 +63,9 @@ void main() {
   // Hard-coded English in the shapes these files use for user-facing text: a Text literal, a
   // toast message, a tooltip or field label, or a ternary branch inside one of them.
   // `Text(` may be followed by a line break, so the files are matched whole.
-  final englishLiteralPattern = RegExp(r"(?:\bText\(\s*|\bmsg: |\btooltip: |\blabelText: |\bhintText: |\? )'[A-Z][a-z]");
+  final englishLiteralPattern = RegExp(
+    r"(?:\bText\(\s*|\bmsg: |\btooltip: |\blabelText: |\bhintText: |\? )'[A-Z][a-z]",
+  );
 
   test('the spaces feature has no hard-coded English user-facing strings', () {
     final found = <String>[];
