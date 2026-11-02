@@ -11,7 +11,7 @@ beforeAll(async () => {
 });
 
 // The jit entry of pg_db_role_setting for this database (role 0) and for the connecting role (database 0).
-const jitSettings = async () => {
+const jitSettings = async (db: Kysely<DB>) => {
   const { rows } = await sql<{ scope: string; jit: string | null }>`
     SELECT CASE WHEN s.setdatabase = 0 THEN 'role' ELSE 'database' END AS scope,
            (SELECT c FROM unnest(s.setconfig) c WHERE c LIKE 'jit=%') AS jit
@@ -24,14 +24,28 @@ const jitSettings = async () => {
 
 describe('1799800000000-ScopeJitOffToDatabase', () => {
   it('moves jit=off from the role to the database, and back on down()', async () => {
-    await sql`ALTER ROLE CURRENT_USER SET jit = off`.execute(db);
-    await sql`DO $$ BEGIN EXECUTE format('ALTER DATABASE %I RESET jit', current_database()); END $$`.execute(db);
-    expect(await jitSettings()).toEqual({ role: 'jit=off' });
+    // A role of its own, on one connection: other medium files run every migration in parallel, which sets and resets
+    // jit on the shared connecting role.
+    const role = `jit_test_${Date.now()}`;
+    await sql`CREATE ROLE ${sql.id(role)} SUPERUSER NOLOGIN`.execute(db);
+    try {
+      await db.connection().execute(async (connection) => {
+        await sql`SET ROLE ${sql.id(role)}`.execute(connection);
+        await sql`ALTER ROLE CURRENT_USER SET jit = off`.execute(connection);
+        await sql`DO $$ BEGIN EXECUTE format('ALTER DATABASE %I RESET jit', current_database()); END $$`.execute(
+          connection,
+        );
+        expect(await jitSettings(connection)).toEqual({ role: 'jit=off' });
 
-    await scopeJit.up(db);
-    expect(await jitSettings()).toEqual({ database: 'jit=off' });
+        await scopeJit.up(connection);
+        expect(await jitSettings(connection)).toEqual({ database: 'jit=off' });
 
-    await scopeJit.down(db);
-    expect(await jitSettings()).toEqual({ role: 'jit=off' });
+        await scopeJit.down(connection);
+        expect(await jitSettings(connection)).toEqual({ role: 'jit=off' });
+        await sql`RESET ROLE`.execute(connection);
+      });
+    } finally {
+      await sql`DROP ROLE ${sql.id(role)}`.execute(db);
+    }
   });
 });
