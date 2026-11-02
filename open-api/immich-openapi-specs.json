@@ -6748,6 +6748,80 @@
         "x-immich-state": "Beta"
       }
     },
+    "/assets/{id}/video/data-saver": {
+      "get": {
+        "description": "Streams the small Data Saver copy of a video, made for playback on mobile data. Without one, streams what /assets/{id}/video/playback does. Supports byte range requests.",
+        "operationId": "playAssetVideoDataSaver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Play the Data Saver copy of a video",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.view",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/video/playback": {
       "get": {
         "description": "Streams the video file for the specified asset. This endpoint also supports byte range requests.",
@@ -28425,6 +28499,31 @@
         ],
         "type": "object"
       },
+      "AdminConfigFFmpegDataSaverDto": {
+        "properties": {
+          "enabled": {
+            "description": "Store a small extra copy of each video for the mobile app on mobile data",
+            "type": "boolean"
+          },
+          "maxBitrate": {
+            "description": "Bitrate cap of the Data Saver copy, in ffmpeg notation (for example 1500k)",
+            "pattern": "^\\d+[km]?$",
+            "type": "string"
+          },
+          "targetResolution": {
+            "$ref": "#/components/schemas/DataSaverVideoResolution"
+          },
+          "targetVideoCodec": {
+            "$ref": "#/components/schemas/DataSaverVideoCodec"
+          }
+        },
+        "required": [
+          "maxBitrate",
+          "targetResolution",
+          "targetVideoCodec"
+        ],
+        "type": "object"
+      },
       "AdminConfigFFmpegDto": {
         "properties": {
           "accel": {
@@ -28469,6 +28568,9 @@
             "maximum": 51,
             "minimum": 0,
             "type": "integer"
+          },
+          "dataSaver": {
+            "$ref": "#/components/schemas/AdminConfigFFmpegDataSaverDto"
           },
           "gopSize": {
             "description": "GOP size",
@@ -28537,6 +28639,7 @@
           "bframes",
           "cqMode",
           "crf",
+          "dataSaver",
           "gopSize",
           "maxBitrate",
           "preferredHwDevice",
@@ -32731,6 +32834,24 @@
         ],
         "type": "object"
       },
+      "DataSaverVideoCodec": {
+        "description": "Video codec of the Data Saver copy",
+        "enum": [
+          "h264",
+          "hevc",
+          "av1"
+        ],
+        "type": "string"
+      },
+      "DataSaverVideoResolution": {
+        "description": "Resolution of the Data Saver copy",
+        "enum": [
+          "480",
+          "720",
+          "1080"
+        ],
+        "type": "string"
+      },
       "DatabaseBackupDeleteDto": {
         "properties": {
           "backups": {
@@ -34971,6 +35092,8 @@
           "PetRecognition",
           "SpatialSceneQueueAll",
           "SpatialScene",
+          "AssetEncodeDataSaverVideoQueueAll",
+          "AssetEncodeDataSaverVideo",
           "WorkflowAssetTrigger",
           "IntegrityUntrackedFilesQueueAll",
           "IntegrityUntrackedFiles",
@@ -41218,6 +41341,10 @@
         "properties": {
           "configFile": {
             "description": "Whether config file is available",
+            "type": "boolean"
+          },
+          "dataSaverVideo": {
+            "description": "Whether videos may have a Data Saver copy at /assets/{id}/video/data-saver. Absent on older servers.",
             "type": "boolean"
           },
           "duplicateDetection": {

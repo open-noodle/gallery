@@ -187,6 +187,7 @@ features:
       - switch-back-to-immich
       - storage-usage-accounting
       - database-backups-to-s3
+      - data-saver-video
     risk: high
     domains: [server, web, database, ci, e2e]
     owned_paths:
@@ -196,6 +197,13 @@ features:
       - server/src/gallery/services/storage-usage.service*.ts
       - server/src/gallery/utils/storage-usage*.ts
       - server/src/gallery/utils/backup-store*.ts
+      - server/src/gallery/services/data-saver-video.service*.ts
+      - server/src/gallery/repositories/data-saver-video.repository.ts
+      - server/src/gallery/utils/data-saver-video*.ts
+      - server/src/gallery/dtos/data-saver-video.dto.ts
+      - server/src/schema/tables/asset-data-saver-video.table.ts
+      - server/test/medium/specs/repositories/data-saver-video.repository.spec.ts
+      - web/src/lib/gallery/components/admin/data-saver-video-settings*
       # fork-created, so owned rather than an upstream extension: the survival audit should hold them
       - web/src/routes/admin/system-settings/BackupSettings.spec.ts
       - docs/docs/features/s3-storage.md
@@ -282,9 +290,10 @@ features:
       - server/src/backends/**
       - server/test/medium/specs/repositories/storage-migration*.spec.ts
     database:
-      tables: [storage_migration_log, asset_duplicate_checksums]
+      tables: [storage_migration_log, asset_duplicate_checksums, asset_data_saver_video]
       migration_globs:
         - server/src/schema/migrations-gallery/*Storage*.ts
+        - server/src/schema/migrations-gallery/*DataSaver*.ts
         - server/src/schema/migrations-gallery/*DuplicateChecksum*.ts
     required_checks: [storage-migration-tests, storage-migration-e2e]
 

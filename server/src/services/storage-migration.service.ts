@@ -222,6 +222,21 @@ export class StorageMigrationService extends BaseService {
       }
     }
 
+    // Stream Data Saver video copies, which move with the encoded videos they sit beside
+    if (fileTypes.encodedVideos) {
+      for await (const row of this.storageMigrationRepository.streamDataSaverVideos(direction)) {
+        await enqueue({
+          entityType: 'asset',
+          entityId: row.assetId,
+          fileType: 'dataSaverVideo',
+          sourcePath: row.path,
+          batchId,
+          direction,
+          deleteSource,
+        });
+      }
+    }
+
     // Stream person thumbnails
     if (fileTypes.personThumbnails) {
       for await (const row of this.storageMigrationRepository.streamPersonThumbnails(direction)) {
@@ -425,6 +440,9 @@ export class StorageMigrationService extends BaseService {
         }
         if (fileType === 'depthMap') {
           return this.storageMigrationRepository.updateDepthMapPath(entityId, oldPath, newPath);
+        }
+        if (fileType === 'dataSaverVideo') {
+          return this.storageMigrationRepository.updateDataSaverVideoPath(entityId, oldPath, newPath);
         }
         return this.storageMigrationRepository.updateAssetOriginalPath(entityId, oldPath, newPath);
       }

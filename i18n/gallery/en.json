@@ -430,7 +430,17 @@
     "storage_usage_include_derivatives_setting": "Include cached files in storage usage",
     "storage_usage_include_derivatives_setting_description": "Count thumbnails and transcoded videos toward each user's storage usage. The figure users see and the number their quota is enforced against both change, so the two can never disagree. Off by default, like upstream, where only original files count.",
     "storage_usage_settings": "Storage usage",
-    "storage_usage_settings_description": "Choose whether server-generated files count toward user storage usage"
+    "storage_usage_settings_description": "Choose whether server-generated files count toward user storage usage",
+    "transcoding_data_saver": "Data Saver video",
+    "transcoding_data_saver_description": "A small extra copy of each video, which the mobile app plays on mobile data",
+    "transcoding_data_saver_enabled": "Enable Data Saver video",
+    "transcoding_data_saver_enabled_description": "Store a bandwidth-capped copy of each video next to the normal one. The mobile app plays it on mobile data and the normal video on Wi-Fi. Turning this on makes copies of existing videos in the background. Acceleration, preset and tone-mapping follow the settings above.",
+    "transcoding_data_saver_max_bitrate": "Bitrate cap",
+    "transcoding_data_saver_max_bitrate_description": "The most the copy may use, for example 1500k. Simple scenes come out smaller. 1500k is about 0.7 GB per hour of video.",
+    "transcoding_data_saver_resolution": "Resolution",
+    "transcoding_data_saver_resolution_description": "Videos larger than this are scaled down for the copy. Videos already within this size and the bitrate cap get no copy.",
+    "transcoding_data_saver_video_codec": "Video codec",
+    "transcoding_data_saver_video_codec_description": "HEVC needs about half the bitrate of H.264 for the same picture, and every recent phone plays it."
   },
   "album_linked_to_space": "Linked to \"{space}\"",
   "all_albums_and_spaces": "All",

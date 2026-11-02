@@ -117,6 +117,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
       videoCodecs: [VideoCodec.H264, VideoCodec.Hevc],
       resolutions: [HlsVideoResolution.p480, HlsVideoResolution.p720, HlsVideoResolution.p1080],
     },
+    dataSaver: { enabled: false, targetVideoCodec: VideoCodec.Hevc, targetResolution: '720', maxBitrate: '1500k' },
   },
   integrityChecks: {
     untrackedFiles: {

@@ -1,12 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Put, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Put, Req, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { type NextFunction, type Response } from 'express';
+import { type NextFunction, type Request, type Response } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import { ApiTag, Permission, RouteKey } from 'src/enum.js';
 import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
+import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
@@ -22,6 +23,7 @@ export class GalleryAssetController {
   constructor(
     private service: GalleryAssetService,
     private spatialScene: SpatialSceneService,
+    private dataSaverVideo: DataSaverVideoService,
     private logger: LoggingRepository,
   ) {}
 
@@ -41,6 +43,31 @@ export class GalleryAssetController {
     @Next() next: NextFunction,
   ) {
     await sendFile(res, next, () => this.spatialScene.getDepthMap(auth, id), this.logger);
+  }
+
+  @Get(':id/video/data-saver')
+  @FileResponse()
+  @Authenticated({ permission: Permission.AssetView, sharedLink: true })
+  @Endpoint({
+    summary: 'Play the Data Saver copy of a video',
+    description:
+      'Streams the small Data Saver copy of a video, made for playback on mobile data. Without one, streams what /assets/{id}/video/playback does. Supports byte range requests.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async playAssetVideoDataSaver(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Req() req: Request,
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ) {
+    // see AssetMediaController.playAssetVideo: @Headers() would leak a required `range` param into the OpenAPI spec
+    await sendFile(
+      res,
+      next,
+      () => this.dataSaverVideo.playbackDataSaverVideo(auth, id, req.headers.range),
+      this.logger,
+    );
   }
 
   @Post('editable')
