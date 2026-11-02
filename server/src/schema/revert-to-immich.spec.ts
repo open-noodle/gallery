@@ -1,9 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { personGroupRejoinStatements } from 'src/gallery/utils/person-group-split.js';
 import { defaults } from 'src/dtos/config.dto.js';
 import * as forkConfig from 'src/gallery/dtos/config.dto.js';
+import { personGroupRejoinStatements } from 'src/gallery/utils/person-group-split.js';
 
 // Note: co-located under src/schema/ (not server/test/) so it runs under the server:unit vitest
 // config, which only globs `src/**/*.spec.ts` — mirrors sync-gallery-migrations.spec.ts.

@@ -395,8 +395,9 @@ DELETE FROM "session_sync_checkpoint"
     'SharedSpaceAssetExifCreateV1', 'SharedSpaceAssetExifUpdateV1', 'SharedSpaceAssetUpdateV1',
     'SharedSpaceDeleteV1', 'SharedSpaceLibraryBackfillV1', 'SharedSpaceLibraryDeleteV1',
     'SharedSpaceLibraryV1', 'SharedSpaceMemberBackfillV1', 'SharedSpaceMemberDeleteV1',
-    'SharedSpaceMemberV1', 'SharedSpaceToAssetBackfillV1', 'SharedSpaceToAssetDeleteV1',
-    'SharedSpaceToAssetV1', 'SharedSpaceV1'
+    'SharedSpaceMemberV1', 'SharedSpaceStackAlbumBackfillV1', 'SharedSpaceStackBackfillV1',
+    'SharedSpaceStackDeleteV1', 'SharedSpaceStackLibraryBackfillV1', 'SharedSpaceStackV1',
+    'SharedSpaceToAssetBackfillV1', 'SharedSpaceToAssetDeleteV1', 'SharedSpaceToAssetV1', 'SharedSpaceV1'
  );
 
 -- -----------------------------------------------------------------------------
@@ -634,13 +635,18 @@ UPDATE "system_metadata"
      #- '{job,peopleBackfill}'
      #- '{job,petDetection}'
      #- '{job,classification}'
+    #- '{job,qualityAnalysis}'
+    #- '{job,spatialScene}'
      #- '{machineLearning,clip,maxDistance}'
      #- '{machineLearning,petDetection}'
      #- '{machineLearning,petRecognition}'
      #- '{machineLearning,facialRecognition,suggestions}'
      #- '{machineLearning,facialRecognition,suggestionMaxDistance}'
+    #- '{machineLearning,spatialScene}'
      #- '{nightlyTasks,clusterNewPets}'
      #- '{server,mergePeopleAcrossOwners}'
+    #- '{server,spaceEditorsCanAddMembers}'
+    #- '{server,spaceEditorsCanChangeRoles}'
  WHERE "key" = 'system-config';
 
 -- Gallery's per-type memory switches (memories.types), which Immich's
