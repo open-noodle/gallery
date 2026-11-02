@@ -27,6 +27,7 @@ import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { TagRepository } from 'src/repositories/tag.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -63,6 +64,7 @@ const setup = async () => {
       PersonRepository,
       SharedSpaceRepository,
       StackRepository,
+      SystemMetadataRepository,
       TagRepository,
       UserRepository,
     ],
