@@ -8,7 +8,7 @@ type ClusterMarker = { id: string; lat: number; lon: number };
  * The map's cluster panel used to be fed the leaf ids captured at CLICK time, and nothing ever
  * recomputed them. Those ids are a snapshot of one particular filter state, but they were used as
  * the panel's client-side `assetFilter` (an EXCLUSION set — `timeline-manager.svelte.ts`
- * `isExcluded`, stripped from the request in `internal/request-options.ts`), so the panel could only
+ * `isExcluded`, stripped from the request in `lib/gallery/timeline/request-options.ts`), so the panel could only
  * ever shrink: change a filter and the map's pins updated while the panel still answered from the
  * old set, and clearing a filter from INSIDE the panel could never surface the assets that had just
  * started matching. Its header, driven by `selectedClusterIds.size`, kept the click-time count

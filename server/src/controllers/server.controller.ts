@@ -10,7 +10,6 @@ import {
   ServerConfigDto,
   ServerFeaturesDto,
   ServerMediaTypesResponseDto,
-  ServerMlHealthResponseDto,
   ServerPingResponse,
   ServerStatsResponseDto,
   ServerStorageResponseDto,
@@ -43,17 +42,6 @@ export class ServerController {
   })
   async getAboutInfo(@Auth() auth: AuthDto): Promise<ServerAboutResponseDto> {
     return forClientAbout(auth, await this.service.getAboutInfo());
-  }
-
-  @Get('ml-health')
-  @Authenticated({ permission: Permission.ServerAbout })
-  @Endpoint({
-    summary: 'Smart search health',
-    description: 'Reports whether the ML server is currently reachable and healthy for smart search.',
-    history: new HistoryBuilder().added('v2'),
-  })
-  getMlHealth(): Promise<ServerMlHealthResponseDto> {
-    return this.service.getMlHealth();
   }
 
   @Get('apk-links')

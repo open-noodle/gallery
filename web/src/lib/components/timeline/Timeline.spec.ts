@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+import { reactiveProps } from '@test-data/reactive-props.svelte';
 import Timeline from './Timeline.svelte';
 
 const testState = vi.hoisted(() => ({
@@ -35,6 +36,8 @@ const testState = vi.hoisted(() => ({
   isViewing: false,
   assetCount: 1,
   months: [] as unknown[],
+  /** A `$state` holder for the months, for tests that replace them after the first render. */
+  liveMonths: undefined as { months: unknown[] } | undefined,
   keepStaleGroupingOnUpdate: false,
   viewportHeight: 600,
   viewportWidth: 390,
@@ -114,7 +117,9 @@ vi.mock('$lib/stores/preferences.store', async () => {
 vi.mock('$lib/managers/timeline-manager/timeline-manager.svelte', () => ({
   TimelineManager: class TimelineManagerMock {
     grouping = testState.grouping;
-    months = testState.months;
+    get months() {
+      return testState.liveMonths ? testState.liveMonths.months : testState.months;
+    }
     timelineBuckets = [testState.representativeBucket];
     visibleWindow = { top: 0, bottom: 600 };
     isInitialized = true;
@@ -180,7 +185,7 @@ vi.mock('$lib/managers/timeline-manager/timeline-manager.svelte', () => ({
         testState.scrollTop = top;
       }
     });
-    loadCoversForBuckets = vi.fn(() => Promise.resolve());
+    bucketLayout = { loadCovers: vi.fn(() => Promise.resolve()) };
     loadTimelineMonth = vi.fn();
     getTimelineMonthByAssetId = vi.fn();
     findTimelineMonthForAsset = vi.fn();
@@ -565,5 +570,61 @@ describe('Timeline top section stacking', () => {
     const { getByTestId } = renderTimeline();
 
     expect(getByTestId('timeline-month-skeleton').style.zIndex).toBe('');
+  });
+});
+
+describe('Timeline month reload', () => {
+  const skeletonMonth = () => ({
+    viewId: '2015-1',
+    isInOrNearViewport: false,
+    isLoaded: false,
+    top: 0,
+    height: 240,
+    title: 'Jan 2015',
+  });
+
+  beforeEach(() => {
+    testState.grouping = 'day';
+    testState.assetCount = 1;
+    testState.viewportHeight = 600;
+    testState.viewportWidth = 390;
+    testState.domHeight = 296;
+    testState.renderOffset = 0;
+    testState.months = [];
+  });
+
+  afterEach(() => {
+    testState.liveMonths = undefined;
+  });
+
+  // A reload rebuilds every month object, with the same year-month keys as before. Rapid filter changes left
+  // stale month DOM mounted (overlapping the new results) while the old nodes were reused under those keys,
+  // so a reload must remount the month layers rather than patch them.
+  it('remounts the month DOM when a reload rebuilds the months under the same keys', async () => {
+    const live = reactiveProps({ months: [skeletonMonth()] });
+    testState.liveMonths = live;
+    renderTimeline();
+    const before = screen.getByTestId('timeline-month-skeleton');
+
+    live.months = [skeletonMonth()];
+    await tick();
+
+    const after = screen.getByTestId('timeline-month-skeleton');
+    expect(after).not.toBe(before);
+    expect(before.isConnected).toBe(false);
+  });
+
+  it('keeps the month DOM while the same month object updates within a load', async () => {
+    const live = reactiveProps({ months: [skeletonMonth()] });
+    testState.liveMonths = live;
+    renderTimeline();
+    const before = screen.getByTestId('timeline-month-skeleton');
+
+    live.months[0].height = 300;
+    await tick();
+
+    const after = screen.getByTestId('timeline-month-skeleton');
+    expect(after).toBe(before);
+    expect(after).toHaveStyle({ height: '300px' });
   });
 });

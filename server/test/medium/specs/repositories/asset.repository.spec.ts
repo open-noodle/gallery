@@ -8,6 +8,7 @@ import {
   SharedSpaceRole,
   TimeBucketSize,
 } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
@@ -34,7 +35,12 @@ const setup = (db?: Kysely<DB>) => {
     real: [],
     mock: [LoggingRepository],
   });
-  return { ctx, sut: ctx.get(AssetRepository), memoryRuleAsset: ctx.get(MemoryRuleAssetRepository) };
+  return {
+    ctx,
+    sut: ctx.get(AssetRepository),
+    galleryAsset: ctx.get(GalleryAssetRepository),
+    memoryRuleAsset: ctx.get(MemoryRuleAssetRepository),
+  };
 };
 
 const seedPeriodAsset = async (
@@ -646,14 +652,14 @@ describe(AssetRepository.name, () => {
 
   describe('getTimeBucketCovers', () => {
     it('returns an empty list without querying when no buckets are requested', async () => {
-      const { sut } = setup();
+      const { galleryAsset } = setup();
 
-      await expect(sut.getTimeBucketCovers({ timeBuckets: [] })).resolves.toEqual([]);
-      await expect(sut.getTimeBucketCovers({})).resolves.toEqual([]);
+      await expect(galleryAsset.getTimeBucketCovers({ timeBuckets: [] })).resolves.toEqual([]);
+      await expect(galleryAsset.getTimeBucketCovers({})).resolves.toEqual([]);
     });
 
     it('picks the latest asset per requested year bucket for descending order', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       await createTimelineAsset(ctx, user.id, new Date('2023-02-01T12:00:00.000Z'), {
@@ -667,7 +673,7 @@ describe(AssetRepository.name, () => {
       });
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
@@ -691,7 +697,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('picks the earliest asset per requested year bucket for ascending order', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       const older2023 = await createTimelineAsset(ctx, user.id, new Date('2023-02-01T12:00:00.000Z'), {
@@ -702,7 +708,7 @@ describe(AssetRepository.name, () => {
       });
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
@@ -720,7 +726,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('uses fileCreatedAt as a tie-break, matching the bucket representative pick', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       const laterTimeEarlierCreated = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T23:00:00.000Z'), {
@@ -732,7 +738,7 @@ describe(AssetRepository.name, () => {
 
       // Same day in DESC: latest localDate ties (both 2024-07-01), so latest fileCreatedAt wins.
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Day,
@@ -745,7 +751,7 @@ describe(AssetRepository.name, () => {
 
       // ASC tie-break: earliest fileCreatedAt wins.
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Day,
@@ -758,13 +764,13 @@ describe(AssetRepository.name, () => {
     });
 
     it('omits requested buckets that have no matching assets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       const only2024 = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'));
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
@@ -775,7 +781,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('honours owner and visibility filters', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
       const { user: otherUser } = await ctx.newUser();
 
@@ -786,7 +792,7 @@ describe(AssetRepository.name, () => {
       await createTimelineAsset(ctx, otherUser.id, new Date('2024-08-01T12:00:00.000Z'));
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
@@ -797,14 +803,14 @@ describe(AssetRepository.name, () => {
     });
 
     it('picks the representative for a month bucket spanning a year boundary', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       const decAsset = await createTimelineAsset(ctx, user.id, new Date('2023-12-15T12:00:00.000Z'));
       await createTimelineAsset(ctx, user.id, new Date('2024-01-10T12:00:00.000Z')); // must be excluded
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Month,
@@ -827,7 +833,7 @@ describe(AssetRepository.name, () => {
       [TimeBucketSize.Month, '12345-06-01'],
       [TimeBucketSize.Day, '12345-06-01'],
     ])('resolves %s covers for expanded-year buckets, which Postgres renders unsigned', async (bucketSize, bucket) => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
 
       const asset = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
@@ -842,7 +848,7 @@ describe(AssetRepository.name, () => {
         .execute();
 
       await expect(
-        sut.getTimeBucketCovers({
+        galleryAsset.getTimeBucketCovers({
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize,
@@ -996,73 +1002,6 @@ describe(AssetRepository.name, () => {
           takenBefore,
         }),
       ).resolves.toEqual([expect.objectContaining({ id: countryOnlyAsset.id })]);
-    });
-  });
-
-  describe('getMemoryAssetsForPerson', () => {
-    it('should return previewable timeline assets for the person before the cutoff and deduplicate multiple faces', async () => {
-      const { ctx, memoryRuleAsset } = setup();
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const cutoff = new Date('2026-04-23T23:59:59Z');
-
-      const { asset: matchingAsset } = await ctx.newAsset({
-        ownerId: user.id,
-        visibility: AssetVisibility.Timeline,
-        localDateTime: new Date('2025-04-01T12:00:00Z'),
-      });
-      const { asset: duplicateFaceAsset } = await ctx.newAsset({
-        ownerId: user.id,
-        visibility: AssetVisibility.Timeline,
-        localDateTime: new Date('2024-04-01T12:00:00Z'),
-      });
-      const { asset: hiddenFaceAsset } = await ctx.newAsset({
-        ownerId: user.id,
-        visibility: AssetVisibility.Timeline,
-        localDateTime: new Date('2023-04-01T12:00:00Z'),
-      });
-      const { asset: missingPreviewAsset } = await ctx.newAsset({
-        ownerId: user.id,
-        visibility: AssetVisibility.Timeline,
-        localDateTime: new Date('2022-04-01T12:00:00Z'),
-      });
-      const { asset: afterCutoffAsset } = await ctx.newAsset({
-        ownerId: user.id,
-        visibility: AssetVisibility.Timeline,
-        localDateTime: new Date('2026-05-01T12:00:00Z'),
-      });
-
-      await Promise.all([
-        ctx.newJobStatus({ assetId: matchingAsset.id }),
-        ctx.newJobStatus({ assetId: duplicateFaceAsset.id }),
-        ctx.newJobStatus({ assetId: hiddenFaceAsset.id }),
-        ctx.newJobStatus({ assetId: missingPreviewAsset.id }),
-        ctx.newJobStatus({ assetId: afterCutoffAsset.id }),
-        ctx.newAssetFile({ assetId: matchingAsset.id, type: AssetFileType.Preview, path: 'matching-preview.jpg' }),
-        ctx.newAssetFile({
-          assetId: duplicateFaceAsset.id,
-          type: AssetFileType.Preview,
-          path: 'duplicate-preview.jpg',
-        }),
-        ctx.newAssetFile({ assetId: hiddenFaceAsset.id, type: AssetFileType.Preview, path: 'hidden-preview.jpg' }),
-        ctx.newAssetFile({ assetId: afterCutoffAsset.id, type: AssetFileType.Preview, path: 'after-preview.jpg' }),
-        ctx.newAssetFace({ assetId: matchingAsset.id, personGroupId: person.personGroupId, isVisible: true }),
-        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personGroupId: person.personGroupId, isVisible: true }),
-        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personGroupId: person.personGroupId, isVisible: true }),
-        ctx.newAssetFace({ assetId: hiddenFaceAsset.id, personGroupId: person.personGroupId, isVisible: false }),
-        ctx.newAssetFace({ assetId: missingPreviewAsset.id, personGroupId: person.personGroupId, isVisible: true }),
-        ctx.newAssetFace({ assetId: afterCutoffAsset.id, personGroupId: person.personGroupId, isVisible: true }),
-      ]);
-
-      const result = await memoryRuleAsset.getMemoryAssetsForPerson(user.id, person.personGroupId, cutoff);
-
-      expect(result.map(({ id }) => id).toSorted()).toEqual([duplicateFaceAsset.id, matchingAsset.id].toSorted());
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: matchingAsset.id, localDateTime: new Date('2025-04-01T12:00:00Z') }),
-          expect.objectContaining({ id: duplicateFaceAsset.id, localDateTime: new Date('2024-04-01T12:00:00Z') }),
-        ]),
-      );
     });
   });
 
@@ -2829,21 +2768,21 @@ describe(AssetRepository.name, () => {
 
   describe('getExternalAssetIds', () => {
     it('returns only assets belonging to an external library', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
       const { library } = await ctx.newLibrary({ ownerId: user.id });
       const { asset: external } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
       await ctx.newAsset({ ownerId: user.id });
 
-      await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set([external.id]));
+      await expect(galleryAsset.getExternalAssetIds(user.id)).resolves.toEqual(new Set([external.id]));
     });
 
     it('returns an empty set for a user with no external library', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, galleryAsset } = setup();
       const { user } = await ctx.newUser();
       await ctx.newAsset({ ownerId: user.id });
 
-      await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
+      await expect(galleryAsset.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
     });
   });
 

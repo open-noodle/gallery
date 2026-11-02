@@ -6,6 +6,8 @@ import {
   FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS,
   FaceIdentityMaintenanceService,
 } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonService } from 'src/services/person.service.js';
 import { factory } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
@@ -46,6 +48,17 @@ const onConfigUpdateTestConfig = (
   }) as SystemConfig;
 
 describe(FaceIdentityMaintenanceService.name, () => {
+  describe('createFor', () => {
+    it("logs under the creating service's context", () => {
+      const setContext = vi.spyOn(LoggingRepository.prototype, 'setContext');
+
+      FaceIdentityMaintenanceService.createFor(newTestService(PersonService).sut);
+
+      expect(setContext).toHaveBeenLastCalledWith(PersonService.name);
+      setContext.mockRestore();
+    });
+  });
+
   let sut: FaceIdentityMaintenanceService;
   let mocks: ServiceMocks;
 
@@ -75,8 +88,6 @@ describe(FaceIdentityMaintenanceService.name, () => {
     faceIdentityMock.deletePendingSharedSpaceFaceMatchBackfillTargets.mockResolvedValue(void 0);
     faceIdentityMock.deleteUnreferencedIdentities ??= vi.fn();
     faceIdentityMock.deleteUnreferencedIdentities.mockResolvedValue(void 0);
-    (mocks.person as any).getPeopleOverviewStatistics ??= vi.fn();
-    (mocks.person as any).getPeopleFaceStatistics ??= vi.fn();
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
     (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);

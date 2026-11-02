@@ -5,6 +5,7 @@ import { HistoryBuilder } from 'src/decorators.js';
 import { AlbumResponseSchema, mapAlbum } from 'src/dtos/album.dto.js';
 import { type AssetResponseDto, AssetResponseSchema, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SharedLinkType, SharedLinkTypeSchema } from 'src/enum.js';
+import { GallerySharedLinkCreateExtension } from 'src/gallery/dtos/shared-link.dto.js';
 import { isoDatetimeToDate } from 'src/validation.js';
 
 const SharedLinkSearchSchema = z
@@ -30,13 +31,7 @@ const SharedLinkCreateSchema = z
     allowUpload: z.boolean().optional().describe('Allow uploads'),
     allowDownload: z.boolean().default(true).optional().describe('Allow downloads'),
     showMetadata: z.boolean().default(true).optional().describe('Show metadata'),
-    spaceId: z
-      .uuidv4()
-      .optional()
-      .describe(
-        'Shared space this link is created from. Lets the link cover assets contributed by other ' +
-          'members, which requires the caller to be an Owner or Editor of the space.',
-      ),
+    ...GallerySharedLinkCreateExtension,
   })
   .superRefine(({ type, albumId, assetIds }, ctx) => {
     switch (type) {

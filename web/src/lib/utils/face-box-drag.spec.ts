@@ -10,7 +10,7 @@ import {
 const image = (naturalWidth: number, naturalHeight: number) =>
   ({ naturalWidth, naturalHeight }) as unknown as HTMLImageElement;
 
-describe('face-box-drag (shared geometry, used by FaceEditor and SpaceFaceEditor)', () => {
+describe('face-box-drag (shared geometry, used by FaceEditor)', () => {
   describe('computeImageContentMetrics', () => {
     it('centers a landscape image inside a taller container', () => {
       // 2000x1000 natural, scaled to fit a 1000x1000 container -> 1000x500, centered vertically.

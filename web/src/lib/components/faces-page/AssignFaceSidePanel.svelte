@@ -1,7 +1,6 @@
 <script lang="ts">
   import { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
   import PersonPickerPanel from '$lib/components/faces-page/PersonPickerPanel.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import { maximumLengthSearchPeople, timeBeforeShowLoadingSpinner } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { getPeopleThumbnailUrl, handlePromiseError } from '$lib/utils';
@@ -15,7 +14,7 @@
     type AssetFaceResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
-  import { IconButton } from '@immich/ui';
+  import { IconButton, LoadingSpinner } from '@immich/ui';
   import { mdiPlus } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';

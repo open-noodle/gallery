@@ -1077,6 +1077,113 @@ describe('rolling fork sync', () => {
     expect(repo.git('rev-parse', 'main')).toBe(forkHead);
   });
 
+  it('resolves a modify/delete on a fork-deleted path by keeping the deletion', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      baseFiles: { 'packages/scripts/package.json': '{"name":"scripts"}\n' },
+    });
+    const output: string[] = [];
+    repo.git('rm', '-q', 'packages/scripts/package.json');
+    const forkHead = repo.commit('chore: drop upstream release tooling (#2)');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    repo.write('packages/scripts/package.json', '{"name":"scripts","v":2}\n');
+    repo.commit('upstream touches the deleted tooling');
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => ({ ok: true, commands: ['pnpm check'], output: 'ok' }),
+      write: (message) => output.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(repo.git('status', '--short')).toBe('');
+    expect(fs.existsSync(path.join(repo.path, 'packages/scripts'))).toBe(false);
+    expect(repo.git('log', '-1', '--format=%s')).toBe(
+      'chore: drop upstream release tooling (#2)',
+    );
+    expect(readRollingState(repo.path, outputDir).integratedForkHead).toBe(
+      forkHead,
+    );
+    expect(output.join('\n')).toContain(
+      'Kept the fork deletion of packages/scripts/package.json',
+    );
+  });
+
+  it('still stops on a modify/delete of a path the fork does not list as deleted', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      baseFiles: { 'kept.txt': 'base\n' },
+    });
+    const errors: string[] = [];
+    repo.git('rm', '-q', 'kept.txt');
+    repo.commit('chore: drop kept.txt (#2)');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    repo.write('kept.txt', 'upstream edit\n');
+    const preSyncHead = repo.commit('upstream edits kept.txt');
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => {
+        throw new Error('checks must not run after cherry-pick conflict');
+      },
+      writeError: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('cherry-pick');
+    expect(repo.git('rev-parse', 'HEAD')).toBe(preSyncHead);
+    expect(repo.git('status', '--short')).toContain('UD kept.txt');
+  });
+
+  it('still stops when the rolling branch deleted a fork-deleted path the fork commit modifies', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      baseFiles: { 'packages/scripts/package.json': '{"name":"scripts"}\n' },
+    });
+    const errors: string[] = [];
+    repo.write('packages/scripts/package.json', '{"name":"scripts","v":2}\n');
+    repo.commit('chore: fork edits the tooling (#2)');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    repo.git('rm', '-q', 'packages/scripts/package.json');
+    const preSyncHead = repo.commit('rolling branch drops the tooling');
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => {
+        throw new Error('checks must not run after cherry-pick conflict');
+      },
+      writeError: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('cherry-pick');
+    expect(repo.git('rev-parse', 'HEAD')).toBe(preSyncHead);
+    expect(repo.git('status', '--short')).toContain(
+      'DU packages/scripts/package.json',
+    );
+  });
+
   it('keeps state unpromoted and recoverable when a later cherry-pick conflicts', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const errors: string[] = [];
@@ -1987,10 +2094,17 @@ function validStateFromPlan(
 }
 
 function createRepoWithPlan(
-  options: { forkCommitsAfterStart?: number; upstreamCommits?: number } = {},
+  options: {
+    forkCommitsAfterStart?: number;
+    upstreamCommits?: number;
+    baseFiles?: Record<string, string>;
+  } = {},
 ) {
   const repo = createTempRepo();
   repo.write('README.md', 'base');
+  for (const [file, content] of Object.entries(options.baseFiles ?? {})) {
+    repo.write(file, content);
+  }
   const base = repo.commit('base commit');
   repo.git('checkout', '-b', 'upstream');
 

@@ -13,16 +13,24 @@ import { GalleryClusterGroupController } from 'src/gallery/controllers/gallery-c
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
+import { GalleryServerController } from 'src/gallery/controllers/gallery-server.controller.js';
+import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
+import { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
@@ -30,11 +38,12 @@ import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identi
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
-import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
+import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
+import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -44,6 +53,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
@@ -77,6 +87,10 @@ export const galleryControllers = [
   SharedSpaceController,
   StorageMigrationController,
   UserGroupController,
+  GalleryAlbumController,
+  GallerySearchController,
+  GalleryServerController,
+  GalleryTimelineController,
 ];
 
 export const galleryRepositories = [
@@ -103,6 +117,12 @@ export const galleryRepositories = [
   ImageAdjustRepository,
   CleanupRepository,
   SpatialSceneRepository,
+  StorageUsageRepository,
+  GalleryDuplicateRepository,
+  GalleryAssetRepository,
+  GalleryPersonRepository,
+  GalleryRepositories,
+  GalleryMachineLearningRepository,
 ];
 
 export const galleryServices = [
@@ -118,7 +138,6 @@ export const galleryServices = [
   GalleryAlbumService,
   GalleryAssetService,
   GalleryPeopleService,
-  GalleryPluginService,
   GallerySearchService,
   GalleryStackService,
   LibraryManifestService,
@@ -129,4 +148,12 @@ export const galleryServices = [
   StorageMigrationService,
   StorageUsageService,
   UserGroupService,
+  RuleMemoryService,
+  VideoTrimService,
 ];
+
+// Providers that are not plain classes, so they cannot sit in the lists above (telemetry, sync-sql, the queue and the
+// event setup iterate those as classes). app.module registers them after `repositories`; Nest keeps the last
+// registration of a token, so the MachineLearningRepository token resolves to the one GalleryMachineLearningRepository
+// instance: one setup() from SystemConfigService, one health-check loop.
+export const galleryProviders = [{ provide: MachineLearningRepository, useExisting: GalleryMachineLearningRepository }];

@@ -47,9 +47,9 @@ describe('FeatureSettings memory types', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.preferences = {
-      memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: false, recent_trip: true } },
+      memories: { enabled: true, duration: 5, types: { on_this_day: true, month_recap: false, recent_trip: true } },
     };
-    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'] };
+    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'month_recap', 'recent_trip'] };
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
   });
 
@@ -57,7 +57,7 @@ describe('FeatureSettings memory types', () => {
     render(FeatureSettings);
 
     expect(screen.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'memory_type_birthday' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'memory_type_month_recap' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'memory_type_recent_trip' })).toBeChecked();
   });
 
@@ -65,7 +65,7 @@ describe('FeatureSettings memory types', () => {
     const user = userEvent.setup();
     render(FeatureSettings);
 
-    await user.click(screen.getByRole('switch', { name: 'memory_type_birthday' }));
+    await user.click(screen.getByRole('switch', { name: 'memory_type_month_recap' }));
     await user.click(screen.getByRole('button', { name: 'save' }));
 
     expect(mocks.updateMyPreferences).toHaveBeenCalledWith({
@@ -73,7 +73,7 @@ describe('FeatureSettings memory types', () => {
         memories: {
           enabled: true,
           duration: 5,
-          types: { on_this_day: true, birthday: true, recent_trip: true },
+          types: { on_this_day: true, month_recap: true, recent_trip: true },
           sidebarWeb: true,
         },
       }),
@@ -81,7 +81,7 @@ describe('FeatureSettings memory types', () => {
   });
 
   it('does not render a toggle for an unavailable memory type', () => {
-    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday'] };
+    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'month_recap'] };
     render(FeatureSettings);
 
     expect(screen.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeInTheDocument();
@@ -99,9 +99,9 @@ describe('memories preference payload', () => {
   // tells us when upstream adds one, which is the signal Task 3 acts on.
   it('sends every memories key, not just the ones upstream knows about', async () => {
     mocks.preferences = {
-      memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: false } },
+      memories: { enabled: true, duration: 5, types: { on_this_day: true, month_recap: false } },
     };
-    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday'] };
+    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'month_recap'] };
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
 
     const user = userEvent.setup();
@@ -112,7 +112,7 @@ describe('memories preference payload', () => {
     expect(payload.memories).toEqual({
       enabled: true,
       duration: 5,
-      types: { on_this_day: true, birthday: false },
+      types: { on_this_day: true, month_recap: false },
       // Upstream's key (immich-28675). The mock preferences omit it, so `true` here is also
       // the fork's D3 default surviving: upstream's component defaults it to `false`.
       sidebarWeb: true,

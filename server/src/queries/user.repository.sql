@@ -404,12 +404,3 @@ set
 where
   "user"."deletedAt" is null
   and "user"."id" = $2::uuid
-
--- UserRepository.setUsage
-update "user"
-set
-  "quotaUsageInBytes" = $1,
-  "updatedAt" = $2
-where
-  "id" = $3::uuid
-  and "user"."deletedAt" is null

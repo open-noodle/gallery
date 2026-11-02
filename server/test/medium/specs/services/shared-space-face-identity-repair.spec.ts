@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { Mocked } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, QueueName, SharedSpaceRole, SourceType } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -28,6 +29,7 @@ const setup = (db?: Kysely<DB>) => {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
+      GalleryAssetRepository,
       SharedSpaceRepository,
       FaceIdentityRepository,
       PersonRepository,
