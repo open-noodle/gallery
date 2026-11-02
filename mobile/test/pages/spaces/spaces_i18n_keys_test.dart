@@ -62,7 +62,8 @@ void main() {
 
   // Hard-coded English in the shapes these files use for user-facing text: a Text literal, a
   // toast message, a tooltip or field label, or a ternary branch inside one of them.
-  final englishLiteralPattern = RegExp(r"(?:\bText\(|\bmsg: |\btooltip: |\blabelText: |\bhintText: |\? )'[A-Z][a-z]");
+  // `Text(` may be followed by a line break, so the files are matched whole.
+  final englishLiteralPattern = RegExp(r"(?:\bText\(\s*|\bmsg: |\btooltip: |\blabelText: |\bhintText: |\? )'[A-Z][a-z]");
 
   test('the spaces feature has no hard-coded English user-facing strings', () {
     final found = <String>[];
@@ -71,11 +72,10 @@ void main() {
         if (entity is! File || !entity.path.endsWith('.dart')) {
           continue;
         }
-        final lines = entity.readAsLinesSync();
-        for (var i = 0; i < lines.length; i++) {
-          if (englishLiteralPattern.hasMatch(lines[i])) {
-            found.add('${entity.path}:${i + 1}: ${lines[i].trim()}');
-          }
+        final source = entity.readAsStringSync();
+        for (final match in englishLiteralPattern.allMatches(source)) {
+          final line = '\n'.allMatches(source.substring(0, match.start)).length + 1;
+          found.add('${entity.path}:$line: ${match.group(0)!.replaceAll(RegExp(r'\s+'), ' ')}');
         }
       }
     }
@@ -87,6 +87,7 @@ void main() {
     expect(englishLiteralPattern.hasMatch("title: const Text('Members'),"), isTrue);
     expect(englishLiteralPattern.hasMatch("msg: 'Space deleted',"), isTrue);
     expect(englishLiteralPattern.hasMatch("Text(isLeaving ? 'Leave Space' : 'Remove Member')"), isTrue);
+    expect(englishLiteralPattern.hasMatch("Text(\n  'Syncing photos.',\n)"), isTrue);
     expect(englishLiteralPattern.hasMatch('title: Text(context.t.members),'), isFalse);
   });
 

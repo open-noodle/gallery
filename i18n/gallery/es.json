@@ -1280,6 +1280,7 @@
   "space_libraries_empty_admin_cta": "Vincula tu primera biblioteca",
   "space_link_album_confirm_count": "Vincular ({count})",
   "space_link_album_page_title": "Vincular álbumes",
+  "space_sync_banner_first_load": "Sincronizando fotos. La primera carga tarda un momento; las siguientes visitas son instantáneas.",
   "spaces": "Spaces",
   "spaces_activity": "Actividad",
   "spaces_activity_added_member_as": "{inviter} añadió a {name} como {role}",

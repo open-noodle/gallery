@@ -1281,6 +1281,7 @@
   "space_libraries_empty_admin_cta": "Liez votre première bibliothèque",
   "space_link_album_confirm_count": "Lier ({count})",
   "space_link_album_page_title": "Lier des albums",
+  "space_sync_banner_first_load": "Synchronisation des photos. Le premier chargement prend un moment ; les visites suivantes sont instantanées.",
   "spaces": "Espaces",
   "spaces_activity": "Activité",
   "spaces_activity_added_member_as": "{inviter} a ajouté {name} en tant que {role}",

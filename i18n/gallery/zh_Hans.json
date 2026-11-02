@@ -1297,6 +1297,7 @@
   "space_libraries_empty_admin_cta": "关联您的第一个资源库",
   "space_link_album_confirm_count": "关联（{count}）",
   "space_link_album_page_title": "关联相簿",
+  "space_sync_banner_first_load": "正在同步照片。首次加载需要一点时间，之后访问将即时显示。",
   "spaces": "Spaces",
   "spaces_activity": "动态",
   "spaces_activity_added_member_as": "{inviter} 将 {name} 添加为{role}",

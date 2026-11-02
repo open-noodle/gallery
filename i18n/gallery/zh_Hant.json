@@ -1295,6 +1295,7 @@
   "space_libraries_empty_admin_cta": "連結您的第一個媒體庫",
   "space_link_album_confirm_count": "連結（{count}）",
   "space_link_album_page_title": "連結相簿",
+  "space_sync_banner_first_load": "正在同步相片。首次載入需要一點時間，之後瀏覽將即時顯示。",
   "spaces": "Spaces",
   "spaces_activity": "動態",
   "spaces_activity_added_member_as": "{inviter} 將 {name} 新增為{role}",

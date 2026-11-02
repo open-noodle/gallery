@@ -1283,6 +1283,7 @@
   "space_libraries_empty_admin_cta": "Połącz swoją pierwszą bibliotekę",
   "space_link_album_confirm_count": "Połącz ({count})",
   "space_link_album_page_title": "Połącz albumy",
+  "space_sync_banner_first_load": "Synchronizowanie zdjęć. Pierwsze ładowanie chwilę potrwa, kolejne wizyty są natychmiastowe.",
   "spaces": "Spaces",
   "spaces_activity": "Aktywność",
   "spaces_activity_added_member_as": "{inviter} dodał(a) {name} jako {role}",

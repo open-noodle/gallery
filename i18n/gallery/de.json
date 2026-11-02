@@ -1282,6 +1282,7 @@
   "space_libraries_empty_admin_cta": "Verknüpfe deine erste Bibliothek",
   "space_link_album_confirm_count": "Verknüpfen ({count})",
   "space_link_album_page_title": "Alben verknüpfen",
+  "space_sync_banner_first_load": "Fotos werden synchronisiert. Das erste Laden dauert einen Moment, danach geht es sofort.",
   "spaces": "Spaces",
   "spaces_activity": "Aktivität",
   "spaces_activity_added_member_as": "{inviter} hat {name} als {role} hinzugefügt",

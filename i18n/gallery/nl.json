@@ -1279,6 +1279,7 @@
   "space_libraries_empty_admin_cta": "Koppel je eerste bibliotheek",
   "space_link_album_confirm_count": "Koppelen ({count})",
   "space_link_album_page_title": "Albums koppelen",
+  "space_sync_banner_first_load": "Foto's worden gesynchroniseerd. De eerste keer laden duurt even; daarna gaat het meteen.",
   "spaces": "Spaces",
   "spaces_activity": "Activiteit",
   "spaces_activity_added_member_as": "{inviter} heeft {name} toegevoegd als {role}",

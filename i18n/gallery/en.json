@@ -1285,6 +1285,7 @@
   "space_libraries_empty_admin_cta": "Link your first library",
   "space_link_album_confirm_count": "Link ({count})",
   "space_link_album_page_title": "Link Albums",
+  "space_sync_banner_first_load": "Syncing photos. The first load takes a moment; later visits are instant.",
   "spaces": "Spaces",
   "spaces_activity": "Activity",
   "spaces_activity_added_member_as": "{inviter} added {name} as {role}",

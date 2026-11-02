@@ -1279,6 +1279,7 @@
   "space_libraries_empty_admin_cta": "Collega la tua prima libreria",
   "space_link_album_confirm_count": "Collega ({count})",
   "space_link_album_page_title": "Collega album",
+  "space_sync_banner_first_load": "Sincronizzazione delle foto. Il primo caricamento richiede un momento; le visite successive sono immediate.",
   "spaces": "Space",
   "spaces_activity": "Attività",
   "spaces_activity_added_member_as": "{inviter} ha aggiunto {name} come {role}",
