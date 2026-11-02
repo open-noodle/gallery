@@ -250,6 +250,9 @@ describe('revert-to-immich.sql', () => {
     expect(sql).toMatch(
       /EXECUTE format\('ALTER DATABASE %I RESET jit', current_database\(\)\);\s+EXCEPTION WHEN insufficient_privilege THEN/,
     );
-    expect(sql).toMatch(/'1799400000000-ScopeJitOffToDatabase'\)\s+THEN\s+EXECUTE 'ALTER ROLE CURRENT_USER RESET jit'/);
+    expect(sql).toMatch(
+      /'1799800000000-ScopeJitOffToDatabase', '1799400000000-ScopeJitOffToDatabase'\)\)\$q\$ INTO scoped;/,
+    );
+    expect(sql).toMatch(/IF NOT database_reset OR NOT scoped THEN\s+EXECUTE 'ALTER ROLE CURRENT_USER RESET jit'/);
   });
 });

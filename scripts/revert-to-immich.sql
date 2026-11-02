@@ -827,15 +827,20 @@ DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_descripti
 DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 
 -- jit=off: restore the PostgreSQL default so the reverted database carries no
--- Gallery-specific planner tuning. 1799400000000-ScopeJitOffToDatabase keeps the
--- setting on this database. Before it, 1783628194057-DisablePostgresJit set it on
--- the application role, which only that role can reset here; on such a database
--- this resets the role running the script, so run it as the application role.
+-- Gallery-specific planner tuning. 1799800000000-ScopeJitOffToDatabase keeps the
+-- setting on this database (RC builds recorded it as 1799400000000). Before it,
+-- 1783628194057-DisablePostgresJit set it on the application role, which only that
+-- role can reset here; on such a database this resets the role running the script,
+-- so run it as the application role.
 -- ALTER DATABASE needs the database owner or a superuser. Without that privilege
--- 1799400000000 also left the setting on the role, so the role is reset instead.
+-- the migration also left the setting on the role, so the role is reset instead.
+-- The gallery_migrations lookup runs through EXECUTE: PL/pgSQL plans a static
+-- query before running it, so on a database from before the ledger split (no
+-- gallery_migrations table) a static one fails even behind an IF.
 DO $$
 DECLARE
   database_reset boolean := true;
+  scoped boolean := false;
 BEGIN
   BEGIN
     EXECUTE format('ALTER DATABASE %I RESET jit', current_database());
@@ -843,10 +848,11 @@ BEGIN
     database_reset := false;
     RAISE WARNING 'jit stays as set on database %: % cannot alter it', current_database(), CURRENT_USER;
   END;
-  IF NOT database_reset
-     OR to_regclass('public.gallery_migrations') IS NULL
-     OR NOT EXISTS (SELECT FROM "gallery_migrations" WHERE "name" = '1799400000000-ScopeJitOffToDatabase')
-  THEN
+  IF to_regclass('public.gallery_migrations') IS NOT NULL THEN
+    EXECUTE $q$SELECT EXISTS (SELECT FROM "gallery_migrations" WHERE "name" IN
+      ('1799800000000-ScopeJitOffToDatabase', '1799400000000-ScopeJitOffToDatabase'))$q$ INTO scoped;
+  END IF;
+  IF NOT database_reset OR NOT scoped THEN
     EXECUTE 'ALTER ROLE CURRENT_USER RESET jit';
   END IF;
 END $$;
@@ -997,10 +1003,10 @@ DELETE FROM "kysely_migrations"
   '1798900000000-MoveVideoTrimToSidecar',
   '1799000000000-AddAssetImageAdjustTable',
   '1799100000000-AddSharedSpaceEditorMemberPermissions',
-  '1799400000000-ScopeJitOffToDatabase',
   '1799500000000-AddCleanupTables',
   '1799600000000-AddAssetQualityScreenshotVersion',
   '1799700000000-AddAssetSpatialSceneTable',
+  '1799800000000-ScopeJitOffToDatabase',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts

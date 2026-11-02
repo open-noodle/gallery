@@ -317,6 +317,24 @@ describe('Database Migration Scenarios', { timeout: 60_000 }, () => {
       expect([await ledger(db, 'kysely_migrations'), await ledger(db, 'gallery_migrations')]).toEqual(before);
     }));
 
+  // Scenario C8: RC builds recorded a fork migration under a name it lost after the ledger split.
+  it('should rename an RC-era fork name in gallery_migrations', () =>
+    withDatabase('migration_test_rc_gallery_names', async (db) => {
+      await createRepo(db).runMigrations();
+      await sql`UPDATE "gallery_migrations" SET "name" = '1799400000000-ScopeJitOffToDatabase'
+        WHERE "name" = '1799800000000-ScopeJitOffToDatabase'`.execute(db);
+      const before = await ledger(db, 'gallery_migrations');
+
+      await createRepo(db).runMigrations();
+
+      const after = await ledger(db, 'gallery_migrations');
+      expect(after.map(({ name }) => name)).toEqual(await fileNames(galleryFolder));
+      expect(after.find(({ name }) => name === '1799800000000-ScopeJitOffToDatabase')?.timestamp).toBe(
+        before.find(({ name }) => name === '1799400000000-ScopeJitOffToDatabase')?.timestamp,
+      );
+      await expectIdempotentBoot(db);
+    }));
+
   // Scenario D: Rollback reverts the newest fork migration first and leaves upstream's ledger alone
   it('should revert the last fork migration first', () =>
     withDatabase('migration_test_rollback', async (db) => {
@@ -363,7 +381,7 @@ describe('Database Migration Scenarios', { timeout: 60_000 }, () => {
   // Scenario H: the fork migrations leave PostgreSQL JIT disabled on Immich's database.
   // JIT-compiling the high-cost (but fast-executing) cross-space People aggregates
   // adds a ~2s per-backend LLVM penalty; jit=off makes the People page ~4x faster
-  // and regresses nothing (see 1783628194057-DisablePostgresJit). 1799400000000-ScopeJitOffToDatabase
+  // and regresses nothing (see 1783628194057-DisablePostgresJit). 1799800000000-ScopeJitOffToDatabase
   // then moves the setting from the role to the database, so the database entry is what is asserted.
   it('should disable PostgreSQL JIT for the database', async () => {
     const dbName = 'migration_test_jit';
