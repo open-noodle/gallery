@@ -29,8 +29,9 @@ import { clamp } from 'src/utils/misc.js';
 // HTTP clients resend custom headers (and some resend Authorization) when they follow a redirect to another host, so a
 // request carrying its credential in one of these is proxied instead of redirected to the storage host. Cookies are
 // host-scoped and query credentials are not part of the presigned URL, so browsers and the apps keep the redirect.
+// Authorization counts only as a bearer token, the one scheme the server reads: Basic auth added by a reverse proxy in
+// front of Gallery is not a Gallery credential, and browsers do not resend it to another host.
 const CREDENTIAL_HEADERS = [
-  'authorization',
   ImmichHeader.ApiKey,
   ImmichHeader.UserToken,
   ImmichHeader.SessionToken,
@@ -40,7 +41,12 @@ const CREDENTIAL_HEADERS = [
 
 const sendsHeaderCredential = () => {
   const headers = ClsServiceManager.getClsService().get<Request | undefined>(CLS_REQ)?.headers;
-  return !!headers && CREDENTIAL_HEADERS.some((header) => headers[header]);
+  if (!headers) {
+    return false;
+  }
+  const authorization = headers.authorization;
+  const bearer = typeof authorization === 'string' && authorization.split(' ', 1)[0].toLowerCase() === 'bearer';
+  return bearer || CREDENTIAL_HEADERS.some((header) => headers[header]);
 };
 
 type FaceThumbnailBounds = {

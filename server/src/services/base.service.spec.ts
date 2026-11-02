@@ -109,6 +109,11 @@ describe(BaseService.name, () => {
       ['a session token header', { 'x-immich-session-token': 'secret' }, true],
       ['a shared link key header', { 'x-immich-share-key': 'secret' }, true],
       ['only a session cookie', { cookie: 'immich_access_token=secret' }, false],
+      [
+        'reverse-proxy Basic auth and a cookie',
+        { authorization: 'Basic dXNlcjpwYXNz', cookie: 'immich_access_token=x' },
+        false,
+      ],
     ])('picks the serve path for a request with %s', async (_, headers, proxy) => {
       const backend = { getServeStrategy: vi.fn().mockResolvedValue({ type: 'redirect', url: 'https://s3/key' }) };
       const { StorageService } = await import('src/services/storage.service.js');
