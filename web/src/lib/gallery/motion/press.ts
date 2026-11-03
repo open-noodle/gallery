@@ -8,7 +8,7 @@ components get it without being edited.
 Opt a custom element in with `data-press`, or out with `data-no-press` (on it or any ancestor).
 `data-no-hover-grow` keeps the press but drops the hover grow: small bordered chips that already
 show hover by colour shimmer as the bouncy grow redraws their 1px border at a new scale every frame.
-Everything inside a map is out.
+Everything inside a map, and every overlay on the photo, is out.
 */
 export const PRESSABLE =
   'button, [role="button"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"], [role="option"], [data-press]';
@@ -21,8 +21,11 @@ Never animated. Maps position their markers with their own transforms, and a mar
 the cursor moves its hit area, so hover flickers on and off and the marker is hard to click.
 ImageCarousel's scroll buttons (the memory lane arrows: @immich/ui markup, matched by its sticky
 button layer) shimmered under the bouncy grow the same way the filter chips did, so they stay still.
+Overlays on the photo (`data-overlay-interactive`, upstream's marker: the OCR text boxes, the face
+editor) are pinned to the image by their own transforms; an OCR box that grows or squishes while the
+user drags across it makes its text jump and the selection slip.
 */
-const NO_MOTION = '[data-no-press], .maplibregl-map, section.overflow-x-scroll > .sticky';
+const NO_MOTION = '[data-no-press], [data-overlay-interactive], .maplibregl-map, section.overflow-x-scroll > .sticky';
 
 /** Hover grows buttons only; rows in menus and lists, tabs and checkboxes highlight instead. */
 const HOVERABLE = 'button, [role="button"], [data-press]';
