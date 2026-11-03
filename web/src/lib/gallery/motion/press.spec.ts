@@ -108,6 +108,14 @@ describe('installPressFeedback', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
+  it('leaves overlays on the photo (OCR text boxes) alone, on press and on hover', () => {
+    document.body.innerHTML = '<div data-overlay-interactive role="button" id="ocr">Hocksprung</div>';
+    const box = document.querySelector('#ocr')!;
+    press(box);
+    box.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+
   it('leaves the image carousel scroll buttons alone, on press and on hover', () => {
     document.body.innerHTML =
       '<section class="overflow-x-scroll"><div class="sticky"><div><button id="next">›</button></div></div></section>';
