@@ -11,6 +11,8 @@ import {
   StorageFolder,
   UserPathType,
 } from 'src/enum.js';
+import { moveS3File } from 'src/gallery/utils/s3-file-move.js';
+import { isInStorageFolder } from 'src/gallery/utils/s3-key.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
@@ -146,7 +148,7 @@ export class StorageCore {
   }
 
   static isAndroidMotionPath(originalPath: string) {
-    return originalPath.startsWith(StorageCore.getBaseFolder(StorageFolder.EncodedVideo));
+    return isInStorageFolder(originalPath, StorageFolder.EncodedVideo, StorageCore.getMediaLocation());
   }
 
   static isImmichPath(path: string) {
@@ -204,9 +206,18 @@ export class StorageCore {
       return;
     }
 
-    // fs.rename only moves disk files (absolute paths); a relative S3 key stays where its backend put it
-    if (!isAbsolute(oldPath)) {
-      return;
+    // fs.rename only moves disk files; an S3 key moves inside S3
+    if (!isAbsolute(oldPath) || !isAbsolute(newPath)) {
+      return moveS3File(request, {
+        mediaLocation: StorageCore.getMediaLocation(),
+        moveRepository: this.moveRepository,
+        cryptoRepository: this.cryptoRepository,
+        configRepository: this.configRepository,
+        systemMetadataRepository: this.systemMetadataRepository,
+        logger: this.logger,
+        moveDiskFile: (diskRequest): Promise<void> => this.moveFile(diskRequest),
+        savePath: (path) => this.savePath(pathType, entityId, path, ownerId),
+      });
     }
 
     this.ensureFolders(newPath);
