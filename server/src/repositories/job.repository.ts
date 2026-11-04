@@ -1,8 +1,7 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
-import { JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
-import { JobType, JobsOptions, Queue, Worker } from 'bullmq';
+import { JobType, JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
 import type { Redis } from 'ioredis';
 import type { JobCounts, JobItem, JobOf } from 'src/types.js';
