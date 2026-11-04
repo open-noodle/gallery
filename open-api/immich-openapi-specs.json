@@ -5499,7 +5499,10 @@
             "name": "spaceId",
             "required": false,
             "in": "query",
+            "description": "Shared space the asset is viewed in, used to resolve its people",
             "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
               "type": "string"
             }
           }
@@ -8382,6 +8385,61 @@
         ],
         "x-immich-permission": "cleanup.read",
         "x-immich-state": "Alpha"
+      }
+    },
+    "/cluster-groups/{id}/users": {
+      "get": {
+        "description": "Retrieve the users that are a member of the cluster group.",
+        "operationId": "getClusterGroupUsers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve the users of a cluster group",
+        "tags": [
+          "Cluster groups"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.2.0",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "clusterGroup.read"
       }
     },
     "/config": {
@@ -15026,6 +15084,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -15075,7 +15142,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -15362,6 +15429,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -15411,7 +15487,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -15634,6 +15710,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -15683,7 +15768,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [

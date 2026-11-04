@@ -86,6 +86,18 @@ apply to Immich unchanged and can be offered upstream; Immich has not been conta
 - **Older search fields:** `search.repository.ts` keeps the flat search endpoints' fork fields next to the V3 hooks,
   because released Gallery apps send them.
 - **Generated files** (OpenAPI spec, SDK, SQL docs) still conflict and are regenerated, not merged.
+- **Memory overlap reconciliation** (owner decision OD-5, 2026-10-15): rule memories outrank on-this-day memories, so
+  `reconcileMemoryOverlap` strips assets from upstream `on_this_day` rows or deletes them, and `backfillMemoryOverlap`
+  does the same to older rows. Stock clients receive only on-this-day memories, so they see fewer and smaller cards
+  than Immich would make, and a stock server after a rollback keeps the reduced set. The alternative, a fork
+  reservation table applied per client, touches the generator, search, four sync streams and audit synthesis.
+- **Fork facts in upstream rows.** Rule 1 holds for the schema, not for the data. Pets are `person` and `asset_face`
+  rows, and their faces carry `sourceType = 'machine-learning'`, so a stock face re-detect deletes them (the
+  switch-back guide warns against it during a trial). Also in upstream rows: `memory.type = 'rule'`,
+  `asset.isEdited = true` on a trim with no `asset_edit` row, the `gallery-core` plugin rows, fork keys inside
+  `system-config` and five fork `system_metadata` keys, fork strings in `api_key.permissions`, `memories.types` in
+  `user_metadata` preferences, fork `SyncEntityType` values in `session_sync_checkpoint`, and `jit = off` on the
+  database. The revert script removes each of them.
 
 Not verified at runtime: a rollback to a v5.7 release (the procedure names what it loses: non-owner favorites and
 `asset_face.createdBy`), real phones, and the ML image.

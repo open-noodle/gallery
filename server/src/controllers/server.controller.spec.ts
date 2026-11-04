@@ -1,8 +1,10 @@
 import request from 'supertest';
+import { immichVersion } from 'src/constants.js';
 import { ServerController } from 'src/controllers/server.controller.js';
 import { ServerService } from 'src/services/server.service.js';
 import { SystemMetadataService } from 'src/services/system-metadata.service.js';
 import { VersionService } from 'src/services/version.service.js';
+import { factory } from 'test/small.factory.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 // Upstream #30715 deleted this spec because its only content was per-route
@@ -28,6 +30,7 @@ describe(ServerController.name, () => {
   beforeEach(() => {
     serverService.resetAllMocks();
     versionService.resetAllMocks();
+    systemMetadataService.resetAllMocks();
     ctx.reset();
   });
 
@@ -62,6 +65,45 @@ describe(ServerController.name, () => {
       expect(versionService.getVersion).toHaveBeenCalledWith(
         expect.objectContaining({ 'user-agent': 'immich-android/3.3.1' }),
       );
+    });
+  });
+
+  // OD-15: a stock client compares these with the Immich base GET /server/version reports.
+  describe('stock clients', () => {
+    const stock = { ...factory.auth(), stockClient: true as const };
+
+    it('should report the Immich base on GET /server/about', async () => {
+      ctx.authenticate.mockResolvedValue(stock);
+      serverService.getAboutInfo.mockResolvedValue({
+        version: 'v5.4.0',
+        versionUrl: 'https://github.com/open-noodle/gallery/releases/tag/v5.4.0',
+        licensed: false,
+      });
+
+      const { body } = await request(ctx.getHttpServer()).get('/server/about');
+
+      expect(body).toMatchObject({
+        version: `v${immichVersion}`,
+        versionUrl: `https://github.com/immich-app/immich/releases/tag/v${immichVersion}`,
+      });
+    });
+
+    it('should never report a Gallery release on GET /server/version-check', async () => {
+      ctx.authenticate.mockResolvedValue(stock);
+      systemMetadataService.getVersionCheckState.mockResolvedValue({ checkedAt: 'now', releaseVersion: 'v5.5.0' });
+
+      const { body } = await request(ctx.getHttpServer()).get('/server/version-check');
+
+      expect(body).toEqual({ checkedAt: 'now', releaseVersion: `v${immichVersion}` });
+    });
+
+    it('should leave both unchanged for a Gallery client', async () => {
+      ctx.authenticate.mockResolvedValue(factory.auth());
+      systemMetadataService.getVersionCheckState.mockResolvedValue({ checkedAt: 'now', releaseVersion: 'v5.5.0' });
+
+      const { body } = await request(ctx.getHttpServer()).get('/server/version-check');
+
+      expect(body).toEqual({ checkedAt: 'now', releaseVersion: 'v5.5.0' });
     });
   });
 });

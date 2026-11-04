@@ -530,7 +530,10 @@ const send = async (actor: Actor, contract: ContractRequest) => {
   }
   const url = params.size > 0 ? `${path}?${params}` : path;
   const base = contract.method === 'GET' ? request(app).get(url) : request(app).post(url);
-  const pending = base.set(asBearerAuth(world.logins[actor].accessToken)).set(contract.headers);
+  const authed = base.set(asBearerAuth(world.logins[actor].accessToken)).set(contract.headers);
+  // A stock case sends no x-gallery-app; without the unset, src/gallery-client.ts would add one.
+  const isGallery = Object.keys(contract.headers ?? {}).some((key) => key.toLowerCase() === 'x-gallery-app');
+  const pending = isGallery ? authed : authed.unset('x-gallery-app');
   const { status, body } = contract.body === undefined ? await pending : await pending.send(contract.body as object);
   // `stale` depends on timing, not on the data: it marks a cached unfiltered answer whose watermark moved since, which
   // happens here when Postgres's write counters for the seed reach its statistics view mid-run. The data is the same

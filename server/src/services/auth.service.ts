@@ -28,6 +28,7 @@ import {
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission } from 'src/enum.js';
+import { isGalleryClient } from 'src/gallery/utils/client-version.js';
 import { OAuthConfig, OAuthRawProfile } from 'src/repositories/oauth.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -241,7 +242,7 @@ export class AuthService extends BaseService {
       throw new ForbiddenException(`Missing required permission: ${requestedPermission}`);
     }
 
-    return authDto;
+    return isGalleryClient(headers) ? authDto : { ...authDto, stockClient: true };
   }
 
   private async validate({ headers, queryParams }: Omit<ValidateRequest, 'metadata'>): Promise<AuthDto> {
