@@ -1,3 +1,4 @@
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { Readable } from 'node:stream';
@@ -49,7 +50,7 @@ describe(AuthService.name, () => {
   let mocks: ServiceMocks;
 
   beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
+    (storageBackends as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
@@ -1174,13 +1175,13 @@ describe(AuthService.name, () => {
           put: vi.fn().mockResolvedValue(void 0),
           getServeStrategy: vi.fn(),
         };
-        (StorageService as any).s3Backend = mockS3Backend;
-        (StorageService as any).writeBackendType = 's3';
+        (storageBackends as any).s3Backend = mockS3Backend;
+        (storageBackends as any).writeBackendType = 's3';
       });
 
       afterEach(() => {
-        (StorageService as any).s3Backend = void 0;
-        (StorageService as any).writeBackendType = 'disk';
+        (storageBackends as any).s3Backend = void 0;
+        (storageBackends as any).writeBackendType = 'disk';
       });
 
       it('should upload OAuth profile picture to S3 and store relative path', async () => {

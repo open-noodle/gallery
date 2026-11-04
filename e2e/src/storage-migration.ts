@@ -323,6 +323,12 @@ export async function setStorageTemplate(token: string, opts: { enabled?: boolea
   await api('PUT', '/system-config', { body: config, token });
 }
 
+export async function setThumbnailFormat(token: string, format: string): Promise<void> {
+  const config = await api('GET', '/system-config', { token });
+  config.image.thumbnail.format = format;
+  await api('PUT', '/system-config', { body: config, token });
+}
+
 export async function triggerQueueCommand(token: string, queueName: string): Promise<void> {
   await api('PUT', `/jobs/${queueName}`, { body: { command: 'start' }, token });
 }
@@ -347,8 +353,19 @@ export function captureContainerLogsSince(service: string, sinceMs: number): str
   });
 }
 
+// How a move gives up, in upstream's disk move and the S3 mover (src/gallery/utils/s3-file-move.ts) alike:
+// a failed rename/copy, a size or checksum mismatch, an old file left behind, or a throw out of the template's move.
+const MOVE_FAILURE_MARKERS = [
+  'Unable to complete move',
+  'Skipping move',
+  'Unable to delete old file',
+  'Problem applying storage template',
+];
+
 export function assertNoMoveEnoent(logs: string, phaseTag: string): void {
-  const bad = logs.split('\n').filter((l) => l.includes('Unable to complete move') || /ENOENT.*rename/.test(l));
+  const bad = logs
+    .split('\n')
+    .filter((l) => MOVE_FAILURE_MARKERS.some((marker) => l.includes(marker)) || /ENOENT.*rename/.test(l));
   assert.equal(bad.length, 0, `[${phaseTag}] unexpected ENOENT/move warnings:\n${bad.join('\n')}`);
 }
 
@@ -443,6 +460,21 @@ export function minioCountPrefix(prefix: string): number {
     return Number(out);
   } catch {
     return 0;
+  }
+}
+
+export function minioObjectSize(key: string): number {
+  assert.ok(minioFileExists(key), `MinIO key missing: ${key}`);
+  return Number(dockerExec('minio', `mc cat local/immich-test/${key} | wc -c`));
+}
+
+/** The `mc ls --recursive` lines under `prefix` that mention `needle`. */
+export function minioListMatching(prefix: string, needle: string): string[] {
+  try {
+    const out = dockerExec('minio', `mc ls --recursive local/immich-test/${prefix} 2>/dev/null`);
+    return out.split('\n').filter((line) => line.includes(needle));
+  } catch {
+    return [];
   }
 }
 
@@ -954,6 +986,9 @@ async function phaseRollback(): Promise<void> {
   const token = await loginAdmin();
   const savedState = loadState();
 
+  // The last toS3 batch (delete-source-false's in the workflow). Rollback only reverts a row whose path is still
+  // the one the batch wrote, so nothing may move files between that batch and this phase: a storage template
+  // move in between would fail those rows as "concurrently modified".
   const batchId = savedState.lastToS3BatchId;
   assert.ok(batchId, 'No lastToS3BatchId in state — run migrate-to-s3 first');
 
@@ -1538,254 +1573,719 @@ async function phaseSidecarVerify(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Phase: Template bulk migration skips S3 assets (regression for #383)
-// Precondition: S3 backend, assets already on S3
+// Storage template on S3 (specs/2026-10-20-storage-template-s3-moves-design.md)
+//
+// The template moves an S3 original inside the bucket: a server-side copy to
+// the templated key under library/<storageLabel or userId>/, a size check, the
+// DB update, then a delete of the old key; its sidecar follows to <key>.xmp.
+// A manual Storage Template Migration run also re-paths the S3 derivatives,
+// and the Migration job moves S3 derivatives as it moves disk ones.
+// Every phase disables the template first (invariant reset) and in `finally`.
 // ---------------------------------------------------------------------------
-async function phaseTemplateS3BulkSkipped(): Promise<void> {
-  console.log('=== Phase: template-s3-bulk-skipped ===');
+
+// The template folders these phases render, as regex sources
+const TEMPLATE_YEAR_MONTH = String.raw`\d{4}/\d{2}`; // {{y}}/{{MM}}
+const TEMPLATE_YEAR_MONTH_NAME = String.raw`\d{4}/[A-Za-z]+`; // {{y}}/{{MMMM}}
+
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
+}
+
+interface TemplateAsset {
+  id: string;
+  ownerId: string;
+  originalPath: string;
+  originalFileName: string;
+  storageLabel: string | null;
+}
+
+async function getTemplateAssets(ids: string[]): Promise<TemplateAsset[]> {
+  return queryDb<TemplateAsset>(
+    `SELECT a.id, a."ownerId", a."originalPath", a."originalFileName", u."storageLabel"
+     FROM asset a JOIN "user" u ON u.id = a."ownerId"
+     WHERE a.id = ANY($1) ORDER BY a.id`,
+    [ids],
+  );
+}
+
+async function getSidecarPath(assetId: string): Promise<string | undefined> {
+  const [row] = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE type = 'sidecar' AND "assetId" = $1`,
+    [assetId],
+  );
+  return row?.path;
+}
+
+/** Asserts the asset sits at the S3 key the template renders: library/<storageLabel or userId>/<folders>/<fileName>. */
+function assertTemplatedKey(asset: TemplateAsset, folders: string, fileName: string, tag: string): void {
+  const root = `library/${asset.storageLabel || asset.ownerId}/`;
+  const pattern = new RegExp(`^${escapeRegExp(root)}${folders}/${escapeRegExp(fileName)}$`);
+  assert.ok(
+    pattern.test(asset.originalPath),
+    `[${tag}] asset ${asset.id}: expected ${root}<${folders}>/${fileName}, got ${asset.originalPath}`,
+  );
+}
+
+/** Asserts no object under the owner's upload/ prefix is still named after the asset: its upload key is gone. */
+function assertUploadKeyGone(asset: { id: string; ownerId: string }, tag: string): void {
+  const leftovers = minioListMatching(`upload/${asset.ownerId}/`, asset.id);
+  assert.equal(leftovers.length, 0, `[${tag}] upload key of ${asset.id} still in MinIO:\n${leftovers.join('\n')}`);
+}
+
+/** Asserts the sidecar moved with its original to <originalKey>.xmp, content intact, and left nothing behind. */
+async function assertSidecarFollowed(
+  asset: TemplateAsset,
+  preSidecarPath: string,
+  expectedHash: string,
+  tag: string,
+): Promise<void> {
+  const sidecarPath = await getSidecarPath(asset.id);
+  const expected = `${asset.originalPath}.xmp`;
+  assert.equal(sidecarPath, expected, `[${tag}] sidecar of ${asset.id} did not follow its original`);
+  assert.ok(minioFileExists(expected), `[${tag}] sidecar missing from MinIO: ${expected}`);
+  const actualHash = sha256(Buffer.from(minioReadFile(expected), 'utf8'));
+  assert.equal(actualHash, expectedHash, `[${tag}] sidecar content changed in the move: ${expected}`);
+  if (preSidecarPath !== expected) {
+    assert.ok(!minioFileExists(preSidecarPath), `[${tag}] old sidecar key still in MinIO: ${preSidecarPath}`);
+  }
+}
+
+interface S3Thumbnail {
+  assetId: string;
+  ownerId: string;
+  path: string;
+}
+
+async function getS3Thumbnails(): Promise<S3Thumbnail[]> {
+  return queryDb<S3Thumbnail>(
+    `SELECT af."assetId", a."ownerId", af.path FROM asset_file af JOIN asset a ON a.id = af."assetId"
+     WHERE af.type = 'thumbnail' AND af."isEdited" = false AND a."deletedAt" IS NULL AND af.path NOT LIKE '/%'
+     ORDER BY af."assetId"`,
+  );
+}
+
+/** The thumbnail format the S3 thumbnail keys do not carry, so a re-path to it has to move them. */
+function otherThumbnailFormat(thumbnails: S3Thumbnail[]): string {
+  return thumbnails.some((t) => t.path.endsWith('.webp')) ? 'jpeg' : 'webp';
+}
+
+/**
+ * Asserts every S3 thumbnail was re-pathed to upstream's path for `format` (StorageCore.getImagePath, as a key),
+ * the new key exists and the old one is gone, and that at least one of them actually moved.
+ */
+async function assertThumbnailsRepathed(pre: S3Thumbnail[], format: string, tag: string): Promise<void> {
+  const post = await getS3Thumbnails();
+  assert.equal(post.length, pre.length, `[${tag}] S3 thumbnail row count changed: ${pre.length} → ${post.length}`);
+
+  let moved = 0;
+  for (const before of pre) {
+    const after = post.find((row) => row.assetId === before.assetId);
+    assert.ok(after, `[${tag}] thumbnail row of ${before.assetId} disappeared`);
+    const { assetId, ownerId } = before;
+    const expected = `thumbs/${ownerId}/${assetId.slice(0, 2)}/${assetId.slice(2, 4)}/${assetId}_thumbnail.${format}`;
+    assert.equal(after.path, expected, `[${tag}] thumbnail of ${assetId} not re-pathed to .${format}`);
+    assert.ok(minioFileExists(expected), `[${tag}] re-pathed thumbnail missing from MinIO: ${expected}`);
+    if (before.path !== expected) {
+      assert.ok(!minioFileExists(before.path), `[${tag}] old thumbnail key still in MinIO: ${before.path}`);
+      moved++;
+    }
+  }
+  assert.ok(moved > 0, `[${tag}] no S3 thumbnail needed a re-path to .${format}`);
+  console.log(`  ${moved}/${pre.length} S3 thumbnails re-pathed to .${format}`);
+}
+
+interface ParkedPersonThumbnail {
+  id: string;
+  ownerId: string;
+  parkedKey: string;
+}
+
+/**
+ * Moves a person's S3 thumbnail off upstream's path to a key of its own, as setup's thumbs/person-test.png was, so
+ * the next derivative re-path has a person thumbnail to move. (The first manual template run re-pathed setup's.)
+ */
+async function parkPersonThumbnail(tag: string): Promise<ParkedPersonThumbnail> {
+  const [person] = await queryDb<{ id: string; ownerId: string; thumbnailPath: string }>(
+    `SELECT "personGroupId" AS id, "ownerId", "thumbnailPath" FROM person
+     WHERE "thumbnailPath" != '' AND "thumbnailPath" NOT LIKE '/%' ORDER BY "personGroupId" LIMIT 1`,
+  );
+  assert.ok(person, `[${tag}] no person with an S3 thumbnail — run \`setup\` and \`migrate-to-s3\` first`);
+
+  const parkedKey = `thumbs/person-${tag}.png`;
+  dockerExec('minio', `mc mv local/immich-test/${person.thumbnailPath} local/immich-test/${parkedKey}`);
+  await queryDb('UPDATE person SET "thumbnailPath" = $1 WHERE "personGroupId" = $2 AND "ownerId" = $3', [
+    parkedKey,
+    person.id,
+    person.ownerId,
+  ]);
+  return { id: person.id, ownerId: person.ownerId, parkedKey };
+}
+
+/** Asserts the parked person thumbnail was re-pathed to upstream's path (StorageCore.getPersonThumbnailPath). */
+async function assertPersonThumbnailRepathed(person: ParkedPersonThumbnail, tag: string): Promise<void> {
+  const { id, ownerId, parkedKey } = person;
+  const rows = await queryDb<{ thumbnailPath: string }>(
+    'SELECT "thumbnailPath" FROM person WHERE "personGroupId" = $1 AND "ownerId" = $2',
+    [id, ownerId],
+  );
+  const expected = `thumbs/${ownerId}/${id.slice(0, 2)}/${id.slice(2, 4)}/${id}.jpeg`;
+  assert.equal(rows[0]?.thumbnailPath, expected, `[${tag}] person ${id} thumbnail not re-pathed`);
+  assert.ok(minioFileExists(expected), `[${tag}] re-pathed person thumbnail missing from MinIO: ${expected}`);
+  assert.ok(!minioFileExists(parkedKey), `[${tag}] old person thumbnail key still in MinIO: ${parkedKey}`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase: Template bulk migration moves S3 assets
+// Precondition: S3 backend, seeded assets on S3 (run after migrate-to-s3)
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3Bulk(): Promise<void> {
+  const tag = 'template-s3-bulk';
+  console.log(`=== Phase: ${tag} ===`);
   const token = await loginAdmin();
   await setStorageTemplate(token, { enabled: false }); // invariant reset
   const startMs = Date.now();
-  const preCount = await countMoveHistory();
-  const preState = await captureState();
+  minioSetupAlias();
 
-  // Precondition: every asset has a relative S3 path
-  for (const a of preState.assets) {
+  const saved = loadState();
+  const seededIds: string[] = [...(saved.adminAssetIds ?? []), ...(saved.user2AssetIds ?? [])];
+  assert.ok(seededIds.length > 0, 'No seeded asset IDs found — run `setup` and `migrate-to-s3` first');
+  assert.ok(saved.sidecarAssetId && saved.sidecarHash, 'No sidecar asset in state — run `setup` first');
+
+  const preCount = await countMoveHistory();
+  const preAssets = await getTemplateAssets(seededIds);
+  assert.equal(preAssets.length, seededIds.length, `Expected ${seededIds.length} seeded assets in pre-state`);
+
+  // Precondition: every seeded asset is an S3 key
+  const preSizes = new Map<string, number>();
+  for (const a of preAssets) {
     assert.ok(!a.originalPath.startsWith('/'), `Precondition failed: asset ${a.id} path is absolute`);
+    preSizes.set(a.id, minioObjectSize(a.originalPath));
   }
+  const preSidecarPath = await getSidecarPath(saved.sidecarAssetId);
+  assert.ok(preSidecarPath, `Expected a sidecar row for asset ${saved.sidecarAssetId}`);
 
   try {
     await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
     await triggerQueueCommand(token, 'storageTemplateMigration');
     await waitForProcessing(token);
 
-    const postState = await captureState();
+    const postAssets = await getTemplateAssets(seededIds);
+    for (const post of postAssets) {
+      const pre = preAssets.find((a) => a.id === post.id);
+      assert.ok(pre, `Asset ${post.id} missing from pre-state`);
 
-    // Every asset path unchanged
-    for (const pre of preState.assets) {
-      const post = postState.assets.find((a) => a.id === pre.id);
-      assert.ok(post, `Asset ${pre.id} disappeared`);
-      assert.equal(post.originalPath, pre.originalPath, `Path changed for asset ${pre.id}`);
+      // admin's storageLabel is 'admin' (admin-sign-up sets it); user2 has none, so the key holds their id
+      assertTemplatedKey(post, TEMPLATE_YEAR_MONTH, post.originalFileName, tag);
+      assert.equal(minioObjectSize(post.originalPath), preSizes.get(post.id), `[${tag}] size changed for ${post.id}`);
+      if (pre.originalPath !== post.originalPath) {
+        assert.ok(!minioFileExists(pre.originalPath), `[${tag}] old key still in MinIO: ${pre.originalPath}`);
+      }
     }
 
-    // MinIO keys still exist
-    minioSetupAlias();
-    for (const a of postState.assets) {
-      assert.ok(minioFileExists(a.originalPath), `MinIO key missing: ${a.originalPath}`);
-    }
+    const sidecarAsset = postAssets.find((a) => a.id === saved.sidecarAssetId);
+    assert.ok(sidecarAsset, 'Sidecar asset missing from post-state');
+    await assertSidecarFollowed(sidecarAsset, preSidecarPath, saved.sidecarHash, tag);
 
-    // No new move_history rows
+    // move_history returns to baseline (each completed move deletes its own row)
     const postCount = await countMoveHistory();
-    assert.equal(postCount, preCount, `move_history grew from ${preCount} to ${postCount}`);
+    assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
 
-    // Log-scrape (secondary)
     const logs = captureContainerLogsSince('immich-server', startMs);
-    assertNoMoveEnoent(logs, 'template-s3-bulk-skipped');
+    assertNoMoveEnoent(logs, tag);
 
-    console.log('  Bulk template migration skipped S3 assets cleanly.');
+    console.log(`  Bulk template migration moved ${postAssets.length} seeded S3 assets to library/…`);
   } finally {
     await setStorageTemplate(token, { enabled: false });
   }
-  console.log('=== Phase: template-s3-bulk-skipped complete ===');
+  console.log(`=== Phase: ${tag} complete ===`);
 }
 
-async function phaseTemplateS3UploadSkipped(): Promise<void> {
-  console.log('=== Phase: template-s3-upload-skipped ===');
+// ---------------------------------------------------------------------------
+// Phase: A new S3 upload is moved by the template after metadata extraction
+// Precondition: S3 backend
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3Upload(): Promise<void> {
+  const tag = 'template-s3-upload';
+  console.log(`=== Phase: ${tag} ===`);
   const token = await loginAdmin();
-  await setStorageTemplate(token, { enabled: false });
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
   const startMs = Date.now();
+  minioSetupAlias();
+
+  // createPng() restarts at 0 in every tsx run, so its first PNGs repeat setup's and the server would answer
+  // with setup's asset (checksum dedup). Start past every other phase's fixtures.
+  for (let i = 0; i < 300; i++) {
+    createPng();
+  }
 
   try {
     await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
 
     const png = createPng();
-    const { id: newAssetId } = await uploadAsset(token, 'template-upload-skip.png', png);
+    const upload = await uploadAsset(token, 'template-upload.png', png);
+    assert.equal(upload.status, 201, `[${tag}] upload ${upload.id} was deduplicated against an existing asset`);
     await waitForProcessing(token);
 
-    const rows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
-      newAssetId,
-    ]);
-    assert.ok(rows[0], `Asset ${newAssetId} not found`);
-    const { originalPath } = rows[0];
+    const [asset] = await getTemplateAssets([upload.id]);
+    assert.ok(asset, `Asset ${upload.id} not found`);
+    assertTemplatedKey(asset, TEMPLATE_YEAR_MONTH_NAME, 'template-upload.png', tag);
+    assert.equal(minioObjectSize(asset.originalPath), png.length, `[${tag}] size changed for ${asset.id}`);
+    assertUploadKeyGone(asset, tag);
 
-    assert.ok(!originalPath.startsWith('/'), `Expected relative path, got ${originalPath}`);
-    assert.ok(originalPath.startsWith('upload/'), `Expected upload/ prefix, got ${originalPath}`);
+    // thumbnail generation is queued after the template job, so it read the moved key
+    const thumbnails = await queryDb<{ path: string }>(
+      `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail' AND "isEdited" = false`,
+      [asset.id],
+    );
+    assert.equal(thumbnails.length, 1, `[${tag}] expected a thumbnail for ${asset.id}, got ${thumbnails.length}`);
+    assert.ok(minioFileExists(thumbnails[0].path), `[${tag}] thumbnail missing from MinIO: ${thumbnails[0].path}`);
 
-    minioSetupAlias();
-    assert.ok(minioFileExists(originalPath), `MinIO key missing: ${originalPath}`);
-
-    const count = await countMoveHistory(newAssetId);
+    const count = await countMoveHistory(asset.id);
     assert.equal(count, 0, `Expected 0 move_history rows for new asset, got ${count}`);
 
     const logs = captureContainerLogsSince('immich-server', startMs);
-    assertNoMoveEnoent(logs, 'template-s3-upload-skipped');
+    assertNoMoveEnoent(logs, tag);
 
-    console.log(`  New S3 upload ${newAssetId} stayed at ${originalPath}.`);
+    console.log(`  New S3 upload ${asset.id} moved to ${asset.originalPath}.`);
   } finally {
     await setStorageTemplate(token, { enabled: false });
   }
-  console.log('=== Phase: template-s3-upload-skipped complete ===');
+  console.log(`=== Phase: ${tag} complete ===`);
 }
 
-async function phaseTemplateS3LivePhotoSkipped(): Promise<void> {
-  console.log('=== Phase: template-s3-live-photo-skipped ===');
+// ---------------------------------------------------------------------------
+// Phase: The still's template job moves both parts of an S3 live photo
+// Precondition: S3 backend
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3LivePhoto(): Promise<void> {
+  const tag = 'template-s3-live-photo';
+  console.log(`=== Phase: ${tag} ===`);
   const token = await loginAdmin();
-  await setStorageTemplate(token, { enabled: false });
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
   const startMs = Date.now();
+  minioSetupAlias();
+
+  // past setup's PNGs and template-s3-upload's (checksum dedup, see there)
+  for (let i = 0; i < 310; i++) {
+    createPng();
+  }
 
   try {
-    // Upload motion video first; then still with livePhotoVideoId linking to motion.
-    // A valid video payload is required for a ffprobe-driven asset flow, but in e2e
-    // the upload path only stores the bytes — metadata extraction handles the rest
-    // and tolerates minimal MP4 headers. A 1x1 PNG stands in fine for the still.
-    const motionBytes = Buffer.from([
-      0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, 0x69, 0x73, 0x6f,
-      0x6d, 0x69, 0x73, 0x6f, 0x32, 0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
-    ]);
-    const { id: motionId } = await uploadAsset(token, 'lp-motion.mp4', motionBytes);
-    const { id: stillId } = await uploadAsset(token, 'lp-still.png', createPng(), undefined, {
-      livePhotoVideoId: motionId,
-    });
+    // The motion part must be a real video: metadata extraction probes it, and the template skips an asset
+    // without exif. The comment makes its checksum unique to this run.
+    const base64 = dockerExec(
+      'immich-server',
+      'ffmpeg -y -loglevel error -f lavfi -i testsrc=duration=1:size=192x144:rate=10 ' +
+        `-c:v libx264 -pix_fmt yuv420p -metadata comment=lp-${Date.now()} /tmp/lp-motion.mp4 ` +
+        String.raw`&& base64 /tmp/lp-motion.mp4 | tr -d "\n"`,
+    );
+    const motion = Buffer.from(base64, 'base64');
+    assert.ok(motion.length > 1000, `Generated video looks too small: ${motion.length} bytes`);
+
+    // The motion part goes up with the template off, so it is still at its upload key when the still's job
+    // moves both parts (its own template job would otherwise race the still's upload).
+    const motionUpload = await uploadAsset(token, 'lp-motion.mp4', motion);
+    assert.equal(motionUpload.status, 201, `[${tag}] motion upload was deduplicated against an existing asset`);
+    await waitForProcessing(token, 120_000);
+    const [preMotion] = await getTemplateAssets([motionUpload.id]);
+    assert.ok(
+      preMotion?.originalPath.startsWith('upload/'),
+      `[${tag}] precondition: motion part should be at its upload key, got ${preMotion?.originalPath}`,
+    );
 
     await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
-    await waitForProcessing(token);
+    const png = createPng();
+    const stillUpload = await uploadAsset(token, 'lp-still.png', png, undefined, {
+      livePhotoVideoId: motionUpload.id,
+    });
+    assert.equal(stillUpload.status, 201, `[${tag}] still upload was deduplicated against an existing asset`);
+    await waitForProcessing(token, 120_000);
 
-    const rows = await queryDb<{ id: string; originalPath: string }>(
-      'SELECT id, "originalPath" FROM asset WHERE id = ANY($1)',
-      [[motionId, stillId]],
+    const assets = await getTemplateAssets([motionUpload.id, stillUpload.id]);
+    const still = assets.find((a) => a.id === stillUpload.id);
+    const motionAsset = assets.find((a) => a.id === motionUpload.id);
+    assert.ok(still && motionAsset, `Expected both live photo parts, got ${assets.length}`);
+
+    // The motion part takes the still's name and date (getLivePhotoMotionFilename), so both share a folder
+    assertTemplatedKey(still, TEMPLATE_YEAR_MONTH, 'lp-still.png', tag);
+    assertTemplatedKey(motionAsset, TEMPLATE_YEAR_MONTH, 'lp-still.mp4', tag);
+    assert.equal(
+      dirname(motionAsset.originalPath),
+      dirname(still.originalPath),
+      `[${tag}] live photo parts landed in different folders`,
     );
-    assert.equal(rows.length, 2, `Expected 2 assets, got ${rows.length}`);
-    for (const r of rows) {
-      assert.ok(!r.originalPath.startsWith('/'), `Expected relative path for ${r.id}, got ${r.originalPath}`);
-      assert.ok(r.originalPath.startsWith('upload/'), `Expected upload/ prefix for ${r.id}`);
-    }
 
-    for (const id of [motionId, stillId]) {
+    assert.equal(minioObjectSize(still.originalPath), png.length, `[${tag}] still size changed`);
+    assert.equal(minioObjectSize(motionAsset.originalPath), motion.length, `[${tag}] motion size changed`);
+    assert.ok(!minioFileExists(preMotion.originalPath), `[${tag}] old motion key still in MinIO`);
+    assertUploadKeyGone(still, tag);
+    assertUploadKeyGone(motionAsset, tag);
+
+    for (const id of [motionUpload.id, stillUpload.id]) {
       const c = await countMoveHistory(id);
       assert.equal(c, 0, `Asset ${id} has ${c} move_history rows, expected 0`);
     }
 
     const logs = captureContainerLogsSince('immich-server', startMs);
-    assertNoMoveEnoent(logs, 'template-s3-live-photo-skipped');
+    assertNoMoveEnoent(logs, tag);
 
-    console.log(`  Live photo pair (still=${stillId}, motion=${motionId}) skipped template migration.`);
+    console.log(`  Live photo pair moved together: ${still.originalPath} + ${motionAsset.originalPath}`);
   } finally {
     await setStorageTemplate(token, { enabled: false });
   }
-  console.log('=== Phase: template-s3-live-photo-skipped complete ===');
+  console.log(`=== Phase: ${tag} complete ===`);
 }
 
-async function phaseTemplateS3SidecarSkipped(): Promise<void> {
-  console.log('=== Phase: template-s3-sidecar-skipped ===');
+// ---------------------------------------------------------------------------
+// Phase: The template moves an S3 sidecar with its original
+// Precondition: S3 backend, setup's sidecar asset on S3 (run after template-s3-bulk,
+// which left it in a {{MM}} folder, so this {{MMMM}} run has to move it)
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3Sidecar(): Promise<void> {
+  const tag = 'template-s3-sidecar';
+  console.log(`=== Phase: ${tag} ===`);
   const token = await loginAdmin();
   const saved = loadState();
   assert.ok(saved.sidecarAssetId, 'No sidecarAssetId — run `setup` and `migrate-to-s3` first');
+  assert.ok(saved.sidecarHash, 'No sidecarHash — run `setup` first');
   const sidecarAssetId: string = saved.sidecarAssetId;
 
-  await setStorageTemplate(token, { enabled: false });
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
   const startMs = Date.now();
   const preCount = await countMoveHistory(sidecarAssetId);
+  minioSetupAlias();
 
-  const preRows = await queryDb<{ id: string; path: string }>(
-    `SELECT af.id, af.path FROM asset_file af WHERE af."assetId" = $1 AND af.type = 'sidecar'`,
-    [sidecarAssetId],
-  );
-  assert.equal(preRows.length, 1, `Expected 1 sidecar row, got ${preRows.length}`);
-  const preSidecarPath = preRows[0].path;
-
-  const preAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
-    sidecarAssetId,
-  ]);
-  const preOriginalPath = preAssetRows[0].originalPath;
+  const [preAsset] = await getTemplateAssets([sidecarAssetId]);
+  assert.ok(preAsset, `Asset ${sidecarAssetId} not found`);
+  assert.ok(!preAsset.originalPath.startsWith('/'), `Precondition failed: ${preAsset.originalPath} is absolute`);
+  const preSize = minioObjectSize(preAsset.originalPath);
+  const preSidecarPath = await getSidecarPath(sidecarAssetId);
+  assert.ok(preSidecarPath, `Expected a sidecar row for asset ${sidecarAssetId}`);
 
   try {
     await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
     await triggerQueueCommand(token, 'storageTemplateMigration');
     await waitForProcessing(token);
 
-    const postRows = await queryDb<{ path: string }>(`SELECT path FROM asset_file WHERE id = $1`, [preRows[0].id]);
-    assert.equal(postRows[0].path, preSidecarPath, `Sidecar path changed`);
-
-    const postAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
-      sidecarAssetId,
-    ]);
-    assert.equal(postAssetRows[0].originalPath, preOriginalPath, `Original path changed`);
+    const [postAsset] = await getTemplateAssets([sidecarAssetId]);
+    assert.ok(postAsset, `Asset ${sidecarAssetId} disappeared`);
+    assert.notEqual(postAsset.originalPath, preAsset.originalPath, `[${tag}] template did not move ${sidecarAssetId}`);
+    assertTemplatedKey(postAsset, TEMPLATE_YEAR_MONTH_NAME, postAsset.originalFileName, tag);
+    assert.equal(minioObjectSize(postAsset.originalPath), preSize, `[${tag}] size changed for ${sidecarAssetId}`);
+    assert.ok(!minioFileExists(preAsset.originalPath), `[${tag}] old key still in MinIO: ${preAsset.originalPath}`);
+    await assertSidecarFollowed(postAsset, preSidecarPath, saved.sidecarHash, tag);
 
     const postCount = await countMoveHistory(sidecarAssetId);
-    assert.equal(postCount, preCount, `move_history grew for ${sidecarAssetId}: ${preCount} → ${postCount}`);
+    assert.equal(postCount, preCount, `move_history delta for ${sidecarAssetId}: ${preCount} → ${postCount}`);
 
     const logs = captureContainerLogsSince('immich-server', startMs);
-    assertNoMoveEnoent(logs, 'template-s3-sidecar-skipped');
+    assertNoMoveEnoent(logs, tag);
 
-    console.log(`  Sidecar asset ${sidecarAssetId} and its .xmp row both unchanged.`);
+    console.log(`  Sidecar asset ${sidecarAssetId} and its .xmp moved to ${postAsset.originalPath}(.xmp).`);
   } finally {
     await setStorageTemplate(token, { enabled: false });
   }
-  console.log('=== Phase: template-s3-sidecar-skipped complete ===');
+  console.log(`=== Phase: ${tag} complete ===`);
 }
 
-async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
-  console.log('=== Phase: template-s3-queue-migration-skipped ===');
+// ---------------------------------------------------------------------------
+// Phase: The Migration job re-paths S3 derivatives after a thumbnail format change
+// Precondition: S3 backend, derivatives on S3
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3QueueMigration(): Promise<void> {
+  const tag = 'template-s3-queue-migration';
+  console.log(`=== Phase: ${tag} ===`);
   const token = await loginAdmin();
-  await setStorageTemplate(token, { enabled: false });
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
   const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  minioSetupAlias();
 
   const config = await api('GET', '/system-config', { token });
   const originalFormat: string = config.image.thumbnail.format;
-  const flippedFormat = originalFormat === 'webp' ? 'jpeg' : 'webp';
-
-  const preThumbs = await queryDb<{ id: string; path: string }>(
-    `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
-  );
-  const prePersons = await queryDb<{ id: string; thumbnailPath: string }>(
-    `SELECT "personGroupId" AS id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
-  );
+  const preThumbs = await getS3Thumbnails();
+  assert.ok(preThumbs.length > 0, `[${tag}] precondition: expected S3 thumbnails`);
+  const flippedFormat = otherThumbnailFormat(preThumbs);
 
   try {
-    // Flip thumbnail format
-    const flipped = {
-      ...config,
-      image: { ...config.image, thumbnail: { ...config.image.thumbnail, format: flippedFormat } },
-    };
-    await api('PUT', '/system-config', { body: flipped, token });
+    const person = await parkPersonThumbnail(tag);
+    await setThumbnailFormat(token, flippedFormat);
 
-    // Trigger FileMigrationQueueAll (fans out AssetFileMigration + PersonFileMigration)
+    // FileMigrationQueueAll fans out AssetFileMigration + PersonFileMigration, which move S3 keys now
     await triggerQueueCommand(token, 'migration');
     await waitForProcessing(token);
 
-    // Thumbnails unchanged (still point at pre-flip extension — intended skip behavior)
-    const postThumbs = await queryDb<{ id: string; path: string }>(
-      `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
-    );
-    assert.equal(postThumbs.length, preThumbs.length, `thumbnail row count changed`);
-    for (const pre of preThumbs) {
-      const post = postThumbs.find((r) => r.id === pre.id);
-      assert.ok(post, `thumbnail row ${pre.id} disappeared`);
-      assert.equal(post.path, pre.path, `thumbnail path changed for ${pre.id}`);
-    }
+    await assertThumbnailsRepathed(preThumbs, flippedFormat, tag);
+    await assertPersonThumbnailRepathed(person, tag);
 
-    // Person thumbnails unchanged
-    const postPersons = await queryDb<{ id: string; thumbnailPath: string }>(
-      `SELECT "personGroupId" AS id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
-    );
-    for (const pre of prePersons) {
-      const post = postPersons.find((r) => r.id === pre.id);
-      assert.ok(post, `person ${pre.id} thumbnailPath disappeared`);
-      assert.equal(post.thumbnailPath, pre.thumbnailPath, `person ${pre.id} thumbnailPath changed`);
-    }
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
 
-    // Primary catch: no ENOENT from handleQueueMigration removeEmptyDirs on pure-S3
+    // also catches an ENOENT from handleQueueMigration's removeEmptyDirs on the S3 server
     const logs = captureContainerLogsSince('immich-server', startMs);
-    assertNoMoveEnoent(logs, 'template-s3-queue-migration-skipped');
+    assertNoMoveEnoent(logs, tag);
 
-    console.log(`  Format flipped ${originalFormat}→${flippedFormat}; DB paths stable; no ENOENT.`);
+    console.log(`  Thumbnail format flipped to ${flippedFormat}; the Migration job re-pathed the S3 keys.`);
   } finally {
-    // Restore original thumbnail format
-    const restore = await api('GET', '/system-config', { token });
-    restore.image.thumbnail.format = originalFormat;
-    await api('PUT', '/system-config', { body: restore, token });
+    // Restores the configured format only: the keys keep the flipped extension, as upstream leaves disk files
+    // until the next Migration run. template-s3-manual-derivatives moves them back.
+    await setThumbnailFormat(token, originalFormat);
   }
-  console.log('=== Phase: template-s3-queue-migration-skipped complete ===');
+  console.log(`=== Phase: ${tag} complete ===`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase: A manual Storage Template Migration run re-paths S3 derivatives too
+// Precondition: S3 backend, derivatives on S3
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3ManualDerivatives(): Promise<void> {
+  const tag = 'template-s3-manual-derivatives';
+  console.log(`=== Phase: ${tag} ===`);
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+  const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  minioSetupAlias();
+
+  const config = await api('GET', '/system-config', { token });
+  const originalFormat: string = config.image.thumbnail.format;
+  const preThumbs = await getS3Thumbnails();
+  assert.ok(preThumbs.length > 0, `[${tag}] precondition: expected S3 thumbnails`);
+  // Flipped against the keys, not the config: after template-s3-queue-migration the keys carry the other format
+  // than the configured one, so this run moves them back and leaves keys and config agreeing again.
+  const flippedFormat = otherThumbnailFormat(preThumbs);
+
+  try {
+    const person = await parkPersonThumbnail(tag);
+    await setThumbnailFormat(token, flippedFormat);
+    // The template originals are already at this template's keys (template-s3-sidecar applied it), so the run
+    // moves derivatives only. The derivative re-path needs the template enabled.
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
+
+    // Started by hand, so QueueStart queues upstream's Migration job (FileMigrationQueueAll), not started by hand here
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    await assertThumbnailsRepathed(preThumbs, flippedFormat, tag);
+    await assertPersonThumbnailRepathed(person, tag);
+
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, tag);
+
+    console.log(`  Manual template run re-pathed the S3 thumbnails to .${flippedFormat}.`);
+  } finally {
+    await setThumbnailFormat(token, originalFormat);
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log(`=== Phase: ${tag} complete ===`);
+}
+
+// The once-decided gate on automatic S3 moves (StorageTemplateS3Service.onBootstrap, isManualOnlyTemplateMove)
+const TEMPLATE_S3_STATE_KEY = 'storage-template-s3-state';
+
+interface TemplateS3State {
+  pending: boolean;
+  decidedAt: string;
+  clearedAt?: string;
+}
+
+async function getTemplateS3State(): Promise<TemplateS3State | undefined> {
+  const [row] = await queryDb<{ value: TemplateS3State }>('SELECT value FROM system_metadata WHERE key = $1', [
+    TEMPLATE_S3_STATE_KEY,
+  ]);
+  return row?.value;
+}
+
+async function setTemplateS3State(state: TemplateS3State): Promise<void> {
+  await queryDb(
+    `INSERT INTO system_metadata (key, value) VALUES ($1, $2::jsonb)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [TEMPLATE_S3_STATE_KEY, JSON.stringify(state)],
+  );
+}
+
+// The warning each worker logs on every start while the state is pending (StorageTemplateS3Service.onBootstrap)
+const TEMPLATE_S3_PENDING_WARNING =
+  'The storage template does not move files in S3 until an admin runs Storage Template Migration from ' +
+  'Administration > Job Queues; uploads keep their upload/ keys until then';
+
+// What the manual run that lifts the gate logs (StorageTemplateS3Service.onJobSuccess)
+const TEMPLATE_S3_CLEARED_LOG =
+  'Storage template migration finished: new uploads in S3 now move to their template path';
+
+// The template the earlier phases left every S3 original at, so the manual run in template-s3-upgrade-pending has
+// only that phase's upload to move
+const TEMPLATE_S3_UPGRADE_TEMPLATE = '{{y}}/{{MMMM}}/{{filename}}';
+
+// ---------------------------------------------------------------------------
+// Phase: Sets up an upgrade's first start for template-s3-upgrade-pending. Deletes the state this database's first
+// start decided ("not pending": the harness starts from an empty database, hence the automatic moves the phases
+// above assert) and enables the template while the originals those phases left are in S3. The workflow then
+// restarts the server, whose StorageTemplateS3Service.onBootstrap finds no row and decides again, as the first
+// start of this version does on an install that upgrades with originals in S3 and the template enabled.
+// Precondition: S3 backend, the template-s3-* phases above run
+// Leaves the row deleted and the template enabled for the restart; template-s3-upgrade-pending puts both back.
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3UpgradePrepare(): Promise<void> {
+  const tag = 'template-s3-upgrade-prepare';
+  console.log(`=== Phase: ${tag} ===`);
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+
+  const preState = await getTemplateS3State();
+  assert.ok(preState, `[${tag}] precondition: no ${TEMPLATE_S3_STATE_KEY} row, which every server start decides`);
+  assert.equal(
+    preState.pending,
+    false,
+    `[${tag}] precondition: an empty database's first start must decide "not pending"`,
+  );
+  // what StorageMigrationRepository.hasS3Originals asks (trashed assets count too)
+  const [{ c }] = await queryDb<{ c: string }>(`SELECT COUNT(*)::text c FROM asset WHERE "originalPath" NOT LIKE '/%'`);
+  const s3Originals = Number(c);
+  assert.ok(s3Originals > 0, `[${tag}] precondition: no original in S3 — run the template-s3-* phases first`);
+
+  // saved before anything changes, so template-s3-upgrade-pending can put it back
+  saveState({ templateS3PreState: preState });
+  try {
+    await setStorageTemplate(token, { enabled: true, template: TEMPLATE_S3_UPGRADE_TEMPLATE });
+    await queryDb('DELETE FROM system_metadata WHERE key = $1', [TEMPLATE_S3_STATE_KEY]);
+  } catch (error) {
+    await setTemplateS3State(preState);
+    await setStorageTemplate(token, { enabled: false });
+    throw error;
+  }
+  // the restart's decision and its warning both come after this moment
+  saveState({ templateS3RestartAfterMs: Date.now() });
+
+  console.log(
+    `  Deleted ${TEMPLATE_S3_STATE_KEY} and enabled the template with ${s3Originals} originals in S3; ` +
+      'restart the server (backend=s3) before template-s3-upgrade-pending.',
+  );
+  console.log(`=== Phase: ${tag} complete ===`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase: After an upgrade that found originals in S3 with the template enabled, a new S3 upload keeps its
+// upload/ key until an admin finishes one Storage Template Migration by hand; that run moves it and lifts the gate
+// Precondition: template-s3-upgrade-prepare, then a server restart (backend=s3), whose first start decided the state
+// again: the decision under test (onBootstrap and the hasS3Originals query). `finally` puts back the state the
+// database's first start decided and disables the template.
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3UpgradePending(): Promise<void> {
+  const tag = 'template-s3-upgrade-pending';
+  console.log(`=== Phase: ${tag} ===`);
+  const saved = loadState();
+  const preState: TemplateS3State | undefined = saved.templateS3PreState;
+  const restartAfterMs: number | undefined = saved.templateS3RestartAfterMs;
+  assert.ok(
+    preState && restartAfterMs,
+    `[${tag}] no saved state — run template-s3-upgrade-prepare, then restart the server (backend=s3)`,
+  );
+  const token = await loginAdmin();
+  // the restart's decision is in its row: the template setting no longer changes it
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+  const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  minioSetupAlias();
+
+  // past setup's PNGs and the other template phases' (checksum dedup, see template-s3-upload)
+  for (let i = 0; i < 320; i++) {
+    createPng();
+  }
+
+  try {
+    // The restart found no row, the template enabled and originals in S3, and decided as an upgrade's first start does
+    const decided = await getTemplateS3State();
+    assert.ok(decided, `[${tag}] the restart did not decide ${TEMPLATE_S3_STATE_KEY}`);
+    assert.deepEqual(
+      decided,
+      { pending: true, decidedAt: decided.decidedAt },
+      `[${tag}] expected the restart to decide {"pending": true}, got ${JSON.stringify(decided)}`,
+    );
+    const decidedMs = Date.parse(decided.decidedAt);
+    assert.ok(
+      decidedMs >= restartAfterMs && decidedMs <= Date.now(),
+      `[${tag}] decidedAt ${decided.decidedAt} is not from the restart (after ${new Date(restartAfterMs).toISOString()})`,
+    );
+
+    // the admin's only notice, logged on start while pending
+    const bootLogs = captureContainerLogsSince('immich-server', restartAfterMs);
+    const warnings = bootLogs.split('\n').filter((line) => line.includes(TEMPLATE_S3_PENDING_WARNING));
+    assert.ok(warnings.length > 0, `[${tag}] no "${TEMPLATE_S3_PENDING_WARNING}" in the server logs since the restart`);
+
+    await setStorageTemplate(token, { enabled: true, template: TEMPLATE_S3_UPGRADE_TEMPLATE });
+
+    const png = createPng();
+    const upload = await uploadAsset(token, 'template-pending.png', png);
+    assert.equal(upload.status, 201, `[${tag}] upload ${upload.id} was deduplicated against an existing asset`);
+    await waitForProcessing(token);
+
+    // The per-asset template job left it alone; the upload is stored, served and thumbnailed from its upload key
+    const [pending] = await getTemplateAssets([upload.id]);
+    assert.ok(pending, `Asset ${upload.id} not found`);
+    assert.ok(
+      pending.originalPath.startsWith(`upload/${pending.ownerId}/`),
+      `[${tag}] the template moved ${pending.id} while pending: ${pending.originalPath}`,
+    );
+    assert.equal(minioObjectSize(pending.originalPath), png.length, `[${tag}] size changed for ${pending.id}`);
+    const served = await downloadAssetOriginal(token, pending.id);
+    assert.equal(sha256(served), sha256(png), `[${tag}] original of ${pending.id} not served from its upload key`);
+
+    // thumbnail generation follows the template job when it skips too
+    const thumbnails = await queryDb<{ path: string }>(
+      `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail' AND "isEdited" = false`,
+      [pending.id],
+    );
+    assert.equal(thumbnails.length, 1, `[${tag}] expected a thumbnail for ${pending.id}, got ${thumbnails.length}`);
+    assert.ok(minioFileExists(thumbnails[0].path), `[${tag}] thumbnail missing from MinIO: ${thumbnails[0].path}`);
+
+    const pendingCount = await countMoveHistory();
+    assert.equal(pendingCount, preCount, `[${tag}] move_history delta while pending: ${preCount} → ${pendingCount}`);
+    const stillPending = await getTemplateS3State();
+    assert.equal(stillPending?.pending, true, `[${tag}] the gate lifted without a manual run`);
+
+    // The admin starts Storage Template Migration by hand: the bulk job moves the upload, and its success lifts the gate
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const [moved] = await getTemplateAssets([upload.id]);
+    assert.ok(moved, `Asset ${upload.id} disappeared`);
+    assertTemplatedKey(moved, TEMPLATE_YEAR_MONTH_NAME, 'template-pending.png', tag);
+    assert.equal(minioObjectSize(moved.originalPath), png.length, `[${tag}] size changed for ${moved.id}`);
+    assert.ok(!minioFileExists(pending.originalPath), `[${tag}] old key still in MinIO: ${pending.originalPath}`);
+    assertUploadKeyGone(moved, tag);
+
+    const cleared = await getTemplateS3State();
+    assert.ok(cleared, `[${tag}] ${TEMPLATE_S3_STATE_KEY} row disappeared`);
+    assert.equal(cleared.pending, false, `[${tag}] the manual run did not lift the gate`);
+    assert.equal(cleared.decidedAt, decided.decidedAt, `[${tag}] lifting the gate rewrote decidedAt`);
+    assert.ok(
+      cleared.clearedAt && !Number.isNaN(Date.parse(cleared.clearedAt)),
+      `[${tag}] expected a clearedAt timestamp, got ${cleared.clearedAt}`,
+    );
+
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, tag);
+    assert.ok(logs.includes(TEMPLATE_S3_CLEARED_LOG), `[${tag}] no "${TEMPLATE_S3_CLEARED_LOG}" in the server logs`);
+
+    console.log(
+      `  The restart decided "pending" (${warnings.length} startup warning(s)); upload ${moved.id} waited at its ` +
+        `upload key, then the manual run moved it to ${moved.originalPath} and lifted the gate.`,
+    );
+  } finally {
+    // the state as this database's first start decided it ("not pending", checked by template-s3-upgrade-prepare),
+    // so the phases after this one see automatic moves; a rerun has to prepare and restart again
+    await setTemplateS3State(preState);
+    await setStorageTemplate(token, { enabled: false });
+    saveState({ templateS3PreState: undefined, templateS3RestartAfterMs: undefined });
+  }
+  console.log(`=== Phase: ${tag} complete ===`);
 }
 
 async function phaseTemplateDiskBaseline(): Promise<void> {
@@ -1808,10 +2308,12 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
   await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
 
   // Only assert against assets created in phaseSetup — later phases
-  // (template-s3-upload-skipped, template-s3-live-photo-skipped) upload
-  // additional test assets directly to S3 that end up with non-library
-  // disk paths after migrate-to-disk, which is not the regression we're
-  // guarding here.
+  // (template-s3-upload, template-s3-live-photo, template-s3-upgrade-pending, copy-asset-sidecar-s3)
+  // upload additional test assets whose paths depend on what those phases
+  // did, which is not the regression we're guarding here. The seeded assets
+  // arrive already templated: the S3 template phases moved them to
+  // library/<label>/YYYY/<Month>/ keys, which the later migrations and the
+  // rollback carried back to the same paths on disk.
   const saved = loadState();
   const seededIds: string[] = [...(saved.adminAssetIds ?? []), ...(saved.user2AssetIds ?? [])];
   assert.ok(seededIds.length > 0, 'No seeded asset IDs found — run `setup` first');
@@ -1980,25 +2482,38 @@ async function phaseUserDeleteS3Orphans(): Promise<void> {
   for (let i = 0; i < 50; i++) {
     createPng();
   }
-  const firstUpload = await uploadAsset(userToken, `orphan-${suffix}-1.png`, createPng());
-  const secondUpload = await uploadAsset(userToken, `orphan-${suffix}-2.png`, createPng());
-  assert.ok(firstUpload.id && secondUpload.id, 'Expected both uploads to return an id');
 
-  await waitForProcessing(adminToken);
+  // The template decides where an S3 upload ends up: with it off the first upload stays under upload/<userId>/,
+  // with it on the second is moved to library/<userId>/ (the user has no storage label). Deletion must clean both.
+  await setStorageTemplate(adminToken, { enabled: false }); // invariant reset
+  try {
+    const firstUpload = await uploadAsset(userToken, `orphan-${suffix}-1.png`, createPng());
+    await waitForProcessing(adminToken);
+
+    await setStorageTemplate(adminToken, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
+    const secondUpload = await uploadAsset(userToken, `orphan-${suffix}-2.png`, createPng());
+    assert.ok(firstUpload.id && secondUpload.id, 'Expected both uploads to return an id');
+    await waitForProcessing(adminToken);
+  } finally {
+    await setStorageTemplate(adminToken, { enabled: false });
+  }
 
   minioSetupAlias();
 
   const uploadPrefix = `upload/${userId}/`;
+  const libraryPrefix = `library/${userId}/`;
   const profilePrefix = `profile/${userId}/`;
   const thumbsPrefix = `thumbs/${userId}/`;
   const encodedVideoPrefix = `encoded-video/${userId}/`;
 
   const preUpload = minioCountPrefix(uploadPrefix);
+  const preLibrary = minioCountPrefix(libraryPrefix);
   const preThumbs = minioCountPrefix(thumbsPrefix);
   assert.ok(preUpload > 0, `Pre-delete: expected objects under ${uploadPrefix}, got ${preUpload}`);
+  assert.ok(preLibrary > 0, `Pre-delete: expected objects under ${libraryPrefix}, got ${preLibrary}`);
   assert.ok(preThumbs > 0, `Pre-delete: expected objects under ${thumbsPrefix}, got ${preThumbs}`);
   console.log(
-    `  Pre-delete: upload=${preUpload} thumbs=${preThumbs} profile=${minioCountPrefix(
+    `  Pre-delete: upload=${preUpload} library=${preLibrary} thumbs=${preThumbs} profile=${minioCountPrefix(
       profilePrefix,
     )} encoded-video=${minioCountPrefix(encodedVideoPrefix)}`,
   );
@@ -2008,15 +2523,17 @@ async function phaseUserDeleteS3Orphans(): Promise<void> {
   await waitForProcessing(adminToken);
 
   const postUpload = minioCountPrefix(uploadPrefix);
+  const postLibrary = minioCountPrefix(libraryPrefix);
   const postProfile = minioCountPrefix(profilePrefix);
   const postThumbs = minioCountPrefix(thumbsPrefix);
   const postEncodedVideo = minioCountPrefix(encodedVideoPrefix);
   assert.equal(postUpload, 0, `Post-delete: ${uploadPrefix} should be empty, got ${postUpload}`);
+  assert.equal(postLibrary, 0, `Post-delete: ${libraryPrefix} should be empty, got ${postLibrary}`);
   assert.equal(postProfile, 0, `Post-delete: ${profilePrefix} should be empty, got ${postProfile}`);
   assert.equal(postThumbs, 0, `Post-delete: ${thumbsPrefix} should be empty, got ${postThumbs}`);
   assert.equal(postEncodedVideo, 0, `Post-delete: ${encodedVideoPrefix} should be empty, got ${postEncodedVideo}`);
 
-  console.log(`  User ${userId} deleted; all 4 S3 prefixes report 0 objects.`);
+  console.log(`  User ${userId} deleted; all 5 S3 prefixes report 0 objects.`);
   console.log('=== Phase: user-delete-s3-orphans complete ===');
 }
 
@@ -2246,24 +2763,36 @@ async function main() {
         await phaseSidecarVerify();
         break;
       }
-      case 'template-s3-bulk-skipped': {
-        await phaseTemplateS3BulkSkipped();
+      case 'template-s3-bulk': {
+        await phaseTemplateS3Bulk();
         break;
       }
-      case 'template-s3-upload-skipped': {
-        await phaseTemplateS3UploadSkipped();
+      case 'template-s3-upload': {
+        await phaseTemplateS3Upload();
         break;
       }
-      case 'template-s3-live-photo-skipped': {
-        await phaseTemplateS3LivePhotoSkipped();
+      case 'template-s3-live-photo': {
+        await phaseTemplateS3LivePhoto();
         break;
       }
-      case 'template-s3-sidecar-skipped': {
-        await phaseTemplateS3SidecarSkipped();
+      case 'template-s3-sidecar': {
+        await phaseTemplateS3Sidecar();
         break;
       }
-      case 'template-s3-queue-migration-skipped': {
-        await phaseTemplateS3QueueMigrationSkipped();
+      case 'template-s3-queue-migration': {
+        await phaseTemplateS3QueueMigration();
+        break;
+      }
+      case 'template-s3-manual-derivatives': {
+        await phaseTemplateS3ManualDerivatives();
+        break;
+      }
+      case 'template-s3-upgrade-prepare': {
+        await phaseTemplateS3UpgradePrepare();
+        break;
+      }
+      case 'template-s3-upgrade-pending': {
+        await phaseTemplateS3UpgradePending();
         break;
       }
       case 'template-disk-baseline': {
@@ -2284,7 +2813,7 @@ async function main() {
       }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk, template-s3-upload, template-s3-live-photo, template-s3-sidecar, template-s3-queue-migration, template-s3-manual-derivatives, template-s3-upgrade-prepare, template-s3-upgrade-pending, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
         );
       }
     }

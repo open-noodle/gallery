@@ -1,3 +1,4 @@
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { Kysely } from 'kysely';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
@@ -58,7 +59,7 @@ const setup = async () => {
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
-  (StorageService as any).diskBackend = new DiskStorageBackend('/tmp/immich-test', {} as StorageRepository);
+  (storageBackends as any).diskBackend = new DiskStorageBackend('/tmp/immich-test', {} as StorageRepository);
 });
 
 beforeEach(() => {

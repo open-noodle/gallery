@@ -16,9 +16,9 @@ import {
   JobStatus,
   SourceType,
 } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { MetadataService, firstDateTime } from 'src/services/metadata.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { PersonGroupFactory } from 'test/factories/person-group.factory.js';
 import { PersonFactory } from 'test/factories/person.factory.js';
@@ -3081,11 +3081,11 @@ describe(MetadataService.name, () => {
         put: vi.fn(),
       };
       // the real resolver then sends relative keys here and disk paths to the disk backend
-      StorageService['s3Backend'] = mockBackend as unknown as S3StorageBackend;
+      storageBackends.s3Backend = mockBackend as unknown as S3StorageBackend;
     });
 
     afterEach(() => {
-      StorageService['s3Backend'] = undefined;
+      storageBackends.s3Backend = undefined;
       vi.restoreAllMocks();
     });
 
