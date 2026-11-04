@@ -42,6 +42,7 @@ import { GallerySearchService } from 'src/gallery/services/gallery-search.servic
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
+import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
@@ -146,6 +147,7 @@ export const galleryServices = [
   PetRecognitionService,
   SharedSpaceService,
   StorageMigrationService,
+  StorageTemplateS3Service,
   StorageUsageService,
   UserGroupService,
   RuleMemoryService,
