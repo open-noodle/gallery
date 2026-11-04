@@ -534,6 +534,9 @@ features:
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
         - server/src/schema/migrations-gallery/1799000000000-AddAssetImageAdjustTable.ts
+        - server/src/schema/migrations-gallery/1799100000000-AddSharedSpaceEditorMemberPermissions.ts
+        - server/src/schema/migrations-gallery/1799500000000-AddCleanupTables.ts
+        - server/src/schema/migrations-gallery/1799600000000-AddAssetQualityScreenshotVersion.ts
         - server/src/schema/migrations-gallery/1799700000000-AddAssetSpatialSceneTable.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
@@ -689,7 +692,7 @@ patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
     version_source: pnpm-workspace.yaml
-    expected_patch: patches/@immich__ui@0.91.0.patch
+    expected_patch: patches/@immich__ui@0.91.1.patch
     required_check: fork-patches-check
 
 risk_patterns:
