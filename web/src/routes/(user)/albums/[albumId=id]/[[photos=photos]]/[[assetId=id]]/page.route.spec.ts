@@ -6,18 +6,15 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
+import { factory } from '#test/unit/factories.ts';
+import { defaultUserConfig } from '#test/unit/gallery-config-defaults.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { AlbumUserRole, AssetOrder } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { albumFactory } from '#test-data/factories/album-factory';
-import { timelineAssetFactory } from '#test-data/factories/asset-factory';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
-import { defaultUserConfig } from '#test-data/gallery-config-defaults';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import AlbumPage from './+page.svelte';
 
 const {
@@ -42,7 +39,7 @@ vi.mock('$app/navigation', () => ({
 // The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
 // what the page's $effect sees.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 
@@ -52,7 +49,7 @@ vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
 });
 
 vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -87,10 +84,10 @@ vi.mock('#lib/utils/navigation.js', async (importOriginal) => {
   };
 });
 
-function renderPage(album = albumFactory.build({ assetCount: 2 })) {
+function renderPage(album = factory.album({ assetCount: 2 })) {
   const owner = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)?.user ?? album.albumUsers[0]?.user;
-  authManager.setUser(userAdminFactory.build({ id: owner?.id ?? 'album-owner' }));
-  authManager.setPreferences(preferencesFactory.build());
+  authManager.setUser(factory.user({ id: owner?.id ?? 'album-owner' }));
+  authManager.setPreferences(factory.preferences());
 
   sdkMock.getFilterSuggestions.mockImplementation((request: { albumId?: string } = {}) => {
     if (request.albumId) {
@@ -187,7 +184,7 @@ describe('album detail filter panel route', () => {
   });
 
   it('hides the filter panel when the active dataset is empty and no filters are active', async () => {
-    renderPage(albumFactory.build({ assetCount: 0 }));
+    renderPage(factory.album({ assetCount: 0 }));
 
     await waitFor(() => expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument());
   });
@@ -233,7 +230,7 @@ describe('album detail filter panel route', () => {
   });
 
   it('does not expose timeline-backed cmdk callbacks before the album timeline manager is bound', () => {
-    renderPage(albumFactory.build({ id: 'without-bound-timeline-manager', assetCount: 2 }));
+    renderPage(factory.album({ id: 'without-bound-timeline-manager', assetCount: 2 }));
 
     expect(registerSelectionContextMock).toHaveBeenCalledOnce();
     const options = registerSelectionContextMock.mock.calls[0][0];
@@ -246,7 +243,7 @@ describe('album detail filter panel route', () => {
   });
 
   it('keeps the filter panel visible when timeline months exist but the manager asset count is zero', async () => {
-    renderPage(albumFactory.build({ id: 'timeline-months-only', assetCount: 2 }));
+    renderPage(factory.album({ id: 'timeline-months-only', assetCount: 2 }));
 
     await waitFor(() => expect(screen.getByTestId('discovery-panel')).toBeInTheDocument());
   });
@@ -382,7 +379,7 @@ describe('album detail filter panel route', () => {
     it('stays available while album search results are showing', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
 
-      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2 }));
+      renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
 
       expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
       expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
@@ -442,7 +439,7 @@ describe('album detail filter panel route', () => {
 
   it('ignores album bucket activation while selection mode is active', async () => {
     renderPage();
-    assetMultiSelectManager.selectAsset(timelineAssetFactory.build({ id: 'selected-asset' }));
+    assetMultiSelectManager.selectAsset(factory.timelineAsset({ id: 'selected-asset' }));
 
     await userEvent.setup().click(await screen.findByTestId('activate-year-bucket'));
 
@@ -498,8 +495,8 @@ describe('album detail filter panel route', () => {
   });
 
   it('resets both filter states and label caches when navigating to another album', async () => {
-    const firstAlbum = albumFactory.build({ id: 'album-1', assetCount: 2 });
-    const secondAlbum = albumFactory.build({ id: 'album-2', assetCount: 2 });
+    const firstAlbum = factory.album({ id: 'album-1', assetCount: 2 });
+    const secondAlbum = factory.album({ id: 'album-2', assetCount: 2 });
     const view = renderPage(firstAlbum);
     const user = userEvent.setup();
 
@@ -562,7 +559,7 @@ describe('album detail filter panel route', () => {
   // Slice 6 — the owner chip on an album is named from the album users the page already holds, so
   // it costs no request. (There is no album chip here: E9 drops `?albumId=` at hydrate.)
   it('names the owner chip from the album users in scope, without a request', async () => {
-    const album = albumFactory.build({ id: 'album-1', assetCount: 2 });
+    const album = factory.album({ id: 'album-1', assetCount: 2 });
     const owner = album.albumUsers[0].user;
     mockPage.url = new URL(`https://gallery.test/albums/album-1?owner=${owner.id}`);
 
@@ -576,7 +573,7 @@ describe('album detail filter panel route', () => {
   // Nested (not a sibling describe) so it shares this outer describe's beforeEach — the mockPage
   // reset and gotoMock re-arm above are what make the round-trip tests below load-bearing.
   describe('album detail filters are URL-backed', () => {
-    const album1 = () => albumFactory.build({ id: 'album-1', assetCount: 2 });
+    const album1 = () => factory.album({ id: 'album-1', assetCount: 2 });
 
     it('hydrates the album timeline filters from the URL', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple&rating=4&lens=RF24-70mm');
@@ -778,7 +775,7 @@ describe('album detail filter panel route', () => {
       sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
 
-      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2 }));
+      renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
 
       await waitFor(() =>
         expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
@@ -792,7 +789,7 @@ describe('album detail filter panel route', () => {
   // #986: an album is a searchable page, so a query launched from one runs against that album
   // instead of bouncing the user to /photos and searching their whole library.
   describe('page-aware search', () => {
-    const album1 = () => albumFactory.build({ id: 'album-1', assetCount: 2 });
+    const album1 = () => factory.album({ id: 'album-1', assetCount: 2 });
 
     it('runs the search in place instead of showing the browse timeline', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
@@ -881,13 +878,13 @@ describe('album detail filter panel route', () => {
     it('lets an explicit sort override the album order in browse mode', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?sort=asc');
 
-      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2, order: AssetOrder.Desc }));
+      renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Desc }));
 
       await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
     });
 
     it("keeps the album's own order in browse mode when the URL carries no sort", async () => {
-      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2, order: AssetOrder.Asc }));
+      renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Asc }));
 
       await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
     });

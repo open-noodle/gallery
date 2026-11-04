@@ -1,12 +1,12 @@
 import { getActiveDragPayload, readDragPayload, setActiveDragPayload } from '#lib/utils/space-album-folder-dnd.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { fireEvent, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import SpaceAlbumCard from './space-album-card.svelte';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
   return { ...original, ContextMenuButton: MockContextMenuButton };
 });
 

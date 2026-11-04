@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: mocks.sidebarModeStore }));
 vi.mock('@immich/ui', async () => {
-  const navbarGroup = await import('#test-data/mocks/navbar-group.stub.svelte');
+  const navbarGroup = await import('#test/unit/mocks/navbar-group.stub.svelte');
   return { NavbarGroup: navbarGroup.default };
 });
 

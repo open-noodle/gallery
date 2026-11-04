@@ -1,5 +1,5 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
+import { factory } from '#test/unit/factories.ts';
 import { spacesApiMock } from './spaces-api.mock';
 
 describe('spaces API mock', () => {
@@ -8,7 +8,7 @@ describe('spaces API mock', () => {
   });
 
   it('should configure getAllSpaces to return factory data', async () => {
-    const spaces = sharedSpaceFactory.buildList(3);
+    const spaces = factory.many(3, () => factory.sharedSpace());
     spacesApiMock.getAllSpaces(spaces);
 
     const result = await sdkMock.getAllSpaces();
@@ -17,7 +17,7 @@ describe('spaces API mock', () => {
   });
 
   it('should configure getSpace to return a single space', async () => {
-    const space = sharedSpaceFactory.build({ name: 'My Space' });
+    const space = factory.sharedSpace({ name: 'My Space' });
     spacesApiMock.getSpace(space);
 
     const result = await sdkMock.getSpace({ id: space.id });
@@ -25,7 +25,7 @@ describe('spaces API mock', () => {
   });
 
   it('should configure createSpace to return the new space', async () => {
-    const space = sharedSpaceFactory.build({ name: 'New Space' });
+    const space = factory.sharedSpace({ name: 'New Space' });
     spacesApiMock.createSpace(space);
 
     const result = await sdkMock.createSpace({ sharedSpaceCreateDto: { name: 'New Space' } });

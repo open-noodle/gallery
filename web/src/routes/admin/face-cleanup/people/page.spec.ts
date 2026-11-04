@@ -1,11 +1,11 @@
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { Route } from '#lib/route.ts';
 import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
+import { factory } from '#test/unit/factories.ts';
 import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import Page from './+page.svelte';
 
 // Manual people browser at /admin/face-cleanup/people (Slice 6, §6.3 of
@@ -23,7 +23,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('#test-data/mocks/noop-component.svelte');
+  const noop = await import('#test/unit/mocks/noop-component.svelte');
   return {
     ...mod,
     // Stub Icon to a no-op to avoid undefined-path errors in happy-dom (matches the sibling face-cleanup specs).
@@ -74,7 +74,7 @@ vi.mock('$app/stores', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#test/unit/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -157,7 +157,7 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     // An id that never coincides with a test's mocked owner ids (they use 'solo', 'u1', 'u2', 'u3'), so
     // pre-existing tests keep exercising the alphabetical-fallback path unchanged; tests for the "defaults
     // to my own account" behavior override this explicitly.
-    authManager.setUser(userAdminFactory.build({ id: 'current-admin-not-in-owner-list' }));
+    authManager.setUser(factory.user({ id: 'current-admin-not-in-owner-list' }));
     localStorage.clear();
     manualReviewOwnerId.reset();
   });
@@ -409,7 +409,7 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
   // ---- defaults to the admin's own account, not whichever owner sorts first alphabetically ----
   it("defaults to the admin's own account when it is among the owners, instead of the alphabetically-first owner", async () => {
     const users = [makeUser('u1', 'Alice Owner'), makeUser('u2', 'Bob Owner')];
-    authManager.setUser(userAdminFactory.build({ id: 'u2' }));
+    authManager.setUser(factory.user({ id: 'u2' }));
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([makePerson({ id: 'p1', name: 'From Bob' })]));
 
     render(Page, { props: { data: makePageData(users) } });

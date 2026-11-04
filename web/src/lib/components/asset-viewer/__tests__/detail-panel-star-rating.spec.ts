@@ -1,11 +1,11 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelStarRating from '../DetailPanelStarRating.svelte';
 
 // Task 5 of Slice 7. R6 — the stars ARE the editing control (a star click means "set rating to N"),
@@ -19,7 +19,7 @@ const { gotoMock, updateAssetMock } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -39,7 +39,7 @@ const authManagerMock = vi.hoisted(() => ({
 vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: authManagerMock }));
 
 const buildAsset = (rating: number | null): AssetResponseDto =>
-  assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', exifInfo: { rating } });
+  factory.asset({ id: 'asset-1', ownerId: 'owner-1', exifInfo: { rating } });
 
 beforeEach(() => {
   vi.clearAllMocks();

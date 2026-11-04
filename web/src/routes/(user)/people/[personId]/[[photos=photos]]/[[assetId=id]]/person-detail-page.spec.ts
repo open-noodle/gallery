@@ -4,6 +4,7 @@ import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { isSuggestionSnoozed, snoozeSuggestions } from '#lib/utils/face-suggestion-snooze.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   SharedSpaceRole,
   Type,
@@ -18,9 +19,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import PersonDetailPage from './+page.svelte';
 
 const {
@@ -112,7 +110,7 @@ vi.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
   return {
     ...original,
     ContextMenuButton: MockContextMenuButton,
@@ -122,7 +120,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
 });
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -133,22 +131,22 @@ vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
 });
 
 vi.mock('#lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/image-thumbnail.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/image-thumbnail.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/people/people-merge-selector.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/people-merge-selector.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/people-merge-selector.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/modals/RepresentativeFacePickerModal.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/gallery/people/PersonSuggestionReviewModal.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -188,7 +186,7 @@ function makeMember(userId: string, role: SharedSpaceRole): SharedSpaceMemberRes
 function mockSpaceRoles(roles: Record<string, SharedSpaceRole>) {
   sdkMock.getAllSpaces.mockResolvedValue(
     Object.entries(roles).map(([id, role]) =>
-      sharedSpaceFactory.build({ id, members: [makeMember('current-user-id', role)] }),
+      factory.sharedSpace({ id, members: [makeMember('current-user-id', role)] }),
     ),
   );
 }
@@ -215,8 +213,8 @@ function renderPage({
   person?: PersonResponseDto;
   statistics?: PersonStatisticsResponseDto;
 } = {}) {
-  authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-  authManager.setPreferences(preferencesFactory.build());
+  authManager.setUser(factory.user({ id: 'current-user-id' }));
+  authManager.setPreferences(factory.preferences());
 
   const props = {
     data: {
@@ -563,7 +561,7 @@ describe('Person detail page', () => {
     expect(await screen.findByText('set_date_of_birth')).toBeInTheDocument();
 
     resolveSpaces([
-      sharedSpaceFactory.build({
+      factory.sharedSpace({
         id: 'loading-space-detail',
         members: [makeMember('current-user-id', SharedSpaceRole.Viewer)],
       }),
@@ -1094,8 +1092,8 @@ describe('face suggestions', () => {
       // The snooze module keys on the authenticated user (both `user` AND `preferences` — see
       // AuthManager#authenticated), so the (real, unmocked) session has to be established before recording it,
       // exactly as it would be by the time the space route runs.
-      authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-      authManager.setPreferences(preferencesFactory.build());
+      authManager.setUser(factory.user({ id: 'current-user-id' }));
+      authManager.setPreferences(factory.preferences());
       // What clicking "Not now" on /spaces/… would do: it passes snoozeId={person.id}, the space-person's own
       // (raw) id — identical to PROFILE_ID here.
       snoozeSuggestions(PROFILE_ID, 3);

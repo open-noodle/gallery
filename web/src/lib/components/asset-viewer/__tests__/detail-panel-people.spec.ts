@@ -1,12 +1,12 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { consumeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import type { AssetFaceResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelPeople from '../DetailPanelPeople.svelte';
 
 // Task 5 of Slice 7 (asset-viewer-contextual-filters).
@@ -33,7 +33,7 @@ const { gotoMock, faceManagerMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -82,7 +82,7 @@ const spacePerson = (overrides: Record<string, unknown> = {}) =>
   }) as unknown as NonNullable<AssetResponseDto['people']>[number];
 
 const buildAsset = (people: AssetResponseDto['people'] = []): AssetResponseDto =>
-  assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', people });
+  factory.asset({ id: 'asset-1', ownerId: 'owner-1', people });
 
 beforeEach(() => {
   vi.clearAllMocks();

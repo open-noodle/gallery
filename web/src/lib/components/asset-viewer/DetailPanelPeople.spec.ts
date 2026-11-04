@@ -1,12 +1,12 @@
 import { cropFacesFromAsset } from '#lib/stores/preferences.store.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { get } from 'svelte/store';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanelPeople from './DetailPanelPeople.svelte';
 
 const { authManagerMock, faceManagerMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
@@ -62,7 +62,7 @@ const person = (name: string, overrides: Partial<PersonResponseDto> = {}): Perso
 // `zoomImageToBase64` takes a different code path for Image vs Video. An unpinned type is a
 // latent flake, so every asset built here pins it.
 const asset = (overrides: Partial<AssetResponseDto> = {}) =>
-  assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image, ...overrides });
+  factory.asset({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image, ...overrides });
 
 const renderPanel = (props: {
   isOwner: boolean;

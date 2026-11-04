@@ -13,7 +13,7 @@ type TestPerson = {
 };
 
 vi.mock('#lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/image-thumbnail.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/image-thumbnail.stub.svelte');
   return { default: MockComponent };
 });
 

@@ -1,9 +1,8 @@
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { factory } from '#test/unit/factories.ts';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import OpenInAppBanner from './open-in-app-banner.svelte';
 
 type Nav = {
@@ -39,8 +38,8 @@ const setUser = (id: string | null) => {
   if (id === null) {
     authManager.reset();
   } else {
-    authManager.setUser(userAdminFactory.build({ id }));
-    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(factory.user({ id }));
+    authManager.setPreferences(factory.preferences());
   }
 };
 
