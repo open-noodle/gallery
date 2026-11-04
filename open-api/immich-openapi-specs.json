@@ -37833,6 +37833,9 @@
             "description": "Person name",
             "type": "string"
           },
+          "type": {
+            "$ref": "#/components/schemas/PersonType"
+          },
           "userId": {
             "description": "Restrict the update to the person record of this User ID",
             "format": "uuid",
@@ -38548,6 +38551,14 @@
         ],
         "type": "object"
       },
+      "PersonType": {
+        "description": "Person or pet type",
+        "enum": [
+          "person",
+          "pet"
+        ],
+        "type": "string"
+      },
       "PersonUpdateDto": {
         "properties": {
           "birthDate": {
@@ -38579,6 +38590,9 @@
           "name": {
             "description": "Person name",
             "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PersonType"
           },
           "userId": {
             "description": "Restrict the update to the person record of this User ID",

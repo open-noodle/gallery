@@ -467,6 +467,8 @@
   "bulk_add_confirmation": "Esto añadirá todas las fotos de tu biblioteca a este Space. Se ejecuta en segundo plano y puede tardar unos minutos en bibliotecas grandes.",
   "bulk_add_started": "Añadiendo todas tus fotos a este Space... Te avisaremos cuando termine.",
   "change_cover_photo": "Cambiar portada",
+  "change_type_to_person": "Cambiar tipo a persona",
+  "change_type_to_pet": "Cambiar tipo a mascota",
   "choose_matching_faces_to_reassign": "Elige las caras coincidentes para reasignarlas",
   "cleanup": "Limpieza",
   "cleanup_accept_suggestions": "Aceptar sugerencias de la página (−{size})",
@@ -1107,6 +1109,7 @@
     "one": "{count} foto",
     "other": "{count} fotos"
   },
+  "person_type_changed": "Tipo de persona cambiado.",
   "pet": "Mascota",
   "pets": "Mascotas",
   "photos_only": "Solo fotos",

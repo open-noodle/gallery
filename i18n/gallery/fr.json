@@ -467,6 +467,8 @@
   "bulk_add_confirmation": "Ceci ajoutera toutes les photos de votre bibliothèque à cet espace. L'opération s'exécute en arrière-plan et peut prendre quelques minutes pour les grandes bibliothèques.",
   "bulk_add_started": "Ajout de toutes vos photos à cet espace... Vous serez notifié une fois l'opération terminée.",
   "change_cover_photo": "Changer la couverture",
+  "change_type_to_person": "Changer le type en personne",
+  "change_type_to_pet": "Changer le type en animal de compagnie",
   "choose_matching_faces_to_reassign": "Choisir les visages correspondants à réattribuer",
   "cleanup": "Nettoyage",
   "cleanup_accept_suggestions": "Accepter les suggestions de la page (−{size})",
@@ -1107,6 +1109,7 @@
     "one": "{count} photo",
     "other": "{count} photos"
   },
+  "person_type_changed": "Type de personne modifié.",
   "pet": "Animal",
   "pets": "Animaux",
   "photos_only": "Photos uniquement",

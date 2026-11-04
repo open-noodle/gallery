@@ -33,7 +33,12 @@
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import MergeFaceSelector from '$lib/gallery/people/MergeFaceSelector.svelte';
-  import { getPersonPageActions, isSpaceEditor, updatePersonName } from '$lib/gallery/people/person.service';
+  import {
+    getPersonPageActions,
+    getPersonTypeAction,
+    isSpaceEditor,
+    updatePersonName,
+  } from '$lib/gallery/people/person.service';
   import PersonSuggestions from '$lib/gallery/people/PersonSuggestions.svelte';
   import { getPersonActions } from '$lib/services/person.service';
   import { lang, locale } from '$lib/stores/preferences.store';
@@ -348,6 +353,7 @@
     onPersonUpdate: (updated) => (person = updated),
     onThumbnailUpdate: refreshThumbnail,
   });
+  const ChangePersonType = $derived(getPersonTypeAction($t, person, invalidateAll));
 
   const Merge: ActionItem = {
     title: $t('merge_people'),
@@ -559,6 +565,7 @@
             SetDateOfBirth,
             Merge,
             SeparateFromGroupedPerson,
+            ChangePersonType,
             Favorite,
             Unfavorite,
           ]}

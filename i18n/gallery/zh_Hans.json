@@ -471,6 +471,8 @@
   "bulk_add_confirmation": "此操作会将资源库中的所有照片添加到此 Space。任务将在后台运行，资源库较大时可能需要几分钟。",
   "bulk_add_started": "正在将您的所有照片添加到此 Space...完成后将通知您。",
   "change_cover_photo": "更换封面",
+  "change_type_to_person": "更改类型为人物",
+  "change_type_to_pet": "更改类型为宠物",
   "choose_matching_faces_to_reassign": "选择要重新分配的匹配人脸",
   "cleanup": "清理",
   "cleanup_accept_suggestions": "接受本页建议（−{size}）",
@@ -1123,6 +1125,7 @@
     "one": "{count} 张照片",
     "other": "{count} 张照片"
   },
+  "person_type_changed": "人物类型已更改。",
   "pet": "宠物",
   "pets": "宠物",
   "photos_only": "仅照片",
