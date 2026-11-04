@@ -1572,6 +1572,19 @@ describe(MetadataService.name, () => {
         deleteOnDisk: true,
       },
       {
+        // Gallery: S3 stores extracted motion videos under a relative key
+        motion: 'an extracted motion video on S3',
+        getOriginalPath: (motion: ThumbnailPathEntity) =>
+          StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, motion.ownerId, `${motion.id}-MP.mp4`),
+        deleteOnDisk: true,
+      },
+      {
+        motion: 'an uploaded motion video on S3',
+        getOriginalPath: (motion: ThumbnailPathEntity) =>
+          StorageCore.getRelativeNestedPath(StorageFolder.Upload, motion.ownerId, `${motion.id}.mov`),
+        deleteOnDisk: false,
+      },
+      {
         motion: 'an uploaded motion video',
         getOriginalPath: (motion: ThumbnailPathEntity) =>
           StorageCore.getNestedPath(StorageFolder.Upload, motion.ownerId, `${motion.id}.mov`),
