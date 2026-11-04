@@ -99,14 +99,22 @@ describe(DatabaseBackupService.name, () => {
 
   /** Turns the remote on for a test, as a configured S3 bucket would. */
   const enableRemote = () => {
-    store.remote = { backend: remote as never, bucket: 'media' };
+    store.destination = 'cloud';
+    store.remote = { backend: remote as never, bucket: 'media', prefix: 'backups/' };
+    store.remoteKey = (filename) => `backups/${filename}`;
   };
 
   beforeEach(() => {
     mocks = getMocks();
     staging = fakeBackend();
     remote = fakeBackend();
-    store = { staging: staging as never, key: (filename) => `backups/${filename}`, prefix: 'backups/' };
+    store = {
+      staging: staging as never,
+      destination: 'local',
+      key: (filename) => `backups/${filename}`,
+      remoteKey: (filename) => `backups/${filename}`,
+      prefix: 'backups/',
+    };
     resolver = { resolve: () => Promise.resolve(store) };
     maintenanceHealthRepositoryMock = automock(MaintenanceHealthRepository, {
       args: [mocks.logger],
@@ -380,6 +388,30 @@ describe(DatabaseBackupService.name, () => {
         expect(staging.held.size).toBe(0);
         expect(remote.held.size).toBe(0);
       });
+
+      it('retains the local copy when the destination is both', async () => {
+        enableRemote();
+        store.destination = 'both';
+        mocks.systemMetadata.get.mockResolvedValue(keepLastConfig(14));
+        staging.seed('backups/immich-db-backup-1.sql.gz');
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(staging.held.has('backups/immich-db-backup-1.sql.gz')).toBe(true);
+        expect(remote.held.has('backups/immich-db-backup-1.sql.gz')).toBe(true);
+      });
+
+      it('does not prune backups when the remote listing fails', async () => {
+        enableRemote();
+        mocks.systemMetadata.get.mockResolvedValue(keepLastConfig(1));
+        staging.seed('backups/immich-db-backup-1.sql.gz', 'backups/immich-db-backup-2.sql.gz');
+        remote.list.mockRejectedValue(new AccessDeniedError());
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/cleanup finished with 2 error/);
+
+        expect(staging.delete).not.toHaveBeenCalled();
+        expect(staging.held.size).toBe(2);
+      });
     });
   });
 
@@ -637,10 +669,9 @@ describe(DatabaseBackupService.name, () => {
         expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz');
       });
 
-      // Regression (review, critical): the remote listing used to be awaited bare at the top of cleanup,
-      // so a bucket that could not be listed threw before anything was pruned or swept — the same
-      // unbounded-growth failure the promote reordering was meant to prevent.
-      it('should still prune and sweep when the bucket cannot be listed', async () => {
+      // A failed remote listing makes the retention inventory incomplete, so preserve routine backups
+      // until the bucket can be listed again. Failed temporary dumps are still local-only and swept.
+      it('should sweep failed dumps but preserve routine backups when the bucket cannot be listed', async () => {
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
         staging.seed(
           'backups/immich-db-backup-1.sql.gz',
@@ -651,8 +682,9 @@ describe(DatabaseBackupService.name, () => {
 
         await expect(sut.cleanupDatabaseBackups()).rejects.toThrow();
 
-        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
         expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
+        expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-2.sql.gz');
         expect(mocks.logger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Could not list database backups in S3'),
         );

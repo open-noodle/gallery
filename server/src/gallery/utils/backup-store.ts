@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend, S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
@@ -12,12 +13,9 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { getConfig } from 'src/utils/config.js';
 
 /**
- * Backups live under `backups/` on both backends, which is `StorageFolder.Backups` — the folder upstream
- * already reserves for them under the media location. Media keys are namespaced by the other five
- * `StorageFolder` values (`upload/`, `library/`, `thumbs/`, `encoded-video/`, `profile/`), so sharing the
- * media bucket cannot collide with them, and the bucket ends up mirroring the on-disk layout. Fixing it
- * rather than configuring it is what makes that guarantee hold: there is no setting an admin can get
- * wrong, and the staging and remote keys are the same string.
+ * The local staging folder uses `StorageFolder.Backups`. A separate remote target uses its own configured
+ * prefix, while legacy S3-backup configuration continues using the reserved `backups/` prefix in the media
+ * bucket.
  */
 export const BACKUP_PREFIX = `${StorageFolder.Backups}/`;
 
@@ -26,38 +24,86 @@ export const BACKUP_PREFIX = `${StorageFolder.Backups}/`;
  *
  * `staging` is always the disk backend: `pg_dump` writes there, and a backup that fails to reach S3 stays
  * there rather than being lost. It is typed as the concrete `DiskStorageBackend` (not the `StorageBackend`
- * interface) because the local-only promote needs its disk-only `rename`.
+ * interface) because staging writes need its disk-only `rename`.
  *
  * `remote` is present only when the gate in {@link BackupStoreResolver.resolve} is satisfied. Both backends
- * take the same key, so there is one `key()` rather than one per backend.
+ * have their own key function because the independent cloud destination uses a configurable prefix.
  */
 export interface BackupStore {
   staging: DiskStorageBackend;
-  remote?: { backend: StorageBackend; bucket: string };
+  destination: 'local' | 'cloud' | 'both';
+  remote?: { backend: StorageBackend; bucket: string; prefix: string };
   key: (filename: string) => string;
+  remoteKey: (filename: string) => string;
   prefix: string;
 }
+
+const normalizeBackupPrefix = (prefix: string): string => {
+  const normalized = prefix.trim().replaceAll(/^\/+|\/+$/g, '');
+  if (!normalized || normalized.split('/').includes('..')) {
+    throw new Error('IMMICH_BACKUP_S3_PREFIX must be a non-empty relative object prefix without ".." segments.');
+  }
+  return normalized;
+};
 
 /**
  * Cross-field rule for the `ConfigValidate` event. It cannot be a `superRefine` on the config schema: those
  * schemas feed `createZodDto` and OpenAPI generation (see src/utils/config.ts), which a refinement would not
- * survive. Without this an admin could reach a state over the API that the UI never offers, because the UI
- * hides the whole group when the storage backend is not S3.
+ * survive. Without this an admin could select a cloud destination before its deployment-managed target is
+ * configured.
  */
 export const validateBackupS3Config = (
   newConfig: SystemConfig,
   oldConfig: SystemConfig,
   env: { storage: { backend: 'disk' | 's3' } },
 ): void => {
-  // Only a save that TURNS IT ON is rejected. Rejecting any config whose flag is already on would brick
-  // every unrelated admin save once IMMICH_STORAGE_BACKEND stopped being s3 — and since the UI hides the
-  // whole group off the S3 backend, there would be no control left to turn it off with. An already-on flag
-  // on a disk-backed server is handled where it matters instead: `resolve()` degrades to local-only.
+  // Only a save that turns the deprecated flag on is rejected. An already-on legacy flag on a disk-backed
+  // server is handled where it matters instead: `resolve()` degrades to local-only.
   const turningOn = newConfig.backup.database.s3.enabled && !oldConfig.backup.database.s3.enabled;
   if (turningOn && env.storage.backend !== 's3') {
     throw new Error(
       'Database backups can only be uploaded to S3 while the server is running on the S3 storage backend. Set IMMICH_STORAGE_BACKEND=s3 first, or leave this off.',
     );
+  }
+};
+
+export const validateBackupDestinationConfig = (
+  newConfig: SystemConfig,
+  oldConfig: SystemConfig,
+  env: {
+    storage: { backend: 'disk' | 's3'; s3: { bucket: string } };
+    backupS3: {
+      bucket?: string;
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      prefix?: string;
+    };
+  },
+): void => {
+  const isLegacyCloudDestination = (config: SystemConfig) =>
+    config.backup.database.destination === 'cloud' && config.backup.database.s3.enabled;
+  const isSeparateCloudDestination = (config: SystemConfig) =>
+    config.backup.database.destination !== 'local' && !isLegacyCloudDestination(config);
+  if (!isSeparateCloudDestination(newConfig) || isSeparateCloudDestination(oldConfig)) {
+    return;
+  }
+
+  if (newConfig.backup.database.s3.enabled) {
+    if (env.storage.backend !== 's3' || !env.storage.s3.bucket) {
+      throw new Error(
+        'Legacy S3 database backups require IMMICH_STORAGE_BACKEND=s3 and IMMICH_S3_BUCKET. Configure a separate IMMICH_BACKUP_S3_* target to use cloud backups with any media backend.',
+      );
+    }
+    return;
+  }
+
+  const { bucket, prefix, accessKeyId, secretAccessKey } = env.backupS3;
+  if (!bucket?.trim() || !prefix?.trim()) {
+    throw new Error('Cloud database backups require IMMICH_BACKUP_S3_BUCKET and a unique IMMICH_BACKUP_S3_PREFIX.');
+  }
+  normalizeBackupPrefix(prefix);
+  if (!!accessKeyId !== !!secretAccessKey) {
+    throw new Error('Set both IMMICH_BACKUP_S3_ACCESS_KEY_ID and IMMICH_BACKUP_S3_SECRET_ACCESS_KEY, or neither.');
   }
 };
 
@@ -88,7 +134,9 @@ export class BackupStoreResolver {
   async resolve(): Promise<BackupStore> {
     const store: BackupStore = {
       staging: new DiskStorageBackend(StorageCore.getMediaLocation(), this.storageRepository),
+      destination: 'local',
       key: (filename: string) => `${BACKUP_PREFIX}${filename}`,
+      remoteKey: (filename: string) => `${BACKUP_PREFIX}${filename}`,
       prefix: BACKUP_PREFIX,
     };
 
@@ -100,14 +148,45 @@ export class BackupStoreResolver {
       },
       { withCache: false },
     );
-    if (!config.backup.database.s3.enabled) {
+    const legacyS3 = config.backup.database.destination === 'cloud' && config.backup.database.s3.enabled;
+    store.destination = config.backup.database.destination;
+    if (store.destination === 'local') {
       return store;
     }
 
-    // Degrade to local-only rather than failing the backup: an admin who sets IMMICH_STORAGE_BACKEND back to
-    // disk should still get backups, and the ConfigValidate guard already stops this state being reached by a
-    // save.
     const env = this.configRepository.getEnv();
+    if (!legacyS3) {
+      const { region, endpoint, accessKeyId, secretAccessKey, prefix } = env.backupS3;
+      const bucket = env.backupS3.bucket?.trim();
+      if (!bucket || !prefix?.trim()) {
+        throw new Error(
+          'Cloud database backups are selected, but IMMICH_BACKUP_S3_BUCKET or IMMICH_BACKUP_S3_PREFIX is missing.',
+        );
+      }
+      if (!!accessKeyId !== !!secretAccessKey) {
+        throw new Error('Set both IMMICH_BACKUP_S3_ACCESS_KEY_ID and IMMICH_BACKUP_S3_SECRET_ACCESS_KEY, or neither.');
+      }
+
+      const normalizedPrefix = normalizeBackupPrefix(prefix);
+
+      store.remote = {
+        backend: this.getRemoteBackend({
+          bucket,
+          region,
+          endpoint,
+          accessKeyId,
+          secretAccessKey,
+          presignedUrlExpiry: 3600,
+          serveMode: 'proxy',
+        }),
+        bucket,
+        prefix: `${normalizedPrefix}/`,
+      };
+      store.remoteKey = (filename: string) => `${normalizedPrefix}/${filename}`;
+      return store;
+    }
+
+    // Legacy configurations keep using the media bucket and its existing credentials.
     if (env.storage.backend !== 's3') {
       this.warnOnce(
         'local-backend',
@@ -127,7 +206,7 @@ export class BackupStoreResolver {
       return store;
     }
 
-    store.remote = { backend: this.getRemoteBackend(env.storage.s3), bucket };
+    store.remote = { backend: this.getRemoteBackend(env.storage.s3), bucket, prefix: BACKUP_PREFIX };
     this.warned = undefined;
 
     return store;
@@ -140,12 +219,19 @@ export class BackupStoreResolver {
     // carries every user's hashed password and session tokens. Forcing `proxy` keeps the download on the
     // authenticated admin route, where the Permission.BackupDownload check actually applies.
     const backupConfig: S3StorageConfig = { ...config, serveMode: 'proxy' };
-    // `accessKeyId` is part of the identity of the client, so a rotated credential rebuilds it; the secret is
-    // not included, since a signature is a cache key and nothing more.
-    const signature = JSON.stringify([config.bucket, config.region, config.endpoint, config.accessKeyId]);
+    const secretFingerprint = config.secretAccessKey
+      ? createHash('sha256').update(config.secretAccessKey).digest('hex')
+      : undefined;
+    const signature = JSON.stringify([
+      config.bucket,
+      config.region,
+      config.endpoint,
+      config.accessKeyId,
+      secretFingerprint,
+    ]);
     if (this.cached?.signature !== signature) {
       this.cached = { signature, backend: this.createS3Backend(backupConfig) };
-      this.logger.log(`Database backups will be uploaded to S3 (bucket: ${config.bucket}, prefix: ${BACKUP_PREFIX})`);
+      this.logger.log(`Database backups will use S3-compatible object storage (bucket: ${config.bucket})`);
     }
     return this.cached.backend;
   }

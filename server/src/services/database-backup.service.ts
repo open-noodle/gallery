@@ -11,7 +11,12 @@ import { OnEvent, OnJob } from 'src/decorators.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { DatabaseBackupListResponseDto } from 'src/dtos/database-backup.dto.js';
 import { CacheControl, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
-import { BackupStore, BackupStoreResolver, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
+import {
+  BackupStore,
+  BackupStoreResolver,
+  validateBackupDestinationConfig,
+  validateBackupS3Config,
+} from 'src/gallery/utils/backup-store.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -90,6 +95,7 @@ export class DatabaseBackupService {
   @OnEvent({ name: 'ConfigValidate' })
   onConfigValidate({ newConfig, oldConfig }: ArgOf<'ConfigValidate'>) {
     validateBackupS3Config(newConfig, oldConfig, this.configRepository.getEnv());
+    validateBackupDestinationConfig(newConfig, oldConfig, this.configRepository.getEnv());
   }
 
   @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
@@ -331,7 +337,7 @@ export class DatabaseBackupService {
   }
 
   /**
-   * The staged promote: stream the finished local file to the bucket, then delete the local copy.
+   * The staged promote: stream the finished local file to the bucket, then remove the local copy in cloud-only mode.
    *
    * Throws on upload failure, leaving the local file in place. `cleanupDatabaseBackups` catches that and
    * carries on so retention still runs; `uploadBackup` lets it reach the admin, who is waiting on the
@@ -345,11 +351,15 @@ export class DatabaseBackupService {
     }
 
     const key = store.key(filename);
+    const remoteKey = store.remoteKey(filename);
 
     let source: Readable | undefined;
     try {
       ({ stream: source } = await store.staging.get(key));
-      await remote.backend.put(key, source, { contentType: backupContentType(filename) });
+      await remote.backend.put(remoteKey, source, { contentType: backupContentType(filename) });
+      if (!(await remote.backend.exists(remoteKey))) {
+        throw new Error('Remote object store did not confirm the uploaded backup.');
+      }
     } catch (error) {
       // The upload may have failed before it consumed the read, so the file descriptor behind it is
       // still open. Every cron tick retries, so leaking one per failure eventually exhausts the process.
@@ -357,27 +367,31 @@ export class DatabaseBackupService {
       // An admin upload and the retention pass can promote the same file at once (they run in different
       // workers). Whichever deletes the local copy first makes the other's read fail, but the backup is
       // in the bucket, so that is not a failed upload.
-      if (await this.promotedElsewhere(store, key)) {
+      if (await this.promotedElsewhere(store, key, remoteKey)) {
         return;
       }
       // The S3 error goes in the message, not only in `cause`: neither the per-file log line nor the job
       // runner's failure log prints a cause, so without it an AccessDenied and a DNS failure log alike.
       throw new Error(
-        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}): ${describeError(error)}. The backup is still on local disk and the next run will retry the upload.`,
+        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${remoteKey}): ${describeError(error)}. The backup is still on local disk and the next run will retry the upload.`,
         { cause: error },
       );
     }
 
-    this.logger.log(`Database Backup uploaded to S3 (bucket: ${remote.bucket}, key: ${key})`);
+    this.logger.log(`Database Backup uploaded to object storage (bucket: ${remote.bucket}, key: ${remoteKey})`);
 
-    await store.staging
-      .delete(key)
-      .catch((error) => this.logger.warn(`Uploaded ${filename} to S3 but failed to delete the local copy: ${error}`));
+    if (store.destination !== 'both') {
+      await store.staging
+        .delete(key)
+        .catch((error) =>
+          this.logger.warn(`Uploaded ${filename} to object storage but failed to delete the local copy: ${error}`),
+        );
+    }
   }
 
-  private async promotedElsewhere(store: BackupStore, key: string): Promise<boolean> {
+  private async promotedElsewhere(store: BackupStore, key: string, remoteKey: string): Promise<boolean> {
     try {
-      return !(await store.staging.exists(key)) && !!(await store.remote?.backend.exists(key));
+      return !(await store.staging.exists(key)) && !!(await store.remote?.backend.exists(remoteKey));
     } catch {
       return false;
     }
@@ -391,7 +405,7 @@ export class DatabaseBackupService {
 
   /**
    * Local first, then remote. A backup whose upload failed is still on disk, and must stay downloadable
-   * and restorable from there; everything else has been promoted and only exists in the bucket.
+   * and restorable from there; a promoted backup may also be retained on disk in `both` mode.
    */
   private async locate(store: BackupStore, filename: string): Promise<{ backend: StorageBackend; key: string }> {
     const key = store.key(filename);
@@ -399,8 +413,9 @@ export class DatabaseBackupService {
       return { backend: store.staging, key };
     }
 
-    if (store.remote && (await store.remote.backend.exists(key))) {
-      return { backend: store.remote.backend, key };
+    const remoteKey = store.remoteKey(filename);
+    if (store.remote && (await store.remote.backend.exists(remoteKey))) {
+      return { backend: store.remote.backend, key: remoteKey };
     }
 
     throw new NotFoundException(`Backup ${filename} was not found`);
@@ -488,7 +503,7 @@ export class DatabaseBackupService {
 
     if (store.remote) {
       try {
-        for (const { key, size } of await store.remote.backend.list(store.prefix)) {
+        for (const { key, size } of await store.remote.backend.list(store.remote.prefix)) {
           sizes.set(basename(key), size);
         }
       } catch (error) {
@@ -541,7 +556,7 @@ export class DatabaseBackupService {
             await store.staging.delete(key);
           }
         };
-        await Promise.all([deleteLocal(), ...(remote ? [remote.backend.delete(key)] : [])]);
+        await Promise.all([deleteLocal(), ...(remote ? [remote.backend.delete(store.remoteKey(filename))] : [])]);
       }),
     );
   }
@@ -568,7 +583,7 @@ export class DatabaseBackupService {
         return undefined;
       }
       try {
-        return await this.filenamesIn(remote.backend, store.prefix);
+        return await this.filenamesIn(remote.backend, remote.prefix);
       } catch (error) {
         failures.push(error);
         this.logger.warn(`Could not list database backups in S3 bucket "${remote.bucket}": ${error}`);
@@ -590,13 +605,16 @@ export class DatabaseBackupService {
           continue;
         }
         if (remoteNames.has(filename)) {
-          // Already in the bucket, so the local copy is a duplicate. A failed delete is only collected:
-          // like every other step here it must not stop the prune and the sweep below.
-          try {
-            await store.staging.delete(store.key(filename));
-          } catch (error) {
-            failures.push(error);
-            this.logger.warn(`Could not delete local copy of ${filename}, which is already in S3: ${error}`);
+          // In cloud-only mode the local file is a promoted duplicate; both mode intentionally retains it.
+          if (store.destination !== 'both') {
+            try {
+              await store.staging.delete(store.key(filename));
+            } catch (error) {
+              failures.push(error);
+              this.logger.warn(
+                `Could not delete local copy of ${filename}, which is already in object storage: ${error}`,
+              );
+            }
           }
           continue;
         }
@@ -612,15 +630,19 @@ export class DatabaseBackupService {
 
     // Retention applies to every routine backup the admin can see, across both backends, so
     // `keepLastAmount` bounds the total however the uploads are faring. Each expired backup is deleted
-    // from the side(s) that hold it: once backups go to S3 they are normally S3-only, and deleting a
-    // missing disk file logs a "does not exist" warning on every run.
+    // from the side(s) that hold it. In cloud-only mode a promoted backup is normally S3-only; in `both`
+    // mode both copies are removed together.
     // The remote half of the union is re-read, since promoting changed it. A failure here is tolerated
-    // the same way: prune what is known rather than nothing at all.
+    // the same way: if the remote inventory is unknown, do not prune any routine backups.
     const localBeforePrune = new Set(await localNames());
-    const routine = [...new Set([...localBeforePrune, ...((await remoteNamesOrNone()) ?? [])])]
-      .filter((filename) => isValidDatabaseRoutineBackupName(filename))
-      .toSorted()
-      .toReversed();
+    const remoteBeforePrune = await remoteNamesOrNone();
+    const mayPrune = !remote || remoteBeforePrune !== undefined;
+    const routine = mayPrune
+      ? [...new Set([...localBeforePrune, ...(remoteBeforePrune ?? [])])]
+          .filter((filename) => isValidDatabaseRoutineBackupName(filename))
+          .toSorted()
+          .toReversed()
+      : [];
 
     const toDelete = routine.slice(config.keepLastAmount);
     for (const filename of toDelete) {
@@ -630,7 +652,7 @@ export class DatabaseBackupService {
           await store.staging.delete(store.key(filename));
         }
         if (remote) {
-          await remote.backend.delete(store.key(filename));
+          await remote.backend.delete(store.remoteKey(filename));
         }
       } catch (error) {
         failures.push(error);

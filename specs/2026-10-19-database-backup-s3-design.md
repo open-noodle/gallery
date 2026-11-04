@@ -2,25 +2,38 @@
 
 ## Overview
 
-Scheduled `pg_dump` backups used to land only on the same disk as the server: every path in
-`DatabaseBackupService` was built from `StorageCore.getBaseFolder(StorageFolder.Backups)` and written with raw
-`StorageRepository` file IO. A host failure took the library and every backup with it, which defeats the point of
-having them.
+Scheduled `pg_dump` backups originally landed only on the server disk. The first S3 increment made backup storage
+backend-addressable and added a same-bucket cloud option. The current design extends that work to independent
+destinations while retaining the original behavior for existing installations.
 
-This makes the backups folder **backend-addressable**. `DatabaseBackupService` stops doing its own file IO and
-works through the `StorageBackend` interface the fork already uses for media, so the destination is configuration
-rather than a hardcoded path. On top of that abstraction sits a staged write: dump to disk → on success upload to
-S3 → on success delete the local copy.
+## Current design: independent destinations
 
-The feature is offered only when the server's storage backend is already S3 (`IMMICH_STORAGE_BACKEND=s3`), with an
-enable/disable flag in Admin → System Settings → Backup that is absent otherwise. Because an S3 backend is already
-constructed and credentialed when it applies, the feature reuses the existing `IMMICH_S3_*` bucket, credentials,
-region and endpoint, and writes under the `backups/` prefix: no new environment variables, nothing about the
-destination in the database, and nothing new that `GET /admin/config` would hand back in the clear (it redacts
-nothing today — `notifications.smtp.transport.password` and `oauth.clientSecret` both come back as stored). The
-admin is left with a single switch.
+The admin chooses **Local only**, **Cloud only**, or **Local and cloud**. Local staging remains under
+`UPLOAD_LOCATION/backups`; the remote destination is configured separately from the media backend, so it works
+with disk-backed or S3-backed media.
 
-## Decisions
+- Set `IMMICH_BACKUP_S3_BUCKET` and an instance-unique `IMMICH_BACKUP_S3_PREFIX`. Region defaults to
+  `us-east-1`; endpoint and static credentials are optional. Credentials come from deployment environment or the
+  AWS SDK provider chain, never from system config.
+- Cloud-only deletes the staged local copy only after upload verification. Local-and-cloud retains both copies.
+  Failed uploads remain local and are retried during cleanup.
+- Retention counts a backup found in both destinations once and removes expired copies from each destination.
+  If the remote listing fails, routine backups are not pruned because the full retention inventory is unknown;
+  local backups remain listable.
+- Config validation checks the deployment target when an administrator transitions to an independent cloud
+  destination. Resolving a cloud destination with missing environment configuration fails explicitly.
+- Existing `backup.database.s3.enabled: true` config is migrated on read to `destination: cloud` and continues to
+  use the media bucket and its existing S3 credentials when media storage is S3; otherwise the legacy setting
+  falls back to local backups. Selecting a new destination clears that deprecated compatibility flag. Moving a
+  legacy cloud destination to `both` therefore requires the independent target.
+- The legacy media-bucket mode still requires `IMMICH_STORAGE_BACKEND=s3` and the old `backups/` prefix. The new
+  independent target uses its configured prefix, preventing separate Gallery instances from sharing retention
+  state.
+
+The remaining sections record the rationale and implementation of the original same-bucket increment. Where they
+conflict with this current-design section, the current design supersedes them.
+
+## Original implementation decisions (historical)
 
 - **The destination is a `StorageBackend`, not a post-hoc uploader.** A second service that uploaded finished
   backups after the fact would have left every other operation — retention, listing, restore, download, delete —

@@ -17,18 +17,19 @@ export const galleryConfigBool = z
   }, z.boolean())
   .meta({ type: 'boolean' });
 
-// Gallery-fork: scheduled database backups to S3. Deliberately a single on/off flag. Bucket, credentials,
-// region and endpoint are not here because the feature is only offered when the server's storage backend is
-// already S3 (IMMICH_STORAGE_BACKEND=s3), so the only S3 configuration that could apply is the one the media
-// backend is already using; and the key prefix is fixed at `backups/` (see BACKUP_PREFIX in
-// src/gallery/utils/backup-store.ts), which is what guarantees the dumps stay out of the media key space.
-// The result is that nothing about the destination is stored in the database, so there is no S3 secret for
-// GET /admin/config to hand back in the clear, and nothing an admin can misconfigure.
+// The old switch is retained for existing configuration files and clients. New installs use
+// GalleryBackupDestinationSchema and deployment-managed IMMICH_BACKUP_S3_* settings.
 export const GalleryBackupS3Schema = z
   .object({
-    enabled: galleryConfigBool.describe('Upload scheduled database backups to S3'),
+    enabled: galleryConfigBool.describe('Deprecated: use the database backup destination setting'),
   })
   .meta({ id: 'AdminConfigDatabaseBackupS3Dto' });
+
+export const GalleryBackupDestinationSchema = z
+  .enum(['local', 'cloud', 'both'])
+  .default('local')
+  .describe('Where scheduled database backups are stored')
+  .meta({ id: 'AdminConfigDatabaseBackupDestinationDto' });
 
 const GalleryClassificationFaceExclusionSchema = z
   .enum(['off', 'any_assigned_face', 'named_people', 'named_visible_people'])
@@ -241,6 +242,7 @@ export const galleryMachineLearningDefaults = {
 
 export const galleryBackupDatabaseDefaults = {
   // off out of the box, so a fresh install behaves exactly like upstream Immich
+  destination: 'local' as const,
   s3: { enabled: false },
 };
 
