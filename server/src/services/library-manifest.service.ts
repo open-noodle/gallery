@@ -18,7 +18,7 @@ export class LibraryManifestService extends BaseService {
       throw new NotFoundException('User not found');
     }
 
-    const rows = await this.assetRepository.getOwnedManifestAssets(id, pageSize + 1, cursor);
+    const rows = await this.galleryAssetRepository.getOwnedManifestAssets(id, pageSize + 1, cursor);
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
 

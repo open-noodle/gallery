@@ -5,7 +5,7 @@
     isSpaceAlbumsExpanded,
     recentSpaceAlbumsExpanded,
     setSpaceAlbumsExpanded,
-  } from '#lib/stores/preferences.store.ts';
+  } from '#lib/gallery/stores/preferences.store.ts';
   import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
   import { getAllSpacesQuery, getSpaceAlbumsQuery } from '#lib/gallery/spaces/space.query.ts';

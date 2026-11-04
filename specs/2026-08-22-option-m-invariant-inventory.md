@@ -122,6 +122,11 @@ Three call sites keep upstream's owner-scoped `getByGroupId` deliberately, becau
 rather than inferred from the caller: `person.service.ts` 215 (`getAll` closest-person), 1303
 (recognition, scoped to the asset's owner), 1448 (`handlePersonMigration`, owner in the job payload).
 
+Recognition's face KNN (`handleRecognizeFaces`) runs upstream's `SearchRepository.searchFaces`, keyed on
+the owner's `clusterGroupId`. With `ClusterGroupController` unmounted every user is alone in their
+cluster group, so the scan equals the owner-scoped one it replaced; turning cluster groups on widens
+recognition to the whole group, as upstream intends.
+
 ## 4. The tripwire
 
 `test/medium/specs/repositories/person.repository.spec.ts` →

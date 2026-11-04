@@ -160,7 +160,7 @@ export class SmartInfoService extends BaseService {
       try {
         let framePaths: string[];
         try {
-          framePaths = await this.mediaRepository.extractVideoFrames(localPath, timestamps, tempDir);
+          framePaths = await this.videoTrimRepository.extractVideoFrames(localPath, timestamps, tempDir);
         } catch (error) {
           this.logger.error(`Failed to extract video frames: ${originalPath}`, error);
           return null;

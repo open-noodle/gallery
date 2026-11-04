@@ -1,6 +1,6 @@
 import SpaceAlbumsTable from '#lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
-import { toggleSpaceAlbumGroupCollapsing } from '#lib/utils/space-album-grouping.ts';
+import { toggleAlbumGroupCollapsing } from '#lib/utils/album-utils.ts';
 import { getSpaceAlbumSortLabels, spaceAlbumSortOptionsMetadata } from '#lib/utils/space-album-sort.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
@@ -187,7 +187,7 @@ describe('SpaceAlbumsTable', () => {
         grouped: true,
       });
       expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'true');
-      toggleSpaceAlbumGroupCollapsing('2024');
+      toggleAlbumGroupCollapsing('2024', spaceAlbumViewSettings);
       await waitFor(() =>
         expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'false'),
       );

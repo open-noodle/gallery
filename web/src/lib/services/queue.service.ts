@@ -1,4 +1,5 @@
 import { OpenQueryParam } from '#lib/constants.ts';
+import { galleryQueueItems } from '#lib/gallery/utils/queue-jobs.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queueManager } from '#lib/managers/queue-manager.svelte.ts';
 import JobCreateModal from '#lib/modals/JobCreateModal.svelte';
@@ -9,18 +10,15 @@ import { getFormatter } from '#lib/utils/i18n.ts';
 import {
   emptyQueue,
   getQueue,
-  JobName,
   QueueCommand,
   QueueName,
   runQueueCommandLegacy,
   updateQueue,
-  type QueueJobTypeCountsDto,
   type QueueResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem, type IconLike } from '@immich/ui';
 import {
   mdiClose,
-  mdiCloudSyncOutline,
   mdiCog,
   mdiContentDuplicate,
   mdiDatabaseOutline,
@@ -29,21 +27,16 @@ import {
   mdiFileJpgBox,
   mdiFileXmlBox,
   mdiFolderMove,
-  mdiImageFilterCenterFocusWeak,
   mdiImageSearch,
   mdiLibraryShelves,
   mdiOcr,
   mdiPause,
-  mdiPaw,
-  mdiPawOutline,
   mdiPencil,
   mdiPlay,
   mdiPlus,
   mdiStateMachine,
   mdiTable,
   mdiTagFaces,
-  mdiTagMultipleOutline,
-  mdiCubeOutline,
   mdiTrashCanOutline,
   mdiTrayFull,
   mdiVideo,
@@ -55,56 +48,6 @@ type QueueItem = {
   icon: IconLike;
   title: string;
   subtitle?: string;
-};
-
-export type QueueJobTypeCounts = QueueJobTypeCountsDto;
-
-export const formatSampledJobTypeCount = (count: number, formatNumber: (count: number) => string) => {
-  return count > 1000 ? `${formatNumber(1000)}+` : formatNumber(count);
-};
-
-export const getQueueJobTypeLabel = (name: JobName) => {
-  switch (name) {
-    case JobName.FacialRecognition:
-    case JobName.FacialRecognitionQueueAll: {
-      return 'Facial recognition';
-    }
-    case JobName.SharedSpaceFaceMatch:
-    case JobName.SharedSpaceFaceMatchAll:
-    case JobName.SharedSpaceFaceMatchPage: {
-      return 'Shared space face matching';
-    }
-    case JobName.SharedSpacePersonDedup: {
-      return 'Shared space people dedup';
-    }
-    case JobName.SharedSpaceIdentityReconciliation: {
-      return 'Shared space identity reconciliation';
-    }
-    case JobName.SharedSpacePersonMetadataBackfill: {
-      return 'Shared space metadata propagation';
-    }
-    case JobName.FaceIdentityBackfill: {
-      return 'Face identity backfill';
-    }
-    case JobName.FaceSuggestionMaintenance: {
-      return 'Face suggestion maintenance';
-    }
-    case JobName.PersonSuggestionScan:
-    case JobName.PersonSuggestionScanQueueAll: {
-      return 'Personal face suggestion scan';
-    }
-    case JobName.SpacePersonSuggestionScan:
-    case JobName.SpacePersonSuggestionScanQueueAll: {
-      return 'Shared-space face suggestion scan';
-    }
-    case JobName.PetRecognition:
-    case JobName.PetRecognitionQueueAll: {
-      return 'Pet recognition';
-    }
-    default: {
-      return name.replaceAll(/([a-z])([A-Z])/g, '$1 $2');
-    }
-  }
 };
 
 export const getQueuesActions = ($t: MessageFormatter, queues: QueueResponseDto[] | undefined) => {
@@ -261,25 +204,10 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       title: $t('admin.machine_learning_facial_recognition'),
       subtitle: $t('admin.facial_recognition_job_description'),
     },
-    [QueueName.PeopleBackfill]: {
-      icon: mdiTagFaces,
-      title: $t('admin.people_backfill_job'),
-      subtitle: $t('admin.people_backfill_job_description'),
-    },
     [QueueName.Ocr]: {
       icon: mdiOcr,
       title: $t('admin.machine_learning_ocr'),
       subtitle: $t('admin.ocr_job_description'),
-    },
-    [QueueName.PetDetection]: {
-      icon: mdiPaw,
-      title: $t('admin.machine_learning_pet_detection'),
-      subtitle: $t('admin.pet_detection_job_description'),
-    },
-    [QueueName.PetRecognition]: {
-      icon: mdiPawOutline,
-      title: $t('admin.machine_learning_pet_recognition'),
-      subtitle: $t('admin.pet_recognition_job_description'),
     },
     [QueueName.VideoConversion]: {
       icon: mdiVideo,
@@ -323,25 +251,7 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       icon: mdiPencil,
       title: $t('editor'),
     },
-    [QueueName.StorageBackendMigration]: {
-      icon: mdiCloudSyncOutline,
-      title: 'Storage Backend Migration',
-    },
-    [QueueName.Classification]: {
-      icon: mdiTagMultipleOutline,
-      title: 'Auto-Classification',
-      subtitle: 'Automatically classify and tag photos',
-    },
-    [QueueName.QualityAnalysis]: {
-      icon: mdiImageFilterCenterFocusWeak,
-      title: $t('admin.quality_analysis_job'),
-      subtitle: $t('admin.quality_analysis_job_description'),
-    },
-    [QueueName.SpatialScene]: {
-      icon: mdiCubeOutline,
-      title: $t('admin.machine_learning_spatial_scene'),
-      subtitle: $t('admin.spatial_scene_job_description'),
-    },
+    ...galleryQueueItems($t),
   };
 
   return items[queue.name];

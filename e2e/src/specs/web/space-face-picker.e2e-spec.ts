@@ -122,7 +122,7 @@ test.describe("Space editor's face picker — the shared panel in its other call
   // exact panel and taps "Create person" once, expecting the same one-step completion the
   // "attach to an existing candidate" case above gets. Nothing in the suite drove that through the
   // real server before this test — spaces-editor-face-assign-completion.e2e-spec.ts proves the
-  // SEPARATE "draw a new box" flow (SpaceFaceEditor's two-step Create person + Tag face), and the
+  // SEPARATE "draw a new box" flow (the space-mode FaceEditor's two-step Create person + Tag face), and the
   // test above only exercises attaching to an EXISTING candidate, never typing a new one here.
   //
   // ROOT CAUSE (found and fixed): `SharedSpaceService.createSpacePerson`'s transaction takes a

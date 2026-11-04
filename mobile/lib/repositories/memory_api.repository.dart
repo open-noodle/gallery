@@ -137,27 +137,11 @@ class MemoryApiRepository extends ApiRepository {
   /// to the offline local-Drift fallback over a count the list can do without.
   Future<int?> _searchMemoriesTotal({required bool onlyFavorites}) async {
     try {
-      final response = await _apiService.apiClient.invokeAPI(
-        '/memories/statistics',
-        'GET',
-        [const QueryParam('isUpcoming', 'false'), if (onlyFavorites) const QueryParam('isSaved', 'true')],
-        null,
-        <String, String>{},
-        <String, String>{},
-        null,
+      final statistics = await _apiService.memoriesApi.memoriesStatistics(
+        isUpcoming: false,
+        isSaved: onlyFavorites ? true : null,
       );
-
-      if (response.statusCode >= 400) {
-        return null;
-      }
-
-      final body = response.bodyBytes.isEmpty ? '' : utf8.decode(response.bodyBytes);
-      if (body.isEmpty) {
-        return null;
-      }
-
-      final decoded = await _apiService.apiClient.deserializeAsync(body, 'MemoryStatisticsResponseDto');
-      return (decoded as MemoryStatisticsResponseDto?)?.total;
+      return statistics?.total;
     } catch (error) {
       debugPrint('Failed to read memories statistics, falling back to empty-page pagination: $error');
       return null;
@@ -165,41 +149,18 @@ class MemoryApiRepository extends ApiRepository {
   }
 
   /// One page of `GET /memories?page=&size=`.
-  ///
-  /// Hand-rolled for the same reason as [_searchMemoriesFor]: the generated client is used
-  /// directly through `invokeAPI` so auth and the base path still apply.
   Future<List<MemoryResponseDto>> _searchMemoriesPage({
     required int page,
     required int size,
     required bool onlyFavorites,
-  }) async {
-    final response = await _apiService.apiClient.invokeAPI(
-      '/memories',
-      'GET',
-      [
-        QueryParam('page', page.toString()),
-        QueryParam('size', size.toString()),
-        const QueryParam('isUpcoming', 'false'),
-        if (onlyFavorites) const QueryParam('isSaved', 'true'),
-      ],
-      null,
-      <String, String>{},
-      <String, String>{},
-      null,
-    );
-
-    if (response.statusCode >= 400) {
-      throw ApiException(response.statusCode, response.body);
-    }
-
-    final body = response.bodyBytes.isEmpty ? '' : utf8.decode(response.bodyBytes);
-    if (body.isEmpty) {
-      throw const NoResponseDtoError();
-    }
-
-    final decoded = await _apiService.apiClient.deserializeAsync(body, 'List<MemoryResponseDto>');
-    return (decoded as List).cast<MemoryResponseDto>();
-  }
+  }) => checkNull(
+    _apiService.memoriesApi.searchMemories(
+      page: page,
+      size: size,
+      isUpcoming: false,
+      isSaved: onlyFavorites ? true : null,
+    ),
+  );
 
   /// The local calendar day as `YYYY-MM-DD` — the same value web sends
   /// (`DateTime.now().toFormat('yyyy-MM-dd')`), so both clients ask for the same window.

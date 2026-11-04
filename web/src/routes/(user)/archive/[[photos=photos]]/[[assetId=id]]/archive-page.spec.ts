@@ -51,11 +51,6 @@ vi.mock('#lib/gallery/actions/ArchiveAction.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('#lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
-  return { default: MockComponent };
-});
-
 vi.mock('#lib/components/timeline/actions/DeleteAssetsAction.svelte', async () => {
   const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };

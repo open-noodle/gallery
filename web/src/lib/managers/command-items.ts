@@ -1,4 +1,5 @@
 import { ADMIN_VISIBLE_QUEUES } from '#lib/constants.ts';
+import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { isAlmostExactWordMatch } from '#lib/managers/cmdk-match.ts';
 import type { CommandContext } from '#lib/managers/command-context-manager.svelte.ts';
@@ -19,7 +20,6 @@ import {
 import AlbumEditModal from '#lib/modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '#lib/modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
-import SpaceAddMemberModal from '#lib/modals/SpaceAddMemberModal.svelte';
 import SpaceCreateModal from '#lib/modals/SpaceCreateModal.svelte';
 import SpaceMembersModal from '#lib/modals/SpaceMembersModal.svelte';
 import { Route } from '#lib/route.ts';
@@ -421,10 +421,10 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
       if (!ctx?.space) {
         return;
       }
-      return modalManager.show(SpaceAddMemberModal, {
-        spaceId: ctx.space.id,
-        existingMemberIds: ctx.space.members.map((m) => m.userId),
-      });
+      return showAddSpaceMembersModal(
+        ctx.space.id,
+        ctx.space.members.map((m) => m.userId),
+      );
     },
   },
   {

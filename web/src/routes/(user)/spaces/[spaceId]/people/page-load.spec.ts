@@ -1,5 +1,5 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import { SharedSpaceRole } from '@immich/sdk';
 import { load } from './+page';
 

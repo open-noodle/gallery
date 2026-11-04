@@ -111,7 +111,7 @@
 {#if assetMultiSelectManager.selectionActive}
   <AssetSelectControlBar>
     {const Actions = $derived(getAssetBulkActions($t))}
-    {const StackActions = $derived(getStackBulkActions($t))}
+    {const StackActions = $derived(filtered.browseOnly(getStackBulkActions($t)))}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
     <ActionButton action={Actions.CreateSharedLink} />
@@ -123,10 +123,8 @@
     {#if assetMultiSelectManager.isAllUserOwned}
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
-        {#if !filtered.showSearchResults}
-          <ActionMenuItem action={StackActions.Stack} />
-          <ActionMenuItem action={StackActions.Unstack} />
-        {/if}
+        <ActionMenuItem action={StackActions.Stack} />
+        <ActionMenuItem action={StackActions.Unstack} />
         {#if !filtered.showSearchResults && isLinkActionAvailable}
           <LinkLivePhotoAction
             menuItem
