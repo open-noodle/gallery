@@ -38,6 +38,7 @@ import {
   GalleryClipExtension,
   GalleryFaceSuggestionSchema,
   GalleryMemoriesSchema,
+  GalleryMetadataFacesExtension,
   GalleryPetDetectionSchema,
   GalleryPetRecognitionSchema,
   GalleryServerExtension,
@@ -46,6 +47,7 @@ import {
   galleryBackupDatabaseDefaults,
   galleryJobDefaults,
   galleryMachineLearningDefaults,
+  galleryMetadataFacesDefaults,
   galleryServerDefaults,
   galleryTopLevelDefaults,
 } from 'src/gallery/dtos/config.dto.js';
@@ -299,7 +301,7 @@ const AdminConfigSchemaWithVisibility = z
       .meta({ id: 'AdminConfigReverseGeocodingDto' }),
     metadata: z
       .object({
-        faces: z.object({ import: configBool.describe('Import') }).meta({ id: 'AdminConfigFacesDto' }),
+        faces: z.object({ import: configBool.describe('Import'), ...GalleryMetadataFacesExtension }).meta({ id: 'AdminConfigFacesDto' }),
       })
       .meta({ id: 'AdminConfigMetadataDto' }),
     oauth: z
@@ -697,6 +699,7 @@ export const defaults = Object.freeze<SystemConfig>({
   metadata: {
     faces: {
       import: false,
+      ...galleryMetadataFacesDefaults,
     },
   },
   oauth: {

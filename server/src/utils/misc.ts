@@ -134,6 +134,7 @@ export const isFaceSuggestionEnabled = (machineLearning: SystemConfig['machineLe
 export const isDuplicateDetectionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isSmartSearchEnabled(machineLearning) && machineLearning.duplicateDetection.enabled;
 export const isFaceImportEnabled = (metadata: SystemConfig['metadata']) => metadata.faces.import;
+export const isFaceExportEnabled = (metadata: SystemConfig['metadata']) => metadata.faces.export;
 
 export const handlePromiseError = <T>(promise: Promise<T>, logger: LoggingRepository): void => {
   promise.catch((error: Error | any) => logger.error(`Promise error: ${error}`, error?.stack));

@@ -28519,6 +28519,10 @@
       },
       "AdminConfigFacesDto": {
         "properties": {
+          "export": {
+            "description": "Export face regions to MWG-rs compliant XMP sidecars",
+            "type": "boolean"
+          },
           "import": {
             "description": "Import",
             "type": "boolean"
