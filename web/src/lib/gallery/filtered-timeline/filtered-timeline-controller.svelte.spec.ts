@@ -12,6 +12,7 @@ import type { TimelineManagerOptions } from '#lib/managers/timeline-manager/type
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
 import { factory } from '#test/unit/factories.ts';
 import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
+import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
 import { createAlbumTimeline } from './album-timeline';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
@@ -37,7 +38,7 @@ vi.mock('#lib/managers/command-context-manager.svelte.js', () => ({
   registerSelectionContext: registerSelectionContextMock,
 }));
 vi.mock('#lib/utils/filter-name-resolution.js', () => ({ resolveFilterNames: vi.fn(() => Promise.resolve()) }));
-vi.mock('#lib/managers/timeline-manager/timeline-anchor.js', () => ({
+vi.mock('#lib/gallery/timeline/timeline-anchor.js', () => ({
   getTimelineTopVisibleAnchor: topVisibleAnchorMock,
 }));
 
@@ -407,6 +408,24 @@ describe('FilteredTimelineController', () => {
       expect(sut.timelineReloadToken).toBe(1);
       sut.onSpaceAddAssets({});
       expect(sut.timelineReloadToken).toBe(1);
+    });
+
+    it('hides browse-only actions while search results show, keeping their own condition', () => {
+      const onAction = vi.fn();
+      const actions: Record<'Stack' | 'Unstack', ActionItem> = {
+        Stack: { title: 'stack', onAction },
+        Unstack: { title: 'unstack', onAction, $if: () => false },
+      };
+
+      navigate('/photos?q=cat');
+      const sut = createController();
+      const guarded = sut.browseOnly(actions);
+      expect(guarded.Stack.$if?.()).toBe(false);
+
+      navigate('/photos');
+      expect(guarded.Stack.$if?.()).toBe(true);
+      expect(guarded.Unstack.$if?.()).toBe(false);
+      expect(guarded.Stack.onAction).toBe(onAction);
     });
 
     it('registers no handlers while the route cannot act', () => {

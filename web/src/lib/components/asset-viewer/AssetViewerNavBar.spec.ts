@@ -1,4 +1,5 @@
 import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
+import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
 import { queryClient } from '#lib/queries/client.ts';
@@ -122,7 +123,7 @@ describe('AssetViewerNavBar component', () => {
       authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false } }));
       const asset = factory.asset({ id: 'space-photo', ownerId: 'space-owner', isTrashed: false });
 
-      renderWithTooltips(AssetViewerNavBar, { asset, space, ...additionalProps });
+      renderInViewerSpace(AssetViewerNavBar, { asset, ...additionalProps }, { space });
       await fireEvent.click(screen.getByLabelText('more'));
     };
 
@@ -166,11 +167,11 @@ describe('AssetViewerNavBar component', () => {
         canEdit,
       });
 
-      renderWithTooltips(AssetViewerNavBar, {
-        asset,
-        space: { id: 'space-1', canWrite: true },
-        ...additionalProps,
-      });
+      renderInViewerSpace(
+        AssetViewerNavBar,
+        { asset, ...additionalProps },
+        { space: { id: 'space-1', canWrite: true } },
+      );
       await fireEvent.click(screen.getByLabelText('more'));
     };
 
@@ -200,11 +201,11 @@ describe('AssetViewerNavBar component', () => {
         canEdit: true,
       });
 
-      renderWithTooltips(AssetViewerNavBar, {
-        asset,
-        space: { id: 'space-1', canWrite: true },
-        ...additionalProps,
-      });
+      renderInViewerSpace(
+        AssetViewerNavBar,
+        { asset, ...additionalProps },
+        { space: { id: 'space-1', canWrite: true } },
+      );
 
       await fireEvent.keyDown(document.body, { key: '5' });
 
@@ -226,11 +227,11 @@ describe('AssetViewerNavBar component', () => {
         canEdit: false,
       });
 
-      renderWithTooltips(AssetViewerNavBar, {
-        asset,
-        space: { id: 'space-1', canWrite: true },
-        ...additionalProps,
-      });
+      renderInViewerSpace(
+        AssetViewerNavBar,
+        { asset, ...additionalProps },
+        { space: { id: 'space-1', canWrite: true } },
+      );
 
       await fireEvent.keyDown(document.body, { key: '5' });
       // The handler is async (it awaits the formatter first), so let it settle before asserting

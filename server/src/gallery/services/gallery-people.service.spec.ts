@@ -69,8 +69,6 @@ describe(GalleryPeopleService.name, () => {
     faceIdentityMock.deletePendingSharedSpaceFaceMatchBackfillTargets.mockResolvedValue(void 0);
     faceIdentityMock.deleteUnreferencedIdentities ??= vi.fn();
     faceIdentityMock.deleteUnreferencedIdentities.mockResolvedValue(void 0);
-    (mocks.person as any).getPeopleOverviewStatistics ??= vi.fn();
-    (mocks.person as any).getPeopleFaceStatistics ??= vi.fn();
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
     (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
@@ -137,12 +135,12 @@ describe(GalleryPeopleService.name, () => {
     it('threads the user preference into the non-shared people-stats surfaces', async () => {
       const auth = AuthFactory.create();
       mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
-      (mocks.person as any).getPeopleOverviewStatistics.mockResolvedValue({
+      mocks.galleryPerson.getPeopleOverviewStatistics.mockResolvedValue({
         total: 0,
         hidden: 0,
         detectedFaceCount: 0,
       });
-      (mocks.person as any).getPeopleFaceStatistics.mockResolvedValue({
+      mocks.galleryPerson.getPeopleFaceStatistics.mockResolvedValue({
         detectedFaceCount: 0,
         assignedVisibleFaceCount: 0,
         namedVisiblePersonCount: 0,
@@ -153,10 +151,10 @@ describe(GalleryPeopleService.name, () => {
       await sut.getPeopleStatistics(auth, { page: 1, size: 50 } as any);
       await sut.getPeopleFaceStatistics(auth, { page: 1, size: 50 } as any);
 
-      expect((mocks.person as any).getPeopleOverviewStatistics).toHaveBeenCalledWith(auth.user.id, {
+      expect(mocks.galleryPerson.getPeopleOverviewStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 5,
       });
-      expect((mocks.person as any).getPeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
+      expect(mocks.galleryPerson.getPeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 5,
       });
     });
@@ -182,12 +180,12 @@ describe(GalleryPeopleService.name, () => {
       expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 3,
       });
-      expect((mocks.person as any).getPeopleOverviewStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleOverviewStatistics).not.toHaveBeenCalled();
     });
 
     it('uses personal-only scope when withSharedSpaces is omitted', async () => {
       const auth = AuthFactory.create();
-      (mocks.person as any).getPeopleOverviewStatistics.mockResolvedValue({
+      mocks.galleryPerson.getPeopleOverviewStatistics.mockResolvedValue({
         total: 2,
         hidden: 0,
         detectedFaceCount: 5,
@@ -199,7 +197,7 @@ describe(GalleryPeopleService.name, () => {
         detectedFaceCount: 5,
       });
 
-      expect((mocks.person as any).getPeopleOverviewStatistics).toHaveBeenCalledWith(auth.user.id, {
+      expect(mocks.galleryPerson.getPeopleOverviewStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 3,
       });
       expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).not.toHaveBeenCalled();
@@ -212,7 +210,7 @@ describe(GalleryPeopleService.name, () => {
         sut.getPeopleStatistics(auth, { closestPersonId: newUuid(), page: 1, size: 50 } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect((mocks.person as any).getPeopleOverviewStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleOverviewStatistics).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).not.toHaveBeenCalled();
     });
 
@@ -223,7 +221,7 @@ describe(GalleryPeopleService.name, () => {
         sut.getPeopleStatistics(auth, { closestAssetId: newUuid(), page: 1, size: 50 } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect((mocks.person as any).getPeopleOverviewStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleOverviewStatistics).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).not.toHaveBeenCalled();
     });
   });
@@ -252,12 +250,12 @@ describe(GalleryPeopleService.name, () => {
       expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 3,
       });
-      expect((mocks.person as any).getPeopleFaceStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleFaceStatistics).not.toHaveBeenCalled();
     });
 
     it('uses personal-only scope when withSharedSpaces is omitted', async () => {
       const auth = AuthFactory.create();
-      (mocks.person as any).getPeopleFaceStatistics.mockResolvedValue({
+      mocks.galleryPerson.getPeopleFaceStatistics.mockResolvedValue({
         detectedFaceCount: 5,
         assignedVisibleFaceCount: 4,
         namedVisiblePersonCount: 2,
@@ -273,7 +271,7 @@ describe(GalleryPeopleService.name, () => {
         unassignedFaceCount: 0,
       });
 
-      expect((mocks.person as any).getPeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
+      expect(mocks.galleryPerson.getPeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 3,
       });
       expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).not.toHaveBeenCalled();
@@ -286,7 +284,7 @@ describe(GalleryPeopleService.name, () => {
         sut.getPeopleFaceStatistics(auth, { closestPersonId: newUuid(), page: 1, size: 50 } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect((mocks.person as any).getPeopleFaceStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleFaceStatistics).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).not.toHaveBeenCalled();
     });
 
@@ -297,7 +295,7 @@ describe(GalleryPeopleService.name, () => {
         sut.getPeopleFaceStatistics(auth, { closestAssetId: newUuid(), page: 1, size: 50 } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect((mocks.person as any).getPeopleFaceStatistics).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getPeopleFaceStatistics).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).not.toHaveBeenCalled();
     });
   });
@@ -309,7 +307,7 @@ describe(GalleryPeopleService.name, () => {
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([face.assetId]));
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue({ ...person, faceAssetId: face.id });
 
@@ -317,7 +315,7 @@ describe(GalleryPeopleService.name, () => {
         expect.objectContaining({ id: person.personGroupId }),
       );
 
-      expect(mocks.person.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
+      expect(mocks.galleryPerson.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
         personId: person.personGroupId,
         assetFaceId: face.id,
       });
@@ -341,8 +339,8 @@ describe(GalleryPeopleService.name, () => {
       const person = PersonFactory.create();
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(
-        undefined as Awaited<ReturnType<typeof mocks.person.getRepresentativeFaceForUpdate>>,
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(
+        undefined as Awaited<ReturnType<typeof mocks.galleryPerson.getRepresentativeFaceForUpdate>>,
       );
 
       await expect(sut.updateRepresentativeFace(auth, person.personGroupId, { assetFaceId: 'face-1' })).rejects.toThrow(
@@ -360,7 +358,7 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
 
       await expect(sut.updateRepresentativeFace(auth, person.personGroupId, { assetFaceId: face.id })).rejects.toThrow(
         BadRequestException,
@@ -376,7 +374,7 @@ describe(GalleryPeopleService.name, () => {
       const person = PersonFactory.create({ faceAssetId: 'face-1' });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaces.mockResolvedValue([
+      mocks.galleryPerson.getRepresentativeFaces.mockResolvedValue([
         {
           ...AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId }),
           fileCreatedAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -401,7 +399,7 @@ describe(GalleryPeopleService.name, () => {
       const cleanup = vi.fn();
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([face.assetId]));
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
       mocks.asset.getForThumbnail.mockResolvedValue({ path: '/preview.jpg' } as any);
       vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup });
       mocks.media.decodeImage.mockResolvedValue({
@@ -414,7 +412,7 @@ describe(GalleryPeopleService.name, () => {
 
       const result = await sut.getFaceThumbnail(auth, 'person-1', 'face-1');
 
-      expect(mocks.person.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
+      expect(mocks.galleryPerson.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
         personId: 'person-1',
         assetFaceId: 'face-1',
       });
@@ -431,7 +429,7 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaces.mockResolvedValue([
+      mocks.galleryPerson.getRepresentativeFaces.mockResolvedValue([
         {
           ...AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId }),
           fileCreatedAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -458,11 +456,11 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaces.mockResolvedValue([]);
+      mocks.galleryPerson.getRepresentativeFaces.mockResolvedValue([]);
 
       await sut.getFacesForPicker(auth, person.personGroupId, { page: 1, size: 10 });
 
-      expect(mocks.person.getRepresentativeFaces).toHaveBeenCalledWith({
+      expect(mocks.galleryPerson.getRepresentativeFaces).toHaveBeenCalledWith({
         personId: person.personGroupId,
         take: 10,
         skip: 0,
@@ -475,11 +473,11 @@ describe(GalleryPeopleService.name, () => {
       const person = PersonFactory.create({ faceAssetId: 'face-1' });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaces.mockResolvedValue([]);
+      mocks.galleryPerson.getRepresentativeFaces.mockResolvedValue([]);
 
       await sut.getFacesForPicker(auth, person.personGroupId, { page: 1, size: 10 });
 
-      expect(mocks.person.getRepresentativeFaces).toHaveBeenCalledWith({
+      expect(mocks.galleryPerson.getRepresentativeFaces).toHaveBeenCalledWith({
         personId: person.personGroupId,
         take: 10,
         skip: 0,
@@ -498,7 +496,7 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.galleryPerson.checkSharedSpaceEditAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([face.assetId]));
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue({ ...person, faceAssetId: face.id });
 
@@ -529,7 +527,7 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set());
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
 
       await expect(sut.updateRepresentativeFace(auth, person.personGroupId, { assetFaceId: face.id })).rejects.toThrow(
         BadRequestException,
@@ -553,7 +551,7 @@ describe(GalleryPeopleService.name, () => {
       mocks.access.galleryPerson.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
       mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([face.assetId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(face);
 
       await expect(sut.updateRepresentativeFace(auth, person.personGroupId, { assetFaceId: face.id })).rejects.toThrow(
         ForbiddenException,

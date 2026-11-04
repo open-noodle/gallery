@@ -19,6 +19,7 @@ import {
   SourceType,
   StorageFolder,
 } from 'src/enum.js';
+import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { MetadataService, firstDateTime } from 'src/services/metadata.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -1575,13 +1576,13 @@ describe(MetadataService.name, () => {
         // Gallery: S3 stores extracted motion videos under a relative key
         motion: 'an extracted motion video on S3',
         getOriginalPath: (motion: ThumbnailPathEntity) =>
-          StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, motion.ownerId, `${motion.id}-MP.mp4`),
+          getRelativeNestedPath(StorageFolder.EncodedVideo, motion.ownerId, `${motion.id}-MP.mp4`),
         deleteOnDisk: true,
       },
       {
         motion: 'an uploaded motion video on S3',
         getOriginalPath: (motion: ThumbnailPathEntity) =>
-          StorageCore.getRelativeNestedPath(StorageFolder.Upload, motion.ownerId, `${motion.id}.mov`),
+          getRelativeNestedPath(StorageFolder.Upload, motion.ownerId, `${motion.id}.mov`),
         deleteOnDisk: false,
       },
       {

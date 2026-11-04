@@ -420,7 +420,6 @@ export enum SystemMetadataKey {
   MediaLocation = 'MediaLocation',
   ReverseGeocodingState = 'reverse-geocoding-state',
   FacialRecognitionState = 'facial-recognition-state',
-  PetRecognitionState = 'pet-recognition-state',
   MemoriesState = 'memories-state',
   AdminOnboarding = 'admin-onboarding',
   MaintenanceMode = 'maintenance-mode',
@@ -429,6 +428,7 @@ export enum SystemMetadataKey {
   VersionCheckState = 'version-check-state',
   License = 'license',
   IntegrityChecksumCheckpoint = 'integrity-checksum-checkpoint',
+  PetRecognitionState = 'pet-recognition-state',
   ClassificationConfigState = 'classification-config-state',
   SharedSpaceFaceJobCleanupState = 'shared-space-face-job-cleanup-state',
   FaceSuggestionDefaultOnState = 'face-suggestion-default-on-state',
@@ -729,10 +729,10 @@ export enum ImmichWorker {
 export enum ImmichTelemetry {
   Host = 'host',
   Api = 'api',
-  App = 'app',
   Io = 'io',
   Repo = 'repo',
   Job = 'job',
+  App = 'app',
 }
 
 export enum ExifOrientation {
@@ -1087,6 +1087,12 @@ export enum JobName {
   // Library Cleanup
   AssetAnalyzeQualityQueueAll = 'AssetAnalyzeQualityQueueAll',
   AssetAnalyzeQuality = 'AssetAnalyzeQuality',
+
+  // Rule memories, queued by MemoryGenerate
+  MemoryRuleGenerate = 'MemoryRuleGenerate',
+
+  // Video trim encode, poster and thumbnails (or their removal), queued by trim writes
+  AssetVideoTrimGenerate = 'AssetVideoTrimGenerate',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
@@ -1495,8 +1501,6 @@ export enum ApiTag {
   Assets = 'Assets',
   AssetFiles = 'Asset files',
   Backups = 'Backups',
-  Classification = 'Classification',
-  Cleanup = 'Cleanup',
   ConfigUser = 'Config (user)',
   ConfigAdmin = 'Config (admin)',
   ConfigPublic = 'Config (public)',
@@ -1523,9 +1527,7 @@ export enum ApiTag {
   Server = 'Server',
   Sessions = 'Sessions',
   SharedLinks = 'Shared links',
-  SharedSpaces = 'Shared Spaces',
   Stacks = 'Stacks',
-  StorageMigration = 'Storage Migration (admin)',
   Sync = 'Sync',
   SystemConfig = 'System config',
   SystemMetadata = 'System metadata',
@@ -1534,9 +1536,15 @@ export enum ApiTag {
   Trash = 'Trash',
   UsersAdmin = 'Users (admin)',
   Users = 'Users',
-  UserGroups = 'User Groups',
   Views = 'Views',
   Workflows = 'Workflows',
+
+  // Gallery fork tags
+  Classification = 'Classification',
+  Cleanup = 'Cleanup',
+  SharedSpaces = 'Shared Spaces',
+  StorageMigration = 'Storage Migration (admin)',
+  UserGroups = 'User Groups',
 }
 
 export const WorkflowTriggerSchema = z

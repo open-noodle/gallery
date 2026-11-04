@@ -6,6 +6,7 @@ import {
   selectNextBatch,
   validatePersistedBatchPlan,
 } from './batch';
+import { isForkDeletedPath } from './fork-deletions';
 import {
   cherryEquivalent,
   currentBranch,
@@ -400,7 +401,11 @@ export function runRollingSyncForkMainCommand(
     let appliedCommitCount = 0;
     try {
       for (const commit of pendingCommits) {
-        runGit(options.repoPath, ['cherry-pick', '--ff', commit]);
+        try {
+          runGit(options.repoPath, ['cherry-pick', '--ff', commit]);
+        } catch (error) {
+          if (!keepForkDeletions(options.repoPath, write)) throw error;
+        }
         appliedCommitCount += 1;
       }
     } catch (error) {
@@ -746,6 +751,41 @@ function assertStringArray(value: unknown, source: string, key: string): void {
       `Invalid rolling state ${source}: ${key} must be an array of strings`,
     );
   }
+}
+
+// A stopped cherry-pick whose only conflicts are modify/delete on paths the fork deleted on purpose
+// (FORK_DELETED_PATHS) has one right answer: keep the deletion. Anything else stays a stop.
+function keepForkDeletions(
+  repoPath: string,
+  write: (message: string) => void,
+): boolean {
+  const unmerged = runGit(repoPath, [
+    'status',
+    '--porcelain=v1',
+    '-z',
+    '--untracked-files=no',
+  ])
+    .split('\0')
+    .filter((entry) => /^(DD|AU|UD|UA|DU|AA|UU) /.test(entry))
+    .map((entry) => ({ code: entry.slice(0, 2), file: entry.slice(3) }));
+  if (
+    unmerged.length === 0 ||
+    !unmerged.every(
+      // UD only: the fork commit deletes. DU (the rolling branch deleted, the fork commit edits) stays a stop.
+      ({ code, file }) => code === 'UD' && isForkDeletedPath(file),
+    )
+  ) {
+    return false;
+  }
+  const files = unmerged.map(({ file }) => file);
+  runGit(repoPath, ['rm', '--quiet', '--', ...files]);
+  runGit(repoPath, ['commit', '--no-edit', '--no-verify']);
+  for (const file of files) {
+    write(
+      `Kept the fork deletion of ${file} (modify/delete, FORK_DELETED_PATHS)`,
+    );
+  }
+  return true;
 }
 
 function shortSha(sha: string): string {
