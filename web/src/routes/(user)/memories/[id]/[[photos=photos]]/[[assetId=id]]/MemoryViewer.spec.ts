@@ -1,12 +1,12 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { memoryManager } from '#lib/managers/memory-manager.svelte.ts';
+import { factory } from '#test/unit/factories.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import MemoryViewer from './MemoryViewer.svelte';
 
 // Ported from the fork's #790/#791 regression suite (deleted with the fork's own memory viewer,
@@ -51,82 +51,82 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 // off `page.params.id` / `page.url.searchParams`, so a non-reactive plain object would not
 // re-trigger that derivation when a test reassigns `mockPage.params`/`mockPage.url`.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 
 vi.mock('#lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/context-menu/MenuOption.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/gallery-viewer-props.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/gallery-viewer-props.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/gallery/actions/ArchiveAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/ChangeDateAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/ChangeDescriptionAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/ChangeLocationAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/CreateSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DeleteAssetsAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/FavoriteAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/TagAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('./MemoryPhotoViewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('./MemoryVideoViewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -160,7 +160,7 @@ function memory(id: string, assetIds: string[]): MemoryResponseDto {
   return {
     id,
     assets: assetIds.map((assetId) =>
-      assetFactory.build({
+      factory.asset({
         id: assetId,
         type: AssetTypeEnum.Image,
         localDateTime: '2015-08-03T00:00:00.000Z',
@@ -193,7 +193,7 @@ function multiYearMemory(id: string, assets: { id: string; localDateTime: string
       assets.map(({ id }) => id),
     ),
     assets: assets.map(({ id, localDateTime }) =>
-      assetFactory.build({ id, type: AssetTypeEnum.Image, localDateTime, fileCreatedAt: localDateTime }),
+      factory.asset({ id, type: AssetTypeEnum.Image, localDateTime, fileCreatedAt: localDateTime }),
     ),
     type: MemoryType.Rule,
     data: { ruleId: 'on_this_day_place', title: 'On this day in Berlin', context: { years: [2021, 2025] } },

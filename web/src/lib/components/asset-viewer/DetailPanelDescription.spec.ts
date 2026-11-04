@@ -1,11 +1,11 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelDescription from './DetailPanelDescription.svelte';
 
 // Slice 7 Task 5 — R6: for the owner the description IS a focusable <Textarea> (clicking it places
@@ -16,7 +16,7 @@ const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn().mockResolvedValue(und
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -30,11 +30,11 @@ describe('DetailPanelDescription', () => {
   it('clears unsaved draft on asset change', async () => {
     const user = userEvent.setup();
 
-    const assetA = assetFactory.build({
+    const assetA = factory.asset({
       id: 'asset-a',
       exifInfo: { description: '' },
     });
-    const assetB = assetFactory.build({
+    const assetB = factory.asset({
       id: 'asset-b',
       exifInfo: { description: '' },
     });
@@ -59,11 +59,11 @@ describe('DetailPanelDescription', () => {
   });
 
   it('updates description on asset switch', async () => {
-    const assetA = assetFactory.build({
+    const assetA = factory.asset({
       id: 'asset-a',
       exifInfo: { description: 'first description' },
     });
-    const assetB = assetFactory.build({
+    const assetB = factory.asset({
       id: 'asset-b',
       exifInfo: { description: 'second description' },
     });
@@ -96,7 +96,7 @@ describe('DetailPanelDescription filter (R6)', () => {
 
   it.each(surfaces)('the ⚗️ icon emits { description } and filters $label', async ({ url, basePath }) => {
     mockPage.reset(url);
-    const asset = assetFactory.build({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
+    const asset = factory.asset({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
 
     renderWithTooltips(DetailPanelDescription, { asset, isOwner: true, canFilter: true });
 
@@ -110,7 +110,7 @@ describe('DetailPanelDescription filter (R6)', () => {
   });
 
   it('offers the ⚗️ to a non-owner too, beside the read-only text', async () => {
-    const asset = assetFactory.build({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
+    const asset = factory.asset({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
 
     renderWithTooltips(DetailPanelDescription, { asset, isOwner: false, canFilter: true });
 
@@ -123,7 +123,7 @@ describe('DetailPanelDescription filter (R6)', () => {
   // R9 — an empty/whitespace-only description trims to nothing: the click would close the viewer and
   // apply no filter at all.
   it.each(['', ' '.repeat(3)])('R9: renders no ⚗️ for an empty description (%j)', async (description) => {
-    const asset = assetFactory.build({ id: 'asset-1', exifInfo: { description } });
+    const asset = factory.asset({ id: 'asset-1', exifInfo: { description } });
 
     renderWithTooltips(DetailPanelDescription, { asset, isOwner: true, canFilter: true });
 
@@ -135,7 +135,7 @@ describe('DetailPanelDescription filter (R6)', () => {
   // must NOT re-implement a truncation of its own, and the long description must still be clickable.
   it('does not truncate: the codec clamps the emitted param to 200 code points', async () => {
     const description = 'a'.repeat(250);
-    const asset = assetFactory.build({ id: 'asset-1', exifInfo: { description } });
+    const asset = factory.asset({ id: 'asset-1', exifInfo: { description } });
 
     renderWithTooltips(DetailPanelDescription, { asset, isOwner: true, canFilter: true });
 
@@ -146,7 +146,7 @@ describe('DetailPanelDescription filter (R6)', () => {
   });
 
   it('E2: with canFilter false no ⚗️ renders', async () => {
-    const asset = assetFactory.build({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
+    const asset = factory.asset({ id: 'asset-1', exifInfo: { description: 'Beach day' } });
 
     renderWithTooltips(DetailPanelDescription, { asset, isOwner: true, canFilter: false });
 

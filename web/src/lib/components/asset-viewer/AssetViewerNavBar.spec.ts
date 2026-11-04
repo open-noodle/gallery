@@ -3,15 +3,13 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
 import { queryClient } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { UserConfigDto } from '@immich/sdk';
 import { AssetTypeEnum } from '@immich/sdk';
 import { commandPaletteManager, modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, screen } from '@testing-library/svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import AssetViewerNavBar from './AssetViewerNavBar.svelte';
 
 vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), function () {
@@ -65,28 +63,28 @@ describe('AssetViewerNavBar component', () => {
   });
 
   it('shows back button', () => {
-    const preferences = preferencesFactory.build({ cast: { gCastEnabled: false } });
+    const preferences = factory.preferences({ cast: { gCastEnabled: false } });
     authManager.setPreferences(preferences);
 
-    const asset = assetFactory.build({ isTrashed: false });
+    const asset = factory.asset({ isTrashed: false });
     const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
     expect(getByLabelText('go_back')).toBeInTheDocument();
   });
 
   it('shows edited badge when asset is edited', () => {
-    const prefs = preferencesFactory.build({ cast: { gCastEnabled: false } });
+    const prefs = factory.preferences({ cast: { gCastEnabled: false } });
     authManager.setPreferences(prefs);
 
-    const asset = assetFactory.build({ isEdited: true, isTrashed: false });
+    const asset = factory.asset({ isEdited: true, isTrashed: false });
     const { getByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
     expect(getByText('edited')).toBeInTheDocument();
   });
 
   it('does not show edited badge when asset is not edited', () => {
-    const prefs = preferencesFactory.build({ cast: { gCastEnabled: false } });
+    const prefs = factory.preferences({ cast: { gCastEnabled: false } });
     authManager.setPreferences(prefs);
 
-    const asset = assetFactory.build({ isEdited: false, isTrashed: false });
+    const asset = factory.asset({ isEdited: false, isTrashed: false });
     const { queryByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
     expect(queryByText('edited')).not.toBeInTheDocument();
   });
@@ -94,8 +92,8 @@ describe('AssetViewerNavBar component', () => {
   describe('if the current user owns the asset', () => {
     it('shows delete button', () => {
       const ownerId = 'id-of-the-user';
-      const user = userAdminFactory.build({ id: ownerId });
-      const asset = assetFactory.build({ ownerId, isTrashed: false });
+      const user = factory.user({ id: ownerId });
+      const asset = factory.asset({ ownerId, isTrashed: false });
       authManager.setUser(user);
       queryClient.setQueryData(getUserConfigQuery().queryKey, {
         machineLearning: {
@@ -108,7 +106,7 @@ describe('AssetViewerNavBar component', () => {
         trash: { enabled: true, days: 30 },
       } as UserConfigDto);
 
-      const preferences = preferencesFactory.build({ cast: { gCastEnabled: false } });
+      const preferences = factory.preferences({ cast: { gCastEnabled: false } });
       authManager.setPreferences(preferences);
 
       const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
@@ -120,9 +118,9 @@ describe('AssetViewerNavBar component', () => {
   // list every personal album — all of which the server must reject.
   describe('add to album on a shared-space photo the user does not own', () => {
     const renderSpaceViewer = async (space: { id: string; canWrite: boolean }) => {
-      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
-      authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
-      const asset = assetFactory.build({ id: 'space-photo', ownerId: 'space-owner', isTrashed: false });
+      authManager.setUser(factory.user({ id: 'space-member' }));
+      authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false } }));
+      const asset = factory.asset({ id: 'space-photo', ownerId: 'space-owner', isTrashed: false });
 
       renderWithTooltips(AssetViewerNavBar, { asset, space, ...additionalProps });
       await fireEvent.click(screen.getByLabelText('more'));
@@ -150,9 +148,9 @@ describe('AssetViewerNavBar component', () => {
   // actions.
   describe('space editor on a member photo (#734)', () => {
     const renderEditableSpacePhoto = async (canEdit: boolean) => {
-      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
-      authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
-      const asset = assetFactory.build({
+      authManager.setUser(factory.user({ id: 'space-member' }));
+      authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false } }));
+      const asset = factory.asset({
         id: 'space-photo',
         ownerId: 'space-owner',
         isTrashed: false,
@@ -192,11 +190,9 @@ describe('AssetViewerNavBar component', () => {
     it('W-rating-1: wires the rating shortcut when canEdit is true', async () => {
       commandPaletteManager.enable();
       updateAssetMock.mockClear();
-      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
-      authManager.setPreferences(
-        preferencesFactory.build({ cast: { gCastEnabled: false }, ratings: { enabled: true } }),
-      );
-      const asset = assetFactory.build({
+      authManager.setUser(factory.user({ id: 'space-member' }));
+      authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false }, ratings: { enabled: true } }));
+      const asset = factory.asset({
         id: 'space-photo',
         ownerId: 'space-owner',
         isTrashed: false,
@@ -220,11 +216,9 @@ describe('AssetViewerNavBar component', () => {
     it('W-rating-2: does not wire the rating shortcut when canEdit is false', async () => {
       commandPaletteManager.enable();
       updateAssetMock.mockClear();
-      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
-      authManager.setPreferences(
-        preferencesFactory.build({ cast: { gCastEnabled: false }, ratings: { enabled: true } }),
-      );
-      const asset = assetFactory.build({
+      authManager.setUser(factory.user({ id: 'space-member' }));
+      authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false }, ratings: { enabled: true } }));
+      const asset = factory.asset({
         id: 'space-photo',
         ownerId: 'space-owner',
         isTrashed: false,

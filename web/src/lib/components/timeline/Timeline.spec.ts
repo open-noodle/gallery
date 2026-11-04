@@ -60,22 +60,22 @@ vi.mock('$app/state', () => ({
 }));
 
 vi.mock('#lib/components/timeline/actions/TimelineKeyboardActions.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/Scrubber.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/elements/HotModuleReload.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/elements/Portal.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 

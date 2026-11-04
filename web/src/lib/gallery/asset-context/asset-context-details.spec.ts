@@ -1,10 +1,10 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import SuggestionAssetDetails from '#lib/gallery/asset-context/asset-context-details.svelte';
+import { factory } from '#test/unit/factories.ts';
 import type { AlbumResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -21,7 +21,7 @@ const person = (name: string): PersonResponseDto =>
   ({ id: `person-${name || 'unnamed'}`, name, updatedAt: '2026-01-01T00:00:00.000Z' }) as PersonResponseDto;
 
 const loadedAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto =>
-  assetFactory.build({
+  factory.asset({
     id: ASSET_ID,
     originalFileName: 'IMG_2841.jpg',
     localDateTime: '2015-08-12T14:32:00.000Z',

@@ -1,4 +1,4 @@
-import { defaultPublicConfig, defaultUserConfig } from '#test-data/gallery-config-defaults';
+import { defaultPublicConfig, defaultUserConfig } from '#test/unit/gallery-config-defaults.ts';
 
 /**
 Gallery test setup (loaded after upstream's setup.ts). Upstream moved the user and public config

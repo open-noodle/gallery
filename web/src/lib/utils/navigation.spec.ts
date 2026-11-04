@@ -1,6 +1,6 @@
 import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import { getAssetInfoFromParam, navigate } from './navigation';
 
 const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn().mockResolvedValue(undefined) }));
@@ -13,7 +13,7 @@ vi.mock('$app/navigation', () => ({
 // which nothing here imports) — see reactive-page.mock.svelte.ts's own docs for why this needs to
 // be a real $state object rather than a plain literal.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 

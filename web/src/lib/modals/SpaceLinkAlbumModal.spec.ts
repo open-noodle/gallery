@@ -3,11 +3,10 @@ import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observe
 import '#lib/__mocks__/sdk.mock.ts';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import { factory } from '#test/unit/factories.ts';
 import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { albumFactory } from '#test-data/factories/album-factory';
-import { userFactory } from '#test-data/factories/user-factory';
 import SpaceLinkAlbumModal from './SpaceLinkAlbumModal.svelte';
 
 const { mockUser } = vi.hoisted(() => ({
@@ -31,8 +30,8 @@ const makeAlbum = (
   // eslint-disable-next-line unicorn/no-unnecessary-parameters
   userId = 'u-me',
 ): AlbumResponseDto =>
-  albumFactory.build({
-    albumUsers: [{ user: userFactory.build({ id: userId }), role }],
+  factory.album({
+    albumUsers: [{ user: factory.userSummary({ id: userId }), role }],
     ...overrides,
   });
 

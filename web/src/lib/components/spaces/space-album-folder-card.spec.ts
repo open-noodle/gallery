@@ -5,7 +5,7 @@ import {
   setActiveDragPayload,
   writeDragPayload,
 } from '#lib/utils/space-album-folder-dnd.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, screen } from '@testing-library/svelte';
 

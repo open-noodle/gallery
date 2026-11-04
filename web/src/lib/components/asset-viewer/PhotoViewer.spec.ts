@@ -1,9 +1,9 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import PhotoViewer from './PhotoViewer.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -43,22 +43,22 @@ vi.mock('#lib/stores/ocr.svelte.js', () => ({
 vi.mock('#lib/actions/zoom-image.js', () => ({ zoomImageAction: () => ({}) }));
 
 vi.mock('#lib/components/AssetViewerEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/AdaptiveImage.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/face-editor.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/space-face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/space-face-editor.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -70,7 +70,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders SpaceFaceEditor and NOT FaceEditor for a non-owner space editor', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
+    const asset = factory.asset({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
 
     renderWithTooltips(PhotoViewer, {
       cursor: { current: asset },
@@ -86,7 +86,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders FaceEditor and NOT SpaceFaceEditor for the asset owner, even inside a space', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image });
+    const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image });
 
     renderWithTooltips(PhotoViewer, {
       cursor: { current: asset },
@@ -101,7 +101,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders the owner FaceEditor (never both) when canEditSpacePeople is true but no space id is available', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
+    const asset = factory.asset({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
 
     renderWithTooltips(PhotoViewer, {
       cursor: { current: asset },

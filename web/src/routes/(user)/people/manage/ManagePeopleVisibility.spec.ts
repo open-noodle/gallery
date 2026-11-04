@@ -1,9 +1,9 @@
 import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { factory } from '#test/unit/factories.ts';
 import type { PersonResponseDto } from '@immich/sdk';
+import '@testing-library/jest-dom';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'svelte';
 import { vi } from 'vitest';
@@ -91,9 +91,9 @@ describe('People manage page', () => {
 
   it('saves global visibility through updatePeople and maps updated hidden state back to global people', async () => {
     const people = [
-      personFactory.build({ id: 'a', name: 'Alice', isHidden: false }),
-      personFactory.build({ id: 'b', name: 'Bob', isHidden: true }),
-      personFactory.build({ id: 'c', name: 'Charlie', isHidden: false }),
+      factory.person({ id: 'a', name: 'Alice', isHidden: false }),
+      factory.person({ id: 'b', name: 'Bob', isHidden: true }),
+      factory.person({ id: 'c', name: 'Charlie', isHidden: false }),
     ];
     sdkMock.updatePeople.mockResolvedValueOnce([
       { id: 'a', success: true },

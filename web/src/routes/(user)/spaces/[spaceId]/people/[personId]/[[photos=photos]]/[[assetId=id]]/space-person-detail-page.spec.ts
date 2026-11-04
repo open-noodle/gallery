@@ -1,6 +1,7 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -16,8 +17,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import { load } from './+page';
 import SpacePersonDetailPage from './+page.svelte';
 
@@ -83,7 +82,7 @@ vi.mock('svelte-i18n', () => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
   return {
     ...original,
     ContextMenuButton: MockContextMenuButton,
@@ -98,17 +97,17 @@ vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
 });
 
 vi.mock('#lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/people/people-merge-selector.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/space-people-merge-selector.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/space-people-merge-selector.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/modals/RepresentativeFacePickerModal.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -180,9 +179,9 @@ function renderPage({
   action?: string | null;
   previousRoute?: string | null;
 } = {}) {
-  const currentUser = userAdminFactory.build({ id: 'current-user-id' });
+  const currentUser = factory.user({ id: 'current-user-id' });
   authManager.setUser(currentUser);
-  authManager.setPreferences(preferencesFactory.build());
+  authManager.setPreferences(factory.preferences());
 
   const props = {
     data: {

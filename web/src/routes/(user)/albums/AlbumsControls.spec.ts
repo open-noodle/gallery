@@ -1,4 +1,4 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import AlbumsControls from './AlbumsControls.svelte';

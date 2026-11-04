@@ -2,8 +2,8 @@ import { ImageAdjustManager, withImageAdjust } from '#lib/gallery/edit/image-adj
 import { imageAdjustFilter } from '#lib/gallery/edit/image-adjust.ts';
 import type { EditToolManager } from '#lib/managers/edit/edit-manager.svelte.ts';
 import { waitForWebsocketEvent } from '#lib/stores/websocket.ts';
+import { factory } from '#test/unit/factories.ts';
 import { editAsset, getAssetAdjust, removeAssetAdjust, removeAssetEdits, updateAssetAdjust } from '@immich/sdk';
-import { assetFactory } from '#test-data/factories/asset-factory';
 
 vi.mock('@immich/sdk');
 vi.mock('#lib/stores/websocket.js', () => ({ waitForWebsocketEvent: vi.fn() }));
@@ -120,7 +120,7 @@ describe(ImageAdjustManager.name, () => {
 
 describe('withImageAdjust', () => {
   let adjust: ImageAdjustManager;
-  const asset = assetFactory.build();
+  const asset = factory.asset();
 
   beforeEach(() => {
     vi.resetAllMocks();

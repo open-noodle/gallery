@@ -9,12 +9,10 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import type { TimelineManagerOptions } from '#lib/managers/timeline-manager/types.ts';
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
+import { factory } from '#test/unit/factories.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import { flushSync } from 'svelte';
-import { assetFactory, timelineAssetFactory } from '#test-data/factories/asset-factory';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import { createAlbumTimeline } from './album-timeline';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
 import { createPhotosTimeline } from './photos-timeline';
@@ -29,7 +27,7 @@ const { gotoMock, registerSelectionContextMock, topVisibleAnchorMock } = vi.hois
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
@@ -136,8 +134,8 @@ describe('FilteredTimelineController', () => {
         Promise.resolve({ ...emptySuggestions(), people: [{ id: 'p9', name: 'Bob' }], tags: [] }),
       ),
     };
-    authManager.setUser(userAdminFactory.build({ id: 'me' }));
-    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(factory.user({ id: 'me' }));
+    authManager.setPreferences(factory.preferences());
     mockPage.reset('https://gallery.test/photos');
   });
 
@@ -210,7 +208,7 @@ describe('FilteredTimelineController', () => {
       expect(sut.smartFacets?.total).toBe(3);
       const fetch = pendingFacets();
       void sut.loadSmartFacets({ ...sut.filters, isFavorite: true });
-      sut.searchResults = [assetFactory.build()];
+      sut.searchResults = [factory.asset()];
 
       navigate('/photos?q=dog');
       expect(fetch.signal()?.aborted).toBe(true);
@@ -228,7 +226,7 @@ describe('FilteredTimelineController', () => {
     it('clears the results in filter-state mode', () => {
       navigate('/albums/a1?q=cat');
       const sut = createController({ urlMode: 'filter-state', hydrate: () => createFilterState() });
-      sut.searchResults = [assetFactory.build()];
+      sut.searchResults = [factory.asset()];
       navigate('/albums/a1?q=dog');
       expect(sut.searchResults).toEqual([]);
     });
@@ -331,7 +329,7 @@ describe('FilteredTimelineController', () => {
       expect(noZoom.grouping).toBe('day');
 
       const sut = createController();
-      assetMultiSelectManager.selectAsset(timelineAssetFactory.build());
+      assetMultiSelectManager.selectAsset(factory.timelineAsset());
       sut.onTimelineBucketActivate(bucket);
       expect(sut.grouping).toBe('day');
 
@@ -390,7 +388,7 @@ describe('FilteredTimelineController', () => {
     it('act on the search results in query mode and the timeline in browse mode', () => {
       navigate('/photos?q=cat');
       const sut = createController();
-      const asset = assetFactory.build({ isFavorite: false });
+      const asset = factory.asset({ isFavorite: false });
       sut.searchResults = [asset];
       sut.onFavorite([asset.id], true);
       expect(sut.searchResults[0].isFavorite).toBe(true);

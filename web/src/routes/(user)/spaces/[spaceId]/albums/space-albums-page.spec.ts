@@ -5,6 +5,7 @@ import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import SpaceLinkAlbumModal from '#lib/modals/SpaceLinkAlbumModal.svelte';
 import { spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import { setActiveDragPayload, writeDragPayload, type DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   SharedSpaceRole,
   type AlbumResponseDto,
@@ -18,8 +19,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { goto, invalidateAll } from '$app/navigation';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
 
 // A mutable holder so individual tests can point `page.url` at a `?folder=` query string before
@@ -40,7 +39,7 @@ const { modalManagerMock } = vi.hoisted(() => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test-data/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
   return {
     ...original,
     ContextMenuButton: MockContextMenuButton,
@@ -250,8 +249,8 @@ describe('Space albums page', () => {
     vi.resetAllMocks();
     localStorage.clear();
     spaceAlbumViewSettings.reset();
-    authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(factory.user({ id: 'current-user-id' }));
+    authManager.setPreferences(factory.preferences());
     sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
     sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue([]);
     // pageMock is a plain object, not a vi.fn — vi.resetAllMocks() above doesn't touch it, and web

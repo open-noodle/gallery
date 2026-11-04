@@ -1,10 +1,9 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { factory } from '#test/unit/factories.ts';
 import { SharedLinkType, type SharedLinkResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { sharedLinkFactory } from '#test-data/factories/shared-link-factory';
 import IndividualSharedViewer from './IndividualSharedViewer.svelte';
 
 const { mockAssetMultiSelectManager, mockAuthManager, mockGetAssetInfo } = vi.hoisted(() => ({
@@ -27,37 +26,37 @@ vi.mock('$app/navigation', () => ({
 }));
 
 vi.mock('#lib/components/asset-viewer/asset-viewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/Logo.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/control-app-bar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/gallery-viewer-props.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/gallery-viewer-props.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/RemoveFromSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -96,7 +95,7 @@ vi.mock('@immich/sdk', async () => {
 
 function renderViewer(sharedLinkOverrides: Partial<SharedLinkResponseDto>) {
   const props = {
-    sharedLink: sharedLinkFactory.build({
+    sharedLink: factory.sharedLink({
       type: SharedLinkType.Individual,
       allowUpload: false,
       allowDownload: false,
@@ -117,12 +116,12 @@ describe('IndividualSharedViewer GalleryViewer grouping', () => {
     vi.clearAllMocks();
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
-    mockGetAssetInfo.mockResolvedValue(assetFactory.build({ id: 'single-asset' }));
+    mockGetAssetInfo.mockResolvedValue(factory.asset({ id: 'single-asset' }));
   });
 
   it('enables GalleryViewer grouping for multi-asset shared views', () => {
     renderViewer({
-      assets: [assetFactory.build({ id: 'shared-1' }), assetFactory.build({ id: 'shared-2' })],
+      assets: [factory.asset({ id: 'shared-1' }), factory.asset({ id: 'shared-2' })],
       allowDownload: true,
     });
 
@@ -130,7 +129,7 @@ describe('IndividualSharedViewer GalleryViewer grouping', () => {
   });
 
   it('keeps the existing single-asset shared-link viewer path out of GalleryViewer grouping', async () => {
-    renderViewer({ assets: [assetFactory.build({ id: 'single-asset' })], allowUpload: false });
+    renderViewer({ assets: [factory.asset({ id: 'single-asset' })], allowUpload: false });
 
     await waitFor(() => expect(mockGetAssetInfo).toHaveBeenCalledWith({ id: 'single-asset' }));
     expect(screen.queryByTestId('gallery-viewer')).not.toBeInTheDocument();

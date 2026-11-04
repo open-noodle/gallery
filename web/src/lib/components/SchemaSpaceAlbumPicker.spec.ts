@@ -1,6 +1,6 @@
 import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
 import SchemaSpaceAlbumPickerWrapper from '#lib/components/SchemaSpaceAlbumPicker.test-wrapper.svelte';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { getSharedSpaceAlbums } from '@immich/sdk';
 import { fireEvent, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';

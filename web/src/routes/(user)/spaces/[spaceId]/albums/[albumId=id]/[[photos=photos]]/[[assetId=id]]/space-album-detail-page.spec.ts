@@ -3,6 +3,8 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { getAlbumAssetsActions } from '#lib/services/album.service.ts';
+import { factory } from '#test/unit/factories.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   AlbumUserRole,
   AssetOrder,
@@ -19,9 +21,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { goto } from '$app/navigation';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import SpaceAlbumDetailPage from './+page.svelte';
 import { mockTimelineState, resetMockTimelineState, setMockTimelineEmpty } from './mock-timeline-state';
 
@@ -72,12 +71,12 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNav
 // its re-hydrate $effect only re-runs when `page.url` is a real signal. A plain object would let a
 // broken re-hydrate pass. See reactive-page.mock.svelte.ts.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
 vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/smart-search-results.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -256,8 +255,8 @@ function renderPage({
   space?: SharedSpaceResponseDto;
   folderId?: string | null;
 } = {}) {
-  authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-  authManager.setPreferences(preferencesFactory.build());
+  authManager.setUser(factory.user({ id: 'current-user-id' }));
+  authManager.setPreferences(factory.preferences());
 
   // Slice 6: the browse selection bar now renders the full <SelectionToolbar>, which (like the
   // regular album page and the direct-space/space-person timelines) renders real @immich/ui

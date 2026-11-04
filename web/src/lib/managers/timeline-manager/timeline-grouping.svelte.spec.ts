@@ -1,8 +1,9 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { fromISODateTimeUTCToObject } from '#lib/utils/timeline-util.ts';
+import { factory } from '#test/unit/factories.ts';
+import { toResponseDto } from '#test/unit/gallery-time-bucket.ts';
 import { AssetOrder, TimeBucketSize } from '@immich/sdk';
 import { tick } from 'svelte';
-import { timelineAssetFactory, toResponseDto } from '#test-data/factories/asset-factory';
 import { mergeTimeBuckets } from './internal/album-picker-support';
 import { toTimeBucketRequest, toTimeBucketsRequest } from './internal/request-options';
 import {
@@ -18,7 +19,7 @@ import { TimelineManager } from './timeline-manager.svelte';
 function buildTimelineAssetAt(id: string, isoDate: string) {
   const date = fromISODateTimeUTCToObject(isoDate);
   return {
-    ...timelineAssetFactory.build({ id, fileCreatedAt: date }),
+    ...factory.timelineAsset({ id, fileCreatedAt: date }),
     localDateTime: date,
   };
 }

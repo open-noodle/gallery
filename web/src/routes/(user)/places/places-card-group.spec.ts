@@ -1,13 +1,13 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { factory } from '#test/unit/factories.ts';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import PlacesCardGroup from './PlacesCardGroup.svelte';
 
 // eslint-disable-next-line unicorn/no-unnecessary-parameters
 function renderGroup(city: string, country?: string | null) {
-  const props = { places: [assetFactory.build({ id: 'asset-1', exifInfo: { city, country } })] };
+  const props = { places: [factory.asset({ id: 'asset-1', exifInfo: { city, country } })] };
 
   return render(TestWrapper as Component<{ component: typeof PlacesCardGroup; componentProps: typeof props }>, {
     component: PlacesCardGroup,

@@ -3,13 +3,13 @@
 import '#lib/__mocks__/sdk.mock.ts';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import AlbumSharedSpaceLinks from '#lib/components/album-page/AlbumSharedSpaceLinks.svelte';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { albumFactory } from '#test-data/factories/album-factory';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
@@ -33,7 +33,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   it('renders one row per space link with the space name', () => {
     renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [
           { spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true },
@@ -52,7 +52,7 @@ describe('AlbumSharedSpaceLinks', () => {
   // now reserved for the caller's own per-member "my timeline" preference (#1041 §2).
   it('shows the "hidden from the space\'s photos" indicator only for links with showInTimeline=false', () => {
     renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [
           { spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true },
@@ -66,7 +66,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   it('calls unlinkAlbum with the space id + album id after confirming', async () => {
     renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [{ spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true }],
       }),
@@ -84,7 +84,7 @@ describe('AlbumSharedSpaceLinks', () => {
   it('does NOT call unlinkAlbum when the confirmation is declined', async () => {
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
     renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [{ spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true }],
       }),
@@ -98,7 +98,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   it('renders nothing when there are no links', () => {
     const { container } = renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({ id: 'album-1', sharedSpaceLinks: undefined }),
+      album: factory.album({ id: 'album-1', sharedSpaceLinks: undefined }),
     });
 
     expect(container.querySelector('[data-testid="album-space-links"]')).toBeNull();
@@ -106,7 +106,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   it("does NOT render the previous album's links after navigating to a different album (L9)", async () => {
     const { rerender } = renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [{ spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true }],
       }),
@@ -119,7 +119,7 @@ describe('AlbumSharedSpaceLinks', () => {
     await rerender({
       component: AlbumSharedSpaceLinks,
       componentProps: {
-        album: albumFactory.build({
+        album: factory.album({
           id: 'album-2',
           sharedSpaceLinks: [{ spaceId: 'space-2', spaceName: 'Zoo', linkedById: 'e2', showInTimeline: true }],
         }),
@@ -132,7 +132,7 @@ describe('AlbumSharedSpaceLinks', () => {
 
   it('unlinking on one album does not affect a same-spaceId link rendered after navigating to another album (L9)', async () => {
     const { rerender } = renderWithTooltips(AlbumSharedSpaceLinks, {
-      album: albumFactory.build({
+      album: factory.album({
         id: 'album-1',
         sharedSpaceLinks: [{ spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true }],
       }),
@@ -149,7 +149,7 @@ describe('AlbumSharedSpaceLinks', () => {
     await rerender({
       component: AlbumSharedSpaceLinks,
       componentProps: {
-        album: albumFactory.build({
+        album: factory.album({
           id: 'album-2',
           sharedSpaceLinks: [{ spaceId: 'space-1', spaceName: 'Trip', linkedById: 'e1', showInTimeline: true }],
         }),

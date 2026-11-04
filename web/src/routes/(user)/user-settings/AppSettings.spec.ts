@@ -1,6 +1,6 @@
 import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
 import { cropFacesFromAsset } from '#lib/stores/preferences.store.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';

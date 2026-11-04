@@ -5,6 +5,7 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -18,8 +19,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 import SpacePeoplePage from './+page.svelte';
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
@@ -184,8 +183,8 @@ describe('Space people page', () => {
     vi.resetAllMocks();
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount });
     clearPeopleFaceStatisticsInfoCache();
-    authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(factory.user({ id: 'current-user-id' }));
+    authManager.setPreferences(factory.preferences());
     Element.prototype.animate = getAnimateMock();
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
     pageStore.setUrl('http://localhost/spaces/space-1/people');

@@ -1,5 +1,5 @@
 import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { fireEvent, screen } from '@testing-library/svelte';
 import Combobox from './Combobox.svelte';
 

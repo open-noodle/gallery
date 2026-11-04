@@ -13,12 +13,12 @@ const layoutMocks = vi.hoisted(() => ({
 vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: layoutMocks.sidebarModeStore }));
 
 vi.mock('#lib/components/shared-components/navigation-bar/NavigationBar.svelte', async () => {
-  const module = await import('#test-data/mocks/navigation-bar-rail-aware.stub.svelte');
+  const module = await import('#test/unit/mocks/navigation-bar-rail-aware.stub.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/side-bar/UserSidebar.svelte', async () => {
-  const module = await import('#test-data/mocks/noop-component.svelte');
+  const module = await import('#test/unit/mocks/noop-component.svelte');
   return { default: module.default };
 });
 

@@ -1,4 +1,4 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { QueueName, type QueueResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
