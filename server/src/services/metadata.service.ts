@@ -27,6 +27,7 @@ import {
   StorageFolder,
 } from 'src/enum.js';
 import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
+import { isExtractedMotionPath } from 'src/gallery/utils/motion-path.js';
 import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -888,7 +889,7 @@ export class MetadataService extends BaseService {
         if (asset.livePhotoVideoId) {
           // the old motion may be the user's own file (linked by livePhotoCID or manually), only remove ones Immich extracted
           const oldMotion = await this.assetRepository.getById(asset.livePhotoVideoId);
-          const deleteOnDisk = !!oldMotion && StorageCore.isAndroidMotionPath(oldMotion.originalPath);
+          const deleteOnDisk = !!oldMotion && isExtractedMotionPath(oldMotion.originalPath);
           await this.jobRepository.queue({
             name: JobName.AssetDelete,
             data: { id: asset.livePhotoVideoId, deleteOnDisk },
