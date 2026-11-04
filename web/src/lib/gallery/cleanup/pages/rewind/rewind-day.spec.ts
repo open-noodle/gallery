@@ -3,10 +3,10 @@ import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
 import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
 import { pulse } from '#lib/gallery/motion/index.ts';
 import { AssetTypeEnum, CleanupQueue, type CleanupAssetDto } from '@immich/sdk';
-import type { BeforeNavigate } from '@sveltejs/kit';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
+import type { BeforeNavigate } from '$app/navigation';
 import RewindDay from './RewindDay.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -382,7 +382,7 @@ describe('RewindDay', () => {
     const leave = navigation({ monthDay: '924' });
     guard()(leave);
     expect(leave.cancel).toHaveBeenCalled();
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url, { replaceState: false }));
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url, { replace: false }));
     expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ title: 'cleanup_unsaved_marks_title' }));
   });
 
