@@ -123,9 +123,7 @@ Fork diff vs upstream, before → after: `metadata.service.ts` 253 → 256 (the 
 - The older `isAndroidMotionPath` call sites ignore S3 keys (unlink guard, download of embedded videos,
   storage template). Same hook would fix them; out of scope for an rc sync.
 - `main`'s `docs/fork/ownership.yml` lacks the three migrations listed above.
-- rc.2 brings immich-32879 (web medium tests): it deletes `e2e/src/ui/` and `web/src/test-data`, on which
-  ~110 fork web specs, 9 fork e2e specs and 6 fork-only UI specs depend. Decide port vs keep-as-fork before
-  that cycle.
+- ~~rc.2 brings immich-32879~~: pulled ahead of rc.2 the same day, see below.
 
 ## Remote CI
 
@@ -154,3 +152,35 @@ Fixes found by CI:
 
 Failed once, passed on re-run: the medium `gallery-search-options` cache `stale` case (its result depends on
 when Postgres's write counters land) and the web maintenance enter/exit test.
+
+## Follow-on: immich-32879 pulled ahead of rc.2 (web medium tests)
+
+Pierre chose to port the fork to upstream's new web test suite now, on the rolling branch, rather than wait
+for rc.2. The rc.1 tip above (`a7fc29d578d`, 10/10 green, on staging as `rolling-v34-rc7`) is kept as
+`backup/rolling-v34-pre-32879-1104`. The branch was rebased onto `e56c8eef292` (immich-32879), which also
+brings the five `release/v3.4` fixes before it: immich-32841 (iOS 10-bit HEIC/AVIF), immich-32842 (OCR search
+text after edits), immich-32874 (fonts), immich-32875 (album asset removal resizes the timeline),
+immich-32877 (web worker import). No migrations; `upstream.version` stays `3.4.0-rc.1`.
+
+Replay (1820 commits, driver v2, which keeps upstream's deletions of the old test infra and refuses to
+resolve a file without conflict markers): the replayed fork commits are left on the old API where they meet
+upstream's converted specs, then two port commits on top:
+
+- `test(web): move Gallery's web specs onto upstream's test layout`: ~430 old-factory calls in ~100 fork
+  specs to `factory.*`; the 23 specs upstream converted re-derived by a 3-way merge (upstream new, upstream
+  old, fork tip); fork builders in `web/test/unit/gallery-factories.ts` (one spread in `factories.ts`); the
+  real-server album-filter and detail-panel tests to `gallery-*` e2e specs.
+- `test(web): run upstream's web medium suite against Gallery ...`: default handlers for the fork endpoints,
+  per-user favorites and bucket sizes in `web/test/medium/gallery/`, the filter panel collapsed by an init
+  script, four fork UI specs ported to `web/test/medium/specs/gallery/`, svelte stubs to
+  `web/src/lib/gallery/__mocks__/`.
+
+Upstream-file hunks this adds: one line each in `test/unit/factories.ts`, `test/medium/mock/mock.ts`,
+`test/medium/fixtures.ts`, `test/medium/mock/factories.ts` (`memories.types`), three assertion edits in
+upstream medium specs (favorites, shared-link navbar), `e2e/package.json` keeps `sharp`, and the new CI job
+uses `github.token`.
+
+Local: web unit 7064, web medium 61/64 (the three that type a date into `datetime-local` fail on this Mac's
+German region, which orders the field day/month/year; CI's Linux runner is en-US), web/server/e2e lint and
+type checks, server unit 7302, audits all OK. The two `e2e/src/ui` Gallery-only specs that only tested the
+deleted generator are gone with it.
