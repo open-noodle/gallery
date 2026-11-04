@@ -35,7 +35,7 @@ describe(BackendMediaServer.name, () => {
     });
 
     it('returns the local path and deletes nothing (disk mode)', async () => {
-      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
+      // storageBackends.diskBackend is undefined in this spec file, so getWriteBackend()
       // returns undefined and persistFile takes its disk branch.
       const result = await sut.persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
 

@@ -2,9 +2,9 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AssetMediaCreateDto } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetFileType, JobName } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
@@ -48,22 +48,22 @@ describe('AssetMediaService.uploadAsset on an S3 write backend', () => {
   let previousWriteBackendType: unknown;
 
   beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
+    (storageBackends as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AssetMediaService));
     s3Backend = { put: vi.fn().mockResolvedValue(void 0), delete: vi.fn().mockResolvedValue(void 0) };
-    previousS3Backend = (StorageService as any).s3Backend;
-    previousWriteBackendType = (StorageService as any).writeBackendType;
-    (StorageService as any).s3Backend = s3Backend;
-    (StorageService as any).writeBackendType = 's3';
+    previousS3Backend = (storageBackends as any).s3Backend;
+    previousWriteBackendType = (storageBackends as any).writeBackendType;
+    (storageBackends as any).s3Backend = s3Backend;
+    (storageBackends as any).writeBackendType = 's3';
     mocks.asset.create.mockResolvedValue(assetEntity);
   });
 
   afterEach(() => {
-    (StorageService as any).s3Backend = previousS3Backend;
-    (StorageService as any).writeBackendType = previousWriteBackendType;
+    (storageBackends as any).s3Backend = previousS3Backend;
+    (storageBackends as any).writeBackendType = previousWriteBackendType;
   });
 
   it('uploads the original, points the asset at its key and queues the local file for deletion', async () => {

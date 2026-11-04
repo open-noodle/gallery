@@ -1,5 +1,7 @@
 # Storage Template S3 Compatibility — Design
 
+Superseded 2026-10: the guards below that kept the storage template, `moveFile` and the Migration job off S3 files are gone; those now move S3 objects inside the bucket, see `specs/2026-10-20-storage-template-s3-moves-design.md`.
+
 ## Overview
 
 Issue [#383](https://github.com/open-noodle/gallery/issues/383) reported ENOENT errors on S3 deployments when the storage-template migration job tried to `fs.rename` an S3 relative key (`upload/uuid/4e/e6/file.jpg`) onto an absolute disk path. The `fix/s3-storage-move` branch adds `isAbsolute()` skip guards at five call sites to prevent this. This design captures:

@@ -513,7 +513,7 @@ describe(VideoTrimService.name, () => {
     });
 
     it('keeps disk-mode trim paths absolute and uploads nothing (regression guard)', async () => {
-      // No getWriteBackend spy: StorageService.diskBackend is undefined in this spec file,
+      // No getWriteBackend spy: storageBackends.diskBackend is undefined in this spec file,
       // so persistFile takes its disk branch. Nothing here may become a relative key.
       const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));

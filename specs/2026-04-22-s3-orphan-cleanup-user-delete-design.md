@@ -1,5 +1,7 @@
 # S3 Orphan Cleanup on User Delete — Design
 
+Superseded 2026-10: the storage template now moves S3 objects into `library/<storageLabel ?? userId>/`, so the S3 sweep includes that prefix too (`getUserS3Prefixes` in `server/src/gallery/utils/storage-usage.ts`); see `specs/2026-10-20-storage-template-s3-moves-design.md`.
+
 ## Context
 
 `handleUserDelete` (`server/src/services/user.service.ts:261`) removes a deleted user's 5 disk folders via `fs.rm` and silently skips S3. On instances running `IMMICH_STORAGE_BACKEND=s3`, every deleted user's data stays in the bucket forever — assets, thumbnails, encoded video, profile images. Flagged as "tracked separately" in `2026-04-21-s3-relative-path-audit-design.md`; this design is the follow-up.

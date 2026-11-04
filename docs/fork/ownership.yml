@@ -212,6 +212,13 @@ features:
       - .github/workflows/gallery-revert-to-immich-validation.yml
       - server/src/gallery/utils/storage-keys*.ts
       - server/src/gallery/utils/s3-job-skip*.ts
+      # storage template moves inside S3 (specs/2026-10-20-storage-template-s3-moves-design.md)
+      - server/src/gallery/utils/s3-file-move*.ts
+      - server/src/gallery/utils/s3-key*.ts
+      - server/src/gallery/utils/storage-backends.ts
+      - server/src/gallery/utils/storage-template-s3*.ts
+      - server/src/gallery/services/storage-template-s3.service*.ts
+      - docs/docs/features/storage-migration.md
       - server/src/gallery/services/video-trim.service*.ts
       - web/src/lib/gallery/asset-actions*.ts
     upstream_extension_paths:
@@ -240,6 +247,17 @@ features:
       - server/src/app.module.ts
       - web/src/routes/admin/system-settings/BackupSettings.svelte
       - mobile/lib/utils/openapi_patching.dart
+      # storage template moves inside S3: the hooks into the template, the mover and the backend registry
+      - server/src/services/storage-template.service.ts
+      - server/src/services/storage-template.service.spec.ts
+      - server/src/cores/storage.core.ts
+      - server/src/cores/storage.core.spec.ts
+      - server/src/services/storage.service.ts
+      - server/src/services/storage.service.spec.ts
+      - docs/docs/administration/storage-template.mdx
+      # their specs set the backends on the registry
+      - server/src/services/metadata.service.spec.ts
+      - server/test/medium/specs/services/asset-media.service.spec.ts
     expected_symbols:
       server/src/services/job.service.ts:
         - isSkippedOnS3
@@ -249,10 +267,19 @@ features:
         - promoteToRemote
       server/src/dtos/server.dto.ts:
         - s3Storage
+      server/src/services/storage-template.service.ts:
+        - getTemplateLibraryRoot
+        - isManualOnlyTemplateMove
+        - isTemplateDestinationTaken
+      server/src/cores/storage.core.ts:
+        - moveS3File
+        - isInStorageFolder
+      server/src/services/storage.service.ts:
+        - storageBackends
     optional_paths:
       - e2e/**
       - server/src/backends/**
-      - server/test/medium/storage-migration*.spec.ts
+      - server/test/medium/specs/repositories/storage-migration*.spec.ts
     database:
       tables: [storage_migration_log, asset_duplicate_checksums]
       migration_globs:
