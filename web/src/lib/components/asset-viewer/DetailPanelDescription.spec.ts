@@ -1,7 +1,7 @@
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -16,7 +16,7 @@ const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn().mockResolvedValue(und
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 

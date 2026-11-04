@@ -6,7 +6,7 @@ import SpaceAlbumCard from './space-album-card.svelte';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#lib/gallery/__mocks__/action-context-menu.stub.svelte');
   return { ...original, ContextMenuButton: MockContextMenuButton };
 });
 

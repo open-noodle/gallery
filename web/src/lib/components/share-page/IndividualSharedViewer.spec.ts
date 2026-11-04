@@ -26,37 +26,37 @@ vi.mock('$app/navigation', () => ({
 }));
 
 vi.mock('#lib/components/asset-viewer/asset-viewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/Logo.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/control-app-bar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/gallery-viewer-props.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/gallery-viewer-props.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/RemoveFromSharedLinkAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
