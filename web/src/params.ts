@@ -1,3 +1,4 @@
+import { matchCleanupQueue } from '#lib/gallery/cleanup/cleanup-queue-param.ts';
 import { defineParams } from '@sveltejs/kit/params';
 
 const UUID_REGEX = /^[\dA-Fa-f]{8}(?:\b-[\dA-Fa-f]{4}){3}\b-[\dA-Fa-f]{12}$/;
@@ -14,4 +15,5 @@ const matchPhotos = (param: string) => {
 export const params = defineParams({
   id: (param) => (matchId(param) ? param : undefined),
   photos: (param) => (matchPhotos(param) ? param : undefined),
+  cleanupQueue: matchCleanupQueue,
 });
