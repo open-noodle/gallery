@@ -38,6 +38,7 @@ test.describe('asset viewer navbar on a shared link without metadata', () => {
     await page.goto(`${Route.viewSharedLink({ key: link.key })}/photos/${asset.id}`);
     await app.viewer.waitForAsset(asset);
 
-    await expectActions(page, ['share', 'zoom_image', 'copy_image', 'download', 'to_favorite', 'delete']);
+    // Gallery: favorites are per user and not offered on a shared link page, not even to the owner.
+    await expectActions(page, ['share', 'zoom_image', 'copy_image', 'download', 'delete']);
   });
 });

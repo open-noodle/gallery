@@ -3,12 +3,12 @@ import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observe
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
 import { PEOPLE_PAGE_SIZE } from '#lib/constants.ts';
+import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
-import { reactivePageMock } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -36,7 +36,7 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({

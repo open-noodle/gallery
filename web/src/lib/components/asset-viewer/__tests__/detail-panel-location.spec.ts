@@ -1,7 +1,7 @@
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -30,7 +30,7 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 // The map pin resolves the CURRENT surface (space / album / map / photos) from `page.url`, so the
 // page has to be a reactive, per-test-settable stand-in. See reactive-page.mock.svelte.ts.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 

@@ -1,4 +1,5 @@
 import { createApp, type App } from '#test/medium/app.ts';
+import { galleryInitScript } from '#test/medium/gallery/init.ts';
 import type { MockApi } from '#test/medium/mock/api.ts';
 import type { MockData } from '#test/medium/mock/data.ts';
 import type { BrowserLogger } from '#test/medium/mock/logger.ts';
@@ -60,6 +61,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           localStorage.setItem('lang', 'dev');
         }
       });
+      await context.addInitScript(galleryInitScript);
       await use(context);
       await context.close();
     },

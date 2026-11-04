@@ -14,7 +14,7 @@ Reusable mock for `$lib/stores/websocket`.
 
 Usage in test files:
 ```ts
-import { websocketMock } from '#test/unit/mocks/websocket.mock.ts';
+import { websocketMock } from '#lib/gallery/__mocks__/websocket.mock.ts';
 // vi.mock is called automatically when this module is imported
 ```
 */
