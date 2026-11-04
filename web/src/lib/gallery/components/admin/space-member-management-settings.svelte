@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
+  import SettingSwitch from '#lib/components/shared-components/settings/SettingSwitch.svelte';
   import type { AdminConfigServerDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 

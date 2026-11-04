@@ -1,18 +1,18 @@
 <script lang="ts">
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import DetailPanelDate from '$lib/components/asset-viewer/DetailPanelDate.svelte';
-  import DetailPanelDescription from '$lib/components/asset-viewer/DetailPanelDescription.svelte';
-  import DetailPanelLocation from '$lib/components/asset-viewer/DetailPanelLocation.svelte';
-  import DetailPanelRating from '$lib/components/asset-viewer/DetailPanelStarRating.svelte';
-  import DetailPanelTags from '$lib/components/asset-viewer/DetailPanelTags.svelte';
-  import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { canEditAsset } from '$lib/utils/asset-editability';
-  import { getDimensions } from '$lib/utils/asset-utils';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
-  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import DetailPanelDate from '#lib/components/asset-viewer/DetailPanelDate.svelte';
+  import DetailPanelDescription from '#lib/components/asset-viewer/DetailPanelDescription.svelte';
+  import DetailPanelLocation from '#lib/components/asset-viewer/DetailPanelLocation.svelte';
+  import DetailPanelRating from '#lib/components/asset-viewer/DetailPanelStarRating.svelte';
+  import DetailPanelTags from '#lib/components/asset-viewer/DetailPanelTags.svelte';
+  import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { canEditAsset } from '#lib/utils/asset-editability.ts';
+  import { getDimensions } from '#lib/utils/asset-utils.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { getAllAlbums, type AlbumResponseDto, type AssetResponseDto, type CleanupAssetDto } from '@immich/sdk';
   import { Icon, Text } from '@immich/ui';
   import { mdiCamera, mdiImageAlbum, mdiImageOutline } from '@mdi/js';
@@ -126,7 +126,7 @@
   });
 
   // Mounting the map through `{#await}` can leave the surrounding subtree unreactive; see lazyComponent().
-  const LazyMap = lazyComponent(() => import('$lib/components/shared-components/map/Map.svelte'));
+  const LazyMap = lazyComponent(() => import('#lib/components/shared-components/map/Map.svelte'));
 </script>
 
 <OnEvents {onAssetUpdate} />
@@ -166,7 +166,7 @@
         {#if latlng && featureFlagsManager.value.map}
           <div class="mb-3 h-40 overflow-hidden rounded-xl">
             {#if LazyMap.current}
-              {@const Map = LazyMap.current}
+              {const Map = $derived(LazyMap.current)}
               <Map
                 mapMarkers={[
                   {

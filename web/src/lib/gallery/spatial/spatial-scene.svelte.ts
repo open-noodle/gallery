@@ -1,16 +1,16 @@
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { createUrl } from '#lib/utils.ts';
 import { AssetTypeEnum, type AssetResponseDto } from '@immich/sdk';
 import type { ActionItem } from '@immich/ui';
 import { mdiCube, mdiCubeOutline } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { createUrl } from '$lib/utils';
 
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md): the viewer's Spatial toggle.
 
 /**
- * Which photo the Spatial view is on. Keyed by asset id rather than a plain flag, so moving to another photo leaves it
- * without any effect having to reset it.
- */
+Which photo the Spatial view is on. Keyed by asset id rather than a plain flag, so moving to another photo leaves it
+without any effect having to reset it.
+*/
 class SpatialSceneState {
   assetId = $state<string>();
 

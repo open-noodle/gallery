@@ -7,7 +7,7 @@ import {
   TITLE_LIFT_ATTR,
   TITLE_LIFT_VAR,
   topEdgeRise,
-} from '$lib/gallery/motion/thumbnail-lift';
+} from '#lib/gallery/motion/thumbnail-lift.ts';
 
 const box = (left: number, top: number, width: number, height: number) => ({
   left,

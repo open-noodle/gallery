@@ -1,6 +1,6 @@
 <script lang="ts">
-  import CleanupViewerLayout from '$lib/gallery/cleanup/pages/CleanupViewerLayout.svelte';
-  import RewindDay from '$lib/gallery/cleanup/pages/rewind/RewindDay.svelte';
+  import CleanupViewerLayout from '#lib/gallery/cleanup/pages/CleanupViewerLayout.svelte';
+  import RewindDay from '#lib/gallery/cleanup/pages/rewind/RewindDay.svelte';
   import type { PageData } from './$types';
 
   type Props = {

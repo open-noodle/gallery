@@ -1,18 +1,18 @@
 /**
- * A hovered timeline photo lifts out of the grid (motion.css). Two things here keep that lift tidy:
- *
- * - **Grow where there is room.** The timeline's scroll area clips at its edges (beside the filter panel,
- *   under the scrubber, at the top and bottom of the view), so a photo growing from its centre lost its
- *   outer strip there. On entering a photo, its zoom is anchored on any edge too close to the scroll
- *   area's (`--gallery-lift-origin`), so it grows only toward the open side.
- * - **Settle smoothly.** The rules raising the photo's clipping and stacking ancestors key off `:hover`,
- *   so on leaving they dropped at once while the photo was still shrinking back: it was cut off and sank
- *   behind its neighbours mid-way, which read as a jump. `data-motion-settling` stays on the photo until
- *   the shrink has finished, and motion.css keeps the ancestors raised for it too.
- * - **Keep the date's distance.** A photo in a day's first row grows up toward the day's date, so the
- *   date moves up by the same amount (`data-motion-title-lift` + `--gallery-title-lift` on the day).
- */
-import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
+A hovered timeline photo lifts out of the grid (motion.css). Two things here keep that lift tidy:
+
+- **Grow where there is room.** The timeline's scroll area clips at its edges (beside the filter panel,
+  under the scrubber, at the top and bottom of the view), so a photo growing from its centre lost its
+  outer strip there. On entering a photo, its zoom is anchored on any edge too close to the scroll
+  area's (`--gallery-lift-origin`), so it grows only toward the open side.
+- **Settle smoothly.** The rules raising the photo's clipping and stacking ancestors key off `:hover`,
+  so on leaving they dropped at once while the photo was still shrinking back: it was cut off and sank
+  behind its neighbours mid-way, which read as a jump. `data-motion-settling` stays on the photo until
+  the shrink has finished, and motion.css keeps the ancestors raised for it too.
+- **Keep the date's distance.** A photo in a day's first row grows up toward the day's date, so the
+  date moves up by the same amount (`data-motion-title-lift` + `--gallery-title-lift` on the day).
+*/
+import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
 
 const THUMBNAIL = '[data-thumbnail-focus-container]';
 export const SETTLING_ATTR = 'data-motion-settling';
@@ -29,10 +29,10 @@ export const SETTLE_MS = 420;
 type Box = Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom' | 'width' | 'height'>;
 
 /**
- * The transform-origin that keeps a photo growing by `scale` inside `clip`: anchored on each side whose
- * edge is closer than the growth, centred otherwise (and centred when both sides of an axis are tight,
- * where nothing would help).
- */
+The transform-origin that keeps a photo growing by `scale` inside `clip`: anchored on each side whose
+edge is closer than the growth, centred otherwise (and centred when both sides of an axis are tight,
+where nothing would help).
+*/
 export const liftOrigin = (photo: Box, clip: Box, scale = LIFT_SCALE): string => {
   const axis = (size: number, before: number, after: number, start: string, end: string) => {
     const grow = (size * (scale - 1)) / 2;
@@ -60,9 +60,9 @@ const clipBox = (element: Element): Box => {
 };
 
 /**
- * How far a photo's top edge rises when it grows by `scale` from `origin`: half its growth from the
- * centre, all of it from the bottom, none from the top.
- */
+How far a photo's top edge rises when it grows by `scale` from `origin`: half its growth from the
+centre, all of it from the bottom, none from the top.
+*/
 export const topEdgeRise = (origin: string, height: number, scale = LIFT_SCALE): number => {
   const grow = height * (scale - 1);
   if (origin.endsWith(' bottom')) {

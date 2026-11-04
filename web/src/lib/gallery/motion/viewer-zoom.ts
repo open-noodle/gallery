@@ -1,20 +1,20 @@
+import { ease, prefersReducedMotion, spring } from '#lib/gallery/motion/tokens.ts';
 import { onDestroy, onMount } from 'svelte';
-import { ease, prefersReducedMotion, spring } from '$lib/gallery/motion/tokens';
 
 /**
- * Opening a photo zooms it out of its timeline thumbnail into the viewer, and closing flies it back
- * into the thumbnail, like the mobile app. A copy of the image flies on top of the page; the viewer's
- * own photo is hidden underneath until the copy lands, so the viewer's zoom, swipe and image loading
- * are untouched. When the thumbnail is not on screen (a photo swiped to, a deep link) the viewer just
- * fades.
- *
- * Positions are read while they can be: the timeline is hidden while the viewer is open, so the
- * thumbnail is recorded when it is clicked (`installViewerZoom`); and the viewer's photo is gone by the
- * time the viewer's teardown runs, so it is recorded on every input that could close it (a key, a
- * click, the browser's back button).
- *
- * Hooks: `installViewerZoom` in setupMotion, one `useViewerZoom` call in AssetViewer.
- */
+Opening a photo zooms it out of its timeline thumbnail into the viewer, and closing flies it back
+into the thumbnail, like the mobile app. A copy of the image flies on top of the page; the viewer's
+own photo is hidden underneath until the copy lands, so the viewer's zoom, swipe and image loading
+are untouched. When the thumbnail is not on screen (a photo swiped to, a deep link) the viewer just
+fades.
+
+Positions are read while they can be: the timeline is hidden while the viewer is open, so the
+thumbnail is recorded when it is clicked (`installViewerZoom`); and the viewer's photo is gone by the
+time the viewer's teardown runs, so it is recorded on every input that could close it (a key, a
+click, the browser's back button).
+
+Hooks: `installViewerZoom` in setupMotion, one `useViewerZoom` call in AssetViewer.
+*/
 const VIEWER = '#immich-asset-viewer';
 const THUMBNAIL = '[data-thumbnail-focus-container]';
 /** AdaptiveImage's box around the displayed photo (upstream markup). */
@@ -77,9 +77,9 @@ const layer = (src: string): HTMLImageElement => {
 };
 
 /**
- * The flying copy: the image already on screen, and, when given, a sharper one that fades in over it
- * once decoded, so the photo sharpens during the flight instead of snapping sharp after it.
- */
+The flying copy: the image already on screen, and, when given, a sharper one that fades in over it
+once decoded, so the photo sharpens during the flight instead of snapping sharp after it.
+*/
 const createFlyer = (src: string, rect: Box, sharpSrc?: string): HTMLDivElement => {
   const flyer = document.createElement('div');
   flyer.setAttribute('aria-hidden', 'true');
@@ -158,10 +158,10 @@ const dropClicked = () => {
 };
 
 /**
- * A plain click or Enter on a thumbnail opens the viewer, unless photos are being selected or the click
- * landed on a control inside it (the select circle), which never opens it: a copy put up then stayed on
- * the page until CLICK_MAX_AGE_MS dropped it. Not links: a hovered thumbnail is covered by one.
- */
+A plain click or Enter on a thumbnail opens the viewer, unless photos are being selected or the click
+landed on a control inside it (the select circle), which never opens it: a copy put up then stayed on
+the page until CLICK_MAX_AGE_MS dropped it. Not links: a hovered thumbnail is covered by one.
+*/
 const opensViewer = (event: Event) =>
   !document.querySelector('#control-bar') &&
   !(event.target instanceof Element && event.target.closest('button, input, [role="checkbox"]')) &&
@@ -217,10 +217,10 @@ const startFlight = (shot: Clicked) => {
 };
 
 /**
- * setupMotion's `beforeNavigate`: the router heading for the clicked photo is the signal that the click
- * opens the viewer (pickers reuse the same thumbnails to select), and it comes well before the viewer has
- * loaded, so the flight starts now, toward an estimate. zoomIn corrects course once the viewer measured.
- */
+setupMotion's `beforeNavigate`: the router heading for the clicked photo is the signal that the click
+opens the viewer (pickers reuse the same thumbnails to select), and it comes well before the viewer has
+loaded, so the flight starts now, toward an estimate. zoomIn corrects course once the viewer measured.
+*/
 export const viewerZoomBeforeNavigate = (navigation: { to: { params: Record<string, string> | null } | null }) => {
   if (clicked && navigation.to?.params?.assetId === clicked.assetId && canAnimate()) {
     startFlight(clicked);

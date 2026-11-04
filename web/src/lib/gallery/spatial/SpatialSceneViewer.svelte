@@ -1,9 +1,9 @@
 <script lang="ts">
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
-  import { contain, depthFromRgba, dilate, stepSpring, subjectDepth } from '$lib/gallery/spatial/depth';
-  import { getDepthMapUrl, spatialSceneState } from '$lib/gallery/spatial/spatial-scene.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+  import { contain, depthFromRgba, dilate, stepSpring, subjectDepth } from '#lib/gallery/spatial/depth.ts';
+  import { getDepthMapUrl, spatialSceneState } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { onMount } from 'svelte';

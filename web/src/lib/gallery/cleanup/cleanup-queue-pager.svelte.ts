@@ -39,9 +39,9 @@ const restoreInto = <T>(list: T[], removed: Removed<T>[], keyOf: (entry: T) => s
 };
 
 /**
- * Keyset pagination over one Cleanup queue. `reset` starts again from the first page, for when a
- * filter changes; a request still in flight from before the reset is dropped when it lands.
- */
+Keyset pagination over one Cleanup queue. `reset` starts again from the first page, for when a
+filter changes; a request still in flight from before the reset is dropped when it lands.
+*/
 export class CleanupQueuePager {
   items = $state<CleanupAssetDto[]>([]);
   groups = $state<CleanupBurstGroupDto[]>([]);
@@ -71,9 +71,9 @@ export class CleanupQueuePager {
   }
 
   /**
-   * Loads the next page. Throws on failure, after setting `failed`. A call made while a page is already
-   * loading waits for that page rather than returning at once, so a caller can tell whether more arrived.
-   */
+  Loads the next page. Throws on failure, after setting `failed`. A call made while a page is already
+  loading waits for that page rather than returning at once, so a caller can tell whether more arrived.
+  */
   loadMore(): Promise<void> {
     if (this.loading && this.#inFlight) {
       return this.#inFlight;

@@ -1,6 +1,6 @@
+import CleanupQuickWins from '#lib/gallery/cleanup/CleanupQuickWins.svelte';
 import { CleanupCountQueue } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import CleanupQuickWins from '$lib/gallery/cleanup/CleanupQuickWins.svelte';
 
 const loaded = {
   [CleanupCountQueue.SpaceHogs]: { count: 12, bytes: 5_000_000_000 },

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
-  import { flipMotion } from '$lib/gallery/motion';
+  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
-  import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
-  import { TILE_MIN_WIDTH, type TileSize } from '$lib/gallery/cleanup/tile-size';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
+  import { TILE_MIN_WIDTH, type TileSize } from '#lib/gallery/cleanup/tile-size.ts';
   import { CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';
@@ -61,8 +61,8 @@
   data-testid="cleanup-select-grid"
 >
   {#each items as item (item.id)}
-    {@const isSelected = selected.has(item.id)}
-    {@const reason = variant === 'blurry' && item.reason ? REASON_LABELS[item.reason] : undefined}
+    {const isSelected = $derived(selected.has(item.id))}
+    {const reason = $derived(variant === 'blurry' && item.reason ? REASON_LABELS[item.reason] : undefined)}
     <div
       animate:flip={flipMotion()}
       class="group relative"

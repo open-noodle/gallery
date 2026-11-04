@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
-  import CleanupQuickWinCard from '$lib/gallery/cleanup/CleanupQuickWinCard.svelte';
-  import { staggerDelay } from '$lib/gallery/motion';
-  import { Route } from '$lib/route';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { queueToSlug } from '$lib/gallery/cleanup/cleanup';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import CleanupQuickWinCard from '#lib/gallery/cleanup/CleanupQuickWinCard.svelte';
+  import { staggerDelay } from '#lib/gallery/motion/index.ts';
+  import { Route } from '#lib/route.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { queueToSlug } from '#lib/gallery/cleanup/cleanup.ts';
   import {
     CleanupCountQueue,
     type CleanupAssetDto,
@@ -95,7 +95,7 @@
 
   <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
     {#each cards as card, index (card.queue)}
-      {@const count = counts[card.queue]}
+      {const count = $derived(counts[card.queue])}
       <div data-motion-reveal style:animation-delay={staggerDelay(index + 1)}>
         <CleanupQuickWinCard
           queue={card.queue}

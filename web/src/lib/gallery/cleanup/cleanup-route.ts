@@ -1,4 +1,4 @@
-import type { CleanupQueueSlug } from '$lib/gallery/cleanup/cleanup';
+import type { CleanupQueueSlug } from '#lib/gallery/cleanup/cleanup.ts';
 
 /** URLs of the Library Cleanup pages, kept out of upstream's `Route` so that file stays upstream text. */
 export const CleanupRoute = {

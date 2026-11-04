@@ -1,7 +1,7 @@
+import { getSpatialSceneActions, spatialSceneState } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
 import { AssetTypeEnum, type AssetResponseDto } from '@immich/sdk';
 import type { ActionEvent, ActionItem } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
-import { getSpatialSceneActions, spatialSceneState } from '$lib/gallery/spatial/spatial-scene.svelte';
 
 const $t = ((key: string) => key) as MessageFormatter;
 const run = (action: ActionItem) => action.onAction?.({ action, event: new Event('click') } as ActionEvent<ActionItem>);

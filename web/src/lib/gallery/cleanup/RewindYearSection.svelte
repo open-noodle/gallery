@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
-  import { flipMotion, pop } from '$lib/gallery/motion';
+  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
+  import { flipMotion, pop } from '#lib/gallery/motion/index.ts';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
-  import type { RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import type { RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
   import type { CleanupAssetDto } from '@immich/sdk';
   import { Button, Heading, Icon } from '@immich/ui';
   import { mdiCheck, mdiHeart } from '@mdi/js';
@@ -105,8 +105,8 @@
 
   <div class="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-1.5">
     {#each assets as asset (asset.id)}
-      {@const tileMark = markOf(asset)}
-      {@const focused = focusedId === asset.id}
+      {const tileMark = $derived(markOf(asset))}
+      {const focused = $derived(focusedId === asset.id)}
       <button
         animate:flip={flipMotion()}
         type="button"

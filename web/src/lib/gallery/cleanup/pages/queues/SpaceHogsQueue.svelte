@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { shortcuts } from '$lib/actions/shortcut';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import { queueShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
-  import SpaceHogList from '$lib/gallery/cleanup/SpaceHogList.svelte';
-  import FormatMessage from '$lib/elements/FormatMessage.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { CleanupQueuePager, type Removed } from '$lib/gallery/cleanup/cleanup-queue-pager.svelte';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { keep, trashWithUndo } from '$lib/gallery/cleanup/cleanup-actions';
+  import { shortcuts } from '#lib/actions/shortcut.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
+  import SpaceHogList from '#lib/gallery/cleanup/SpaceHogList.svelte';
+  import FormatMessage from '#lib/elements/FormatMessage.svelte';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { keep, trashWithUndo } from '#lib/gallery/cleanup/cleanup-actions.ts';
   import {
     CLEANUP_SDK_QUEUES,
     CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
     CLEANUP_SPACE_HOG_MIN_SIZES,
-  } from '$lib/gallery/cleanup/cleanup';
-  import { handleError } from '$lib/utils/handle-error';
-  import { navigate } from '$lib/utils/navigation';
+  } from '#lib/gallery/cleanup/cleanup.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { navigate } from '#lib/utils/navigation.ts';
   import {
     CleanupAssetTypeFilter,
     getCleanupQueueCount,
@@ -179,7 +179,11 @@
 <QueueHeader {title}>
   {#snippet subtitle()}
     {#if count}
-      {@const values = { count: count.count, size: getByteUnitString(count.bytes, lang), percent: percent ?? 0 }}
+      {const values = $derived({
+        count: count.count,
+        size: getByteUnitString(count.bytes, lang),
+        percent: percent ?? 0,
+      })}
       <FormatMessage
         key={percent === undefined ? 'cleanup_space_hogs_subtitle_no_percent' : 'cleanup_space_hogs_subtitle'}
         {values}

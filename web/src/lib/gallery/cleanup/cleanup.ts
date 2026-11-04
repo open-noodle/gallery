@@ -46,9 +46,9 @@ export const monthDayLabel = (monthDay: number, locale: string) =>
 export type ShadeScale = { quartiles: [number, number, number]; max: number };
 
 /**
- * Quartiles of the dates that have photos. Shading by rank rather than by fraction of the busiest
- * date keeps ordinary dates apart when one date (a big trip, an import day) holds far more photos.
- */
+Quartiles of the dates that have photos. Shading by rank rather than by fraction of the busiest
+date keeps ordinary dates apart when one date (a big trip, an import day) holds far more photos.
+*/
 export const shadeScale = (counts: number[]): ShadeScale => {
   const sorted = counts.filter((count) => count > 0).sort((a, b) => a - b);
   const at = (p: number) => sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? 0;
@@ -142,10 +142,10 @@ export const monthDayShortLabel = (monthDay: number, locale: string) =>
 export const CLEANUP_BURST_GAP_MS = 2000;
 
 /**
- * The ids of photos taken within `CLEANUP_BURST_GAP_MS` of another photo in `assets`. Rewind's
- * one-at-a-time hints use it to point at the Bursts queue; it is the time rule only, without the
- * server's CLIP check, so it is a hint rather than a promise that the photo is in that queue.
- */
+The ids of photos taken within `CLEANUP_BURST_GAP_MS` of another photo in `assets`. Rewind's
+one-at-a-time hints use it to point at the Bursts queue; it is the time rule only, without the
+server's CLIP check, so it is a hint rather than a promise that the photo is in that queue.
+*/
 export const burstMemberIds = (assets: Array<{ id: string; localDateTime: string }>) => {
   // `map` already copies, so sorting in place does not touch the caller's array.
   const sorted = assets.map(({ id, localDateTime }) => ({ id, time: Date.parse(localDateTime) }));
@@ -180,9 +180,9 @@ export const burstDecision = (group: BurstGroupLike, marks: ReadonlyMap<string, 
 };
 
 /**
- * "12 Aug 2024 · 14:03:21 → 14:03:24". `localDateTime` is the wall-clock time at capture stored as
- * if it were UTC, so it is formatted in UTC to show that time unchanged.
- */
+"12 Aug 2024 · 14:03:21 → 14:03:24". `localDateTime` is the wall-clock time at capture stored as
+if it were UTC, so it is formatted in UTC to show that time unchanged.
+*/
 export const burstTimeRange = (from: string, to: string, locale: string) => {
   const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const time = new Intl.DateTimeFormat(locale, {
@@ -215,7 +215,7 @@ export const busiestYear = <T extends { year: number; count: number }>(years: T[
 };
 
 /**
- * The outline on the photo the keyboard shortcuts act on. `outline-solid` is needed: Tailwind 4's
- * `outline-none` also zeroes the style that `outline-3` reads, so without it the outline never shows.
- */
+The outline on the photo the keyboard shortcuts act on. `outline-solid` is needed: Tailwind 4's
+`outline-none` also zeroes the style that `outline-3` reads, so without it the outline never shows.
+*/
 export const FOCUS_RING = 'outline-solid outline-3 outline-offset-2 outline-primary';

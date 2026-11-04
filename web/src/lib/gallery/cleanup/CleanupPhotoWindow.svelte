@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { shortcuts, type ShortcutOptions } from '$lib/actions/shortcut';
-  import Thumbhash from '$lib/components/Thumbhash.svelte';
-  import AssetContextDetails from '$lib/gallery/asset-context/asset-context-details.svelte';
-  import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
-  import { duration, ease, slideFrom } from '$lib/gallery/motion';
-  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
-  import { Route } from '$lib/route';
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { shortcuts, type ShortcutOptions } from '#lib/actions/shortcut.ts';
+  import Thumbhash from '#lib/components/Thumbhash.svelte';
+  import AssetContextDetails from '#lib/gallery/asset-context/asset-context-details.svelte';
+  import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
+  import { duration, ease, slideFrom } from '#lib/gallery/motion/index.ts';
+  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+  import { Route } from '#lib/route.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
   import { Button, Icon, IconButton, Modal, ModalBody } from '@immich/ui';
   import {
@@ -302,7 +302,7 @@
                   </span>
                 {/if}
                 {#if currentSignal.sharpness}
-                  {@const { value, rank, of } = currentSignal.sharpness}
+                  {const { value, rank, of } = $derived(currentSignal.sharpness)}
                   <p class="text-xs font-semibold tracking-wide text-muted uppercase">{$t('cleanup_sharpness')}</p>
                   <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-subtle">
                     <span class="block h-full bg-success" style:width="{Math.min(100, Math.max(4, value))}%"></span>

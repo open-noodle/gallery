@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { countMotion, pop } from '$lib/gallery/motion';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { getByteUnitString } from '$lib/utils/byte-units';
+  import { countMotion, pop } from '#lib/gallery/motion/index.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { AssetMediaSize, type CleanupAssetDto, type CleanupCountResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCheckCircle } from '@mdi/js';
