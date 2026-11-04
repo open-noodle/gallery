@@ -463,7 +463,7 @@ BRANDED_SPINNER_FILES=(
   'routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte'
   'routes/(user)/memories/+page.svelte'
   'routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte'
-  'routes/(user)/user-settings/OauthSettings.svelte'
+  'routes/(user)/user-settings/OAuthSettings.svelte'
   'routes/(user)/utilities/geolocation/+page.svelte'
   'routes/admin/queues/[name]/QueueGraph.svelte'
   'routes/admin/system-settings/TemplateSettings.svelte'
@@ -472,7 +472,7 @@ BRANDED_SPINNER_FILES=(
 patch_loading_spinner() {
   echo "--- Patching loading spinner ---"
   local ui_import="^[[:space:]]*import \{[^}]*[{ ,]LoadingSpinner[ ,}][^}]*\} from '@immich/ui';$"
-  local branded="import LoadingSpinner from '\$lib/components/shared-components/LoadingSpinner.svelte';"
+  local branded="import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';"
   local rel file
   for rel in "${BRANDED_SPINNER_FILES[@]}"; do
     file="$REPO_ROOT/web/src/$rel"
@@ -486,11 +486,12 @@ patch_loading_spinner() {
       return 1
     fi
     # `{ LoadingSpinner }` alone becomes the branded import; otherwise drop the name and add the import below.
-    sed -i -E "\#$ui_import#{
-      s#^([[:space:]]*)import \{ LoadingSpinner \} from '@immich/ui';\$#\1$branded#
+    # `|` delimits: the branded import contains `#`.
+    sed -i -E "\|$ui_import|{
+      s|^([[:space:]]*)import \{ LoadingSpinner \} from '@immich/ui';\$|\1$branded|
       t
-      s#([{ ])LoadingSpinner, #\1#
-      s#, LoadingSpinner \}# }#
+      s|([{ ])LoadingSpinner, |\1|
+      s|, LoadingSpinner \}| }|
       a\\  $branded
     }" "$file"
     if grep -qE "$ui_import" "$file"; then
