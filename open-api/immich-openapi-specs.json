@@ -10358,6 +10358,45 @@
         "x-immich-state": "Internal"
       }
     },
+    "/futo-backups/onboarding/restore/continue": {
+      "post": {
+        "description": "Record that the user has moved on from a finished restore, so it is no longer offered on reload.",
+        "operationId": "futoBackupsContinueAfterRestore",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Continue after a restore",
+        "tags": [
+          "Backups"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v3.4.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.0",
+            "state": "Internal"
+          }
+        ],
+        "x-immich-state": "Internal"
+      }
+    },
     "/futo-backups/onboarding/skip": {
       "post": {
         "description": "Skip the optional configuration steps of onboarding.",
@@ -30752,7 +30791,7 @@
   "info": {
     "title": "Immich",
     "description": "Immich API",
-    "version": "3.4.0-rc.0",
+    "version": "3.4.0-rc.1",
     "contact": {}
   },
   "tags": [
@@ -41076,6 +41115,9 @@
           "requiresAuthentication": {
             "type": "boolean"
           },
+          "restoreJobId": {
+            "type": "string"
+          },
           "status": {
             "$ref": "#/components/schemas/BootstrapStatus"
           }
@@ -42897,7 +42939,8 @@
           "failed",
           "completed",
           "delayed",
-          "waiting"
+          "waiting",
+          "paused"
         ],
         "type": "string"
       },
@@ -54337,6 +54380,11 @@
           },
           "name": {
             "description": "User name",
+            "type": "string"
+          },
+          "password": {
+            "deprecated": true,
+            "description": "User password (deprecated, use change password endpoint)",
             "type": "string"
           }
         },
