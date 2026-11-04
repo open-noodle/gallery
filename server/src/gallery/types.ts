@@ -211,4 +211,5 @@ export interface GallerySystemMetadata extends Record<SystemMetadataKey, Record<
   [SystemMetadataKey.PetRecognitionState]: { lastRun?: string; modelName?: string; pendingReprocess?: boolean };
   [SystemMetadataKey.PersonSuggestionScanJobCleanupState]: { cleanedAt?: string };
   [SystemMetadataKey.SharedSpaceFaceJobCleanupState]: { cleanedAt?: string };
+  [SystemMetadataKey.StorageTemplateS3State]: { pending: boolean; decidedAt: string; clearedAt?: string };
 }
