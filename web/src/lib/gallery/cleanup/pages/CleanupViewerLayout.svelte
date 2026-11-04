@@ -1,11 +1,11 @@
 <script lang="ts">
-  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
-  import type { Action } from '$lib/components/asset-viewer/actions/action';
-  import Portal from '$lib/elements/Portal.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { handlePromiseError } from '$lib/utils';
-  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
-  import { navigate } from '$lib/utils/navigation';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
+  import Portal from '#lib/elements/Portal.svelte';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { handlePromiseError } from '#lib/utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
+  import { navigate } from '#lib/utils/navigation.ts';
   import type { AssetResponseDto } from '@immich/sdk';
   import type { Snippet } from 'svelte';
 
@@ -38,7 +38,7 @@
 
   // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
   // See lazyComponent().
-  const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <!-- The Cleanup rewind and queue pages: the page itself, with the asset viewer opened over it for the
@@ -49,7 +49,7 @@
 
 {#if assetViewerManager.isViewing && assetViewerManager.asset}
   {#if LazyAssetViewer.current}
-    {@const AssetViewer = LazyAssetViewer.current}
+    {const AssetViewer = $derived(LazyAssetViewer.current)}
     <Portal target="body">
       <AssetViewer
         cursor={{ current: assetViewerManager.asset }}

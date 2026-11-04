@@ -1,4 +1,4 @@
-import { shouldIgnoreEvent, type ShortcutOptions } from '$lib/actions/shortcut';
+import { shouldIgnoreEvent, type ShortcutOptions } from '#lib/actions/shortcut.ts';
 
 export type CleanupShortcutHandlers = {
   keep: () => void;
@@ -27,10 +27,10 @@ const isFormField = (target: EventTarget | null) => {
 };
 
 /**
- * A focused button, link or role="button" element that is not an asset tile. Asset tiles are
- * buttons too, but they carry `data-asset-id`; Space on a tile opens the viewer, while Space on
- * any other control (Keep, Trash, Finish day, ...) must press that control.
- */
+A focused button, link or role="button" element that is not an asset tile. Asset tiles are
+buttons too, but they carry `data-asset-id`; Space on a tile opens the viewer, while Space on
+any other control (Keep, Trash, Finish day, ...) must press that control.
+*/
 const isNonTileControl = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   target.dataset.assetId === undefined &&
@@ -57,14 +57,14 @@ const bind = (bindings: Binding[]): ShortcutOptions[] =>
   }));
 
 /**
- * Keyboard shortcuts for the Cleanup pages. They are all turned off while the asset viewer is
- * open, because the viewer already uses `z` for zoom and Space for video play/pause.
- *
- * `shouldIgnoreEvent` only covers text-like inputs; checkboxes, selects and contenteditable
- * elements are ignored here too, so Space still toggles the "Hide reviewed" checkbox. Space also
- * stays with a focused button or link that is not an asset tile, so it presses Keep, Trash or
- * Finish day. The default is only prevented once a shortcut actually runs.
- */
+Keyboard shortcuts for the Cleanup pages. They are all turned off while the asset viewer is
+open, because the viewer already uses `z` for zoom and Space for video play/pause.
+
+`shouldIgnoreEvent` only covers text-like inputs; checkboxes, selects and contenteditable
+elements are ignored here too, so Space still toggles the "Hide reviewed" checkbox. Space also
+stays with a focused button or link that is not an asset tile, so it presses Keep, Trash or
+Finish day. The default is only prevented once a shortcut actually runs.
+*/
 export const cleanupShortcuts = (handlers: CleanupShortcutHandlers, isViewing: () => boolean): ShortcutOptions[] => {
   if (isViewing()) {
     return [];
@@ -102,9 +102,9 @@ export type QueueShortcutHandlers = {
 };
 
 /**
- * Keyboard shortcuts for the queue pages (space hogs, bursts, screenshots, blurry), with the same
- * form-field rules as `cleanupShortcuts`. `isDisabled` should cover the asset viewer and any modal.
- */
+Keyboard shortcuts for the queue pages (space hogs, bursts, screenshots, blurry), with the same
+form-field rules as `cleanupShortcuts`. `isDisabled` should cover the asset viewer and any modal.
+*/
 export const queueShortcuts = (handlers: QueueShortcutHandlers, isDisabled: () => boolean): ShortcutOptions[] => {
   if (isDisabled()) {
     return [];

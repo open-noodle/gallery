@@ -1,8 +1,8 @@
+import { parseMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
+import { authenticate } from '#lib/utils/auth.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import { getCleanupRewindAssets, getCleanupRewindYears, type CleanupAssetDto } from '@immich/sdk';
 import { error } from '@sveltejs/kit';
-import { parseMonthDay } from '$lib/gallery/cleanup/cleanup';
-import { authenticate } from '$lib/utils/auth';
-import { getFormatter } from '$lib/utils/i18n';
 import type { PageLoad } from './$types';
 
 // Only the most recent year is loaded up front; the page fetches the rest one year at a time as
