@@ -31,10 +31,10 @@ export const shouldCrossfade = (navigation: {
 const TRANSITION_CLASS = 'gallery-page-transition';
 
 /**
- * Elements that morph from one page to the next opt in with `data-shared-element="<name>"`: a hub photo
- * collage becoming the rewind header's photo stack, say. They are named only while a transition runs, since a
- * `view-transition-name` makes its element a stacking context (rule 6 in the motion design).
- */
+Elements that morph from one page to the next opt in with `data-shared-element="<name>"`: a hub photo
+collage becoming the rewind header's photo stack, say. They are named only while a transition runs, since a
+`view-transition-name` makes its element a stacking context (rule 6 in the motion design).
+*/
 export const SHARED_ELEMENT_ATTR = 'data-shared-element';
 
 /** Names every opted-in element under `root` after its attribute; returns a function that clears them. */
