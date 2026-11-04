@@ -379,7 +379,7 @@ describe(LibraryService.name, () => {
       mocks.library.get.mockResolvedValue(library);
       mocks.library.streamAssetIds.mockReturnValue(makeStream(assets));
       mocks.asset.getLibraryAssetCount.mockResolvedValue(assets.length);
-      mocks.asset.detectOfflineExternalAssets.mockResolvedValue({ numUpdatedRows: 0n });
+      mocks.asset.detectOfflineExternalAssets.mockResolvedValue(0);
 
       const response = await sut.handleQueueSyncAssets({ id: library.id });
 
