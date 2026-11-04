@@ -3,7 +3,7 @@ import { Kysely, sql } from 'kysely';
 // asset."isFavorite" returns with upstream's meaning, the owner's favorite, as a projection of the
 // asset_favorite overlay, which stays the source of truth for every user. The backfill runs before the
 // triggers exist, so it does not echo into the overlay; its UPDATE bumps updateId once per owner favorite
-// through asset_updatedAt, re-syncing those assets to stock clients. Trigger bodies: src/schema/functions.ts.
+// through asset_updatedAt, re-syncing those assets to stock clients. Trigger bodies: src/schema/gallery-functions.ts.
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS "isFavorite" boolean NOT NULL DEFAULT false;`.execute(db);
   await sql`

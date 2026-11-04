@@ -1343,7 +1343,7 @@ describe(TimelineService.name, () => {
 
   describe('getTimeBucketCovers', () => {
     it('runs access checks and forwards resolved options + buckets to the repository', async () => {
-      mocks.asset.getTimeBucketCovers.mockResolvedValue([]);
+      mocks.galleryAsset.getTimeBucketCovers.mockResolvedValue([]);
 
       await sut.getTimeBucketCovers(authStub.user1, {
         userId: 'user-id',
@@ -1351,7 +1351,7 @@ describe(TimelineService.name, () => {
         timeBuckets: ['2024-01-01'],
       });
 
-      expect(mocks.asset.getTimeBucketCovers).toHaveBeenCalledWith(
+      expect(mocks.galleryAsset.getTimeBucketCovers).toHaveBeenCalledWith(
         expect.objectContaining({
           timeBuckets: ['2024-01-01'],
           bucketSize: TimeBucketSize.Year,

@@ -44,3 +44,64 @@ insert into
 values
   ($1, $2)
 rollback
+
+-- PetFaceRepository.getForPetDetection
+select
+  "asset"."ownerId",
+  "asset"."visibility",
+  (
+    select
+      "asset_file"."path"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = 'preview'
+      and "asset_file"."isEdited" = false
+  ) as "previewFile"
+from
+  "asset"
+where
+  "asset"."id" = $1
+
+-- PetFaceRepository.streamForPetDetectionJob
+select
+  "asset"."id"
+from
+  "asset"
+  inner join "asset_job_status" on "asset_job_status"."assetId" = "asset"."id"
+  left join "asset_job_status_gallery" on "asset_job_status_gallery"."assetId" = "asset"."id"
+where
+  "asset_job_status_gallery"."petsDetectedAt" is null
+  and "asset"."deletedAt" is null
+  and "asset"."visibility" != $1
+
+-- PetFaceRepository.searchPets
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personGroupId",
+      pet_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "pet_search" on "pet_search"."faceId" = "asset_face"."id"
+    where
+      "asset"."ownerId" = any ($2::uuid[])
+      and "asset"."deletedAt" is null
+    order by
+      "distance"
+    limit
+      $3
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $4
+commit

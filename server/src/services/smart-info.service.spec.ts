@@ -291,13 +291,13 @@ describe(SmartInfoService.name, () => {
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
         const framePaths = Array.from({ length: 8 }, (_, i) => `/tmp/frame-${i}.jpg`);
-        mocks.media.extractVideoFrames.mockResolvedValue(framePaths);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(framePaths);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Success);
 
         expect(mocks.media.probe).toHaveBeenCalledWith(asset.originalPath);
-        expect(mocks.media.extractVideoFrames).toHaveBeenCalledTimes(1);
+        expect(mocks.videoTrim.extractVideoFrames).toHaveBeenCalledTimes(1);
         expect(mocks.machineLearning.encodeImage).toHaveBeenCalledTimes(8);
         expect(mocks.search.upsert).toHaveBeenCalledTimes(1);
       });
@@ -306,12 +306,12 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(100));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
-        const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+        const timestamps = mocks.videoTrim.extractVideoFrames.mock.calls[0][1] as number[];
         expect(timestamps).toHaveLength(8);
         expect(timestamps[0]).toBeCloseTo(5, 0);
         expect(timestamps[7]).toBeCloseTo(95, 0);
@@ -324,12 +324,12 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(1.5));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
-        const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+        const timestamps = mocks.videoTrim.extractVideoFrames.mock.calls[0][1] as number[];
         expect(timestamps).toEqual([0.75]);
         expect(mocks.machineLearning.encodeImage).toHaveBeenCalledTimes(1);
       });
@@ -338,12 +338,12 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(0));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
-        const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+        const timestamps = mocks.videoTrim.extractVideoFrames.mock.calls[0][1] as number[];
         expect(timestamps).toEqual([0]);
       });
 
@@ -351,12 +351,12 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(NaN));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
-        const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+        const timestamps = mocks.videoTrim.extractVideoFrames.mock.calls[0][1] as number[];
         expect(timestamps).toEqual([0]);
       });
 
@@ -364,12 +364,12 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(-5));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
-        const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+        const timestamps = mocks.videoTrim.extractVideoFrames.mock.calls[0][1] as number[];
         expect(timestamps).toEqual([0]);
       });
 
@@ -377,7 +377,7 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/a.jpg', '/tmp/b.jpg', '/tmp/c.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/a.jpg', '/tmp/b.jpg', '/tmp/c.jpg']);
         mocks.machineLearning.encodeImage
           .mockResolvedValueOnce('[1,0,0]')
           .mockResolvedValueOnce('[0,1,0]')
@@ -407,7 +407,7 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
         mocks.machineLearning.encodeImage.mockRejectedValue(new Error('ML service unavailable'));
 
         expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Failed);
@@ -419,7 +419,7 @@ describe(SmartInfoService.name, () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockRejectedValue(new Error('extraction failed'));
+        mocks.videoTrim.extractVideoFrames.mockRejectedValue(new Error('extraction failed'));
 
         expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Failed);
 
@@ -454,7 +454,7 @@ describe(SmartInfoService.name, () => {
         expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Success);
 
         expect(mocks.media.probe).not.toHaveBeenCalled();
-        expect(mocks.media.extractVideoFrames).not.toHaveBeenCalled();
+        expect(mocks.videoTrim.extractVideoFrames).not.toHaveBeenCalled();
         expect(mocks.machineLearning.encodeImage).toHaveBeenCalledWith(
           asset.files[0].path,
           expect.objectContaining({ modelName: 'ViT-B-32__openai' }),
@@ -480,13 +480,17 @@ describe(SmartInfoService.name, () => {
           .build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[0.1, 0.2]');
 
         await sut.handleEncodeClip({ id: asset.id });
 
         expect(mocks.media.probe).toHaveBeenCalledWith(tempPath);
-        expect(mocks.media.extractVideoFrames).toHaveBeenCalledWith(tempPath, expect.any(Array), expect.any(String));
+        expect(mocks.videoTrim.extractVideoFrames).toHaveBeenCalledWith(
+          tempPath,
+          expect.any(Array),
+          expect.any(String),
+        );
         expect(cleanupSpy).toHaveBeenCalledOnce();
       });
 
@@ -508,7 +512,7 @@ describe(SmartInfoService.name, () => {
           .build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockRejectedValue(new Error('frame extraction failed'));
+        mocks.videoTrim.extractVideoFrames.mockRejectedValue(new Error('frame extraction failed'));
 
         await sut.handleEncodeClip({ id: asset.id });
 
@@ -521,7 +525,7 @@ describe(SmartInfoService.name, () => {
           .build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
         mocks.machineLearning.encodeImage.mockRejectedValue(new Error('ML down'));
 
         await sut.handleEncodeClip({ id: asset.id });
@@ -537,7 +541,7 @@ describe(SmartInfoService.name, () => {
           .build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
         mocks.media.probe.mockResolvedValue(probeStub(10));
-        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.videoTrim.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[0.1, 0.2]');
 
         await sut.handleEncodeClip({ id: asset.id });

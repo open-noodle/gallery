@@ -4,9 +4,10 @@ import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 
-// Coupled to AutoTabsRouter transition — see tab_shell.page.dart (upstream's
-// 600 ms FadeTransition). 20 ms buffer lets MainTimelinePage finish its first-
-// build pass before search mode replaces its app bar.
+// Coupled to AutoTabsRouter transition — see gallery_tab_shell.page.dart (its
+// 600 ms FadeTransition, copied from upstream's tab shell). 20 ms buffer lets
+// MainTimelinePage finish its first-build pass before search mode replaces its
+// app bar.
 const Duration kGalleryTabTransitionDelay = Duration(milliseconds: 620);
 
 /// Reader is the common shape across WidgetRef, Ref, and ProviderContainer's
