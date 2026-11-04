@@ -1,6 +1,7 @@
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import * as handleErrorModule from '#lib/utils/handle-error.ts';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   getMembers,
   getPersonFaces,
@@ -14,13 +15,12 @@ import {
   updateSpacePersonRepresentativeFace,
   type PersonFacePageResponseDto,
   type SharedSpaceMemberResponseDto,
+  type PersonResponseDto,
   type SharedSpacePersonResponseDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { personFactory } from '#test-data/factories/person-factory';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 import {
   getPersonActions,
   getPersonFacesPage,
@@ -81,7 +81,7 @@ afterEach(() => {
 
 describe('handleUpdatePersonBirthDate', () => {
   it('routes the birthday write to the shared space endpoint for a space-scoped person', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       id: 'space-person-1',
       birthDate: null,
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
@@ -104,7 +104,7 @@ describe('handleUpdatePersonBirthDate', () => {
   });
 
   it('clears the birthday of a space-scoped person', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       id: 'space-person-1',
       birthDate: '1990-06-15',
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
@@ -122,7 +122,7 @@ describe('handleUpdatePersonBirthDate', () => {
   });
 
   it('keeps using the person endpoint for an owned person', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       primaryProfile: { type: Type.UserPerson, id: 'person-1' },
     });
     const updated = { ...person, birthDate: '1990-06-15' };
@@ -136,7 +136,7 @@ describe('handleUpdatePersonBirthDate', () => {
   });
 
   it('handles failures from the shared space endpoint without emitting updates', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
     });
     const error = new Error('no access');
@@ -154,7 +154,7 @@ describe('getPersonActions', () => {
   const $t = ((key: string) => key) as unknown as MessageFormatter;
 
   it('routes unhiding a space-scoped person to the shared space endpoint', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       id: 'space-person-1',
       isHidden: true,
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
@@ -173,7 +173,7 @@ describe('getPersonActions', () => {
   });
 
   it('handles failures when hiding a space-scoped person without emitting updates', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       isHidden: false,
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
     });
@@ -201,9 +201,9 @@ describe('isSpaceEditor', () => {
   });
 
   const spaces = [
-    sharedSpaceFactory.build({ id: 'editor-space', members: [member('user-1', SharedSpaceRole.Editor)] }),
-    sharedSpaceFactory.build({ id: 'owner-space', members: [member('user-1', SharedSpaceRole.Owner)] }),
-    sharedSpaceFactory.build({
+    factory.sharedSpace({ id: 'editor-space', members: [member('user-1', SharedSpaceRole.Editor)] }),
+    factory.sharedSpace({ id: 'owner-space', members: [member('user-1', SharedSpaceRole.Owner)] }),
+    factory.sharedSpace({
       id: 'viewer-space',
       members: [member('someone-else', SharedSpaceRole.Owner), member('user-1', SharedSpaceRole.Viewer)],
     }),
@@ -235,8 +235,8 @@ describe('getPersonActions viewer gating', () => {
   const spaceProfile = { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' };
 
   it('hides write actions for a space-scoped person when the user cannot edit', () => {
-    const visible = personFactory.build({ isHidden: false, primaryProfile: spaceProfile });
-    const hidden = personFactory.build({ isHidden: true, primaryProfile: spaceProfile });
+    const visible = factory.person({ isHidden: false, primaryProfile: spaceProfile });
+    const hidden = factory.person({ isHidden: true, primaryProfile: spaceProfile });
 
     const { SetDateOfBirth, HidePerson } = getPersonActions($t, visible, { canEditSpacePerson: false });
     const { ShowPerson } = getPersonActions($t, hidden, { canEditSpacePerson: false });
@@ -247,7 +247,7 @@ describe('getPersonActions viewer gating', () => {
   });
 
   it('offers write actions for a space-scoped person by default', () => {
-    const person = personFactory.build({ isHidden: false, primaryProfile: spaceProfile });
+    const person = factory.person({ isHidden: false, primaryProfile: spaceProfile });
 
     const { SetDateOfBirth, HidePerson } = getPersonActions($t, person);
 
@@ -256,7 +256,7 @@ describe('getPersonActions viewer gating', () => {
   });
 
   it('keeps write actions for an owned person regardless of the flag', () => {
-    const person = personFactory.build({
+    const person = factory.person({
       isHidden: false,
       primaryProfile: { type: Type.UserPerson, id: 'person-1' },
     });
@@ -270,8 +270,8 @@ describe('getPersonActions viewer gating', () => {
 
 describe('representative face routing', () => {
   // eslint-disable-next-line unicorn/no-unnecessary-parameters
-  const spaceScopedPerson = (overrides: Parameters<typeof personFactory.build>[0] = {}) =>
-    personFactory.build({
+  const spaceScopedPerson = (overrides: Partial<PersonResponseDto> = {}) =>
+    factory.person({
       id: 'space-person-1',
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
       ...overrides,
@@ -288,7 +288,7 @@ describe('representative face routing', () => {
   });
 
   it('loads faces of an owned person from the person endpoint', async () => {
-    const person = personFactory.build({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
+    const person = factory.person({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
     vi.mocked(getPersonFaces).mockResolvedValue(facesPage);
 
     await expect(getPersonFacesPage(person, { page: 1, size: 20 })).resolves.toEqual(facesPage);
@@ -315,7 +315,7 @@ describe('representative face routing', () => {
   });
 
   it('updates the representative face of an owned person via the person endpoint', async () => {
-    const person = personFactory.build({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
+    const person = factory.person({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
     const updated = { ...person, updatedAt: '2026-02-01T00:00:00Z' };
     vi.mocked(updateRepresentativeFace).mockResolvedValue(updated);
 
@@ -330,7 +330,7 @@ describe('representative face routing', () => {
 
   it('builds face thumbnail URLs for space-scoped and owned people', () => {
     const spacePerson = spaceScopedPerson();
-    const ownedPerson = personFactory.build({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
+    const ownedPerson = factory.person({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
 
     expect(getPersonFaceThumbnail(spacePerson, 'face-1')).toBe(
       getSpacePersonFaceThumbnailUrl('space-1', 'space-person-1', 'face-1', spacePerson.updatedAt),
@@ -343,7 +343,7 @@ describe('representative face routing', () => {
 
 describe('updatePersonName', () => {
   it('merges the shared space response into a space-scoped person', async () => {
-    const person = personFactory.build({
+    const person = factory.person({
       id: 'space-person-1',
       name: 'Old Name',
       numberOfAssets: 5,

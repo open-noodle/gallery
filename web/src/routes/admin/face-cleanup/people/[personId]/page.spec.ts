@@ -45,7 +45,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('#test-data/mocks/noop-component.svelte');
+  const noop = await import('#test/unit/mocks/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -108,7 +108,7 @@ vi.mock('$app/stores', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('#test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#test/unit/mocks/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 

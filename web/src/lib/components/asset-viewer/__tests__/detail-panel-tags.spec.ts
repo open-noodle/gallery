@@ -1,11 +1,11 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelTags from '../DetailPanelTags.svelte';
 
 // Task 5 of Slice 7 (asset-viewer-contextual-filters). Per R5 this is a dedicated child spec —
@@ -25,7 +25,7 @@ const { gotoMock, removeTagMock, getAssetInfoMock } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -60,7 +60,7 @@ const TAGS = [
 ];
 
 const buildAsset = (): AssetResponseDto =>
-  assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', tags: TAGS as AssetResponseDto['tags'] });
+  factory.asset({ id: 'asset-1', ownerId: 'owner-1', tags: TAGS as AssetResponseDto['tags'] });
 
 beforeEach(() => {
   vi.clearAllMocks();

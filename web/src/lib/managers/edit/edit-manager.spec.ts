@@ -1,11 +1,11 @@
 import { EditManager, EditToolType } from '#lib/managers/edit/edit-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
+import { factory } from '#test/unit/factories.ts';
+import { websocketMock } from '#test/unit/mocks/websocket.mock.ts';
 import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { websocketMock } from '#test-data/mocks/websocket.mock';
 
 vi.mock('@immich/sdk');
 vi.mock('#lib/stores/websocket.js');
@@ -65,8 +65,8 @@ describe('EditManager', () => {
     });
 
     it('should call editAsset and emit AssetUpdate on success', async () => {
-      const asset = assetFactory.build();
-      const refreshedAsset = assetFactory.build({ id: asset.id, thumbhash: 'new-thumbhash' });
+      const asset = factory.asset();
+      const refreshedAsset = factory.asset({ id: asset.id, thumbhash: 'new-thumbhash' });
       vi.mocked(editAsset).mockResolvedValue(undefined as never);
       vi.mocked(getAssetInfo).mockResolvedValue(refreshedAsset);
 
@@ -81,8 +81,8 @@ describe('EditManager', () => {
     });
 
     it('should emit AssetUpdate before AssetEditsApplied', async () => {
-      const asset = assetFactory.build();
-      const refreshedAsset = assetFactory.build({ id: asset.id });
+      const asset = factory.asset();
+      const refreshedAsset = factory.asset({ id: asset.id });
       vi.mocked(editAsset).mockResolvedValue(undefined as never);
       vi.mocked(getAssetInfo).mockResolvedValue(refreshedAsset);
 
@@ -98,8 +98,8 @@ describe('EditManager', () => {
     });
 
     it('should call removeAssetEdits when edits are empty', async () => {
-      const asset = assetFactory.build();
-      const refreshedAsset = assetFactory.build({ id: asset.id });
+      const asset = factory.asset();
+      const refreshedAsset = factory.asset({ id: asset.id });
       vi.mocked(removeAssetEdits).mockResolvedValue(undefined as never);
       vi.mocked(getAssetInfo).mockResolvedValue(refreshedAsset);
 
@@ -113,8 +113,8 @@ describe('EditManager', () => {
     });
 
     it('should save through the selected tool when it saves itself, and skip the edits endpoints', async () => {
-      const asset = assetFactory.build();
-      vi.mocked(getAssetInfo).mockResolvedValue(assetFactory.build({ id: asset.id }));
+      const asset = factory.asset();
+      vi.mocked(getAssetInfo).mockResolvedValue(factory.asset({ id: asset.id }));
       const save = vi.fn().mockResolvedValue(undefined);
       editManager.selectedTool = {
         type: EditToolType.Trim,
@@ -133,7 +133,7 @@ describe('EditManager', () => {
     });
 
     it('should return false and show error toast on failure', async () => {
-      const asset = assetFactory.build();
+      const asset = factory.asset();
       vi.mocked(removeAssetEdits).mockRejectedValue(new Error('fail'));
 
       editManager.currentAsset = asset;
@@ -145,8 +145,8 @@ describe('EditManager', () => {
     });
 
     it('should set hasAppliedEdits to true on success', async () => {
-      const asset = assetFactory.build();
-      const refreshedAsset = assetFactory.build({ id: asset.id });
+      const asset = factory.asset();
+      const refreshedAsset = factory.asset({ id: asset.id });
       vi.mocked(editAsset).mockResolvedValue(undefined as never);
       vi.mocked(getAssetInfo).mockResolvedValue(refreshedAsset);
 
@@ -158,8 +158,8 @@ describe('EditManager', () => {
     });
 
     it('should set isApplyingEdits during the operation', async () => {
-      const asset = assetFactory.build();
-      const refreshedAsset = assetFactory.build({ id: asset.id });
+      const asset = factory.asset();
+      const refreshedAsset = factory.asset({ id: asset.id });
       vi.mocked(editAsset).mockResolvedValue(undefined as never);
       vi.mocked(getAssetInfo).mockResolvedValue(refreshedAsset);
 

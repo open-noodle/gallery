@@ -1,6 +1,6 @@
 import type { AssetMediaResponseDto, LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { thumbnailUtils, timelineUtils } from 'src/ui/specs/timeline/utils.js';
+import { thumbnailUtils, timelineUtils } from 'src/gallery-timeline.js';
 import { utils } from 'src/utils.js';
 
 test.describe('Timeline grouping navigation', () => {
