@@ -129,4 +129,28 @@ Fork diff vs upstream, before → after: `metadata.service.ts` 253 → 256 (the 
 
 ## Remote CI
 
-Pending.
+Branch `rebase/upstream-rolling-v3.4`, dispatched in two staggered waves.
+
+| Workflow                            | Status | Commit        | Run           | Notes                                                         |
+| ----------------------------------- | ------ | ------------- | ------------- | ------------------------------------------------------------- |
+| Test                                | GREEN  | `25eb9ace987` | `41852034383` | third run, see below                                          |
+| Docker                              | GREEN  | `2730dc550a2` | `41842049284` | later commits touch only e2e specs                            |
+| Static Code Analysis                | GREEN  | `2730dc550a2` | `41841776332` |                                                               |
+| Gallery Build Mobile                | GREEN  | `2730dc550a2` | `41841944413` |                                                               |
+| Gallery Mobile Smoke                | GREEN  | `2730dc550a2` | `41841887695` |                                                               |
+| Gallery Rebase Smoke                | GREEN  | `2730dc550a2` | `41841831665` |                                                               |
+| Gallery ML Smoke                    | GREEN  | `2730dc550a2` | `41842211669` |                                                               |
+| Storage Migration Tests             | GREEN  | `2730dc550a2` | `41842130238` |                                                               |
+| Storage Migration E2E               | GREEN  | `2730dc550a2` | `41842375652` |                                                               |
+| Gallery Revert-to-Immich Validation | RED    | `2730dc550a2` | `41842294197` | tested `gallery-server:main` (3.3.5), needs a branch RC image |
+
+Fixes found by CI:
+
+- End-to-End Lint: the synced e2e specs on rolling's unicorn rules (`d1a9376dcac`).
+- `database-backups` "rollback to restore point": the rollback is a second full restore, and on Gallery's
+  schema it stood at the same statement (progress 0.7476) when upstream's 30 s poll ended, on both runs.
+  The poll now has the 60 s the restore test above it already uses (`25eb9ace987`). This is a test-only
+  hunk in an upstream e2e file.
+
+Failed once, passed on re-run: the medium `gallery-search-options` cache `stale` case (its result depends on
+when Postgres's write counters land) and the web maintenance enter/exit test.
