@@ -56,7 +56,6 @@ void main() {
       return <Person>[];
     }),
     driftSpacePeopleProvider.overrideWith((ref, key) async => <Person>[]),
-    getAllPeopleProvider.overrideWith((ref, sortBy) => Stream.value(<Person>[])),
   ];
 
   // Keeps the server-backed provider actively listened so invalidation triggers a

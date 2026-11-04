@@ -3,6 +3,7 @@ import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder } from 'src/enum.js';
+import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md).
 
@@ -23,7 +24,7 @@ export const depthMapPath = (asset: { id: string; ownerId: string }, backend: St
   const fileName = `${asset.id}_depth.png`;
   return backend instanceof DiskStorageBackend
     ? StorageCore.getNestedPath(StorageFolder.Thumbnails, asset.ownerId, fileName)
-    : StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, asset.ownerId, fileName);
+    : getRelativeNestedPath(StorageFolder.Thumbnails, asset.ownerId, fileName);
 };
 
 export type DepthMetrics = {

@@ -563,7 +563,7 @@ describe('favoriting a photo you do not own, by space role (#763)', () => {
   //
   // That destination query differs from the /favorites one in a load-bearing way: it states
   // `userId`, the personal timeline's owner gate. The gate is OR-ed with the shared-space arm
-  // (asset.repository.ts), and the isFavorite carve-out above still widens the space scope to every
+  // (gallery/utils/time-bucket-filter.ts), and the isFavorite carve-out above still widens the space scope to every
   // space the caller belongs to — so a favourite on someone else's asset inside a space hidden from
   // the caller's timeline has to come back. If either ever became an AND, the fix would silently
   // return an empty page again, which is the failure this pins.

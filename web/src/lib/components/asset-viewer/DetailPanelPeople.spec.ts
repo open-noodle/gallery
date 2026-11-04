@@ -1,4 +1,4 @@
-import { cropFacesFromAsset } from '#lib/stores/preferences.store.ts';
+import { cropFacesFromAsset } from '#lib/gallery/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';

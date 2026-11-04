@@ -4,6 +4,11 @@
 **Status:** Implemented. Seam figures in §1 and §5.1 are measured from the implemented branch, not estimated.
 **Scope:** Add shared-space actions to upstream's workflows feature, with a fork/upstream boundary that does not grow as more fork features are added.
 
+> **Superseded in part (OD-18, 2026-10):** the `gallery` host function (D2) is gone. A stock Immich server could not
+> load a plugin importing it. The plugin's exports are now no-ops built with upstream's `plugin-sdk prepareBuild`, and
+> upstream's execute loop calls `GalleryWorkflowHostService.runStep`, which runs `gallery-core` steps in TypeScript
+> before they reach WASM. The dispatcher and its handlers below are unchanged.
+
 ## 1. Summary
 
 Upstream Immich ships a workflow engine driven by WASM plugins. Gallery's shared spaces are invisible to it: a workflow can add an uploaded asset to an album, but not to a space or to a space album.

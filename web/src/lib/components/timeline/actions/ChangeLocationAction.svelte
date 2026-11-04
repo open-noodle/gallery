@@ -3,7 +3,8 @@
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import GeolocationPointPickerModal from '#lib/modals/GeolocationPointPickerModal.svelte';
-  import { getEditableAssetsWithWarning, getOwnedAssetsWithWarning } from '#lib/utils/asset-utils.ts';
+  import { getEditableAssetsWithWarning } from '#lib/gallery/utils/editable-assets.ts';
+  import { getOwnedAssetsWithWarning } from '#lib/utils/asset-utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { updateAssets } from '@immich/sdk';
   import { modalManager, toastManager } from '@immich/ui';

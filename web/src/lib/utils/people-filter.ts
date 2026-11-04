@@ -1,4 +1,4 @@
-import { PeopleFilterBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+import { PeopleFilterBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import { get } from 'svelte/store';
 
 /**

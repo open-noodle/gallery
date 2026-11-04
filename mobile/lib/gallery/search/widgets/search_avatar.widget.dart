@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
+import 'package:immich_mobile/gallery/utils/person_thumbnail_url.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
-import 'package:immich_mobile/utils/image_url_builder.dart';
 
 /// A person's face, routed by its thumbnail profile: a Space person goes to the membership-gated space endpoint, never
 /// to the owner-only person endpoint (CLAUDE.md, "Edits are gated and routed exactly like web").

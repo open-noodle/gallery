@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -71,7 +72,7 @@ describe('UserRepository.updateUsage', () => {
   });
 });
 
-describe('UserRepository.setUsage', () => {
+describe('StorageUsageRepository.setUsage', () => {
   it('overwrites the same column syncUsage fills', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
@@ -81,7 +82,7 @@ describe('UserRepository.setUsage', () => {
     await sut.syncUsage(user.id);
     // The derivative-inclusive walk writes here, so display and quota enforcement read whichever
     // figure the admin's toggle selected without knowing which one produced it.
-    await sut.setUsage(user.id, 4321);
+    await ctx.get(StorageUsageRepository).setUsage(user.id, 4321);
 
     await expect(getUsage(user.id)).resolves.toEqual({ quotaUsageInBytes: 4321 });
   });

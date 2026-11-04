@@ -1,5 +1,5 @@
+import { PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
-import { PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import type { Size } from '#lib/utils/container-utils.ts';
 import {
   appendUniqueById,

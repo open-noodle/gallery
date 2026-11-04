@@ -752,7 +752,7 @@ describe(SyncService.name, () => {
       expect(memoryMessages).toHaveLength(2);
     });
 
-    it('should omit birthday memory upserts for every client, and still stream their deletes', async () => {
+    it('should omit birthday memory upserts on MemoriesV1 for every client, and still stream their deletes', async () => {
       for (const types of [
         [SyncRequestType.MemoriesV1],
         [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1],
@@ -800,34 +800,38 @@ describe(SyncService.name, () => {
     });
 
     // immich-32167 added MemoriesV2 / MemoryToAssetsV2 and narrowed V1 to on_this_day. A Gallery
-    // server applies one policy to both versions: a stock Immich app at 3.3+ requests V2 from a
-    // Gallery server (its 5.x version clears upstream's 3.3.0 gate) and cannot decode `rule`, and
+    // server keeps upstream's split for `birthday` (V2 only: a client on V1 cannot decode it, and
+    // that includes every Gallery app before 5.8.0) and sends `rule` to fork-aware clients only: a
+    // stock Immich app at 3.3+ requests V2 from a Gallery server and cannot decode `rule`, and
     // installed Gallery apps stay on V1 yet need their rule memories and those memories' photos.
     describe('memory sync policy across MemoriesV1/V2 and MemoryToAssetsV1/V2', () => {
-      it('should send a stock client on_this_day only, on V1 and on V2', async () => {
+      it('should send a stock client on_this_day on V1, and on_this_day and birthday on V2', async () => {
         await expect(streamMemories(stockClient(SyncRequestType.MemoriesV1), SyncEntityType.MemoryV1)).resolves.toEqual(
           [MemoryType.OnThisDay],
         );
         await expect(streamMemories(stockClient(SyncRequestType.MemoriesV2), SyncEntityType.MemoryV2)).resolves.toEqual(
-          [MemoryType.OnThisDay],
+          [MemoryType.OnThisDay, MemoryType.Birthday],
         );
       });
 
-      it('should send a Gallery client on_this_day and rule, and never birthday, on V1 and on V2', async () => {
+      it('should send a Gallery client on_this_day and rule on V1, and birthday too on V2', async () => {
         await expect(
           streamMemories(galleryClient(SyncRequestType.MemoriesV1), SyncEntityType.MemoryV1),
         ).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule]);
         await expect(
           streamMemories(galleryClient(SyncRequestType.MemoriesV2), SyncEntityType.MemoryV2),
-        ).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule]);
+        ).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule, MemoryType.Birthday]);
       });
 
       it('should scope memory photo links to the memory types the client is sent', async () => {
         for (const [types, expected] of [
           [stockClient(SyncRequestType.MemoryToAssetsV1), [MemoryType.OnThisDay]],
-          [stockClient(SyncRequestType.MemoryToAssetsV2), [MemoryType.OnThisDay]],
+          [stockClient(SyncRequestType.MemoryToAssetsV2), [MemoryType.OnThisDay, MemoryType.Birthday]],
           [galleryClient(SyncRequestType.MemoryToAssetsV1), [MemoryType.OnThisDay, MemoryType.Rule]],
-          [galleryClient(SyncRequestType.MemoryToAssetsV2), [MemoryType.OnThisDay, MemoryType.Rule]],
+          [
+            galleryClient(SyncRequestType.MemoryToAssetsV2),
+            [MemoryType.OnThisDay, MemoryType.Rule, MemoryType.Birthday],
+          ],
         ] as const) {
           syncSubs.memoryToAsset.getUpsertsForTypes.mockClear();
           const { writable } = makeWritable();
@@ -857,9 +861,15 @@ describe(SyncService.name, () => {
 
           await streamTypes([...types], SyncEntityType.PersonV1);
 
-          expect(syncSubs.person.getUpserts).toHaveBeenCalledWith(expect.anything(), withPets);
-          expect(syncSubs.assetFace.getUpsertsV2).toHaveBeenCalledWith(expect.anything(), withPets);
-          expect(syncSubs.assetFace.getUpsertsV3).toHaveBeenCalledWith(expect.anything(), withPets);
+          expect(syncSubs.person.getUpserts).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
+          expect(syncSubs.assetFace.getUpsertsV2).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
+          expect(syncSubs.assetFace.getUpsertsV3).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
         }
       });
     });

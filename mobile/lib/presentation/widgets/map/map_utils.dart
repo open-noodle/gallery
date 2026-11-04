@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:immich_mobile/gallery/location_disclosure.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/widgets/common/confirm_dialog.dart';
 import 'package:logging/logging.dart';
@@ -72,27 +73,32 @@ class MapUtils {
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-      bool shouldContinueFromDisclosure = false;
+      if (permission == LocationPermission.deniedForever && !silent) {
+        return (
+          null,
+          context.mounted
+              ? await discloseBeforeAppSettings(context, _LocationPermissionDisabledDialog.new)
+              : LocationPermission.unableToDetermine,
+        );
+      }
+      bool shouldRequestPermission = false;
 
-      if ((permission == LocationPermission.denied || permission == LocationPermission.deniedForever) && !silent) {
+      if (permission == LocationPermission.denied && !silent) {
         if (!context.mounted) {
           return (null, LocationPermission.unableToDetermine);
         }
 
-        shouldContinueFromDisclosure =
-            await showDialog<bool>(
-              context: context,
-              builder: (context) => _LocationPermissionDisabledDialog(context),
-            ) ??
-            false;
-        if (shouldContinueFromDisclosure && permission == LocationPermission.denied) {
+        shouldRequestPermission = await confirmLocationDisclosure(context, _LocationPermissionDisabledDialog.new);
+        if (shouldRequestPermission) {
           permission = await Geolocator.requestPermission();
-        } else if (shouldContinueFromDisclosure && permission == LocationPermission.deniedForever) {
-          await Geolocator.openAppSettings();
         }
       }
 
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        // Open app settings only if you did not request for permission before
+        if (permission == LocationPermission.deniedForever && !shouldRequestPermission && !silent) {
+          await Geolocator.openAppSettings();
+        }
         return (null, LocationPermission.deniedForever);
       }
 

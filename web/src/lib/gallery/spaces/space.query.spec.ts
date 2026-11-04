@@ -1,7 +1,7 @@
 import { getAllSpacesQuery, getSpaceAlbumsQuery, spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { recentSpacesDropdown } from '#lib/gallery/stores/preferences.store.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
-import { recentSpacesDropdown } from '#lib/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
 import { getAllSpaces, getSharedSpaceAlbums, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { get } from 'svelte/store';

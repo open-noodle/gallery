@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { loadManifest } from './manifest';
 import { classifyCommit, detectDomain } from './risk';
 import type { Manifest } from './types';
 
@@ -86,5 +88,43 @@ describe('classifyCommit', () => {
       'Touches shared-spaces upstream extension path',
     );
     expect(result.reasons).toContain('Matches risk pattern breaking-refactor');
+  });
+});
+
+describe('upstream search redesign watch (docs/fork/ownership.yml)', () => {
+  const repoManifest = loadManifest(
+    path.resolve(process.cwd(), '../../docs/fork/ownership.yml'),
+  );
+  const classify = (subject: string, files: string[]) =>
+    classifyCommit(
+      { sha: 'abc123', shortSha: 'abc123', subject, files },
+      repoManifest,
+      [],
+    );
+
+  it.each([
+    ['feat(server): search facets endpoint', ['server/src/dtos/search.dto.ts']],
+    [
+      'fix: keep locked assets out of search',
+      ['server/src/repositories/search.repository.ts'],
+    ],
+    [
+      'feat(server): POST /search/facets',
+      ['open-api/immich-openapi-specs.json'],
+    ],
+  ])('flags %s', (subject, files) => {
+    const result = classify(subject, files);
+    expect(result.risk).toBe('high');
+    expect(result.reasons).toContain(
+      'Matches risk pattern upstream-search-redesign',
+    );
+  });
+
+  it('leaves unrelated commits alone', () => {
+    expect(
+      classify('fix(web): album title overflow', [
+        'web/src/lib/components/album-page/album-title.svelte',
+      ]).reasons,
+    ).not.toContain('Matches risk pattern upstream-search-redesign');
   });
 });

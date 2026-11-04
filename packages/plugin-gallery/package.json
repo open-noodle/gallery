@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "pnpm build:tsc && pnpm build:wasm",
-    "build:tsc": "node bin/prepare-build.mjs && tsc --noEmit && node esbuild.js",
+    "build:tsc": "plugin-sdk prepareBuild && tsc --noEmit && node esbuild.js",
     "build:wasm": "extism-js dist/index.js -i dist/index.d.ts -o dist/plugin.wasm"
   },
   "license": "AGPL-3.0",

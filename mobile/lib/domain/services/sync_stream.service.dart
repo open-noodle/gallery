@@ -320,7 +320,7 @@ class SyncStreamService {
         // asset has now run, so a link whose asset arrived late can finally be written, and
         // pruning afterwards keeps the existing semantics (a link to an unreachable asset is
         // cascade-removed along with the asset).
-        await _syncStreamRepository.flushDeferredMemoryAssetsV1();
+        await _gallerySyncStreamRepository.flushDeferredMemoryAssetsV1();
         return _gallerySyncStreamRepository.pruneAssets();
       // Request to reset the client state. Clear everything related to remote entities
       case SyncEntityType.syncResetV1:

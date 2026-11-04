@@ -223,7 +223,7 @@ enum ActionButtonType {
                 read: ProviderScope.containerOf(buildContext, listen: false).read,
                 popViewer: () => buildContext.maybePop(),
                 // Activate the existing timeline tab without rebuilding it (a fresh
-                // TabShellRoute would reload the timeline to the top and discard the scroll).
+                // GalleryTabShellRoute would reload the timeline to the top and discard the scroll).
                 goToTimeline: () => buildContext.navigateTo(const MainTimelineRoute()),
               ),
       ),

@@ -15,6 +15,7 @@ import { IWorker } from 'src/constants.js';
 import { controllers } from 'src/controllers/index.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { ApiTag, ImmichEnvironment, ImmichWorker } from 'src/enum.js';
+import { galleryProviders } from 'src/gallery/index.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { MaintenanceAuthGuard } from 'src/maintenance/maintenance-auth.guard.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
@@ -47,7 +48,7 @@ import { getKyselyConfig } from 'src/utils/database.js';
 import { configureUserAgent } from 'src/utils/fetch.js';
 import { detectMediaLocation, getBackupsStatePath } from 'src/utils/storage.js';
 
-const common = [...repositories, ...services, GlobalExceptionFilter];
+const common = [...repositories, ...galleryProviders, ...services, GlobalExceptionFilter];
 
 const commonMiddleware = [
   { provide: APP_FILTER, useClass: GlobalExceptionFilter },

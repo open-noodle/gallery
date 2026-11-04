@@ -118,7 +118,7 @@ export function encodeFilterParams(params: URLSearchParams, filters: FilterState
   }
 
   // albumId takes precedence over the has/none album filter, mirroring the server
-  // (asset.repository.ts guards isInAlbum/isNotInAlbum with `&& !options.albumId`). Emitting
+  // (gallery/utils/time-bucket-filter.ts guards isInAlbum/isNotInAlbum with `&& !options.albumId`). Emitting
   // both would be a contradiction the server silently resolves in albumId's favour anyway.
   const albumId = filters.albumId?.trim();
   if (albumId) {

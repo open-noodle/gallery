@@ -263,8 +263,8 @@ export const getMemoryTitle = (
     }
   }
 
-  // immich-30831's birthday type. Gallery keeps these rows off every list (spec
-  // 2026-09-24), so this only titles one reached by id.
+  // immich-30831's birthday type, Gallery's only birthday memory since OD-3. The `birthday` rule
+  // builders above title the rule rows earlier releases generated.
   if (memory.type === MemoryType.Birthday) {
     const name = (memory.data as Record<string, unknown>).personName;
     if (typeof name === 'string') {

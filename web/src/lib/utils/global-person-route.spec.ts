@@ -1,4 +1,5 @@
-import { getPersonActions, updatePersonName } from '#lib/services/person.service.ts';
+import { updatePersonName } from '#lib/gallery/people/person.service.ts';
+import { getPersonActions } from '#lib/services/person.service.ts';
 import {
   getGlobalPersonHref,
   getGlobalPersonThumbnailUrl,

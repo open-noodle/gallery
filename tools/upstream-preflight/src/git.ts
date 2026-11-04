@@ -190,3 +190,43 @@ function gitError(error: unknown): string {
 
   return String(error);
 }
+
+export type WhitespaceHeavyFile = {
+  file: string;
+  changed: number;
+  whitespaceOnly: number;
+};
+
+// Files whose from..to diff is mostly whitespace: `git diff -w` drops at least `minShare` of the
+// changed lines. Re-indents in upstream files conflict at every rebase and carry no fork logic.
+export function findWhitespaceHeavyFiles(
+  cwd: string,
+  from: string,
+  to: string,
+  { minLines = 10, minShare = 0.5 } = {},
+): WhitespaceHeavyFile[] {
+  const numstat = (extra: string[]) =>
+    new Map(
+      runGit(cwd, ['diff', '--numstat', '--no-renames', ...extra, from, to])
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.split('\t'))
+        .filter(([added, removed]) => added !== '-' && removed !== '-')
+        .map(([added, removed, file]) => [
+          file,
+          Number(added) + Number(removed),
+        ]),
+    );
+  const ignoringWhitespace = numstat(['-w']);
+  return [...numstat([])]
+    .map(([file, changed]) => ({
+      file,
+      changed,
+      whitespaceOnly: changed - (ignoringWhitespace.get(file) ?? 0),
+    }))
+    .filter(
+      ({ changed, whitespaceOnly }) =>
+        changed >= minLines && whitespaceOnly / changed >= minShare,
+    )
+    .sort((left, right) => right.whitespaceOnly - left.whitespaceOnly);
+}

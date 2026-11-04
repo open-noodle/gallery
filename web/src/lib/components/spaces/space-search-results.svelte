@@ -4,6 +4,7 @@
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import Portal from '#lib/elements/Portal.svelte';
+  import { setViewerSpace } from '#lib/gallery/viewer-space.ts';
   import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -49,6 +50,7 @@
     onReload,
     onScroll,
   }: Props = $props();
+  setViewerSpace(() => ({ spaceId, space }));
 
   let isViewerOpen = $state(false);
   let sentinelElement: HTMLElement | undefined = $state();
@@ -189,7 +191,7 @@
   {#if isViewerOpen && cursor}
     {#if LazyAssetViewer.current}
       {const AssetViewer = $derived(LazyAssetViewer.current)}
-      <AssetViewer {cursor} {isShared} {spaceId} {space} onClose={() => handlePromiseError(handleClose())} />
+      <AssetViewer {cursor} {isShared} onClose={() => handlePromiseError(handleClose())} />
     {/if}
   {/if}
 </Portal>

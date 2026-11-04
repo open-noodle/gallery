@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
@@ -33,6 +34,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
+    galleryPersonRepository: ctx.get(GalleryPersonRepository),
     sharedSpaceRepository: ctx.get(SharedSpaceRepository),
   });
 
@@ -231,13 +233,13 @@ describe('IdentityMergePropagationService medium tests', () => {
 
   it('rolls back all profile and identity changes when one profile merge fails', async () => {
     const { ctx, sut } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const galleryPersonRepository = ctx.get(GalleryPersonRepository);
     const { user } = await ctx.newUser();
     const target = await createPersonProfile(ctx, { ownerId: user.id, name: 'Target' });
     const sourceA = await createPersonProfile(ctx, { ownerId: user.id, name: 'Source A' });
     const sourceB = await createPersonProfile(ctx, { ownerId: user.id, name: 'Source B' });
-    const originalMerge = personRepository.mergePersonProfile.bind(personRepository);
-    vi.spyOn(personRepository, 'mergePersonProfile')
+    const originalMerge = galleryPersonRepository.mergePersonProfile.bind(galleryPersonRepository);
+    vi.spyOn(galleryPersonRepository, 'mergePersonProfile')
       .mockImplementationOnce((input, db) => originalMerge(input, db))
       .mockRejectedValueOnce(new Error('profile merge failed'));
 
@@ -639,7 +641,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     const db = await getKyselyDB();
     try {
       const { ctx, sut } = setup(db);
-      const personRepository = ctx.get(PersonRepository);
+      const galleryPersonRepository = ctx.get(GalleryPersonRepository);
       const { user } = await ctx.newUser();
       const identityA = await createIdentity(ctx.database);
       const identityB = await createIdentity(ctx.database);
@@ -647,11 +649,11 @@ describe('IdentityMergePropagationService medium tests', () => {
       const personA = await createPersonProfile(ctx, { ownerId: user.id, identityId: identityA.id, name: 'A' });
       const personB = await createPersonProfile(ctx, { ownerId: user.id, identityId: identityB.id, name: 'B' });
       const personC = await createPersonProfile(ctx, { ownerId: user.id, identityId: identityC.id, name: 'C' });
-      const originalLock = personRepository.lockPeopleForMerge.bind(personRepository);
+      const originalLock = galleryPersonRepository.lockPeopleForMerge.bind(galleryPersonRepository);
       const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
       const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
-      vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
+      vi.spyOn(galleryPersonRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
         if (!(!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId))) {
           return;
@@ -689,15 +691,15 @@ describe('IdentityMergePropagationService medium tests', () => {
     const db = await getKyselyDB();
     try {
       const { ctx, sut } = setup(db);
-      const personRepository = ctx.get(PersonRepository);
+      const galleryPersonRepository = ctx.get(GalleryPersonRepository);
       const { user } = await ctx.newUser();
       const personA = await createPersonProfile(ctx, { ownerId: user.id, identityId: null, name: 'A' });
       const personB = await createPersonProfile(ctx, { ownerId: user.id, identityId: null, name: 'B' });
-      const originalLock = personRepository.lockPeopleForMerge.bind(personRepository);
+      const originalLock = galleryPersonRepository.lockPeopleForMerge.bind(galleryPersonRepository);
       const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
       const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
-      vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
+      vi.spyOn(galleryPersonRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
         if (!(!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId))) {
           return;

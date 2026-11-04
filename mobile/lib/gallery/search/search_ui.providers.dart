@@ -1,12 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
 // What search mode's widgets read beyond the Slice 2 core.
 
@@ -36,7 +35,7 @@ SearchAvailability? searchScopeAvailability(WidgetRef ref, SearchState state, Se
 /// The People sheet's Recent row: the 7 most recently updated people, read from the local database (no request). Only
 /// those the narrowed options still offer are shown, so they carry counts and respect the other filters.
 final searchRecentPersonIdsProvider = FutureProvider.autoDispose<List<String>>((ref) async {
-  final people = await ref.watch(getAllPeopleProvider(PeopleSortBy.name).future);
+  final people = await ref.watch(Store.people.all().future);
   final recent = people.where((p) => p.updatedAt != null).toList()
     ..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!));
   return [for (final person in recent.take(7)) person.id];

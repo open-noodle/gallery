@@ -1,5 +1,5 @@
+import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { factory } from '#test/unit/factories.ts';
-import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen } from '@testing-library/svelte';
@@ -156,7 +156,7 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
     const refreshed = { ...asset, people: [] };
     getAssetInfoMock.mockResolvedValue(refreshed);
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await fireEvent.click(screen.getByTestId('trigger-refresh'));
 
@@ -175,7 +175,7 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
     });
     getAssetInfoMock.mockResolvedValue({ ...asset, people: [] });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await fireEvent.click(screen.getByTestId('trigger-refresh'));
 

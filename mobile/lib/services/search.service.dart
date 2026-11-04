@@ -7,7 +7,6 @@ import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 
-// ignore: unused-code
 final searchServiceProvider = Provider(
   (ref) => SearchService(ref.watch(apiServiceProvider), ref.watch(searchApiRepositoryProvider)),
 );
@@ -19,7 +18,6 @@ class SearchService {
   final _log = Logger("SearchService");
   SearchService(this._apiService, this._searchApiRepository);
 
-  // ignore: unused-code
   Future<List<String>?> getSearchSuggestions(
     SearchSuggestionType type, {
     String? country,

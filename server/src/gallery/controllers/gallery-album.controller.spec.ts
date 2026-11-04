@@ -3,6 +3,7 @@ import { AlbumController } from 'src/controllers/album.controller.js';
 import { controllers } from 'src/controllers/index.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
+import { AlbumService } from 'src/services/album.service.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(GalleryAlbumController.name, () => {
@@ -10,7 +11,10 @@ describe(GalleryAlbumController.name, () => {
   const service = mockBaseService(GalleryAlbumService);
 
   beforeAll(async () => {
-    ctx = await controllerSetup(GalleryAlbumController, [{ provide: GalleryAlbumService, useValue: service }]);
+    ctx = await controllerSetup(GalleryAlbumController, [
+      { provide: GalleryAlbumService, useValue: service },
+      { provide: AlbumService, useValue: mockBaseService(AlbumService) },
+    ]);
     return () => ctx.close();
   });
 

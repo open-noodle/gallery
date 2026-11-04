@@ -1,6 +1,7 @@
 <script lang="ts">
   import { shortcut } from '#lib/actions/shortcut.ts';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import type { FaceEditorSpace } from '#lib/gallery/asset-viewer/space-face-editor.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import FaceCreateTagModal from '#lib/modals/CreateFaceModal.svelte';
   import { executeMutation } from '#lib/queries/client.ts';
@@ -27,9 +28,10 @@
     containerWidth: number;
     containerHeight: number;
     assetId: string;
+    spaceFaces?: FaceEditorSpace; // Gallery: a space editor tags the space's people (FaceEditorPanel)
   };
 
-  let { htmlElement, containerWidth, containerHeight, assetId }: Props = $props();
+  let { htmlElement, containerWidth, containerHeight, assetId, spaceFaces }: Props = $props();
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let canvas: Canvas | undefined = $state();
@@ -143,6 +145,10 @@
   };
 
   const getPeople = async () => {
+    if (spaceFaces) {
+      candidates = await spaceFaces.loadPeople();
+      return;
+    }
     const { hasNextPage, people, total } = await getAllPeople({ page, size: 1000, withHidden: false });
 
     if (candidates.length === total) {
@@ -260,6 +266,16 @@
       return;
     }
 
+    if (spaceFaces) {
+      try {
+        await spaceFaces.tag(person, data);
+      } catch (error) {
+        handleError(error, 'Error tagging face');
+      }
+      onClose();
+      return;
+    }
+
     const isConfirmed = await modalManager.showDialog({
       prompt: person.name ? $t('confirm_tag_face', { values: { name: person.name } }) : $t('confirm_tag_face_unnamed'),
     });
@@ -286,11 +302,9 @@
         return;
       }
 
-      const created = await modalManager.show(FaceCreateTagModal, {
-        assetId,
-        ...data,
-        previewUrl: getFacePreviewUrl(data),
-      });
+      const created = spaceFaces
+        ? await spaceFaces.create(data)
+        : await modalManager.show(FaceCreateTagModal, { assetId, ...data, previewUrl: getFacePreviewUrl(data) });
       if (!created) {
         return;
       }
@@ -309,7 +323,7 @@
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose, ignoreInputFields: false }} />
 
 <div
-  data-testid="face-editor-data"
+  id="face-editor-data"
   class="absolute inset-s-0 top-0 z-5 size-full overflow-hidden"
   data-overlay-interactive
   data-face-left={faceBoxPosition.left}
@@ -317,10 +331,11 @@
   data-face-width={faceBoxPosition.width}
   data-face-height={faceBoxPosition.height}
 >
-  <canvas bind:this={canvasEl} data-testid="face-editor" class="absolute inset-s-0 top-0"></canvas>
+  <canvas bind:this={canvasEl} id={spaceFaces ? 'space-face-editor' : 'face-editor'} class="absolute inset-s-0 top-0"
+  ></canvas>
 
   <div
-    data-testid="face-selector"
+    id="face-selector"
     bind:this={faceSelectorEl}
     class="absolute inset-s-[calc(50%-125px)] top-[calc(50%-250px)] w-62.5 max-w-62.5 rounded-xl border border-gray-200 bg-white px-2 py-4 backdrop-blur-sm transition-[top,left] duration-200 ease-out dark:border-gray-800 dark:bg-immich-dark-gray dark:text-immich-dark-fg"
   >
@@ -342,7 +357,7 @@
               <ImageThumbnail
                 curve
                 shadow
-                url={getPeopleThumbnailUrl(person)}
+                url={spaceFaces?.thumbnailUrl(person) ?? getPeopleThumbnailUrl(person)}
                 altText={person.name}
                 title={person.name}
                 widthStyle="30px"

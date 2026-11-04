@@ -1,7 +1,7 @@
 import z from 'zod';
 
-// Spread into AssetResponseSchema. A leaf module: it must not import from src/dtos.
-export const GalleryAssetResponseExtension = {
+// Spread into GalleryAssetResponseExtension (src/gallery/dtos/asset-response.dto.ts). A leaf module: it must not import from src/dtos.
+export const SpatialSceneAssetResponseExtension = {
   spatialScene: z
     .boolean()
     .optional()

@@ -86,17 +86,15 @@ export class MapRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getAlbumMapMarkers(albumId: string) {
-    return (
-      this.mapMarkersQuery()
-        .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
-        .where('album_asset.albumId', '=', albumId)
-        // security-2: never expose GPS / city / state / country of Hidden or Locked album assets. Flat
-        // gate (no owner exception), consistent with the album grid (withDefaultVisibility) and the album
-        // download path (downloadAlbumId). mapMarkersQuery() is asset-rooted, so asset.visibility is
-        // available without an extra join.
-        .where((eb) => spaceVisibilityGate(eb))
-        .execute()
-    );
+    // security-2: never expose GPS / city / state / country of Hidden or Locked album assets. Flat
+    // gate (no owner exception), consistent with the album grid (withDefaultVisibility) and the album
+    // download path (downloadAlbumId). mapMarkersQuery() is asset-rooted, so asset.visibility is
+    // available without an extra join.
+    return this.mapMarkersQuery()
+      .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
+      .where('album_asset.albumId', '=', albumId)
+      .where((eb) => spaceVisibilityGate(eb))
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], [DummyValue.UUID]] })

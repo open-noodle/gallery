@@ -2,7 +2,7 @@
   import RoleBadge from '#lib/components/spaces/role-badge.svelte';
   import SpaceCollage from '#lib/components/spaces/space-collage.svelte';
   import { Route } from '#lib/route.ts';
-  import { formatTimeAgo } from '#lib/utils/timesince.ts';
+  import { formatTimeAgo } from '#lib/gallery/utils/time-ago.ts';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiPin, mdiPinOff } from '@mdi/js';

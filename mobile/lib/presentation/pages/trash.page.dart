@@ -18,8 +18,6 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 class TrashPage extends StatelessWidget {
   const TrashPage({super.key});
 
-  // ignore: unused-code
-  static const timelineOverviewControlsEnabled = true;
   // Soft scrubber-snapping hint, not a measured height (the rendered banner is ~48 px;
   // this 24 px delta is the value the old combined constant always encoded).
   static const trashInfoBannerTopSliverHeight = 24.0;

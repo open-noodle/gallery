@@ -1,11 +1,8 @@
 <script lang="ts">
   import { SortOrder, locale } from '#lib/stores/preferences.store.ts';
   import { spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
-  import {
-    isSpaceAlbumGroupCollapsed,
-    toggleSpaceAlbumGroupCollapsing,
-    type SpaceAlbumGroup,
-  } from '#lib/utils/space-album-grouping.ts';
+  import { type SpaceAlbumGroup } from '#lib/utils/space-album-grouping.ts';
+  import { isAlbumGroupCollapsed, toggleAlbumGroupCollapsing } from '#lib/utils/album-utils.ts';
   import LazyChunks from '#lib/gallery/components/lazy-chunks.svelte';
   import SpaceAlbumsTableHeader from '#lib/components/spaces/space-albums-table-header.svelte';
   import {
@@ -201,12 +198,12 @@
   {/if}
   {#if grouped}
     {#each groups as group (group.id)}
-      {const collapsed = $derived(isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id))}
+      {const collapsed = $derived(isAlbumGroupCollapsed($spaceAlbumViewSettings, group.id))}
       {const iconRotation = $derived(collapsed ? 'rotate-0' : 'rotate-90')}
       <tbody class="mt-4 block w-full">
         <tr
           class="flex w-full place-items-center p-2 md:py-3 md:ps-5 md:pe-5"
-          onclick={() => toggleSpaceAlbumGroupCollapsing(group.id)}
+          onclick={() => toggleAlbumGroupCollapsing(group.id, spaceAlbumViewSettings)}
           aria-expanded={!collapsed}
           data-testid="space-album-group-header-{group.id}"
         >

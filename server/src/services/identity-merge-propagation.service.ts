@@ -4,6 +4,7 @@ import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
@@ -119,6 +120,7 @@ type IdentityMergePropagationDependencies = {
   jobRepository: JobRepository;
   logger: LoggingRepository;
   personRepository: PersonRepository;
+  galleryPersonRepository: GalleryPersonRepository;
   sharedSpaceRepository: SharedSpaceRepository;
 };
 
@@ -278,7 +280,7 @@ export class IdentityMergePropagationService {
         .map((update) => update.profileId),
     ];
 
-    await this.deps.personRepository.lockPeopleForMerge(personIds, db);
+    await this.deps.galleryPersonRepository.lockPeopleForMerge(personIds, db);
     await this.deps.sharedSpaceRepository.lockSpacePeopleForMerge(spacePersonIds, db);
   }
 
@@ -313,7 +315,7 @@ export class IdentityMergePropagationService {
       let targetNeedsFeatureFaceRepair = false;
       for (const sourcePersonId of step.sourcePersonIds) {
         const { deletedThumbnailPath, targetNeedsFeatureFaceRepair: sourceMergeNeedsFeatureFaceRepair } =
-          await this.deps.personRepository.mergePersonProfile(
+          await this.deps.galleryPersonRepository.mergePersonProfile(
             {
               sourcePersonId,
               targetPersonId: step.targetPersonId,
@@ -361,7 +363,7 @@ export class IdentityMergePropagationService {
 
     for (const update of plan.profileIdentityUpdates) {
       await (update.kind === 'person'
-        ? this.deps.personRepository.updatePersonIdentity(
+        ? this.deps.galleryPersonRepository.updatePersonIdentity(
             { personId: update.profileId, identityId: update.identityId },
             db,
           )
@@ -467,7 +469,7 @@ export class IdentityMergePropagationService {
   ): Promise<IdentityMergePropagationPlan> {
     const sourcePersonIds = [...new Set(input.sourcePersonIds)].filter((id) => id !== input.targetPersonId);
     const originPersonIds = [input.targetPersonId, ...sourcePersonIds];
-    await this.deps.personRepository.lockPeopleForMerge(originPersonIds, db);
+    await this.deps.galleryPersonRepository.lockPeopleForMerge(originPersonIds, db);
     const originProfiles = await this.deps.faceIdentityRepository.getMergePropagationProfiles(
       {
         mode: 'profiles',
@@ -543,7 +545,7 @@ export class IdentityMergePropagationService {
     const personIds = originProfiles.filter(({ kind }) => kind === 'person').map(({ id }) => id);
     const spacePersonIds = originProfiles.filter(({ kind }) => kind === 'space-person').map(({ id }) => id);
     if (personIds.length > 0) {
-      await this.deps.personRepository.lockPeopleForMerge(personIds, db);
+      await this.deps.galleryPersonRepository.lockPeopleForMerge(personIds, db);
     }
     if (spacePersonIds.length > 0) {
       await this.deps.sharedSpaceRepository.lockSpacePeopleForMerge(spacePersonIds, db);

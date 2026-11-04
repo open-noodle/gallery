@@ -1,7 +1,4 @@
-import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
-import { IntegrityReport, JobStatus } from 'src/enum.js';
 import { IntegrityService } from 'src/services/integrity.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe(IntegrityService.name, () => {
@@ -23,29 +20,6 @@ describe(IntegrityService.name, () => {
     beforeEach(() => {
       mocks.integrityReport.getAssetPathsByPaths.mockResolvedValue([]);
       mocks.integrityReport.getPersonThumbnailPathsByPaths.mockResolvedValue([]);
-      mocks.spatialScene.getPathsByPaths.mockResolvedValue([]);
-    });
-
-    it('should not report a Spatial Scene depth map in the thumbnail folder', async () => {
-      const depthMap = '/data/thumbs/user-id/as/se/asset-id_depth.png';
-      mocks.integrityReport.getAssetFilePathsByPaths.mockResolvedValue([]);
-      mocks.spatialScene.getPathsByPaths.mockResolvedValue([{ path: depthMap }]);
-
-      await sut.handleUntrackedFiles({ type: 'asset_file', paths: [depthMap] });
-
-      expect(mocks.spatialScene.getPathsByPaths).toHaveBeenCalledWith([depthMap]);
-      expect(mocks.integrityReport.create).not.toHaveBeenCalled();
-    });
-
-    it('should report an untracked file in the thumbnail folder', async () => {
-      const orphan = '/data/thumbs/user-id/as/se/orphan.webp';
-      mocks.integrityReport.getAssetFilePathsByPaths.mockResolvedValue([]);
-
-      await sut.handleUntrackedFiles({ type: 'asset_file', paths: [orphan] });
-
-      expect(mocks.integrityReport.create).toHaveBeenCalledWith([
-        { type: IntegrityReport.UntrackedFile, path: orphan },
-      ]);
     });
 
     it.each([
@@ -128,27 +102,6 @@ describe(IntegrityService.name, () => {
 
       expect(mocks.storage.unlink).toHaveBeenCalledExactlyOnceWith(untracked);
       expect(mocks.integrityReport.deleteByIds).toHaveBeenCalledWith(['tracked-report', 'untracked-report']);
-    });
-  });
-
-  describe('S3 backend guard (open-noodle/gallery#685)', () => {
-    afterEach(() => {
-      vitest.restoreAllMocks();
-    });
-
-    it('skips scan jobs when an S3 backend is configured', async () => {
-      vitest.spyOn(StorageService, 'getS3Backend').mockReturnValue({} as S3StorageBackend);
-
-      await expect(sut.handleMissingFilesQueueAll()).resolves.toBe(JobStatus.Skipped);
-      await expect(sut.handleUntrackedFilesQueueAll()).resolves.toBe(JobStatus.Skipped);
-      await expect(sut.handleChecksumFiles()).resolves.toBe(JobStatus.Skipped);
-      expect(mocks.storage.walk).not.toHaveBeenCalled();
-    });
-
-    it('does not skip when no S3 backend is configured', () => {
-      vitest.spyOn(StorageService, 'getS3Backend').mockReturnValue(void 0);
-
-      expect(sut['skipIfS3Configured']()).toBe(false);
     });
   });
 

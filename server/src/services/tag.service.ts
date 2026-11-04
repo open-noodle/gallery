@@ -13,6 +13,7 @@ import {
   mapTag,
 } from 'src/dtos/tag.dto.js';
 import { JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
+import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { addAssets, removeAssets } from 'src/utils/asset.util.js';
@@ -93,7 +94,7 @@ export class TagService extends BaseService {
   async bulkTagAssets(auth: AuthDto, dto: TagBulkAssetsDto): Promise<TagBulkAssetsResponseDto> {
     const [tagIds, assetIds] = await Promise.all([
       this.checkAccess({ auth, permission: Permission.TagAsset, ids: dto.tagIds }),
-      this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds }),
+      checkAssetEditAccess(this.accessRepository, { auth, ids: dto.assetIds }),
     ]);
 
     const items: Insertable<TagAssetTable>[] = [];
@@ -118,9 +119,7 @@ export class TagService extends BaseService {
     const results = await addAssets(
       auth,
       { access: this.accessRepository, bulk: this.tagRepository },
-      // Gallery: owner-only — see the note in memory.service.ts. AssetUpdate admits space editors
-      // in this fork, which would let an editor tag another member's asset.
-      { parentId: id, assetIds: dto.ids, ownerOnly: true },
+      { parentId: id, assetIds: dto.ids, permission: Permission.AssetUpdate },
     );
 
     for (const { id: assetId, success } of results) {

@@ -1,3 +1,4 @@
+import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '#lib/utils/exif-utils.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
@@ -218,11 +219,7 @@ describe('DetailPanel', () => {
       people: [person],
     };
 
-    const { container } = renderWithTooltips(DetailPanel, {
-      asset,
-      currentAlbum: null,
-      spaceId: 'space-1',
-    });
+    const { container } = renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await waitFor(() => expect(zoomImageToBase64Mock).toHaveBeenCalledWith(face, asset.id, asset.type, undefined));
 
@@ -309,11 +306,7 @@ describe('DetailPanel', () => {
       people: [alice, bob],
     };
 
-    const { container } = renderWithTooltips(DetailPanel, {
-      asset,
-      currentAlbum: null,
-      spaceId: 'space-1',
-    });
+    const { container } = renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await waitFor(() => expect(zoomImageToBase64Mock).toHaveBeenCalledTimes(2));
 

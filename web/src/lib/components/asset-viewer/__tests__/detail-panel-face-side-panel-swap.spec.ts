@@ -1,3 +1,4 @@
+import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
@@ -138,7 +139,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     expect(screen.getByTestId('space-person-side-panel-stub')).toBeInTheDocument();
     expect(screen.queryByTestId('person-side-panel-stub')).toBeNull();
@@ -151,7 +152,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
   it('renders PersonSidePanel and NOT SpacePersonSidePanel for the asset owner, even inside a space', () => {
     const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     expect(screen.getByTestId('person-side-panel-stub')).toBeInTheDocument();
     expect(screen.queryByTestId('space-person-side-panel-stub')).toBeNull();

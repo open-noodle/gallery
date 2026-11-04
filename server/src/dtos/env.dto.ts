@@ -1,5 +1,6 @@
 import z from 'zod';
 import { ImmichEnvironmentSchema, LogFormatSchema, LogLevelSchema } from 'src/enum.js';
+import { GalleryStorageEnvExtension } from 'src/gallery/dtos/env.dto.js';
 import { IsIPRange } from 'src/validation.js';
 
 // TODO import from sql-tools once the swagger plugin supports external enums
@@ -50,14 +51,7 @@ export const EnvSchema = z
     IMMICH_LOG_LEVEL: LogLevelSchema.optional(),
     IMMICH_LOG_FORMAT: LogFormatSchema.optional(),
     IMMICH_MEDIA_LOCATION: absolutePath,
-    IMMICH_STORAGE_BACKEND: z.enum(['disk', 's3']).optional(),
-    IMMICH_S3_BUCKET: z.string().optional(),
-    IMMICH_S3_REGION: z.string().optional(),
-    IMMICH_S3_ENDPOINT: z.string().optional(),
-    IMMICH_S3_ACCESS_KEY_ID: z.string().optional(),
-    IMMICH_S3_SECRET_ACCESS_KEY: z.string().optional(),
-    IMMICH_S3_PRESIGNED_URL_EXPIRY: z.coerce.number().int().optional(),
-    IMMICH_S3_SERVE_MODE: z.enum(['redirect', 'proxy']).optional(),
+    ...GalleryStorageEnvExtension,
     IMMICH_MICROSERVICES_METRICS_PORT: z.coerce.number().int().optional(),
     IMMICH_ALLOW_EXTERNAL_PLUGINS: stringBool.optional(),
     IMMICH_PLUGINS_INSTALL_FOLDER: absolutePath,

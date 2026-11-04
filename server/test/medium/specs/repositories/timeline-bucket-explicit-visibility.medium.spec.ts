@@ -19,6 +19,7 @@ the leak is in the repository query itself — the primary defense must hold the
 
 import { Kysely } from 'kysely';
 import { AssetVisibility, TimeBucketSize } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
@@ -39,6 +40,7 @@ const setup = () => {
   return {
     ctx,
     assetRepo: ctx.get(AssetRepository),
+    galleryAssetRepo: ctx.get(GalleryAssetRepository),
     spaceRepo: ctx.get(SharedSpaceRepository),
   };
 };
@@ -123,7 +125,7 @@ const seedSpacePerson = async (
 
 describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', () => {
   it("visibility=HIDDEN does NOT surface another member's Hidden in-space assets (direct/library/album)", async () => {
-    const { assetRepo, spaceRepo, ctx } = setup();
+    const { assetRepo, galleryAssetRepo, spaceRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -161,7 +163,7 @@ describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', 
     expect(ids.has(hiAlbum)).toBe(false);
 
     // getTimeBucketCovers — no cover produced
-    const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: [BUCKET] });
+    const covers = await galleryAssetRepo.getTimeBucketCovers({ ...opts, timeBuckets: [BUCKET] });
     const coverIds = new Set(covers.map((c) => c.representativeAssetId));
     expect(coverIds.has(hiDirect)).toBe(false);
     expect(coverIds.has(hiLib)).toBe(false);
@@ -211,7 +213,7 @@ describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', 
 
 describe('timeline bucket explicit-visibility — withSharedSpaces (timelineSpaceIds)', () => {
   it("visibility=HIDDEN does NOT surface another member's Hidden in-space asset", async () => {
-    const { assetRepo, spaceRepo, ctx } = setup();
+    const { assetRepo, galleryAssetRepo, spaceRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -240,7 +242,7 @@ describe('timeline bucket explicit-visibility — withSharedSpaces (timelineSpac
     expect(ids.has(hiDirect)).toBe(false);
     expect(ids.has(hiAlbum)).toBe(false);
 
-    const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: [BUCKET] });
+    const covers = await galleryAssetRepo.getTimeBucketCovers({ ...opts, timeBuckets: [BUCKET] });
     const coverIds = new Set(covers.map((c) => c.representativeAssetId));
     expect(coverIds.has(hiDirect)).toBe(false);
     expect(coverIds.has(hiAlbum)).toBe(false);

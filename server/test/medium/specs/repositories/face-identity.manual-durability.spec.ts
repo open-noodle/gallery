@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SourceType } from 'src/enum.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -29,7 +30,7 @@ const setup = () => {
   });
   return {
     ctx,
-    personRepository: ctx.get(PersonRepository),
+    galleryPersonRepository: ctx.get(GalleryPersonRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
   };
 };
@@ -134,7 +135,7 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
   });
 
   it('survives a people merge followed by a backfill', async () => {
-    const { ctx, personRepository, faceIdentityRepository } = setup();
+    const { ctx, galleryPersonRepository, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
     const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Anna dup' });
@@ -148,7 +149,7 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
     });
 
     const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.personGroupId);
-    await personRepository.mergePersonProfile({
+    await galleryPersonRepository.mergePersonProfile({
       sourcePersonId: source.personGroupId,
       targetPersonId: target.personGroupId,
       targetIdentityId: targetIdentity.id,

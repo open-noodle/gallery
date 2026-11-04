@@ -1,3 +1,5 @@
+import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
@@ -57,58 +59,56 @@ vi.mock('#lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () =
   return { default: MockComponent };
 });
 
-vi.mock('#lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('#lib/gallery/__mocks__/space-face-editor.stub.svelte');
-  return { default: MockComponent };
-});
+vi.mock('#lib/gallery/asset-viewer/space-face-editor.js', () => ({
+  getFaceEditorSpace: (spaceId: string) => ({ spaceId }),
+}));
 
 describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     assetViewerManagerMock.isFaceEditMode = true;
     assetViewerManagerMock.imgRef = { naturalWidth: 100, naturalHeight: 100 } as unknown;
+    authManager.setUser(factory.user({ id: 'owner-1' }));
+    authManager.setPreferences(factory.preferences());
   });
 
-  it('renders SpaceFaceEditor and NOT FaceEditor for a non-owner space editor', () => {
-    const asset = factory.asset({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
-
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      spaceId: 'space-1',
-      canEditSpacePeople: true,
+  it('renders FaceEditor in its space mode for a non-owner space editor', () => {
+    const asset = factory.asset({
+      id: 'asset-1',
+      ownerId: 'someone-else',
+      canEdit: true,
+      type: AssetTypeEnum.Image,
     });
 
-    const stub = screen.getByTestId('space-face-editor-stub');
-    expect(stub).toBeInTheDocument();
+    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
+
+    const stub = screen.getByTestId('face-editor-stub');
     expect(stub).toHaveAttribute('data-space-id', 'space-1');
     expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(screen.queryByTestId('face-editor-stub')).toBeNull();
   });
 
-  it('renders FaceEditor and NOT SpaceFaceEditor for the asset owner, even inside a space', () => {
-    const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image });
+  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', () => {
+    const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      spaceId: 'space-1',
-      canEditSpacePeople: false,
-    });
+    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
     const stub = screen.getByTestId('face-editor-stub');
     expect(stub).toBeInTheDocument();
     expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
+    expect(stub).not.toHaveAttribute('data-space-id');
   });
 
-  it('renders the owner FaceEditor (never both) when canEditSpacePeople is true but no space id is available', () => {
-    const asset = factory.asset({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
-
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      canEditSpacePeople: true,
+  it('renders the owner FaceEditor (never both) for an editor when no space id is available', () => {
+    const asset = factory.asset({
+      id: 'asset-1',
+      ownerId: 'someone-else',
+      canEdit: true,
+      resolvedSpaceId: undefined,
+      type: AssetTypeEnum.Image,
     });
 
-    expect(screen.getByTestId('face-editor-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
+    renderWithTooltips(PhotoViewer, { cursor: { current: asset } });
+
+    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 });

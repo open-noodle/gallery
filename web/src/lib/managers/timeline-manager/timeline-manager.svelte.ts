@@ -1,15 +1,11 @@
+import { TimelineBucket, TimelineBucketLayout } from '#lib/gallery/timeline/timeline-bucket.svelte.ts';
 import { VirtualScrollManager } from '#lib/managers/VirtualScrollManager/VirtualScrollManager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { GroupInsertionCache } from '#lib/managers/timeline-manager/group-insertion-cache.svelte.ts';
-import {
-  getTimelineAlbumQueryOptions,
-  mergeTimeBuckets,
-} from '#lib/managers/timeline-manager/internal/album-picker-support.ts';
 import { updateTimelineMonthViewportProximity } from '#lib/managers/timeline-manager/internal/intersection-support.svelte.ts';
 import { updateGeometry } from '#lib/managers/timeline-manager/internal/layout-support.svelte.ts';
 import { loadFromTimeBuckets } from '#lib/managers/timeline-manager/internal/load-support.svelte.ts';
-import { toTimeBucketsRequest } from '#lib/managers/timeline-manager/internal/request-options.ts';
 import {
   findClosestTimelineMonthForDate,
   findTimelineMonthForAsset as findTimelineMonthForAssetUtil,
@@ -30,27 +26,10 @@ import {
   type TimelineDateTime,
   type TimelineYearMonth,
 } from '#lib/utils/timeline-util.ts';
-import {
-  AssetOrder,
-  AssetOrderBy,
-  AssetVisibility,
-  getAssetInfo,
-  getTimeBucketCovers,
-  getTimeBuckets,
-  type AssetResponseDto,
-  type TimeBucketCoverResponseDto,
-  type TimeBucketsResponseDto,
-} from '@immich/sdk';
+import { AssetOrder, AssetOrderBy, AssetVisibility, getAssetInfo, type AssetResponseDto } from '@immich/sdk';
 import { clamp, isEqual } from 'lodash-es';
 import { SvelteDate, SvelteSet } from 'svelte/reactivity';
 import { isMismatched, updateObject } from './internal/utils.svelte';
-import {
-  REPRESENTATIVE_TIMELINE_BUCKET_GAP,
-  TimelineBucket,
-  aggregateDayBucketsByMonth,
-  getTimeBucketSizeForGrouping,
-  layoutTimelineBuckets,
-} from './timeline-bucket.svelte';
 import { TimelineDay } from './timeline-day.svelte';
 import { TimelineMonth } from './timeline-month.svelte';
 import {
@@ -77,16 +56,8 @@ export class TimelineManager extends VirtualScrollManager {
 
   override bodySectionHeight = $derived.by(() => {
     if (this.grouping !== 'day') {
-      if (this.timelineBuckets.length === 0) {
-        return 0;
-      }
-
-      return (
-        this.timelineBuckets.reduce((height, bucket) => height + bucket.height, 0) +
-        (this.timelineBuckets.length - 1) * REPRESENTATIVE_TIMELINE_BUCKET_GAP
-      );
+      return this.bucketLayout.height;
     }
-
     let height = 0;
     for (const month of this.months) {
       height += month.height;
@@ -96,13 +67,8 @@ export class TimelineManager extends VirtualScrollManager {
 
   assetCount = $derived.by(() => {
     if (this.grouping !== 'day') {
-      let count = 0;
-      for (const bucket of this.timelineBuckets) {
-        count += bucket.count;
-      }
-      return count;
+      return this.bucketLayout.count;
     }
-
     let count = 0;
     for (const month of this.months) {
       count += month.assetsCount;
@@ -111,11 +77,10 @@ export class TimelineManager extends VirtualScrollManager {
   });
 
   isInitialized = $state(false);
-  /** Increments on every (re)load. Views `{#key}` their bucket DOM on it to drop stale nodes. */
-  reloadToken = $state(0);
   isScrollingOnLoad = false;
   grouping: TimelineGrouping = $state(DEFAULT_TIMELINE_GROUPING);
   timelineBuckets: TimelineBucket[] = $state([]);
+  readonly bucketLayout = new TimelineBucketLayout(this);
   months: TimelineMonth[] = $state([]);
   albumAssets: Set<string> = new SvelteSet();
   scrubberMonths: ScrubberMonth[] = $state([]);
@@ -139,8 +104,6 @@ export class TimelineManager extends VirtualScrollManager {
   #unsubscribes: Array<() => void> = [];
   #initSequence = 0;
   #destroyed = false;
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  #coverRequested = new Set<string>();
 
   get showAssetOwners() {
     return userPreferencesManager.showAssetOwners;
@@ -336,45 +299,13 @@ export class TimelineManager extends VirtualScrollManager {
     }
   }
 
-  async #initializeTimelineBuckets(signal: AbortSignal, sequence: number) {
-    const grouping = this.grouping;
-    const bucketSize = getTimeBucketSizeForGrouping(grouping);
-    const requestOptions = toTimeBucketsRequest(this.#options, bucketSize);
-    const albumQueryOptions = getTimelineAlbumQueryOptions(this.#options, bucketSize);
-    const [timebuckets, albumTimebuckets] = await Promise.all([
-      getTimeBuckets(
-        {
-          ...authManager.params,
-          ...requestOptions,
-        },
-        { signal },
-      ),
-      albumQueryOptions
-        ? getTimeBuckets(
-            {
-              ...authManager.params,
-              ...albumQueryOptions,
-            },
-            { signal },
-          )
-        : Promise.resolve([]),
-    ]);
+  async #initializeTimelineMonths(signal: AbortSignal, sequence: number) {
+    const timebuckets = await this.bucketLayout.fetch(this.#options, this.grouping, signal);
     if (signal.aborted || this.#destroyed || sequence !== this.#initSequence) {
       return;
     }
-    const mergedTimebuckets =
-      albumTimebuckets.length > 0 ? mergeTimeBuckets(timebuckets, albumTimebuckets, this.#options.order) : timebuckets;
 
-    this.#coverRequested.clear();
-    this.timelineBuckets = mergedTimebuckets.map((timeBucket) => new TimelineBucket(this, grouping, timeBucket));
-    layoutTimelineBuckets(this.timelineBuckets);
-    this.months = grouping === 'day' ? this.#createTimelineMonthsFromDayBuckets(mergedTimebuckets) : [];
-    this.albumAssets.clear();
-    this.updateViewportGeometry(false);
-  }
-
-  #createTimelineMonthsFromDayBuckets(timeBuckets: TimeBucketsResponseDto[]) {
-    return aggregateDayBucketsByMonth(timeBuckets, this.#options.order).map((timeBucket) => {
+    this.months = this.bucketLayout.apply(this.#options, this.grouping, timebuckets).map((timeBucket) => {
       const date = new SvelteDate(timeBucket.timeBucket);
       return new TimelineMonth(
         this,
@@ -385,6 +316,8 @@ export class TimelineManager extends VirtualScrollManager {
         this.#options.orderBy,
       );
     });
+    this.albumAssets.clear();
+    this.updateViewportGeometry(false);
   }
 
   /**
@@ -428,20 +361,16 @@ export class TimelineManager extends VirtualScrollManager {
 
   async #init(options: TimelineManagerOptions) {
     const sequence = ++this.#initSequence;
-    // Bump on every (re)load so views can `{#key}` their bucket DOM on it. Rapid filter changes
-    // can otherwise leave the keyed {#each months} with stale month nodes mounted (manager state
-    // is correct, but the DOM keeps an old month — they overlap). Remounting on reload clears it.
-    this.reloadToken++;
     this.isInitialized = false;
     this.disconnect();
     this.initTask.cancel();
     this.grouping = options.grouping ?? DEFAULT_TIMELINE_GROUPING;
     this.months = [];
-    this.timelineBuckets = [];
+    this.bucketLayout.clear();
     this.albumAssets.clear();
     const status = await this.initTask.execute(async (signal) => {
       this.#options = options;
-      await this.#initializeTimelineBuckets(signal, sequence);
+      await this.#initializeTimelineMonths(signal, sequence);
     }, true);
     if (sequence !== this.#initSequence) {
       return;
@@ -464,7 +393,7 @@ export class TimelineManager extends VirtualScrollManager {
     this.disconnect();
     this.isInitialized = false;
     this.months = [];
-    this.timelineBuckets = [];
+    this.bucketLayout.clear();
 
     for (const unsubscribe of this.#unsubscribes) {
       unsubscribe();
@@ -497,7 +426,7 @@ export class TimelineManager extends VirtualScrollManager {
       return;
     }
     if (this.grouping !== 'day') {
-      layoutTimelineBuckets(this.timelineBuckets);
+      this.bucketLayout.layout();
       this.resyncScrollMapping();
       return;
     }
@@ -514,12 +443,6 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   #createScrubberMonths() {
-    if (this.grouping !== 'day') {
-      this.scrubberMonths = [];
-      this.scrubberTimelineHeight = this.totalViewerHeight;
-      return;
-    }
-
     this.scrubberMonths = this.months.map((month) => ({
       assetCount: month.assetsCount,
       year: month.yearMonth.year,
@@ -530,59 +453,8 @@ export class TimelineManager extends VirtualScrollManager {
     this.scrubberTimelineHeight = this.totalViewerHeight;
   }
 
-  async loadCoversForBuckets(timeBuckets: string[]) {
-    const grouping = this.grouping;
-    if (grouping === 'day') {
-      return;
-    }
-    const todo = timeBuckets.filter((tb) => !this.#coverRequested.has(tb));
-    if (todo.length === 0) {
-      return;
-    }
-    for (const tb of todo) {
-      this.#coverRequested.add(tb);
-    }
-
-    const sequence = this.#initSequence;
-    const bucketSize = getTimeBucketSizeForGrouping(grouping);
-    const requestOptions = toTimeBucketsRequest(this.#options, bucketSize);
-    const albumOptions = getTimelineAlbumQueryOptions(this.#options, bucketSize);
-    let mainCovers: TimeBucketCoverResponseDto[];
-    let albumCovers: TimeBucketCoverResponseDto[];
-    try {
-      // Requests are not aborted on re-init by design — the stale-sequence guard below prevents stale
-      // application, and cover fetches are light GETs bounded to the currently visible bucket set.
-      [mainCovers, albumCovers] = await Promise.all([
-        getTimeBucketCovers({ ...authManager.params, ...requestOptions, timeBuckets: todo }),
-        albumOptions
-          ? getTimeBucketCovers({ ...authManager.params, ...albumOptions, timeBuckets: todo })
-          : Promise.resolve([]),
-      ]);
-    } catch {
-      for (const tb of todo) {
-        this.#coverRequested.delete(tb);
-      }
-      return;
-    }
-    if (this.#destroyed || sequence !== this.#initSequence) {
-      return;
-    }
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const byBucket = new Map(mainCovers.map((c) => [c.timeBucket, c]));
-    // Album covers take precedence over main covers when an album overlay is active
-    for (const cover of albumCovers) {
-      byBucket.set(cover.timeBucket, cover);
-    }
-    for (const bucket of this.timelineBuckets) {
-      const cover = byBucket.get(bucket.timeBucket);
-      if (cover) {
-        bucket.setRepresentative(cover);
-      }
-    }
-  }
-
   async loadTimelineMonth(yearMonth: TimelineYearMonth, options?: { cancelable: boolean }): Promise<void> {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       return;
     }
 
@@ -606,7 +478,7 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   upsertAssets(assets: TimelineAsset[]) {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       return;
     }
 
@@ -703,7 +575,7 @@ export class TimelineManager extends VirtualScrollManager {
 
   /** Executes callback on assets, handling moves between groups and removals due to filter criteria. */
   update(ids: string[], callback: (asset: TimelineAsset) => void) {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       // eslint-disable-next-line svelte/prefer-svelte-reactivity
       return { updated: new Set<string>(), notUpdated: new Set(ids), changedGeometry: false };
     }
@@ -713,7 +585,7 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   removeAssets(ids: string[]) {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       return ids;
     }
 
@@ -740,7 +612,7 @@ export class TimelineManager extends VirtualScrollManager {
   present in the timeline. For updating existing assets, use updateAssetOperation().
   */
   protected addAssetsUpsertSegments(assets: TimelineAsset[]) {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       return;
     }
 
@@ -759,7 +631,7 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   #updateAssets(assets: TimelineAsset[]) {
-    if (!this.#isDetailedTimeline()) {
+    if (this.grouping !== 'day') {
       return assets;
     }
 
@@ -818,8 +690,8 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   override refreshLayout() {
-    if (!this.#isDetailedTimeline()) {
-      layoutTimelineBuckets(this.timelineBuckets);
+    if (this.grouping !== 'day') {
+      this.bucketLayout.layout();
       this.updateViewportProximities();
       return;
     }
@@ -908,10 +780,6 @@ export class TimelineManager extends VirtualScrollManager {
 
   getOrderBy() {
     return this.#options.orderBy ?? AssetOrderBy.TakenAt;
-  }
-
-  #isDetailedTimeline() {
-    return this.grouping === 'day';
   }
 
   protected postCreateSegments(): void {

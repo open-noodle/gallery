@@ -3,8 +3,8 @@ import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observe
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-import { PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
 import {
   RepresentativeFaceSource,

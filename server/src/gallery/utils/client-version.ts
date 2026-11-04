@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from 'node:http';
-import { SemVer, coerce } from 'semver';
+import { SemVer, coerce, lt } from 'semver';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { immichVersion, serverVersion } from 'src/constants.js';
 import { getAppVersionFromUA } from 'src/utils/request.js';
@@ -29,6 +29,24 @@ export const isGalleryClient = (headers: IncomingHttpHeaders, socketAuth?: Recor
   return (appVersion?.major ?? 0) >= GALLERY_APP_MIN_MAJOR;
 };
 
+// immich-30831's `birthday` memory type first reached the Gallery app's generated client in 5.8.0.
+const BIRTHDAY_MEMORY_MIN_APP = '5.8.0';
+
+/**
+`AuthService.authenticate`'s client class. Every build that sends `x-gallery-app` decodes `birthday` memories, so
+only a Gallery app that identifies by User-Agent alone can be older than 5.8.0.
+*/
+export const classifyClient = (headers: IncomingHttpHeaders, auth: AuthDto): AuthDto => {
+  if (!isGalleryClient(headers)) {
+    return { ...auth, stockClient: true };
+  }
+
+  const appVersion = coerce(getAppVersionFromUA(headers['user-agent'] ?? ''));
+  return !headers[GALLERY_APP_HEADER] && appVersion && lt(appVersion, BIRTHDAY_MEMORY_MIN_APP)
+    ? { ...auth, legacyGalleryApp: true }
+    : auth;
+};
+
 /** Stock clients see the Immich version Gallery is based on, so they do not treat Gallery's 5.x as a newer server. */
 export const getClientServerVersion = (headers: IncomingHttpHeaders): SemVer =>
   isGalleryClient(headers) ? serverVersion : immichVersion;
@@ -45,8 +63,8 @@ export const forClientAbout = <T extends { version: string; versionUrl: string }
 };
 
 /**
- * `GET /server/version-check` for a stock client: Gallery releases reach Gallery clients only, as `on_new_release`
- * does, so the latest release a stock client sees is the Immich base it is told it runs.
- */
+`GET /server/version-check` for a stock client: Gallery releases reach Gallery clients only, as `on_new_release`
+does, so the latest release a stock client sees is the Immich base it is told it runs.
+*/
 export const forClientVersionCheck = <T extends { releaseVersion: string | null }>(auth: AuthDto, state: T): T =>
   auth.stockClient && state.releaseVersion ? { ...state, releaseVersion: `v${immichVersion}` } : state;

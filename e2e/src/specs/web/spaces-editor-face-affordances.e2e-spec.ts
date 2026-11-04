@@ -7,8 +7,8 @@ import { utils } from 'src/utils';
 // REAL browser, against a REAL server, that the "tag people" affordance in the info panel's
 // People row (DetailPanelPeople.svelte, aria-label `tag_people`) is visible for a space
 // Owner/Editor on a space surface and opens the SPACE-flavoured face editor
-// (`FaceEditorPanel.svelte` -> `SpaceFaceEditor.svelte`, canvas `#space-face-editor`,
-// `select_person_to_tag` copy) -- not the owner's `FaceEditor.svelte`.
+// (`FaceEditorPanel.svelte` -> `FaceEditor.svelte` in space mode, canvas `#space-face-editor`,
+// `select_person_to_tag` copy) -- not its owner mode.
 //
 // This exists because Slice 8 shipped exactly this kind of wiring gap once already (see
 // 2c39be4622 "fix(web): wire the space-flavoured face panels Slice 8 left unconnected"): the
@@ -99,8 +99,8 @@ test.describe('Spaces — the tag-people affordance opens the SPACE face editor 
 
     await tagPeopleButton.click();
 
-    // The SPACE-flavoured editor rendered -- not the owner's FaceEditor, which never renders a
-    // canvas with this id, and never shows this copy.
+    // The SPACE-flavoured editor rendered -- not the owner mode, which never renders a
+    // canvas with this id.
     await expect(page.locator('#space-face-editor')).toBeVisible();
     await expect(page.getByText('Select a person to tag')).toBeVisible();
   });

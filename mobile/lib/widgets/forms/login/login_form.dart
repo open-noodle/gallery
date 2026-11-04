@@ -13,6 +13,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/widgets/demo_login_button.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/models/auth/login_response.model.dart';
@@ -37,8 +38,6 @@ import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
-const _demoServerUrl = 'https://demo.opennoodle.de';
 
 class LoginForm extends HookConsumerWidget {
   LoginForm({super.key});
@@ -77,7 +76,6 @@ class LoginForm extends HookConsumerWidget {
     unawaited(logoAnimationController.repeat());
     final serverInfo = ref.watch(serverInfoProvider);
     final warningMessage = useState<String?>(null);
-    final isDemoLoginLoading = useState<bool>(false);
     final loginFormKey = GlobalKey<FormState>();
     final ValueNotifier<String?> serverEndpoint = useState<String?>(null);
 
@@ -302,42 +300,6 @@ class LoginForm extends HookConsumerWidget {
       }
     }
 
-    Future<void> demoLogin() async {
-      if (isDemoLoginLoading.value) {
-        return;
-      }
-
-      TextInput.finishAutofillContext();
-      isDemoLoginLoading.value = true;
-
-      try {
-        serverEndpointController.text = _demoServerUrl;
-        await ref.read(authProvider.notifier).validateServerUrl(_demoServerUrl);
-
-        // Invalidate all api repository provider instance to take into account the demo endpoint and access token.
-        invalidateAllApiRepositoryProviders(ref);
-
-        await ref.read(serverInfoProvider.notifier).getServerInfo();
-        final result = await ref.read(authProvider.notifier).demoLogin();
-        await completeLogin(result);
-      } catch (error, stack) {
-        log.severe('Error logging into demo mode: $error', error, stack);
-
-        if (!context.mounted) {
-          return;
-        }
-
-        ImmichToast.show(
-          context: context,
-          msg: context.t.login_form_failed_demo_login,
-          toastType: ToastType.error,
-          gravity: ToastGravity.TOP,
-        );
-      } finally {
-        isDemoLoginLoading.value = false;
-      }
-    }
-
     String generateRandomString(int length) {
       const chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
       final random = Random.secure();
@@ -503,13 +465,7 @@ class LoginForm extends HookConsumerWidget {
                     onSubmit: (_) => form.submit(),
                   ),
                 ),
-                ImmichTextButton(
-                  labelText: context.t.login_form_try_demo,
-                  icon: Icons.travel_explore_rounded,
-                  variant: ImmichVariant.ghost,
-                  loading: isDemoLoginLoading.value,
-                  onPressed: demoLogin,
-                ),
+                GalleryDemoLoginButton(serverEndpointController: serverEndpointController, onLoggedIn: completeLogin),
                 ImmichTextButton(
                   labelText: context.t.settings,
                   icon: Icons.settings,

@@ -418,7 +418,7 @@ class PersonSync extends BaseSync {
   }
 
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
-  getUpserts(options: SyncQueryOptions, withPets = true) {
+  getUpserts(options: SyncQueryOptions) {
     return this.upsertQuery('person', options)
       .select([
         'personGroupId as id',
@@ -434,7 +434,7 @@ class PersonSync extends BaseSync {
         'faceAssetId',
       ])
       .where('ownerId', '=', options.userId)
-      .$if(!withPets, (qb) => qb.where((eb) => eb.not(personIsPet())))
+      .$if(options.forkAwareClient === false, (qb) => qb.where((eb) => eb.not(personIsPet())))
       .stream();
   }
 }
@@ -474,18 +474,18 @@ class AssetFaceSync extends BaseSync {
 
   // TODO(v5) drop when AssetFacesV2 is removed
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
-  getUpsertsV2(options: SyncQueryOptions, withPets = true) {
+  getUpsertsV2(options: SyncQueryOptions) {
     return this.upsertQuery('asset_face', options)
       .select(columns.syncAssetFace)
       .select('asset_face.updateId')
       .leftJoin('asset', 'asset.id', 'asset_face.assetId')
       .where('asset.ownerId', '=', options.userId)
-      .$if(!withPets, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
+      .$if(options.forkAwareClient === false, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
       .stream();
   }
 
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
-  getUpsertsV3(options: SyncQueryOptions, withPets = true) {
+  getUpsertsV3(options: SyncQueryOptions) {
     return this.upsertQuery('asset_face', options)
       .select(columns.syncAssetFace)
       .select('asset_face.updateId')
@@ -494,7 +494,7 @@ class AssetFaceSync extends BaseSync {
       .where('owner.clusterGroupId', '=', ({ selectFrom }) =>
         selectFrom('user').select('user.clusterGroupId').where('user.id', '=', options.userId),
       )
-      .$if(!withPets, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
+      .$if(options.forkAwareClient === false, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
       .stream();
   }
 }
