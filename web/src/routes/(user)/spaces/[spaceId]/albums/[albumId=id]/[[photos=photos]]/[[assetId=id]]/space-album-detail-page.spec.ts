@@ -1,10 +1,10 @@
 import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { getAlbumAssetsActions } from '#lib/services/album.service.ts';
 import { factory } from '#test/unit/factories.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   AlbumUserRole,
   AssetOrder,
@@ -71,12 +71,12 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNav
 // its re-hydrate $effect only re-runs when `page.url` is a real signal. A plain object would let a
 // broken re-hydrate pass. See reactive-page.mock.svelte.ts.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
 vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/smart-search-results.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 

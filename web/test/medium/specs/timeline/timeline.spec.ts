@@ -354,13 +354,15 @@ test.describe('timeline', () => {
       await app.timeline.select(asset);
       await app.timeline.selectionBar.favoriteButton.click();
       await expect(app.timeline.favoriteIcon(asset)).toHaveCount(1);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
 
       await app.timeline.select(asset);
       await app.timeline.selectionBar.unfavoriteButton.click();
       await expect(app.timeline.favoriteIcon(asset)).toHaveCount(0);
       await expect(app.timeline.thumbnail(asset)).toHaveCount(1);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
     });
 
     test('archive from album, unarchive from /archive', async ({ page, data, api, app }) => {
@@ -399,14 +401,16 @@ test.describe('timeline', () => {
       await app.timeline.select(asset);
       await app.timeline.selectionBar.favoriteButton.click();
       await expect(app.timeline.favoriteIcon(asset)).toHaveCount(1);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
 
       await app.sidebar.favoritesLink.click();
       await expect(app.timeline.thumbnail(asset)).toBeInViewport();
       await app.timeline.select(asset);
       await app.timeline.selectionBar.unfavoriteButton.click();
       await expect(app.timeline.thumbnail(asset)).toHaveCount(0);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
 
       await app.sidebar.photosLink.click();
       await expect(app.timeline.thumbnail(asset)).toBeInViewport();
@@ -421,7 +425,8 @@ test.describe('timeline', () => {
       await app.timeline.select(asset);
       await app.timeline.selectionBar.favoriteButton.click();
       await expect(app.timeline.favoriteIcon(asset)).toHaveCount(1);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
 
       await app.timeline.selectionBar.closeButton.click();
       await app.sidebar.favoritesLink.click();
@@ -430,7 +435,8 @@ test.describe('timeline', () => {
       await app.timeline.select(asset);
       await app.timeline.selectionBar.unfavoriteButton.click();
       await expect(app.timeline.thumbnail(asset)).toHaveCount(0);
-      expect(api.updateAssets).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
+      // Gallery: favorites are per user, written through updateAssetFavorites.
+      expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
 
       await page.goto(Route.viewAlbum({ id: album.id }));
       await expect(app.timeline.thumbnail(asset)).toBeInViewport();

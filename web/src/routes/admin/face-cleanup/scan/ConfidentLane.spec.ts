@@ -7,7 +7,7 @@ import { createScanTriageModel, type FaceCleanupPerson } from './scan-triage.sve
 
 vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
-  const noop = await import('#test/unit/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { ...mod, Icon: noop.default };
 });
 vi.mock('svelte-i18n', async (orig) => {

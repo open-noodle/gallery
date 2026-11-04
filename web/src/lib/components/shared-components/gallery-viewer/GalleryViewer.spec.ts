@@ -59,12 +59,12 @@ const asAssetInteraction = (assetInteraction: typeof mockAssetInteraction) =>
   assetInteraction as unknown as AssetMultiSelectManager;
 
 vi.mock('#lib/components/assets/thumbnail/Thumbnail.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/thumbnail-with-label.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/thumbnail-with-label.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/elements/Portal.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/sidebar.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/sidebar.stub.svelte');
   return { default: MockComponent };
 });
 

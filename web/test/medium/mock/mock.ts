@@ -1,3 +1,4 @@
+import { galleryHandlers } from '#test/medium/gallery/handlers.ts';
 import { createMockApi, type MockApi } from '#test/medium/mock/api.ts';
 import { MockData } from '#test/medium/mock/data.ts';
 import { factory } from '#test/medium/mock/factories.ts';
@@ -152,6 +153,7 @@ export class Mock {
       viewAsset: ({ params }) => this.media(params.id),
       downloadAsset: ({ params }) => this.media(params.id),
     });
+    this.api.on(galleryHandlers(this.data));
   }
 
   async install(page?: Page) {
