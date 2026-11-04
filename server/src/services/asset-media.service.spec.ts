@@ -13,11 +13,11 @@ import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/a
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFileFactory } from 'test/factories/asset-file.factory.js';
@@ -201,7 +201,7 @@ describe(AssetMediaService.name, () => {
   beforeAll(() => {
     // Initialize the disk backend for StorageService so that serveFromBackend works in tests.
     // The DiskStorageBackend returns absolute paths as-is, so the mediaLocation value doesn't matter.
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
+    (storageBackends as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
@@ -620,8 +620,8 @@ describe(AssetMediaService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getForOriginal.mockResolvedValue(asset);
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         await expect(sut.downloadOriginal(authStub.admin, asset.id, {})).resolves.toEqual(
@@ -637,7 +637,7 @@ describe(AssetMediaService.name, () => {
           disposition: 'inline',
         });
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -657,8 +657,8 @@ describe(AssetMediaService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getForOriginal.mockResolvedValue(asset);
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         await expect(sut.downloadOriginal(authStub.admin, asset.id, {}, 'bytes=0-1023')).resolves.toEqual(
@@ -669,7 +669,7 @@ describe(AssetMediaService.name, () => {
           expect.objectContaining({ range: 'bytes=0-1023' }),
         );
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -816,8 +816,8 @@ describe(AssetMediaService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getForThumbnail.mockResolvedValue({ ...asset, path });
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         const results = await Promise.all(
@@ -844,7 +844,7 @@ describe(AssetMediaService.name, () => {
           disposition: 'inline',
         });
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -863,8 +863,8 @@ describe(AssetMediaService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getForThumbnail.mockResolvedValue({ ...asset, path });
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         const response = (await sut.viewThumbnail(authStub.admin, asset.id, {
@@ -875,7 +875,7 @@ describe(AssetMediaService.name, () => {
         // client is never told it can range-request this URL
         expect(response.acceptsRanges).toBeUndefined();
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -1065,8 +1065,8 @@ describe(AssetMediaService.name, () => {
         originalPath: 'upload/admin/aa/bb/video.mp4',
         encodedVideoPath: null,
       });
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         await expect(sut.playbackVideo(authStub.admin, 'asset-1', 'bytes=0-1023')).resolves.toEqual(
@@ -1084,7 +1084,7 @@ describe(AssetMediaService.name, () => {
           expect.objectContaining({ range: 'bytes=0-1023' }),
         );
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -1101,8 +1101,8 @@ describe(AssetMediaService.name, () => {
         originalPath: 'upload/admin/aa/bb/video.mp4',
         encodedVideoPath: null,
       });
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         const response = await sut.playbackVideo(authStub.admin, 'asset-1');
@@ -1113,7 +1113,7 @@ describe(AssetMediaService.name, () => {
         );
         expect((response as ImmichStreamResponse).contentRange).toBeUndefined();
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
 
@@ -1126,15 +1126,15 @@ describe(AssetMediaService.name, () => {
         originalPath: 'upload/admin/aa/bb/video.mp4',
         encodedVideoPath: null,
       });
-      const previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      const previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       try {
         await expect(sut.playbackVideo(authStub.admin, 'asset-1', 'bytes=999999999-')).rejects.toMatchObject({
           status: 416,
         });
       } finally {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       }
     });
   });

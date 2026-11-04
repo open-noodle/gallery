@@ -5,7 +5,6 @@ import path from 'node:path';
 import sanitize from 'sanitize-filename';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, StorageAsset } from 'src/types.js';
-import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ConfigTemplateStorageOptionDto } from 'src/dtos/config.dto.js';
@@ -19,6 +18,11 @@ import {
   QueueName,
   StorageFolder,
 } from 'src/enum.js';
+import {
+  getTemplateLibraryRoot,
+  isManualOnlyTemplateMove,
+  isTemplateDestinationTaken,
+} from 'src/gallery/utils/storage-template-s3.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getAssetFile } from 'src/utils/asset.util.js';
 import { getFilenameExtension, getLivePhotoMotionFilename } from 'src/utils/file.js';
@@ -154,6 +158,10 @@ export class StorageTemplateService extends BaseService {
       return JobStatus.Failed;
     }
 
+    if (await isManualOnlyTemplateMove(asset, this.systemMetadataRepository)) {
+      return JobStatus.Skipped;
+    }
+
     const user = await this.userRepository.get(asset.ownerId, {});
     const storageLabel = user?.storageLabel || null;
     const filename = asset.originalFileName || asset.id;
@@ -168,7 +176,9 @@ export class StorageTemplateService extends BaseService {
         return JobStatus.Failed;
       }
       const motionFilename = getLivePhotoMotionFilename(filename, livePhotoVideo.originalPath);
-      await this.moveAsset(livePhotoVideo, { storageLabel, filename: motionFilename }, asset);
+      if (!(await isManualOnlyTemplateMove(livePhotoVideo, this.systemMetadataRepository))) {
+        await this.moveAsset(livePhotoVideo, { storageLabel, filename: motionFilename }, asset);
+      }
     }
     return JobStatus.Success;
   }
@@ -234,12 +244,6 @@ export class StorageTemplateService extends BaseService {
       return;
     }
 
-    // moveFile would not move a backend key either; this skips rendering its template path (album lookups, a lock)
-    if (!isDiskPath(asset.originalPath)) {
-      this.logger.debug(`Skipping storage template migration for S3 asset ${asset.id}`);
-      return;
-    }
-
     return this.databaseRepository.withLock(DatabaseLock.StorageTemplateMigration, async () => {
       const { id, originalPath, checksum, fileSizeInByte } = asset;
       const oldPath = originalPath;
@@ -288,7 +292,7 @@ export class StorageTemplateService extends BaseService {
       let extension = getFilenameExtension(source).split('.').pop() as string;
       const sanitized = sanitize(path.basename(filenameWithoutExtension, `.${extension}`));
       extension = extension?.toLowerCase();
-      const rootPath = StorageCore.getLibraryFolder({ id: asset.ownerId, storageLabel });
+      const rootPath = getTemplateLibraryRoot(source, { id: asset.ownerId, storageLabel });
 
       switch (extension) {
         case 'jpeg':
@@ -387,7 +391,7 @@ export class StorageTemplateService extends BaseService {
       let duplicateCount = 0;
 
       while (true) {
-        const isExists = await this.storageRepository.checkFileExists(destination);
+        const isExists = await isTemplateDestinationTaken(destination, this.storageRepository, this.logger);
         if (!isExists) {
           break;
         }

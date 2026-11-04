@@ -1,12 +1,20 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CompletedPart,
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   GetObjectCommandInput,
   GetObjectCommandOutput,
   HeadObjectCommand,
+  HeadObjectCommandOutput,
   ListObjectsV2Command,
   S3Client,
+  StorageClass,
+  UploadPartCopyCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -44,6 +52,36 @@ const READABLE_URL_EXPIRY_SECONDS = 60;
 // could still have resumed. Exported so tests derive their timings from it.
 export const S3_STREAM_IDLE_TIMEOUT_MS = 60_000;
 
+// CopyObject copies at most 5 GiB in one request; a larger object is copied part by part with UploadPartCopy,
+// whose parts are 5 MiB..5 GiB (the last one smaller) and at most 10,000 per upload. 512 MiB parts keep a large
+// video to a handful of requests and only grow for an object near S3's 5 TiB maximum.
+const COPY_OBJECT_MAX_BYTES = 5 * 1024 ** 3;
+const MULTIPART_COPY_PART_BYTES = 512 * 1024 ** 2;
+const MULTIPART_MAX_PARTS = 10_000;
+
+/**
+ * A key as the `CopySource` header needs it: S3 URL-decodes the header, so a template name's spaces, Unicode and
+ * `+N` duplicate suffix (which it would read as a space) are encoded, per segment so the slashes stay.
+ */
+const toCopySource = (bucket: string, key: string) =>
+  `${bucket}/${key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')}`;
+
+const S3_STORAGE_CLASSES = new Set<string>(Object.values(StorageClass));
+
+/**
+ * The storage class a copy is given. A copy is written in STANDARD unless told otherwise, which would undo the
+ * transition a lifecycle rule made, so the source's class is kept; STANDARD itself is the default and not sent, and
+ * neither is a class the SDK does not list: MinIO reports an ILM-transitioned object's tier name (e.g. `WARM-TIER`) in
+ * HeadObject, and rejects it on CopyObject and CreateMultipartUpload with InvalidStorageClass.
+ */
+const toCopyStorageClass = (storageClass?: StorageClass) =>
+  storageClass && storageClass !== StorageClass.STANDARD && S3_STORAGE_CLASSES.has(storageClass)
+    ? storageClass
+    : undefined;
+
 class AsyncLimiter {
   private active = 0;
   private readonly queue: Array<() => void> = [];
@@ -79,6 +117,10 @@ export interface S3StorageConfig {
   presignedUrlExpiry: number;
   serveMode: 'redirect' | 'proxy';
   proxyReadConcurrency?: number;
+  /** Tests only: the largest object copied with one CopyObject (default 5 GiB, CopyObject's limit). */
+  multipartCopyThreshold?: number;
+  /** Tests only: the smallest part of a multipart copy (default 512 MiB; raised to stay within 10,000 parts). */
+  multipartCopyPartSize?: number;
 }
 
 export class S3StorageBackend implements StorageBackend {
@@ -87,12 +129,16 @@ export class S3StorageBackend implements StorageBackend {
   private presignedUrlExpiry: number;
   private serveMode: 'redirect' | 'proxy';
   private proxyReadLimiter: AsyncLimiter;
+  private multipartCopyThreshold: number;
+  private multipartCopyPartSize: number;
 
   constructor(config: S3StorageConfig) {
     this.bucket = config.bucket;
     this.presignedUrlExpiry = config.presignedUrlExpiry;
     this.serveMode = config.serveMode;
     this.proxyReadLimiter = new AsyncLimiter(config.proxyReadConcurrency ?? 32);
+    this.multipartCopyThreshold = config.multipartCopyThreshold ?? COPY_OBJECT_MAX_BYTES;
+    this.multipartCopyPartSize = config.multipartCopyPartSize ?? MULTIPART_COPY_PART_BYTES;
 
     this.client = new S3Client({
       region: config.region,
@@ -177,6 +223,98 @@ export class S3StorageBackend implements StorageBackend {
       }
       throw error;
     }
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    const head = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: fromKey }));
+    const size = head.ContentLength ?? 0;
+    const copySource = toCopySource(this.bucket, fromKey);
+    const storageClass = toCopyStorageClass(head.StorageClass);
+
+    if (size <= this.multipartCopyThreshold) {
+      await this.copyObject(copySource, toKey, storageClass);
+      return;
+    }
+
+    try {
+      await this.copyMultipart(copySource, toKey, size, { ContentType: head.ContentType, StorageClass: storageClass });
+    } catch (error: any) {
+      // Storj's gateway answers UploadPartCopy with 501 NotImplemented, and its CopyObject has no 5 GiB limit
+      if (error?.name !== 'NotImplemented' && error?.$metadata?.httpStatusCode !== 501) {
+        throw error;
+      }
+      await this.copyObject(copySource, toKey, storageClass);
+    }
+  }
+
+  private async copyObject(copySource: string, toKey: string, storageClass?: StorageClass): Promise<void> {
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: toKey,
+        CopySource: copySource,
+        MetadataDirective: 'COPY',
+        StorageClass: storageClass,
+      }),
+    );
+  }
+
+  /**
+   * A copy above CopyObject's limit: UploadPartCopy over consecutive byte ranges of the source, one part at a time.
+   * A multipart upload does not inherit the source's metadata, so the content type and storage class are set on it. A
+   * failed copy aborts the upload, or its parts would be stored (and billed) until a lifecycle rule removed them.
+   */
+  private async copyMultipart(
+    copySource: string,
+    toKey: string,
+    size: number,
+    source: Pick<HeadObjectCommandOutput, 'ContentType' | 'StorageClass'>,
+  ): Promise<void> {
+    const { UploadId } = await this.client.send(
+      new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: toKey, ...source }),
+    );
+
+    try {
+      const partSize = Math.max(this.multipartCopyPartSize, Math.ceil(size / MULTIPART_MAX_PARTS));
+      const parts: CompletedPart[] = [];
+      for (let start = 0; start < size; start += partSize) {
+        const end = Math.min(start + partSize, size) - 1;
+        const PartNumber = parts.length + 1;
+        const { CopyPartResult } = await this.client.send(
+          new UploadPartCopyCommand({
+            Bucket: this.bucket,
+            Key: toKey,
+            UploadId,
+            PartNumber,
+            CopySource: copySource,
+            CopySourceRange: `bytes=${start}-${end}`,
+          }),
+        );
+        parts.push({ ETag: CopyPartResult?.ETag, PartNumber });
+      }
+
+      await this.client.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: this.bucket,
+          Key: toKey,
+          UploadId,
+          MultipartUpload: { Parts: parts },
+        }),
+      );
+    } catch (error) {
+      try {
+        await this.client.send(new AbortMultipartUploadCommand({ Bucket: this.bucket, Key: toKey, UploadId }));
+      } catch {
+        // the copy's own error is the one to report
+      }
+      throw error;
+    }
+  }
+
+  async stat(key: string): Promise<{ size: number }> {
+    // a missing object rejects with NotFound rather than reading as empty
+    const head = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+    return { size: head.ContentLength ?? 0 };
   }
 
   async delete(key: string): Promise<void> {
