@@ -1,11 +1,10 @@
-import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AssetMediaCreateDto } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetFileType, JobName } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
