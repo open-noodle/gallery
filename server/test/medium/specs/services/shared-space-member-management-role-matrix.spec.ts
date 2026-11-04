@@ -1,29 +1,29 @@
 /**
- * Space member management: ACTOR × SERVER SETTINGS × SPACE SETTINGS × OPERATION matrix.
- *
- * The access and RBAC oracles do not reach the role gates inside SharedSpaceService (`requireRole`), so this
- * file is the RBAC guarantee for "space editors may add members and change viewer/editor roles"
- * (specs/2026-10-24-space-editor-member-management-design.md, "The role matrix").
- *
- * Every combination is enumerated, none hand-picked:
- *   actors     every SharedSpaceRole (owner → the creator) + a promoted co-owner + a non-member user + a
- *              non-member server admin (no bypass)
- *   server     spaceEditorsCanAddMembers {false,true} × spaceEditorsCanChangeRoles {false,true}, written to the
- *              real system-config row and flipped MID-SPEC (the service reads it with `withCache: false`)
- *   space      editorsCanAddMembers {null,true,false} × editorsCanChangeRoles {null,true,false}
- *   operations addMember, updateMember, removeMember, update (the two settings), get, getAll
- *
- * The expected outcome comes from `expectedOutcome` below, a truth table that restates the design's rules and
- * today's owner rules. It deliberately does NOT import `resolveSpaceMemberManagement`, so a bug in that helper
- * cannot agree with itself.
- *
- * Per case: the outcome equals the truth table; an allowed mutation leaves the expected post-state; a rejected
- * one leaves the membership table (and the space's settings) byte-for-byte unchanged. The whole outcome grid is
- * snapshotted, so any change to who can do what is a reviewed snapshot diff (`-u`).
- *
- * Mutation-checked: removing the non-owner gate in addMember, in updateMember, or the owner-only check for the
- * two settings in update each fails this spec (see the Task 7 report).
- */
+Space member management: ACTOR × SERVER SETTINGS × SPACE SETTINGS × OPERATION matrix.
+
+The access and RBAC oracles do not reach the role gates inside SharedSpaceService (`requireRole`), so this
+file is the RBAC guarantee for "space editors may add members and change viewer/editor roles"
+(specs/2026-10-24-space-editor-member-management-design.md, "The role matrix").
+
+Every combination is enumerated, none hand-picked:
+  actors     every SharedSpaceRole (owner → the creator) + a promoted co-owner + a non-member user + a
+             non-member server admin (no bypass)
+  server     spaceEditorsCanAddMembers {false,true} × spaceEditorsCanChangeRoles {false,true}, written to the
+             real system-config row and flipped MID-SPEC (the service reads it with `withCache: false`)
+  space      editorsCanAddMembers {null,true,false} × editorsCanChangeRoles {null,true,false}
+  operations addMember, updateMember, removeMember, update (the two settings), get, getAll
+
+The expected outcome comes from `expectedOutcome` below, a truth table that restates the design's rules and
+today's owner rules. It deliberately does NOT import `resolveSpaceMemberManagement`, so a bug in that helper
+cannot agree with itself.
+
+Per case: the outcome equals the truth table; an allowed mutation leaves the expected post-state; a rejected
+one leaves the membership table (and the space's settings) byte-for-byte unchanged. The whole outcome grid is
+snapshotted, so any change to who can do what is a reviewed snapshot diff (`-u`).
+
+Mutation-checked: removing the non-owner gate in addMember, in updateMember, or the owner-only check for the
+two settings in update each fails this spec (see the Task 7 report).
+*/
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
@@ -76,10 +76,10 @@ const SERVER_COMBOS = BOOLS.flatMap((serverAdd) => BOOLS.map((serverChange) => (
 const SPACE_COMBOS = TRIS.flatMap((spaceAdd) => TRIS.map((spaceChange) => ({ spaceAdd, spaceChange })));
 
 /**
- * Members of every space at the start of every case. `target-editor` / `target-viewer` are bystanders, so the
- * "editor" and "viewer" targets of updateMember / removeMember / addMember are never the acting editor or
- * viewer (that case is covered by the explicit `self` target instead).
- */
+Members of every space at the start of every case. `target-editor` / `target-viewer` are bystanders, so the
+"editor" and "viewer" targets of updateMember / removeMember / addMember are never the acting editor or
+viewer (that case is covered by the explicit `self` target instead).
+*/
 const BASELINE: Array<{ fixture: Fixture; role: SharedSpaceRole }> = [
   { fixture: 'creator', role: SharedSpaceRole.Owner },
   { fixture: 'co-owner', role: SharedSpaceRole.Owner },
@@ -183,9 +183,7 @@ const roleOf = (actor: Actor): SharedSpaceRole | undefined => {
   }
 };
 
-/**
- * Effective permissions. Owners: always both on. Editors: `space ?? server`. Viewers and non-members: both off.
- */
+/** Effective permissions. Owners: always both on. Editors: `space ?? server`. Viewers and non-members: both off. */
 const effective = (actor: Actor, s: Settings) => {
   const role = roleOf(actor);
   if (role === SharedSpaceRole.Owner) {

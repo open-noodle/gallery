@@ -22,9 +22,9 @@ import { DB } from 'src/schema/index.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
 
 /**
- * `afterLocalDateTime` is the previous window's last `cursorT` (full precision). A `Date` is accepted
- * for convenience but only carries milliseconds.
- */
+`afterLocalDateTime` is the previous window's last `cursorT` (full precision). A `Date` is accepted
+for convenience but only carries milliseconds.
+*/
 export type BurstWindowOptions = { afterLocalDateTime?: string | Date; afterId?: string; limit: number };
 
 export type CleanupAssetTypeFilter = 'all' | 'image' | 'video';
@@ -34,13 +34,13 @@ export type CleanupBlurReason = 'all' | 'blurry' | 'dark' | 'bright';
 export type CleanupAssetRow = Omit<CleanupAssetDto, 'localDateTime'> & { localDateTime: Date };
 
 /**
- * The Include/exclude scope rules shared by every Cleanup query (calendar, rewind, queues):
- * owned, not deleted, timeline/archive visibility, not offline. External-library photos are included: the
- * trash confirmation warns that a read-only library brings them back at its next scan.
- *
- * `queue: true` additionally applies the stack rule (queues only, not rewind or the calendar):
- * an asset is in scope only if it is not in a stack, or is its stack's primary.
- */
+The Include/exclude scope rules shared by every Cleanup query (calendar, rewind, queues):
+owned, not deleted, timeline/archive visibility, not offline. External-library photos are included: the
+trash confirmation warns that a read-only library brings them back at its next scan.
+
+`queue: true` additionally applies the stack rule (queues only, not rewind or the calendar):
+an asset is in scope only if it is not in a stack, or is its stack's primary.
+*/
 export const withCleanupScope = <O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   userId: string | undefined,
@@ -75,20 +75,20 @@ export const withCleanupScope = <O>(
 const monthDayExpr = sql<number>`${sql.raw(MONTH_DAY_SQL.replaceAll('"localDateTime"', '"asset"."localDateTime"'))}`;
 
 /**
- * Live-photo-inclusive file size: the still's own `fileSizeInByte` plus its motion part's, when one
- * exists. Shared between `cleanupAssetColumns`' `fileSize` row column and every `countQueue` bytes
- * sum, so a hub card's total always matches the sum of what the corresponding list page shows.
- * Space hogs' own filter/sort stay on the asset's plain `fileSizeInByte` (index use) — only the
- * reported byte totals include the motion part.
- */
+Live-photo-inclusive file size: the still's own `fileSizeInByte` plus its motion part's, when one
+exists. Shared between `cleanupAssetColumns`' `fileSize` row column and every `countQueue` bytes
+sum, so a hub card's total always matches the sum of what the corresponding list page shows.
+Space hogs' own filter/sort stay on the asset's plain `fileSizeInByte` (index use) — only the
+reported byte totals include the motion part.
+*/
 const cleanupFileSizeExpr = sql<number>`coalesce("asset_exif"."fileSizeInByte", 0) + coalesce((select e2."fileSizeInByte" from asset_exif e2 where e2."assetId" = asset."livePhotoVideoId"), 0)`;
 
 /**
- * The `CleanupAssetDto` column list, shared by every query that returns `CleanupAssetRow`s
- * (rewind and the queue lists). `kept` differs per caller: rewind checks its own decision, while
- * queue list endpoints already exclude any keep for that queue at the WHERE level, so they pass a
- * `false` literal.
- */
+The `CleanupAssetDto` column list, shared by every query that returns `CleanupAssetRow`s
+(rewind and the queue lists). `kept` differs per caller: rewind checks its own decision, while
+queue list endpoints already exclude any keep for that queue at the WHERE level, so they pass a
+`false` literal.
+*/
 const cleanupAssetColumns = <E extends readonly unknown[]>(
   eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>,
   kept: AliasableExpression<SqlBool>,
@@ -138,17 +138,17 @@ const notKeptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, que
   eb.not(keptForQueue(eb, userId, queue));
 
 /**
- * The `(localDateTime, id)` keyset cursor timestamp at full (microsecond) precision. A JS `Date` only
- * holds milliseconds, so a cursor built from one would re-admit (ascending) or skip (descending) rows
- * whose `localDateTime` has sub-millisecond digits. Every `(t, id)` cursor is built from this column.
- */
+The `(localDateTime, id)` keyset cursor timestamp at full (microsecond) precision. A JS `Date` only
+holds milliseconds, so a cursor built from one would re-admit (ascending) or skip (descending) rows
+whose `localDateTime` has sub-millisecond digits. Every `(t, id)` cursor is built from this column.
+*/
 const cursorTExpr = sql<string>`to_char("asset"."localDateTime" at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 
 /**
- * `("localDateTime", "id") <op> (cursorT::timestamptz, id)` — a row comparison, so PostgreSQL turns it
- * into an index condition on `asset_cleanup_localDateTime_idx ("ownerId", "localDateTime", "id")` and
- * a page deep in a 500k-asset library starts at the cursor instead of scanning from the top.
- */
+`("localDateTime", "id") <op> (cursorT::timestamptz, id)` — a row comparison, so PostgreSQL turns it
+into an index condition on `asset_cleanup_localDateTime_idx ("ownerId", "localDateTime", "id")` and
+a page deep in a 500k-asset library starts at the cursor instead of scanning from the top.
+*/
 const localDateTimeKeyset = (eb: ExpressionBuilder<DB, 'asset'>, op: '<' | '>', cursorT: string, id: string) =>
   eb(eb.refTuple('asset.localDateTime', 'asset.id'), op, eb.tuple(sql<Date>`${cursorT}::timestamptz`, id));
 
@@ -184,10 +184,10 @@ const mapCleanupAssetRow = <T extends { fileSize: unknown; isFavorite: unknown; 
 });
 
 /**
- * The three Blurry predicates, driven by the strictness/threshold constants from Task 1. A screenshot meets none of
- * them: a light-mode screen clips white over most of the frame and a dark-mode one is mostly black, so the exposure
- * rules would flag ordinary screenshots as overexposed or too dark. Screenshots have their own queue.
- */
+The three Blurry predicates, driven by the strictness/threshold constants from Task 1. A screenshot meets none of
+them: a light-mode screen clips white over most of the frame and a dark-mode one is mostly black, so the exposure
+rules would flag ordinary screenshots as overexposed or too dark. Screenshots have their own queue.
+*/
 const blurryExpressions = (strictness: CleanupStrictnessValue) => {
   const threshold = CLEANUP_BLUR_THRESHOLDS[strictness];
   const photo = sql`not asset_quality."isScreenshot"`;
@@ -305,9 +305,9 @@ export class CleanupRepository {
   }
 
   /**
-   * Re-stamps only the metadata-derived screenshot flag, leaving the pixel scores and `qualityAnalyzedAt` as they
-   * are: for a row whose pixel version is current but whose screenshot version is stale.
-   */
+  Re-stamps only the metadata-derived screenshot flag, leaving the pixel scores and `qualityAnalyzedAt` as they
+  are: for a row whose pixel version is current but whose screenshot version is stale.
+  */
   @GenerateSql({
     params: [{ assetId: DummyValue.UUID, isScreenshot: DummyValue.BOOLEAN, screenshotVersion: DummyValue.NUMBER }],
   })
@@ -368,13 +368,13 @@ export class CleanupRepository {
   }
 
   /**
-   * Whether any in-scope asset holds a row analysed with an older `CLEANUP_QUALITY_VERSION` or
-   * `CLEANUP_SCREENSHOT_VERSION`: the boot check behind the automatic re-run after a bump. Never-analysed assets do
-   * not count (the thumbnail job chains their analysis, and "Missing" covers the rest), so a library with nothing
-   * to upgrade never queues anything. It runs once per start. When every row is current it is one parallel scan of
-   * `asset_quality` that matches nothing and never reads `asset`: 8 ms at 500k rows (PostgreSQL 14), so it needs
-   * no index. After a bump the first row matches and it returns at once.
-   */
+  Whether any in-scope asset holds a row analysed with an older `CLEANUP_QUALITY_VERSION` or
+  `CLEANUP_SCREENSHOT_VERSION`: the boot check behind the automatic re-run after a bump. Never-analysed assets do
+  not count (the thumbnail job chains their analysis, and "Missing" covers the rest), so a library with nothing
+  to upgrade never queues anything. It runs once per start. When every row is current it is one parallel scan of
+  `asset_quality` that matches nothing and never reads `asset`: 8 ms at 500k rows (PostgreSQL 14), so it needs
+  no index. After a bump the first row matches and it returns at once.
+  */
   @GenerateSql({ params: [] })
   async hasStaleQualityAnalysis(): Promise<boolean> {
     let qb = this.db
@@ -452,9 +452,9 @@ export class CleanupRepository {
   }
 
   /**
-   * `reason` is the Blurry queue's reason at the default strictness, so one-at-a-time mode can hint
-   * that a photo also sits in that queue. It is null (dropped) for an unscored asset.
-   */
+  `reason` is the Blurry queue's reason at the default strictness, so one-at-a-time mode can hint
+  that a photo also sits in that queue. It is null (dropped) for an unscored asset.
+  */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER, DummyValue.NUMBER] })
   async getRewindAssets(userId: string, monthDay: number, year: number): Promise<CleanupAssetRow[]> {
     const qb = this.db
@@ -491,11 +491,11 @@ export class CleanupRepository {
   }
 
   /**
-   * `commit`'s steps 3-5 (favourite, keep, complete-the-day) share one database transaction — the
-   * trash update and its `AssetTrashAll` event, which the caller runs first, are deliberately kept
-   * out of this transaction: they use `assetRepository`/`eventRepository`, and a trashed asset should
-   * land even if the day-review write fails for an unrelated reason.
-   */
+  `commit`'s steps 3-5 (favourite, keep, complete-the-day) share one database transaction — the
+  trash update and its `AssetTrashAll` event, which the caller runs first, are deliberately kept
+  out of this transaction: they use `assetRepository`/`eventRepository`, and a trashed asset should
+  land even if the day-review write fails for an unrelated reason.
+  */
   @GenerateSql({
     params: [
       DummyValue.UUID,
@@ -1051,12 +1051,12 @@ export class CleanupRepository {
   }
 
   /**
-   * One ordered pass over the user's images (the spec's `lag()` count), shaped for 500k-asset
-   * libraries: `lead()` marks the last row of each group, so singletons — almost every row — are
-   * dropped before the second window and the `group by`, which then only see burst members. The
-   * earlier shape grouped every row and spilled a ~450k-group hash aggregate to disk (p95 377 ms at
-   * 500k assets vs 239 ms for this one; see the spec's "Scale" section).
-   */
+  One ordered pass over the user's images (the spec's `lag()` count), shaped for 500k-asset
+  libraries: `lead()` marks the last row of each group, so singletons — almost every row — are
+  dropped before the second window and the `group by`, which then only see burst members. The
+  earlier shape grouped every row and spilled a ~450k-group hash aggregate to disk (p95 377 ms at
+  500k assets vs 239 ms for this one; see the spec's "Scale" section).
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   async countBursts(userId: string): Promise<{ count: number; bytes: number }> {
     const orderClause = sql`order by "asset"."localDateTime", "asset"."id"`;

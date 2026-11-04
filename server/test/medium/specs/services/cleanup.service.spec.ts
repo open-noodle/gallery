@@ -18,9 +18,9 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
-const setup = (db?: Kysely<DB>) => {
+const setup = () => {
   const { sut, ctx } = newMediumService(CleanupService, {
-    database: db || defaultDatabase,
+    database: defaultDatabase,
     // Config + system metadata: commit reads `trash.enabled` to choose soft- or force-delete.
     real: [AssetRepository, CleanupRepository, ConfigRepository, SystemMetadataRepository],
     mock: [EventRepository, JobRepository, LoggingRepository],
