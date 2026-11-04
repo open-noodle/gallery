@@ -110,7 +110,7 @@ export class SpatialSceneService extends BaseService {
 
     const { modelName } = machineLearning.spatialScene;
     try {
-      const depth = await this.machineLearningRepository.estimateDepth(asset.previewPath, { modelName });
+      const depth = await this.galleryMachineLearningRepository.estimateDepth(asset.previewPath, { modelName });
 
       // The ML call can outlast a model switch, whose ConfigUpdate has already queued a forced run under the new
       // model: a map from the old one must not be stored over it.

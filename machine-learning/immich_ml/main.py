@@ -184,30 +184,23 @@ def prometheus_metrics() -> Response:
     return Response(metrics.render(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.post("/predict", dependencies=[Depends(update_state)])
+@app.post("/predict", dependencies=[Depends(update_state), metrics.predict_metrics(get_entries)])
 async def predict(
     entries: list[InferenceEntry[Any]] = Depends(get_entries),
     image: bytes | None = File(default=None),
     text: str | None = Form(default=None),
 ) -> Any:
-    started = time.perf_counter()
-    metric_labels = metrics.labels_from_entries(entries)
-    try:
-        if image is not None:
-            decoded = await run(lambda: decode_pil(image))
-            if decoded.width == 0 or decoded.height == 0:
-                raise HTTPException(400, "Image has zero width or height")
-            inputs: Image | str = decoded
-        elif text is not None:
-            inputs = text
-        else:
-            raise HTTPException(400, "Either image or text must be provided")
-        response = await run_inference(inputs, entries)
-        metrics.record_predict(metric_labels, "success", started)
-        return ORJSONResponse(response)
-    except Exception:
-        metrics.record_predict(metric_labels, "error", started)
-        raise
+    if image is not None:
+        decoded = await run(lambda: decode_pil(image))
+        if decoded.width == 0 or decoded.height == 0:
+            raise HTTPException(400, "Image has zero width or height")
+        inputs: Image | str = decoded
+    elif text is not None:
+        inputs = text
+    else:
+        raise HTTPException(400, "Either image or text must be provided")
+    response = await run_inference(inputs, entries)
+    return ORJSONResponse(response)
 
 
 async def run_inference(payload: Image | str, entries: list[InferenceEntry[Any]]) -> InferenceResponse:

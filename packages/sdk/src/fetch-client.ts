@@ -13797,7 +13797,9 @@ export enum JobName {
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify",
     AssetAnalyzeQualityQueueAll = "AssetAnalyzeQualityQueueAll",
-    AssetAnalyzeQuality = "AssetAnalyzeQuality"
+    AssetAnalyzeQuality = "AssetAnalyzeQuality",
+    MemoryRuleGenerate = "MemoryRuleGenerate",
+    AssetVideoTrimGenerate = "AssetVideoTrimGenerate"
 }
 export enum QueueJobStatus {
     Active = "active",

@@ -12,13 +12,12 @@
   import { zoomImageToBase64 } from '#lib/utils/people-utils.ts';
   import { getPersonNameWithHiddenValue } from '#lib/utils/person.ts';
   import { AssetTypeEnum, createPerson, type AssetFaceResponseDto, type PersonResponseDto } from '@immich/sdk';
-  import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Icon, IconButton, LoadingSpinner, modalManager, toastManager } from '@immich/ui';
   import { mdiAccountOff, mdiArrowLeftThin, mdiArrowRightThin, mdiPencil, mdiRestart, mdiTrashCan } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import ImageThumbnail from '../assets/thumbnail/ImageThumbnail.svelte';
   import AssignFaceSidePanel from './AssignFaceSidePanel.svelte';
 

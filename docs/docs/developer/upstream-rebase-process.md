@@ -291,7 +291,10 @@ make upstream-sync-fork-main
 
 Never merge `origin/main` into the rolling branch. The sync command cherry-picks
 the range from the stored `integratedForkHead` to the current fork ref, then runs
-the fork checks and the last completed batch audit.
+the fork checks and the last completed batch audit. A cherry-pick that stops only
+on modify/delete conflicts for paths in `FORK_DELETED_PATHS`
+(`tools/upstream-preflight/src/fork-deletions.ts`) is resolved by keeping the
+deletion; any other conflict still stops the sync.
 
 If checks fail after cherry-picking succeeds, fix the branch and continue:
 
@@ -392,6 +395,19 @@ make fork-patches-check
 `make ci-invariants-check` verifies manifest-defined workflow invariants, such
 as avoiding upstream `PUSH_O_MATIC` token dependencies and keeping Gallery image
 names in release workflows.
+
+Some upstream workflows stay in the tree as upstream's unedited text, so a
+rebase never stops on them. `docs-destroy.yml` is one: it runs on every closed
+pull request and fails without Immich's Cloudflare and app secrets. Editing its
+trigger would bring the modify/delete conflicts back, so it is switched off in
+the repository settings instead, once per repository, by the owner:
+
+```bash
+gh workflow disable docs-destroy.yml --repo open-noodle/gallery
+```
+
+No check can see a repository setting. If closed pull requests start failing
+`docs-destroy.yml` runs, run the command again.
 
 `make fork-patches-check` verifies package patch metadata, including expected
 patch files and references in `pnpm-workspace.yaml`.

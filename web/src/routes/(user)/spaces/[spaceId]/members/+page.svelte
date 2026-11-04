@@ -3,11 +3,11 @@
   import SpaceMemberPermissionSettings from '#lib/gallery/components/spaces/space-member-permission-settings.svelte';
   import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
   import RoleBadge from '#lib/components/spaces/role-badge.svelte';
-  import SpaceAddMemberModal from '#lib/modals/SpaceAddMemberModal.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { formatTimeAgo } from '#lib/utils/timesince.ts';
+  import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
+  import { formatTimeAgo } from '#lib/gallery/utils/time-ago.ts';
   import {
     removeMember,
     SharedSpaceRole,
@@ -51,11 +51,11 @@
   });
 
   async function handleAddMember() {
-    const result = await modalManager.show(SpaceAddMemberModal, {
-      spaceId: space.id,
-      existingMemberIds: members.map((m) => m.userId),
-    });
-    if (result) {
+    const added = await showAddSpaceMembersModal(
+      space.id,
+      members.map((m) => m.userId),
+    );
+    if (added.length > 0) {
       await invalidateAll();
     }
   }

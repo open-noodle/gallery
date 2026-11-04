@@ -1,5 +1,6 @@
 import en from '#i18n/en.json';
 import { ADMIN_VISIBLE_QUEUES, MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
+import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import * as selectionHandlers from '#lib/managers/selection-command-handlers.ts';
 import { Route } from '#lib/route.ts';
@@ -16,7 +17,6 @@ import { goto } from '$app/navigation';
 import AlbumEditModal from '../modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '../modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '../modals/ShortcutsModal.svelte';
-import SpaceAddMemberModal from '../modals/SpaceAddMemberModal.svelte';
 import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import SpaceMembersModal from '../modals/SpaceMembersModal.svelte';
 import type { CommandContext } from './command-context-manager.svelte';
@@ -42,6 +42,8 @@ vi.mock('@immich/sdk', async (orig) => ({
 }));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
+
+vi.mock('#lib/gallery/spaces/add-space-members.js', () => ({ showAddSpaceMembersModal: vi.fn() }));
 
 vi.mock('#lib/services/album.service.js', () => ({
   handleDeleteAlbum: vi.fn().mockResolvedValue(undefined),
@@ -861,14 +863,11 @@ describe('space-context commands', () => {
     it('shows for owner', () => {
       expect(cmd().isAvailable!(makeCtx())).toBe(true);
     });
-    it('handler opens SpaceAddMemberModal with existingMemberIds from ctx.space.members', async () => {
+    it('handler opens the add-member modal with existingMemberIds from ctx.space.members', async () => {
       const members = [makeMember({ userId: 'u-a' }), makeMember({ userId: 'u-b' })];
       const ctx = makeCtx({ space: { ...makeCtx().space!, members } });
       await cmd().handler(ctx);
-      expect(modalManager.show).toHaveBeenCalledWith(SpaceAddMemberModal, {
-        spaceId: 's1',
-        existingMemberIds: ['u-a', 'u-b'],
-      });
+      expect(showAddSpaceMembersModal).toHaveBeenCalledWith('s1', ['u-a', 'u-b']);
     });
   });
 

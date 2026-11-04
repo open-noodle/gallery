@@ -3,7 +3,7 @@
 // kNN search (see spec §4.4). The `describe('pet_search', ...)` block below only proves the
 // schema/migration land correctly, so those tests talk to ctx.database directly, mirroring
 // face-backfill-contributions.medium.spec.ts. Slice 4 (below) adds the repository methods
-// (PetFaceRepository.refreshPetFaces, SearchRepository.searchPets) that write/read pet_search.
+// (PetFaceRepository.refreshPetFaces, PetFaceRepository.searchPets) that write/read pet_search.
 import { Kysely, sql } from 'kysely';
 import { VECTOR_INDEX_TABLES } from 'src/constants.js';
 import { VectorIndex } from 'src/enum.js';
@@ -309,11 +309,11 @@ describe('PetFaceRepository.refreshPetFaces', () => {
   });
 });
 
-describe('SearchRepository.searchPets', () => {
+describe('PetFaceRepository.searchPets', () => {
   // 4.5
   it('orders results by cosine distance and honours maxDistance', async () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const query = axisEmbedding('first');
     const { assetFace: nearFace } = await newPetFace(ctx, {
@@ -325,7 +325,7 @@ describe('SearchRepository.searchPets', () => {
       embedding: blendedEmbedding(116, 140), // distance ~0.547
     });
 
-    const loose = await searchRepository.searchPets({
+    const loose = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,
@@ -333,7 +333,7 @@ describe('SearchRepository.searchPets', () => {
     });
     expect(loose.map((result) => result.id)).toEqual([nearFace.id, farFace.id]);
 
-    const tight = await searchRepository.searchPets({
+    const tight = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,
@@ -345,14 +345,14 @@ describe('SearchRepository.searchPets', () => {
   // 4.6
   it('only returns pet faces owned by the given user', async () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user: owner } = await ctx.newUser();
     const { user: otherUser } = await ctx.newUser();
     const query = axisEmbedding('first');
     const { assetFace: ownFace } = await newPetFace(ctx, { ownerId: owner.id, embedding: query });
     await newPetFace(ctx, { ownerId: otherUser.id, embedding: query });
 
-    const results = await searchRepository.searchPets({
+    const results = await petFaceRepository.searchPets({
       userIds: [owner.id],
       embedding: query,
       numResults: 10,
@@ -365,7 +365,7 @@ describe('SearchRepository.searchPets', () => {
   // 4.7
   it('excludes unassigned faces when hasPerson is true', async () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const query = axisEmbedding('first');
@@ -376,7 +376,7 @@ describe('SearchRepository.searchPets', () => {
     });
     await newPetFace(ctx, { ownerId: user.id, embedding: query, personGroupId: null });
 
-    const results = await searchRepository.searchPets({
+    const results = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,
@@ -391,13 +391,13 @@ describe('SearchRepository.searchPets', () => {
   // matching embedding must never leak into a pet search.
   it('never returns rows from face_search, even with a matching embedding', async () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const query = axisEmbedding('first');
     const { assetFace: petFace } = await newPetFace(ctx, { ownerId: user.id, embedding: query });
     const { assetFace: humanFace } = await newHumanFace(ctx, { ownerId: user.id, embedding: query });
 
-    const results = await searchRepository.searchPets({
+    const results = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,
@@ -410,10 +410,10 @@ describe('SearchRepository.searchPets', () => {
 
   it('rejects a numResults below 1, mirroring searchFaces', () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
 
     expect(() =>
-      searchRepository.searchPets({
+      petFaceRepository.searchPets({
         userIds: [newUuid()],
         embedding: axisEmbedding('first'),
         numResults: 0,
@@ -495,16 +495,16 @@ describe('PetFaceRepository.getPetFaceForRecognition (medium)', () => {
   });
 });
 
-describe('SearchRepository.searchPets maxDistance boundary (medium)', () => {
+describe('PetFaceRepository.searchPets maxDistance boundary (medium)', () => {
   it('R9.3 keeps a row whose distance is exactly maxDistance (the comparison is inclusive)', async () => {
     const { ctx } = setup();
-    const searchRepository = ctx.get(SearchRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const query = axisEmbedding('first');
     const { assetFace } = await newPetFace(ctx, { ownerId: user.id, embedding: blendedEmbedding(140, 116) });
 
     // Read the row's real distance with a deliberately loose search...
-    const loose = await searchRepository.searchPets({
+    const loose = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,
@@ -514,7 +514,7 @@ describe('SearchRepository.searchPets maxDistance boundary (medium)', () => {
     expect(match).toBeDefined();
 
     // ...then re-query with maxDistance set to exactly that distance.
-    const exact = await searchRepository.searchPets({
+    const exact = await petFaceRepository.searchPets({
       userIds: [user.id],
       embedding: query,
       numResults: 10,

@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -69,7 +70,14 @@ describe('upstream owner-only favorite writes', () => {
     const { ctx, auth, user } = await setup();
     const { sut, ctx: serviceCtx } = newMediumService(AssetMediaService, {
       database: defaultDatabase,
-      real: [AccessRepository, AlbumRepository, AssetRepository, SharedLinkRepository, UserRepository],
+      real: [
+        AccessRepository,
+        AlbumRepository,
+        AssetRepository,
+        GalleryAssetRepository,
+        SharedLinkRepository,
+        UserRepository,
+      ],
       mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
     });
     serviceCtx.getMock(StorageRepository).utimes.mockResolvedValue();
@@ -91,7 +99,7 @@ describe('upstream owner-only favorite writes', () => {
     const { ctx, auth, user } = await setup();
     const { sut } = newMediumService(AssetService, {
       database: defaultDatabase,
-      real: [AccessRepository, AssetRepository, AssetFavoriteRepository],
+      real: [AccessRepository, AssetRepository, GalleryAssetRepository, AssetFavoriteRepository],
       mock: [LoggingRepository],
     });
     const { asset: source } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
@@ -123,6 +131,7 @@ describe('upstream owner-only favorite writes', () => {
         AccessRepository,
         AlbumRepository,
         AssetRepository,
+        GalleryAssetRepository,
         AssetFavoriteRepository,
         ConfigRepository,
         DuplicateRepository,
