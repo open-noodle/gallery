@@ -1,5 +1,6 @@
 import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '#lib/utils/exif-utils.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import {
   AssetTypeEnum,
   AssetVisibility,
@@ -9,7 +10,6 @@ import {
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor, within } from '@testing-library/svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanel from './DetailPanel.svelte';
 
 const { authManagerMock, faceManagerMock, getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(
@@ -81,7 +81,7 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 }));
 
 vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/map-component.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -89,52 +89,52 @@ vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
 // attributes) rather than the plain noop, so the editability-propagation tests below can assert
 // on what DetailPanel actually threaded down to each row.
 vi.mock('#lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/faces-page/person-side-panel.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/LoadingSpinner.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -351,7 +351,7 @@ describe('DetailPanel', () => {
     faceManagerMock.people = [person];
     faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
 
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       ownerId: 'owner-1',
       localDateTime: '2026-01-01T00:00:00.000Z',
       people: [],
@@ -386,7 +386,7 @@ describe('DetailPanel', () => {
     faceManagerMock.people = [person];
     faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
 
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       ownerId: 'owner-1',
       localDateTime: '2026-01-01T00:00:00.000Z',
       people: [],
@@ -421,7 +421,7 @@ describe('DetailPanel', () => {
     faceManagerMock.people = [person];
     faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
 
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       ownerId: 'owner-1',
       localDateTime: '2026-01-01T00:00:00.000Z',
       people: [],
@@ -441,7 +441,7 @@ describe('DetailPanel', () => {
   it('renders Google, Apple, and OpenStreetMap links in the image info panel map popup', async () => {
     const lat = 48.85341;
     const lon = 2.3488;
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       id: 'asset-with-location',
       ownerId: 'owner-1',
       exifInfo: {
@@ -481,7 +481,7 @@ describe('DetailPanel', () => {
   describe('editability propagation to child rows (#734)', () => {
     it('widens description/rating/date/location and tags-add to a non-owner space editor when canEdit is true', async () => {
       authManagerMock.preferences.tags.enabled = true;
-      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: true, tags: [] });
+      const asset = factory.asset({ ownerId: 'someone-else', canEdit: true, tags: [] });
 
       renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
@@ -500,7 +500,7 @@ describe('DetailPanel', () => {
 
     it('keeps the rows real-owner-gated for a non-owner when canEdit is false', async () => {
       authManagerMock.preferences.tags.enabled = true;
-      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: false, tags: [] });
+      const asset = factory.asset({ ownerId: 'someone-else', canEdit: false, tags: [] });
 
       renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
@@ -538,7 +538,7 @@ describe('DetailPanel', () => {
       };
       faceManagerMock.people = [person];
 
-      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: true });
+      const asset = factory.asset({ ownerId: 'someone-else', canEdit: true });
 
       renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 

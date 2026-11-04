@@ -1,7 +1,7 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import '@testing-library/jest-dom';
 import { screen, within } from '@testing-library/svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanelTags from './DetailPanelTags.svelte';
 
 const { authManagerMock } = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 }));
 
 const taggedAsset = () =>
-  assetFactory.build({
+  factory.asset({
     id: 'asset-1',
     ownerId: 'owner-1',
     tags: [
@@ -86,14 +86,14 @@ describe('DetailPanelTags', () => {
   });
 
   it('still renders the section for an owner whose asset has no tags', () => {
-    renderWithTooltips(DetailPanelTags, { asset: assetFactory.build({ ownerId: 'owner-1', tags: [] }), isOwner: true });
+    renderWithTooltips(DetailPanelTags, { asset: factory.asset({ ownerId: 'owner-1', tags: [] }), isOwner: true });
 
     expect(screen.getByTestId('detail-panel-tags')).toBeInTheDocument();
   });
 
   it('hides the section from a non-owner when the asset has no tags', () => {
     renderWithTooltips(DetailPanelTags, {
-      asset: assetFactory.build({ ownerId: 'owner-1', tags: [] }),
+      asset: factory.asset({ ownerId: 'owner-1', tags: [] }),
       isOwner: false,
     });
 

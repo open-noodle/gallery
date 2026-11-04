@@ -4,6 +4,8 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+import { factory } from '#test/unit/factories.ts';
+import { reactivePageMock } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   SharedSpaceRole,
   type PeopleFaceStatisticsResponseDto,
@@ -17,9 +19,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
-import { reactivePageMock } from '#test-data/mocks/reactive-page.mock.svelte.ts';
 import SpacePeoplePage from '../../../routes/(user)/spaces/[spaceId]/people/+page.svelte';
 
 const PAGE_SIZE = 100;
@@ -48,7 +47,7 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
@@ -145,9 +144,9 @@ function renderPage({
   /** Whether the space has any people at all, ignoring the filter, as `load` resolves it. */
   hasSpacePeople?: boolean;
 } = {}) {
-  const currentUser = userAdminFactory.build({ id: userId });
+  const currentUser = factory.user({ id: userId });
   authManager.setUser(currentUser);
-  authManager.setPreferences(preferencesFactory.build());
+  authManager.setPreferences(factory.preferences());
 
   const props = {
     data: {
@@ -550,7 +549,7 @@ describe('Spaces people page', () => {
     expect(await screen.findByText('1,111')).toBeInTheDocument();
 
     await userEvent.click(trigger);
-    authManager.setUser(userAdminFactory.build({ id: 'other-user-id' }));
+    authManager.setUser(factory.user({ id: 'other-user-id' }));
     await userEvent.click(trigger);
 
     expect(await screen.findByText('2,222')).toBeInTheDocument();

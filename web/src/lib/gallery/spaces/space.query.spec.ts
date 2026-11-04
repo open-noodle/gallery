@@ -2,9 +2,9 @@ import { getAllSpacesQuery, getSpaceAlbumsQuery, spacesQueryKey } from '#lib/gal
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { recentSpacesDropdown } from '#lib/stores/preferences.store.ts';
+import { factory } from '#test/unit/factories.ts';
 import { getAllSpaces, getSharedSpaceAlbums, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { get } from 'svelte/store';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
@@ -22,7 +22,7 @@ describe('getAllSpacesQuery', () => {
   });
 
   it('fetches the spaces list once into the shared cache', async () => {
-    const spaces = [sharedSpaceFactory.build()];
+    const spaces = [factory.sharedSpace()];
     vi.mocked(getAllSpaces).mockResolvedValue(spaces);
 
     const [first, second] = await Promise.all([
@@ -37,7 +37,7 @@ describe('getAllSpacesQuery', () => {
   });
 
   it('retries on the next read after a failed fetch', async () => {
-    const spaces = [sharedSpaceFactory.build()];
+    const spaces = [factory.sharedSpace()];
     vi.mocked(getAllSpaces).mockRejectedValueOnce(new Error('network')).mockResolvedValue(spaces);
 
     await expect(queryClient.fetchQuery(getAllSpacesQuery())).rejects.toThrow('network');
@@ -47,7 +47,7 @@ describe('getAllSpacesQuery', () => {
   });
 
   it.each(['SpaceAddAssets', 'SpaceRemoveAssets'] as const)('invalidates the spaces list on %s', (event) => {
-    queryClient.setQueryData(spacesQueryKey, [sharedSpaceFactory.build()]);
+    queryClient.setQueryData(spacesQueryKey, [factory.sharedSpace()]);
 
     eventManager.emit(event, { assetIds: ['a1'], spaceId: 's1' });
 
@@ -57,7 +57,7 @@ describe('getAllSpacesQuery', () => {
   it.each(['SpaceLinkAlbum', 'SpaceUnlinkAlbum'] as const)(
     "invalidates the spaces list and only that space's albums on %s",
     (event) => {
-      queryClient.setQueryData(spacesQueryKey, [sharedSpaceFactory.build()]);
+      queryClient.setQueryData(spacesQueryKey, [factory.sharedSpace()]);
       queryClient.setQueryData(getSpaceAlbumsQuery('s1').queryKey, []);
       queryClient.setQueryData(getSpaceAlbumsQuery('s2').queryKey, []);
 

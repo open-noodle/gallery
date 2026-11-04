@@ -5,12 +5,11 @@ import { queryClient } from '#lib/queries/client.ts';
 import { recentSpaceAlbumsExpanded } from '#lib/stores/preferences.store.ts';
 import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
+import { factory } from '#test/unit/factories.ts';
 import { UserAvatarColor } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
-import { sharedSpaceLinkedAlbumFactory } from '#test-data/factories/shared-space-linked-album-factory';
 
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/photos') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -66,23 +65,23 @@ describe('RecentSpaces component', () => {
     });
 
     it('does not call getAllSpaces when cache is populated', async () => {
-      queryClient.setQueryData(spacesQueryKey, [sharedSpaceFactory.build()]);
+      queryClient.setQueryData(spacesQueryKey, [factory.sharedSpace()]);
       await renderAndFlush();
       expect(sdkMock.getAllSpaces).not.toHaveBeenCalled();
     });
 
     it('sorts pinned spaces first, then by lastActivityAt descending', async () => {
-      const pinned = sharedSpaceFactory.build({
+      const pinned = factory.sharedSpace({
         id: 'pinned-1',
         name: 'Pinned',
         lastActivityAt: '2024-01-01T00:00:00Z',
       });
-      const recent = sharedSpaceFactory.build({
+      const recent = factory.sharedSpace({
         id: 'recent-1',
         name: 'Recent',
         lastActivityAt: '2024-06-01T00:00:00Z',
       });
-      const old = sharedSpaceFactory.build({ id: 'old-1', name: 'Old', lastActivityAt: '2024-03-01T00:00:00Z' });
+      const old = factory.sharedSpace({ id: 'old-1', name: 'Old', lastActivityAt: '2024-03-01T00:00:00Z' });
 
       pinnedSpaceIds.set(['pinned-1']);
       sdkMock.getAllSpaces.mockResolvedValueOnce([recent, old, pinned]);
@@ -97,7 +96,7 @@ describe('RecentSpaces component', () => {
 
     it('takes only top 3 spaces', async () => {
       const spaces = Array.from({ length: 5 }, (_, i) =>
-        sharedSpaceFactory.build({ lastActivityAt: `2024-0${5 - i}-01T00:00:00Z` }),
+        factory.sharedSpace({ lastActivityAt: `2024-0${5 - i}-01T00:00:00Z` }),
       );
 
       sdkMock.getAllSpaces.mockResolvedValueOnce(spaces);
@@ -108,7 +107,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('links to Route.viewSpace for each space', async () => {
-      const space = sharedSpaceFactory.build({ id: 'abc-123' });
+      const space = factory.sharedSpace({ id: 'abc-123' });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -132,9 +131,9 @@ describe('RecentSpaces component', () => {
   // thumbnail, centred, which is how Google Photos' rail shows spaces and albums.
   describe('rail mode', () => {
     const railWithAlbums = async (albumCount: number) => {
-      const space = sharedSpaceFactory.build({ id: 'rail-1', albumCount, thumbnailAssetId: 'asset-rail-1' });
+      const space = factory.sharedSpace({ id: 'rail-1', albumCount, thumbnailAssetId: 'asset-rail-1' });
       const albums = Array.from({ length: albumCount }, (_, i) =>
-        sharedSpaceLinkedAlbumFactory.build({ id: `album-${i}`, linkedAt: `2026-01-0${i + 1}T00:00:00.000Z` }),
+        factory.sharedSpaceLinkedAlbum({ id: `album-${i}`, linkedAt: `2026-01-0${i + 1}T00:00:00.000Z` }),
       );
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       sdkMock.getSharedSpaceAlbums.mockResolvedValueOnce(albums);
@@ -184,7 +183,7 @@ describe('RecentSpaces component', () => {
 
   describe('space thumbnail', () => {
     it('shows the space thumbnail when there are no new assets', async () => {
-      const space = sharedSpaceFactory.build({
+      const space = factory.sharedSpace({
         id: 'thumb-1',
         newAssetCount: 0,
         thumbnailAssetId: 'asset-thumb-1',
@@ -200,7 +199,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('keeps showing the thumbnail when the space has new assets', async () => {
-      const space = sharedSpaceFactory.build({
+      const space = factory.sharedSpace({
         id: 'thumb-2',
         newAssetCount: 5,
         color: UserAvatarColor.Blue,
@@ -218,9 +217,9 @@ describe('RecentSpaces component', () => {
 
     it('never renders an activity dot, whatever the space colour', async () => {
       const spaces = [
-        sharedSpaceFactory.build({ id: 'blue-1', newAssetCount: 3, color: UserAvatarColor.Blue }),
-        sharedSpaceFactory.build({ id: 'red-1', newAssetCount: 3, color: UserAvatarColor.Red }),
-        sharedSpaceFactory.build({ id: 'null-color', newAssetCount: 2, color: null }),
+        factory.sharedSpace({ id: 'blue-1', newAssetCount: 3, color: UserAvatarColor.Blue }),
+        factory.sharedSpace({ id: 'red-1', newAssetCount: 3, color: UserAvatarColor.Red }),
+        factory.sharedSpace({ id: 'null-color', newAssetCount: 2, color: null }),
       ];
       sdkMock.getAllSpaces.mockResolvedValueOnce(spaces);
       await renderAndFlush();
@@ -230,7 +229,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('falls back to the placeholder square when the space has no thumbnail asset', async () => {
-      const space = sharedSpaceFactory.build({ id: 'no-thumb', newAssetCount: 4, thumbnailAssetId: null });
+      const space = factory.sharedSpace({ id: 'no-thumb', newAssetCount: 4, thumbnailAssetId: null });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -242,8 +241,8 @@ describe('RecentSpaces component', () => {
 
   describe('sorting edge cases', () => {
     it('sorts null lastActivityAt to the end', async () => {
-      const recent = sharedSpaceFactory.build({ id: 'recent', lastActivityAt: '2024-06-01T00:00:00Z' });
-      const nullActivity = sharedSpaceFactory.build({ id: 'null-activity', lastActivityAt: null });
+      const recent = factory.sharedSpace({ id: 'recent', lastActivityAt: '2024-06-01T00:00:00Z' });
+      const nullActivity = factory.sharedSpace({ id: 'null-activity', lastActivityAt: null });
 
       sdkMock.getAllSpaces.mockResolvedValueOnce([nullActivity, recent]);
       await renderAndFlush();
@@ -254,8 +253,8 @@ describe('RecentSpaces component', () => {
     });
 
     it('pinned space with old activity appears before unpinned with recent activity', async () => {
-      const pinnedOld = sharedSpaceFactory.build({ id: 'pinned-old', lastActivityAt: '2020-01-01T00:00:00Z' });
-      const unpinnedRecent = sharedSpaceFactory.build({
+      const pinnedOld = factory.sharedSpace({ id: 'pinned-old', lastActivityAt: '2020-01-01T00:00:00Z' });
+      const unpinnedRecent = factory.sharedSpace({
         id: 'unpinned-recent',
         lastActivityAt: '2024-12-01T00:00:00Z',
       });
@@ -271,9 +270,9 @@ describe('RecentSpaces component', () => {
 
     it('preserves input order when all spaces have same lastActivityAt (stable sort)', async () => {
       const sameTime = '2024-06-01T00:00:00Z';
-      const a = sharedSpaceFactory.build({ id: 'a', lastActivityAt: sameTime });
-      const b = sharedSpaceFactory.build({ id: 'b', lastActivityAt: sameTime });
-      const c = sharedSpaceFactory.build({ id: 'c', lastActivityAt: sameTime });
+      const a = factory.sharedSpace({ id: 'a', lastActivityAt: sameTime });
+      const b = factory.sharedSpace({ id: 'b', lastActivityAt: sameTime });
+      const c = factory.sharedSpace({ id: 'c', lastActivityAt: sameTime });
 
       sdkMock.getAllSpaces.mockResolvedValueOnce([a, b, c]);
       await renderAndFlush();
@@ -287,7 +286,7 @@ describe('RecentSpaces component', () => {
 
     it('fills all 3 slots with pinned spaces when 3+ are pinned', async () => {
       const spaces = Array.from({ length: 5 }, (_, i) =>
-        sharedSpaceFactory.build({ id: `s${i}`, lastActivityAt: `2024-0${5 - i}-01T00:00:00Z` }),
+        factory.sharedSpace({ id: `s${i}`, lastActivityAt: `2024-0${5 - i}-01T00:00:00Z` }),
       );
 
       pinnedSpaceIds.set(['s0', 's1', 's2', 's3']);
@@ -321,7 +320,7 @@ describe('RecentSpaces component', () => {
 
   describe('album drill-down chevron', () => {
     it('shows a chevron when albumCount > 0', async () => {
-      const space = sharedSpaceFactory.build({ id: 'has-albums', albumCount: 2 });
+      const space = factory.sharedSpace({ id: 'has-albums', albumCount: 2 });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -329,7 +328,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('shows no chevron when albumCount is 0', async () => {
-      const space = sharedSpaceFactory.build({ id: 'no-albums', albumCount: 0 });
+      const space = factory.sharedSpace({ id: 'no-albums', albumCount: 0 });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -337,7 +336,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('sizes the chevron like the NavbarItem chevron it sits under', async () => {
-      const space = sharedSpaceFactory.build({ id: 'space-a', albumCount: 2 });
+      const space = factory.sharedSpace({ id: 'space-a', albumCount: 2 });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -350,7 +349,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('shows no chevron when albumCount is undefined', async () => {
-      const space = sharedSpaceFactory.build({ id: 'undef-albums' });
+      const space = factory.sharedSpace({ id: 'undef-albums' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (space as any).albumCount = undefined;
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
@@ -362,8 +361,8 @@ describe('RecentSpaces component', () => {
 
   describe('pin reactivity', () => {
     it('re-sorts when pinnedSpaceIds changes', async () => {
-      const a = sharedSpaceFactory.build({ id: 'a', lastActivityAt: '2024-01-01T00:00:00Z' });
-      const b = sharedSpaceFactory.build({ id: 'b', lastActivityAt: '2024-06-01T00:00:00Z' });
+      const a = factory.sharedSpace({ id: 'a', lastActivityAt: '2024-01-01T00:00:00Z' });
+      const b = factory.sharedSpace({ id: 'b', lastActivityAt: '2024-06-01T00:00:00Z' });
 
       sdkMock.getAllSpaces.mockResolvedValueOnce([a, b]);
       await renderAndFlush();
@@ -386,11 +385,11 @@ describe('RecentSpaces component', () => {
 
   describe('album drill-down list', () => {
     const buildSpaceWithAlbums = (albums: number) =>
-      sharedSpaceFactory.build({ id: 'space-a', albumCount: albums, newAssetCount: 0 });
+      factory.sharedSpace({ id: 'space-a', albumCount: albums, newAssetCount: 0 });
 
     it('fetches albums once on first expand and caches on the second', async () => {
       const space = buildSpaceWithAlbums(2);
-      const albums = sharedSpaceLinkedAlbumFactory.buildList(2);
+      const albums = factory.many(2, () => factory.sharedSpaceLinkedAlbum());
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
       await renderAndFlush();
@@ -413,10 +412,10 @@ describe('RecentSpaces component', () => {
     it('renders albums sorted by linkedAt descending, sliced to three', async () => {
       const space = buildSpaceWithAlbums(4);
       const albums = [
-        sharedSpaceLinkedAlbumFactory.build({ id: 'old', albumName: 'Old', linkedAt: '2024-01-01T00:00:00Z' }),
-        sharedSpaceLinkedAlbumFactory.build({ id: 'new', albumName: 'New', linkedAt: '2024-06-01T00:00:00Z' }),
-        sharedSpaceLinkedAlbumFactory.build({ id: 'mid', albumName: 'Mid', linkedAt: '2024-03-01T00:00:00Z' }),
-        sharedSpaceLinkedAlbumFactory.build({ id: 'older', albumName: 'Older', linkedAt: '2023-01-01T00:00:00Z' }),
+        factory.sharedSpaceLinkedAlbum({ id: 'old', albumName: 'Old', linkedAt: '2024-01-01T00:00:00Z' }),
+        factory.sharedSpaceLinkedAlbum({ id: 'new', albumName: 'New', linkedAt: '2024-06-01T00:00:00Z' }),
+        factory.sharedSpaceLinkedAlbum({ id: 'mid', albumName: 'Mid', linkedAt: '2024-03-01T00:00:00Z' }),
+        factory.sharedSpaceLinkedAlbum({ id: 'older', albumName: 'Older', linkedAt: '2023-01-01T00:00:00Z' }),
       ];
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
@@ -471,9 +470,9 @@ describe('RecentSpaces component', () => {
     });
 
     it('shows no "See all" row at exactly three albums', async () => {
-      const space = sharedSpaceFactory.build({ id: 'space-a', albumCount: 3, newAssetCount: 0 });
+      const space = factory.sharedSpace({ id: 'space-a', albumCount: 3, newAssetCount: 0 });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
-      sdkMock.getSharedSpaceAlbums.mockResolvedValue(sharedSpaceLinkedAlbumFactory.buildList(3));
+      sdkMock.getSharedSpaceAlbums.mockResolvedValue(factory.many(3, () => factory.sharedSpaceLinkedAlbum()));
       await renderAndFlush();
 
       await fireEvent.click(screen.getByTestId('sidebar-space-chevron-space-a'));
@@ -484,9 +483,9 @@ describe('RecentSpaces component', () => {
     });
 
     it('shows a "See all (N)" row above three albums using the fetched length', async () => {
-      const space = sharedSpaceFactory.build({ id: 'space-a', albumCount: 3, newAssetCount: 0 }); // stale count
+      const space = factory.sharedSpace({ id: 'space-a', albumCount: 3, newAssetCount: 0 }); // stale count
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
-      sdkMock.getSharedSpaceAlbums.mockResolvedValue(sharedSpaceLinkedAlbumFactory.buildList(5)); // fetched truth
+      sdkMock.getSharedSpaceAlbums.mockResolvedValue(factory.many(5, () => factory.sharedSpaceLinkedAlbum())); // fetched truth
       await renderAndFlush();
 
       await fireEvent.click(screen.getByTestId('sidebar-space-chevron-space-a'));
@@ -500,7 +499,7 @@ describe('RecentSpaces component', () => {
 
     it('auto-loads albums on mount for a persisted-expanded space without a click', async () => {
       const space = buildSpaceWithAlbums(2);
-      const albums = sharedSpaceLinkedAlbumFactory.buildList(2);
+      const albums = factory.many(2, () => factory.sharedSpaceLinkedAlbum());
       recentSpaceAlbumsExpanded.set({ 'space-a': true });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
@@ -519,11 +518,11 @@ describe('RecentSpaces component', () => {
     // its own albums *list* page, which has no row of its own.
     describe('selected row', () => {
       const renderExpanded = async () => {
-        const space = sharedSpaceFactory.build({ id: 'space-a', albumCount: 4, newAssetCount: 0 });
+        const space = factory.sharedSpace({ id: 'space-a', albumCount: 4, newAssetCount: 0 });
         sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
         sdkMock.getSharedSpaceAlbums.mockResolvedValue([
-          sharedSpaceLinkedAlbumFactory.build({ id: 'album-1', linkedAt: '2024-03-01T00:00:00Z' }),
-          sharedSpaceLinkedAlbumFactory.build({ id: 'album-2', linkedAt: '2024-02-01T00:00:00Z' }),
+          factory.sharedSpaceLinkedAlbum({ id: 'album-1', linkedAt: '2024-03-01T00:00:00Z' }),
+          factory.sharedSpaceLinkedAlbum({ id: 'album-2', linkedAt: '2024-02-01T00:00:00Z' }),
         ]);
         recentSpaceAlbumsExpanded.set({ 'space-a': true });
         await renderAndFlush();
@@ -572,9 +571,9 @@ describe('RecentSpaces component', () => {
     });
 
     it('keeps the chevron anchored to the space row when expanded', async () => {
-      const space = sharedSpaceFactory.build({ id: 'space-a', albumCount: 4, newAssetCount: 0 });
+      const space = factory.sharedSpace({ id: 'space-a', albumCount: 4, newAssetCount: 0 });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
-      sdkMock.getSharedSpaceAlbums.mockResolvedValue(sharedSpaceLinkedAlbumFactory.buildList(4));
+      sdkMock.getSharedSpaceAlbums.mockResolvedValue(factory.many(4, () => factory.sharedSpaceLinkedAlbum()));
       await renderAndFlush();
 
       await fireEvent.click(screen.getByTestId('sidebar-space-chevron-space-a'));

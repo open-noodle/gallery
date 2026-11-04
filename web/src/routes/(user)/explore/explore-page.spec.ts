@@ -1,10 +1,9 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { factory } from '#test/unit/factories.ts';
 import { Type, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { personFactory } from '#test-data/factories/person-factory';
 import ExplorePage from './+page.svelte';
 
 vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
@@ -13,7 +12,7 @@ vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
 });
 
 function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
-  return personFactory.build({
+  return factory.person({
     id: 'person-1',
     name: 'Alice',
     isHidden: false,
@@ -104,7 +103,7 @@ describe('Explore page', () => {
       [
         {
           fieldName: 'exifInfo.city',
-          items: [{ value: 'Cape Town', data: assetFactory.build({ id: 'asset-1' }) }],
+          items: [{ value: 'Cape Town', data: factory.asset({ id: 'asset-1' }) }],
         },
       ],
     );
@@ -125,7 +124,7 @@ describe('Explore page', () => {
           items: [
             {
               value: 'Cape Town',
-              data: assetFactory.build({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: 'South Africa' } }),
+              data: factory.asset({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: 'South Africa' } }),
             },
           ],
         },
@@ -147,7 +146,7 @@ describe('Explore page', () => {
           items: [
             {
               value: 'Cape Town',
-              data: assetFactory.build({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: null } }),
+              data: factory.asset({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: null } }),
             },
           ],
         },
