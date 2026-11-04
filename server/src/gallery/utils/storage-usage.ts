@@ -4,6 +4,8 @@ import { StorageFolder } from 'src/enum.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 
 const UUID_LENGTH = 36;
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
@@ -34,6 +36,39 @@ export const getDerivativeAssetId = (filename: string): string | null => {
   // extraction. Filenames are built from asset.id (already lowercase) so this never
   // fires today, but keep it — do not go back to preserving the source casing.
   return candidate.toLowerCase();
+};
+
+/**
+A user's S3 prefixes, the keys of the disk folders upstream counts and deletes for the user (a storage migration
+maps `<mediaLocation>/<key>` onto `<key>`). Each ends in '/' so one user's prefix never matches another's. The
+storage template and a disk-to-S3 storage migration write originals to `library/<label>/`. Backups is
+admin/global scope, not a user's.
+*/
+export const getUserS3Prefixes = (user: Pick<UserAdmin, 'id' | 'storageLabel'>) => ({
+  library: `${StorageFolder.Library}/${user.storageLabel || user.id}/`,
+  upload: `${StorageFolder.Upload}/${user.id}/`,
+  profile: `${StorageFolder.Profile}/${user.id}/`,
+  thumbnails: `${StorageFolder.Thumbnails}/${user.id}/`,
+  encodedVideo: `${StorageFolder.EncodedVideo}/${user.id}/`,
+});
+
+/**
+The S3 prefixes user deletion removes. library/<label>/ is kept while an asset of another owner is stored under it:
+an admin can change a storage label without running the template migration and give the old label to another user,
+whose library then shares the prefix with the first user's originals. The id-keyed prefixes are the user's alone.
+*/
+export const getDeletableUserS3Prefixes = async (
+  user: Pick<UserAdmin, 'id' | 'storageLabel'>,
+  storageMigrationRepository: StorageMigrationRepository,
+  logger: LoggingRepository,
+): Promise<string[]> => {
+  const { library, ...owned } = getUserS3Prefixes(user);
+  if (await storageMigrationRepository.hasOtherOwnerFilesUnderPrefix(library, user.id)) {
+    logger.warn(`Skipped S3 prefix ${library} for user ${user.id}: it holds files of another user's assets`);
+    return Object.values(owned);
+  }
+
+  return [library, ...Object.values(owned)];
 };
 
 type PhysicalUsageDeps = {
@@ -75,11 +110,13 @@ export const computePhysicalUsage = async ({
   let total = disk.reduce((total, value) => total + value, 0);
 
   if (s3) {
+    const prefixes = getUserS3Prefixes(user);
     const remote = await Promise.all([
-      s3.getPrefixUsage(`${StorageFolder.Upload}/${user.id}/`),
-      s3.getPrefixUsage(`${StorageFolder.Profile}/${user.id}/`),
-      s3.getPrefixUsage(`${StorageFolder.Thumbnails}/${user.id}/`, shouldCount),
-      s3.getPrefixUsage(`${StorageFolder.EncodedVideo}/${user.id}/`, shouldCount),
+      s3.getPrefixUsage(prefixes.library),
+      s3.getPrefixUsage(prefixes.upload),
+      s3.getPrefixUsage(prefixes.profile),
+      s3.getPrefixUsage(prefixes.thumbnails, shouldCount),
+      s3.getPrefixUsage(prefixes.encodedVideo, shouldCount),
     ]);
     total += remote.reduce((total, value) => total + value, 0);
   }
