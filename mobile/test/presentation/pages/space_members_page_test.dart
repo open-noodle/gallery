@@ -91,24 +91,24 @@ void main() {
     expect(find.byIcon(Icons.person_add_outlined), findsNothing);
     await tester.tap(find.text('vw'));
     await tester.pumpAndSettle();
-    expect(find.text('Set as Viewer'), findsNothing);
-    expect(find.text('Set as Editor'), findsNothing);
+    expect(find.byIcon(Icons.visibility_outlined), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
   });
 
   testWidgets('editor with canChangeRoles gets the role sheet for a viewer, without remove', (tester) async {
     await pump(tester, 'ed', _space(add: false, roles: true));
     await tester.tap(find.text('vw'));
     await tester.pumpAndSettle();
-    expect(find.text('Set as Editor'), findsOneWidget);
-    expect(find.text('Set as Viewer'), findsOneWidget);
-    expect(find.text('Remove from Space'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.person_remove_outlined), findsNothing);
   });
 
   testWidgets('editor with canChangeRoles gets no sheet for an owner target', (tester) async {
     await pump(tester, 'ed', _space(add: false, roles: true));
     await tester.tap(find.text('owner@example.com'));
     await tester.pumpAndSettle();
-    expect(find.text('Set as Editor'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
   });
 
   testWidgets('owner sees the settings widget, the add button and remove', (tester) async {
@@ -117,7 +117,7 @@ void main() {
     expect(find.byIcon(Icons.person_add_outlined), findsOneWidget);
     await tester.tap(find.text('vw'));
     await tester.pumpAndSettle();
-    expect(find.text('Remove from Space'), findsOneWidget);
+    expect(find.byIcon(Icons.person_remove_outlined), findsOneWidget);
   });
 
   testWidgets('older server (no memberManagement): owner as today, editor nothing', (tester) async {
@@ -131,6 +131,6 @@ void main() {
     expect(find.byIcon(Icons.person_add_outlined), findsNothing);
     await tester.tap(find.text('vw'));
     await tester.pumpAndSettle();
-    expect(find.text('Set as Viewer'), findsNothing);
+    expect(find.byIcon(Icons.visibility_outlined), findsNothing);
   });
 }

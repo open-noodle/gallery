@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Put, UseInterceptors } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AdminConfigDto, ConfigTemplateStorageOptionDto } from 'src/dtos/config.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
+import { UpstreamConfigBodyInterceptor } from 'src/gallery/middleware/upstream-config-body.interceptor.js';
 import { Authenticated } from 'src/middleware/auth.guard.js';
 import { StorageTemplateService } from 'src/services/storage-template.service.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
@@ -56,6 +57,7 @@ export class SystemConfigController {
       .stable('v2')
       .deprecated('v3.2.0', { replacementId: 'updateAdminConfig' }),
   })
+  @UseInterceptors(UpstreamConfigBodyInterceptor)
   updateConfig(@Body() dto: AdminConfigDto): Promise<AdminConfigDto> {
     return this.service.updateAdminConfig(dto);
   }

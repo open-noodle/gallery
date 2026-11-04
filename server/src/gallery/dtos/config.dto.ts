@@ -268,3 +268,20 @@ export const galleryTopLevelDefaults = {
   // and counts original files only.
   storageUsage: { includeDerivatives: false },
 };
+
+/**
+ * Every setting Gallery adds to upstream's config, as a dotted path into SystemConfig. A body that leaves one out
+ * is upstream-shaped (src/gallery/middleware/upstream-config-body.interceptor.ts).
+ */
+export const galleryConfigPaths = [
+  ...Object.keys(galleryTopLevelDefaults),
+  ...Object.keys(galleryJobDefaults).map((key) => `job.${key}`),
+  ...Object.keys(galleryServerDefaults).map((key) => `server.${key}`),
+  ...Object.keys(galleryBackupDatabaseDefaults).map((key) => `backup.database.${key}`),
+  ...Object.keys(GalleryClipExtension).map((key) => `machineLearning.clip.${key}`),
+  'machineLearning.petDetection',
+  'machineLearning.petRecognition',
+  'machineLearning.spatialScene',
+  'machineLearning.facialRecognition.suggestions',
+  'nightlyTasks.clusterNewPets',
+];
