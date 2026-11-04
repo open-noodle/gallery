@@ -12,10 +12,10 @@ export type ServerMemberPermissionSettings = {
 };
 
 /**
- * Effective member-management permissions of one caller in one space.
- * Owners always have both, viewers and non-members never do, and an editor gets `space ?? server`.
- * Server admins get no bypass.
- */
+Effective member-management permissions of one caller in one space.
+Owners always have both, viewers and non-members never do, and an editor gets `space ?? server`.
+Server admins get no bypass.
+*/
 export function resolveSpaceMemberManagement(
   role: SharedSpaceRole | undefined,
   space: SpaceMemberPermissionSettings,
