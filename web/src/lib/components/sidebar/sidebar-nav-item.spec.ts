@@ -1,9 +1,9 @@
 import SidebarNavItem from '#lib/components/sidebar/sidebar-nav-item.svelte';
+import { reactiveProps } from '#test/unit/reactive-props.svelte.ts';
 import { mdiImageMultiple } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import { reactiveProps } from '#test-data/reactive-props.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {

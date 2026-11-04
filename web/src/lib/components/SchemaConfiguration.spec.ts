@@ -1,7 +1,7 @@
 import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
 import SchemaConfiguration from '#lib/components/SchemaConfiguration.svelte';
 import type { JSONSchemaProperty } from '#lib/types.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
 import { screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';

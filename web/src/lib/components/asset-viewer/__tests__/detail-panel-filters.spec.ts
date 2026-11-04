@@ -1,11 +1,11 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Task 2 of Slice 7 (asset-viewer-contextual-filters). Per the plan's R5, this is a NEW, dedicated
@@ -35,7 +35,7 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 // different URL per test the way driving four different FilterTarget surfaces requires. See
 // reactive-page.mock.svelte.ts's own docs for why this needs to be the shared $state stand-in.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -71,28 +71,31 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 
 // The embedded map is a dynamic import; the stub exposes its "open in map view" control as a button.
 vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/map-component.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto =>
-  assetFactory.build({
+// factory.asset merges exifInfo into its own defaults (camera, lens, dates); these tests need exactly the EXIF they pass.
+const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto => {
+  const asset = factory.asset({
     id: 'asset-1',
     ownerId: 'owner-1',
     type: AssetTypeEnum.Image,
     visibility: AssetVisibility.Timeline,
     ...overrides,
   });
+  return overrides.exifInfo ? { ...asset, exifInfo: overrides.exifInfo } : asset;
+};
 
 beforeEach(() => {
   vi.clearAllMocks();

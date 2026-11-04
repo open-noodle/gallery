@@ -69,7 +69,8 @@ const preferences = (overrides: Partial<UserPreferencesResponseDto> = {}): UserP
   download: { archiveSize: 4_294_967_296, includeEmbeddedVideos: false },
   emailNotifications: { albumInvite: true, albumUpdate: true, enabled: true },
   folders: { enabled: false, sidebarWeb: false },
-  memories: { enabled: true, duration: 5, sidebarWeb: false },
+  // Gallery: the per-type memories map is a required Gallery field.
+  memories: { enabled: true, duration: 5, sidebarWeb: false, types: {} },
   people: { enabled: true, sidebarWeb: false, updateStrategy: PersonUpdateStrategy.Everyone },
   purchase: { hideBuyButtonUntil: '2100-02-12T00:00:00.000Z', showSupportBadge: false },
   ratings: { enabled: false },

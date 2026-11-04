@@ -1,9 +1,9 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { albumFactory } from '#test-data/factories/album-factory';
 import AlbumMap from '../AlbumMap.svelte';
 
 const { handleErrorMock, modalShowMock } = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ describe('AlbumMap', () => {
   });
 
   it('fetches album-scoped markers honouring the active filters', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
 
     renderWithTooltips(AlbumMap, { album, filters: { ...createFilterState(), make: 'Apple' } });
 
@@ -46,7 +46,7 @@ describe('AlbumMap', () => {
   });
 
   it('refetches when the album filters change', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
     const { rerender } = renderWithTooltips(AlbumMap, { album, filters: { ...createFilterState(), make: 'Apple' } });
 
     await vi.waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1));
@@ -73,7 +73,7 @@ describe('AlbumMap', () => {
   // original example) but Finding 2 (#767 fresh instance) made them marker-relevant — see the
   // "refetches" test below — so this now has to pick a field the album map truly never reads.
   it('does not refetch markers when a filter the album map does not read changes (e.g. sortOrder)', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
     const { rerender } = renderWithTooltips(AlbumMap, { album, filters: { ...createFilterState(), make: 'Apple' } });
 
     await vi.waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1));
@@ -92,7 +92,7 @@ describe('AlbumMap', () => {
   // query (buildAlbumMapMarkerOptions -> applyCommonMapFilters), so — unlike sortOrder above —
   // changing one of them IS marker-relevant and must trigger a refetch with the new value applied.
   it('refetches markers when the description filter changes (now marker-relevant)', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
     const { rerender } = renderWithTooltips(AlbumMap, { album, filters: { ...createFilterState(), make: 'Apple' } });
 
     await vi.waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1));
@@ -115,7 +115,7 @@ describe('AlbumMap', () => {
   // in-flight request, and the superseded promise REJECTS. Without a guard that rejection reaches
   // handleError and the user gets an error toast for every character they type into a filter.
   it('does not surface an error when a filter change aborts the in-flight request', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
     let rejectFirst: (error: unknown) => void = () => {};
     sdkMock.getFilteredMapMarkers
       .mockReturnValueOnce(
@@ -152,7 +152,7 @@ describe('AlbumMap', () => {
   // The other half of the same race: a superseded request that RESOLVES late must not clobber the
   // markers of the request that replaced it.
   it('ignores a stale response that resolves after a newer one', async () => {
-    const album = albumFactory.build({ id: 'album-1' });
+    const album = factory.album({ id: 'album-1' });
     let resolveFirst: (markers: unknown) => void = () => {};
     sdkMock.getFilteredMapMarkers
       .mockReturnValueOnce(
@@ -184,7 +184,7 @@ describe('AlbumMap', () => {
   // must keep using the album endpoint: /gallery/map/markers has no shared-link auth, and E2 says
   // shared links get no filter affordances at all.
   it('falls back to the album endpoint when no filters are provided', async () => {
-    renderWithTooltips(AlbumMap, { album: albumFactory.build({ id: 'album-1' }) });
+    renderWithTooltips(AlbumMap, { album: factory.album({ id: 'album-1' }) });
 
     await vi.waitFor(() =>
       expect(sdkMock.getAlbumMapMarkers).toHaveBeenCalledWith({ id: 'album-1' }, expect.anything()),
