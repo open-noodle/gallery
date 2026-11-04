@@ -75,8 +75,8 @@ import {
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum.js';
-import { resolveSpaceMemberManagement } from 'src/gallery/utils/space-member-management.js';
 import { requireSpaceShareAccess } from 'src/gallery/utils/access-grants.js';
+import { resolveSpaceMemberManagement } from 'src/gallery/utils/space-member-management.js';
 import { AlbumAssetCount } from 'src/repositories/album.repository.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,

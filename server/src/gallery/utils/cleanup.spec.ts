@@ -183,19 +183,13 @@ describe('computeStreak', () => {
   });
 });
 
-const row = (
-  id: string,
-  iso: string,
-  autoStackId: string | null = null,
-  sharpness: number | null = 10,
-  fileSize = 100,
-) => ({
+const row = (id: string, iso: string, autoStackId: string | null = null) => ({
   id,
   localDateTime: new Date(iso),
   cursorT: iso,
   autoStackId,
-  sharpness,
-  fileSize,
+  sharpness: 10 as number | null,
+  fileSize: 100,
 });
 
 describe('groupBursts', () => {

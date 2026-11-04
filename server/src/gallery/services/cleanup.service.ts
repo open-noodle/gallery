@@ -75,11 +75,11 @@ type CleanupCountOptions = {
 const mapAsset = (row: CleanupAssetRow) => ({ ...row, localDateTime: row.localDateTime.toISOString() });
 
 /**
- * `decodeCursor` only validates the generic on-the-wire shape (an array of strings/numbers). Each
- * queue's keyset cursor has its own concrete shape, and a cursor that satisfies the generic check but
- * not the concrete one would otherwise reach a repository query as `NaN`/`Invalid Date` and fail with
- * a 500 instead of a 400. These re-validate per queue and throw `BadRequestException` on a mismatch.
- */
+`decodeCursor` only validates the generic on-the-wire shape (an array of strings/numbers). Each
+queue's keyset cursor has its own concrete shape, and a cursor that satisfies the generic check but
+not the concrete one would otherwise reach a repository query as `NaN`/`Invalid Date` and fail with
+a 500 instead of a 400. These re-validate per queue and throw `BadRequestException` on a mismatch.
+*/
 const decodeDateIdCursor = (raw: string): CleanupCursor => {
   const cursor = decodeCursor(raw);
   const [date, id] = cursor.v;
@@ -217,21 +217,21 @@ export class CleanupService extends BaseService {
   }
 
   /**
-   * Fetches a window of up to `CLEANUP_BURST_WINDOW` rows after `after`, then extends it with
-   * further windows while the boundary falls inside a burst (the last row of the fetched window
-   * is within `CLEANUP_BURST_GAP_MS` of the next row) — so a group is never split across a page.
-   * `reachedEnd` is true once a fetch comes back short, meaning there is nothing left to scan.
-   *
-   * When the extension probe finds a real gap, its rows are exactly the next window (same cursor,
-   * same limit), so they are returned as `lookahead` and the caller passes them back in instead of
-   * fetching them again — halving the queries per bursts page at 500k assets.
-   *
-   * Safety net: at most `CLEANUP_BURST_MAX_EXTENSIONS` extra windows are appended (a pathological
-   * run of photos under 2 s apart would otherwise read the whole library into one page; such a run is
-   * split at the cap instead), and a returned row equal to the cursor row is dropped.
-   *
-   * `stats.queries` counts the window queries run, for the caller's per-page cap.
-   */
+  Fetches a window of up to `CLEANUP_BURST_WINDOW` rows after `after`, then extends it with
+  further windows while the boundary falls inside a burst (the last row of the fetched window
+  is within `CLEANUP_BURST_GAP_MS` of the next row) — so a group is never split across a page.
+  `reachedEnd` is true once a fetch comes back short, meaning there is nothing left to scan.
+  
+  When the extension probe finds a real gap, its rows are exactly the next window (same cursor,
+  same limit), so they are returned as `lookahead` and the caller passes them back in instead of
+  fetching them again — halving the queries per bursts page at 500k assets.
+  
+  Safety net: at most `CLEANUP_BURST_MAX_EXTENSIONS` extra windows are appended (a pathological
+  run of photos under 2 s apart would otherwise read the whole library into one page; such a run is
+  split at the cap instead), and a returned row equal to the cursor row is dropped.
+  
+  `stats.queries` counts the window queries run, for the caller's per-page cap.
+  */
   private async fetchBurstWindow(
     userId: string,
     after: { cursorT?: string; id?: string },
@@ -479,12 +479,12 @@ export class CleanupService extends BaseService {
   }
 
   /**
-   * The automatic re-run after a `CLEANUP_QUALITY_VERSION` / `CLEANUP_SCREENSHOT_VERSION` bump: when any row was
-   * analysed by an older version, queue the "Missing" run once, which re-analyses only the stale part of the stale
-   * rows. The lock serialises the replicas' microservices workers, and a QueueAll already waiting or running (a
-   * replica that got there first, or an admin's click) stops a second one. A rare duplicate is still harmless: its
-   * `staleOnly` jobs skip rows already current.
-   */
+  The automatic re-run after a `CLEANUP_QUALITY_VERSION` / `CLEANUP_SCREENSHOT_VERSION` bump: when any row was
+  analysed by an older version, queue the "Missing" run once, which re-analyses only the stale part of the stale
+  rows. The lock serialises the replicas' microservices workers, and a QueueAll already waiting or running (a
+  replica that got there first, or an admin's click) stops a second one. A rare duplicate is still harmless: its
+  `staleOnly` jobs skip rows already current.
+  */
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
     await this.databaseRepository.withLock(DatabaseLock.CleanupQualityRerun, async () => {
@@ -529,11 +529,11 @@ export class CleanupService extends BaseService {
   }
 
   /**
-   * Analyses one asset. With `staleOnly` (the "Missing" run, and the automatic re-run after a version bump) it
-   * recomputes only the stale part: nothing when both versions are current, and only the metadata-derived
-   * screenshot flag, without reading the preview, when just `CLEANUP_SCREENSHOT_VERSION` moved. Without it (the
-   * thumbnail chain, whose preview is new, and "All") it analyses in full.
-   */
+  Analyses one asset. With `staleOnly` (the "Missing" run, and the automatic re-run after a version bump) it
+  recomputes only the stale part: nothing when both versions are current, and only the metadata-derived
+  screenshot flag, without reading the preview, when just `CLEANUP_SCREENSHOT_VERSION` moved. Without it (the
+  thumbnail chain, whose preview is new, and "All") it analyses in full.
+  */
   @OnJob({ name: JobName.AssetAnalyzeQuality, queue: QueueName.QualityAnalysis })
   async handleQualityAnalysis({ id, staleOnly }: JobOf<JobName.AssetAnalyzeQuality>): Promise<JobStatus> {
     const asset = await this.cleanupRepository.getForQualityAnalysis(id);

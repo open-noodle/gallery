@@ -13,9 +13,9 @@ export class SpatialSceneRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * What the depth job needs: the preview the viewer shows (the edited one once the photo is edited, so the map lines
-   * up with the crop and rotation) and what decides whether the photo is processed at all.
-   */
+  What the depth job needs: the preview the viewer shows (the edited one once the photo is edited, so the map lines
+  up with the crop and rotation) and what decides whether the photo is processed at all.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getForJob(id: string) {
     return this.db

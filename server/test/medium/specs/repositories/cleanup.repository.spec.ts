@@ -12,9 +12,9 @@ import { getKyselyDB } from 'test/utils.js';
 let defaultDatabase: Kysely<DB>;
 
 /**
- * Microsecond-precision timestamps (a JS `Date` cannot hold them): two rows share `.123457` so the id
- * tie-break is exercised too. Written with raw SQL because every normal writer goes through a `Date`.
- */
+Microsecond-precision timestamps (a JS `Date` cannot hold them): two rows share `.123457` so the id
+tie-break is exercised too. Written with raw SQL because every normal writer goes through a `Date`.
+*/
 const MICRO_TIMES = [
   '2024-01-01 00:00:00.123456+00',
   '2024-01-01 00:00:00.123457+00',
