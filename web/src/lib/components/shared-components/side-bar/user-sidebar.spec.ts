@@ -26,27 +26,27 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/components/sidebar/sidebar-shell.svelte', async () => {
-  const module = await import('#test/unit/mocks/sidebar-shell.stub.svelte');
+  const module = await import('#lib/gallery/__mocks__/sidebar-shell.stub.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/side-bar/BottomInfo.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/side-bar/rail-storage.svelte', async () => {
-  const module = await import('#test/unit/mocks/rail-storage.stub.svelte');
+  const module = await import('#lib/gallery/__mocks__/rail-storage.stub.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/side-bar/recent-spaces.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
@@ -59,12 +59,12 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 }));
 
 vi.mock('#lib/components/sidebar/sidebar-nav-item.svelte', async () => {
-  const module = await import('#test/unit/mocks/sidebar-nav-item.stub.svelte');
+  const module = await import('#lib/gallery/__mocks__/sidebar-nav-item.stub.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/sidebar/sidebar-nav-group.svelte', async () => {
-  const module = await import('#test/unit/mocks/navbar-group.stub.svelte');
+  const module = await import('#lib/gallery/__mocks__/navbar-group.stub.svelte');
   return { default: module.default };
 });
 

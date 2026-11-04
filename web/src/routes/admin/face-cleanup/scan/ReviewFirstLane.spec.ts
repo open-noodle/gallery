@@ -11,7 +11,7 @@ import type { FaceCleanupPerson } from './scan-triage.svelte';
 
 vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
-  const noop = await import('#test/unit/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { ...mod, Icon: noop.default };
 });
 // Every (key, options) pair the component asked to translate — the mock below still renders keys verbatim

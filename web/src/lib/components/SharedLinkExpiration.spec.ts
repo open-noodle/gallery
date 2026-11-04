@@ -1,5 +1,5 @@
+import SharedLinkExpirationHost from '#lib/gallery/__mocks__/shared-link-expiration-host.stub.svelte';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import SharedLinkExpirationHost from '#test/unit/mocks/shared-link-expiration-host.stub.svelte';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { Settings } from 'luxon';

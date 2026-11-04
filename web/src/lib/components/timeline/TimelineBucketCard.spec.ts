@@ -15,7 +15,7 @@ vi.mock('#lib/utils.js', async (importOriginal) => ({
 }));
 
 vi.mock('#lib/components/Thumbhash.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 

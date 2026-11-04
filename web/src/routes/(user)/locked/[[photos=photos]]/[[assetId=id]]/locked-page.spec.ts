@@ -22,7 +22,7 @@ const { gotoMock, mockAssetMultiSelectManager } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -32,52 +32,52 @@ vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
 });
 
 vi.mock('#lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/EmptyPlaceholder.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/bindable-timeline.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/bindable-timeline.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/AssetSelectControlBar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/ChangeDateAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/ChangeLocationAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DeleteAssetsAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/DownloadAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/SelectAllAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/timeline/actions/SetVisibilityAction.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
