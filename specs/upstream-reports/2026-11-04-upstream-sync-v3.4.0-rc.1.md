@@ -209,3 +209,82 @@ Staging runs `rolling-v34-rc7` (server + ML); dump `~/gallery-backups/staging-pr
 Follow-ups from this run: three upstream medium specs passed only on retry in CI (`detail-panel` shared link
 with hidden metadata, `search-gallery` delete advances, `timeline` arrow keys and tab); check whether they
 are flaky upstream too or only against Gallery's web.
+
+## Follow-on: fork sync of #1195, #1214 and #1239
+
+`main` moved from `0c5bff615d4` to `3b3f35f85b7`: #1195 (layering wave 4), #1214 (waves 5 to 11, 663 files)
+and #1239 (storage template on S3). `make upstream-sync-fork-main` stopped on conflicts each time, so the three
+were cherry-picked by hand and `integratedForkHead` advanced to `3b3f35f85b7`. Rolling copies: `16155a70a7f`,
+`b06c5d0ab45`, `a548fd18fc6`.
+
+How #1214 was replayed (195 conflicted files):
+
+- Base and fork sides were normalised to rolling's style before `git merge-file`: `$lib/x` to `#lib/x.<ext>`
+  (`.js` in `vi.mock`), `{@const}` to `{const … = $derived(…)}`, doc comments without `*`, prettier. That settled
+  98 of 174 files outright.
+- An upstream file that #1214 left as pure upstream v3.3.5 became upstream v3.4 here (41 files, among them the
+  four restored release workflows and `test_main.py`). Where rolling's fork lines in a file matched `main`'s,
+  the result is upstream v3.4 plus `main`'s post-#1214 fork delta.
+- Where rolling had its own fork lines (bullmq 6, SvelteKit 3, upstream v3.4 reworks), they were kept and
+  carried into the module #1214 moved the code to: the bullmq 6 queue handling into
+  `queue-maintenance.repository.ts`; `new URL(page.url.href)`, `refreshAll` and `goto({ replace, reset })` into
+  `PersonTile`, `PersonSuggestions`, `map-filter-controller`, `detail-panel-filters`, `FilterValue`,
+  `AppearsInAlbum`; the archive animation and per-user bulk favorite into `asset.service.ts`; the HLS element in
+  `VideoNativeViewer`; partners in the mobile person timeline (`extraWhere`); the locale date format in
+  `remote_album_gallery.dart`.
+- Rolling already had its own layering for two areas, so #1214's duplicates were dropped:
+  `gallery/stores/spaces-cache.ts` (rolling reads spaces through `gallery/spaces/space.query.ts`) and
+  `gallery/album-actions.ts` (rolling has `gallery/album/album-add.ts` and `link-album-to-space.ts`). Both are out
+  of `docs/fork/ownership.yml`.
+- One deliberate divergence from `main`: `notifyAddToAlbum` keeps the fork's #764 toast severity. On `main` #1214
+  switched it to upstream's (immich-30976) because that function is upstream's there; upstream v3.4 no longer has
+  it, so rolling's `gallery/album/notify-add-to-album.ts` is the only implementation.
+- `person.service.ts` (replay-owned) took #1214's moves into `FaceIdentityMaintenanceService` and its switch of
+  recognition to upstream's cluster-group `searchFaces`; the moved helpers were byte-identical on both branches.
+- Upstream-file diffs against v3.4 shrank, for example `asset.service.ts` (web) +212/−30 to +23/−7,
+  `timeline.service.ts` to +37/−10, `DetailPanel.svelte` +298/−85 to +88/−81, `person.service.ts` by ~130 lines.
+
+#1239: rolling already had #1239's e2e retry helper as `fetchGet`, so the duplicate `fetchAfterSyncChecks` went.
+Upstream v3.4 sanitizes `make` in storage templates, so the EXIF sibling-folder test asserts the asset stays in
+its own library folder instead of expecting the path-guard warning; two log expectations follow v3.4's wording.
+
+Audit: every line rolling had that `main` lacked, in every file #1214 touched, is present on rolling, except
+lines moved or replaced on purpose (listed above).
+
+Local: server build, `tsc`, lint and unit (7617 passed); web `tsc`, svelte-check, lint and unit (7072 passed);
+access oracle (197), RBAC oracle, migration ledger and jit migration medium specs; `dart analyze --fatal-infos`
+clean and 1197 mobile tests over the touched areas; ML ruff, mypy and pytest (287); preflight (350), i18n overlay,
+SQL regeneration (no diff), revert coverage, autolink check.
+
+CI found four zero-conflict breaks the local gates did not, all fixed on the branch:
+
+- `apply-branding.sh` (moved there by #1214) listed `main`'s `OauthSettings.svelte`; upstream renamed it
+  `OAuthSettings.svelte`. macOS's case-insensitive filesystem hid it locally. The swapped-in import now uses
+  `#lib`, and the `sed` expressions take `|` as delimiter. Proved in a Linux container: 21 files swapped,
+  idempotent on a second run.
+- `gallery-test.yml` (the jobs #1214 moved out of `test.yml`) carried `main`'s `use-mise` v3.1.0/v3.2.1 pins,
+  whose mise resolves java outside rolling's lockfile; it now uses rolling's `test.yml` pins.
+- The revert gate's guide check (from #1195) matched `vX.Y.Z` only, so `v3.4.0-rc.1` read as `v3.4.0`; it now
+  accepts a prerelease suffix.
+- The camera contextual filter label went back to upstream's `getCameraName` (in `detail-panel-filters.ts`),
+  `stock-client.e2e-spec.ts` compares `/server/version` with the base's core version, and #1195's files got the
+  prettier and doc-comment fixes the earlier lint pass (scoped to #1214 and #1239) missed.
+
+Remote CI for the fork sync. Later commits on the branch only touched `.github/`, `branding/`, web/e2e/server
+fixes and this report, so each row names the newest commit its inputs changed at.
+
+| Workflow                    | Status | Commit        | Run           | Notes                                                                       |
+| --------------------------- | ------ | ------------- | ------------- | --------------------------------------------------------------------------- |
+| Test                        | GREEN  | `f1f418adeba` | `41927772938` | 21/21 jobs, first attempt                                                   |
+| Gallery Test                | GREEN  | `f1f418adeba` | `41927850826` |                                                                             |
+| Docker                      | GREEN  | `f1f418adeba` | `41927927021` |                                                                             |
+| Static Code Analysis        | GREEN  | `a548fd18fc6` | `41916450387` | mobile unchanged since                                                      |
+| Gallery Build Mobile        | GREEN  | `51fd7a21349` | `41917980905` | Android re-run once (runner disk full); iOS built on the first attempt      |
+| Gallery Mobile Smoke        | GREEN  | `51fd7a21349` | `41917846589` |                                                                             |
+| Gallery ML Smoke            | GREEN  | `51fd7a21349` | `41917913580` |                                                                             |
+| Gallery Rebase Smoke        | GREEN  | `a548fd18fc6` | `41916839993` |                                                                             |
+| Storage Migration Tests     | GREEN  | `a548fd18fc6` | `41916923421` |                                                                             |
+| Storage Migration E2E       | GREEN  | `a548fd18fc6` | `41917007644` |                                                                             |
+| Revert-to-Immich Validation | GREEN  | `f19c2be64e6` | `41922233233` | `gallery-server:rolling-v34-rc9` (built from `51fd7a21349`) + `v3.4.0-rc.1` |
+
+`rolling-v34-rc9` is built (run `41918049263`) and not deployed; staging still runs `rolling-v34-rc7`.
