@@ -9,7 +9,7 @@ Requires `$lib/__mocks__/sdk.mock` to be imported first (auto-mocks @immich/sdk)
 Usage:
 ```ts
 import '#lib/__mocks__/sdk.mock.ts';
-import { spacesApiMock } from '#test/unit/mocks/spaces-api.mock.ts';
+import { spacesApiMock } from '#lib/gallery/__mocks__/spaces-api.mock.ts';
 
 beforeEach(() => { vi.resetAllMocks(); });
 

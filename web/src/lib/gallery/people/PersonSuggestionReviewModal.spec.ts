@@ -1,8 +1,8 @@
+import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
 import { faceSuggestionContextExpanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { handleError } from '#lib/utils/handle-error.ts';
-import { reactivePageMock } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -17,7 +17,7 @@ vi.mock('svelte-i18n', () => ({
 }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 

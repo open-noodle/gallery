@@ -82,7 +82,7 @@ vi.mock('svelte-i18n', () => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
-  const { default: MockContextMenuButton } = await import('#test/unit/mocks/action-context-menu.stub.svelte');
+  const { default: MockContextMenuButton } = await import('#lib/gallery/__mocks__/action-context-menu.stub.svelte');
   return {
     ...original,
     ContextMenuButton: MockContextMenuButton,
@@ -97,17 +97,17 @@ vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
 });
 
 vi.mock('#lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/people/people-merge-selector.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/space-people-merge-selector.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/space-people-merge-selector.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/modals/RepresentativeFacePickerModal.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
