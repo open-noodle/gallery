@@ -184,3 +184,28 @@ Local: web unit 7064, web medium 61/64 (the three that type a date into `datetim
 German region, which orders the field day/month/year; CI's Linux runner is en-US), web/server/e2e lint and
 type checks, server unit 7302, audits all OK. The two `e2e/src/ui` Gallery-only specs that only tested the
 deleted generator are gone with it.
+
+### Remote CI for the immich-32879 tip
+
+Branch tip `ce1a9f463ab` (= `bc65b0cb02e` plus a two-line format fix in one web spec).
+
+| Workflow                    | Status                        | Commit        | Run           | Notes                                                                                                |
+| --------------------------- | ----------------------------- | ------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
+| Test                        | GREEN                         | `ce1a9f463ab` | `41871539863` | e2e server arm re-run once (user-admin hard delete timed out; the same tree passed on `bc65b0cb02e`) |
+| Test Web (Medium)           | GREEN                         | `ce1a9f463ab` | `41871539863` | 70 passed; 3 passed on retry (see follow-ups); the 3 locale-only date tests pass on Linux            |
+| Docker                      | GREEN                         | `bc65b0cb02e` | `41867101138` |                                                                                                      |
+| Static Code Analysis        | GREEN                         | `bc65b0cb02e` | `41866793875` |                                                                                                      |
+| Gallery Mobile Smoke        | GREEN                         | `bc65b0cb02e` | `41866916247` |                                                                                                      |
+| Gallery Rebase Smoke        | GREEN                         | `bc65b0cb02e` | `41866854689` |                                                                                                      |
+| Gallery ML Smoke            | GREEN                         | `bc65b0cb02e` | `41867274267` |                                                                                                      |
+| Storage Migration Tests     | GREEN                         | `bc65b0cb02e` | `41867187273` |                                                                                                      |
+| Storage Migration E2E       | GREEN                         | `bc65b0cb02e` | `41867361683` |                                                                                                      |
+| Revert-to-Immich Validation | GREEN                         | `bc65b0cb02e` | `41871371665` | `gallery-server:rolling-v34-rc8` + `immich-server:v3.4.0-rc.1`                                       |
+| Gallery Build Mobile        | Android GREEN, iOS UNVERIFIED | `bc65b0cb02e` | `41866975366` | iOS never got a macOS runner on 3 attempts (0 steps); iOS last built on `a7fc29d578d`                |
+
+The rc.1 tip itself (`a7fc29d578d`) went 10/10, the revert gate with `rolling-v34-rc7` (run `41859527208`).
+Staging runs `rolling-v34-rc7` (server + ML); dump `~/gallery-backups/staging-pre-rolling-v34-rc7-2026-11-04.dump`.
+
+Follow-ups from this run: three upstream medium specs passed only on retry in CI (`detail-panel` shared link
+with hidden metadata, `search-gallery` delete advances, `timeline` arrow keys and tab); check whether they
+are flaky upstream too or only against Gallery's web.
