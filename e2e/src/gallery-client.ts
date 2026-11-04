@@ -1,11 +1,11 @@
 import { Test } from 'supertest';
 
 /**
- * The e2e API suite talks to the server as a Gallery client, as the web, mobile and CLI apps do: every
- * supertest request sends `x-gallery-app` unless it sets its own value, and `utils.initSdk` sets it on the SDK.
- * A request that calls `.unset('x-gallery-app')` stays a stock Immich client (see stock-client.e2e-spec.ts).
- * `src/utils.ts` imports this module, so every spec and the Playwright suites load the patch.
- */
+The e2e API suite talks to the server as a Gallery client, as the web, mobile and CLI apps do: every
+supertest request sends `x-gallery-app` unless it sets its own value, and `utils.initSdk` sets it on the SDK.
+A request that calls `.unset('x-gallery-app')` stays a stock Immich client (see stock-client.e2e-spec.ts).
+`src/utils.ts` imports this module, so every spec and the Playwright suites load the patch.
+*/
 export const GALLERY_APP_HEADER = 'x-gallery-app';
 
 const patched = Symbol.for('gallery-e2e-client');

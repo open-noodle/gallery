@@ -1,6 +1,6 @@
+import { galleryAppHeader } from '#lib/gallery/client-header.ts';
 import { isHttpError, setHeaders, type ApiHttpError } from '@immich/sdk';
 import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
-import { galleryAppHeader } from '#lib/gallery/client-header.ts';
 
 // Gallery: runs before any route loads, so no load function can reach the server as a stock client.
 export const init: ClientInit = () => {
