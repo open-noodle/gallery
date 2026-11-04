@@ -419,4 +419,16 @@ describe('resolveViewerScope', () => {
 
     expect(sharedSpaceRepository.getAllMemberSpaceIds).toHaveBeenCalledWith(userId, trx);
   });
+
+  // F6: a stock or third-party client sends takenAfter/takenBefore as upstream defines them.
+  it('keeps upstream’s taken range for a stock client on the search surface only', async () => {
+    const { repos } = setup();
+    const stock = { ...authFor(), stockClient: true as const };
+
+    await expect(resolveViewerScope(repos, stock, 'search', {})).resolves.toMatchObject({ upstreamTakenRange: true });
+    await expect(resolveViewerScope(repos, authFor(), 'search', {})).resolves.not.toHaveProperty('upstreamTakenRange');
+    await expect(resolveViewerScope(repos, stock, 'timeline', { userId })).resolves.not.toHaveProperty(
+      'upstreamTakenRange',
+    );
+  });
 });

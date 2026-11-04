@@ -9,6 +9,7 @@ import { UserGroupController } from 'src/controllers/user-group.controller.js';
 import { CleanupController } from 'src/gallery/controllers/cleanup.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { GalleryClusterGroupController } from 'src/gallery/controllers/gallery-cluster-group.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
@@ -68,6 +69,7 @@ export const galleryControllers = [
   FaceSuggestionController,
   GalleryAlbumController,
   GalleryAssetController,
+  GalleryClusterGroupController,
   GalleryMapController,
   GalleryPeopleController,
   GallerySearchController,
