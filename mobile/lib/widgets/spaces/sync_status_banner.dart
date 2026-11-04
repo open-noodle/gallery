@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 
 const double kSyncStatusBannerSliverHeight = 48.0;
@@ -56,12 +57,7 @@ class _SyncBannerContent extends StatelessWidget {
           children: [
             const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Syncing photos. The first load takes a moment; later visits are instant.',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
+            Expanded(child: Text(context.t.space_sync_banner_first_load, style: theme.textTheme.bodyMedium)),
           ],
         ),
       ),
