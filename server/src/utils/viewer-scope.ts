@@ -74,6 +74,8 @@ export type ViewerScope = {
   spacePersonIds?: string[];
   identityIds?: string[];
   forceEmptyResult?: boolean;
+  /** Search only: a stock client's taken range keeps upstream's meaning (searchAssetBuilderWithLocalTaken). */
+  upstreamTakenRange?: boolean;
 };
 
 type SurfaceRule = {
@@ -231,6 +233,10 @@ export const resolveViewerScope = async <S extends ViewerSurface>(
   if (surface === 'search' && request.withFavoriteSpaces && request.withSharedSpaces) {
     const ids = await getMemberSpaceIds();
     scope.favoriteSpaceIds = ids.length > 0 ? ids : undefined;
+  }
+
+  if (surface === 'search' && auth.stockClient) {
+    scope.upstreamTakenRange = true;
   }
 
   if (rule.notLockedDefault) {

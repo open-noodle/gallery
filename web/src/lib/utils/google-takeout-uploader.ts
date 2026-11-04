@@ -11,17 +11,12 @@ import {
   updateAsset,
   type AssetMediaResponseDto,
 } from '@immich/sdk';
+import { hashFile } from '#lib/utils/file-uploader.ts';
 
 export interface UploadResult {
   assetId: string;
   status: 'imported' | 'duplicate' | 'error';
   error?: string;
-}
-
-async function computeSha1(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const hash = await crypto.subtle.digest('SHA-1', bytes);
-  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportOptions): Promise<UploadResult> {
@@ -32,9 +27,9 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
     const file = await item.getFile();
 
     // Duplicate check
-    if (options.skipDuplicates && crypto?.subtle) {
+    if (options.skipDuplicates) {
       try {
-        const checksum = await computeSha1(file);
+        const checksum = await hashFile(file);
         const {
           results: [checkResult],
         } = await checkBulkUpload({

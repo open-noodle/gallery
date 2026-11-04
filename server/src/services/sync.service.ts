@@ -155,9 +155,8 @@ export class SyncService extends BaseService {
     }
 
     const { nowId } = await this.syncCheckpointRepository.getNow();
-    const options: SyncQueryOptions = { nowId, userId: auth.user.id };
-
     const forkAwareClient = GallerySyncStreams.isForkAwareClient(dto);
+    const options: SyncQueryOptions = { nowId, userId: auth.user.id, forkAwareClient };
 
     const handlers: Record<SyncRequestType, () => Promise<void>> = {
       // deprecated handlers

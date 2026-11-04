@@ -167,8 +167,9 @@ export class MemoryRepository implements IBulkAsset {
       .executeTakeFirstOrThrow();
   }
 
-  statisticsAccessible(userId: string, dto: MemorySearchDto) {
+  statisticsAccessible(userId: string, dto: MemorySearchDto, types: MemoryType[]) {
     return this.accessibleSearchBuilder(userId, dto)
+      .where('memory.type', 'in', types)
       .select((qb) => qb.fn.countAll<number>().as('total'))
       .executeTakeFirstOrThrow();
   }
@@ -308,9 +309,12 @@ export class MemoryRepository implements IBulkAsset {
     dto: MemorySearchDto,
     hiddenScope?: TimelineHiddenScope,
     visibleSpaceIds: string[] = [],
+    types?: MemoryType[],
   ) {
     return (
       this.accessibleSearchBuilder(userId, dto)
+        // Before the limit, so a page holds `size` memories the client can decode.
+        .$if(types !== undefined, (qb) => qb.where('memory.type', 'in', types!))
         .select((eb) =>
           jsonArrayFrom(
             eb

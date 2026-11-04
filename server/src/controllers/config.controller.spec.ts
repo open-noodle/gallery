@@ -4,6 +4,7 @@ import { ConfigAdminController } from 'src/controllers/config-admin.controller.j
 import { ConfigPublicController } from 'src/controllers/config-public.controller.js';
 import { ConfigUserController } from 'src/controllers/config-user.controller.js';
 import { defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto.js';
+import { galleryConfigPaths } from 'src/gallery/dtos/config.dto.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 import { errorDto } from 'test/medium/responses.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
@@ -52,6 +53,28 @@ describe('config controllers', () => {
   });
 
   describe('PUT /admin/config', () => {
+    // F9: a stock admin tool or config-as-code script sends upstream's shape without Gallery's settings.
+    it('should accept an upstream-shaped body and keep the stored Gallery settings', async () => {
+      const stored = { ...validConfig(), classification: { enabled: false, categories: [] } };
+      service.getAdminConfig.mockResolvedValue(stored);
+      service.updateAdminConfig.mockImplementation((dto) => Promise.resolve(dto));
+      const body = cloneDeep(stored) as Record<string, any>;
+      for (const path of galleryConfigPaths) {
+        const keys = path.split('.');
+        const key = keys.pop()!;
+        let node = body;
+        for (const parent of keys) {
+          node = node[parent];
+        }
+        delete node[key];
+      }
+
+      const { status } = await request(ctx.getHttpServer()).put('/admin/config').send(body);
+
+      expect(status).toBe(200);
+      expect(service.updateAdminConfig).toHaveBeenCalledWith(stored);
+    });
+
     it('should accept a valid config', async () => {
       service.updateAdminConfig.mockImplementation((dto) => Promise.resolve(dto));
 

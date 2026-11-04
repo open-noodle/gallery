@@ -1,5 +1,11 @@
-import { isHttpError, type ApiHttpError } from '@immich/sdk';
-import type { ClientCaughtError, HandleClientError } from '@sveltejs/kit/hooks';
+import { isHttpError, setHeaders, type ApiHttpError } from '@immich/sdk';
+import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
+import { galleryAppHeader } from '#lib/gallery/client-header.ts';
+
+// Gallery: runs before any route loads, so no load function can reach the server as a stock client.
+export const init: ClientInit = () => {
+  setHeaders(galleryAppHeader);
+};
 
 const DEFAULT_MESSAGE = 'Hmm, not sure about that. Check the logs or open a ticket?';
 
@@ -19,13 +25,9 @@ const parseHTTPError = (httpError: ApiHttpError) => {
   };
 };
 
-const parseError = ({ kind, error }: ClientCaughtError) => {
-  if (kind === 'unknown') {
-    if (isHttpError(error)) {
-      return parseHTTPError(error);
-    }
-    console.error(error);
-    return;
+const parseError = (error: App.Error | { status: number; message: string }) => {
+  if (isHttpError(error)) {
+    return parseHTTPError(error);
   }
 
   return {
@@ -34,9 +36,12 @@ const parseError = ({ kind, error }: ClientCaughtError) => {
   };
 };
 
-export const handleError: HandleClientError = (error) => {
+export const handleError: HandleClientError = ({ kind, error }) => {
+  if (kind === 'unknown') {
+    console.error(error);
+    return;
+  }
   const result = parseError(error);
-
-  console.error(`[hooks.client.ts]:handleError ${result?.message}`, error);
+  console.error(`[hooks.client.ts]:handleError ${result.message}`, error);
   return result;
 };

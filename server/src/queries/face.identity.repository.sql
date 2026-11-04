@@ -219,7 +219,13 @@ WITH
         ) = $6
       )
       AND (
-        $7 <> 'pet'
+        NOT EXISTS (
+          SELECT
+          FROM
+            "person_pet"
+          WHERE
+            "person_pet"."personGroupId" = "person"."personGroupId"
+        )
         OR (
           SELECT
             "person_identity"."identityId"
@@ -255,7 +261,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $8
+      AND shared_space_person_alias."userId" = $7
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -278,11 +284,11 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $9 = ''
-        OR shared_space_person.type = $10
+        $8 = ''
+        OR shared_space_person.type = $9
       )
       AND (
-        $11 <> 'pet'
+        shared_space_person.type <> 'pet'
         OR shared_space_person."identityId" IN (
           SELECT
             "identityId"
@@ -298,12 +304,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $12::boolean
+        $10::boolean
         OR "isHidden" = false
       )
       AND (
-        $13 = ''
-        OR name ILIKE $14
+        $11 = ''
+        OR name ILIKE $12
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -381,10 +387,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $15 = 'pet'
+        $13 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $16
+      OR identity_counts."visibleAssetCount" >= $14
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -394,9 +400,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $17
+      $15
     OFFSET
-      $18
+      $16
   )
 SELECT
   page_rows."identityId",
@@ -520,7 +526,13 @@ WITH
         ) = $6
       )
       AND (
-        $7 <> 'pet'
+        NOT EXISTS (
+          SELECT
+          FROM
+            "person_pet"
+          WHERE
+            "person_pet"."personGroupId" = "person"."personGroupId"
+        )
         OR (
           SELECT
             "person_identity"."identityId"
@@ -556,7 +568,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $8
+      AND shared_space_person_alias."userId" = $7
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -579,11 +591,11 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $9 = ''
-        OR shared_space_person.type = $10
+        $8 = ''
+        OR shared_space_person.type = $9
       )
       AND (
-        $11 <> 'pet'
+        shared_space_person.type <> 'pet'
         OR shared_space_person."identityId" IN (
           SELECT
             "identityId"
@@ -599,12 +611,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $12::boolean
+        $10::boolean
         OR "isHidden" = false
       )
       AND (
-        $13 = ''
-        OR name ILIKE $14
+        $11 = ''
+        OR name ILIKE $12
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -682,10 +694,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $15 = 'pet'
+        $13 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $16
+      OR identity_counts."visibleAssetCount" >= $14
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -695,9 +707,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $17
+      $15
     OFFSET
-      $18
+      $16
   )
 SELECT
   page_rows."identityId",
@@ -1353,7 +1365,13 @@ WITH
         ) = $6
       )
       AND (
-        $7 <> 'pet'
+        NOT EXISTS (
+          SELECT
+          FROM
+            "person_pet"
+          WHERE
+            "person_pet"."personGroupId" = "person"."personGroupId"
+        )
         OR (
           SELECT
             "person_identity"."identityId"
@@ -1389,7 +1407,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $8
+      AND shared_space_person_alias."userId" = $7
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1412,11 +1430,11 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $9 = ''
-        OR shared_space_person.type = $10
+        $8 = ''
+        OR shared_space_person.type = $9
       )
       AND (
-        $11 <> 'pet'
+        shared_space_person.type <> 'pet'
         OR shared_space_person."identityId" IN (
           SELECT
             "identityId"
@@ -1432,12 +1450,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $12::boolean
+        $10::boolean
         OR "isHidden" = false
       )
       AND (
-        $13 = ''
-        OR name ILIKE $14
+        $11 = ''
+        OR name ILIKE $12
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1515,10 +1533,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $15 = 'pet'
+        $13 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $16
+      OR identity_counts."visibleAssetCount" >= $14
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1528,9 +1546,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $17
+      $15
     OFFSET
-      $18
+      $16
   )
 SELECT
   page_rows."identityId",
@@ -1694,7 +1712,13 @@ WITH
         ) = $6
       )
       AND (
-        $7 <> 'pet'
+        NOT EXISTS (
+          SELECT
+          FROM
+            "person_pet"
+          WHERE
+            "person_pet"."personGroupId" = "person"."personGroupId"
+        )
         OR (
           SELECT
             "person_identity"."identityId"
@@ -1730,7 +1754,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $8
+      AND shared_space_person_alias."userId" = $7
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1753,11 +1777,11 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $9 = ''
-        OR shared_space_person.type = $10
+        $8 = ''
+        OR shared_space_person.type = $9
       )
       AND (
-        $11 <> 'pet'
+        shared_space_person.type <> 'pet'
         OR shared_space_person."identityId" IN (
           SELECT
             "identityId"
@@ -1773,12 +1797,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $12::boolean
+        $10::boolean
         OR "isHidden" = false
       )
       AND (
-        $13 = ''
-        OR name ILIKE $14
+        $11 = ''
+        OR name ILIKE $12
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1856,10 +1880,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $15 = 'pet'
+        $13 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $16
+      OR identity_counts."visibleAssetCount" >= $14
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1869,9 +1893,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $17
+      $15
     OFFSET
-      $18
+      $16
   ),
   all_identity_counts AS (
     SELECT
@@ -1906,10 +1930,10 @@ WITH
     WHERE
       identity_visibility."hasNamedProfile" = true
       OR (
-        $19 = 'pet'
+        $17 = 'pet'
         AND identity_visibility."hasPetProfile"
       )
-      OR all_identity_counts."visibleAssetCount" >= $20
+      OR all_identity_counts."visibleAssetCount" >= $18
   )
 SELECT
   page_rows."identityId",

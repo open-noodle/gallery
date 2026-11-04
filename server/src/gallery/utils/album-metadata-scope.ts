@@ -15,7 +15,10 @@ export const sharedLinkAlbumMetadataScope = (link: { userId: string; spaceId?: s
 
 /**
 The scope an album response's count and date range are computed in, so they match the grid the same
-caller sees: their own rows plus the contributions (#764) live in a space they belong to.
+caller sees: their own rows plus the contributions (#764) live in a space they belong to. A stock client
+syncs album_asset only, so its count leaves out space contributions.
 */
 export const albumMetadataScope = (auth: AuthDto): AlbumMetadataScope =>
-  auth.sharedLink ? sharedLinkAlbumMetadataScope(auth.sharedLink) : { forUserId: auth.user.id };
+  auth.sharedLink
+    ? sharedLinkAlbumMetadataScope(auth.sharedLink)
+    : { forUserId: auth.stockClient ? undefined : auth.user.id };

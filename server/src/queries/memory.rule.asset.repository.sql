@@ -324,3 +324,11 @@ where
   and memory.data ->> 'ruleId' = $3
   and memory.data ->> 'dedupeKey' = $4
   and "deletedAt" is null
+
+-- MemoryRuleAssetRepository.getPetPersonGroupIds
+select
+  "personGroupId"
+from
+  "person_pet"
+where
+  "personGroupId" in ($1)
