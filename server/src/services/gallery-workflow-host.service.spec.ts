@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { type Mock, describe, expect, it, vi } from 'vitest';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto.js';
+import { BaseService } from 'src/services/base.service.js';
 import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service.js';
+import { WorkflowExecutionService } from 'src/services/workflow-execution.service.js';
 import { newTestService } from 'test/utils.js';
 
 const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
@@ -404,5 +406,94 @@ describe('addToSpaceAlbum compensation', () => {
     doubles.album.delete.mockRejectedValue(new Error('delete blew up'));
 
     await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+  });
+});
+
+const GALLERY_PLUGIN_ID = '00000000-0000-4000-8000-0000000000f1';
+const OTHER_PLUGIN_ID = '00000000-0000-4000-8000-0000000000f2';
+
+const step = (pluginId: string, methodName: string, config: object) => ({ pluginId, methodName, config });
+
+describe('runStep', () => {
+  // OD-18: gallery-core's WASM exports are no-ops, so its steps must run here instead.
+  const data = { asset: { id: ASSET } };
+
+  it('dispatches a gallery-core step with the asset and step config', async () => {
+    const { sut, mocks } = newTestService(GalleryWorkflowHostService);
+    mocks.plugin.getForLoad.mockResolvedValue([{ id: GALLERY_PLUGIN_ID, name: 'gallery-core' }] as never);
+    const dispatch = vi.spyOn(sut, 'dispatch').mockResolvedValue({ ok: true });
+
+    await expect(
+      sut.runStep(step(GALLERY_PLUGIN_ID, 'addToSpace', { spaceIds: [SPACE_A] }), 'user-1', data),
+    ).resolves.toBe(true);
+    expect(dispatch).toHaveBeenCalledWith(auth, 'addToSpace', { spaceIds: [SPACE_A], assetId: ASSET });
+  });
+
+  it('leaves a same-named method of another plugin to the WASM runtime', async () => {
+    const { sut, mocks } = newTestService(GalleryWorkflowHostService);
+    mocks.plugin.getForLoad.mockResolvedValue([{ id: GALLERY_PLUGIN_ID, name: 'gallery-core' }] as never);
+    const dispatch = vi.spyOn(sut, 'dispatch');
+
+    await expect(sut.runStep(step(OTHER_PLUGIN_ID, 'addToSpace', {}), 'user-1', data)).resolves.toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not look up the plugin for a method gallery-core does not have', async () => {
+    const { sut, mocks } = newTestService(GalleryWorkflowHostService);
+
+    await expect(sut.runStep(step(OTHER_PLUGIN_ID, 'assetAddToAlbums', {}), 'user-1', data)).resolves.toBe(false);
+    expect(mocks.plugin.getForLoad).not.toHaveBeenCalled();
+  });
+
+  it('leaves a disabled gallery-core step to upstream, which fails it like any unloaded plugin', async () => {
+    // Upstream reads `enabled` only in getForLoad; a disabled plugin is never loaded, so callMethod throws.
+    const { sut, mocks } = newTestService(GalleryWorkflowHostService);
+    mocks.plugin.getForLoad.mockResolvedValue([]);
+    const dispatch = vi.spyOn(sut, 'dispatch');
+
+    await expect(sut.runStep(step(GALLERY_PLUGIN_ID, 'addToSpace', {}), 'user-1', data)).resolves.toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('reads the enabled plugins once per repository, not once per run', async () => {
+    const { sut, mocks } = newTestService(GalleryWorkflowHostService);
+    mocks.plugin.getForLoad.mockResolvedValue([{ id: GALLERY_PLUGIN_ID, name: 'gallery-core' }] as never);
+    vi.spyOn(sut, 'dispatch').mockResolvedValue({ ok: true });
+    const again = BaseService.create(GalleryWorkflowHostService, sut);
+
+    await sut.runStep(step(GALLERY_PLUGIN_ID, 'addToSpace', {}), 'user-1', data);
+    await again.runStep(step(OTHER_PLUGIN_ID, 'addToSpace', {}), 'user-1', data);
+    expect(mocks.plugin.getForLoad).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('WorkflowExecutionService with a gallery-core step', () => {
+  it('runs the step in TypeScript and never calls the WASM plugin', async () => {
+    const { sut, mocks } = newTestService(WorkflowExecutionService);
+    mocks.workflow.getForWorkflowRun.mockResolvedValue({
+      id: 'workflow-1',
+      trigger: 'AssetCreate',
+      logging: false,
+      steps: [
+        {
+          id: 'step-1',
+          config: { spaceIds: [SPACE_A] },
+          pluginId: GALLERY_PLUGIN_ID,
+          methodName: 'addToSpace',
+          types: ['AssetV1'],
+          hostFunctions: false,
+          allowedHosts: [],
+        },
+      ],
+    } as never);
+    mocks.workflow.getForAssetV1.mockResolvedValue({ id: ASSET, ownerId: 'user-1' } as never);
+    mocks.plugin.getForLoad.mockResolvedValue([{ id: GALLERY_PLUGIN_ID, name: 'gallery-core' }] as never);
+    const dispatch = vi.spyOn(GalleryWorkflowHostService.prototype, 'dispatch').mockResolvedValue({ ok: true });
+
+    await sut.handleAssetTrigger({ workflowId: 'workflow-1', assetId: ASSET, trigger: 'AssetCreate' } as never);
+
+    expect(dispatch).toHaveBeenCalledWith(auth, 'addToSpace', { spaceIds: [SPACE_A], assetId: ASSET });
+    expect(mocks.plugin.callMethod).not.toHaveBeenCalled();
+    dispatch.mockRestore();
   });
 });

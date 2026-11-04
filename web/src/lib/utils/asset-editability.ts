@@ -42,7 +42,7 @@ export function canEditAsset(asset: { ownerId?: string; canEdit?: boolean }, ctx
  * Resolve the space the People row / face-editing surfaces should treat as "the" space for this
  * asset: an explicit `spaceId` (the surface is already scoped to one space) or else whatever space
  * the asset itself resolved to (`asset.resolvedSpaceId`, set on a single-asset read reached via a
- * space's People/timeline/map). Mirrors `DetailPanel.svelte`'s `effectiveSpaceId`.
+ * space's People/timeline/map). Read through `useAssetSpace` (lib/gallery/asset-viewer/asset-space.ts).
  */
 export function resolveEffectiveSpaceId(
   asset: { resolvedSpaceId?: string | null },
@@ -54,9 +54,9 @@ export function resolveEffectiveSpaceId(
 /**
  * "May this user use the space-flavoured face-editing affordances (name/correct/draw a face)
  * on this asset?" — the sibling of `canEditAsset` for the People row (#734-style, never a
- * widening of `isOwner`; see `DetailPanel.svelte`'s `canEditSpacePeople` doc, which this
- * factors out so `DetailPanel.svelte`, `PhotoViewer.svelte` and `VideoNativeViewer.svelte`
- * cannot drift from one another on the SAME asset).
+ * widening of `isOwner`). DetailPanel (People row and side-panel swap) and `FaceEditorPanel`
+ * (the on-photo editor for images and videos) all read it through `useAssetSpace`
+ * (lib/gallery/asset-viewer/asset-space.ts), so they cannot drift on the SAME asset.
  *
  * Explicitly narrowed to `!isOwner`: the owner keeps the owner-only face endpoints
  * (`reassignFacesById`, `createPerson`, `deleteFace`, `createFace`) regardless of `canEdit`.

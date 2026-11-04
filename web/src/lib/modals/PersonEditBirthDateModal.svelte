@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { handleUpdatePersonBirthDate } from '$lib/services/person.service';
+  import { handleUpdatePersonBirthDate } from '$lib/gallery/people/person.service';
   import { type PersonResponseDto } from '@immich/sdk';
   import { Button, DatePicker, Field, FormModal, HelperText } from '@immich/ui';
   import { mdiCake } from '@mdi/js';

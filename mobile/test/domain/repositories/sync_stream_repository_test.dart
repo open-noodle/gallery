@@ -1813,7 +1813,7 @@ void main() {
       await gallery.updateSharedSpaceAssetsV1([
         _createAsset(id: 'asset-late', checksum: 'c2', fileName: 'late.jpg', ownerId: 'user-1'),
       ]);
-      await sut.flushDeferredMemoryAssetsV1();
+      await sut.gallery.flushDeferredMemoryAssetsV1();
 
       final rows = await db.memoryAssetEntity.select().get();
       expect(rows.map((r) => r.assetId), ['asset-late']);
@@ -1827,7 +1827,7 @@ void main() {
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
 
       await sut.updateMemoriesV2([makeMemory(id: 'memory-unknown')]);
-      await sut.flushDeferredMemoryAssetsV1();
+      await sut.gallery.flushDeferredMemoryAssetsV1();
 
       expect((await db.memoryAssetEntity.select().get()).single.memoryId, 'memory-unknown');
     });
@@ -1835,12 +1835,12 @@ void main() {
     test('drops a link that is still unresolvable at sync completion, without throwing', () async {
       await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'never-arrives')]);
 
-      await expectLater(sut.flushDeferredMemoryAssetsV1(), completes);
+      await expectLater(sut.gallery.flushDeferredMemoryAssetsV1(), completes);
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
 
       // The parked row is not retained across sync passes.
       await sut.updateAssetsV1([_createAsset(id: 'never-arrives', checksum: 'c3', fileName: 'n.jpg')]);
-      await sut.flushDeferredMemoryAssetsV1();
+      await sut.gallery.flushDeferredMemoryAssetsV1();
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
     });
 
@@ -1849,7 +1849,7 @@ void main() {
       await sut.deleteMemoryAssetsV1([SyncMemoryAssetDeleteV1(memoryId: 'memory-1', assetId: 'asset-1')]);
 
       await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
-      await sut.flushDeferredMemoryAssetsV1();
+      await sut.gallery.flushDeferredMemoryAssetsV1();
 
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
     });
@@ -1875,7 +1875,7 @@ void main() {
       await sut.updateAssetsV1([
         for (var i = 0; i < orphans; i++) _createAsset(id: 'missing-$i', checksum: 'late-c$i', fileName: 'late-$i.jpg'),
       ]);
-      await sut.flushDeferredMemoryAssetsV1();
+      await sut.gallery.flushDeferredMemoryAssetsV1();
 
       expect(await db.memoryAssetEntity.select().get(), hasLength(present + orphans));
     });

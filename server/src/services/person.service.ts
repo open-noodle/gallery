@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import type { AccessibleIdentityFaceMatch } from 'src/repositories/face-identity.repository.js';
 import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { Chunked, OnJob } from 'src/decorators.js';
@@ -41,16 +40,15 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { requireThumbnailAccess } from 'src/gallery/services/gallery-people.service.js';
+import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
-import {
-  buildAutomaticReconciliationClaim,
-  chooseAutomaticTargetIdentity,
-} from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
@@ -90,6 +88,14 @@ const assertOwnRecord = (auth: AuthDto, userId: string | undefined) => {
 
 @Injectable()
 export class PersonService extends BaseService {
+  private faceIdentityMaintenance?: FaceIdentityMaintenanceService;
+
+  // Gallery: the face-identity steps of recognition live in FaceIdentityMaintenanceService.
+  private get faceIdentity() {
+    this.faceIdentityMaintenance ??= FaceIdentityMaintenanceService.createFor(this);
+    return this.faceIdentityMaintenance;
+  }
+
   private async crossOwnerMergeAuthorizer(dto: { confirmCrossOwner?: boolean }): Promise<MergeAuthorizer> {
     return crossOwnerMergeAuthorizer(await this.getConfig({ withCache: false }), dto);
   }
@@ -330,7 +336,7 @@ export class PersonService extends BaseService {
   }
 
   async getThumbnail(auth: AuthDto, personGroupId: string): Promise<ImmichMediaResponse> {
-    await this.requireThumbnailAccess(auth, personGroupId);
+    await requireThumbnailAccess(this.accessRepository, auth, personGroupId);
     const person = await this.personRepository.getByGroupIdOnly(personGroupId);
     if (!person || !person.thumbnailPath) {
       throw new NotFoundException();
@@ -341,31 +347,6 @@ export class PersonService extends BaseService {
       mimeTypes.lookup(person.thumbnailPath),
       CacheControl.PrivateWithoutCache,
     );
-  }
-
-  private async requireThumbnailAccess(auth: AuthDto, id: string) {
-    const ids = new Set([id]);
-    const ownerAccess = await this.accessRepository.galleryPerson.checkOwnerAccess(auth.user.id, ids);
-    const isOwner = ownerAccess.has(id);
-    if (!isOwner) {
-      const isShared = await this.accessRepository.galleryPerson.checkSharedSpaceAccess(auth.user.id, ids);
-      if (!isShared.has(id)) {
-        throw new BadRequestException('Not found or no person.read access');
-      }
-    }
-
-    // Fork (#869 follow-up): both arms above grant person.read off ANY reachable face, while the thumbnail
-    // is a crop of the representative face's photo specifically. The owner needs an elevated session to be
-    // handed back a crop of their own Locked Folder photo; a shared-space viewer must never receive one at
-    // all — the folder belongs to the owner, so the viewer's own elevation says nothing about it.
-    if (isOwner && auth.session?.hasElevatedPermission) {
-      return;
-    }
-
-    const isUnlocked = await this.accessRepository.galleryPerson.checkUnlockedThumbnailAccess(ids);
-    if (!isUnlocked.has(id)) {
-      throw new BadRequestException('Not found or no person.read access');
-    }
   }
 
   async create(auth: AuthDto, dto: PersonCreateDto): Promise<PersonResponseDto> {
@@ -466,7 +447,7 @@ export class PersonService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.PersonDelete, ids });
     await this.removeAllPersonGroups(ids, auth.user.id);
     if (ids.length > 0) {
-      await this.queueSpacePersonMetadataBackfill();
+      await this.faceIdentity.queueSpacePersonMetadataBackfill();
     }
   }
 
@@ -496,7 +477,7 @@ export class PersonService extends BaseService {
 
     this.logger.debug(`Deleted ${personGroups} empty person groups and ${clusterGroups} orphaned cluster groups`);
     if (people.length > 0) {
-      await this.queueSpacePersonMetadataBackfill();
+      await this.faceIdentity.queueSpacePersonMetadataBackfill();
     }
     return JobStatus.Success;
   }
@@ -711,19 +692,7 @@ export class PersonService extends BaseService {
       await this.handlePersonCleanup();
       await this.vacuum('asset_face', 'person');
 
-      // Wipe shared-space person state so the new strict clustering algorithm can
-      // rebuild from scratch. Aliases cascade via the FK on personId; named
-      // space-persons are lost by design (Force already clears named native persons).
-      await this.sharedSpaceRepository.deleteAllPersonFaces({ excludePets: true });
-      await this.sharedSpaceRepository.deleteAllPersons({ excludePets: true });
-      await this.faceIdentityRepository.deleteUnreferencedIdentities();
-      // Slice 8 (F16): the reaper for face_person_verdict rows deleteUnreferencedIdentities is what nulls a
-      // row's LAST remaining key (personId/spacePersonId are already NULL by this point, via the person and
-      // space-person wipes above) — a row is only fully orphaned once this line has run, so the reaper must
-      // run strictly after it, not from inside handlePersonCleanup a few lines up (which runs BEFORE the
-      // space-person wipe and before this identity GC — see the ordering test in
-      // face-review-cross-flow.spec.ts for the discriminating case).
-      await this.facePersonVerdictRepository.deleteOrphanedVerdicts();
+      await this.faceIdentity.resetSharedSpacePeople();
     } else if (hasPendingRecognitionWork) {
       this.logger.debug(
         `Skipping facial recognition queueing because recognition work is already pending ` +
@@ -816,7 +785,7 @@ export class PersonService extends BaseService {
 
     if (face.personGroupId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
-      await this.replaceFaceIdentity(face.personGroupId, face.id, 'owner-person');
+      await this.faceIdentity.replaceFaceIdentity(face.personGroupId, face.id, 'owner-person');
 
       if (skipSharedSpaceMatch) {
         return JobStatus.Skipped;
@@ -824,14 +793,14 @@ export class PersonService extends BaseService {
 
       // Still queue space face matching because this face may belong to a space
       // that was created or linked after the face was originally recognized.
-      await this.queueSharedSpaceFaceMatchesForAsset(face.assetId);
+      await this.faceIdentity.queueSharedSpaceFaceMatchesForAsset(face.assetId);
 
       return JobStatus.Skipped;
     }
 
-    const { ownerId } = face.asset;
-    const matches = await this.faceSearchRepository.searchFaces({
-      userIds: [ownerId],
+    const { ownerId, clusterGroupId } = face.asset;
+    const matches = await this.searchRepository.searchFaces({
+      clusterGroupId,
       embedding: face.faceSearch.embedding,
       maxDistance: machineLearning.facialRecognition.maxDistance,
       numResults: machineLearning.facialRecognition.minFaces,
@@ -843,7 +812,7 @@ export class PersonService extends BaseService {
     let personGroupId = matches.find((match) => match.personGroupId)?.personGroupId;
     const accessibleIdentityMatch = personGroupId
       ? undefined
-      : await this.findClosestAccessibleSharedIdentity({
+      : await this.faceIdentity.findClosestAccessibleSharedIdentity({
           userId: face.asset.ownerId,
           embedding: face.faceSearch.embedding,
           maxDistance: machineLearning.facialRecognition.maxDistance,
@@ -879,8 +848,8 @@ export class PersonService extends BaseService {
     }
 
     if (!personGroupId) {
-      const [matchWithPerson] = await this.faceSearchRepository.searchFaces({
-        userIds: [ownerId],
+      const [matchWithPerson] = await this.searchRepository.searchFaces({
+        clusterGroupId,
         embedding: face.faceSearch.embedding,
         maxDistance: machineLearning.facialRecognition.maxDistance,
         numResults: 1,
@@ -914,8 +883,8 @@ export class PersonService extends BaseService {
 
       this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
-      const sourceIdentityId = await this.replaceFaceIdentity(personGroupId, id, 'owner-person');
-      await this.mergeWithAccessibleSharedIdentity({
+      const sourceIdentityId = await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
+      await this.faceIdentity.mergeWithAccessibleSharedIdentity({
         userId: face.asset.ownerId,
         embedding: face.faceSearch.embedding,
         maxDistance: machineLearning.facialRecognition.maxDistance,
@@ -933,112 +902,9 @@ export class PersonService extends BaseService {
       return JobStatus.Success;
     }
 
-    await this.queueSharedSpaceFaceMatchesForAsset(face.assetId);
+    await this.faceIdentity.queueSharedSpaceFaceMatchesForAsset(face.assetId);
 
     return JobStatus.Success;
-  }
-
-  private async queueSharedSpaceFaceMatchesForAsset(assetId: string): Promise<void> {
-    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(assetId);
-    const queuedSpaceIds = new Set<string>();
-    for (const { spaceId } of spaceIds) {
-      if (queuedSpaceIds.has(spaceId)) {
-        continue;
-      }
-      queuedSpaceIds.add(spaceId);
-      await this.jobRepository.queue({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId },
-      });
-    }
-  }
-
-  private async replaceFaceIdentity(
-    personId: string,
-    assetFaceId: string,
-    source: 'owner-person' | 'manual',
-  ): Promise<string> {
-    const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId);
-    await this.faceIdentityRepository.replaceFaceIdentity({ assetFaceId, identityId: identity.id, source });
-    return identity.id;
-  }
-
-  private async mergeWithAccessibleSharedIdentity(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    sourceIdentityId: string;
-    match?: AccessibleIdentityFaceMatch;
-  }): Promise<void> {
-    const match =
-      input.match ??
-      (await this.findClosestAccessibleSharedIdentity({
-        userId: input.userId,
-        embedding: input.embedding,
-        maxDistance: input.maxDistance,
-        excludeIdentityId: input.sourceIdentityId,
-      }));
-    if (!match || match.identityId === input.sourceIdentityId) {
-      return;
-    }
-
-    const target = chooseAutomaticTargetIdentity({
-      bridge: 'personal-upload',
-      localIdentityId: input.sourceIdentityId,
-      spaceIdentityId: match.identityId,
-    });
-    const claim = buildAutomaticReconciliationClaim({
-      bridge: 'personal-upload',
-      localIdentityId: input.sourceIdentityId,
-      spaceIdentityId: match.identityId,
-      sourceIdentityId: target.sourceIdentityId,
-      targetIdentityId: target.targetIdentityId,
-      distance: match.distance,
-      hasAccessBridge: true,
-      compatibleType: true,
-      hasEmbedding: true,
-      hiddenOrIgnored: false,
-      alreadySameIdentity: match.identityId === input.sourceIdentityId,
-      sameOwnerConflict: false,
-      sameSpaceConflict: false,
-    });
-    if (!claim) {
-      return;
-    }
-
-    const conflicts = await this.faceIdentityRepository.getMergeConflicts({
-      targetIdentityId: claim.targetIdentityId,
-      sourceIdentityIds: [claim.sourceIdentityId],
-    });
-    if (conflicts.personalProfileConflictCount > 0 || conflicts.spaceProfileConflictCount > 0) {
-      this.logger.warn(
-        `Skipping accessible identity merge due to conflicts: ${conflicts.personalProfileConflictCount} personal, ${conflicts.spaceProfileConflictCount} space`,
-      );
-      return;
-    }
-
-    await this.faceIdentityRepository.mergeIdentities({
-      targetIdentityId: claim.targetIdentityId,
-      sourceIdentityIds: [claim.sourceIdentityId],
-      source: 'shared-space-evidence',
-    });
-
-    await this.queueSpacePersonMetadataBackfill(claim.targetIdentityId);
-  }
-
-  private findClosestAccessibleSharedIdentity(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    excludeIdentityId?: string | null;
-  }): Promise<AccessibleIdentityFaceMatch | undefined> {
-    return this.faceIdentityRepository.findClosestAccessibleIdentityForFace({
-      userId: input.userId,
-      embedding: input.embedding,
-      maxDistance: input.maxDistance,
-      type: 'person',
-      excludeIdentityId: input.excludeIdentityId ?? null,
-    });
   }
 
   @OnJob({ name: JobName.PersonFileMigration, queue: QueueName.Migration })
@@ -1121,13 +987,6 @@ export class PersonService extends BaseService {
     );
   }
 
-  private async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {
-    await this.jobRepository.queue({
-      name: JobName.SharedSpacePersonMetadataBackfill,
-      data: identityId ? { identityId } : {},
-    });
-  }
-
   // Upstream looks the person up owner-scoped (`getByGroupId({ ownerId, personGroupId })`) because it has
   // no concept of a person reachable by anyone but its owner. In the fork, `requireAccess` above each call
   // site is the authorization gate, and several of those permissions (PersonRead in particular) admit
@@ -1141,7 +1000,7 @@ export class PersonService extends BaseService {
   // TODO return a asset face response
   async createFace(auth: AuthDto, dto: AssetFaceCreateDto): Promise<void> {
     await Promise.all([
-      this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [dto.assetId] }),
+      requireAssetEditAccess(this.accessRepository, { auth, ids: [dto.assetId] }),
       this.requireAccess({ auth, permission: Permission.PersonRead, ids: [dto.personId] }),
     ]);
 

@@ -4,6 +4,7 @@
 // must never desync: both consume the same member-gate (albumSpaceIds / forUserId).
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -146,7 +147,7 @@ describe('P0-2: contributions render in the album grid', () => {
     // without the contributed arm the bucket has NO cover at all.
     await db.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', s.owned.id).execute();
     const albumSpaceIds = await ctx.get(SharedSpaceRepository).getMemberSpaceIdsLinkingAlbum(s.album.id, s.viewer.id);
-    const covers = await ctx.get(AssetRepository).getTimeBucketCovers({
+    const covers = await ctx.get(GalleryAssetRepository).getTimeBucketCovers({
       albumId: s.album.id,
       albumSpaceIds,
       timeBuckets: ['2020-03-01'],

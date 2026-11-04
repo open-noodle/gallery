@@ -24,6 +24,7 @@ import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, TimeBucketSize } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -82,6 +83,7 @@ const setup = () => {
     accessRepo: ctx.get(AccessRepository),
     activityRepo: ctx.get(ActivityRepository),
     assetRepo: ctx.get(AssetRepository),
+    galleryAssetRepo: ctx.get(GalleryAssetRepository),
     downloadRepo: ctx.get(DownloadRepository),
     mapRepo: ctx.get(MapRepository),
     memoryRepo: ctx.get(MemoryRepository),
@@ -1501,7 +1503,7 @@ describe('matrix: view/folders (getUniqueOriginalPaths)', () => {
 
 describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCKED)', () => {
   it("visibility=HIDDEN via spaceId does NOT surface another member's Hidden in-space asset", async () => {
-    const { assetRepo, spaceRepo, ctx } = setup();
+    const { assetRepo, galleryAssetRepo, spaceRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -1527,7 +1529,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
     expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     // getTimeBucketCovers likewise returns nothing
-    const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
+    const covers = await galleryAssetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
     const coverIds = new Set(covers.map((c) => c.representativeAssetId));
     expect(coverIds.has(hiDirect)).toBe(false);
     expect(coverIds.has(hiAlbum)).toBe(false);
@@ -1551,7 +1553,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
   });
 
   it("OWN Hidden via timelineSpaceIds IS present (owner's own hidden must not be over-blocked)", async () => {
-    const { assetRepo, ctx } = setup();
+    const { assetRepo, galleryAssetRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
@@ -1567,13 +1569,13 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
     };
     expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(1);
 
-    const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
+    const covers = await galleryAssetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
     const coverIds = new Set(covers.map((c) => c.representativeAssetId));
     expect(coverIds.has(ownHidden)).toBe(true);
   });
 
   it("viewer's Hidden via timelineSpaceIds does NOT surface another member's Hidden album asset", async () => {
-    const { assetRepo, spaceRepo, ctx } = setup();
+    const { assetRepo, galleryAssetRepo, spaceRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -1593,7 +1595,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
     };
     expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
-    const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
+    const covers = await galleryAssetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
     expect(covers.map((c) => c.representativeAssetId)).not.toContain(hiAlbum);
   });
 

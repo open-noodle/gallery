@@ -11,7 +11,6 @@
   // Mirrors the server-side memory-type registry keys.
   const memoryTypeKeys = [
     'on_this_day',
-    'birthday',
     'recent_trip',
     'month_recap',
     'favorites_throwback',

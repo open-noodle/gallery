@@ -1,7 +1,9 @@
 import { Kysely } from 'kysely';
+import { Mocked } from 'vitest';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetVisibility, JobName, JobStatus, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { personIdentityId, personSidecarColumns, personSpecies } from 'src/gallery/utils/person-sidecar.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
@@ -906,18 +908,20 @@ describe('pet detection -> recognition pipeline (medium)', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.webp` });
 
-    ctx.getMock(MachineLearningRepository).detectPets.mockResolvedValue({
-      imageHeight: 500,
-      imageWidth: 400,
-      pets: [
-        {
-          boundingBox: { x1: 10, y1: 20, x2: 110, y2: 120 },
-          score: 0.9,
-          label: 'dog',
-          embedding: axisEmbedding('first'),
-        },
-      ],
-    });
+    ctx
+      .getMock<typeof MachineLearningRepository, Mocked<GalleryMachineLearningRepository>>(MachineLearningRepository)
+      .detectPets.mockResolvedValue({
+        imageHeight: 500,
+        imageWidth: 400,
+        pets: [
+          {
+            boundingBox: { x1: 10, y1: 20, x2: 110, y2: 120 },
+            score: 0.9,
+            label: 'dog',
+            embedding: axisEmbedding('first'),
+          },
+        ],
+      });
 
     expect(await detectionSut.handlePetDetection({ id: asset.id })).toBe(JobStatus.Success);
 

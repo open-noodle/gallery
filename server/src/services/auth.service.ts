@@ -1,13 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { parse } from 'cookie';
 import { DateTime } from 'luxon';
-import { createReadStream } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
-import { basename } from 'node:path';
 import sanitize from 'sanitize-filename';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_CALLBACK_URI, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { AuthSharedLink, AuthUser, UserAdmin } from 'src/database.js';
 import {
   AuthDto,
@@ -28,13 +24,11 @@ import {
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission } from 'src/enum.js';
-import { isGalleryClient } from 'src/gallery/utils/client-version.js';
+import { classifyClient } from 'src/gallery/utils/client-version.js';
 import { OAuthProfile } from 'src/repositories/oauth.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { isGranted } from 'src/utils/access.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
-import { mimeTypes } from 'src/utils/mime-types.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
 import { getUserAgentDetails } from 'src/utils/request.js';
 
@@ -251,7 +245,7 @@ export class AuthService extends BaseService {
       throw new ForbiddenException(`Missing required permission: ${requestedPermission}`);
     }
 
-    return isGalleryClient(headers) ? authDto : { ...authDto, stockClient: true };
+    return classifyClient(headers, authDto);
   }
 
   private async validate({ headers, queryParams }: Omit<ValidateRequest, 'metadata'>): Promise<AuthDto> {
@@ -401,17 +395,7 @@ export class AuthService extends BaseService {
         Buffer.from(data),
       );
 
-      const writeBackend = StorageService.getWriteBackend();
-
-      if (!(writeBackend instanceof DiskStorageBackend)) {
-        const filename = basename(profileImagePath);
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, filename);
-        const stream = createReadStream(profileImagePath);
-        await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
-        // After S3 upload, drop the local generated file and store the relative key.
-        await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
-        profileImagePath = relativeKey;
-      }
+      profileImagePath = await this.backendMedia.persistProfileImage(user.id, profileImagePath);
 
       await this.userRepository.update(user.id, { profileImagePath, profileChangedAt: new Date() });
 

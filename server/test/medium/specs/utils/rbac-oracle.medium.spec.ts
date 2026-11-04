@@ -14,6 +14,7 @@ import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AlbumUserRole, AssetStatus, AssetVisibility, MemoryType, SharedLinkType, TimeBucketSize } from 'src/enum.js';
 import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
@@ -79,6 +80,7 @@ const seed = async () => {
       AssetEditRepository,
       AssetFavoriteRepository,
       AssetRepository,
+      GalleryAssetRepository,
       ConfigRepository,
       CryptoRepository,
       DatabaseRepository,
@@ -247,6 +249,14 @@ const seed = async () => {
   const memViewer = await newMemory('memViewer', spaceViewer.id, [spaceAsset, spaceArchived, libraryAsset, petAsset]);
   // A rule memory, which a stock client cannot decode (F5).
   await newMemory('memRule', owner.id, [ownAsset], true);
+  // An Immich birthday memory, which every client here can decode (OD-3).
+  const { memory: memBirthday } = await ctx.newMemory({
+    ownerId: owner.id,
+    type: MemoryType.Birthday,
+    data: { personId: pet.personGroupId, personName: 'Rex', year: 2020 },
+  });
+  label('memBirthday', memBirthday.id);
+  await ctx.newMemoryAsset({ memoryId: memBirthday.id, assetId: ownAsset });
 
   const newLink = async (name: string, dto: Parameters<typeof ctx.newSharedLink>[0]) => {
     const { sharedLink } = await ctx.newSharedLink(dto);
@@ -815,17 +825,22 @@ describe('viewer-scope RBAC oracle', () => {
     const result: Record<string, unknown> = {};
     for (const [actor, auth] of Object.entries(world.actors)) {
       const detail: string[] = [];
+      const canEdit: string[] = [];
       for (const id of Object.values(world.assets)) {
         const asset = await attempt(
           () => assetService.get(auth, id),
           (dto) => dto,
         );
+        if ((asset as { canEdit?: boolean }).canEdit) {
+          canEdit.push(name(id));
+        }
         if (typeof asset === 'object' && asset) {
           detail.push(...assetList([asset as { id: string; isFavorite?: boolean }]));
         }
       }
       result[actor] = {
         detail: sorted(detail),
+        canEdit: sorted(canEdit),
         statistics: await attempt(
           () => assetService.getStatistics(auth, {}),
           (stats) => stats,

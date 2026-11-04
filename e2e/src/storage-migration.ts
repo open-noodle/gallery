@@ -2137,7 +2137,7 @@ async function phaseVideoTrimS3(): Promise<void> {
 
     // Duration reflects the trim (~2s), not the original (4s). The trim is a `-c copy`
     // stream copy, so ffmpeg snaps to keyframes and the result is close to, not exactly,
-    // the requested 2s — which is why handleVideoTrim re-probes the output instead of
+    // the requested 2s — which is why VideoTrimService re-probes the output instead of
     // trusting the requested duration. The window allows one keyframe interval of slack.
     const trimmedRows = await queryDb<{ duration: string | null }>(
       'SELECT duration FROM asset_video_trim WHERE "assetId" = $1',

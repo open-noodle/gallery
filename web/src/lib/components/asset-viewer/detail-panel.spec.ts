@@ -7,6 +7,7 @@ import {
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor, within } from '@testing-library/svelte';
+import { renderInViewerSpace } from '$lib/gallery/viewer-space.test-helpers';
 import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
 import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
@@ -218,11 +219,7 @@ describe('DetailPanel', () => {
       people: [person],
     };
 
-    const { container } = renderWithTooltips(DetailPanel, {
-      asset,
-      currentAlbum: null,
-      spaceId: 'space-1',
-    });
+    const { container } = renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await waitFor(() => expect(zoomImageToBase64Mock).toHaveBeenCalledWith(face, asset.id, asset.type, undefined));
 
@@ -309,11 +306,7 @@ describe('DetailPanel', () => {
       people: [alice, bob],
     };
 
-    const { container } = renderWithTooltips(DetailPanel, {
-      asset,
-      currentAlbum: null,
-      spaceId: 'space-1',
-    });
+    const { container } = renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     await waitFor(() => expect(zoomImageToBase64Mock).toHaveBeenCalledTimes(2));
 

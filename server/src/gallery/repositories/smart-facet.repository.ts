@@ -13,13 +13,11 @@ import {
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { SEARCH_OPTIONS_PROBE, isSearchOptionsProbeTimeout } from 'src/gallery/utils/search-options-probe.js';
-import { TimeBucketOptions, withTimeBucketAssetFilters } from 'src/repositories/asset.repository.js';
+import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
+import { withTimeBucketAssetFilters } from 'src/gallery/utils/time-bucket-filter.js';
+import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
-import {
-  AssetSearchBuilderOptions,
-  SmartSearchOptions,
-  isActiveDistanceThreshold,
-} from 'src/repositories/search.repository.js';
+import { AssetSearchBuilderOptions, SmartSearchOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFilter, searchAssetBuilderWithLocalTaken, withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, hasPeople, hasTags, searchAssetBuilderLegacy, truncatedDate } from 'src/utils/database.js';

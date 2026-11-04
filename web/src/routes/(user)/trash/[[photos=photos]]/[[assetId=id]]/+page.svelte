@@ -9,6 +9,7 @@
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import { timelineGroupingProps } from '$lib/gallery/filtered-timeline/timeline-grouping.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
@@ -16,9 +17,6 @@
   import { Route } from '$lib/route';
   import { getTrashActions } from '$lib/services/trash.service';
   import { handlePromiseError } from '$lib/utils';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -29,16 +27,8 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
-  const baseTimelineOptions = { isTrashed: true };
-  const options = $derived({
-    ...baseTimelineOptions,
-    grouping: timelineGrouping,
-  });
-  const hideGroupingControls = $derived(
-    assetMultiSelectManager.selectionActive || (timelineManager?.isInitialized && timelineManager.assetCount === 0),
-  );
+  const timelineGrouping = timelineGroupingProps(() => timelineManager);
+  const options = $derived({ isTrashed: true, grouping: timelineGrouping.grouping });
 
   if (!featureFlagsManager.value.trash) {
     handlePromiseError(goto(Route.photos()));
@@ -53,26 +43,6 @@
     return;
   };
 
-  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  }
-
-  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  }
-
   const { Empty, RestoreAll } = $derived(getTrashActions($t, timelineManager?.assetCount ?? 0));
 </script>
 
@@ -83,22 +53,14 @@
     title={data.meta.title}
     scrollbar={false}
   >
-    <TimelineRouteGroupingBar
-      grouping={timelineGrouping}
-      hidden={hideGroupingControls}
-      onGroupingChange={handleTimelineGroupingChange}
-    />
+    <TimelineRouteGroupingBar {...timelineGrouping.barProps} />
     <Timeline
       enableRouting={true}
       bind:timelineManager
       {options}
       assetInteraction={assetMultiSelectManager}
       onEscape={handleEscape}
-      {temporalAnchor}
-      onTimelineBucketActivate={handleTimelineBucketActivate}
-      onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-      grouping={timelineGrouping}
-      onGroupingChange={handleTimelineGroupingChange}
+      {...timelineGrouping.timelineProps}
     >
       <p class="p-4 font-medium text-gray-500/60 dark:text-gray-300/60">
         {$t('trashed_items_will_be_permanently_deleted_after', {

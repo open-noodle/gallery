@@ -1,4 +1,5 @@
 import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
+import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { createFilterState, type FilterPanelConfig, type FilterState } from '$lib/components/filter-panel/filter-panel';
@@ -35,7 +36,7 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerSelectionContext: registerSelectionContextMock,
 }));
 vi.mock('$lib/utils/filter-name-resolution', () => ({ resolveFilterNames: vi.fn(() => Promise.resolve()) }));
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('$lib/gallery/timeline/timeline-anchor', () => ({
   getTimelineTopVisibleAnchor: topVisibleAnchorMock,
 }));
 
@@ -405,6 +406,24 @@ describe('FilteredTimelineController', () => {
       expect(sut.timelineReloadToken).toBe(1);
       sut.onSpaceAddAssets({});
       expect(sut.timelineReloadToken).toBe(1);
+    });
+
+    it('hides browse-only actions while search results show, keeping their own condition', () => {
+      const onAction = vi.fn();
+      const actions: Record<'Stack' | 'Unstack', ActionItem> = {
+        Stack: { title: 'stack', onAction },
+        Unstack: { title: 'unstack', onAction, $if: () => false },
+      };
+
+      navigate('/photos?q=cat');
+      const sut = createController();
+      const guarded = sut.browseOnly(actions);
+      expect(guarded.Stack.$if?.()).toBe(false);
+
+      navigate('/photos');
+      expect(guarded.Stack.$if?.()).toBe(true);
+      expect(guarded.Unstack.$if?.()).toBe(false);
+      expect(guarded.Stack.onAction).toBe(onAction);
     });
 
     it('registers no handlers while the route cannot act', () => {

@@ -15,18 +15,16 @@
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import { timelineGroupingProps } from '$lib/gallery/filtered-timeline/timeline-grouping.svelte';
   import Portal from '$lib/elements/Portal.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { getStackBulkActions } from '$lib/services/stack.service';
   import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import { type OnLink, type OnUnlink } from '$lib/utils/actions';
   import { buildMapTimelineOptions } from '$lib/utils/map-filter-options';
-  import { type ActivatableTimelineBucket, getTimelineBucketZoomTarget } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';
@@ -58,8 +56,10 @@
   // is the count of what the panel actually lists: the server's bucket counts until a month loads,
   // and the loaded assets (client-side `assetFilter` exclusions already applied) after.
   const assetCount = $derived(timelineManager?.assetCount ?? 0);
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const timelineGrouping = timelineGroupingProps(() => timelineManager, {
+    hideWhenEmpty: false,
+    lockWhileSelecting: true,
+  });
   let selectedAssets = $derived(assetMultiSelectManager.assets);
   let isLinkActionAvailable = $derived.by(() => {
     const isLivePhoto = selectedAssets.length === 1 && !!selectedAssets[0].livePhotoVideoId;
@@ -90,29 +90,9 @@
     assetMultiSelectManager.clear();
   };
 
-  const handleTimelineGroupingChange = (grouping: TimelineGrouping) => {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  };
-
-  const handleTimelineBucketActivate = (bucket: ActivatableTimelineBucket) => {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  };
-
   const clearTemporalFilter = () => {
     filters = clearTimelineTemporalFilter(filters);
-    temporalAnchor = undefined;
+    timelineGrouping.temporalAnchor = undefined;
     // #767 fresh instance: this used to only mutate the bound `filters`, leaving the map page's
     // URL-backed from/to params in place — a reload, Back, or shared link brought the "cleared"
     // filter right back. Mirror the page's other mutation sites (FilterPanel's onFiltersChange).
@@ -129,7 +109,7 @@
     return {
       ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId),
       withStacked: true,
-      grouping: timelineGrouping,
+      grouping: timelineGrouping.grouping,
     };
   });
 
@@ -156,11 +136,9 @@
 
   <TimelineRouteGroupingBar
     class="px-2 py-1 md:flex"
-    grouping={timelineGrouping}
+    {...timelineGrouping.barProps}
     {filters}
     resultCount={assetCount}
-    hidden={assetMultiSelectManager.selectionActive}
-    onGroupingChange={handleTimelineGroupingChange}
     onClearTemporalFilter={clearTemporalFilter}
   />
 
@@ -173,11 +151,7 @@
       assetInteraction={assetMultiSelectManager}
       showArchiveIcon
       withStacked
-      grouping={timelineGrouping}
-      onGroupingChange={assetMultiSelectManager.selectionActive ? undefined : handleTimelineGroupingChange}
-      onTimelineBucketActivate={handleTimelineBucketActivate}
-      {temporalAnchor}
-      onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+      {...timelineGrouping.timelineProps}
     />
   </div>
 </aside>

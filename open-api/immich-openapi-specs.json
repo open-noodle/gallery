@@ -35000,7 +35000,9 @@
           "AssetClassifyQueueAll",
           "AssetClassify",
           "AssetAnalyzeQualityQueueAll",
-          "AssetAnalyzeQuality"
+          "AssetAnalyzeQuality",
+          "MemoryRuleGenerate",
+          "AssetVideoTrimGenerate"
         ],
         "type": "string"
       },

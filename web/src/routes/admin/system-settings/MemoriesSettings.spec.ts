@@ -136,12 +136,11 @@ describe('MemoriesSettings', () => {
     );
   });
 
-  // Mirrors MEMORY_TYPE_METADATA in server/src/services/memory-rules/memory-type.metadata.ts.
+  // Mirrors MEMORY_TYPE_METADATA in server/src/gallery/services/memory-rules/memory-type.metadata.ts.
   // Guards against the UI list drifting out of sync with the server registry — a type missing
   // here is a type no admin can ever turn off.
   const ALL_MEMORY_TYPE_KEYS = [
     'on_this_day',
-    'birthday',
     'recent_trip',
     'month_recap',
     'favorites_throwback',
@@ -165,16 +164,16 @@ describe('MemoriesSettings', () => {
 
   it('renders a switch per memory type, defaulting unset types to enabled', () => {
     mocks.systemConfig = makeConfig();
-    mocks.systemConfig.memories.types = { birthday: false };
+    mocks.systemConfig.memories.types = { month_recap: false };
 
     render(MemoriesSettings);
 
     expect(screen.getByText('admin.memory_type_on_this_day_setting')).toBeInTheDocument();
-    expect(screen.getByText('admin.memory_type_birthday_setting')).toBeInTheDocument();
+    expect(screen.getByText('admin.memory_type_month_recap_setting')).toBeInTheDocument();
     expect(screen.getByText('admin.memory_type_recent_trip_setting')).toBeInTheDocument();
     // unset → defaults to enabled; explicitly false → off
     expect(screen.getByRole('switch', { name: 'admin.memory_type_on_this_day_setting' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'admin.memory_type_birthday_setting' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'admin.memory_type_month_recap_setting' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'admin.memory_type_recent_trip_setting' })).toBeChecked();
   });
 
@@ -182,7 +181,7 @@ describe('MemoriesSettings', () => {
     const user = userEvent.setup();
     render(MemoriesSettings);
 
-    await user.click(screen.getByRole('switch', { name: 'admin.memory_type_birthday_setting' }));
+    await user.click(screen.getByRole('switch', { name: 'admin.memory_type_month_recap_setting' }));
     await user.click(screen.getByRole('button', { name: 'save' }));
 
     expect(handleSystemConfigSave).toHaveBeenCalledWith({
@@ -194,9 +193,8 @@ describe('MemoriesSettings', () => {
         personThrowbackDormancyMonths: 6,
         types: {
           on_this_day: true,
-          birthday: false,
           recent_trip: true,
-          month_recap: true,
+          month_recap: false,
           favorites_throwback: true,
           on_this_day_place: true,
           season_recap: true,

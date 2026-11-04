@@ -323,8 +323,9 @@ describe('space asset access via checkOtherAccess', () => {
       const accessMock = newAccessRepositoryMock();
       const auth = makeAuth();
       const assetId = newUuid();
+      accessMock.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
 
-      // Space access doesn't apply to AssetUpdate — only owner can update
+      // Immich's meaning: owner only. Space editors are granted at the call site (requireAssetEditAccess).
       const result = await checkAccess(accessMock as any, {
         auth,
         permission: Permission.AssetUpdate,

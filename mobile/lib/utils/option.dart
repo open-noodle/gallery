@@ -27,7 +27,6 @@ sealed class Option<T> {
     None() => None<U>(),
   };
 
-  // ignore: unused-code
   U fold<U>(U Function(T value) onSome, U Function() onNone) => switch (this) {
     Some(:final value) => onSome(value),
     None() => onNone(),

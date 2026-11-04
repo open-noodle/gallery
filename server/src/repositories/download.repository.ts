@@ -34,28 +34,27 @@ export class DownloadRepository {
    * `AssetRepository`'s album arm, so browse and download can't disagree.
    */
   downloadAlbumId(albumId: string, albumSpaceIds?: string[]) {
-    return (
-      builder(this.db)
-        // rbac-8 (no functional change): flat visibility gate, NO owner exception, so an album-archive
-        // export omits Hidden/Locked rows for everyone, matching the album grid (withDefaultVisibility) and
-        // map-markers. An `own OR` here would let the owner download Hidden while the grid hides it.
-        // Applied before the join so `eb` keeps the type spaceVisibilityGate expects.
-        .where((eb) => spaceVisibilityGate(eb))
-        // #1048: mirrors `AccessRepository.spaceAsset.checkSpaceAccess`, whose album arm requires
-        // `isOffline = false`. The manifest this builds is re-checked asset-by-asset under `AssetDownload`
-        // before the zip is streamed, and `requireAccess` is all-or-nothing, so a single offline row here
-        // does not merely go missing from the archive, it 400s the entire download for anyone whose only
-        // route to it is the space.
-        .where('asset.isOffline', '=', false)
-        .innerJoin(
-          (eb) =>
-            albumMembership(eb, [albumId], albumSpaceIds?.length ? { spaceIds: albumSpaceIds } : undefined).as(
-              'album_members',
-            ),
-          (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
-        )
-        .stream()
-    );
+    // rbac-8 (no functional change): flat visibility gate, NO owner exception, so an album-archive
+    // export omits Hidden/Locked rows for everyone, matching the album grid (withDefaultVisibility) and
+    // map-markers. An `own OR` here would let the owner download Hidden while the grid hides it.
+    // Applied before the join so `eb` keeps the type spaceVisibilityGate expects.
+    //
+    // #1048: the `isOffline = false` filter mirrors `AccessRepository.spaceAsset.checkSpaceAccess`, whose
+    // album arm requires it. The manifest this builds is re-checked asset-by-asset under `AssetDownload`
+    // before the zip is streamed, and `requireAccess` is all-or-nothing, so a single offline row here
+    // does not merely go missing from the archive, it 400s the entire download for anyone whose only
+    // route to it is the space.
+    return builder(this.db)
+      .where((eb) => spaceVisibilityGate(eb))
+      .where('asset.isOffline', '=', false)
+      .innerJoin(
+        (eb) =>
+          albumMembership(eb, [albumId], albumSpaceIds?.length ? { spaceIds: albumSpaceIds } : undefined).as(
+            'album_members',
+          ),
+        (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+      )
+      .stream();
   }
 
   downloadUserId(userId: string) {

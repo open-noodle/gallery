@@ -146,7 +146,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             ),
           ])
           ..addColumns([assetCountExp, dateExp])
-          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId) & extraWhere)
+          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId))
+          ..where(extraWhere)
           ..groupBy([dateExp])
           ..orderBy([OrderingTerm.desc(dateExp)]);
 
@@ -182,7 +183,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             ),
           ])
           ..addColumns([_db.remoteAssetEntity.id])
-          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId) & extraWhere)
+          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId))
+          ..where(extraWhere)
           ..orderBy([OrderingTerm.desc(_db.localAssetEntity.createdAt)])
           ..limit(count, offset: offset);
 
@@ -248,11 +250,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
                 useColumns: false,
               ),
             ])
-            ..where(
-              _db.remoteAssetEntity.deletedAt.isNull() &
-                  _db.remoteAlbumAssetEntity.albumId.equals(albumId) &
-                  extraWhere,
-            )
+            ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId))
+            ..where(extraWhere)
             ..groupBy([dateExp]);
 
           if (isAscending) {
@@ -296,16 +295,14 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         ..limit(1),
     );
 
-    final query =
-        _db.remoteAssetEntity.select().addColumns([localId]).join([
-          innerJoin(
-            _db.remoteAlbumAssetEntity,
-            _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-            useColumns: false,
-          ),
-        ])..where(
-          _db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId) & extraWhere,
-        );
+    final query = _db.remoteAssetEntity.select().addColumns([localId]).join([
+      innerJoin(
+        _db.remoteAlbumAssetEntity,
+        _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+        useColumns: false,
+      ),
+    ])..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId));
+    query.where(extraWhere);
 
     query.orderBy(
       _assetDateOrder(groupBy, ascending: isAscending).map((order) => order(_db.remoteAssetEntity)).toList(),
@@ -427,13 +424,19 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     origin: TimelineOrigin.person,
   );
 
-  Stream<List<Bucket>> _watchPlaceBucket(String place, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+  Stream<List<Bucket>> _watchPlaceBucket(
+    String place, {
+    GroupAssetsBy groupBy = GroupAssetsBy.day,
+    List<Join> extraJoins = const [],
+    Expression<bool> extraWhere = const Constant(true),
+  }) {
     if (groupBy == GroupAssetsBy.none) {
       // TODO: implement GroupAssetBy for place
       throw UnsupportedError("GroupAssetsBy.none is not supported for watchPlaceBucket");
     }
 
-    final assetCountExp = _db.remoteAssetEntity.id.count();
+    // gallery-fork: extraJoins can fan out, so a joined bucket counts distinct assets.
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: extraJoins.isNotEmpty);
     final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
 
     final query = _db.remoteAssetEntity.selectOnly()
@@ -444,11 +447,13 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
           _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
           useColumns: false,
         ),
+        ...extraJoins,
       ])
       ..where(
         _db.remoteExifEntity.city.equals(place) &
             _db.remoteAssetEntity.deletedAt.isNull() &
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline),
+            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
+            extraWhere,
       )
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
@@ -465,6 +470,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     required int offset,
     required int count,
     GroupAssetsBy groupBy = GroupAssetsBy.day,
+    Expression<bool> extraWhere = const Constant(true),
   }) {
     final query =
         _db.remoteAssetEntity.select().join([
@@ -477,7 +483,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
           ..where(
             _db.remoteAssetEntity.deletedAt.isNull() &
                 _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-                _db.remoteExifEntity.city.equals(place),
+                _db.remoteExifEntity.city.equals(place) &
+                extraWhere,
           )
           ..orderBy(_assetDateOrder(groupBy).map((order) => order(_db.remoteAssetEntity)).toList())
           ..limit(count, offset: offset);
@@ -503,11 +510,12 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     List<String> userIds,
     String personId, {
     GroupAssetsBy groupBy = GroupAssetsBy.day,
+    Expression<bool> extraWhere = const Constant(true),
   }) {
     if (groupBy == GroupAssetsBy.none) {
       final query = _db.remoteAssetEntity.selectOnly()
         ..addColumns([_db.remoteAssetEntity.id.count()])
-        ..where(_personAssetFilter(userIds, personId));
+        ..where(_personAssetFilter(userIds, personId) & extraWhere);
 
       return query.map((row) {
         final count = row.read(_db.remoteAssetEntity.id.count())!;
@@ -520,7 +528,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
-      ..where(_personAssetFilter(userIds, personId))
+      ..where(_personAssetFilter(userIds, personId) & extraWhere)
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
 
@@ -537,9 +545,10 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     required int offset,
     required int count,
     GroupAssetsBy groupBy = GroupAssetsBy.day,
+    Expression<bool> extraWhere = const Constant(true),
   }) {
     final query = _db.remoteAssetEntity.select()
-      ..where((_) => _personAssetFilter(userIds, personId))
+      ..where((_) => _personAssetFilter(userIds, personId) & extraWhere)
       ..orderBy(_assetDateOrder(groupBy))
       ..limit(count, offset: offset);
 
@@ -698,17 +707,24 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     required Expression<bool> Function($RemoteAssetEntityTable row) filter,
     GroupAssetsBy groupBy = GroupAssetsBy.day,
     SortAssetsBy sortBy = SortAssetsBy.taken,
+    List<Join> extraJoins = const [],
   }) {
+    // gallery-fork: extraJoins (real joins, so .watch() tracks their tables) can fan out, so a
+    // joined bucket counts distinct assets; the none count is a joined count for the same reason.
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: extraJoins.isNotEmpty);
     if (groupBy == GroupAssetsBy.none) {
-      final query = _db.remoteAssetEntity.count(where: filter);
-      return query.map(_generateBuckets).watchSingle();
+      final query = _db.remoteAssetEntity.selectOnly()
+        ..addColumns([assetCountExp])
+        ..join(extraJoins)
+        ..where(filter(_db.remoteAssetEntity));
+      return query.map((row) => row.read(assetCountExp) ?? 0).map(_generateBuckets).watchSingle();
     }
 
-    final assetCountExp = _db.remoteAssetEntity.id.count();
     final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy, sortBy: sortBy);
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
+      ..join(extraJoins)
       ..where(filter(_db.remoteAssetEntity))
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
@@ -727,7 +743,10 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     required int count,
     bool joinLocal = false,
     SortAssetsBy sortBy = SortAssetsBy.taken,
+    // gallery-fork: joined after the local join; only the joinLocal query takes joins.
+    List<Join> extraJoins = const [],
   }) {
+    assert(joinLocal || extraJoins.isEmpty, 'extraJoins needs joinLocal');
     if (joinLocal) {
       final query =
           _db.remoteAssetEntity.select().join([
@@ -736,6 +755,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
                 _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
                 useColumns: false,
               ),
+              ...extraJoins,
             ])
             ..addColumns([_db.localAssetEntity.id])
             ..where(filter(_db.remoteAssetEntity))

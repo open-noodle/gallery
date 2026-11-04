@@ -9,6 +9,7 @@
   import { preloadManager } from '$lib/components/asset-viewer/PreloadManager.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { AssetAction, ProjectionType } from '$lib/constants';
+  import { getViewerSpace } from '$lib/gallery/viewer-space';
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -25,10 +26,6 @@
   import { navigateToAsset } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
   import { navigate } from '$lib/utils/navigation';
-  import {
-    canEditSpacePeople as resolveCanEditSpacePeople,
-    resolveEffectiveSpaceId,
-  } from '$lib/utils/asset-editability';
   import { InvocationTracker } from '$lib/utils/invocationTracker';
   import { SlideshowHistory } from '$lib/utils/slideshow-history';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
@@ -82,9 +79,6 @@
     onUndoDelete?: OnUndoDelete;
     onClose?: (assetId: string) => void;
     onRandom?: () => Promise<{ id: string } | undefined>;
-    spaceId?: string;
-    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
-    space?: { id: string; canWrite: boolean };
   }
 
   let {
@@ -100,8 +94,6 @@
     onUndoDelete,
     onClose,
     onRandom,
-    spaceId,
-    space,
   }: Props = $props();
 
   const {
@@ -117,18 +109,12 @@
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
   let stack: StackResponseDto | undefined = $state();
+
   const asset = $derived(previewStackedAsset ?? cursor.current);
   useViewerZoom(() => asset.id);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
-  // Slice 8 gap closure: the SAME rule DetailPanel.svelte's People row uses for `asset` — see
-  // `resolveCanEditSpacePeople`'s doc. Threaded into PhotoViewer/VideoViewer's `FaceEditorPanel`
-  // so the face-draw affordance opens the matching endpoint family, never the owner's when a
-  // non-owner space editor triggered it.
-  const canEditSpacePeople = $derived(
-    resolveCanEditSpacePeople(asset, { userId: authManager.authenticated ? authManager.user.id : undefined, spaceId }),
-  );
-  const effectiveSpaceId = $derived(resolveEffectiveSpaceId(asset, spaceId));
+  const { spaceId } = $derived.by(getViewerSpace());
   let sharedLink = getSharedLink();
   let fullscreenElement = $state<Element>();
 
@@ -556,7 +542,6 @@
         onClose={onClose ? () => onClose(stack?.primaryAssetId ?? asset.id) : undefined}
         {isPlayingOriginalVideo}
         {setPlayOriginalVideo}
-        {space}
       />
     </div>
   {/if}
@@ -594,8 +579,6 @@
         onVideoEnded={() => navigateAsset()}
         onVideoStarted={handleVideoStarted}
         playOriginalVideo={isPlayingOriginalVideo}
-        spaceId={effectiveSpaceId}
-        {canEditSpacePeople}
       />
     {:else if viewerKind === 'LiveVideoViewer'}
       <VideoViewer
@@ -608,8 +591,6 @@
         onNextAsset={() => navigateAsset('next')}
         onVideoEnded={() => (assetViewerManager.isPlayingMotionPhoto = false)}
         playOriginalVideo={isPlayingOriginalVideo}
-        spaceId={effectiveSpaceId}
-        {canEditSpacePeople}
       />
     {:else if viewerKind === 'ImagePanaramaViewer'}
       <ImagePanoramaViewer {asset} />
@@ -620,13 +601,7 @@
     {:else if viewerKind === 'SpatialSceneViewer'}
       <SpatialSceneViewer {asset} />
     {:else if viewerKind === 'PhotoViewer'}
-      <PhotoViewer
-        cursor={{ ...cursor, current: asset }}
-        {sharedLink}
-        {onSwipe}
-        spaceId={effectiveSpaceId}
-        {canEditSpacePeople}
-      />
+      <PhotoViewer cursor={{ ...cursor, current: asset }} {sharedLink} {onSwipe} />
     {:else if viewerKind === 'VideoViewer'}
       <VideoViewer
         {asset}
@@ -640,8 +615,6 @@
         onVideoEnded={() => navigateAsset()}
         onVideoStarted={handleVideoStarted}
         playOriginalVideo={isPlayingOriginalVideo}
-        spaceId={effectiveSpaceId}
-        {canEditSpacePeople}
       />
     {/if}
 
@@ -685,7 +658,7 @@
       translate="yes"
     >
       {#if showDetailPanel}
-        <DetailPanel {asset} currentAlbum={album} {spaceId} />
+        <DetailPanel {asset} currentAlbum={album} />
       {:else if assetViewerManager.isShowEditor}
         <EditorPanel {asset} onClose={closeEditor} />
       {/if}
