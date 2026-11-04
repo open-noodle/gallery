@@ -464,7 +464,8 @@
     if (to?.route.id === page.route.id && to?.params?.monthDay === String(monthDay)) {
       return;
     }
-    const { type, delta } = navigation;
+    const { type } = navigation;
+    const delta = navigation.type === 'popstate' ? navigation.delta : undefined;
     navigation.cancel();
     if (!to) {
       return;
@@ -485,7 +486,7 @@
       if (type === 'popstate' && delta) {
         history.go(delta);
       } else {
-        await goto(to.url, { replaceState: type === 'popstate' });
+        await goto(to.url, { replace: type === 'popstate' });
       }
     })();
   });
