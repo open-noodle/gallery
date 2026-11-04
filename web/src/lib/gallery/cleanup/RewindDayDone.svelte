@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { celebrate } from '$lib/gallery/motion';
-  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
-  import { getByteUnitString } from '$lib/utils/byte-units';
+  import { celebrate } from '#lib/gallery/motion/index.ts';
+  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { Button } from '@immich/ui';
   import { mdiArrowRight } from '@mdi/js';
   import { onMount } from 'svelte';

@@ -43,7 +43,7 @@
   } from '@immich/sdk';
   import { CommandPaletteDefaultProvider } from '@immich/ui';
   import { onDestroy, onMount, untrack } from 'svelte';
-  import { useViewerZoom } from '$lib/gallery/motion/viewer-zoom';
+  import { useViewerZoom } from '#lib/gallery/motion/viewer-zoom.ts';
   import type { SwipeCustomEvent } from 'svelte-gestures';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
@@ -55,8 +55,8 @@
   import TrimArea from './editor/trim-tool/trim-area.svelte';
   import CropArea from './editor/transform-tool/CropArea.svelte';
   import ImagePanoramaViewer from './ImagePanoramaViewer.svelte';
-  import SpatialSceneViewer from '$lib/gallery/spatial/SpatialSceneViewer.svelte';
-  import { spatialSceneState } from '$lib/gallery/spatial/spatial-scene.svelte';
+  import SpatialSceneViewer from '#lib/gallery/spatial/SpatialSceneViewer.svelte';
+  import { spatialSceneState } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
   import OcrButton from './OcrButton.svelte';
   import PhotoViewer from './PhotoViewer.svelte';
   import SlideshowBar from './SlideshowBar.svelte';

@@ -1,11 +1,10 @@
-import { beforeNavigate, onNavigate } from '$app/navigation';
 import { crossfadeNavigation } from '#lib/gallery/motion/page-transition.ts';
 import { installPressFeedback } from '#lib/gallery/motion/press.ts';
 import { installThumbnailLift } from '#lib/gallery/motion/thumbnail-lift.ts';
 import { installTilt } from '#lib/gallery/motion/tilt.ts';
 import { installViewerZoom, viewerZoomBeforeNavigate } from '#lib/gallery/motion/viewer-zoom.ts';
 import { onMount } from 'svelte';
-import { onNavigate } from '$app/navigation';
+import { beforeNavigate, onNavigate } from '$app/navigation';
 
 export { celebrate, pop, pulse } from '#lib/gallery/motion/celebrate.ts';
 export { countMotion, flipMotion, slideFrom, staggerDelay, type ListMotion } from '#lib/gallery/motion/list.ts';

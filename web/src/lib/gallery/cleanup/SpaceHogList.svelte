@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { flipMotion } from '$lib/gallery/motion';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
   import { flip } from 'svelte/animate';
-  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
-  import { getByteUnitString } from '$lib/utils/byte-units';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
   import { Button, Card } from '@immich/ui';
   import { Duration } from 'luxon';
@@ -46,7 +46,7 @@
 <Card data-testid="cleanup-hog-list">
   <div class="divide-y">
     {#each items as item (item.id)}
-      {@const busy = busyIds?.has(item.id) ?? false}
+      {const busy = $derived(busyIds?.has(item.id) ?? false)}
       <div
         animate:flip={flipMotion()}
         class="grid grid-cols-[60px_minmax(0,1fr)_auto] items-center gap-3.5 px-3.5 py-2.5 md:grid-cols-[72px_minmax(0,1fr)_200px_auto] {focusedId ===

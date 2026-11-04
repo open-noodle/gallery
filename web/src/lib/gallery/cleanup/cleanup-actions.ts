@@ -1,3 +1,7 @@
+import { chunk } from '#lib/gallery/cleanup/cleanup.ts';
+import { animateRemoval, type RemovalKind } from '#lib/gallery/motion/index.ts';
+import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import {
   commitCleanup,
   createStack,
@@ -9,10 +13,6 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import { chunk } from '$lib/gallery/cleanup/cleanup';
-import { animateRemoval, type RemovalKind } from '$lib/gallery/motion';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { handleError } from '$lib/utils/handle-error';
 
 /** The server rejects a commit or in-spaces list longer than this. */
 export const CLEANUP_MAX_IDS = 1000;
@@ -28,34 +28,34 @@ export type CleanupCommitResult = {
 type OnIds = (ids: string[]) => void;
 
 /**
- * Whether Cleanup's "trash" is the recoverable trash. With the server's trash turned off, the
- * commit endpoint deletes permanently instead (the duplicates utility does the same), so every
- * trash action asks for a "permanently delete" confirmation and never offers Undo.
- */
+Whether Cleanup's "trash" is the recoverable trash. With the server's trash turned off, the
+commit endpoint deletes permanently instead (the duplicates utility does the same), so every
+trash action asks for a "permanently delete" confirmation and never offers Undo.
+*/
 export const isTrashEnabled = () => featureFlagsManager.value.trash;
 
 /**
- * Sends the trashed photos off screen: into the sidebar's Trash link, or dissolving in place when
- * the trash is off and the delete is permanent. Call it before the photos leave the DOM.
- */
+Sends the trashed photos off screen: into the sidebar's Trash link, or dissolving in place when
+the trash is off and the delete is permanent. Call it before the photos leave the DOM.
+*/
 export const animateCleanupRemoval = (ids: string[]) => {
   const kind: RemovalKind = isTrashEnabled() ? 'trash' : 'delete';
   animateRemoval(ids, kind);
 };
 
 /**
- * Confirms a Cleanup trash before anything is committed.
- *
- * - Trashing an owned photo that is also in a shared space removes it for the space's members too,
- *   so the server is asked which of `ids` are in a space; if any are, the user confirms.
- * - A photo from an external library comes back at the library's next scan when Gallery can only read
- *   its folder, so the same lookup returns those ids and the user confirms with a sentence about it.
- * - With the trash turned off the delete is permanent, so the user always confirms, with the Space and
- *   external-library sentences added when they apply.
- *
- * Resolves to true when the trash may go ahead. Throws when the lookup fails, so callers never
- * trash without having checked.
- */
+Confirms a Cleanup trash before anything is committed.
+
+- Trashing an owned photo that is also in a shared space removes it for the space's members too,
+  so the server is asked which of `ids` are in a space; if any are, the user confirms.
+- A photo from an external library comes back at the library's next scan when Gallery can only read
+  its folder, so the same lookup returns those ids and the user confirms with a sentence about it.
+- With the trash turned off the delete is permanent, so the user always confirms, with the Space and
+  external-library sentences added when they apply.
+
+Resolves to true when the trash may go ahead. Throws when the lookup fails, so callers never
+trash without having checked.
+*/
 export const confirmCleanupTrash = async (ids: string[]): Promise<boolean> => {
   if (ids.length === 0) {
     return true;
@@ -100,10 +100,10 @@ export const confirmCleanupTrash = async (ids: string[]): Promise<boolean> => {
 };
 
 /**
- * Reports what a Cleanup commit removed. A trash gets a 5-second Undo that restores exactly the
- * ids the server trashed; a permanent delete (trash turned off) has nothing to restore, so it gets
- * a plain notice and no Undo.
- */
+Reports what a Cleanup commit removed. A trash gets a 5-second Undo that restores exactly the
+ids the server trashed; a permanent delete (trash turned off) has nothing to restore, so it gets
+a plain notice and no Undo.
+*/
 export const showRemovedToast = (removed: string[], onRestored?: OnIds) => {
   if (removed.length === 0) {
     return;
@@ -134,13 +134,13 @@ export const showRemovedToast = (removed: string[], onRestored?: OnIds) => {
 };
 
 /**
- * Sends one queue decision — photos to trash and photos to keep — through `POST /cleanup/commit`,
- * split into requests of at most 1,000 ids per list. Anything trashed is reported through
- * `onRemoved` and `showRemovedToast`: an Undo toast, or a permanent-delete notice with the trash off.
- *
- * Resolves to undefined when the user cancels the confirmation or the check itself fails; in both
- * cases nothing has been committed.
- */
+Sends one queue decision — photos to trash and photos to keep — through `POST /cleanup/commit`,
+split into requests of at most 1,000 ids per list. Anything trashed is reported through
+`onRemoved` and `showRemovedToast`: an Undo toast, or a permanent-delete notice with the trash off.
+
+Resolves to undefined when the user cancels the confirmation or the check itself fails; in both
+cases nothing has been committed.
+*/
 export const commitWithUndo = async (
   queue: CleanupQueue,
   { trashIds = [], keepIds = [] }: { trashIds?: string[]; keepIds?: string[] },

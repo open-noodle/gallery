@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { shortcuts } from '$lib/actions/shortcut';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import { queueShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
-  import QueueSelectGrid from '$lib/gallery/cleanup/QueueSelectGrid.svelte';
-  import CleanupPhotoWindow from '$lib/gallery/cleanup/CleanupPhotoWindow.svelte';
-  import { TILE_SIZES, tileSize, type TileSize } from '$lib/gallery/cleanup/tile-size';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { CleanupQueuePager, type Removed } from '$lib/gallery/cleanup/cleanup-queue-pager.svelte';
-  import { keep, trashWithUndo } from '$lib/gallery/cleanup/cleanup-actions';
-  import { CLEANUP_SDK_QUEUES } from '$lib/gallery/cleanup/cleanup';
-  import { handleError } from '$lib/utils/handle-error';
-  import { navigate } from '$lib/utils/navigation';
+  import { shortcuts } from '#lib/actions/shortcut.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
+  import QueueSelectGrid from '#lib/gallery/cleanup/QueueSelectGrid.svelte';
+  import CleanupPhotoWindow from '#lib/gallery/cleanup/CleanupPhotoWindow.svelte';
+  import { TILE_SIZES, tileSize, type TileSize } from '#lib/gallery/cleanup/tile-size.ts';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
+  import { keep, trashWithUndo } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { CLEANUP_SDK_QUEUES } from '#lib/gallery/cleanup/cleanup.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { navigate } from '#lib/utils/navigation.ts';
   import {
     CleanupBlurReason,
     CleanupStrictness,
@@ -291,7 +291,7 @@
     <div class="flex flex-wrap items-center gap-3 px-3.5 py-2.5">
       <div class="flex flex-wrap gap-2" role="group">
         {#each REASONS as option (option.reason)}
-          {@const active = reason === option.reason}
+          {const active = $derived(reason === option.reason)}
           <button
             type="button"
             class="{chip} {active

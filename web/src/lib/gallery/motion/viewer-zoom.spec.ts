@@ -1,4 +1,4 @@
-import { estimateTarget, installViewerZoom, transformBetween } from '$lib/gallery/motion/viewer-zoom';
+import { estimateTarget, installViewerZoom, transformBetween } from '#lib/gallery/motion/viewer-zoom.ts';
 
 describe('estimateTarget', () => {
   const viewport = { width: 1000, height: 800 };

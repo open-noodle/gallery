@@ -1,4 +1,4 @@
-import { TILE_MIN_WIDTH, tileSize } from '$lib/gallery/cleanup/tile-size';
+import { TILE_MIN_WIDTH, tileSize } from '#lib/gallery/cleanup/tile-size.ts';
 
 describe('tileSize', () => {
   beforeEach(() => localStorage.clear());

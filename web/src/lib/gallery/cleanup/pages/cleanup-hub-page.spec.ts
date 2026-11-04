@@ -1,11 +1,11 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { todayMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
+import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
+import { pop } from '#lib/gallery/motion/index.ts';
 import { CleanupCountQueue, type CleanupCountResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { todayMonthDay } from '$lib/gallery/cleanup/cleanup';
-import { finishedDay } from '$lib/gallery/cleanup/finished-day';
-import { pop } from '$lib/gallery/motion';
 import CleanupPage from './CleanupHubPage.svelte';
 
 const sdk = vi.hoisted(() => ({
@@ -18,15 +18,18 @@ const sdk = vi.hoisted(() => ({
 }));
 const flags = vi.hoisted(() => ({ value: { trash: true } }));
 
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: flags }));
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: flags }));
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...sdk }));
-vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pop: vi.fn() }));
+vi.mock('#lib/gallery/motion/index.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  pop: vi.fn(),
+}));
 
 // The hub pins a slim banner once the full one has scrolled away; tests drive the observer by hand.
 const observers = vi.hoisted(() => ({ callbacks: [] as IntersectionObserverCallback[] }));
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 

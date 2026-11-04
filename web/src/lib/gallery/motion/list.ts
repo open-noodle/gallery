@@ -1,5 +1,5 @@
+import { duration, prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
 import { quintOut } from 'svelte/easing';
-import { duration, prefersReducedMotion } from '$lib/gallery/motion/tokens';
 
 /** Svelte `animate:` / `Tween` options: an easing function, not a CSS curve. */
 export interface ListMotion {
@@ -8,9 +8,9 @@ export interface ListMotion {
 }
 
 /**
- * `animate:flip` for a grid or list that loses items: the rest slide into the gap on the settle
- * curve (quintOut is the JS twin of `ease.settle`). Instant under reduced motion.
- */
+`animate:flip` for a grid or list that loses items: the rest slide into the gap on the settle
+curve (quintOut is the JS twin of `ease.settle`). Instant under reduced motion.
+*/
 export const flipMotion = (): ListMotion =>
   prefersReducedMotion() ? { duration: 0 } : { duration: duration.slow, easing: quintOut };
 
@@ -23,9 +23,9 @@ export const staggerDelay = (index: number, stepMs = 40, maxTotalMs = 360): stri
   prefersReducedMotion() ? '0ms' : `${Math.min(index * stepMs, maxTotalMs)}ms`;
 
 /**
- * Keyframes for content arriving from the direction of travel: 1 (forward, a later day or the next photo)
- * comes in from the right, -1 from the left. Empty (no animation) for 0 and under reduced motion.
- */
+Keyframes for content arriving from the direction of travel: 1 (forward, a later day or the next photo)
+comes in from the right, -1 from the left. Empty (no animation) for 0 and under reduced motion.
+*/
 export const slideFrom = (direction: -1 | 0 | 1, distancePx = 12): Keyframe[] =>
   prefersReducedMotion() || direction === 0
     ? []

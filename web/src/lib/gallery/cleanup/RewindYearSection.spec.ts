@@ -1,10 +1,13 @@
+import RewindYearSection from '#lib/gallery/cleanup/RewindYearSection.svelte';
+import type { RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
+import { pop } from '#lib/gallery/motion/index.ts';
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import RewindYearSection from '$lib/gallery/cleanup/RewindYearSection.svelte';
-import type { RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
-import { pop } from '$lib/gallery/motion';
 
-vi.mock('$lib/gallery/motion', async (importOriginal) => ({ ...(await importOriginal<object>()), pop: vi.fn() }));
+vi.mock('#lib/gallery/motion/index.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  pop: vi.fn(),
+}));
 
 const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,

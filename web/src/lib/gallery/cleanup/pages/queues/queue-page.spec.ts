@@ -1,3 +1,4 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
 import {
   AssetTypeEnum,
   CleanupBurstSource,
@@ -9,7 +10,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { addMessages } from 'svelte-i18n';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import BurstsQueue from './BurstsQueue.svelte';
 import SelectQueue from './SelectQueue.svelte';
 import SpaceHogsQueue from './SpaceHogsQueue.svelte';
@@ -41,13 +41,13 @@ vi.mock('@immich/ui', async (importOriginal) => {
     isModalOpen: mocks.isModalOpen,
   };
 });
-vi.mock('$lib/utils/navigation', async (importOriginal) => ({
+vi.mock('#lib/utils/navigation.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   navigate: mocks.navigate,
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mocks.auth }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
-vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({
+vi.mock('#lib/managers/auth-manager.svelte.js', () => ({ authManager: mocks.auth }));
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: mocks.flags }));
+vi.mock('#lib/managers/AssetCacheManager.svelte.js', () => ({
   assetCacheManager: { getAsset: () => Promise.resolve(undefined) },
 }));
 

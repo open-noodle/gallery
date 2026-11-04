@@ -1,5 +1,5 @@
+import { RewindSession } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
 import { CleanupQueue, CleanupSkipReason } from '@immich/sdk';
-import { RewindSession } from '$lib/gallery/cleanup/rewind-session.svelte';
 
 const ok = (trashed: string[] = []) => ({ trashed, favorited: 0, kept: 0, skipped: [] });
 

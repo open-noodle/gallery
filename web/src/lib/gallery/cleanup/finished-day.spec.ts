@@ -1,4 +1,4 @@
-import { finishedDay } from '$lib/gallery/cleanup/finished-day';
+import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
 
 describe('finishedDay', () => {
   it('hands the finished date over once', () => {

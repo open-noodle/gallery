@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { flipMotion } from '$lib/gallery/motion';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
   import { flip } from 'svelte/animate';
-  import { shortcuts } from '$lib/actions/shortcut';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import BurstGroupCard from '$lib/gallery/cleanup/BurstGroupCard.svelte';
-  import CleanupPhotoWindow from '$lib/gallery/cleanup/CleanupPhotoWindow.svelte';
-  import { queueShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
-  import FormatMessage from '$lib/elements/FormatMessage.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { CleanupQueuePager, type Removed } from '$lib/gallery/cleanup/cleanup-queue-pager.svelte';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { commitWithUndo, stackGroup } from '$lib/gallery/cleanup/cleanup-actions';
-  import { burstDecision, burstMarkOf, CLEANUP_SDK_QUEUES, type BurstMark } from '$lib/gallery/cleanup/cleanup';
-  import { handleError } from '$lib/utils/handle-error';
-  import { navigate } from '$lib/utils/navigation';
+  import { shortcuts } from '#lib/actions/shortcut.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import BurstGroupCard from '#lib/gallery/cleanup/BurstGroupCard.svelte';
+  import CleanupPhotoWindow from '#lib/gallery/cleanup/CleanupPhotoWindow.svelte';
+  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
+  import FormatMessage from '#lib/elements/FormatMessage.svelte';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { commitWithUndo, stackGroup } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { burstDecision, burstMarkOf, CLEANUP_SDK_QUEUES, type BurstMark } from '#lib/gallery/cleanup/cleanup.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { navigate } from '#lib/utils/navigation.ts';
   import { getCleanupQueueCount, type CleanupBurstGroupDto, type CleanupCountResponseDto } from '@immich/sdk';
   import { Button, isModalOpen } from '@immich/ui';
   import { onMount } from 'svelte';
@@ -82,9 +82,9 @@
   };
 
   /**
-   * After an undo, a group comes back with only its restored photos (the kept ones stay kept, so
-   * the server leaves them out of bursts from now on), and only while it still has two or more.
-   */
+  After an undo, a group comes back with only its restored photos (the kept ones stay kept, so
+  the server leaves them out of bursts from now on), and only while it still has two or more.
+  */
   const restoreGroups = (removed: Removed<CleanupBurstGroupDto>[], restoredIds: string[]) => {
     const restored = new Set(restoredIds);
     const entries = removed.flatMap(({ item, index }) => {
@@ -95,7 +95,7 @@
       const suggestedKeepId = assets.some((asset) => asset.id === item.suggestedKeepId)
         ? item.suggestedKeepId
         : assets[0].id;
-      return [{ index, item: { ...item, assets, suggestedKeepId } }];
+      return { index, item: { ...item, assets, suggestedKeepId } };
     });
     pager.restoreGroups(entries);
   };
@@ -356,7 +356,7 @@
 {/each}
 
 {#if photoWindow && windowGroup}
-  {@const series = windowGroup}
+  {const series = $derived(windowGroup)}
   <CleanupPhotoWindow
     items={() => series.assets}
     startId={photoWindow.id}

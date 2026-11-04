@@ -1,4 +1,4 @@
-import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
+import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
 import { match } from '../../../params/cleanupQueue';
 
 describe('cleanup routes', () => {

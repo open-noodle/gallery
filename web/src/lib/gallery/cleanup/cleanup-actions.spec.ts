@@ -1,11 +1,11 @@
-import { CleanupQueue, CleanupSkipReason } from '@immich/sdk';
 import {
   commitWithUndo,
   confirmCleanupTrash,
   keep,
   stackGroup,
   trashWithUndo,
-} from '$lib/gallery/cleanup/cleanup-actions';
+} from '#lib/gallery/cleanup/cleanup-actions.ts';
+import { CleanupQueue, CleanupSkipReason } from '@immich/sdk';
 
 const mocks = vi.hoisted(() => ({
   sdk: {
@@ -26,11 +26,11 @@ vi.mock('@immich/ui', () => ({
   toastManager: mocks.toast,
   modalManager: { showDialog: mocks.showDialog },
 }));
-vi.mock('$lib/utils/handle-error', () => ({ handleError: mocks.handleError }));
-vi.mock('$lib/gallery/motion', () => ({ animateRemoval: mocks.animateRemoval }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
+vi.mock('#lib/utils/handle-error.js', () => ({ handleError: mocks.handleError }));
+vi.mock('#lib/gallery/motion/index.js', () => ({ animateRemoval: mocks.animateRemoval }));
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: mocks.flags }));
 
-const ids = (count: number, prefix = 'id') => Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
+const ids = (count: number) => Array.from({ length: count }, (_, i) => `id-${i}`);
 
 describe('cleanup actions', () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
-  import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
+  import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
+  import SettingSwitch from '#lib/components/shared-components/settings/SettingSwitch.svelte';
   import type { AdminConfigDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   // the select lives beside the settings page it was written for; nothing in $lib exports one

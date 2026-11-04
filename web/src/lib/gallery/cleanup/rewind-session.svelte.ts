@@ -1,6 +1,6 @@
+import { chunk } from '#lib/gallery/cleanup/cleanup.ts';
 import { CleanupQueue, type CleanupCommitDto, type CleanupCommitResponseDto } from '@immich/sdk';
 import { SvelteMap } from 'svelte/reactivity';
-import { chunk } from '$lib/gallery/cleanup/cleanup';
 
 export type RewindMark = 'keep' | 'fav' | 'trash';
 export type RewindCommitResult = { trashed: string[]; skipped: number };
@@ -12,9 +12,9 @@ const CYCLE: Array<RewindMark | undefined> = [undefined, 'keep', 'fav', 'trash']
 const MAX_IDS = 1000;
 
 /**
- * Holds the local keep / favourite / trash marks of one rewind date. Nothing reaches the server
- * until `commitTrash` or `finishDay`, so marking is cheap and every step can be undone.
- */
+Holds the local keep / favourite / trash marks of one rewind date. Nothing reaches the server
+until `commitTrash` or `finishDay`, so marking is cheap and every step can be undone.
+*/
 export class RewindSession {
   readonly marks = new SvelteMap<string, RewindMark>();
   focusedId = $state<string | null>(null);

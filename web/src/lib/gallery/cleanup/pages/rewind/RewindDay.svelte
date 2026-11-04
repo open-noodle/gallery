@@ -1,29 +1,33 @@
 <script lang="ts">
-  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { shortcuts } from '$lib/actions/shortcut';
-  import OnEvents from '$lib/components/OnEvents.svelte';
-  import { cleanupShortcuts } from '$lib/gallery/cleanup/cleanup-shortcuts';
-  import RewindOneAtATime from '$lib/gallery/cleanup/RewindOneAtATime.svelte';
-  import RewindYearSection from '$lib/gallery/cleanup/RewindYearSection.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { RewindSession, type RewindMark } from '$lib/gallery/cleanup/rewind-session.svelte';
-  import FormatMessage from '$lib/elements/FormatMessage.svelte';
-  import { slideMotion } from '$lib/components/filter-panel/motion';
-  import RewindDayDone from '$lib/gallery/cleanup/RewindDayDone.svelte';
-  import RewindExplainer from '$lib/gallery/cleanup/RewindExplainer.svelte';
-  import { explainerSeen, tapHintDone } from '$lib/gallery/cleanup/explainer-seen';
-  import { finishedDay } from '$lib/gallery/cleanup/finished-day';
-  import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
-  import { prefersReducedMotion } from '$lib/gallery/motion/tokens';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '$lib/gallery/motion';
-  import CleanupFinishButton from '$lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
-  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-  import { Route } from '$lib/route';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { animateCleanupRemoval, confirmCleanupTrash, showRemovedToast } from '$lib/gallery/cleanup/cleanup-actions';
+  import { shortcuts } from '#lib/actions/shortcut.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import { cleanupShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
+  import RewindOneAtATime from '#lib/gallery/cleanup/RewindOneAtATime.svelte';
+  import RewindYearSection from '#lib/gallery/cleanup/RewindYearSection.svelte';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { RewindSession, type RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
+  import FormatMessage from '#lib/elements/FormatMessage.svelte';
+  import { slideMotion } from '#lib/components/filter-panel/motion.ts';
+  import RewindDayDone from '#lib/gallery/cleanup/RewindDayDone.svelte';
+  import RewindExplainer from '#lib/gallery/cleanup/RewindExplainer.svelte';
+  import { explainerSeen, tapHintDone } from '#lib/gallery/cleanup/explainer-seen.ts';
+  import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
+  import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
+  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '#lib/gallery/motion/index.ts';
+  import CleanupFinishButton from '#lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
+  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+  import { Route } from '#lib/route.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import {
+    animateCleanupRemoval,
+    confirmCleanupTrash,
+    showRemovedToast,
+  } from '#lib/gallery/cleanup/cleanup-actions.ts';
   import {
     browserTimeZone,
     burstMemberIds,
@@ -32,9 +36,9 @@
     monthDayShortLabel,
     nextUnreviewedDay,
     shiftMonthDay,
-  } from '$lib/gallery/cleanup/cleanup';
-  import { handleError } from '$lib/utils/handle-error';
-  import { navigate } from '$lib/utils/navigation';
+  } from '#lib/gallery/cleanup/cleanup.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { navigate } from '#lib/utils/navigation.ts';
   import {
     AssetMediaSize,
     AssetTypeEnum,
@@ -343,11 +347,11 @@
   const trashMarkedIds = () => [...session.marks].filter(([, mark]) => mark === 'trash').map(([id]) => id);
 
   /**
-   * Trashing a photo that is also in a shared space removes it for the space's members too, and
-   * with the server's trash turned off the delete is permanent, so the user confirms either first.
-   * Resolves to false when they cancel or the check fails; nothing has been committed then, and
-   * the marks stay.
-   */
+  Trashing a photo that is also in a shared space removes it for the space's members too, and
+  with the server's trash turned off the delete is permanent, so the user confirms either first.
+  Resolves to false when they cancel or the check fails; nothing has been committed then, and
+  the marks stay.
+  */
   const confirmTrash = async () => {
     const ids = trashMarkedIds();
     if (ids.length === 0) {
@@ -804,7 +808,7 @@
         total={flat.length}
         upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
         marks={session.marks}
-        inBurst={current ? burstIds.has(current.id) : false}
+        inBurst={!!current && burstIds.has(current.id)}
         onTrash={() => markCurrent('trash')}
         onSkip={() => step(1)}
         onFavorite={() => markCurrent('fav')}

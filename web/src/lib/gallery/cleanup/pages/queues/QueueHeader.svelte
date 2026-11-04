@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
-  import { Route } from '$lib/route';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import { Route } from '#lib/route.ts';
   import { Breadcrumbs, Heading, Text } from '@immich/ui';
   import { mdiSlashForward } from '@mdi/js';
   import type { Snippet } from 'svelte';

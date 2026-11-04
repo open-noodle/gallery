@@ -1,4 +1,4 @@
-import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
+import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
 
 describe('rewindDirection', () => {
   it('hands the direction over once, and 0 when nothing was set', () => {

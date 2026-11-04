@@ -1,5 +1,5 @@
-import { countMotion, flipMotion, slideFrom, staggerDelay } from '$lib/gallery/motion/list';
-import { duration } from '$lib/gallery/motion/tokens';
+import { countMotion, flipMotion, slideFrom, staggerDelay } from '#lib/gallery/motion/list.ts';
+import { duration } from '#lib/gallery/motion/tokens.ts';
 
 const stubReducedMotion = (reduce: boolean) =>
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: reduce && query.includes('reduce') }));

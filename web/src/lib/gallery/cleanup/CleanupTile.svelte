@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Thumbhash from '$lib/components/Thumbhash.svelte';
-  import { getAssetMediaUrl } from '$lib/utils';
+  import Thumbhash from '#lib/components/Thumbhash.svelte';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize } from '@immich/sdk';
   import { Duration } from 'luxon';
   import type { Snippet } from 'svelte';
