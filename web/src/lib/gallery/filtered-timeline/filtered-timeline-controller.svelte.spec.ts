@@ -4,13 +4,13 @@ import {
   type FilterPanelConfig,
   type FilterState,
 } from '#lib/components/filter-panel/filter-panel.ts';
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import type { TimelineManagerOptions } from '#lib/managers/timeline-manager/types.ts';
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
 import { factory } from '#test/unit/factories.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import { flushSync } from 'svelte';
 import { createAlbumTimeline } from './album-timeline';
@@ -27,7 +27,7 @@ const { gotoMock, registerSelectionContextMock, topVisibleAnchorMock } = vi.hois
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({

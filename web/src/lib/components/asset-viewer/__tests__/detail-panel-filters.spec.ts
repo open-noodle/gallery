@@ -1,7 +1,7 @@
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
@@ -35,7 +35,7 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 // different URL per test the way driving four different FilterTarget surfaces requires. See
 // reactive-page.mock.svelte.ts's own docs for why this needs to be the shared $state stand-in.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -71,17 +71,17 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 
 // The embedded map is a dynamic import; the stub exposes its "open in map view" control as a button.
 vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/map-component.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 

@@ -81,7 +81,7 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 }));
 
 vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/map-component.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -89,52 +89,52 @@ vi.mock('#lib/components/shared-components/map/Map.svelte', async () => {
 // attributes) rather than the plain noop, so the editability-propagation tests below can assert
 // on what DetailPanel actually threaded down to each row.
 vi.mock('#lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/detail-panel-row-probe.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/faces-page/person-side-panel.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/shared-components/LoadingSpinner.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 

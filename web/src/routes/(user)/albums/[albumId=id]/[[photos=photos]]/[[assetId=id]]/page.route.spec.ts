@@ -1,6 +1,7 @@
 import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
@@ -8,7 +9,6 @@ import { queryClient } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { factory } from '#test/unit/factories.ts';
 import { defaultUserConfig } from '#test/unit/gallery-config-defaults.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { AlbumUserRole, AssetOrder } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -39,7 +39,7 @@ vi.mock('$app/navigation', () => ({
 // The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
 // what the page's $effect sees.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 
@@ -49,7 +49,7 @@ vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
 });
 
 vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/smart-search-results.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 

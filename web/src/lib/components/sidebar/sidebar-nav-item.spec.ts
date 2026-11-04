@@ -1,5 +1,5 @@
 import SidebarNavItem from '#lib/components/sidebar/sidebar-nav-item.svelte';
-import { reactiveProps } from '#test/unit/reactive-props.svelte.ts';
+import { reactiveProps } from '#lib/gallery/__mocks__/reactive-props.svelte.ts';
 import { mdiImageMultiple } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';

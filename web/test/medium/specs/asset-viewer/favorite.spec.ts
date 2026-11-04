@@ -17,6 +17,7 @@ test('favorite and unfavorite an asset from the viewer by button and shortcut', 
   await page.keyboard.press('f');
   await expect(app.viewer.unfavoriteButton).toBeVisible();
 
-  expect(api.updateAsset).toHaveBeenCalledWith({ params: { id: asset.id }, body: { isFavorite: true } });
-  expect(api.updateAsset).toHaveBeenCalledWith({ params: { id: asset.id }, body: { isFavorite: false } });
+  // Gallery: favorites are per user, written through updateAssetFavorites.
+  expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: true } });
+  expect(api.updateAssetFavorites).toHaveBeenCalledWith({ body: { ids: [asset.id], isFavorite: false } });
 });

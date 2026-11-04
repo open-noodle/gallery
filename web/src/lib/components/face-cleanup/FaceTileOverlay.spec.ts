@@ -1,5 +1,5 @@
 import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
-import StopPropagationHost from '#test/unit/mocks/face-tile-overlay-stop-propagation.host.stub.svelte';
+import StopPropagationHost from '#lib/gallery/__mocks__/face-tile-overlay-stop-propagation.host.stub.svelte';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';

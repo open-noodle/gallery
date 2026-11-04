@@ -2,10 +2,10 @@ import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
-import { reactivePageMock } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   SharedSpaceRole,
   type PeopleFaceStatisticsResponseDto,
@@ -47,7 +47,7 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({

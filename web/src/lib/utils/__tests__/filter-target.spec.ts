@@ -1,4 +1,5 @@
 import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import {
   applyContextualFilter,
   buildContextualFilterUrl,
@@ -9,7 +10,6 @@ import {
   resolveFilterTarget,
 } from '#lib/utils/filter-target.ts';
 import { getPhotosPersonFilterId } from '#lib/utils/photos-filter-options.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn().mockResolvedValue(undefined) }));
@@ -21,7 +21,7 @@ vi.mock('$app/navigation', () => ({
 // applyContextualFilter reads the reactive `page` from `$app/state` — see reactive-page.mock's own
 // docs for why this needs to be a real $state object rather than a plain vi.hoisted literal.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 

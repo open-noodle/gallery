@@ -46,27 +46,27 @@ vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
 // Written out one by one on purpose: vi.mock is hoisted to the top of the module and
 // needs a literal path, so a loop over an array of paths silently fails to mock anything.
 vi.mock('#lib/components/global-search/global-search-input-trigger.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/navigation-bar/NotificationPanel.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/navigation-bar/AccountInfoPanel.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 
 vi.mock('#lib/components/shared-components/ThemeButton.svelte', async () => {
-  const module = await import('#test/unit/mocks/noop-component.svelte');
+  const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
 });
 

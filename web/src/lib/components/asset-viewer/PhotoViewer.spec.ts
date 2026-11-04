@@ -43,22 +43,22 @@ vi.mock('#lib/stores/ocr.svelte.js', () => ({
 vi.mock('#lib/actions/zoom-image.js', () => ({ zoomImageAction: () => ({}) }));
 
 vi.mock('#lib/components/AssetViewerEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/AdaptiveImage.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/face-editor.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/space-face-editor.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/space-face-editor.stub.svelte');
   return { default: MockComponent };
 });
 

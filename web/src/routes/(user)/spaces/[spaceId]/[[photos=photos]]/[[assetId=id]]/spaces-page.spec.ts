@@ -1,12 +1,12 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
 import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { lang } from '#lib/stores/preferences.store.ts';
 import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
-import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { AssetTypeEnum, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
 import '@testing-library/jest-dom';
@@ -57,7 +57,7 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAll
 // after render (back/forward, or the `?at=` write from closing the asset viewer) would assert
 // against a page that never re-hydrated, and would pass whether or not the bug is present.
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 
@@ -84,32 +84,32 @@ vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
 });
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/filter-panel/filter-panel.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/bindable-filter-panel.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/bindable-filter-panel.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/filter-panel/active-filters-bar.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/active-filters-bar-actions.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/active-filters-bar-actions.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/filter-panel/search-sort-dropdown.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/filter-panel/sort-toggle.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/sort-toggle.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/sort-toggle.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/search/smart-search-results.svelte', async () => {
-  const { default: MockComponent } = await import('#test/unit/mocks/smart-search-results.stub.svelte');
+  const { default: MockComponent } = await import('#lib/gallery/__mocks__/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
 
