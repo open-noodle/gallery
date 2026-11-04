@@ -1,8 +1,8 @@
+import { websocketMock } from '#lib/gallery/__mocks__/websocket.mock.ts';
 import { EditManager, EditToolType } from '#lib/managers/edit/edit-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { factory } from '#test/unit/factories.ts';
-import { websocketMock } from '#lib/gallery/__mocks__/websocket.mock.ts';
 import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
