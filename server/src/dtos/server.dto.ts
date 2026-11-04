@@ -2,8 +2,8 @@ import { createZodDto } from 'nestjs-zod';
 import type { SemVer } from 'semver';
 import z from 'zod';
 import { ExtraModel, HistoryBuilder } from 'src/decorators.js';
-import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { ServerFeatureLevel, ServerFeatureLevelSchema } from 'src/enum.js';
+import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { isoDatetimeToDate } from 'src/validation.js';
 
 const ServerPingResponseSchema = z

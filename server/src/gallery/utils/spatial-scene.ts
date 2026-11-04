@@ -15,10 +15,10 @@ export const spatialSceneServerFeatures = (machineLearning: Parameters<typeof is
 });
 
 /**
- * Where a photo's depth map lives on the given backend: an absolute path on disk, a relative key on S3, which is the
- * form MediaService.persistFile stores for thumbnails. Deterministic, so the AssetDelete handler can find the file
- * after the cascade has already removed its row.
- */
+Where a photo's depth map lives on the given backend: an absolute path on disk, a relative key on S3, which is the
+form MediaService.persistFile stores for thumbnails. Deterministic, so the AssetDelete handler can find the file
+after the cascade has already removed its row.
+*/
 export const depthMapPath = (asset: { id: string; ownerId: string }, backend: StorageBackend) => {
   const fileName = `${asset.id}_depth.png`;
   return backend instanceof DiskStorageBackend
@@ -41,11 +41,11 @@ export type FaceBox = {
 };
 
 /**
- * Whether a photo with a depth map gets the Spatial button. Decided when the photo is opened, so a threshold change or
- * a face found later applies without reprocessing. Suitable means sharp depth edges around a subject (or many sharp
- * edges), or a person or pet face of a reasonable size: depth edges alone miss groups and people in rooms, where the
- * foreground split lands on the floor, and close portraits, which the foreground band rejects.
- */
+Whether a photo with a depth map gets the Spatial button. Decided when the photo is opened, so a threshold change or
+a face found later applies without reprocessing. Suitable means sharp depth edges around a subject (or many sharp
+edges), or a person or pet face of a reasonable size: depth edges alone miss groups and people in rooms, where the
+foreground split lands on the floor, and close portraits, which the foreground band rejects.
+*/
 export const isSpatialSceneOffered = (metrics: DepthMetrics, config: SpatialSceneConfig, faces: FaceBox[]) => {
   if (config.offer === 'all') {
     return true;

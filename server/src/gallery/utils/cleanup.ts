@@ -7,31 +7,31 @@ export const CLEANUP_BURST_CLIP_MAX_DISTANCE = 0.1;
 export const CLEANUP_BURST_MAX_EXTENSIONS = 10;
 export const CLEANUP_BURST_WINDOW = 2000;
 /**
- * Burst-window queries one bursts page may start. A library with few bursts would otherwise scan to
- * its end looking for `limit` groups (~250 windows at 500k assets). At ~13 ms per window query
- * (500k seed), 8 windows cost ~105 ms; the worst case — a burst still straddling the last window's
- * edge — adds up to `CLEANUP_BURST_MAX_EXTENSIONS` more, ~235 ms, still under the 300 ms budget. Past
- * the cap the page ends early (possibly empty) with a cursor, and the client asks for the next one.
- */
+Burst-window queries one bursts page may start. A library with few bursts would otherwise scan to
+its end looking for `limit` groups (~250 windows at 500k assets). At ~13 ms per window query
+(500k seed), 8 windows cost ~105 ms; the worst case — a burst still straddling the last window's
+edge — adds up to `CLEANUP_BURST_MAX_EXTENSIONS` more, ~235 ms, still under the 300 ms budget. Past
+the cap the page ends early (possibly empty) with a cursor, and the client asks for the next one.
+*/
 export const CLEANUP_BURST_MAX_WINDOWS_PER_PAGE = 8;
 export const CLEANUP_BLUR_THRESHOLDS = { lenient: 25, balanced: 60, strict: 110 } as const;
 export const CLEANUP_DARK = { maxBrightness: 35, minClippedDark: 0.5 } as const;
 export const CLEANUP_BRIGHT = { minClippedBright: 0.4 } as const;
 /**
- * Versions of the quality analysis, stamped on every `asset_quality` row. Bump one whenever the code it covers
- * changes what it outputs; `cleanup-analysis.pin.spec.ts` fails until you do. A bump re-runs only the stale part,
- * automatically at the next server start (`CleanupService.onBootstrap`); see "Changing the quality analysis" in
- * specs/2026-09-23-library-cleanup-design.md.
- *
- * - `CLEANUP_QUALITY_VERSION`: the pixel scores (`sharpness`, `brightness`, `clippedDark`, `clippedBright`):
- *   `readGreyscalePixels`, `CLEANUP_ANALYSIS_SIZE`, `laplacianVariance`, `exposureStats`. Re-running reads every
- *   image's preview again.
- * - `CLEANUP_SCREENSHOT_VERSION`: `isScreenshot`, from metadata only (`isScreenshotCandidate`,
- *   `CLEANUP_SCREENSHOT_PATTERNS`). Re-running reads no preview.
- *
- * Queue thresholds (`CLEANUP_BLUR_THRESHOLDS`, `CLEANUP_DARK`, `CLEANUP_BRIGHT`) apply at query time: changing one
- * needs no bump and no re-run.
- */
+Versions of the quality analysis, stamped on every `asset_quality` row. Bump one whenever the code it covers
+changes what it outputs; `cleanup-analysis.pin.spec.ts` fails until you do. A bump re-runs only the stale part,
+automatically at the next server start (`CleanupService.onBootstrap`); see "Changing the quality analysis" in
+specs/2026-09-23-library-cleanup-design.md.
+
+- `CLEANUP_QUALITY_VERSION`: the pixel scores (`sharpness`, `brightness`, `clippedDark`, `clippedBright`):
+  `readGreyscalePixels`, `CLEANUP_ANALYSIS_SIZE`, `laplacianVariance`, `exposureStats`. Re-running reads every
+  image's preview again.
+- `CLEANUP_SCREENSHOT_VERSION`: `isScreenshot`, from metadata only (`isScreenshotCandidate`,
+  `CLEANUP_SCREENSHOT_PATTERNS`). Re-running reads no preview.
+
+Queue thresholds (`CLEANUP_BLUR_THRESHOLDS`, `CLEANUP_DARK`, `CLEANUP_BRIGHT`) apply at query time: changing one
+needs no bump and no re-run.
+*/
 export const CLEANUP_QUALITY_VERSION = 1;
 export const CLEANUP_SCREENSHOT_VERSION = 1;
 export const CLEANUP_ANALYSIS_SIZE = 512;
@@ -42,10 +42,10 @@ export const CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE = 104_857_600;
 export type CleanupStrictnessValue = keyof typeof CLEANUP_BLUR_THRESHOLDS;
 
 /**
- * Blurry queue defaults, matching the page's own defaults. Shared by the service's list path
- * (`CleanupService.getQueue`) and the repository's `countBlurry`, so the hub card and the list page
- * can never silently drift apart on what "default" means.
- */
+Blurry queue defaults, matching the page's own defaults. Shared by the service's list path
+(`CleanupService.getQueue`) and the repository's `countBlurry`, so the hub card and the list page
+can never silently drift apart on what "default" means.
+*/
 export const CLEANUP_BLURRY_DEFAULTS = { strictness: 'balanced', reason: 'all', hideFaces: true } as const;
 
 export const CLEANUP_SCREENSHOT_PATTERNS =
@@ -210,13 +210,13 @@ export const suggestKeep = (group: BurstRow[]): string => {
 export type CleanupCursor = { v: Array<string | number> };
 
 /**
- * A `(localDateTime, id)` keyset cursor's timestamp: an ISO-8601 UTC string with up to microsecond
- * precision, as produced by `CLEANUP_CURSOR_T_SQL`. Anything else is rejected before it reaches SQL.
- *
- * A JS Date rolls impossible dates over (`2024-02-30` becomes 1 March), which PostgreSQL's
- * `::timestamptz` cast would then reject with a 500, so the parsed value must round-trip to the same
- * seconds. Cursors outside the years 0001-9999 are unsupported; EXIF cannot produce them in practice.
- */
+A `(localDateTime, id)` keyset cursor's timestamp: an ISO-8601 UTC string with up to microsecond
+precision, as produced by `CLEANUP_CURSOR_T_SQL`. Anything else is rejected before it reaches SQL.
+
+A JS Date rolls impossible dates over (`2024-02-30` becomes 1 March), which PostgreSQL's
+`::timestamptz` cast would then reject with a 500, so the parsed value must round-trip to the same
+seconds. Cursors outside the years 0001-9999 are unsupported; EXIF cannot produce them in practice.
+*/
 export const isCleanupCursorTimestamp = (value: string) => {
   if (!/^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(value)) {
     return false;
