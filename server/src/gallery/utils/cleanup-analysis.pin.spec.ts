@@ -14,16 +14,16 @@ import { readGreyscalePixels } from 'src/gallery/utils/image-quality.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 
 /**
- * Pins what the Library Cleanup quality analysis OUTPUTS, keyed by the version it is stamped with. Every
- * `asset_quality` row records the versions that computed it, and only a version bump re-runs the analysis
- * (`CleanupService.onBootstrap`): a change to the rule or the scores without a bump leaves every analysed asset
- * with the old result for good. This spec turns that into a failing test.
- *
- * When it fails because you changed the analysis on purpose: bump the version named in the message, then copy the
- * new results into the pinned expectation below together with the new version. Never update only the results.
- * Thresholds applied at query time (`CLEANUP_BLUR_THRESHOLDS`, `CLEANUP_DARK`, `CLEANUP_BRIGHT`) are not pinned:
- * they need no re-run. See "Changing the quality analysis" in specs/2026-09-23-library-cleanup-design.md.
- */
+Pins what the Library Cleanup quality analysis OUTPUTS, keyed by the version it is stamped with. Every
+`asset_quality` row records the versions that computed it, and only a version bump re-runs the analysis
+(`CleanupService.onBootstrap`): a change to the rule or the scores without a bump leaves every analysed asset
+with the old result for good. This spec turns that into a failing test.
+
+When it fails because you changed the analysis on purpose: bump the version named in the message, then copy the
+new results into the pinned expectation below together with the new version. Never update only the results.
+Thresholds applied at query time (`CLEANUP_BLUR_THRESHOLDS`, `CLEANUP_DARK`, `CLEANUP_BRIGHT`) are not pinned:
+they need no re-run. See "Changing the quality analysis" in specs/2026-09-23-library-cleanup-design.md.
+*/
 
 const SCREENSHOT_MESSAGE =
   'the screenshot rule changed: bump CLEANUP_SCREENSHOT_VERSION (src/gallery/utils/cleanup.ts) and update this expectation';
