@@ -1,6 +1,6 @@
+import SpaceMemberManagementSettings from '#lib/gallery/components/admin/space-member-management-settings.svelte';
 import type { AdminConfigServerDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import SpaceMemberManagementSettings from '$lib/gallery/components/admin/space-member-management-settings.svelte';
 
 const makeServer = () =>
   ({ spaceEditorsCanAddMembers: false, spaceEditorsCanChangeRoles: false }) as AdminConfigServerDto;

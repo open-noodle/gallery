@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { CleanupRoute } from '$lib/gallery/cleanup/cleanup-route';
-  import CleanupCalendar from '$lib/gallery/cleanup/CleanupCalendar.svelte';
-  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
-  import CleanupDayBanner from '$lib/gallery/cleanup/CleanupDayBanner.svelte';
-  import CleanupQuickWins from '$lib/gallery/cleanup/CleanupQuickWins.svelte';
-  import type { DayPeek } from '$lib/gallery/cleanup/day-peek';
-  import { finishedDay } from '$lib/gallery/cleanup/finished-day';
-  import { countMotion, staggerDelay } from '$lib/gallery/motion';
-  import { Route } from '$lib/route';
-  import { handleEmptyTrash } from '$lib/services/trash.service';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { browserTimeZone, busiestYear, dominantCity, todayMonthDay } from '$lib/gallery/cleanup/cleanup';
-  import { isTrashEnabled } from '$lib/gallery/cleanup/cleanup-actions';
-  import { handleError } from '$lib/utils/handle-error';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import CleanupCalendar from '#lib/gallery/cleanup/CleanupCalendar.svelte';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import CleanupDayBanner from '#lib/gallery/cleanup/CleanupDayBanner.svelte';
+  import CleanupQuickWins from '#lib/gallery/cleanup/CleanupQuickWins.svelte';
+  import type { DayPeek } from '#lib/gallery/cleanup/day-peek.ts';
+  import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
+  import { countMotion, staggerDelay } from '#lib/gallery/motion/index.ts';
+  import { Route } from '#lib/route.ts';
+  import { handleEmptyTrash } from '#lib/services/trash.service.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { browserTimeZone, busiestYear, dominantCity, todayMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
+  import { isTrashEnabled } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     CleanupCountQueue,
     CleanupListQueue,

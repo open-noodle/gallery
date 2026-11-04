@@ -1,10 +1,10 @@
-import { shortcuts } from '$lib/actions/shortcut';
+import { shortcuts } from '#lib/actions/shortcut.ts';
 import {
   cleanupShortcuts,
   queueShortcuts,
   type CleanupShortcutHandlers,
   type QueueShortcutHandlers,
-} from '$lib/gallery/cleanup/cleanup-shortcuts';
+} from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
 
 const makeHandlers = (): CleanupShortcutHandlers => ({
   keep: vi.fn(),
@@ -39,8 +39,11 @@ describe('cleanupShortcuts', () => {
     root.remove();
   });
 
-  const bind = (handlers: CleanupShortcutHandlers, isViewing = () => false) => {
-    const action = shortcuts(root, cleanupShortcuts(handlers, isViewing));
+  const bind = (handlers: CleanupShortcutHandlers) => {
+    const action = shortcuts(
+      root,
+      cleanupShortcuts(handlers, () => false),
+    );
     destroy = action?.destroy;
   };
 

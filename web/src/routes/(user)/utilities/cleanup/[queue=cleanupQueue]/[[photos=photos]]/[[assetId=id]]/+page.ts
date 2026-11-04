@@ -1,6 +1,6 @@
-import { slugToQueue, type CleanupQueueSlug } from '$lib/gallery/cleanup/cleanup';
-import { authenticate } from '$lib/utils/auth';
-import { getFormatter } from '$lib/utils/i18n';
+import { slugToQueue, type CleanupQueueSlug } from '#lib/gallery/cleanup/cleanup.ts';
+import { authenticate } from '#lib/utils/auth.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 import type { PageLoad } from './$types';
 
 // The queue page fetches its items itself, so a filter change can reset the list without a reload.
