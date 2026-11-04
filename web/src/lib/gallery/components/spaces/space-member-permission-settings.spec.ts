@@ -1,6 +1,6 @@
+import SpaceMemberPermissionSettings from '#lib/gallery/components/spaces/space-member-permission-settings.svelte';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import SpaceMemberPermissionSettings from '$lib/gallery/components/spaces/space-member-permission-settings.svelte';
 
 // The real @immich/ui Select wraps a bits-ui listbox that cannot be driven in jsdom; use the same stand-in the
 // members page spec uses (trigger named after the selected option, one click target per option).

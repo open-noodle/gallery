@@ -1,6 +1,6 @@
+import CleanupDayBanner from '#lib/gallery/cleanup/CleanupDayBanner.svelte';
 import type { CleanupAssetDto } from '@immich/sdk';
 import { render, screen, within } from '@testing-library/svelte';
-import CleanupDayBanner from '$lib/gallery/cleanup/CleanupDayBanner.svelte';
 
 const asset = (id: string) => ({ id, thumbhash: null, originalFileName: `${id}.jpg` }) as unknown as CleanupAssetDto;
 const assets = Array.from({ length: 14 }, (_, i) => asset(`a${i}`));

@@ -8,10 +8,10 @@ export const depthFromRgba = (rgba: Uint8ClampedArray) => {
 };
 
 /**
- * The still plane: the mean depth of the foreground, split from the background with Otsu's threshold, as the server
- * computes it. Keeping the subject still and moving the background behind it is the Apple look, and it moves the
- * stretching at the subject's edges into the background, where it is least visible. 0..1.
- */
+The still plane: the mean depth of the foreground, split from the background with Otsu's threshold, as the server
+computes it. Keeping the subject still and moving the background behind it is the Apple look, and it moves the
+stretching at the subject's edges into the background, where it is least visible. 0..1.
+*/
 export const subjectDepth = (depth: Uint8Array) => {
   const histogram = new Float64Array(256);
   for (const value of depth) {
@@ -53,9 +53,9 @@ export const subjectDepth = (depth: Uint8Array) => {
 };
 
 /**
- * Separable max filter: near (bright) edges grow outwards by `radius` pixels, so the shader never samples a sliver of
- * the subject at a background depth and smears it across the background.
- */
+Separable max filter: near (bright) edges grow outwards by `radius` pixels, so the shader never samples a sliver of
+the subject at a background depth and smears it across the background.
+*/
 export const dilate = (depth: Uint8Array, width: number, height: number, radius: number) => {
   if (radius <= 0) {
     return depth;
@@ -91,9 +91,9 @@ export const contain = (width: number, height: number, boxWidth: number, boxHeig
 };
 
 /**
- * A damped spring stepped by `dt` seconds, so the scene eases after the pointer instead of jumping to it. Slightly
- * underdamped, which reads as a physical object.
- */
+A damped spring stepped by `dt` seconds, so the scene eases after the pointer instead of jumping to it. Slightly
+underdamped, which reads as a physical object.
+*/
 export const stepSpring = (
   state: { position: number; velocity: number },
   target: number,

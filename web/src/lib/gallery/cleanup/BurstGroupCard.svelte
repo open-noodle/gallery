@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { FOCUS_RING } from '$lib/gallery/cleanup/cleanup';
-  import CleanupTile from '$lib/gallery/cleanup/CleanupTile.svelte';
-  import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
-  import { duration as motionDuration, pop } from '$lib/gallery/motion';
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { getByteUnitString } from '$lib/utils/byte-units';
-  import { burstMarkOf, burstTimeRange, dominantCity, type BurstMark } from '$lib/gallery/cleanup/cleanup';
+  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
+  import { duration as motionDuration, pop } from '#lib/gallery/motion/index.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { burstMarkOf, burstTimeRange, dominantCity, type BurstMark } from '#lib/gallery/cleanup/cleanup.ts';
   import { AssetMediaSize, CleanupBurstSource, type CleanupBurstGroupDto } from '@immich/sdk';
   import { Button, Card, Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';
@@ -259,7 +259,7 @@
         <p class="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{$t('cleanup_sharpness')}</p>
         <ul class="flex flex-col gap-2">
           {#each bySharpness as asset (asset.id)}
-            {@const index = group.assets.indexOf(asset) + 1}
+            {const index = $derived(group.assets.indexOf(asset) + 1)}
             <li
               class="cursor-default text-xs {asset.id === shown.id ? 'font-semibold' : ''}"
               data-testid="cleanup-burst-sharpness-row-{asset.id}"
@@ -285,8 +285,8 @@
 
     <div class="mt-2.5 grid grid-cols-4 gap-1.5 sm:grid-cols-8">
       {#each group.assets as asset (asset.id)}
-        {@const tileMark = markOf(asset.id)}
-        {@const suggested = asset.id === group.suggestedKeepId}
+        {const tileMark = $derived(markOf(asset.id))}
+        {const suggested = $derived(asset.id === group.suggestedKeepId)}
         <button
           type="button"
           class="relative block rounded-md {shownId === asset.id || focusedId === asset.id

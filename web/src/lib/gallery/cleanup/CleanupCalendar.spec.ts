@@ -1,11 +1,11 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import CleanupCalendar from '#lib/gallery/cleanup/CleanupCalendar.svelte';
+import { pop } from '#lib/gallery/motion/index.ts';
 import type { CleanupCalendarDayDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import CleanupCalendar from '$lib/gallery/cleanup/CleanupCalendar.svelte';
-import { pop } from '$lib/gallery/motion';
 
-vi.mock('$lib/gallery/motion', async (importOriginal) => ({
+vi.mock('#lib/gallery/motion/index.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   pop: vi.fn(),
 }));

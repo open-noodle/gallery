@@ -1,8 +1,8 @@
+import BurstGroupCard from '#lib/gallery/cleanup/BurstGroupCard.svelte';
 import { AssetTypeEnum, CleanupBurstSource, type CleanupAssetDto, type CleanupBurstGroupDto } from '@immich/sdk';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { addMessages } from 'svelte-i18n';
 import { SvelteMap } from 'svelte/reactivity';
-import BurstGroupCard from '$lib/gallery/cleanup/BurstGroupCard.svelte';
 
 const asset = (id: string, second: number): CleanupAssetDto => ({
   id,

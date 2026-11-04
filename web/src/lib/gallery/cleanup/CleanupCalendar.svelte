@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { pop } from '$lib/gallery/motion';
-  import { monthDayLabel, shadeLevel, shadeScale } from '$lib/gallery/cleanup/cleanup';
+  import { pop } from '#lib/gallery/motion/index.ts';
+  import { monthDayLabel, shadeLevel, shadeScale } from '#lib/gallery/cleanup/cleanup.ts';
   import type { CleanupCalendarDayDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
   import { mdiArrowLeft, mdiChevronLeft, mdiChevronRight } from '@mdi/js';
@@ -106,8 +106,8 @@
   <Text size="tiny" color="muted">{$t('cleanup_your_year_hint')}</Text>
 </div>
 {#snippet cell(monthDay: number, large: boolean)}
-  {@const day = byMonthDay.get(monthDay)}
-  {@const state = cellState(day)}
+  {const day = $derived(byMonthDay.get(monthDay))}
+  {const state = $derived(cellState(day))}
   <button
     type="button"
     data-testid="cleanup-cal-{monthDay}"
@@ -139,7 +139,7 @@
   onfocusout={onFocusOut}
 >
   {#if shownMonth !== null}
-    {@const month = MONTHS[shownMonth - 1]}
+    {const month = $derived(MONTHS[shownMonth - 1])}
     <div data-testid="cleanup-month-open">
       <div class="mb-2 flex items-center gap-1">
         <IconButton
@@ -181,7 +181,7 @@
   {:else}
     <div class="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-6 lg:grid-cols-12">
       {#each MONTHS as { month, days: monthDays } (month)}
-        {@const isCurrent = month === currentMonth}
+        {const isCurrent = $derived(month === currentMonth)}
         <div data-testid="cleanup-month-{month}" data-current={isCurrent ? 'true' : undefined} class="relative">
           <Text size="tiny" class="mb-1.5 {isCurrent ? 'font-semibold text-dark' : 'text-muted'}">
             {monthName(month)}
