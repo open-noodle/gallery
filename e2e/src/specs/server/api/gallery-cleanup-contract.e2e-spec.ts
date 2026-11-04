@@ -1,15 +1,15 @@
 /**
- * Mobile Library Cleanup ↔ server contract (specs/2026-10-29-mobile-library-cleanup-design.md, "Testing approach").
- *
- * Seeds one library, then records or verifies the fixtures in `mobile/test/fixtures/cleanup_contract/` (see the README
- * there). Verify mode (the default) replays every fixture's request against this server, in file order, and fails on
- * any difference; `CLEANUP_CONTRACT_RECORD=1` rewrites the fixtures from `fixtureCases` below instead.
- *
- * Unlike the search contract, these requests change the server: a commit trashes photos, a restore brings them back,
- * a finished day turns reviewed. The fixtures are therefore one script, in the order the mobile test (and so the app)
- * sends them, numbered so that file order is script order. Two fixtures may hold the same request with different
- * responses (the state moved in between); the mobile stand-in serves them in order.
- */
+Mobile Library Cleanup ↔ server contract (specs/2026-10-29-mobile-library-cleanup-design.md, "Testing approach").
+
+Seeds one library, then records or verifies the fixtures in `mobile/test/fixtures/cleanup_contract/` (see the README
+there). Verify mode (the default) replays every fixture's request against this server, in file order, and fails on
+any difference; `CLEANUP_CONTRACT_RECORD=1` rewrites the fixtures from `fixtureCases` below instead.
+
+Unlike the search contract, these requests change the server: a commit trashes photos, a restore brings them back,
+a finished day turns reviewed. The fixtures are therefore one script, in the order the mobile test (and so the app)
+sends them, numbered so that file order is script order. Two fixtures may hold the same request with different
+responses (the state moved in between); the mobile stand-in serves them in order.
+*/
 import { LoginResponseDto } from '@immich/sdk';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -44,9 +44,9 @@ type ContractRequest = {
 };
 
 /**
- * How a fixture shows a server this one is not (see the README):
- * - `no-cleanup`: a Gallery server from before Library Cleanup: the route does not exist, so Nest answers 404.
- */
+How a fixture shows a server this one is not (see the README):
+- `no-cleanup`: a Gallery server from before Library Cleanup: the route does not exist, so Nest answers 404.
+*/
 type ResponseView = 'no-cleanup';
 
 type Fixture = {
@@ -303,9 +303,9 @@ const seedQueues = async () => {
 };
 
 /**
- * The series the 300s need (mobile cleanup_bursts_e2e_test.dart and cleanup_duplicates_e2e_test.dart), seeded at `300`:
- * three bursts, two from the camera's burst id and one by time alone, and three duplicate groups.
- */
+The series the 300s need (mobile cleanup_bursts_e2e_test.dart and cleanup_duplicates_e2e_test.dart), seeded at `300`:
+three bursts, two from the camera's burst id and one by time alone, and three duplicate groups.
+*/
 type SeriesSeed = {
   takenAt: string;
   fileSize: number;
@@ -318,9 +318,9 @@ type SeriesSeed = {
 };
 
 /**
- * Duplicate group ids are fixed (as `duplicate-favorite.e2e-spec.ts` fixes them), so the server lists the groups in
- * the same order on every run.
- */
+Duplicate group ids are fixed (as `duplicate-favorite.e2e-spec.ts` fixes them), so the server lists the groups in
+the same order on every run.
+*/
 const duplicateGroups: Record<string, string> = {
   'duplicate:a': '00000000-0000-4000-8000-000000000301',
   'duplicate:b': '00000000-0000-4000-8000-000000000302',
@@ -636,10 +636,10 @@ const queueCommit = (queue: string, marks: { trash?: string[]; favorite?: string
   }) as const;
 
 /**
- * The queue screens (mobile/test/gallery/cleanup/cleanup_queues_e2e_test.dart), on photos seeded at `200`: Blurry
- * opened with its defaults, then filtered to blurry only, paged on, applied and undone; three screenshots trashed from
- * the grid; Space hogs opened and filtered.
- */
+The queue screens (mobile/test/gallery/cleanup/cleanup_queues_e2e_test.dart), on photos seeded at `200`: Blurry
+opened with its defaults, then filtered to blurry only, paged on, applied and undone; three screenshots trashed from
+the grid; Space hogs opened and filtered.
+*/
 const queueCases = (): FixtureCase[] => [
   {
     name: '200-queues-blurry-count',
@@ -751,11 +751,11 @@ const queueCases = (): FixtureCase[] => [
 ];
 
 /**
- * The series queues, on series seeded at `300`. Bursts (mobile cleanup_bursts_e2e_test.dart): one series accepted as
- * set, another accepted after a frame's mark changed, a third stacked, all applied at once, then the toast's Undo.
- * Duplicates (mobile cleanup_duplicates_e2e_test.dart): one group accepted on the suggestion, another after its marks
- * changed, a third dismissed, all applied at once, then the toast's Undo.
- */
+The series queues, on series seeded at `300`. Bursts (mobile cleanup_bursts_e2e_test.dart): one series accepted as
+set, another accepted after a frame's mark changed, a third stacked, all applied at once, then the toast's Undo.
+Duplicates (mobile cleanup_duplicates_e2e_test.dart): one group accepted on the suggestion, another after its marks
+changed, a third dismissed, all applied at once, then the toast's Undo.
+*/
 const seriesCases = (): FixtureCase[] => [
   {
     name: '300-bursts-count',
@@ -1078,9 +1078,9 @@ const fixtureCases = (): FixtureCase[] => [
 ];
 
 /**
- * Cursors are chained through the script: `@n` stands for the next-page cursor of the n-th default Blurry page, and
- * `@name` for the one a case saved with `saveCursorAs`.
- */
+Cursors are chained through the script: `@n` stands for the next-page cursor of the n-th default Blurry page, and
+`@name` for the one a case saved with `saveCursorAs`.
+*/
 const cursors = new Map<string, string>();
 const resolveCursor = (contract: CaseRequest): CaseRequest => {
   const cursor = contract.query?.cursor;
