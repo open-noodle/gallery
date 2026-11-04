@@ -288,7 +288,7 @@ describe('/admin/database-backups', () => {
       );
     });
 
-    it('rollback to restore point if backup is missing admin', { timeout: 60_000, concurrent: false }, async () => {
+    it('rollback to restore point if backup is missing admin', { timeout: 90_000, concurrent: false }, async () => {
       await utils.prepareTestBackup('empty');
 
       const { status, headers } = await request(app)
@@ -325,7 +325,9 @@ describe('/admin/database-backups', () => {
           },
           {
             interval: 500,
-            timeout: 30_000,
+            // Gallery: the rollback restores Gallery's larger schema, which alone takes about as long as
+            // upstream's 30 s budget; same budget as the restore test above.
+            timeout: 60_000,
           },
         )
         .toEqual(
