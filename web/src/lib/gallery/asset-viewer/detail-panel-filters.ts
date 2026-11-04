@@ -1,5 +1,6 @@
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { getCameraName } from '#lib/utils/camera-utils.ts';
 import { buildContextualMapUrl } from '#lib/utils/filter-target.ts';
 import type { AssetResponseDto } from '@immich/sdk';
 import { goto } from '$app/navigation';
@@ -26,13 +27,11 @@ export const filenameFilter = ({ originalFileName }: AssetResponseDto) => {
 };
 
 export const cameraFilter = ({ exifInfo }: AssetResponseDto) =>
-  valueFilter(
-    [exifInfo?.make, exifInfo?.model]
-      .map((value) => value?.trim())
-      .filter(Boolean)
-      .join(' '),
-    { make: exifInfo?.make ?? undefined, model: exifInfo?.model ?? undefined },
-  );
+  // Labelled like the panel shows the camera (upstream's getCameraName drops a make the model repeats).
+  valueFilter(getCameraName(exifInfo?.make, exifInfo?.model), {
+    make: exifInfo?.make ?? undefined,
+    model: exifInfo?.model ?? undefined,
+  });
 
 export const lensFilter = ({ exifInfo }: AssetResponseDto) =>
   valueFilter(exifInfo?.lensModel?.trim() ?? '', { lensModel: exifInfo?.lensModel ?? undefined });
