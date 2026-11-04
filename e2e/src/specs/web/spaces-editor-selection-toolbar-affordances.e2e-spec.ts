@@ -1,7 +1,7 @@
 import { LoginResponseDto, SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
+import { thumbnailUtils } from 'src/gallery-timeline.js';
 import { utils } from 'src/utils';
 
 // Web E2E: closes the #992 audit gap for the space timeline's multi-select toolbar — the higher

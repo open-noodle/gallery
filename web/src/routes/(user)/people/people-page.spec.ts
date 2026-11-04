@@ -7,6 +7,8 @@ import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
+import { factory } from '#test/unit/factories.ts';
+import { reactivePageMock } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -23,11 +25,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
-import { personFactory } from '#test-data/factories/person-factory';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
-import { reactivePageMock } from '#test-data/mocks/reactive-page.mock.svelte.ts';
 import PeoplePage from './+page.svelte';
 
 const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
@@ -39,7 +36,7 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte.ts');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
 });
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
@@ -61,7 +58,7 @@ vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
 });
 
 function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
-  return personFactory.build({
+  return factory.person({
     id: 'person-1',
     name: 'Alice',
     isHidden: false,
@@ -93,7 +90,7 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
 
 // The viewer's role in a space comes from the spaces list (getAllSpaces embeds members).
 function makeSpace(spaceId: string, role: SharedSpaceRole): SharedSpaceResponseDto {
-  return sharedSpaceFactory.build({
+  return factory.sharedSpace({
     id: spaceId,
     members: [
       {
@@ -203,8 +200,8 @@ describe('Global people page', () => {
     queryClient.removeQueries({ queryKey: spacesQueryKey });
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     clearPeopleFaceStatisticsInfoCache();
-    authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
-    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(factory.user({ id: 'current-user-id' }));
+    authManager.setPreferences(factory.preferences());
     Element.prototype.animate = getAnimateMock();
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
     reactivePageMock.reset('http://localhost/people', { routeId: '/(user)/people' });
@@ -502,7 +499,7 @@ describe('Global people page', () => {
     expect(await screen.findByText('1,111')).toBeInTheDocument();
 
     await userEvent.click(trigger);
-    authManager.setUser(userAdminFactory.build({ id: 'other-user-id' }));
+    authManager.setUser(factory.user({ id: 'other-user-id' }));
     await userEvent.click(trigger);
 
     expect(await screen.findByText('2,222')).toBeInTheDocument();

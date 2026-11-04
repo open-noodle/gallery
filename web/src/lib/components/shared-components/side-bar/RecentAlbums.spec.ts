@@ -2,9 +2,9 @@ import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import RecentAlbums from '#lib/components/shared-components/side-bar/RecentAlbums.svelte';
 import { albumsQueryKey } from '#lib/queries/album.query.ts';
 import { queryClient } from '#lib/queries/client.ts';
+import { factory } from '#test/unit/factories.ts';
 import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { albumFactory } from '#test-data/factories/album-factory';
 
 const sidebarMocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -41,7 +41,7 @@ describe('RecentAlbums component', () => {
       sidebarMocks.sidebarModeStore.layout = layout;
       sidebarMocks.sidebarModeStore.hoverExpanded = hoverExpanded;
       sidebarMocks.sidebarModeStore.railExpanded = hoverExpanded;
-      sdkMock.getAllAlbums.mockResolvedValueOnce([albumFactory.build()]);
+      sdkMock.getAllAlbums.mockResolvedValueOnce([factory.album()]);
       render(RecentAlbums);
       await tick();
       await tick();
@@ -57,10 +57,10 @@ describe('RecentAlbums component', () => {
 
   it('sorts albums by most recently updated', async () => {
     const albums = [
-      albumFactory.build({ updatedAt: '2024-01-01T00:00:00Z' }),
-      albumFactory.build({ updatedAt: '2024-01-09T00:00:01Z' }),
-      albumFactory.build({ updatedAt: '2024-01-10T00:00:00Z' }),
-      albumFactory.build({ updatedAt: '2024-01-09T00:00:00Z' }),
+      factory.album({ updatedAt: '2024-01-01T00:00:00Z' }),
+      factory.album({ updatedAt: '2024-01-09T00:00:01Z' }),
+      factory.album({ updatedAt: '2024-01-10T00:00:00Z' }),
+      factory.album({ updatedAt: '2024-01-09T00:00:00Z' }),
     ];
 
     sdkMock.getAllAlbums.mockResolvedValueOnce([...albums]);

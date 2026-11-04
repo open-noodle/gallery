@@ -1,9 +1,9 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -70,48 +70,48 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
 }));
 
 vi.mock('#lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/OnEvents.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/shared-components/UserAvatar.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/shared-components/LoadingSpinner.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('#lib/components/faces-page/PersonSidePanel.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/person-side-panel.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/person-side-panel.stub.svelte');
   return { default: MockComponent };
 });
 vi.mock('#lib/components/asset-viewer/SpacePersonSidePanel.svelte', async () => {
-  const { default: MockComponent } = await import('#test-data/mocks/space-person-side-panel.stub.svelte');
+  const { default: MockComponent } = await import('#test/unit/mocks/space-person-side-panel.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -131,7 +131,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders SpacePersonSidePanel and NOT PersonSidePanel for a non-owner space editor', () => {
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
       canEdit: true,
@@ -149,7 +149,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders PersonSidePanel and NOT SpacePersonSidePanel for the asset owner, even inside a space', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
+    const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
     renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
 
@@ -161,7 +161,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders the owner PersonSidePanel (never both) for a non-owner with no space context', () => {
-    const asset = assetFactory.build({
+    const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
       canEdit: true,

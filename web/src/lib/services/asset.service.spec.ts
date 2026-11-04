@@ -15,6 +15,7 @@ import {
 } from '#lib/services/asset.service.ts';
 import { setSharedLink } from '#lib/utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
+import { factory } from '#test/unit/factories.ts';
 import {
   AssetEditAction,
   getAssetInfo,
@@ -26,10 +27,6 @@ import {
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { preferencesFactory } from '#test-data/factories/preferences-factory';
-import { sharedLinkFactory } from '#test-data/factories/shared-link-factory';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 
 const { downloadUrlMock } = vitest.hoisted(() => ({
   downloadUrlMock: vitest.fn(),
@@ -81,7 +78,7 @@ vitest.mock('#lib/utils.js', async () => {
 describe('AssetService', () => {
   describe('getAssetActions', () => {
     beforeEach(() => {
-      authManager.setPreferences(preferencesFactory.build());
+      authManager.setPreferences(factory.preferences());
       queryClient.setQueryData(getUserConfigQuery().queryKey, {
         machineLearning: {
           enabled: false,
@@ -95,36 +92,36 @@ describe('AssetService', () => {
 
     it('should allow shared link downloads if the user owns the asset and shared link downloads are disabled', () => {
       const ownerId = 'owner';
-      const user = userAdminFactory.build({ id: ownerId });
-      const asset = assetFactory.build({ ownerId });
+      const user = factory.user({ id: ownerId });
+      const asset = factory.asset({ ownerId });
       authManager.setUser(user);
-      setSharedLink(sharedLinkFactory.build({ allowDownload: false }));
+      setSharedLink(factory.sharedLink({ allowDownload: false }));
       const assetActions = getAssetActions(() => '', asset);
       expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(true);
     });
 
     it('should not allow shared link downloads if the user does not own the asset and shared link downloads are disabled', () => {
       const ownerId = 'owner';
-      const user = userAdminFactory.build({ id: 'non-owner' });
-      const asset = assetFactory.build({ ownerId });
+      const user = factory.user({ id: 'non-owner' });
+      const asset = factory.asset({ ownerId });
       authManager.setUser(user);
-      setSharedLink(sharedLinkFactory.build({ allowDownload: false }));
+      setSharedLink(factory.sharedLink({ allowDownload: false }));
       const assetActions = getAssetActions(() => '', asset);
       expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(false);
     });
 
     it('should allow shared link downloads if shared link downloads are enabled regardless of user', () => {
-      const asset = assetFactory.build();
-      setSharedLink(sharedLinkFactory.build({ allowDownload: true }));
+      const asset = factory.asset();
+      setSharedLink(factory.sharedLink({ allowDownload: true }));
       const assetActions = getAssetActions(() => '', asset);
       expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(true);
     });
 
     it('should offer the share action if the user owns the asset', () => {
       const ownerId = 'owner';
-      authManager.setUser(userAdminFactory.build({ id: ownerId }));
+      authManager.setUser(factory.user({ id: ownerId }));
       setSharedLink(undefined);
-      const asset = assetFactory.build({ ownerId });
+      const asset = factory.asset({ ownerId });
       const assetActions = getAssetActions(() => '', asset);
       expect(assetActions.Share.$if?.()).toStrictEqual(true);
     });
@@ -132,9 +129,9 @@ describe('AssetService', () => {
     it('should offer the share action if a shared link stripped the asset owner', () => {
       // A `showMetadata: false` shared link returns SanitizedAssetResponseDto, which omits `ownerId`
       // altogether, so ownership is unknowable client-side. The owner still has to get the button.
-      authManager.setUser(userAdminFactory.build({ id: 'owner' }));
-      setSharedLink(sharedLinkFactory.build({ allowDownload: false }));
-      const { ownerId: _, ...sanitized } = assetFactory.build();
+      authManager.setUser(factory.user({ id: 'owner' }));
+      setSharedLink(factory.sharedLink({ allowDownload: false }));
+      const { ownerId: _, ...sanitized } = factory.asset();
       const assetActions = getAssetActions(() => '', sanitized as AssetResponseDto);
       expect(assetActions.Share.$if?.()).toStrictEqual(true);
     });
@@ -143,9 +140,9 @@ describe('AssetService', () => {
       // Server-side `Permission.AssetShare` is owner ∪ partner only — album or space membership
       // grants no share access, so a shared-album/space viewer would get
       // "Not found or no asset.share access" from POST /shared-links (#871).
-      authManager.setUser(userAdminFactory.build({ id: 'non-owner' }));
+      authManager.setUser(factory.user({ id: 'non-owner' }));
       setSharedLink(undefined);
-      const asset = assetFactory.build({ ownerId: 'owner' });
+      const asset = factory.asset({ ownerId: 'owner' });
       const assetActions = getAssetActions(() => '', asset);
       expect(assetActions.Share.$if?.()).toStrictEqual(false);
     });
@@ -241,7 +238,7 @@ describe('AssetService', () => {
     it('should use the asset originalFileName when showing toasts', async () => {
       const $t = vitest.fn().mockReturnValue('formatter');
       vitest.mocked(getFormatter).mockResolvedValue($t);
-      const asset = assetFactory.build({ originalFileName: 'asset.heic' });
+      const asset = factory.asset({ originalFileName: 'asset.heic' });
       await handleDownloadAsset(asset, { edited: false });
       expect($t).toHaveBeenNthCalledWith(1, 'downloading_asset_filename', { values: { filename: 'asset.heic' } });
       expect(toastManager.primary).toHaveBeenCalledWith('formatter');
@@ -250,9 +247,9 @@ describe('AssetService', () => {
     it('should use the motion asset originalFileName when showing toasts', async () => {
       const $t = vitest.fn().mockReturnValue('formatter');
       vitest.mocked(getFormatter).mockResolvedValue($t);
-      const motionAsset = assetFactory.build({ originalFileName: 'asset.mov' });
+      const motionAsset = factory.asset({ originalFileName: 'asset.mov' });
       vitest.mocked(getAssetInfo).mockResolvedValue(motionAsset);
-      const asset = assetFactory.build({ originalFileName: 'asset.heic', livePhotoVideoId: '1' });
+      const asset = factory.asset({ originalFileName: 'asset.heic', livePhotoVideoId: '1' });
       await handleDownloadAsset(asset, { edited: false });
       expect($t).toHaveBeenNthCalledWith(1, 'downloading_asset_filename', { values: { filename: 'asset.heic' } });
       expect($t).toHaveBeenNthCalledWith(2, 'downloading_asset_filename', { values: { filename: 'asset-motion.mov' } });
@@ -263,7 +260,7 @@ describe('AssetService', () => {
       downloadUrlMock.mockClear();
       const $t = vitest.fn().mockReturnValue('formatter');
       vitest.mocked(getFormatter).mockResolvedValue($t);
-      const asset = assetFactory.build({ id: 'asset-1', originalFileName: 'asset.jpg', thumbhash: 'cache-1' });
+      const asset = factory.asset({ id: 'asset-1', originalFileName: 'asset.jpg', thumbhash: 'cache-1' });
 
       await handleDownloadAsset(asset, { edited: false });
 
@@ -290,7 +287,7 @@ describe('add to album/space entry points', () => {
   });
 
   it('single-photo viewer "+" opens the unified collection modal with the one id', () => {
-    const asset = assetFactory.build({ id: 'single-1' });
+    const asset = factory.asset({ id: 'single-1' });
     const action = getAssetActions(() => '', asset).AddToAlbum;
     action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['single-1'] });
@@ -303,12 +300,12 @@ describe('add to album/space entry points', () => {
     // `authManager.authenticated` — and with it the ownership check — is false unless BOTH the
     // user and the preferences are set, so setting only the user would make every case look
     // non-owned and the assertions unfalsifiable.
-    beforeEach(() => authManager.setPreferences(preferencesFactory.build()));
+    beforeEach(() => authManager.setPreferences(factory.preferences()));
     afterEach(() => authManager.reset());
 
     it('opens the same picker as the timeline when a space editor opens a photo they do not own (#1119)', () => {
-      authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
-      const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
+      authManager.setUser(factory.user({ id: 'editor-1' }));
+      const asset = factory.asset({ id: 'not-mine', ownerId: 'someone-else' });
 
       const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
       action.onAction({ action, event: new Event('click') });
@@ -320,8 +317,8 @@ describe('add to album/space entry points', () => {
     });
 
     it('leaves the picker unrestricted for a photo the space editor owns', () => {
-      authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
-      const asset = assetFactory.build({ id: 'mine', ownerId: 'editor-1' });
+      authManager.setUser(factory.user({ id: 'editor-1' }));
+      const asset = factory.asset({ id: 'mine', ownerId: 'editor-1' });
 
       const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
       action.onAction({ action, event: new Event('click') });
@@ -333,8 +330,8 @@ describe('add to album/space entry points', () => {
     });
 
     it('hides the action for a space viewer looking at a photo they do not own', () => {
-      authManager.setUser(userAdminFactory.build({ id: 'viewer-1' }));
-      const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
+      authManager.setUser(factory.user({ id: 'viewer-1' }));
+      const asset = factory.asset({ id: 'not-mine', ownerId: 'someone-else' });
 
       const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: false } }).AddToAlbum;
 
@@ -345,8 +342,8 @@ describe('add to album/space entry points', () => {
       // Partner-shared assets legitimately reach the caller's own album through
       // Permission.AssetShare, which the viewer cannot evaluate — so it must not gate on ownership
       // outside a space.
-      authManager.setUser(userAdminFactory.build({ id: 'partner-of-owner' }));
-      const asset = assetFactory.build({ id: 'partners-photo', ownerId: 'the-partner' });
+      authManager.setUser(factory.user({ id: 'partner-of-owner' }));
+      const asset = factory.asset({ id: 'partners-photo', ownerId: 'the-partner' });
 
       const action = getAssetActions(() => '', asset).AddToAlbum;
       action.onAction({ action, event: new Event('click') });
@@ -367,8 +364,8 @@ describe('bulk CreateSharedLink action', () => {
   beforeEach(() => {
     vitest.mocked(modalManager.show).mockClear();
     vitest.mocked(toastManager.warning).mockClear();
-    authManager.setPreferences(preferencesFactory.build());
-    authManager.setUser(userAdminFactory.build({ id: 'me' }));
+    authManager.setPreferences(factory.preferences());
+    authManager.setUser(factory.user({ id: 'me' }));
   });
   afterEach(() => {
     authManager.reset();
@@ -401,8 +398,8 @@ describe('bulk Tag action', () => {
   beforeEach(() => {
     vitest.mocked(modalManager.show).mockClear();
     vitest.mocked(toastManager.warning).mockClear();
-    authManager.setPreferences(preferencesFactory.build({ tags: { enabled: true, sidebarWeb: false } }));
-    authManager.setUser(userAdminFactory.build({ id: 'me' }));
+    authManager.setPreferences(factory.preferences({ tags: { enabled: true, sidebarWeb: false } }));
+    authManager.setUser(factory.user({ id: 'me' }));
     selection.isAllUserOwned = false;
   });
   afterEach(() => {
@@ -451,10 +448,10 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
 
   it('shows Favorite to an authenticated NON-OWNER when not yet favorited by them', () => {
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: 'non-owner' });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: 'non-owner' });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    const asset = assetFactory.build({ ownerId, isFavorite: false });
+    const asset = factory.asset({ ownerId, isFavorite: false });
 
     const assetActions = getAssetActions(() => '', asset);
 
@@ -464,10 +461,10 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
 
   it('shows Unfavorite to a non-owner who HAS favorited (viewer state, not owner state)', () => {
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: 'non-owner' });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: 'non-owner' });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    const asset = assetFactory.build({ ownerId, isFavorite: true });
+    const asset = factory.asset({ ownerId, isFavorite: true });
 
     const assetActions = getAssetActions(() => '', asset);
 
@@ -477,33 +474,33 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
 
   it('owner behavior unchanged (regression)', () => {
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: ownerId });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: ownerId });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
 
-    const notFavorited = assetFactory.build({ ownerId, isFavorite: false });
+    const notFavorited = factory.asset({ ownerId, isFavorite: false });
     const notFavoritedActions = getAssetActions(() => '', notFavorited);
     expect(notFavoritedActions.Favorite.$if?.()).toBe(true);
     expect(notFavoritedActions.Unfavorite.$if?.()).toBe(false);
 
-    const favorited = assetFactory.build({ ownerId, isFavorite: true });
+    const favorited = factory.asset({ ownerId, isFavorite: true });
     const favoritedActions = getAssetActions(() => '', favorited);
     expect(favoritedActions.Favorite.$if?.()).toBe(false);
     expect(favoritedActions.Unfavorite.$if?.()).toBe(true);
   });
 
   it('shared-link session: neither action available (and thus the f shortcut is inert)', () => {
-    const user = userAdminFactory.build();
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user();
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    setSharedLink(sharedLinkFactory.build());
+    setSharedLink(factory.sharedLink());
 
-    const notFavorited = assetFactory.build({ ownerId: user.id, isFavorite: false });
+    const notFavorited = factory.asset({ ownerId: user.id, isFavorite: false });
     const notFavoritedActions = getAssetActions(() => '', notFavorited);
     expect(notFavoritedActions.Favorite.$if?.()).toBe(false);
     expect(notFavoritedActions.Unfavorite.$if?.()).toBe(false);
 
-    const favorited = assetFactory.build({ ownerId: user.id, isFavorite: true });
+    const favorited = factory.asset({ ownerId: user.id, isFavorite: true });
     const favoritedActions = getAssetActions(() => '', favorited);
     expect(favoritedActions.Favorite.$if?.()).toBe(false);
     expect(favoritedActions.Unfavorite.$if?.()).toBe(false);
@@ -515,10 +512,10 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
     vitest.mocked(updateAssetFavorites).mockResolvedValue(undefined as never);
 
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: 'non-owner' });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: 'non-owner' });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: false });
+    const asset = factory.asset({ id: 'asset-1', ownerId, isFavorite: false });
 
     const assetActions = getAssetActions(() => '', asset);
     await assetActions.Favorite.onAction({ action: assetActions.Favorite, event: new Event('click') });
@@ -536,10 +533,10 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
     vitest.mocked(updateAssetFavorites).mockResolvedValue(undefined as never);
 
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: 'non-owner' });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: 'non-owner' });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: true });
+    const asset = factory.asset({ id: 'asset-1', ownerId, isFavorite: true });
 
     const assetActions = getAssetActions(() => '', asset);
     await assetActions.Unfavorite.onAction({ action: assetActions.Unfavorite, event: new Event('click') });
@@ -557,10 +554,10 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
     vitest.mocked(updateAssetFavorites).mockRejectedValue(new Error('network error'));
 
     const ownerId = 'owner';
-    const user = userAdminFactory.build({ id: 'non-owner' });
-    authManager.setPreferences(preferencesFactory.build());
+    const user = factory.user({ id: 'non-owner' });
+    authManager.setPreferences(factory.preferences());
     authManager.setUser(user);
-    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: false });
+    const asset = factory.asset({ id: 'asset-1', ownerId, isFavorite: false });
 
     const assetActions = getAssetActions(() => '', asset);
     await assetActions.Favorite.onAction({ action: assetActions.Favorite, event: new Event('click') });

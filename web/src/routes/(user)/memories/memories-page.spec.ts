@@ -1,9 +1,9 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { factory } from '#test/unit/factories.ts';
 import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import { assetFactory } from '#test-data/factories/asset-factory';
 import MemoriesPage from './+page.svelte';
 
 // Fork delta guard. Upstream's memory card renders the title only, but the fork's rule engine
@@ -37,7 +37,7 @@ function memory(overrides: Partial<MemoryResponseDto> = {}): MemoryResponseDto {
   return {
     id: 'memory-1',
     ownerId: 'user-1',
-    assets: [assetFactory.build({ id: 'asset-1' })],
+    assets: [factory.asset({ id: 'asset-1' })],
     createdAt: '2020-01-01T00:00:00.000Z',
     updatedAt: '2020-01-01T00:00:00.000Z',
     deletedAt: undefined,

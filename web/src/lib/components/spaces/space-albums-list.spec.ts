@@ -4,12 +4,12 @@ import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '#lib/s
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import { toggleSpaceAlbumGroupCollapsing } from '#lib/utils/space-album-grouping.ts';
 import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
 import { screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import { userAdminFactory } from '#test-data/factories/user-factory';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/stores', () => ({
@@ -74,7 +74,7 @@ describe('SpaceAlbumsList', () => {
     localStorage.clear();
     spaceAlbumViewSettings.reset();
     albumViewSettings.reset();
-    authManager.setUser(userAdminFactory.build({ id: 'me' }));
+    authManager.setUser(factory.user({ id: 'me' }));
   });
 
   it('renders cover cards by default and switches to the table on view=List', async () => {

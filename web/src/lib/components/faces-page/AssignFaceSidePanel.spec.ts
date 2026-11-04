@@ -1,4 +1,4 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, type AssetFaceResponseDto, type PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor, within } from '@testing-library/svelte';

@@ -1,7 +1,7 @@
 import { AssetMediaResponseDto, LoginResponseDto, SharedSpaceResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { expect, test, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
+import { thumbnailUtils } from 'src/gallery-timeline.js';
 import { utils } from 'src/utils';
 
 // Web E2E for the literal #763 scenario: a space VIEWER (non-owner) favorites a photo they don't

@@ -1,12 +1,12 @@
 import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
-import { renderWithTooltips } from '#tests/helpers';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { reactivePageMock as mockPage } from '#test/unit/mocks/reactive-page.mock.svelte.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { assetFactory } from '#test-data/factories/asset-factory';
-import { reactivePageMock as mockPage } from '#test-data/mocks/reactive-page.mock.svelte';
 import DetailPanelDate from '../DetailPanelDate.svelte';
 
 // Task 4 of Slice 7 (asset-viewer-contextual-filters) — E14.
@@ -18,7 +18,7 @@ const { gotoMock } = vi.hoisted(() => ({
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
-  const { reactivePageMock } = await import('#test-data/mocks/reactive-page.mock.svelte');
+  const { reactivePageMock } = await import('#test/unit/mocks/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };
 });
 
@@ -30,8 +30,11 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto =>
-  assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', ...overrides });
+// factory.asset merges exifInfo into its own defaults (including dateTimeOriginal); these tests need exactly the EXIF they pass.
+const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto => {
+  const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', ...overrides });
+  return overrides.exifInfo ? { ...asset, exifInfo: overrides.exifInfo } : asset;
+};
 
 /**
 E14's load-bearing fixture. The asset was taken at 01:00 on 1 Jan 2026 in Auckland (UTC+13) —

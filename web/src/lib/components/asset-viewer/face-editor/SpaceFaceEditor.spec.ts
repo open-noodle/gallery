@@ -1,4 +1,4 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpacePersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';

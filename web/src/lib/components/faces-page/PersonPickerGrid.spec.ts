@@ -1,4 +1,4 @@
-import { renderWithTooltips } from '#tests/helpers';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';

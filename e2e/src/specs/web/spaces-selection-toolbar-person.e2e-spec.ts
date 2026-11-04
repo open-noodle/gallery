@@ -1,7 +1,7 @@
 import { LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures.js';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils.js';
+import { thumbnailUtils } from 'src/gallery-timeline.js';
 import { utils } from 'src/utils.js';
 
 // Web E2E: Slice 5 of specs/2026-07-24-selection-toolbar-consistency-design.md —

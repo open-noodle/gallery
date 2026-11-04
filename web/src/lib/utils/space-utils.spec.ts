@@ -1,6 +1,6 @@
 import { spaceRoleLabelKey, splitPinnedSpaces } from '#lib/utils/space-utils.ts';
+import { factory } from '#test/unit/factories.ts';
 import { SharedSpaceRole } from '@immich/sdk';
-import { sharedSpaceFactory } from '#test-data/factories/shared-space-factory';
 
 describe('spaceRoleLabelKey', () => {
   it('maps owner to the existing owner key', () => {
@@ -22,7 +22,7 @@ describe('spaceRoleLabelKey', () => {
 
 describe('splitPinnedSpaces', () => {
   it('should return empty pinned and all unpinned when no IDs pinned', () => {
-    const spaces = [sharedSpaceFactory.build({ id: 'a' }), sharedSpaceFactory.build({ id: 'b' })];
+    const spaces = [factory.sharedSpace({ id: 'a' }), factory.sharedSpace({ id: 'b' })];
     const result = splitPinnedSpaces(spaces, []);
     expect(result.pinned).toEqual([]);
     expect(result.unpinned).toHaveLength(2);
@@ -30,9 +30,9 @@ describe('splitPinnedSpaces', () => {
 
   it('should split spaces into pinned and unpinned', () => {
     const spaces = [
-      sharedSpaceFactory.build({ id: 'a' }),
-      sharedSpaceFactory.build({ id: 'b' }),
-      sharedSpaceFactory.build({ id: 'c' }),
+      factory.sharedSpace({ id: 'a' }),
+      factory.sharedSpace({ id: 'b' }),
+      factory.sharedSpace({ id: 'c' }),
     ];
     const result = splitPinnedSpaces(spaces, ['a', 'c']);
     expect(result.pinned.map((s) => s.id)).toEqual(['a', 'c']);
@@ -40,7 +40,7 @@ describe('splitPinnedSpaces', () => {
   });
 
   it('should ignore stale pinned IDs not in spaces list', () => {
-    const spaces = [sharedSpaceFactory.build({ id: 'a' })];
+    const spaces = [factory.sharedSpace({ id: 'a' })];
     const result = splitPinnedSpaces(spaces, ['a', 'deleted-id']);
     expect(result.pinned).toHaveLength(1);
     expect(result.unpinned).toHaveLength(0);
@@ -48,10 +48,10 @@ describe('splitPinnedSpaces', () => {
 
   it('should preserve spaces array order within pinned group', () => {
     const spaces = [
-      sharedSpaceFactory.build({ id: 'a' }),
-      sharedSpaceFactory.build({ id: 'b' }),
-      sharedSpaceFactory.build({ id: 'c' }),
-      sharedSpaceFactory.build({ id: 'd' }),
+      factory.sharedSpace({ id: 'a' }),
+      factory.sharedSpace({ id: 'b' }),
+      factory.sharedSpace({ id: 'c' }),
+      factory.sharedSpace({ id: 'd' }),
     ];
     const result = splitPinnedSpaces(spaces, ['c', 'a']);
     expect(result.pinned.map((s) => s.id)).toEqual(['a', 'c']);
@@ -59,7 +59,7 @@ describe('splitPinnedSpaces', () => {
   });
 
   it('should set showSection=false when all spaces are pinned', () => {
-    const spaces = [sharedSpaceFactory.build({ id: 'a' }), sharedSpaceFactory.build({ id: 'b' })];
+    const spaces = [factory.sharedSpace({ id: 'a' }), factory.sharedSpace({ id: 'b' })];
     const result = splitPinnedSpaces(spaces, ['a', 'b']);
     expect(result.pinned).toHaveLength(2);
     expect(result.unpinned).toHaveLength(0);
@@ -67,7 +67,7 @@ describe('splitPinnedSpaces', () => {
   });
 
   it('should set showSection=true when there are both pinned and unpinned', () => {
-    const spaces = [sharedSpaceFactory.build({ id: 'a' }), sharedSpaceFactory.build({ id: 'b' })];
+    const spaces = [factory.sharedSpace({ id: 'a' }), factory.sharedSpace({ id: 'b' })];
     const result = splitPinnedSpaces(spaces, ['a']);
     expect(result.showSection).toBe(true);
   });
