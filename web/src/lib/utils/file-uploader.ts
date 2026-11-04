@@ -113,7 +113,7 @@ function getDeviceAssetId(asset: File) {
   return 'web-' + asset.name + '-' + asset.lastModified;
 }
 
-function hashFile(file: File): Promise<string> {
+export function hashFile(file: File): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const worker = new Worker(new URL('$lib/workers/hash-file.ts', import.meta.url), { type: 'module' });
 

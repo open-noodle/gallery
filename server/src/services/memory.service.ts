@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { shuffle } from 'lodash-es';
 import { DateTime } from 'luxon';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
@@ -17,6 +17,7 @@ import {
   mapMemory,
 } from 'src/dtos/memory.dto.js';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
+import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import {
@@ -542,7 +543,14 @@ export class MemoryService extends BaseService {
 
   async search(auth: AuthDto, dto: MemorySearchDto) {
     const { hiddenScope, visibleSpaceIds } = await this.resolveViewerScope(auth, 'memories');
-    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto, hiddenScope, visibleSpaceIds);
+    // Gallery: a stock or third-party client gets only the memory types it can decode, as on sync.
+    const memories = await this.memoryRepository.searchAccessible(
+      auth.user.id,
+      dto,
+      hiddenScope,
+      visibleSpaceIds,
+      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient),
+    );
     const assetIds = memories.flatMap((memory) => memory.assets.map((asset) => asset.id));
     const allowedAssetIds = await this.checkAccess({ auth, permission: Permission.AssetView, ids: assetIds });
 
@@ -586,12 +594,20 @@ export class MemoryService extends BaseService {
   }
 
   statistics(auth: AuthDto, dto: MemorySearchDto) {
-    return this.memoryRepository.statisticsAccessible(auth.user.id, dto);
+    return this.memoryRepository.statisticsAccessible(
+      auth.user.id,
+      dto,
+      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient),
+    );
   }
 
   async get(auth: AuthDto, id: string): Promise<MemoryResponseDto> {
     await this.requireAccess({ auth, permission: Permission.MemoryRead, ids: [id] });
     const memory = await this.findOrFail(auth, id);
+    // Gallery: a stock client cannot decode a rule memory. Gallery clients keep reading any type by id.
+    if (auth.stockClient && !GallerySyncStreams.syncedMemoryTypes(false).includes(memory.type)) {
+      throw new BadRequestException('Memory not found');
+    }
     return mapMemory(memory, auth);
   }
 

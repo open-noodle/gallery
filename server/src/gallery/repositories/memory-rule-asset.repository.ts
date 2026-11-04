@@ -446,4 +446,19 @@ export class MemoryRuleAssetRepository {
 
     return !!result;
   }
+
+  /** The pets among `personGroupIds`: upstream's forBirthdayMemories has no notion of pets, so the birthday rule asks. */
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getPetPersonGroupIds(personGroupIds: string[]) {
+    if (personGroupIds.length === 0) {
+      return new Set<string>();
+    }
+
+    const rows = await this.db
+      .selectFrom('person_pet')
+      .select('personGroupId')
+      .where('personGroupId', 'in', personGroupIds)
+      .execute();
+    return new Set(rows.map(({ personGroupId }) => personGroupId));
+  }
 }

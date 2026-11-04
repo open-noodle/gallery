@@ -140,6 +140,28 @@ const seedDormantPersonChapter = async (
   return { person, chapterAssetIds };
 };
 
+// Four photos of one person in one year: enough for the birthday rule's fallback card.
+const addPersonAssets = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string, personGroupId: string) => {
+  const assetRepo = ctx.get(AssetRepository);
+  for (const localDateTime of [
+    '2024-06-01T12:00:00Z',
+    '2024-06-02T12:00:00Z',
+    '2024-06-03T12:00:00Z',
+    '2024-06-04T12:00:00Z',
+  ]) {
+    const { asset } = await ctx.newAsset({ ownerId, localDateTime });
+    await Promise.all([
+      ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
+      ctx.newJobStatus({ assetId: asset.id }),
+      ctx.newAssetFace({ assetId: asset.id, personGroupId }),
+      assetRepo.upsertFiles([
+        { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+        { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+      ]),
+    ]);
+  }
+};
+
 describe(MemoryService.name, () => {
   describe('get', () => {
     it('should return the memory', async () => {
@@ -824,6 +846,55 @@ describe(MemoryService.name, () => {
       ]);
       expect(memories[0]?.assets).toHaveLength(4);
       expect(memories[0]?.assets.map(({ id }) => id).toSorted()).toEqual([...pierreAssetIds].toSorted());
+    });
+
+    // F16: the rule runs upstream's forBirthdayMemories, which observes a 29 February birthday on 28 February in a
+    // non-leap year, and still skips pets through person_pet.
+    describe('birthday rule on upstream birthday query', () => {
+      it('creates the memory for a 29 February birthday on 28 February of a non-leap year', async () => {
+        const { sut, ctx } = setup();
+        const now = DateTime.fromObject({ year: 2025, month: 2, day: 28 }, { zone: 'utc' }) as DateTime<true>;
+        const { user } = await ctx.newUser();
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Leap', birthDate: new Date('1992-02-29') });
+        await addPersonAssets(ctx, user.id, person.personGroupId);
+
+        vi.setSystemTime(now.toJSDate());
+        await sut.onMemoriesCreate();
+
+        const memories = await ctx
+          .get(MemoryRepository)
+          .search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+        expect(memories).toEqual([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              ruleId: 'birthday',
+              context: expect.objectContaining({ personName: 'Leap' }),
+            }),
+          }),
+        ]);
+      });
+
+      it('does not create a birthday memory for a pet', async () => {
+        const { sut, ctx } = setup();
+        const now = DateTime.fromObject({ year: 2025, month: 7, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+        const { user } = await ctx.newUser();
+        const { person: pet } = await ctx.newPerson({
+          ownerId: user.id,
+          name: 'Rex',
+          type: 'pet',
+          species: 'dog',
+          birthDate: new Date('2020-07-10'),
+        });
+        await addPersonAssets(ctx, user.id, pet.personGroupId);
+
+        vi.setSystemTime(now.toJSDate());
+        await sut.onMemoriesCreate();
+
+        const memories = await ctx
+          .get(MemoryRepository)
+          .search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+        expect(memories.filter(({ data }) => (data as { ruleId?: string }).ruleId === 'birthday')).toEqual([]);
+      });
     });
 
     it('creates a recent-trip rule memory for a dense non-home cluster', async () => {

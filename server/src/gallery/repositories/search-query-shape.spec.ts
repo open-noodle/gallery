@@ -6,6 +6,7 @@ import { AssetOrder, AssetVisibility } from 'src/enum.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
+import { searchAssetBuilderWithLocalTaken } from 'src/utils/asset-filter.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 
 // Offline Kysely — compiles SQL without executing it. No DB connection needed.
@@ -925,5 +926,27 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"asset_favorite"');
       expect(sql).toContain('"shared_space_asset"');
     });
+  });
+});
+
+const compileLocalTaken = (options: Record<string, unknown>) =>
+  searchAssetBuilderWithLocalTaken(offlineKysely(), options as any)
+    .selectAll('asset')
+    .compile().sql;
+
+describe('searchAssetBuilderWithLocalTaken', () => {
+  const range = { takenAfter: new Date('2026-01-01T00:00:00.000Z'), takenBefore: new Date('2026-01-02T00:00:00.000Z') };
+
+  it('filters Gallery clients by local taken time with an exclusive end', () => {
+    const sql = compileLocalTaken(range);
+    expect(sql).toContain('"asset"."localDateTime" >= $');
+    expect(sql).toContain('"asset"."localDateTime" < $');
+    expect(sql).not.toContain('"fileCreatedAt"');
+  });
+
+  it('keeps the upstream fileCreatedAt range for a stock client', () => {
+    const sql = compileLocalTaken({ ...range, upstreamTakenRange: true });
+    expect(sql).toBe(buildAssetSearchSql(range));
+    expect(sql).not.toContain('"localDateTime" <');
   });
 });
