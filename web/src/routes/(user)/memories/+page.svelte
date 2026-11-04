@@ -1,6 +1,5 @@
 <script lang="ts">
   import { scrollMemory } from '#lib/actions/scroll-memory.ts';
-  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import { memoryManager } from '#lib/managers/memory-manager.svelte.ts';
   import { userPreferencesManager } from '#lib/managers/user-preferences-manager.svelte.ts';
@@ -12,7 +11,7 @@
   import { getAltText } from '#lib/utils/thumbnail-util.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import type { MemoryResponseDto } from '@immich/sdk';
-  import { IconButton, modalManager } from '@immich/ui';
+  import { IconButton, LoadingSpinner, modalManager } from '@immich/ui';
   import { mdiTune } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';

@@ -4,28 +4,28 @@ Gallery builds memory cards that bring old groups of photos back to the surface,
 
 ## Memory types
 
-There are two memory families:
+There are three memory families:
 
 | Type            | What it shows                                               | Title source                       |
 | --------------- | ----------------------------------------------------------- | ---------------------------------- |
 | **On this day** | Photos taken around the same calendar day in previous years | App-generated "N years ago" title  |
-| **Rule memory** | Server-curated sets such as birthdays and recent trips      | Server-provided title and subtitle |
+| **Birthday**    | Photos of a person taken on their past birthdays            | App-generated "Happy birthday"     |
+| **Rule memory** | Server-curated sets such as recent trips and month recaps   | Server-provided title and subtitle |
 
-Each individual type can be enabled or disabled both globally by an admin and per user. See [Generated memory controls](#generated-memory-controls) below for the full list of type keys.
+On this day and each rule memory type can be enabled or disabled both globally by an admin and per user. Birthday memories have no switch. See [Generated memory controls](#generated-memory-controls) below for the full list of type keys.
 
 Saved memories stay available after their normal display window. Hidden or deleted assets are excluded from generated memories.
 
 ## Birthday memories
 
-Birthday memories are generated from people with a birthday set on their person record.
+Birthday memories use the upstream memory type, so stock upstream apps show them too. They are generated for every named, visible person or pet in your own people with a birthday set, from the year after they were born.
 
-Gallery looks for photos of that person up to the target day. When there is enough history, it prefers a throwback that spans several years:
+- The card appears 3 days before the birthday and stays until the end of the day.
+- It holds photos of that person taken on their past birthdays: up to 5 per year and 25 in total. With more than 25 birthdays on record, it takes one photo from each of 25 random ones.
+- A 29 February birthday is celebrated on 28 February in other years.
+- A birthday with no photos taken on it gets no card.
 
-- At least 6 qualifying photos across at least 2 distinct years creates **Happy birthday, Name** with the subtitle **Photos from different years**.
-- If there is not enough cross-year history, Gallery can still create a smaller fallback from the 4 most recent qualifying photos, with the subtitle **Recent photos of Name**.
-- At most 2 photos per year are used in the cross-year set, and the memory is capped at 12 assets.
-
-Each birthday memory is deduplicated by person and day, so rerunning the nightly task does not create duplicate birthday cards for the same person.
+Birthday memories cannot be turned off by type. The birthday cards earlier Gallery versions made (on the day only, photos from any date) stay until retention removes them.
 
 ## Recent trip memories
 
@@ -78,7 +78,6 @@ The built-in types each have a stable key used in configuration:
 | Type key              | Setting label           | Controls                                                                      |
 | --------------------- | ----------------------- | ----------------------------------------------------------------------------- |
 | `on_this_day`         | On this day             | "N years ago" photo memories                                                  |
-| `birthday`            | Birthdays               | Birthday rule memories for named people                                       |
 | `recent_trip`         | Recent trips            | Recent trip rule memories                                                     |
 | `month_recap`         | This month              | A past year's photos from this calendar month, shown early in the month       |
 | `favorites_throwback` | Favorite moments        | Your favorite photos from this calendar month in a past year                  |
@@ -108,7 +107,6 @@ Once created, a memory stays in the memory lane on the home page for its visibil
 | Type key              | Generated on                                       | Stays in the memory lane for |
 | --------------------- | -------------------------------------------------- | ---------------------------- |
 | `on_this_day`         | every day                                          | 1 day                        |
-| `birthday`            | every day (a person's birthday must fall that day) | 1 day                        |
 | `recent_trip`         | every day                                          | 3–7 days, matching the trip  |
 | `on_this_day_place`   | every day                                          | 1 day                        |
 | `trip_anniversary`    | every day (the anniversary of a past trip's start) | 3–7 days, matching the trip  |
@@ -152,10 +150,7 @@ The per-type switches only control which memory types are generated and shown. T
 
 #### Legacy `birthday` / `recentTrips` fields
 
-Earlier versions exposed two booleans, `memories.birthday` and `memories.recentTrips`. They are **deprecated but still honored** for back-compat as aliases:
-
-- `memories.birthday` ⇒ `memories.types["birthday"]`
-- `memories.recentTrips` ⇒ `memories.types["recent_trip"]`
+Earlier versions exposed two booleans, `memories.birthday` and `memories.recentTrips`. `memories.recentTrips` is **deprecated but still honored** for back-compat as an alias of `memories.types["recent_trip"]`. `memories.birthday` is still accepted but ignored, because birthday memories no longer have a switch.
 
 Resolution precedence per type is: an explicit `types[key]` wins, otherwise the legacy boolean is used, otherwise the type defaults to on. Prefer the `types` map for new configuration, since it also covers `on_this_day`, which the legacy fields could not control.
 

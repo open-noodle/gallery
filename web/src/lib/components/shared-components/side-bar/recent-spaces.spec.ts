@@ -1,8 +1,8 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import RecentSpaces from '#lib/components/shared-components/side-bar/recent-spaces.svelte';
 import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { recentSpaceAlbumsExpanded } from '#lib/gallery/stores/preferences.store.ts';
 import { queryClient } from '#lib/queries/client.ts';
-import { recentSpaceAlbumsExpanded } from '#lib/stores/preferences.store.ts';
 import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { factory } from '#test/unit/factories.ts';

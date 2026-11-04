@@ -15,16 +15,12 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
-  import { lang } from '#lib/stores/preferences.store.ts';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
-  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
   import { AssetVisibility } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, modalManager } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -36,17 +32,7 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-
-  const handleAddAllToCollection = () => {
-    void modalManager.show(SearchAddAllToCollectionModal, {
-      terms: { isFavorite: true },
-      total: timelineManager?.assetCount ?? 0,
-      smartSearchEnabled: false,
-      language: $lang,
-    });
-  };
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const timelineGrouping = timelineGroupingProps(() => timelineManager, { addAllTerms: { isFavorite: true } });
   // #763: favorites are a per-user overlay, so this page is cross-scope like the Photos timeline
   // favorites filter (see buildPhotosTimelineOptions). Without these, a favorite a member placed on
   // another member's Space asset — which the overlay explicitly permits — would be unreachable here.
@@ -60,20 +46,14 @@
   // which is why it was reverted. Matching buildPhotosTimelineOptions keeps the two favorite
   // surfaces consistent; the trade-off is that an archived favorite of your own no longer appears
   // here, exactly as it already does not under the /photos favorites chip.
-  const baseTimelineOptions = {
+  const options = $derived({
     isFavorite: true,
     withStacked: true,
     withPartners: true,
     withSharedSpaces: true,
     visibility: AssetVisibility.Timeline,
-  };
-  const options = $derived({
-    ...baseTimelineOptions,
-    grouping: timelineGrouping,
+    grouping: timelineGrouping.grouping,
   });
-  const hideGroupingControls = $derived(
-    assetMultiSelectManager.selectionActive || (timelineManager?.isInitialized && timelineManager.assetCount === 0),
-  );
 
   const handleEscape = () => {
     if (!assetMultiSelectManager.selectionActive) {
@@ -88,36 +68,10 @@
     timelineManager.removeAssets(assetIds);
     assetMultiSelectManager.clear();
   };
-
-  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  }
-
-  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  }
 </script>
 
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} title={data.meta.title} scrollbar={false}>
-  <TimelineRouteGroupingBar
-    grouping={timelineGrouping}
-    hidden={hideGroupingControls}
-    resultCount={timelineManager?.assetCount ?? 0}
-    onGroupingChange={handleTimelineGroupingChange}
-    onAddAllToCollection={handleAddAllToCollection}
-  />
+  <TimelineRouteGroupingBar {...timelineGrouping.barProps} />
   <Timeline
     enableRouting={true}
     withStacked={true}
@@ -125,11 +79,7 @@
     {options}
     assetInteraction={assetMultiSelectManager}
     onEscape={handleEscape}
-    {temporalAnchor}
-    onTimelineBucketActivate={handleTimelineBucketActivate}
-    onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-    grouping={timelineGrouping}
-    onGroupingChange={handleTimelineGroupingChange}
+    {...timelineGrouping.timelineProps}
   >
     {#snippet empty()}
       <EmptyPlaceholder text={$t('no_favorites_message')} class="mx-auto mt-10" />

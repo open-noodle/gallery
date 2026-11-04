@@ -17,9 +17,6 @@
     onNextAsset?: () => void;
     onVideoEnded?: () => void;
     onVideoStarted?: () => void;
-    /** Slice 8 gap closure — threaded through to VideoNativeViewer's FaceEditorPanel. */
-    spaceId?: string;
-    canEditSpacePeople?: boolean;
   }
 
   let {
@@ -35,8 +32,6 @@
     onNextAsset,
     onVideoEnded,
     onVideoStarted,
-    spaceId,
-    canEditSpacePeople,
   }: Props = $props();
 
   const effectiveAssetId = $derived(assetId ?? asset.id);
@@ -57,7 +52,5 @@
     {onVideoEnded}
     {onVideoStarted}
     {onClose}
-    {spaceId}
-    {canEditSpacePeople}
   />
 {/if}

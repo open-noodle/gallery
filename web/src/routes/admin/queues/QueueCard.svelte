@@ -4,11 +4,11 @@
   import QueueCardButton from './QueueCardButton.svelte';
   import { Route } from '#lib/route.ts';
   import {
-    asQueueItem,
     formatSampledJobTypeCount,
     getQueueJobTypeLabel,
     type QueueJobTypeCounts,
-  } from '#lib/services/queue.service.ts';
+  } from '#lib/gallery/utils/queue-jobs.ts';
+  import { asQueueItem } from '#lib/services/queue.service.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { transformToTitleCase } from '#lib/utils.ts';
   import { QueueCommand, type QueueCommandDto, type QueueResponseDto } from '@immich/sdk';

@@ -2,7 +2,7 @@ import SpaceAlbumsList from '#lib/components/spaces/space-albums-list.svelte';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '#lib/stores/preferences.store.ts';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
-import { toggleSpaceAlbumGroupCollapsing } from '#lib/utils/space-album-grouping.ts';
+import { toggleAlbumGroupCollapsing } from '#lib/utils/album-utils.ts';
 import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
@@ -222,7 +222,7 @@ describe('SpaceAlbumsList', () => {
       }));
       renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
       expect(screen.getByTestId('space-album-group-2020')).toHaveAttribute('aria-expanded', 'true');
-      toggleSpaceAlbumGroupCollapsing('2020');
+      toggleAlbumGroupCollapsing('2020', spaceAlbumViewSettings);
       await waitFor(() =>
         expect(screen.getByTestId('space-album-group-2020')).toHaveAttribute('aria-expanded', 'false'),
       );

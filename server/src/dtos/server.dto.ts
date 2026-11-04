@@ -3,7 +3,7 @@ import z from 'zod';
 import type { SemVer } from 'semver';
 import { ExtraModel, HistoryBuilder } from 'src/decorators.js';
 import { ServerFeatureLevel, ServerFeatureLevelSchema } from 'src/enum.js';
-import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
+import { GalleryServerConfigExtension, GalleryServerFeaturesExtension } from 'src/gallery/dtos/server.dto.js';
 import { isoDatetimeToDate } from 'src/validation.js';
 
 const ServerPingResponseSchema = z
@@ -133,16 +133,13 @@ const ServerConfigSchema = z
     mapLightStyleUrl: z.string().describe('Map light style URL'),
     maintenanceMode: z.boolean().describe('Whether maintenance mode is active'),
     minFaces: z.int().describe('People min faces server default'),
-    availableMemoryTypes: z.array(z.string()).describe('Globally-available memory type keys'),
+    ...GalleryServerConfigExtension,
   })
   .meta({ id: 'ServerConfigDto' });
 
 const ServerFeaturesSchema = z
   .object({
     smartSearch: z.boolean().describe('Whether smart search is enabled'),
-    smartSearchHasCutoff: z
-      .boolean()
-      .describe('Whether smart search has an active relevance cutoff (clip.maxDistance)'),
     duplicateDetection: z.boolean().describe('Whether duplicate detection is enabled'),
     configFile: z.boolean().describe('Whether config file is available'),
     facialRecognition: z.boolean().describe('Whether facial recognition is enabled'),
@@ -159,32 +156,7 @@ const ServerFeaturesSchema = z
     email: z.boolean().describe('Whether email notifications are enabled'),
     ocr: z.boolean().describe('Whether OCR is enabled'),
     realtimeTranscoding: z.boolean().describe('Whether real-time transcoding is enabled'),
-    peopleStatistics: z.boolean().describe('Whether the people face statistics UI is enabled'),
-    // Gallery-fork: the admin UI hides config that only applies on the S3 storage backend (database
-    // backups to S3), and the client has no other signal for which backend the server is running on.
-    s3Storage: z.boolean().describe('Whether the server is running on the S3 storage backend'),
-    // Deliberately plain strings, not the SyncRequestType enum: a client must be able to
-    // parse a newer server's list without choking on values its own enum doesn't know yet.
-    syncRequestTypes: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating.',
-      ),
-    localTakenRange: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.',
-      ),
-    searchOptions: z.boolean().optional().describe('Whether POST /search/options exists. Absent on older servers.'),
-    searchFavoritesAcrossSpaces: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.',
-      ),
-    ...SpatialSceneServerFeatures,
+    ...GalleryServerFeaturesExtension,
   })
   .meta({ id: 'ServerFeaturesDto' });
 
@@ -207,14 +179,6 @@ const ReleaseEventV1Schema = z.object({
   releaseVersion: ServerVersionResponseSchema,
   type: ReleaseTypeSchema.nullable(),
 });
-
-const ServerMlHealthResponseSchema = z
-  .object({
-    smartSearchHealthy: z
-      .boolean()
-      .describe('Whether the ML server is currently reachable and healthy for smart search'),
-  })
-  .meta({ id: 'ServerMlHealthResponseDto' });
 
 export class ServerPingResponse extends createZodDto(ServerPingResponseSchema) {}
 export class ServerAboutResponseDto extends createZodDto(ServerAboutResponseSchema) {}
@@ -241,10 +205,11 @@ export class ServerStatsResponseDto extends createZodDto(ServerStatsResponseSche
 export class ServerMediaTypesResponseDto extends createZodDto(ServerMediaTypesResponseSchema) {}
 export class ServerConfigDto extends createZodDto(ServerConfigSchema) {}
 export class ServerFeaturesDto extends createZodDto(ServerFeaturesSchema) {}
-export class ServerMlHealthResponseDto extends createZodDto(ServerMlHealthResponseSchema) {}
 
 @ExtraModel()
 export class ReleaseEventV1 extends createZodDto(ReleaseEventV1Schema) {}
 
 @ExtraModel()
 export class ServerFeatureLevelDto extends createZodDto(ServerFeatureLevelSchema as unknown as z.ZodObject) {}
+
+export * from 'src/gallery/dtos/server.dto.js';

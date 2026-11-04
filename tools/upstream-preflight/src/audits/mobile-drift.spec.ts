@@ -61,6 +61,52 @@ describe('analyzeMobileDriftFiles', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('derives the renumber target from every fork-only step, not from the highest one', () => {
+    // The real ladder shape: fork-only steps sit mid-ladder (v23-v25, v30, v36-v38) and renumbered
+    // upstream steps sit above them (v39-v41 are upstream v32-v34), so upstream vN lands at
+    // vN + 7. "Highest owned + 1" would point at v39, which exists, and pass silently.
+    const ladder = (top: number) => ({
+      currentDbRepository: [
+        `int get schemaVersion => ${top};`,
+        ...Array.from(
+          { length: top - 22 },
+          (_, index) =>
+            `from${index + 22}To${index + 23}: (m, v${index + 23}) async {}`,
+        ),
+      ].join('\n'),
+      currentSnapshots: Array.from(
+        { length: top - 21 },
+        (_, index) => `drift_schema_v${index + 22}.json`,
+      ),
+    });
+    const owned = [23, 24, 25, 30, 36, 37, 38];
+
+    const before = analyzeMobileDriftFiles({
+      galleryOwnedVersions: owned,
+      galleryVersionsShipped: true,
+      ...ladder(41),
+      upstreamTouchedFiles: [
+        'mobile/drift_schemas/main/drift_schema_v35.json',
+        'mobile/drift_schemas/main/drift_schema_v36.json',
+      ],
+    });
+    expect(before.ok).toBe(false);
+    expect(before.details.join('\n')).toContain(
+      'Upstream touches shipped Gallery Drift version v36; keep Gallery v23/v24/v25/v30/v36/v37/v38 and renumber incoming upstream migrations to v43',
+    );
+
+    const after = analyzeMobileDriftFiles({
+      galleryOwnedVersions: owned,
+      galleryVersionsShipped: true,
+      ...ladder(43),
+      upstreamTouchedFiles: [
+        'mobile/drift_schemas/main/drift_schema_v35.json',
+        'mobile/drift_schemas/main/drift_schema_v36.json',
+      ],
+    });
+    expect(after.ok).toBe(true);
+  });
+
   it('passes when shipped Gallery versions are untouched and callbacks exist', () => {
     const result = analyzeMobileDriftFiles({
       galleryOwnedVersions: [23, 24],

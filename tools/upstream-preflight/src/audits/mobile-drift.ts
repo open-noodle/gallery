@@ -76,12 +76,11 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
       ),
     )
     .sort((left, right) => left - right);
-  const highestOwnedVersion =
-    input.galleryOwnedVersions.length > 0
-      ? Math.max(...input.galleryOwnedVersions)
-      : undefined;
+  // The fork's ladder is upstream's with the fork-only steps inserted, so an incoming upstream vN
+  // lands at vN plus the number of fork-only steps: the owned list, which must name every one.
+  const forkOnlySteps = new Set(input.galleryOwnedVersions).size;
   const renumberedVersions = touchedOwnedVersions.map(
-    (_, index) => (highestOwnedVersion ?? 0) + index + 1,
+    (version) => version + forkOnlySteps,
   );
   if (
     input.galleryVersionsShipped &&
