@@ -11,9 +11,9 @@ const brandingConfig = resolve(import.meta.dirname, '../../../../../branding/con
 const { version: base } = JSON.parse(readFileSync(brandingConfig, 'utf8')).upstream as { version: string };
 
 /**
- * A stock Immich client (no `x-gallery-app`, no Gallery app User-Agent) gets only what upstream at the base
- * version can decode. Everything else in the e2e suite is a Gallery client (src/gallery-client.ts).
- */
+A stock Immich client (no `x-gallery-app`, no Gallery app User-Agent) gets only what upstream at the base
+version can decode. Everything else in the e2e suite is a Gallery client (src/gallery-client.ts).
+*/
 describe('stock Immich clients', () => {
   let admin: LoginResponseDto;
 
@@ -31,7 +31,8 @@ describe('stock Immich clients', () => {
     it('reports the Immich base on GET /server/version', async () => {
       const { status, body } = await request(app).get('/server/version').unset(GALLERY_APP_HEADER);
       expect(status).toBe(200);
-      expect(`${body.major}.${body.minor}.${body.patch}`).toBe(base);
+      // The endpoint carries major.minor.patch only, so a prerelease base (the rolling branch's -rc.N) reports its core.
+      expect(`${body.major}.${body.minor}.${body.patch}`).toBe(base.replace(/-.*$/, ''));
     });
 
     it('reports the Immich base and its release page on GET /server/about', async () => {

@@ -8,9 +8,9 @@ type ConfigNode = Record<string, unknown>;
 const isNode = (value: unknown): value is ConfigNode => !!value && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Fills every Gallery setting an upstream-shaped config body leaves out with its stored value, in place. A setting
- * the body sends is kept as sent, and a path whose parent is missing is left alone for validation to report.
- */
+Fills every Gallery setting an upstream-shaped config body leaves out with its stored value, in place. A setting
+the body sends is kept as sent, and a path whose parent is missing is left alone for validation to report.
+*/
 export const withStoredGallerySettings = (body: unknown, stored: unknown) => {
   for (const path of galleryConfigPaths) {
     const keys = path.split('.');
@@ -29,10 +29,10 @@ export const withStoredGallerySettings = (body: unknown, stored: unknown) => {
 };
 
 /**
- * Lets `PUT /system-config` and `PUT /admin/config` accept an upstream-shaped body (a stock admin tool, a
- * config-as-code script). Runs before validation, so the Gallery sections stay required in the schema and a
- * missing one keeps its stored value; a schema default would reset it on every such PUT instead.
- */
+Lets `PUT /system-config` and `PUT /admin/config` accept an upstream-shaped body (a stock admin tool, a
+config-as-code script). Runs before validation, so the Gallery sections stay required in the schema and a
+missing one keeps its stored value; a schema default would reset it on every such PUT instead.
+*/
 @Injectable()
 export class UpstreamConfigBodyInterceptor implements NestInterceptor {
   constructor(private service: SystemConfigService) {}
