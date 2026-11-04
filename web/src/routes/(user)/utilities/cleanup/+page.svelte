@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CleanupHubPage from '$lib/gallery/cleanup/pages/CleanupHubPage.svelte';
+  import CleanupHubPage from '#lib/gallery/cleanup/pages/CleanupHubPage.svelte';
   import type { PageData } from './$types';
 
   type Props = {

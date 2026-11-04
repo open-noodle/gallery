@@ -1,12 +1,12 @@
+import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
+import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
+import { pulse } from '#lib/gallery/motion/index.ts';
 import { AssetTypeEnum, CleanupQueue, type CleanupAssetDto } from '@immich/sdk';
 import type { BeforeNavigate } from '@sveltejs/kit';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component, ComponentProps } from 'svelte';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { finishedDay } from '$lib/gallery/cleanup/finished-day';
-import { rewindDirection } from '$lib/gallery/cleanup/rewind-direction';
-import { pulse } from '$lib/gallery/motion';
 import RewindDay from './RewindDay.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -40,8 +40,8 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
-vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
-vi.mock('$lib/gallery/motion', async (importOriginal) => ({
+vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: mocks.flags }));
+vi.mock('#lib/gallery/motion/index.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   pulse: vi.fn(),
   celebrate: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('$lib/gallery/motion', async (importOriginal) => ({
 vi.mock('$app/state', () => ({
   page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
 }));
-vi.mock('$lib/utils/navigation', async (importOriginal) => ({
+vi.mock('#lib/utils/navigation.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   navigate: mocks.navigate,
 }));

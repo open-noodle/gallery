@@ -1,4 +1,4 @@
-import { contain, depthFromRgba, dilate, stepSpring, subjectDepth } from '$lib/gallery/spatial/depth';
+import { contain, depthFromRgba, dilate, stepSpring, subjectDepth } from '#lib/gallery/spatial/depth.ts';
 
 describe('depthFromRgba', () => {
   it('keeps the red channel of each pixel', () => {

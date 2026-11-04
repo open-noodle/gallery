@@ -1,10 +1,10 @@
+import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
+import CleanupPhotoWindow from '#lib/gallery/cleanup/CleanupPhotoWindow.svelte';
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import CleanupExpandButton from '$lib/gallery/cleanup/CleanupExpandButton.svelte';
-import CleanupPhotoWindow from '$lib/gallery/cleanup/CleanupPhotoWindow.svelte';
 
 const getAssetMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
+vi.mock('#lib/managers/AssetCacheManager.svelte.js', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
 
 const asset = (id: string): CleanupAssetDto => ({
   id,
