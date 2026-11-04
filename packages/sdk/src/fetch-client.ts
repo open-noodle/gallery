@@ -1,6 +1,6 @@
 /**
  * Immich
- * 3.4.0-rc.0
+ * 3.4.0-rc.1
  * DO NOT MODIFY - This file has been generated using oazapfts.
  * See https://www.npmjs.com/package/oazapfts
  */
@@ -2605,6 +2605,7 @@ export type OnboardingStatusResponseDto = {
     hasTelemetry: TelemetryLevel;
     isAuthenticated: boolean;
     requiresAuthentication: boolean;
+    restoreJobId?: string;
     status: BootstrapStatus;
 };
 export type CurrentRecoveryKeyResponse = {
@@ -5181,6 +5182,8 @@ export type UserUpdateMeDto = {
     email?: string;
     /** User name */
     name?: string;
+    /** User password (deprecated, use change password endpoint) */
+    password?: string;
 };
 export type OnboardingResponseDto = {
     /** Is user onboarded */
@@ -8493,6 +8496,15 @@ export function futoBackupsImportRecoveryKey({ importRecoveryKeyRequest }: {
  */
 export function futoBackupsReportError(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/futo-backups/onboarding/report-error", {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Continue after a restore
+ */
+export function futoBackupsContinueAfterRestore(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/futo-backups/onboarding/restore/continue", {
         ...opts,
         method: "POST"
     }));
@@ -13773,7 +13785,8 @@ export enum QueueJobStatus {
     Failed = "failed",
     Completed = "completed",
     Delayed = "delayed",
-    Waiting = "waiting"
+    Waiting = "waiting",
+    Paused = "paused"
 }
 export enum SearchOrderField {
     FileCreatedAt = "fileCreatedAt",
