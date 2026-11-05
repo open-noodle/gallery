@@ -66,6 +66,17 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  /** Data Saver video copies (specs/2026-11-01-data-saver-video-design.md): they move with the encoded videos. */
+  streamDataSaverVideos(direction: StorageMigrationDirection) {
+    return this.db
+      .selectFrom('asset_data_saver_video')
+      .select((eb) => ['assetId', eb.ref('path').$castTo<string>().as('path')])
+      .where('path', 'is not', null)
+      .$if(direction === 'toS3', (qb) => qb.where('path', 'like', '/%'))
+      .$if(direction === 'toDisk', (qb) => qb.where('path', 'not like', '/%'))
+      .stream();
+  }
+
   streamPersonThumbnails(direction: StorageMigrationDirection) {
     return this.db
       .selectFrom('person')
@@ -192,6 +203,12 @@ export class StorageMigrationRepository {
         .where('profileImagePath', pathFilter, pathPattern)
         .executeTakeFirstOrThrow(),
     ]);
+    // Data Saver copies move with the encoded videos they sit beside
+    const dataSaverVideos = await this.db
+      .selectFrom('asset_data_saver_video')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('path', pathFilter, pathPattern)
+      .executeTakeFirstOrThrow();
 
     return {
       originals: originals.count,
@@ -200,7 +217,7 @@ export class StorageMigrationRepository {
       previews: Number(assetFiles.previews) + Number(depthMaps.count),
       fullsize: assetFiles.fullsize,
       sidecars: assetFiles.sidecars,
-      encodedVideos: encodedVideos.count,
+      encodedVideos: Number(encodedVideos.count) + Number(dataSaverVideos.count),
       personThumbnails: personThumbnails.count,
       profileImages: profileImages.count,
     };
@@ -245,6 +262,17 @@ export class StorageMigrationRepository {
   async updateDepthMapPath(assetId: string, oldPath: string, newPath: string): Promise<boolean> {
     const result = await this.db
       .updateTable('asset_spatial_scene')
+      .set({ path: newPath })
+      .where('assetId', '=', assetId)
+      .where('path', '=', oldPath)
+      .executeTakeFirst();
+
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  async updateDataSaverVideoPath(assetId: string, oldPath: string, newPath: string): Promise<boolean> {
+    const result = await this.db
+      .updateTable('asset_data_saver_video')
       .set({ path: newPath })
       .where('assetId', '=', assetId)
       .where('path', '=', oldPath)

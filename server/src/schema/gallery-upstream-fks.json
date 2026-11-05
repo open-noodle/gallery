@@ -35,6 +35,7 @@
       ],
       "forkForeignKeys": [
         "album_space_asset_assetId_fkey",
+        "asset_data_saver_video_assetId_fkey",
         "asset_duplicate_checksum_assetId_fkey",
         "asset_favorite_assetId_fkey",
         "asset_image_adjust_assetId_fkey",
