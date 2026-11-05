@@ -179,6 +179,24 @@ describe(DataSaverVideoService.name, () => {
     });
   });
 
+  describe('onBootstrap', () => {
+    // A config file never fires ConfigUpdate, so the boot is where a feature switched on there gets its backfill.
+    it('backfills missing or stale copies when the feature is on', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled());
+      await sut.onBootstrap();
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetEncodeDataSaverVideoQueueAll,
+        data: { force: false },
+      });
+    });
+
+    it('queues nothing while the feature is off', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled({ enabled: false }));
+      await sut.onBootstrap();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
   describe('onConfigUpdate', () => {
     const queueAll = { name: JobName.AssetEncodeDataSaverVideoQueueAll, data: { force: false } };
 

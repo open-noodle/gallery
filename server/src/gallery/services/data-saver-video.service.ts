@@ -35,9 +35,17 @@ import { mimeTypes } from 'src/utils/mime-types.js';
 export class DataSaverVideoService extends BaseService {
   videoInterfaces: VideoInterfaces = { dri: [], mali: false };
 
+  // Also backfills on start. A config file never fires ConfigUpdate (the server reads it at boot and refuses saves),
+  // so turning the feature on there, or changing its settings, would otherwise only reach new uploads. The queue-all
+  // selects only missing or stale copies, so a restart with everything current encodes nothing.
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap() {
     this.videoInterfaces = await this.storageCore.getVideoInterfaces();
+
+    const { ffmpeg } = await this.getConfig({ withCache: false });
+    if (ffmpeg.dataSaver.enabled) {
+      await this.jobRepository.queue({ name: JobName.AssetEncodeDataSaverVideoQueueAll, data: { force: false } });
+    }
   }
 
   // Chained off JobSuccess, as Spatial Scene is, so upstream's follow-up list in JobService.onDone stays untouched.
