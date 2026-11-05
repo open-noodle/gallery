@@ -117,8 +117,10 @@
     onThumbnailClick,
   }: Props = $props();
 
-  timelineManager = new TimelineManager();
-  onDestroy(() => timelineManager.destroy());
+  const ownManager = new TimelineManager();
+  timelineManager = ownManager;
+  // Not the bound prop: on a remount the parent's binding already holds the next instance's manager.
+  onDestroy(() => ownManager.destroy());
   $effect(() => options && void timelineManager.updateOptions(options));
 
   let scrollableElement: HTMLElement | undefined = $state();
