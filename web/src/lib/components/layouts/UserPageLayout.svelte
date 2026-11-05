@@ -3,7 +3,6 @@
 </script>
 
 <script lang="ts">
-  import { useActions, type ActionArray } from '#lib/actions/use-actions.ts';
   import NavigationBar from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
   import UserSidebar from '#lib/components/shared-components/side-bar/UserSidebar.svelte';
   import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
@@ -18,7 +17,6 @@
     title?: string | undefined;
     description?: string | undefined;
     scrollbar?: boolean;
-    use?: ActionArray;
     actions?: Array<HeaderButtonActionItem | MenuItemType>;
     leading?: Snippet;
     descriptionTrailing?: Snippet;
@@ -32,13 +30,13 @@
     title = undefined,
     description = undefined,
     scrollbar = true,
-    use = [],
     actions = [],
     leading,
     descriptionTrailing,
     sidebar,
     buttons,
     children,
+    ...rest
   }: Props = $props();
 
   const enabledActions = $derived(
@@ -100,7 +98,7 @@
   {/if}
 
   <main class="relative">
-    <div class="{scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" use:useActions={use}>
+    <div class="{scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" {...rest}>
       {@render children?.()}
     </div>
 
