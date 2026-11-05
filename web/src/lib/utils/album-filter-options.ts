@@ -53,7 +53,8 @@ export function buildAlbumTimelineOptions(
   order: AssetOrder,
   filters: FilterState,
 ): Record<string, unknown> {
-  const base = applyCommonFilterFields({ albumId, order }, filters);
+  // Stacks collapse to one photo the album holds (server: album-stack-collapse.ts), as on /photos.
+  const base = applyCommonFilterFields({ albumId, order, withStacked: true }, filters);
 
   // The route already scopes the query to `albumId`; the server's albumId is a scalar driving one
   // inner join, so a second album cannot be AND-ed. A stray albumId filter is therefore never

@@ -3,6 +3,7 @@ import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { createFilterState, type FilterPanelConfig, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { albumStackPreferences } from '$lib/gallery/stack/album-stack-preferences.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
@@ -585,5 +586,29 @@ describe('FilteredTimelineController', () => {
 
     sut.onSpaceAddAssets({});
     expect(sut.timelineReloadToken).toBe(1);
+  });
+
+  describe('album stack count setting', () => {
+    afterEach(() => {
+      albumStackPreferences.countInAlbum = false;
+    });
+
+    it('collapses stacks and asks for album-only counts only when the setting is on', () => {
+      navigate('/albums/a1');
+      const sut = create(() =>
+        createAlbumTimeline({
+          name: 'album',
+          getAlbum: () => ({ id: 'a1', albumUsers: [] }) as never,
+          getTimelineManager: () => undefined,
+          isBrowse: () => true,
+        }),
+      );
+      expect(sut.options).toMatchObject({ albumId: 'a1', withStacked: true });
+      expect(sut.options).not.toHaveProperty('stackCountInAlbum');
+
+      albumStackPreferences.countInAlbum = true;
+      flushSync();
+      expect(sut.options).toMatchObject({ albumId: 'a1', withStacked: true, stackCountInAlbum: true });
+    });
   });
 });

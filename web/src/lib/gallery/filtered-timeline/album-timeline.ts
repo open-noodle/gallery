@@ -1,6 +1,7 @@
 import { AssetOrder, type AlbumResponseDto } from '@immich/sdk';
 import { page } from '$app/state';
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { albumStackPreferences } from '$lib/gallery/stack/album-stack-preferences.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
@@ -64,7 +65,10 @@ export const createAlbumTimeline = ({
     urlMode: 'filter-state',
     hydrate: hydrateAlbumFilters,
     scope: () => ({ albumIds: [getAlbum().id] }),
-    timelineOptions: (filters) => buildAlbumTimelineOptions(getAlbum().id, albumOrder(getAlbum(), filters), filters),
+    timelineOptions: (filters) => ({
+      ...buildAlbumTimelineOptions(getAlbum().id, albumOrder(getAlbum(), filters), filters),
+      ...(albumStackPreferences.countInAlbum && { stackCountInAlbum: true }),
+    }),
     browseConfig: () => buildAlbumDetailFilterConfig(getAlbum().id),
     facetFailure: 'empty',
     queryModeProviders: false,

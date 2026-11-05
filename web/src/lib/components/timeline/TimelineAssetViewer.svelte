@@ -5,6 +5,7 @@
   import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { AssetAction } from '$lib/constants';
+  import { albumStackSuccessor } from '$lib/gallery/stack/album-stack-strip';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -116,7 +117,8 @@
   const onAlbumRemoveAssets = async ({ assetIds, albumIds }: { assetIds: string[]; albumIds: string[] }) => {
     if (!!album && albumIds.includes(album.id) && assetIds.includes(assetCursor.current.id)) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      (await navigateToAsset(assetCursor?.nextAsset)) ||
+      (await navigateToAsset(await albumStackSuccessor(album.id, assetCursor.current))) ||
+        (await navigateToAsset(assetCursor?.nextAsset)) ||
         (await navigateToAsset(assetCursor?.previousAsset)) ||
         (await handleClose(assetCursor.current.id));
     }
