@@ -1037,6 +1037,10 @@ export enum JobName {
   SpatialSceneQueueAll = 'SpatialSceneQueueAll',
   SpatialScene = 'SpatialScene',
 
+  // Data Saver video
+  AssetEncodeDataSaverVideoQueueAll = 'AssetEncodeDataSaverVideoQueueAll',
+  AssetEncodeDataSaverVideo = 'AssetEncodeDataSaverVideo',
+
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',
 

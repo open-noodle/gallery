@@ -91,6 +91,14 @@ export type AdminConfigClassificationDto = {
     /** Enable classification globally */
     enabled?: boolean;
 };
+export type AdminConfigFFmpegDataSaverDto = {
+    /** Store a small extra copy of each video for the mobile app on mobile data */
+    enabled?: boolean;
+    /** Bitrate cap of the Data Saver copy, in ffmpeg notation (for example 1500k) */
+    maxBitrate: string;
+    targetResolution: DataSaverVideoResolution;
+    targetVideoCodec: DataSaverVideoCodec;
+};
 export type AdminConfigFFmpegRealtimeDto = {
     /** Enable real-time HLS transcoding (alpha) */
     enabled: boolean;
@@ -114,6 +122,7 @@ export type AdminConfigFFmpegDto = {
     cqMode: CQMode;
     /** CRF */
     crf: number;
+    dataSaver: AdminConfigFFmpegDataSaverDto;
     /** GOP size */
     gopSize: number;
     /** Max bitrate */
@@ -3980,6 +3989,8 @@ export type ServerFeaturesDto = {
     backups: boolean;
     /** Whether config file is available */
     configFile: boolean;
+    /** Whether videos may have a Data Saver copy at /assets/{id}/video/data-saver. Absent on older servers. */
+    dataSaverVideo?: boolean;
     /** Whether duplicate detection is enabled */
     duplicateDetection: boolean;
     /** Whether email notifications are enabled */
@@ -7296,6 +7307,24 @@ export function updateAssetTrim({ id, assetVideoTrimDto }: {
         method: "PUT",
         body: assetVideoTrimDto
     })));
+}
+/**
+ * Play the Data Saver copy of a video
+ */
+export function playAssetVideoDataSaver({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/assets/${encodeURIComponent(id)}/video/data-saver${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Play asset video
@@ -12124,6 +12153,16 @@ export enum CQMode {
     Cqp = "cqp",
     Icq = "icq"
 }
+export enum DataSaverVideoResolution {
+    $480 = "480",
+    $720 = "720",
+    $1080 = "1080"
+}
+export enum DataSaverVideoCodec {
+    H264 = "h264",
+    Hevc = "hevc",
+    Av1 = "av1"
+}
 export enum HlsVideoResolution {
     $480 = 480,
     $720 = 720,
@@ -12724,6 +12763,8 @@ export enum JobName {
     PetRecognition = "PetRecognition",
     SpatialSceneQueueAll = "SpatialSceneQueueAll",
     SpatialScene = "SpatialScene",
+    AssetEncodeDataSaverVideoQueueAll = "AssetEncodeDataSaverVideoQueueAll",
+    AssetEncodeDataSaverVideo = "AssetEncodeDataSaverVideo",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",
     IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
     IntegrityUntrackedFiles = "IntegrityUntrackedFiles",

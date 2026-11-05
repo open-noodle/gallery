@@ -35,7 +35,10 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
   trash: '/src/routes/admin/system-settings/TrashSettings.svelte',
   'user-settings': '/src/routes/admin/system-settings/UserSettings.svelte',
   'version-check': '/src/routes/admin/system-settings/NewVersionCheckSettings.svelte',
-  'video-transcoding': '/src/routes/admin/system-settings/FFmpegSettings.svelte',
+  'video-transcoding': [
+    '/src/routes/admin/system-settings/FFmpegSettings.svelte',
+    '/src/lib/gallery/components/admin/data-saver-video-settings.svelte',
+  ],
 };
 
 // Raw sources, fetched only when someone first searches the settings page.

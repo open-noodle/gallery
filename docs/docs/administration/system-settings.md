@@ -286,3 +286,7 @@ In addition to the conditions in `required`, video streams are also transcoded i
 #### Videos higher than target resolution or not in an accepted format (`optimal`) {#ffmpeg.transcode-optimal}
 
 In addition to the conditions in `required`, video streams are also transcoded if the horizontal **and** vertical dimensions are higher than [`targetResolution`](#ffmpeg.targetResolution).
+
+### Data Saver video (`ffmpeg.dataSaver`) {#ffmpeg.dataSaver}
+
+An optional second, small copy of each video, which the mobile app streams on mobile data. Off by default. See [Data Saver Video](/features/data-saver-video) for how it works, its settings and what it does to existing videos.

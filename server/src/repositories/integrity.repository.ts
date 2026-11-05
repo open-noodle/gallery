@@ -115,6 +115,12 @@ export class IntegrityRepository {
           .select('asset_spatial_scene.path as path')
           .where('asset_spatial_scene.path', 'in', paths),
       )
+      .union((eb) =>
+        eb
+          .selectFrom('asset_data_saver_video')
+          .select((eb) => eb.ref('asset_data_saver_video.path').$castTo<string>().as('path'))
+          .where('asset_data_saver_video.path', 'in', paths),
+      )
       .execute();
   }
 

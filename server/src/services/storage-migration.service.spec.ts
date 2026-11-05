@@ -252,6 +252,9 @@ describe(StorageMigrationService.name, () => {
           },
         ]),
       );
+      mocks.storageMigration.streamDataSaverVideos.mockReturnValue(
+        makeStream([{ assetId: 'asset-2', path: '/usr/src/app/upload/encoded-video/user/ab/cd/asset-2_ds.mp4' }]),
+      );
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(
         makeStream([
           {
@@ -272,7 +275,17 @@ describe(StorageMigrationService.name, () => {
 
       // Verify the jobs were queued
       const queuedJobs = mocks.job.queueAll.mock.calls.flat().flat();
-      expect(queuedJobs).toHaveLength(6);
+      expect(queuedJobs).toHaveLength(7);
+      expect(queuedJobs).toContainEqual(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            entityType: 'asset',
+            entityId: 'asset-2',
+            fileType: 'dataSaverVideo',
+            sourcePath: '/usr/src/app/upload/encoded-video/user/ab/cd/asset-2_ds.mp4',
+          }),
+        }),
+      );
       expect(queuedJobs).toContainEqual(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -323,6 +336,7 @@ describe(StorageMigrationService.name, () => {
       expect(mocks.storageMigration.streamAssetFiles).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamDepthMaps).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamEncodedVideos).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.streamDataSaverVideos).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamPersonThumbnails).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamProfileImages).not.toHaveBeenCalled();
     });
@@ -673,6 +687,31 @@ describe(StorageMigrationService.name, () => {
         'thumbs/user/ab/cd/asset-1_depth.png',
       );
       expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
+    });
+
+    it('should update the Data Saver copy path for dataSaverVideo file type', async () => {
+      const dataSaverJob = {
+        ...baseJob,
+        fileType: 'dataSaverVideo',
+        sourcePath: '/usr/src/app/upload/encoded-video/user/ab/cd/asset-1_ds.mp4',
+      };
+
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.exists.mockResolvedValue(false);
+      mockDiskBackend.get.mockResolvedValue({ stream: Readable.from([]) });
+      mockS3Backend.put.mockResolvedValue(void 0);
+      mocks.storageMigration.updateDataSaverVideoPath.mockResolvedValue(true);
+      mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+      const result = await sut.handleMigration(dataSaverJob);
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.storageMigration.updateDataSaverVideoPath).toHaveBeenCalledWith(
+        'asset-1',
+        dataSaverJob.sourcePath,
+        'encoded-video/user/ab/cd/asset-1_ds.mp4',
+      );
+      expect(mocks.storageMigration.updateAssetEncodedVideoPath).not.toHaveBeenCalled();
     });
 
     it('should update asset file path for assetFile entity type', async () => {

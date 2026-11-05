@@ -49,6 +49,7 @@ import {
   galleryServerDefaults,
   galleryTopLevelDefaults,
 } from 'src/gallery/dtos/config.dto.js';
+import { GalleryDataSaverVideoSchema, galleryDataSaverVideoDefaults } from 'src/gallery/dtos/data-saver-video.dto.js';
 
 const { Admin, User, Public } = ConfigVisibility;
 
@@ -155,6 +156,7 @@ const AdminConfigFFmpegSchema = z
           .meta({ visibility: User }),
       })
       .meta({ id: 'AdminConfigFFmpegRealtimeDto' }),
+    dataSaver: GalleryDataSaverVideoSchema,
   })
   .meta({ id: 'AdminConfigFFmpegDto' });
 
@@ -652,6 +654,7 @@ export const defaults = Object.freeze<SystemConfig>({
       videoCodecs: [VideoCodec.H264, VideoCodec.Hevc],
       resolutions: [HlsVideoResolution.p480, HlsVideoResolution.p720, HlsVideoResolution.p1080],
     },
+    dataSaver: galleryDataSaverVideoDefaults,
   },
   integrityChecks: {
     missingFiles: {

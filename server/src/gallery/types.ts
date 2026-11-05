@@ -155,6 +155,10 @@ export type GalleryJobItem =
   | { name: JobName.SpatialSceneQueueAll; data: IBaseJob }
   | { name: JobName.SpatialScene; data: IEntityJob }
 
+  // Data Saver video
+  | { name: JobName.AssetEncodeDataSaverVideoQueueAll; data: IBaseJob }
+  | { name: JobName.AssetEncodeDataSaverVideo; data: IEntityJob }
+
   // Storage Backend Migration
   | { name: JobName.StorageBackendMigrationQueueAll; data: IStorageMigrationQueueAllJob }
   | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob }

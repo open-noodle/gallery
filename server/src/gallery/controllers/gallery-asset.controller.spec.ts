@@ -2,6 +2,7 @@ import request from 'supertest';
 import { AssetController } from 'src/controllers/asset.controller.js';
 import { controllers } from 'src/controllers/index.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { factory } from 'test/small.factory.js';
@@ -11,11 +12,13 @@ describe(GalleryAssetController.name, () => {
   let ctx: ControllerContext;
   const service = mockBaseService(GalleryAssetService);
   const spatialScene = mockBaseService(SpatialSceneService);
+  const dataSaverVideo = mockBaseService(DataSaverVideoService);
 
   beforeAll(async () => {
     ctx = await controllerSetup(GalleryAssetController, [
       { provide: GalleryAssetService, useValue: service },
       { provide: SpatialSceneService, useValue: spatialScene },
+      { provide: DataSaverVideoService, useValue: dataSaverVideo },
     ]);
     return () => ctx.close();
   });
@@ -23,6 +26,7 @@ describe(GalleryAssetController.name, () => {
   beforeEach(() => {
     service.resetAllMocks();
     spatialScene.resetAllMocks();
+    dataSaverVideo.resetAllMocks();
     ctx.reset();
   });
 
@@ -121,6 +125,25 @@ describe(GalleryAssetController.name, () => {
       const id = factory.uuid();
       await request(ctx.getHttpServer()).get(`/assets/${id}/depth`);
       expect(spatialScene.getDepthMap).toHaveBeenCalledWith(undefined, id);
+    });
+  });
+
+  describe('GET /assets/:id/video/data-saver', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/video/data-saver`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a valid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).get('/assets/not-a-uuid/video/data-saver');
+      expect(status).toBe(400);
+      expect(dataSaverVideo.playbackDataSaverVideo).not.toHaveBeenCalled();
+    });
+
+    it('should pass the range header to the service', async () => {
+      const id = factory.uuid();
+      await request(ctx.getHttpServer()).get(`/assets/${id}/video/data-saver`).set('Range', 'bytes=0-1023');
+      expect(dataSaverVideo.playbackDataSaverVideo).toHaveBeenCalledWith(undefined, id, 'bytes=0-1023');
     });
   });
 

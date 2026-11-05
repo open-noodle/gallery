@@ -27,6 +27,8 @@ enum StoreKey<T> {
   libraryCleanupPrefs<String>._(90007),
   // The Photos tab's library view (lib/gallery/library_view.provider.dart, #1038).
   photosLibraryView<String>._(90008),
+  // Data Saver video's "on mobile data" switch (lib/gallery/video/data_saver_video.dart).
+  dataSaverVideoOnMobileData<bool>._(90009),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

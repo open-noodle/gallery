@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
+import 'package:immich_mobile/gallery/video/data_saver_video.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/is_motion_video_playing.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/video_player_provider.dart';
@@ -169,7 +170,7 @@ class NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widge
       }
 
       final isOriginalVideo = ref.read(appConfigProvider).viewer.loadOriginalVideo;
-      final String postfixUrl = isOriginalVideo ? 'original' : 'video/playback';
+      final String postfixUrl = isOriginalVideo ? 'original' : await ref.read(remoteVideoRouteProvider).resolve();
       final String assetId = remoteAsset.livePhotoVideoId ?? remoteAsset.id;
       final String videoUrl = '$serverEndpoint/assets/$assetId/$postfixUrl';
 

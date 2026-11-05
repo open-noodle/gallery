@@ -13,6 +13,7 @@
     "body": {
       "backups": false,
       "configFile": false,
+      "dataSaverVideo": false,
       "duplicateDetection": false,
       "email": false,
       "facialRecognition": false,

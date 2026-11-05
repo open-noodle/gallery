@@ -284,4 +284,6 @@ export const galleryConfigPaths = [
   'machineLearning.spatialScene',
   'machineLearning.facialRecognition.suggestions',
   'nightlyTasks.clusterNewPets',
+  // Data Saver video (src/gallery/dtos/data-saver-video.dto.ts), spread into the upstream FFmpeg section
+  'ffmpeg.dataSaver',
 ];

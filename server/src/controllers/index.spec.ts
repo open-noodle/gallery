@@ -59,6 +59,8 @@ const SHARED_LINK_ROUTES = new Set([
   'GET assets/:id',
   // fork-only: the Spatial Scene depth map, viewable wherever the photo is (AssetView + sharedLink, as thumbnail)
   'GET assets/:id/depth',
+  // fork-only: the Data Saver copy of a video, playable wherever the video is (AssetView + sharedLink, as playback)
+  'GET assets/:id/video/data-saver',
   'GET assets/:id/original',
   'GET assets/:id/thumbnail',
   'GET assets/:id/video/playback',

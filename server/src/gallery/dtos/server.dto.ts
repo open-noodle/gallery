@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
+import { DataSaverVideoServerFeatures } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
 
 // Fork server config and feature fields and the fork-only ML health response, merged into src/dtos/server.dto.ts with
@@ -39,6 +40,7 @@ export const GalleryServerFeaturesExtension = {
       'Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.',
     ),
   ...SpatialSceneServerFeatures,
+  ...DataSaverVideoServerFeatures,
 };
 
 const ServerMlHealthResponseSchema = z

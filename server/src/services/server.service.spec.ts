@@ -163,6 +163,7 @@ describe(ServerService.name, () => {
         searchOptions: true,
         searchFavoritesAcrossSpaces: true,
         spatialScene: false,
+        dataSaverVideo: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
