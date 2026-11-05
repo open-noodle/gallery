@@ -168,7 +168,20 @@ For the full walkthrough (linking versus creating, cross-owner contributions, pe
 
 1. Open the space.
 2. Long-press to select photos.
-3. Tap **Remove from Space** in the bottom sheet.
+3. Tap **Remove from space** in the bottom sheet.
+
+### From the Photos timeline
+
+You can also remove photos from a space without opening it, from **Photos** on the web and in the mobile app. Select the photos (the [space badge](#seeing-which-photos-are-in-a-space) shows which ones are in a space), then:
+
+- If the selection is in one space you own or edit, the action reads **Remove from** followed by the space's name.
+- If it is in several, **Remove from a space…** lets you choose the space, with how many of the selected photos each one holds.
+
+The removal works as it does inside the space: the web asks you to confirm, the mobile app does not. Only spaces where you are an Owner or Editor are offered.
+
+### Photos that stay
+
+Only photos added to the space directly can be removed this way. A photo that is in the space because it belongs to a linked album, or to a connected library, stays: Gallery tells you which album to remove it from, or that a library brings it (remove it from the library's folder, or unlink the library).
 
 ## Stacked Photos
 

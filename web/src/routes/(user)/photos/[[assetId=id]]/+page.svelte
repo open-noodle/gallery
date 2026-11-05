@@ -32,6 +32,7 @@
   import { getAltText } from '#lib/utils/thumbnail-util.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import MemoryCard from '#lib/components/memories/MemoryCard.svelte';
+  import RemoveFromSpaceButton from '#lib/gallery/space-remove/RemoveFromSpaceButton.svelte';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
@@ -139,6 +140,7 @@
     <ActionButton action={Actions.CreateSharedLink} />
     <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} onSelectAll={filtered.onSelectAll} />
     <ActionButton action={Actions.AddToAlbum} />
+    <RemoveFromSpaceButton onLeaveTimeline={filtered.onAssetDelete} />
 
     <!-- #763: a favorite is a per-user overlay row, so it needs no ownership gate. -->
     <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={filtered.onFavorite} />

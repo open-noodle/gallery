@@ -109,17 +109,4 @@ mixin _GalleryActionNotifier on Notifier<void> {
       return ActionResult(count: ids.length, success: false, error: error.toString());
     }
   }
-
-  Future<ActionResult> removeFromSpace(ActionSource source, String spaceId) async {
-    // Removing from a Space is NOT owner-scoped: an editor may remove another
-    // member's photo. Must stay _getRemoteIdsForSource, never the owned variant.
-    final ids = _notifier._getRemoteIdsForSource(source);
-    try {
-      final removedCount = await _notifier._service.removeFromSpace(ids, spaceId);
-      return ActionResult(count: removedCount, success: true);
-    } catch (error, stack) {
-      _notifier._logger.severe('Failed to remove assets from space', error, stack);
-      return ActionResult(count: ids.length, success: false, error: error.toString());
-    }
-  }
 }

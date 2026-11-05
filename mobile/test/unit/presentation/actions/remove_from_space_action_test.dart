@@ -1,26 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/space_removal.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/remove_from_space.action.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../../service.mocks.dart';
 import '../../factories/local_asset_factory.dart';
 import '../../factories/remote_asset_factory.dart';
 import '../presentation_context.dart';
 
+class MockSpaceRemovalService extends Mock implements SpaceRemovalService {}
+
 void main() {
   late PresentationContext context;
-  late MockActionService actionService;
+  late MockSpaceRemovalService removal;
 
   const spaceId = 'space-1';
 
   setUp(() async {
     context = await PresentationContext.create();
-    actionService = context.service.action.service;
+    removal = MockSpaceRemovalService();
+    when(
+      () => removal.remove(any(), any()),
+    ).thenAnswer((_) async => (removed: <String>[], kept: 0, albumNames: <String>[]));
   });
+
+  List<Override> scope(Set<BaseAsset> selection) => [
+    ...context.selected(selection),
+    spaceRemovalServiceProvider.overrideWithValue(removal),
+  ];
 
   tearDown(() => context.dispose());
 
@@ -30,7 +41,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Set<BaseAsset> selection, {VoidCallback? onComplete}) => tester.pumpTestAction(
     context,
     RemoveFromSpaceAction(source: .timeline, spaceId: spaceId, onComplete: onComplete),
-    overrides: context.selected(selection),
+    overrides: scope(selection),
   );
 
   group('RemoveFromSpaceAction', () {
@@ -87,8 +98,7 @@ void main() {
       await pump(tester, {a, b});
       await tester.pumpAndSettle();
 
-      final captured =
-          verify(() => actionService.removeFromSpace(captureAny(), spaceId)).captured.single as List<String>;
+      final captured = verify(() => removal.remove(spaceId, captureAny())).captured.single as List<String>;
       expect(captured, containsAll([a.id, b.id]), reason: 'a space editor may remove another member\'s photo');
     });
 
@@ -98,25 +108,75 @@ void main() {
       await tester.pumpTestAction(
         context,
         const RemoveFromSpaceAction(source: .timeline, spaceId: otherSpaceId),
-        overrides: context.selected({mine()}),
+        overrides: scope({mine()}),
       );
       await tester.pumpAndSettle();
 
-      verify(() => actionService.removeFromSpace(any(), otherSpaceId)).called(1);
-      verifyNever(() => actionService.removeFromSpace(any(), spaceId));
+      verify(() => removal.remove(otherSpaceId, any())).called(1);
+      verifyNever(() => removal.remove(spaceId, any()));
     });
 
-    testWidgets('shows a snackbar with the removed count on success', (tester) async {
-      when(() => actionService.removeFromSpace(any(), any())).thenAnswer((_) async => 2);
+    testWidgets('says how many photos the server removed', (tester) async {
+      when(
+        () => removal.remove(any(), any()),
+      ).thenAnswer((_) async => (removed: ['a', 'b'], kept: 0, albumNames: <String>[]));
+
+      await pump(tester, {mine(), theirs(), mine()});
+      await tester.pumpUntilFound(find.byType(SnackBar));
+
+      expect(find.text('Removed 2 assets'), findsOneWidget, reason: 'the server count, not the 3 asked for');
+    });
+
+    testWidgets('names the linked album of a photo it could not remove', (tester) async {
+      when(
+        () => removal.remove(any(), any()),
+      ).thenAnswer((_) async => (removed: <String>[], kept: 1, albumNames: ['Trip']));
 
       await pump(tester, {mine()});
       await tester.pumpUntilFound(find.byType(SnackBar));
 
-      expect(find.text('2 photos removed from space'), findsOneWidget);
+      expect(
+        find.text(
+          'This photo is in the album "Trip", which is linked to this space. Remove it from the album instead.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('explains photos it could not remove because a library brings them', (tester) async {
+      when(
+        () => removal.remove(any(), any()),
+      ).thenAnswer((_) async => (removed: ['a'], kept: 2, albumNames: <String>[]));
+
+      await pump(tester, {mine(), mine(), mine()});
+      await tester.pumpUntilFound(find.byType(SnackBar));
+
+      expect(
+        find.text(
+          "These photos are in a library linked to this space. Remove them from the library's folder, or unlink the library.",
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('falls back to the general explanation when the album lookup fails, as web does', (tester) async {
+      when(
+        () => removal.remove(any(), any()),
+      ).thenAnswer((_) async => (removed: <String>[], kept: 1, albumNames: null));
+
+      await pump(tester, {mine()});
+      await tester.pumpUntilFound(find.byType(SnackBar));
+
+      expect(
+        find.text(
+          "Photos shared with this space through an album can't be removed here. Remove them from the album instead.",
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('surfaces a translated error toast on failure, without throwing', (tester) async {
-      when(() => actionService.removeFromSpace(any(), any())).thenThrow(Exception('boom'));
+      when(() => removal.remove(any(), any())).thenThrow(Exception('boom'));
 
       await pump(tester, {mine()});
       await tester.pumpUntilFound(find.byType(SnackBar));
@@ -140,7 +200,9 @@ void main() {
     });
 
     testWidgets('completes the success path when onComplete is null', (tester) async {
-      when(() => actionService.removeFromSpace(any(), any())).thenAnswer((_) async => 5);
+      when(
+        () => removal.remove(any(), any()),
+      ).thenAnswer((_) async => (removed: ['a', 'b', 'c', 'd', 'e'], kept: 0, albumNames: <String>[]));
 
       await pump(tester, {mine()});
       await tester.pumpUntilFound(find.byType(SnackBar));
@@ -151,7 +213,7 @@ void main() {
       // `takeException()` alone stays null either way (the action's own
       // try/catch swallows a bad null-check on onComplete and would surface
       // it as the same "no exception thrown" outcome).
-      expect(find.text('5 photos removed from space'), findsOneWidget);
+      expect(find.text('Removed 5 assets'), findsOneWidget);
     });
   });
 }
