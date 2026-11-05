@@ -70,6 +70,7 @@
   "reset_sqlite_done": "App data has been cleared. Please restart Noodle Gallery and log in again.",
   "search_type_description": "Choose how Noodle Gallery interprets your search: by visual content, file details, or embedded text.",
   "settings_require_restart": "Please restart Noodle Gallery to apply this setting",
+  "support_ensure_latest": "Before reaching out through official Noodle Gallery support channels, please ensure you are using the <link>latest version</link> of Noodle Gallery.",
   "support_third_party_description": "Your Noodle Gallery installation was packaged by a third-party. Issues you experience may be caused by that package, so please raise issues with them in the first instance using the links below.",
   "sync_upload_album_setting_subtitle": "Create and upload your photos and videos to the selected albums on Noodle Gallery",
   "trash_page_empty_trash_dialog_content": "Do you want to empty your trashed assets? These items will be permanently removed from Noodle Gallery",
