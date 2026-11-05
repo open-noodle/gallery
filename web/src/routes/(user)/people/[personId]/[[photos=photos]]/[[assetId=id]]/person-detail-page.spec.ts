@@ -243,6 +243,35 @@ describe('Person detail page', () => {
     featureFlagsMock.value.peopleStatistics = true;
   });
 
+  it.each([
+    { type: 'person', nextType: 'pet', label: 'change_type_to_pet' },
+    { type: 'pet', nextType: 'person', label: 'change_type_to_person' },
+  ])('changes a $type cluster to $nextType', async ({ type, nextType, label }) => {
+    const person = makePerson({ type });
+    sdkMock.updatePerson.mockResolvedValue(makePerson({ type: nextType }));
+
+    renderPage({ person });
+    await userEvent.click(screen.getByText(label));
+
+    await waitFor(() =>
+      expect(sdkMock.updatePerson).toHaveBeenCalledWith({
+        id: person.id,
+        personUpdateDto: { type: nextType },
+      }),
+    );
+    expect(invalidateAllMock).toHaveBeenCalled();
+    expect(toastManager.primary).toHaveBeenCalledWith('person_type_changed');
+  });
+
+  it('does not offer type changes for a space-primary profile', () => {
+    renderPage({
+      person: makePerson({ primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' } }),
+    });
+
+    expect(screen.queryByText('change_type_to_pet')).not.toBeInTheDocument();
+    expect(screen.queryByText('change_type_to_person')).not.toBeInTheDocument();
+  });
+
   it('uses same-person repair when merging a personal person with a space-primary candidate', async () => {
     renderPage();
 
