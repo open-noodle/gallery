@@ -57,6 +57,13 @@ const DetachScopedPersonSchema = z
   })
   .meta({ id: 'DetachScopedPersonDto' });
 
+export const PersonTypeSchema = z.enum(['person', 'pet']).describe('Person or pet type').meta({ id: 'PersonType' });
+
+/** PersonUpdateBaseSchema: reclassifies the cluster without touching its faces. */
+export const GalleryPersonUpdateExtension = {
+  type: PersonTypeSchema.optional(),
+};
+
 /** PersonSearchSchema */
 export const GalleryPersonSearchExtension = {
   withSharedSpaces: stringToBool

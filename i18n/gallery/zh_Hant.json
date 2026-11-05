@@ -480,6 +480,8 @@
   "bulk_add_confirmation": "此操作會將媒體庫中的所有相片加入到此 Space。工作將於背景執行，媒體庫較大時可能需要幾分鐘。",
   "bulk_add_started": "正在將您的所有相片加入到此 Space...完成後將通知您。",
   "change_cover_photo": "更換封面",
+  "change_type_to_person": "變更類型為人物",
+  "change_type_to_pet": "變更類型為寵物",
   "choose_matching_faces_to_reassign": "選擇要重新指派的相符臉孔",
   "cleanup": "清理",
   "cleanup_accept_suggestions": "接受本頁建議（−{size}）",
@@ -1120,6 +1122,7 @@
     "one": "{count} 張相片",
     "other": "{count} 張相片"
   },
+  "person_type_changed": "人物類型已變更。",
   "pet": "寵物",
   "pets": "寵物",
   "photos_only": "僅相片",

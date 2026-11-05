@@ -30,7 +30,6 @@
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import MergeFaceSelector from '#lib/gallery/people/MergeFaceSelector.svelte';
-  import { getPersonPageActions, isSpaceEditor, updatePersonName } from '#lib/gallery/people/person.service.ts';
   import PersonSuggestions from '#lib/gallery/people/PersonSuggestions.svelte';
   import { getPersonActions } from '#lib/services/person.service.ts';
   import { lang, locale } from '#lib/stores/preferences.store.ts';
@@ -44,6 +43,12 @@
   import { afterNavigate, goto, refreshAll } from '$app/navigation';
   import { page } from '$app/state';
   import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
+  import {
+    getPersonPageActions,
+    getPersonTypeAction,
+    isSpaceEditor,
+    updatePersonName,
+  } from '#lib/gallery/people/person.service.ts';
 
   import { AssetVisibility, searchPerson, type PersonResponseDto } from '@immich/sdk';
   import {
@@ -350,6 +355,7 @@
     onPersonUpdate: (updated) => (person = updated),
     onThumbnailUpdate: refreshThumbnail,
   });
+  const ChangePersonType = $derived(getPersonTypeAction($t, person, refreshAll));
 
   const Merge: ActionItem = {
     title: $t('merge_people'),
@@ -557,6 +563,7 @@
             SetDateOfBirth,
             Merge,
             SeparateFromGroupedPerson,
+            ChangePersonType,
             Favorite,
             Unfavorite,
           ]}
