@@ -141,7 +141,7 @@ describe(PersonController.name, () => {
           {
             path: [],
             message:
-              'At least one of the following fields is required: name, birthDate, isHidden, isFavorite, color, featureFaceAssetId',
+              'At least one of the following fields is required: name, birthDate, isHidden, isFavorite, color, type, featureFaceAssetId',
           },
         ]),
       );
