@@ -265,7 +265,7 @@ features:
         - list
       server/src/services/database-backup.service.ts:
         - promoteToRemote
-      server/src/dtos/server.dto.ts:
+      server/src/gallery/dtos/server.dto.ts:
         - s3Storage
       server/src/services/storage-template.service.ts:
         - getTemplateLibraryRoot
