@@ -628,3 +628,47 @@ describe('Timeline month reload', () => {
     expect(after).toHaveStyle({ height: '300px' });
   });
 });
+
+describe('Timeline remount under a bound manager', () => {
+  beforeEach(() => {
+    testState.grouping = 'day';
+    testState.assetCount = 1;
+    testState.months = [];
+  });
+
+  // FilteredTimeline remounts the timeline to reload it (#1041). The parent's bound manager already holds the new
+  // instance's manager when the old instance is torn down, so the old one must destroy its own manager, not the
+  // bound one: destroying the bound one emptied the remounted timeline until the page was left.
+  it('destroys only the manager the unmounted instance created', async () => {
+    const { default: Host } = await import('#lib/gallery/__mocks__/timeline-remount.host.stub.svelte');
+    const managers: { destroy: ReturnType<typeof vi.fn> }[] = [];
+    const props = reactiveProps({
+      showOld: true,
+      showNew: false,
+      timelineProps: {
+        enableRouting: false,
+        options: { grouping: testState.grouping },
+        grouping: testState.grouping,
+        assetInteraction: assetInteraction(),
+        onTimelineBucketActivate: () => {},
+      } as never,
+      onManager: (manager: unknown) => {
+        if (!managers.includes(manager as never)) {
+          managers.push(manager as never);
+        }
+      },
+    });
+    render(Host, props);
+    await tick();
+
+    props.showNew = true;
+    await tick();
+    props.showOld = false;
+    await tick();
+
+    expect(managers).toHaveLength(2);
+    const [first, second] = managers;
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    expect(second.destroy).not.toHaveBeenCalled();
+  });
+});
