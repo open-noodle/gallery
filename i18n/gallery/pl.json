@@ -467,6 +467,8 @@
   "bulk_add_confirmation": "Spowoduje to dodanie wszystkich zdjęć z Twojej biblioteki do tego Space. Operacja działa w tle i przy dużych bibliotekach może potrwać kilka minut.",
   "bulk_add_started": "Dodawanie wszystkich Twoich zdjęć do tego Space... Otrzymasz powiadomienie po zakończeniu.",
   "change_cover_photo": "Zmień okładkę",
+  "change_type_to_person": "Zmień typ na osobę",
+  "change_type_to_pet": "Zmień typ na zwierzę",
   "choose_matching_faces_to_reassign": "Wybierz pasujące twarze do ponownego przypisania",
   "cleanup": "Czyszczenie",
   "cleanup_accept_suggestions": "Zaakceptuj sugestie na stronie (−{size})",
@@ -1109,6 +1111,7 @@
     "one": "{count} zdjęcie",
     "other": "{count} zdjęć"
   },
+  "person_type_changed": "Zmieniono typ osoby.",
   "pet": "Zwierzę",
   "pets": "Zwierzęta",
   "photos_only": "Tylko zdjęcia",

@@ -466,6 +466,8 @@
   "bulk_add_confirmation": "This adds every photo in your library to this space. It runs in the background and can take a few minutes for a large library.",
   "bulk_add_started": "Adding all your photos to this space... You'll be notified when it's done.",
   "change_cover_photo": "Change cover",
+  "change_type_to_person": "Change type to person",
+  "change_type_to_pet": "Change type to pet",
   "choose_matching_faces_to_reassign": "Choose matching faces to reassign",
   "cleanup": "Cleanup",
   "cleanup_accept_suggestions": "Accept suggestions on page (−{size})",
@@ -1110,6 +1112,7 @@
     "one": "{count} photo",
     "other": "{count} photos"
   },
+  "person_type_changed": "Person type changed.",
   "pet": "Pet",
   "pets": "Pets",
   "photos_only": "Photos only",

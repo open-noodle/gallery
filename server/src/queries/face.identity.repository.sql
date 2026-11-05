@@ -239,6 +239,22 @@ WITH
           FROM
             embedded_pet_identities
         )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = (
+              SELECT
+                "person_identity"."identityId"
+              FROM
+                "person_identity"
+              WHERE
+                "person_identity"."personGroupId" = "person"."personGroupId"
+            )
+        )
       )
     UNION ALL
     SELECT
@@ -294,6 +310,15 @@ WITH
             "identityId"
           FROM
             embedded_pet_identities
+        )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = "shared_space_person"."identityId"
         )
       )
   ),
@@ -546,6 +571,22 @@ WITH
           FROM
             embedded_pet_identities
         )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = (
+              SELECT
+                "person_identity"."identityId"
+              FROM
+                "person_identity"
+              WHERE
+                "person_identity"."personGroupId" = "person"."personGroupId"
+            )
+        )
       )
     UNION ALL
     SELECT
@@ -601,6 +642,15 @@ WITH
             "identityId"
           FROM
             embedded_pet_identities
+        )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = "shared_space_person"."identityId"
         )
       )
   ),
@@ -1385,6 +1435,22 @@ WITH
           FROM
             embedded_pet_identities
         )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = (
+              SELECT
+                "person_identity"."identityId"
+              FROM
+                "person_identity"
+              WHERE
+                "person_identity"."personGroupId" = "person"."personGroupId"
+            )
+        )
       )
     UNION ALL
     SELECT
@@ -1440,6 +1506,15 @@ WITH
             "identityId"
           FROM
             embedded_pet_identities
+        )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = "shared_space_person"."identityId"
         )
       )
   ),
@@ -1732,6 +1807,22 @@ WITH
           FROM
             embedded_pet_identities
         )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = (
+              SELECT
+                "person_identity"."identityId"
+              FROM
+                "person_identity"
+              WHERE
+                "person_identity"."personGroupId" = "person"."personGroupId"
+            )
+        )
       )
     UNION ALL
     SELECT
@@ -1787,6 +1878,15 @@ WITH
             "identityId"
           FROM
             embedded_pet_identities
+        )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            face_identity_face AS embedded_face
+            INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+          WHERE
+            embedded_face."identityId" = "shared_space_person"."identityId"
         )
       )
   ),

@@ -45,6 +45,7 @@ import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identi
 import { requireThumbnailAccess } from 'src/gallery/services/gallery-people.service.js';
 import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
+import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -371,7 +372,7 @@ export class PersonService extends BaseService {
     const prior = await this.personRepository.getByGroupIdOnly(personGroupId);
 
     const { ownerId } = await this.findOrFail(auth, personGroupId);
-    const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color } = dto;
+    const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color, type } = dto;
     // TODO: set by faceId directly
     let faceId: string | undefined;
     if (assetId) {
@@ -384,7 +385,7 @@ export class PersonService extends BaseService {
       faceId = face.id;
     }
 
-    const person = await this.personRepository.update({
+    const person = await updatePersonWithType(this.databaseRepository, this.personRepository, {
       ownerId,
       personGroupId,
       faceAssetId: faceId,
@@ -393,6 +394,7 @@ export class PersonService extends BaseService {
       isHidden,
       isFavorite,
       color,
+      type,
     });
 
     if (assetId) {
@@ -430,6 +432,7 @@ export class PersonService extends BaseService {
           birthDate: person.birthDate,
           featureFaceAssetId: person.featureFaceAssetId,
           isFavorite: person.isFavorite,
+          type: person.type,
           userId: person.userId,
         });
         results.push({ id: person.id, success: true });

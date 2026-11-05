@@ -469,6 +469,8 @@
   "bulk_add_confirmation": "Dadurch werden alle Fotos aus deiner Bibliothek zu diesem Space hinzugefügt. Dies läuft im Hintergrund und kann bei großen Bibliotheken einige Minuten dauern.",
   "bulk_add_started": "Alle deine Fotos werden zu diesem Space hinzugefügt... Du wirst benachrichtigt, sobald es fertig ist.",
   "change_cover_photo": "Titelbild ändern",
+  "change_type_to_person": "Als Person einstufen",
+  "change_type_to_pet": "Als Haustier einstufen",
   "choose_matching_faces_to_reassign": "Passende Gesichter zur Neuzuweisung auswählen",
   "cleanup": "Bereinigung",
   "cleanup_accept_suggestions": "Vorschläge auf der Seite übernehmen (−{size})",
@@ -1108,6 +1110,7 @@
     "one": "{count} Foto",
     "other": "{count} Fotos"
   },
+  "person_type_changed": "Personentyp geändert.",
   "pet": "Haustier",
   "pets": "Haustiere",
   "photos_only": "Nur Fotos",

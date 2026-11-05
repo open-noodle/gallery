@@ -13,6 +13,7 @@ import {
   GalleryPersonResponseExtension,
   GalleryPersonSearchExtension,
   GalleryPersonStatisticsExtension,
+  GalleryPersonUpdateExtension,
 } from 'src/gallery/dtos/person.dto.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
@@ -37,6 +38,7 @@ const PersonCreateSchema = z
   .meta({ id: 'PersonCreateDto' });
 
 const PersonUpdateBaseSchema = PersonCreateSchema.extend({
+  ...GalleryPersonUpdateExtension,
   featureFaceAssetId: z.uuidv4().optional().describe('Asset ID used for feature face thumbnail'),
 });
 

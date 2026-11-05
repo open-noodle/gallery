@@ -9,6 +9,7 @@ import {
   getPersonFaces,
   getSpacePersonFaces,
   ScopedPersonProfileType,
+  PersonType,
   SharedSpaceRole,
   updatePerson,
   updateRepresentativeFace,
@@ -20,7 +21,7 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
-import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline } from '@mdi/js';
+import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline, mdiSwapHorizontal } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 import { refreshAll } from '$app/navigation';
 
@@ -189,4 +190,30 @@ export const getPersonPageActions = (
   };
 
   return { SelectRepresentativeFace, SeparateFromGroupedPerson };
+};
+
+// Reclassifies a personal cluster as person or pet; the title names the destination type. Faces stay where they
+// are. Hidden for a space-primary profile, which is a projection, not the owner's cluster.
+export const getPersonTypeAction = (
+  $t: MessageFormatter,
+  person: PersonResponseDto,
+  onUpdated: () => Promise<void>,
+): ActionItem => {
+  const type = person.type === PersonType.Pet ? PersonType.Person : PersonType.Pet;
+
+  return {
+    title: $t(type === PersonType.Pet ? 'change_type_to_pet' : 'change_type_to_person'),
+    icon: mdiSwapHorizontal,
+    $if: () => !getSpaceProfile(person),
+    onAction: async () => {
+      try {
+        const response = await updatePerson({ id: person.id, personUpdateDto: { type } });
+        eventManager.emit('PersonUpdate', response);
+        toastManager.primary($t('person_type_changed'));
+        await onUpdated();
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
+  };
 };

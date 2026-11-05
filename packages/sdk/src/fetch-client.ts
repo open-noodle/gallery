@@ -2734,6 +2734,7 @@ export type PeopleUpdateItem = {
     isHidden?: boolean;
     /** Person name */
     name?: string;
+    "type"?: PersonType;
     /** Restrict the update to the person record of this User ID */
     userId?: string;
 };
@@ -2833,6 +2834,7 @@ export type PersonUpdateDto = {
     isHidden?: boolean;
     /** Person name */
     name?: string;
+    "type"?: PersonType;
     /** Restrict the update to the person record of this User ID */
     userId?: string;
 };
@@ -12671,6 +12673,10 @@ export enum MemoryType {
 export enum PartnerDirection {
     SharedBy = "shared-by",
     SharedWith = "shared-with"
+}
+export enum PersonType {
+    Person = "person",
+    Pet = "pet"
 }
 export enum ScopedPersonProfileType {
     Person = "person",

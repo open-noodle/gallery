@@ -187,21 +187,35 @@ where
   and "asset_face"."isVisible" is true
   and "person"."isHidden" = $2
   and (
-    not EXISTS (
+    NOT EXISTS (
       SELECT
       FROM
         "person_pet"
       WHERE
         "person_pet"."personGroupId" = "person"."personGroupId"
     )
-    or exists (
-      select
-        1 as "one"
-      from
-        "asset_face" as "pet_face"
-        inner join "pet_search" on "pet_search"."faceId" = "pet_face"."id"
-      where
+    OR EXISTS (
+      SELECT
+      FROM
+        "asset_face" "pet_face"
+      WHERE
         "pet_face"."personGroupId" = "person"."personGroupId"
+        AND (
+          EXISTS (
+            SELECT
+            FROM
+              "pet_search"
+            WHERE
+              "pet_search"."faceId" = "pet_face"."id"
+          )
+          OR EXISTS (
+            SELECT
+            FROM
+              "face_search"
+            WHERE
+              "face_search"."faceId" = "pet_face"."id"
+          )
+        )
     )
   )
 group by
@@ -791,12 +805,26 @@ WITH
         )
         OR EXISTS (
           SELECT
-            1
           FROM
             "asset_face" "pet_face"
-            INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
           WHERE
             "pet_face"."personGroupId" = "person"."personGroupId"
+            AND (
+              EXISTS (
+                SELECT
+                FROM
+                  "pet_search"
+                WHERE
+                  "pet_search"."faceId" = "pet_face"."id"
+              )
+              OR EXISTS (
+                SELECT
+                FROM
+                  "face_search"
+                WHERE
+                  "face_search"."faceId" = "pet_face"."id"
+              )
+            )
         )
       )
       -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index

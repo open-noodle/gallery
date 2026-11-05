@@ -467,6 +467,8 @@
   "bulk_add_confirmation": "Hiermee worden alle foto's uit je bibliotheek aan deze Space toegevoegd. Dit gebeurt op de achtergrond en kan bij grote bibliotheken enkele minuten duren.",
   "bulk_add_started": "Al je foto's worden aan deze Space toegevoegd... Je krijgt bericht zodra dit klaar is.",
   "change_cover_photo": "Omslag wijzigen",
+  "change_type_to_person": "Type wijzigen in persoon",
+  "change_type_to_pet": "Type wijzigen in huisdier",
   "choose_matching_faces_to_reassign": "Kies overeenkomende gezichten om opnieuw toe te wijzen",
   "cleanup": "Opschonen",
   "cleanup_accept_suggestions": "Suggesties op pagina accepteren (−{size})",
@@ -1105,6 +1107,7 @@
     "one": "{count} foto",
     "other": "{count} foto's"
   },
+  "person_type_changed": "Persoonstype gewijzigd.",
   "pet": "Huisdier",
   "pets": "Huisdieren",
   "photos_only": "Alleen foto's",
