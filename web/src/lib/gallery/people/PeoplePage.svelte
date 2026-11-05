@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { scrollMemory } from '#lib/actions/scroll-memory.ts';
+  import { scrollMemory } from '#lib/actions/scroll-memory.svelte.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import PeopleFaceStatisticsInfo from '#lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
@@ -454,23 +454,18 @@
 <UserPageLayout
   title={$t('people')}
   description={headerDescription}
-  use={[
-    [
-      scrollMemory,
-      {
-        routeStartsWith: Route.people(),
-        beforeSave: () => {
-          if (currentPage) {
-            sessionStorage.setItem(SessionStorageKey.INFINITE_SCROLL_PAGE, currentPage.toString());
-          }
-        },
-        beforeClear: () => {
-          sessionStorage.removeItem(SessionStorageKey.INFINITE_SCROLL_PAGE);
-        },
-        beforeLoad: loadInitialScroll,
-      },
-    ],
-  ]}
+  {@attach scrollMemory({
+    routeStartsWith: Route.people(),
+    beforeSave: () => {
+      if (currentPage) {
+        sessionStorage.setItem(SessionStorageKey.INFINITE_SCROLL_PAGE, currentPage.toString());
+      }
+    },
+    beforeClear: () => {
+      sessionStorage.removeItem(SessionStorageKey.INFINITE_SCROLL_PAGE);
+    },
+    beforeScroll: loadInitialScroll,
+  })}
 >
   {#snippet descriptionTrailing()}
     {#if showFaceStatisticsInfo}

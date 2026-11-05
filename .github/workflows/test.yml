@@ -379,6 +379,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./server
@@ -395,6 +396,13 @@ jobs:
         with:
           github_token: ${{ github.token }}
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
       - name: Run ci-medium
         run: mise run ci-medium
         if: ${{ !cancelled() }}
@@ -406,6 +414,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./e2e
@@ -454,6 +463,13 @@ jobs:
           sudo docker image prune --all --force
           df -h /
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
       - name: Start Docker Compose
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -497,6 +513,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./e2e
@@ -543,6 +560,13 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
           df -h /
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
 
       - name: Docker build
         env:
@@ -783,9 +807,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     services:
       postgres:
         image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3@sha256:dbf18b3ffea4a81434c65b71e20d27203baf903a0275f4341e4c16dfd901fd67
+        credentials:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
