@@ -331,7 +331,7 @@ export class MetadataService extends BaseService {
         exifTags.Author ??
         null,
       fps: video?.frameRate ?? validate(Number(exifTags.VideoFrameRate!)),
-      iso: validate(exifTags.RecommendedExposureIndex ?? exifTags.StandardOutputSensitivity ?? exifTags.ISO) as number,
+      iso: validate(exifTags.RecommendedExposureIndex || exifTags.StandardOutputSensitivity || exifTags.ISO) as number,
       exposureTime: exifTags.ExposureTime ?? null,
       lensModel: getLensModel(exifTags),
       fNumber: validate(exifTags.FNumber),
@@ -756,15 +756,13 @@ export class MetadataService extends BaseService {
       }
       // Default video extraction
       else {
-        // Corrupted Samsung motion-photo metadata can report length + padding
-        // larger than the file, yielding a negative read position that throws
-        // RangeError. Skip extraction for these assets instead.
-        if (position < 0) {
+        if (length <= 0 || padding < 0 || position < 0) {
           this.logger.warn(
-            `Skipping motion photo extraction for ${asset.id}: ${asset.originalPath}: computed negative read position (${position})`,
+            `Skipping motion photo video extraction for asset ${asset.id}: video range is outside the file`,
           );
           return;
         }
+
         video = await this.storageRepository.readFile(effectiveOriginalPath, {
           buffer: Buffer.alloc(length),
           position,

@@ -1600,7 +1600,7 @@ describe(MetadataService.name, () => {
 
       expect(mocks.storage.readFile).not.toHaveBeenCalled();
       expect(mocks.asset.create).not.toHaveBeenCalled();
-      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('negative read position'));
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('video range is outside the file'));
     });
 
     it.each([

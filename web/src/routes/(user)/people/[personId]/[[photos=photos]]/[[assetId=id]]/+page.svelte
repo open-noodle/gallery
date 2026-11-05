@@ -1,7 +1,7 @@
 <script lang="ts">
   import { clickOutside } from '#lib/actions/click-outside.ts';
   import { listNavigation } from '#lib/actions/list-navigation.ts';
-  import { scrollMemoryClearer } from '#lib/actions/scroll-memory.ts';
+  import { scrollMemoryClearer } from '#lib/actions/scroll-memory.svelte.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
@@ -371,12 +371,12 @@
 
 <main
   class="relative z-0 flex h-dvh flex-col overflow-hidden px-2 pt-(--control-bar-height) md:px-6 md:pt-(--control-bar-height-md)"
-  use:scrollMemoryClearer={{
+  {@attach scrollMemoryClearer({
     routeStartsWith: Route.people(),
     beforeClear: () => {
       sessionStorage.removeItem(SessionStorageKey.INFINITE_SCROLL_PAGE);
     },
-  }}
+  })}
 >
   <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
        mt-12 clears the taller ControlAppBar, which exceeds the --control-bar-height padding reserve. -->
