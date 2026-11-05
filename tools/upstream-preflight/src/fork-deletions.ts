@@ -25,6 +25,10 @@ const CLUSTER_GROUPS_UI =
 // deletes an upstream path on purpose, with the commit that did it.
 export const FORK_DELETED_PATHS: { path: string; why: string }[] = [
   {
+    path: 'mobile/test/presentation/pages/search_page_test.dart',
+    why: `${MOBILE_SEARCH}; upstream's test for that page (immich-31800) arrived on release/v3.4 after rc.1`,
+  },
+  {
     path: 'packages/scripts',
     why: "upstream's release-version tooling, dropped in bc06e84a1f4; the fork releases via its own gallery-release-* workflows",
   },
