@@ -16,6 +16,7 @@
   import { handleErrorAsync } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
+  import { albumStackSuccessor } from '#lib/gallery/stack/album-stack-strip.ts';
   import { type AlbumResponseDto, type AssetResponseDto, type PersonResponseDto, getAssetInfo } from '@immich/sdk';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -116,7 +117,8 @@
   const onAlbumRemoveAssets = async ({ assetIds, albumIds }: { assetIds: string[]; albumIds: string[] }) => {
     if (!!album && albumIds.includes(album.id) && assetIds.includes(assetCursor.current.id)) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      (await navigateToAsset(assetCursor?.nextAsset)) ||
+      (await navigateToAsset(await albumStackSuccessor(album.id, assetCursor.current))) ||
+        (await navigateToAsset(assetCursor?.nextAsset)) ||
         (await navigateToAsset(assetCursor?.previousAsset)) ||
         (await handleClose(assetCursor.current.id));
     }

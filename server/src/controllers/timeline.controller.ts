@@ -14,6 +14,8 @@ export class TimelineController {
 
   @Get('buckets')
   @Authenticated({ permission: Permission.AssetRead, sharedLink: true })
+  // Gallery: the web re-requests the same URL after an edit (album stack collapse); a browser must not reuse its copy.
+  @Header('Cache-Control', 'private, no-cache')
   @Endpoint({
     summary: 'Get time buckets',
     description: 'Retrieve a list of all minimal time buckets.',
@@ -27,6 +29,7 @@ export class TimelineController {
   @Authenticated({ permission: Permission.AssetRead, sharedLink: true })
   @ApiOkResponse({ type: TimeBucketAssetResponseDto })
   @Header('Content-Type', 'application/json')
+  @Header('Cache-Control', 'private, no-cache')
   @Endpoint({
     summary: 'Get time bucket',
     description: 'Retrieve a string of all asset ids in a given time bucket.',

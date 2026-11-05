@@ -84,6 +84,7 @@ Immich's AI covers faces and basic CLIP search. Pets go undetected, memories sho
 Trimming a video means exporting it to another tool. Moving off Google Photos needs CLI scripts. Storage is local disk or external libraries, with no native S3 backend, and a large existing library can't be linked into a shared collection.
 
 - [Image Editing](https://opennoodle.de/features/image-editing) adds batch rotation of a timeline selection to Immich's own non-destructive editor, which rotates, crops and mirrors in the asset viewer. ([Docs](https://docs.opennoodle.de/features/editing))
+- Stacks in Albums collapse each stack in an album to one photo with a count badge, as on the timeline, picking a photo the album actually holds. ([Docs](https://docs.opennoodle.de/features/album-stacks))
 - [Video Trimming](https://opennoodle.de/features/video-trimming) cuts clips in the browser. FFmpeg stream copy makes it instant and lossless, and you can restore the original at any time. ([Docs](https://docs.opennoodle.de/features/editing))
 - [Connected Libraries](https://opennoodle.de/features/connected-libraries) link external photo libraries into Shared Spaces, with no file duplication and originals left untouched. ([Docs](https://docs.opennoodle.de/features/libraries))
 - [Google Photos Import](https://opennoodle.de/features/google-photos-import) is a guided in-browser wizard for Takeout archives. It keeps dates, GPS, descriptions and album structure, and needs no CLI. ([Docs](https://docs.opennoodle.de/features/google-photos-import))
