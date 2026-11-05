@@ -136,4 +136,42 @@ the releases link in the modal (ordered before the source-URL rewrite, whose pat
 
 ## Remote CI verification
 
-Recorded below once the dispatched runs finish.
+All 12 workflows green on `135335a4aeb`:
+
+| Workflow                    | Run           | Result                                                                                 |
+| --------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| Test                        | `41986588525` | green on attempt 2, see below                                                          |
+| Gallery Test                | `41987238650` | green                                                                                  |
+| Docker                      | `41986847359` | green                                                                                  |
+| Static Code Analysis        | `41986650020` | green                                                                                  |
+| Gallery Build Mobile        | `41986711576` | green (iOS + Android)                                                                  |
+| Gallery Mobile Smoke        | `41987143971` | green on attempt 2, see below                                                          |
+| Gallery ML Smoke            | `41987068911` | green                                                                                  |
+| Gallery Rebase Smoke        | `41986919401` | green                                                                                  |
+| Storage Migration Tests     | `41986994228` | green                                                                                  |
+| Storage Migration E2E       | `41987212539` | green                                                                                  |
+| Revert-to-Immich Validation | `41988630726` | green with `gallery-server:rolling-v34-rc10` against stock `immich-server:v3.4.0-rc.2` |
+| Release Candidate Build     | `41988933123` | `rolling-v34-rc11`, server and ML                                                      |
+
+Attempt-1 failures, all on code rc.2 does not touch, all green on rerun with no change:
+
+- **E2E Server & CLI (arm)**: the e2e server exited with code 135 (SIGBUS) mid-suite while generating
+  thumbnails; every later request was `ECONNREFUSED`. Same signature as the untraced SIGBUS seen on two
+  fork PRs in October. The amd64 job was cancelled with it.
+- **E2E Web, maintenance**: `enter and exit maintenance mode` stayed on "Server is restarting" past its
+  10 s window; the retries then 404ed because the server was left in maintenance mode.
+- **Mobile Smoke**: two timing-based celebration cases in `rewind_page_test.dart` (Library Cleanup). The
+  same file passed in Test's Unit Test Mobile on the same commit and locally (21/21).
+
+## Staging
+
+`rolling-v34-rc11` (server and ML) deployed to staging; gitops `056d117` (ML) and `5e4603f` (server).
+Live-DB parity before the deploy: 0 orphans, 1 pending (`1799800000000-ScopeJitOffToDatabase`, from the
+#1214 fork sync). Dump: `~/gallery-backups/staging-pre-rolling-v34-rc11-2026-11-05.dump`, checksum
+matched the pod copy (the plain `kubectl exec cat` stream truncated twice; copied in 8 MiB chunks).
+
+On boot the jit migration ran (`jit=off` now on the database, role setting reset) and both workers
+report no schema drift; 0 restarts, no ERROR lines. `/server/version` reports `3.4.0-rc.2` to a stock
+client and `5.10.0-rc.1` to a Gallery client. CLIP text inference from the server pod returns 200. The
+deployed web bundle has no Immich docs or releases link, carries Gallery's, and the branded
+`support_ensure_latest` string. Authenticated API checks were not run (no test key minted on staging).
