@@ -1,6 +1,7 @@
 import { Expression, ExpressionBuilder, SelectQueryBuilder, SqlBool, sql } from 'kysely';
 import { AssetStatus, TimeBucketSize } from 'src/enum.js';
 import { withOwnArchiveOnly } from 'src/gallery/utils/favorites-scope.js';
+import { withLibraryView } from 'src/gallery/utils/library-view.js';
 import { type TimeBucketOptions, getBoundingCircle, withBoundingBox } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { withAssetFilter } from 'src/utils/asset-filter.js';
@@ -248,6 +249,7 @@ export function withTimeBucketAssetFilters<O>(
           );
         }),
       )
+      .$call((qb) => withLibraryView(qb, options))
       .$if(options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
           options.isFavorite

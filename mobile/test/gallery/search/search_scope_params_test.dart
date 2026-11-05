@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
@@ -51,6 +52,18 @@ final cases = [
     timeline: photosTimeline,
     smart: photosQuery,
   ),
+  // #1038: browsing narrows to the library view; a text or similar-photo search spans every photo.
+  for (final view in [LibraryViewMode.personal, LibraryViewMode.spaces])
+    ScopeCase(
+      'Photos under the ${view.name} library view',
+      PhotosSearchScope(libraryView: view),
+      optionsBrowse: {...photosBrowse, 'libraryView': view.name},
+      timeline: {
+        ...photosTimeline,
+        'libraryView': [view.name],
+      },
+      smart: photosQuery,
+    ),
   const ScopeCase(
     'album: albumIds to search, albumId to the timeline; no withSharedSpaces, no spaceId',
     AlbumSearchScope(album),
@@ -274,16 +287,24 @@ void main() {
     });
   });
 
-  test('archived only on Photos drops shared spaces and partners, which only exist on the timeline', () async {
-    final api = RecordingApi();
-    final state = const SearchState().copyWith(filters: const SearchFilters(archivedOnly: true));
-    final params = buildSearchParams(const PhotosSearchScope(), state, now: now, localTakenRange: true);
-    await api.repository.options(params);
-    expect(api.requests.single.body, {
-      'visibility': 'archive',
-      'dimensions': ['availability'],
-    });
-  });
+  test(
+    'archived only on Photos drops shared spaces, partners and the library view, which only exist on the timeline',
+    () async {
+      final api = RecordingApi();
+      final state = const SearchState().copyWith(filters: const SearchFilters(archivedOnly: true));
+      final params = buildSearchParams(
+        const PhotosSearchScope(libraryView: LibraryViewMode.spaces),
+        state,
+        now: now,
+        localTakenRange: true,
+      );
+      await api.repository.options(params);
+      expect(api.requests.single.body, {
+        'visibility': 'archive',
+        'dimensions': ['availability'],
+      });
+    },
+  );
 
   group('people ids come from filterId / primaryProfile, never the response id', () {
     test('options: filterId, even when the response id differs', () async {

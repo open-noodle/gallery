@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
@@ -84,10 +86,28 @@ void main() {
     searchResultsProvider.overrideWith(() => _FixedResults(loading: loading)),
   ];
 
+  testWidgets('an empty library view shows no results, without the filter actions', (tester) async {
+    await tester.pumpConsumerWidget(
+      const TimelineEmptyState(),
+      overrides: [
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.personal),
+        syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState())),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.text(StaticTranslations.instance.timeline_empty_filtered_title), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.timeline_empty_clear_filters), findsNothing);
+    expect(find.text(StaticTranslations.instance.timeline_empty_title), findsNothing);
+  });
+
   testWidgets('first-run state shows the onboarding title and an Enable Backup action', (tester) async {
     await tester.pumpConsumerWidget(
       withFakeAssets(const TimelineEmptyState()),
-      overrides: [syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState()))],
+      overrides: [
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.both),
+        syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState())),
+      ],
     );
     await tester.pumpAndSettle();
 
@@ -100,6 +120,7 @@ void main() {
     await tester.pumpConsumerWidgetRaw(
       const TimelineEmptyState(),
       overrides: [
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.both),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
       ],
     );
@@ -118,6 +139,7 @@ void main() {
       const TimelineEmptyState(),
       overrides: [
         ...searching(beach, loading: true),
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.both),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState())),
       ],
     );
@@ -136,6 +158,7 @@ void main() {
         ...searching(beach.copyWith(filters: const SearchFilters(favoritesOnly: true, minRating: 4)), loading: false),
         // syncing so that after the reset we deterministically land on the loader
         // (no asset/router needed) rather than the first-run state.
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.both),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
       ],
     );
@@ -161,6 +184,7 @@ void main() {
       const TimelineEmptyState(),
       overrides: [
         ...searching(const SearchState(), loading: false),
+        activeLibraryViewProvider.overrideWithValue(LibraryViewMode.both),
         syncStatusProvider.overrideWith(() => _FixedSync(const SyncStatusState(remoteSyncStatus: SyncStatus.syncing))),
       ],
     );

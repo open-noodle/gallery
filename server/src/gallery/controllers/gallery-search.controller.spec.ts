@@ -62,6 +62,19 @@ describe(GallerySearchController.name, () => {
       });
     });
 
+    it('passes the Photos library view on (#1038)', async () => {
+      galleryService.getSearchOptions.mockResolvedValue({ total: 0 } as never);
+
+      await request(ctx.getHttpServer())
+        .post('/search/options')
+        .send({ withSharedSpaces: true, libraryView: 'personal' });
+
+      expect(galleryService.getSearchOptions).toHaveBeenCalledWith(undefined, {
+        withSharedSpaces: true,
+        libraryView: 'personal',
+      });
+    });
+
     it('accepts person:, space-person: and bare person ids', async () => {
       const id = '4a5ab9a5-5f69-4a3e-bf9e-7f7c7ce8f1a2';
       galleryService.getSearchOptions.mockResolvedValue({ total: 0 } as never);
@@ -80,6 +93,7 @@ describe(GallerySearchController.name, () => {
       [{ albumIds: ['nope'] }, 'albumIds'],
       [{ visibility: 'nope' }, 'visibility'],
       [{ queryAssetId: 'nope' }, 'queryAssetId'],
+      [{ libraryView: 'nope' }, 'libraryView'],
     ])('rejects an invalid %o', async (dto, field) => {
       const { status, body } = await request(ctx.getHttpServer()).post('/search/options').send(dto);
 

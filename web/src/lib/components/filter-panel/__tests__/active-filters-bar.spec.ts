@@ -1,3 +1,4 @@
+import { mdiPin } from '@mdi/js';
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import ActiveFiltersBar from '../active-filters-bar.svelte';
@@ -938,6 +939,56 @@ describe('ActiveFiltersBar', () => {
       expect(onRemoveFilter).toHaveBeenCalledWith(type, undefined);
       cleanup();
     }
+  });
+
+  describe('pinned chips', () => {
+    const pinnedChip = (onRemove = vi.fn()) => ({
+      type: 'library-view',
+      icon: mdiPin,
+      labelKey: 'library_view_chip_personal' as const,
+      titleKey: 'library_view_remembered' as const,
+      onRemove,
+    });
+
+    it('renders a pinned chip first, saying it is remembered, and removes it on its own', async () => {
+      const filters = createFilterState();
+      filters.country = 'Germany';
+      const onRemove = vi.fn();
+      const onRemoveFilter = vi.fn();
+
+      const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+        props: { filters, pinned: [pinnedChip(onRemove)], onRemoveFilter, onClearAll: () => {} },
+      });
+
+      const chips = getAllByTestId(/^(pinned|active)-chip$/);
+      expect(chips.map((chip) => chip.dataset.testid)).toEqual(['pinned-chip', 'active-chip']);
+      expect(getByTestId('pinned-chip')).toHaveTextContent('Personal photos only');
+      expect(getByTestId('pinned-chip')).toHaveAttribute('title', 'Remembered between visits');
+
+      await fireEvent.click(getByTestId('pinned-chip-close'));
+      expect(onRemove).toHaveBeenCalledOnce();
+      expect(onRemoveFilter).not.toHaveBeenCalled();
+    });
+
+    it('is not cleared by Clear all, which only shows for the other filters', async () => {
+      const onRemove = vi.fn();
+      const onClearAll = vi.fn();
+
+      const alone = render(ActiveFiltersBar, {
+        props: { filters: createFilterState(), pinned: [pinnedChip(onRemove)], onRemoveFilter: () => {}, onClearAll },
+      });
+      expect(alone.queryByTestId('clear-all-btn')).toBeNull();
+      cleanup();
+
+      const filters = createFilterState();
+      filters.country = 'Germany';
+      const { getByTestId } = render(ActiveFiltersBar, {
+        props: { filters, pinned: [pinnedChip(onRemove)], onRemoveFilter: () => {}, onClearAll },
+      });
+      await fireEvent.click(getByTestId('clear-all-btn'));
+      expect(onClearAll).toHaveBeenCalledOnce();
+      expect(onRemove).not.toHaveBeenCalled();
+    });
   });
 
   it('omits its own band and padding in embedded mode', () => {

@@ -75,6 +75,7 @@ import type { MessageFormatter } from 'svelte-i18n';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
+import { resetLibraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 
 export const getAssetBulkActions = (
   $t: MessageFormatter,
@@ -371,7 +372,10 @@ export const getAssetActions = (
     title: $t('view_in_timeline'),
     icon: mdiImageSearch,
     $if: () => isOwner && asset.visibility !== AssetVisibility.Locked && !asset.isArchived && !asset.isTrashed,
-    onAction: () => goto(Route.photos({ at: asset.stackPrimaryAssetId ?? asset.id })),
+    onAction: () => {
+      resetLibraryView();
+      return goto(Route.photos({ at: asset.stackPrimaryAssetId ?? asset.id }));
+    },
   };
 
   const ViewSimilar: ActionItem = {

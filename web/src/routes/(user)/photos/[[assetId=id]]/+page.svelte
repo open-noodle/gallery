@@ -121,7 +121,7 @@
     {/if}
     {#snippet empty()}
       <!-- #763: an empty FILTERED timeline is not an empty library; only the unfiltered one invites an upload. -->
-      {#if filtered.hasActiveFilters}
+      {#if filtered.isNarrowed}
         <EmptyPlaceholder text={$t('no_results')} class="mx-auto mt-10" />
       {:else}
         <EmptyPlaceholder text={$t('no_assets_message')} onClick={() => openFileUploadDialog()} class="mx-auto mt-10" />

@@ -208,7 +208,7 @@ The same search mode, with the same field, chips and sheets, is available on eac
 
 | Screen (mobile page) | Today's timeline | Scope |
 |---|---|---|
-| Photos (`presentation/pages/dev/main_timeline.page.dart`) | own + timeline partners + spaces shown in the timeline | `withSharedSpaces: true`, visibility timeline |
+| Photos (`presentation/pages/dev/main_timeline.page.dart`) | own + timeline partners + spaces shown in the timeline | `withSharedSpaces: true`, visibility timeline; browsing also sends the library view, if any (`libraryView`, #1038) |
 | Album (`remote_album.page.dart`) | the album | the album |
 | Space (`pages/library/spaces/space_detail.page.dart`) | the space | the space; people are space people |
 | Space album (`pages/library/spaces/space_album_detail.page.dart`) | the album's space-linked assets, timeline + archive | the album only, never the space too (web `album-timeline.ts`) |

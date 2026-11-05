@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
@@ -50,6 +54,9 @@ Future<void> viewAssetInTimeline({
     await goToTimeline();
     return;
   }
+  // The library view (#1038) can hide the photo just as a filter can. A Space timeline is not narrowed by it, so a
+  // jump there keeps the remembered view.
+  unawaited(read(libraryViewProvider.notifier).set(LibraryViewMode.both));
   await goToTimeline();
   scrollToAssetNotifierProvider.scrollToAsset(asset);
 }

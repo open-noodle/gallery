@@ -373,6 +373,7 @@ const unfilteredKeys = [
   'withSharedSpaces',
   'withPartners',
   'withStacked',
+  'libraryView',
   'visibility',
   'spaceId',
   'albumIds',
