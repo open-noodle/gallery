@@ -27,6 +27,7 @@ describe('buildAlbumTimelineOptions', () => {
     expect(buildAlbumTimelineOptions('album-1', AssetOrder.Asc, filters)).toEqual({
       albumId: 'album-1',
       order: AssetOrder.Asc,
+      withStacked: true,
       personIds: ['person-1'],
       country: 'Germany',
       city: 'Berlin',

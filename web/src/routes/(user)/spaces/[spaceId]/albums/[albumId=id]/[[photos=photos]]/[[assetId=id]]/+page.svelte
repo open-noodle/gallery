@@ -30,6 +30,9 @@
   import SmartSearchResults from '#lib/components/search/smart-search-results.svelte';
   import SharedLinkCreateModal from '#lib/modals/SharedLinkCreateModal.svelte';
   import { lang } from '#lib/stores/preferences.store.ts';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import AlbumStackMenuOptions from '#lib/gallery/stack/AlbumStackMenuOptions.svelte';
+  import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
   import {
     AlbumUserRole,
     SharedSpaceRole,
@@ -41,7 +44,7 @@
   import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { mdiArrowLeft, mdiImageOutline, mdiImagePlusOutline, mdiLink } from '@mdi/js';
+  import { mdiArrowLeft, mdiDotsVertical, mdiImageOutline, mdiImagePlusOutline, mdiLink } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -238,6 +241,7 @@
 
 <!-- Header shows the space (context/breadcrumb); the album name lives in the editable AlbumTitle in the
      timeline below, mirroring the regular album page (which has no page-header title). -->
+<AlbumStackEvents albumId={album.id} {timelineManager} />
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} title={space.name}>
   {#snippet leading()}
     <IconButton
@@ -278,6 +282,17 @@
         onclick={() => void modalManager.show(SharedLinkCreateModal, { albumId: album.id, spaceId: space.id })}
         icon={mdiLink}
       />
+    {/if}
+    {#if mode === 'browse'}
+      <!-- The album page keeps these in its options menu; this page has no other per-album options. -->
+      <ButtonContextMenu
+        icon={mdiDotsVertical}
+        title={$t('album_options')}
+        color="secondary"
+        offset={{ x: 175, y: 25 }}
+      >
+        <AlbumStackMenuOptions />
+      </ButtonContextMenu>
     {/if}
   {/snippet}
 
@@ -380,6 +395,7 @@
             isSelectionMode={false}
             singleSelect={false}
             space={{ id: space.id, canWrite: isSpaceEditor }}
+            withStacked
             {...filtered.timelineProps}
           >
             <!-- Editable album header (Timeline leading content — always rendered, incl. for an empty

@@ -1,5 +1,72 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`viewer-scope RBAC oracle > album stacks 1`] = `
+{
+  "albumEditor": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "albumLink": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "albumViewer": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "individualLink": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "owner": {
+    "ownAlbum": [
+      "ownAsset*",
+    ],
+    "spaceAlbum": [],
+  },
+  "ownerElevated": {
+    "ownAlbum": [
+      "ownAsset*",
+    ],
+    "spaceAlbum": [],
+  },
+  "partner": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "spaceAlbumLink": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "spaceEditor": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "spaceLink": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "spaceViewer": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "spaceViewerOff": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+  "stockOwner": {
+    "ownAlbum": [
+      "ownAsset*",
+    ],
+    "spaceAlbum": [],
+  },
+  "stranger": {
+    "ownAlbum": "error:BadRequestException",
+    "spaceAlbum": "error:BadRequestException",
+  },
+}
+`;
+
 exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates and stacks 1`] = `
 {
   "albumEditor": {

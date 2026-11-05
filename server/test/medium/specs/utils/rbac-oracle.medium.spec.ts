@@ -17,6 +17,7 @@ import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-sugg
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -328,6 +329,7 @@ const seed = async () => {
       ownAlbum: ownAlbum.id,
       spaceAlbum: spaceAlbum.id,
       tagOwn,
+      stack: stack.id,
       tagSpace,
       pet: pet.personGroupId,
       memories: { memOwner, memViewer },
@@ -897,6 +899,27 @@ describe('viewer-scope RBAC oracle', () => {
               .toSorted(([a], [b]) => a.localeCompare(b)),
           ),
       );
+    }
+    expect(result).toMatchSnapshot();
+  });
+
+  // GET /albums/{id}/stacks/{stackId}: a stack narrowed to an album's members, so it must never show an actor more
+  // than GET /stacks/{id} (the `stacks` cell above) does.
+  it('album stacks', async () => {
+    const sut = world.ctx.getService(GalleryAlbumService);
+    const { ownAlbum, spaceAlbum, stack } = world.ids;
+    const result: Record<string, unknown> = {};
+    for (const [actor, auth] of Object.entries(world.actors)) {
+      result[actor] = {
+        ownAlbum: await attempt(
+          () => sut.getStack(auth, ownAlbum, stack),
+          ({ assets }) => assetList(assets),
+        ),
+        spaceAlbum: await attempt(
+          () => sut.getStack(auth, spaceAlbum, stack),
+          ({ assets }) => assetList(assets),
+        ),
+      };
     }
     expect(result).toMatchSnapshot();
   });

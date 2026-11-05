@@ -21,6 +21,7 @@
   import type { OnUndoDelete } from '#lib/utils/actions.ts';
   import { canEditAsset } from '#lib/utils/asset-editability.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
+  import { viewerAlbumId } from '#lib/gallery/stack/album-stack-strip.ts';
   import {
     AssetTypeEnum,
     AssetVisibility,
@@ -88,7 +89,7 @@
   const Actions = $derived(
     getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album, { space }),
   );
-  const StackActions = $derived(getStackActions($t, stack, asset));
+  const StackActions = $derived(getStackActions($t, stack, asset, !!viewerAlbumId(album)));
   const SpatialActions = $derived(getSpatialSceneActions($t, asset));
   const sharedLink = getSharedLink();
 </script>

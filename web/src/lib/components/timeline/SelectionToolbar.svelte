@@ -16,6 +16,7 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import AlbumStackBulkActions from '#lib/gallery/stack/AlbumStackBulkActions.svelte';
   import type {
     AlbumContext,
     CommandContext,
@@ -267,6 +268,11 @@
         {#if onVisibilitySet}
           <SetVisibilityAction menuItem {onVisibilitySet} />
         {/if}
+      {/if}
+      <!-- Stacking is owner-only filing (server: StackService.create). Album pages only; hidden over search
+           results, which the page passes without a timeline. -->
+      {#if album && timelineManager && assetInteraction.isAllUserOwned}
+        <AlbumStackBulkActions />
       {/if}
       {#if caps.canSetCover && onSetCover}
         {#if album}

@@ -444,6 +444,8 @@
     "transcoding_data_saver_video_codec_description": "HEVC требуется примерно вдвое меньший битрейт, чем H.264, для той же картинки, и его воспроизводит любой современный телефон."
   },
   "album_linked_to_space": "Привязан к «{space}»",
+  "album_stack_count_in_album": "Считать в группах только фото из этого альбома",
+  "album_stack_strip_in_album": "Показывать только фото из этого альбома при открытии группы",
   "all_albums_and_spaces": "Все",
   "apply_changes": "Применить изменения",
   "asset_count": "Количество объектов",
@@ -795,6 +797,7 @@
   "cmdk_typed_search_choices_heading": "Выберите значение фильтра",
   "cmdk_typed_search_issues_heading": "Фильтры поиска",
   "cmdk_unnamed_person": "Безымянный человек",
+  "confirm_keep_this_delete_others_in_album": "{count, plural, one {# другой объект в группе будет удалён} few {# других объекта в группе будут удалены} many {# других объектов в группе будут удалены} other {# другого объекта в группе будут удалены}} из вашей библиотеки, а не только из этого альбома. Продолжить?",
   "create_group": "Создать группу",
   "create_space": "Создать общий Space",
   "crop_faces_from_photo": "Обрезать лица с фотографии",

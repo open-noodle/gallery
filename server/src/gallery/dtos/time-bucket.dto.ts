@@ -69,6 +69,11 @@ export const GalleryTimeBucketQueryExtension = {
     .optional()
     .describe('Only include assets taken before this local date and time (ISO 8601, exclusive)'),
   libraryView: LibraryViewSchema.optional(),
+  stackCountInAlbum: stringToBool
+    .optional()
+    .describe(
+      "With albumId and withStacked: a stack's count covers only the stack members this album holds. Otherwise it covers the whole stack.",
+    ),
 };
 
 export const TimeBucketCoverResponseSchema = z

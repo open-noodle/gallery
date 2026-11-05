@@ -29,6 +29,7 @@
   import { InvocationTracker } from '#lib/utils/invocationTracker.ts';
   import { SlideshowHistory } from '#lib/utils/slideshow-history.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
+  import { loadAlbumStackStripIds, stackStrip, viewerAlbumId } from '#lib/gallery/stack/album-stack-strip.ts';
   import {
     AssetTypeEnum,
     getAssetInfo,
@@ -109,7 +110,8 @@
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
   let stack: StackResponseDto | undefined = $state();
-
+  let stackStripIds: Set<string> | undefined = $state();
+  const strip = $derived(stackStrip(stack, stackStripIds));
   const asset = $derived(previewStackedAsset ?? cursor.current);
   useViewerZoom(() => asset.id);
   const nextAsset = $derived(cursor.nextAsset);
@@ -132,6 +134,7 @@
 
     if (asset.stack) {
       stack = await getStack({ id: asset.stack.id });
+      stackStripIds = await loadAlbumStackStripIds(asset.stack.id, viewerAlbumId(album));
     }
 
     if (!stack?.assets.some(({ id }) => id === asset.id)) {
@@ -295,18 +298,18 @@
   };
 
   const navigateStack = (direction: 'previous' | 'next') => {
-    if (!stack || !withStacked || assetViewerManager.isShowEditor) {
+    if (!strip || !withStacked || assetViewerManager.isShowEditor) {
       return;
     }
-    const currentIndex = stack.assets.findIndex(({ id }) => id === asset.id);
+    const currentIndex = strip.assets.findIndex(({ id }) => id === asset.id);
     if (currentIndex === -1) {
       return;
     }
     const nextIndex = direction === 'previous' ? currentIndex - 1 : currentIndex + 1;
-    if (nextIndex < 0 || nextIndex >= stack.assets.length) {
+    if (nextIndex < 0 || nextIndex >= strip.assets.length) {
       return;
     }
-    cursor.current = stack.assets[nextIndex];
+    cursor.current = strip.assets[nextIndex];
   };
 
   /** Slide show mode */
@@ -661,10 +664,10 @@
     </div>
   {/if}
 
-  {#if stack && withStacked && !assetViewerManager.isShowEditor && $slideshowState === SlideshowState.None}
+  {#if strip && withStacked && !assetViewerManager.isShowEditor && $slideshowState === SlideshowState.None}
     <div id="stack-slideshow" class="absolute bottom-0 col-span-4 col-start-1 w-fit max-w-full">
       <div class="no-wrap horizontal-scrollbar relative flex flex-row overflow-x-auto overflow-y-hidden">
-        {#each stack.assets as stackedAsset (stackedAsset.id)}
+        {#each strip.assets as stackedAsset (stackedAsset.id)}
           <div
             class={['relative inline-block px-1 pb-2 transition-all']}
             style:bottom={stackedAsset.id === asset.id ? '0' : '-10px'}

@@ -63,3 +63,7 @@ export const GalleryAlbumResponseExtension = {
 };
 
 export class AlbumSharedSpaceLinkResponseDto extends createZodDto(AlbumSharedSpaceLinkResponseSchema) {}
+
+export class AlbumStackParamDto extends createZodDto(
+  z.object({ id: z.uuidv4(), stackId: z.uuidv4() }).meta({ id: 'AlbumStackParamDto' }),
+) {}

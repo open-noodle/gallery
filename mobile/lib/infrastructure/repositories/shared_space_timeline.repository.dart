@@ -11,9 +11,40 @@ part of 'timeline.repository.dart';
 class SharedSpaceTimelineRepository {
   final TimelineRepository _timeline;
 
-  const SharedSpaceTimelineRepository(this._timeline);
+  /// The user whose stacks collapse in album timelines (`albumStackCollapse`).
+  final String? Function() viewerId;
+
+  const SharedSpaceTimelineRepository(this._timeline, {this.viewerId = signedInUserId});
 
   Drift get _db => _timeline._db;
+
+  // An album timeline shows one photo per stack among its own members, as on the web; a sibling counts only when it
+  // passes the same view (album membership, temporal scope).
+  Expression<bool> _remoteAlbumStacks(String albumId, TimelineTemporalScope temporalScope) => albumStackCollapse(
+    _db,
+    viewerId: viewerId(),
+    inAlbum: (ahead) =>
+        ahead.id.isInQuery(
+          _db.remoteAlbumAssetEntity.selectOnly()
+            ..addColumns([_db.remoteAlbumAssetEntity.assetId])
+            ..where(_db.remoteAlbumAssetEntity.albumId.equals(albumId)),
+        ) &
+        _remoteWithinTemporalScope(ahead, temporalScope),
+  );
+
+  Expression<bool> _spaceAlbumStacks(String albumId, TimelineTemporalScope temporalScope) => albumStackCollapse(
+    _db,
+    viewerId: viewerId(),
+    inAlbum: (ahead) =>
+        ahead.id.isInQuery(
+          _db.sharedSpaceAlbumAssetEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId])
+            ..where(_db.sharedSpaceAlbumAssetEntity.albumId.equals(albumId)),
+        ) &
+        (ahead.visibility.equalsValue(AssetVisibility.timeline) |
+            ahead.visibility.equalsValue(AssetVisibility.archive)) &
+        _remoteWithinTemporalScope(ahead, temporalScope),
+  );
 
   TimelineQuery main(
     List<String> userIds,
@@ -239,14 +270,16 @@ class SharedSpaceTimelineRepository {
     bucketSource: () => _timeline._watchRemoteAlbumBucket(
       albumId,
       groupBy: groupBy,
-      extraWhere: _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
+      extraWhere:
+          _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) & _remoteAlbumStacks(albumId, temporalScope),
     ),
     assetSource: (offset, count) => _timeline._getRemoteAlbumBucketAssets(
       albumId,
       groupBy: groupBy,
       offset: offset,
       count: count,
-      extraWhere: _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
+      extraWhere:
+          _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) & _remoteAlbumStacks(albumId, temporalScope),
     ),
     origin: TimelineOrigin.remoteAlbum,
   );
@@ -371,6 +404,7 @@ class SharedSpaceTimelineRepository {
         rae.deletedAt.isNull() &
         (rae.visibility.equalsValue(AssetVisibility.timeline) | rae.visibility.equalsValue(AssetVisibility.archive)) &
         _remoteWithinTemporalScope(rae, temporalScope) &
+        _spaceAlbumStacks(albumId, temporalScope) &
         membership;
 
     return (
