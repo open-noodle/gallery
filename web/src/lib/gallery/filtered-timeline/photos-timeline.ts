@@ -1,6 +1,5 @@
 import { AssetVisibility } from '@immich/sdk';
-import { libraryViewOptions, libraryViewShown } from '$lib/gallery/library-view/library-view.svelte';
-import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
+import { keepSpacesLoaded, libraryViewOptions, libraryViewShown } from '$lib/gallery/library-view/library-view.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
@@ -35,7 +34,6 @@ export const photosTimelineConfig = (
 });
 
 export const createPhotosTimeline = (getTimelineManager: () => TimelineManager | undefined) => {
-  // The library view needs the spaces list.
-  loadSpaces();
+  keepSpacesLoaded();
   return new FilteredTimelineController(photosTimelineConfig(getTimelineManager));
 };

@@ -84,6 +84,18 @@ void main() {
     expect(container.read(libraryViewProvider), LibraryViewMode.both);
   });
 
+  test('#1038: keeps the library view for a jump to a Space timeline, which it does not narrow', () async {
+    await viewAssetInTimeline(
+      asset: _asset('a1'),
+      read: container.read,
+      popViewer: steps.pop,
+      goToTimeline: steps.goToTimeline,
+      spaceId: 'space-1',
+    );
+
+    expect(container.read(libraryViewProvider), LibraryViewMode.personal);
+  });
+
   test('closes the viewer before search mode closes under it', () async {
     // The viewer holds the search TimelineService by value; leaving search mode
     // disposes it. Pop first so nothing is torn out from under a live viewer.

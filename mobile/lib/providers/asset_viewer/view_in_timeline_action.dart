@@ -43,8 +43,6 @@ Future<void> viewAssetInTimeline({
 }) async {
   await popViewer();
   read(closeSearchModeProvider)();
-  // The library view (#1038) can hide the photo just as a filter can.
-  unawaited(read(libraryViewProvider.notifier).set(LibraryViewMode.both));
   if (spaceId != null) {
     // A Space timeline is PUSHED over the main one, and auto_route's push future
     // completes when the route is POPPED, not when it is pushed (`_addNewPage` returns
@@ -56,6 +54,9 @@ Future<void> viewAssetInTimeline({
     await goToTimeline();
     return;
   }
+  // The library view (#1038) can hide the photo just as a filter can. A Space timeline is not narrowed by it, so a
+  // jump there keeps the remembered view.
+  unawaited(read(libraryViewProvider.notifier).set(LibraryViewMode.both));
   await goToTimeline();
   scrollToAssetNotifierProvider.scrollToAsset(asset);
 }

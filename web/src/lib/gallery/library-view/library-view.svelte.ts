@@ -3,6 +3,7 @@ import { mdiPin } from '@mdi/js';
 import { persisted } from 'svelte-persisted-store';
 import { fromStore } from 'svelte/store';
 import type { PinnedFilterChip } from '$lib/components/filter-panel/filter-panel';
+import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { userInteraction } from '$lib/stores/user.svelte';
 
@@ -29,6 +30,18 @@ const hasTimelineSpace = () =>
   userInteraction.recentSpaces?.some((space) =>
     space.members?.some((member) => member.userId === authManager.user.id && member.showInTimeline),
   );
+
+/**
+ * The view reads the spaces list, which every space change drops (spaces-cache). Reload it whenever that happens,
+ * or the view stays applied with its section and chip hidden until something else refetches the list.
+ */
+export const keepSpacesLoaded = () => {
+  $effect(() => {
+    if (!userInteraction.recentSpaces) {
+      loadSpaces();
+    }
+  });
+};
 
 /** The view only means something once a space is on the timeline, so the control waits for the spaces list. */
 export const libraryViewShown = () => hasTimelineSpace() === true;
