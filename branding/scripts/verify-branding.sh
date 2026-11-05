@@ -241,8 +241,10 @@ if [[ -f "$help_modal" ]]; then
     # these hrefs the Immich pattern vanishes and this passes vacuously. Require the
     # patched-in Noodle URLs to be present too.
     missing=""
-    grep -qF "$REPO_DOCS_URL" "$help_modal" || missing="$missing docs"
+    # The docs link is ExternalRoute.docs() in route.ts since immich-32976.
+    grep -qF "$REPO_DOCS_URL" "$REPO_ROOT/web/src/lib/route.ts" || missing="$missing docs"
     grep -qF "$REPO_ISSUES_URL" "$help_modal" || missing="$missing issues"
+    grep -qF "$REPO_RELEASES_URL" "$help_modal" || missing="$missing releases"
     if [[ -n "$missing" ]]; then
       echo "  WARN: HelpAndFeedbackModal.svelte is missing Noodle URL(s):$missing"
       echo "        (no upstream URL either — the hrefs likely moved and apply-branding no-opped)"

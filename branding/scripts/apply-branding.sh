@@ -570,14 +570,17 @@ patch_emails() {
 patch_help_modal() {
   echo "--- Patching help modal URLs ---"
   local help_modal="$REPO_ROOT/web/src/lib/modals/HelpAndFeedbackModal.svelte"
+  local route_file="$REPO_ROOT/web/src/lib/route.ts"
 
-  # Replace docs URL (backtick template literal → plain string)
-  # Matching literal ${info.version} in Svelte template, not a shell variable
-  # shellcheck disable=SC2016
-  sed -i 's|`https://docs\.\${info\.version}\.archive\.immich\.app/overview/introduction`|'"'${REPO_DOCS_URL}'"'|g' "$help_modal"
+  # Docs URL: since immich-32976 the modal renders ExternalRoute.docs() from route.ts, not a literal.
+  sed -i "s|'https://docs\.immich\.app/overview/quick-start'|'${REPO_DOCS_URL}'|g" "$route_file"
 
   # Replace bugs/issues URL (only appears once, outside upstream section)
   sed -i "s|https://github\.com/immich-app/immich/issues/new/choose|${REPO_ISSUES_URL}|g" "$help_modal"
+
+  # "Latest version" link (immich-32976). Must run before the source-URL rewrite below, whose
+  # pattern is a prefix of this URL.
+  sed -i "s|https://github\.com/immich-app/immich/releases|${REPO_RELEASES_URL}|g" "$help_modal"
 
   # Replace primary source URL (with trailing slash — upstream section has no trailing slash)
   sed -i "s|https://github\.com/immich-app/immich/|${REPO_URL}|" "$help_modal"
