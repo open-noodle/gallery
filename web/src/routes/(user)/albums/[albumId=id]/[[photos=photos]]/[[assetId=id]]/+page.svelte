@@ -75,6 +75,9 @@
   } from '#lib/queries/album.query.ts';
   import { createPreloadedQuery, executeMutation } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
+  import AlbumStackBulkActions from '#lib/gallery/stack/AlbumStackBulkActions.svelte';
+  import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
+  import AlbumStackMenuOptions from '#lib/gallery/stack/AlbumStackMenuOptions.svelte';
 
   let { params }: PageProps = $props();
 
@@ -335,6 +338,7 @@
 </script>
 
 <OnEvents {onAlbumAddAssets} {onAlbumRemoveAssets} onAssetsDelete={() => refreshAlbum()} />
+<AlbumStackEvents albumId={album.id} {timelineManager} />
 
 <CommandPaletteDefaultProvider name={$t('album')} actions={[AddAssets, Upload, Close, ...Object.values(Actions)]} />
 
@@ -491,6 +495,7 @@
             <ChangeLocation menuItem />
             <ArchiveAction menuItem unarchive={assetMultiSelectManager.isAllArchived} onArchive={filtered.onArchive} />
             <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
+            {#if !filtered.showSearchResults}<AlbumStackBulkActions />{/if}
           {/if}
           {#if isEditor && assetMultiSelectManager.assets.length === 1}
             <MenuOption
@@ -564,6 +569,7 @@
                     onClick={() => timelineManager.toggleShowAssetOwners()}
                   />
                 {/if}
+                <AlbumStackMenuOptions />
                 <ActionMenuItem action={Actions.Options} />
                 {#if isOwned && album.assetCount > 0}
                   <MenuOption

@@ -14,6 +14,7 @@ import { factory } from '#test/unit/factories.ts';
 import { LibraryView, type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
+import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { createAlbumTimeline } from './album-timeline';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
 import { createPhotosTimeline } from './photos-timeline';
@@ -588,5 +589,29 @@ describe('FilteredTimelineController', () => {
 
     sut.onSpaceAddAssets({});
     expect(sut.timelineReloadToken).toBe(1);
+  });
+
+  describe('album stack count setting', () => {
+    afterEach(() => {
+      albumStackPreferences.countInAlbum = false;
+    });
+
+    it('collapses stacks and asks for album-only counts only when the setting is on', () => {
+      navigate('/albums/a1');
+      const sut = create(() =>
+        createAlbumTimeline({
+          name: 'album',
+          getAlbum: () => ({ id: 'a1', albumUsers: [] }) as never,
+          getTimelineManager: () => undefined,
+          isBrowse: () => true,
+        }),
+      );
+      expect(sut.options).toMatchObject({ albumId: 'a1', withStacked: true });
+      expect(sut.options).not.toHaveProperty('stackCountInAlbum');
+
+      albumStackPreferences.countInAlbum = true;
+      flushSync();
+      expect(sut.options).toMatchObject({ albumId: 'a1', withStacked: true, stackCountInAlbum: true });
+    });
   });
 });
