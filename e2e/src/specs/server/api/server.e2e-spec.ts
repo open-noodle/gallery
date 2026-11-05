@@ -118,6 +118,8 @@ describe('/server', () => {
         s3Storage: false,
         // off on the e2e stack: Spatial Scene ships disabled
         spatialScene: false,
+        // off on the e2e stack: Data Saver video ships disabled
+        dataSaverVideo: false,
         // The full list mirrors the SyncRequestType enum; pin the fork's space-album types,
         // which mobile's sync gate opens on (capability signalling).
         syncRequestTypes: expect.arrayContaining([

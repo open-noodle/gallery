@@ -33,3 +33,27 @@ describe('IntegrityService.handleUntrackedFiles with Spatial Scene depth maps', 
     expect(mocks.integrityReport.create).toHaveBeenCalledWith([{ type: IntegrityReport.UntrackedFile, path: orphan }]);
   });
 });
+
+// The Data Saver copy is `<id>_ds.mp4` beside the encoded videos; the untracked-files scan counts it as tracked
+// (src/gallery/repositories/data-saver-video.repository.ts getPathsByPaths).
+describe('IntegrityService.handleUntrackedFiles with Data Saver copies', () => {
+  let sut: IntegrityService;
+  let mocks: ServiceMocks;
+
+  beforeEach(() => {
+    ({ sut, mocks } = newTestService(IntegrityService));
+    mocks.integrityReport.getAssetPathsByPaths.mockResolvedValue([]);
+    mocks.integrityReport.getPersonThumbnailPathsByPaths.mockResolvedValue([]);
+    mocks.integrityReport.getAssetFilePathsByPaths.mockResolvedValue([]);
+  });
+
+  it('should not report a Data Saver copy in the encoded-video folder', async () => {
+    const copy = '/data/encoded-video/user-id/as/se/asset-id_ds.mp4';
+    mocks.dataSaverVideo.getPathsByPaths.mockResolvedValue([{ path: copy }]);
+
+    await sut.handleUntrackedFiles({ type: 'asset_file', paths: [copy] });
+
+    expect(mocks.dataSaverVideo.getPathsByPaths).toHaveBeenCalledWith([copy]);
+    expect(mocks.integrityReport.create).not.toHaveBeenCalled();
+  });
+});
