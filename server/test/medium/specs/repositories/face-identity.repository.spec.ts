@@ -5841,6 +5841,33 @@ describe('FaceIdentityRepository getAccessiblePeople type filter', () => {
     expect(ids).not.toContain(bucket.personGroupId);
   });
 
+  // A human cluster reclassified as a pet keeps its face_search embeddings and no pet_search row; it
+  // must stay listed rather than read as a species bucket.
+  it('lists a pet whose faces carry a face embedding', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      name: 'Rex',
+      assets: 3,
+    });
+    const faces = await ctx.database
+      .selectFrom('asset_face')
+      .select('id')
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
+    await ctx.database
+      .insertInto('face_search')
+      .values(faces.map(({ id }) => ({ faceId: id, embedding: newEmbedding() })))
+      .execute();
+
+    for (const type of [undefined, 'pet']) {
+      const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type });
+      expect(result.people.map(({ id }) => id)).toContain(person.personGroupId);
+    }
+  });
+
   it('keeps the minimumFaceCount gate on the unfiltered view', async () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();

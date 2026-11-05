@@ -3,9 +3,12 @@ import { AssetFileType, AssetVisibility, SharedSpaceRole, SourceType } from 'src
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { personType } from 'src/gallery/utils/person-sidecar.js';
+import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
@@ -102,7 +105,134 @@ const seedFace = async (
   return faceId;
 };
 
+const seedIdentityCluster = async (ctx: ReturnType<typeof setup>['ctx'], type: 'person' | 'pet') => {
+  const { user: owner } = await ctx.newUser();
+  const { person } = await ctx.newPerson({
+    ownerId: owner.id,
+    name: 'Rex',
+    type,
+    ...(type === 'pet' && { species: 'dog' }),
+  });
+  const { asset } = await ctx.newAsset({ ownerId: owner.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+
+  const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.personGroupId);
+  const { user: otherOwner } = await ctx.newUser();
+  const { person: otherPerson } = await ctx.newPerson({
+    ownerId: otherOwner.id,
+    name: 'Rex elsewhere',
+    type,
+    ...(type === 'pet' && { species: 'dog' }),
+  });
+  await ctx.get(GalleryPersonRepository).updatePersonIdentity({
+    personId: otherPerson.personGroupId,
+    identityId: identity.id,
+  });
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: false });
+  const spacePerson = await ctx.get(SharedSpaceRepository).createPerson({
+    spaceId: space.id,
+    identityId: identity.id,
+    type,
+  });
+
+  return { owner, person, otherPerson, identity, assetFace, spacePerson };
+};
+
 describe(PersonRepository.name, () => {
+  describe('update type', () => {
+    it('reclassifies a person cluster as a pet without moving its faces', async () => {
+      const { ctx } = setup();
+      const { owner, person, otherPerson, identity, assetFace, spacePerson } = await seedIdentityCluster(ctx, 'person');
+
+      const updated = await updatePersonWithType(ctx.get(DatabaseRepository), ctx.get(PersonRepository), {
+        ownerId: owner.id,
+        personGroupId: person.personGroupId,
+        type: 'pet',
+      });
+
+      expect(updated).toMatchObject({ type: 'pet', species: null });
+      await expect(
+        ctx.database.selectFrom('person_pet').selectAll().where('personGroupId', '=', person.personGroupId).execute(),
+      ).resolves.toHaveLength(1);
+      await expect(
+        ctx.database
+          .selectFrom('person_pet')
+          .selectAll()
+          .where('personGroupId', '=', otherPerson.personGroupId)
+          .execute(),
+      ).resolves.toHaveLength(1);
+      await expect(
+        ctx.database.selectFrom('face_identity').select('type').where('id', '=', identity.id).executeTakeFirst(),
+      ).resolves.toEqual({ type: 'pet' });
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person')
+          .select('type')
+          .where('id', '=', spacePerson.id)
+          .executeTakeFirst(),
+      ).resolves.toEqual({ type: 'pet' });
+      await expect(
+        ctx.database.selectFrom('asset_face').select('personGroupId').where('id', '=', assetFace.id).executeTakeFirst(),
+      ).resolves.toEqual({ personGroupId: person.personGroupId });
+    });
+
+    it('reclassifies a pet cluster as a person without moving its faces', async () => {
+      const { ctx } = setup();
+      const { owner, person, otherPerson, identity, assetFace, spacePerson } = await seedIdentityCluster(ctx, 'pet');
+
+      const updated = await updatePersonWithType(ctx.get(DatabaseRepository), ctx.get(PersonRepository), {
+        ownerId: owner.id,
+        personGroupId: person.personGroupId,
+        type: 'person',
+      });
+
+      expect(updated).toMatchObject({ type: 'person', species: null });
+      await expect(
+        ctx.database.selectFrom('person_pet').selectAll().where('personGroupId', '=', person.personGroupId).execute(),
+      ).resolves.toHaveLength(0);
+      await expect(
+        ctx.database
+          .selectFrom('person_pet')
+          .selectAll()
+          .where('personGroupId', '=', otherPerson.personGroupId)
+          .execute(),
+      ).resolves.toHaveLength(0);
+      await expect(
+        ctx.database.selectFrom('face_identity').select('type').where('id', '=', identity.id).executeTakeFirst(),
+      ).resolves.toEqual({ type: 'person' });
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person')
+          .select('type')
+          .where('id', '=', spacePerson.id)
+          .executeTakeFirst(),
+      ).resolves.toEqual({ type: 'person' });
+      await expect(
+        ctx.database.selectFrom('asset_face').select('personGroupId').where('id', '=', assetFace.id).executeTakeFirst(),
+      ).resolves.toEqual({ personGroupId: person.personGroupId });
+    });
+    it('keeps a human cluster switched to pet on the People list', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Rex' });
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await seedFace(ctx, { assetId: asset.id, personGroupId: person.personGroupId, embedding: axis(0) });
+      }
+
+      await updatePersonWithType(ctx.get(DatabaseRepository), sut, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        type: 'pet',
+      });
+
+      for (const type of [undefined, 'pet'] as const) {
+        const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type });
+        expect(items.map(({ personGroupId }) => personGroupId)).toEqual([person.personGroupId]);
+      }
+    });
+  });
+
   describe('createAll', () => {
     it('should create people in the groups they were given', async () => {
       const { ctx, sut } = setup();
