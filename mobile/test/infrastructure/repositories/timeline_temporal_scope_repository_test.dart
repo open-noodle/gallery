@@ -13,6 +13,7 @@ import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -169,6 +170,94 @@ void main() {
       TimeBucket(date: DateTime(2025, 6), assetCount: 1),
       TimeBucket(date: DateTime(2025, 5), assetCount: 1),
     ]);
+  });
+
+  test('#1038: main() applies the library view on every path, with or without a year scope', () async {
+    final date = DateTime(2025, 5, 1, 12);
+    final me = (await ctx.newUser(id: 'me')).id;
+    final partner = (await ctx.newUser(id: 'partner')).id;
+    final peer = (await ctx.newUser(id: 'peer')).id;
+    await ctx.newSharedSpace(id: 'shown', createdById: peer);
+    await ctx.newSharedSpace(id: 'hidden', createdById: peer);
+    await ctx.newSharedSpaceMember(spaceId: 'shown', userId: me);
+    await ctx.newSharedSpaceMember(spaceId: 'hidden', userId: me, showInTimeline: false);
+    Future<void> remote(
+      String id,
+      String ownerId, {
+      String? checksum,
+      String? libraryId,
+      DateTime? deletedAt,
+      AssetVisibility? visibility,
+    }) => ctx.newRemoteAsset(
+      id: id,
+      ownerId: ownerId,
+      createdAt: date,
+      checksum: checksum,
+      libraryId: libraryId,
+      deletedAt: deletedAt,
+      visibility: visibility,
+    );
+
+    await remote('mine', me);
+    await remote('mineInSpace', me, checksum: 'mine-in-space');
+    await ctx.insertSharedSpaceAsset(spaceId: 'shown', assetId: 'mineInSpace');
+    await remote('mineInHiddenSpace', me);
+    await ctx.insertSharedSpaceAsset(spaceId: 'hidden', assetId: 'mineInHiddenSpace');
+    await ctx.newSharedSpaceAlbum(id: 'album');
+    await ctx.insertSharedSpaceAlbumLink(spaceId: 'shown', albumId: 'album');
+    await remote('mineInAlbum', me);
+    await ctx.insertSharedSpaceAlbumAsset(albumId: 'album', assetId: 'mineInAlbum');
+    await ctx.newSharedSpaceAlbum(id: 'hidden-album');
+    await ctx.insertSharedSpaceAlbumLink(spaceId: 'shown', albumId: 'hidden-album');
+    await remote('mineInHiddenAlbum', me);
+    await ctx.insertSharedSpaceAlbumAsset(albumId: 'hidden-album', assetId: 'mineInHiddenAlbum');
+    await ctx.db
+        .into(ctx.db.sharedSpaceAlbumHiddenEntity)
+        .insert(SharedSpaceAlbumHiddenEntityCompanion.insert(spaceId: 'shown', albumId: 'hidden-album', userId: me));
+    await remote('mineInLibrary', me, libraryId: 'library');
+    await ctx.insertSharedSpaceLibrary(spaceId: 'shown', libraryId: 'library');
+    await remote('partner', partner);
+    await remote('partnerInSpace', partner);
+    await ctx.insertSharedSpaceAsset(spaceId: 'shown', assetId: 'partnerInSpace');
+    await remote('peerInSpace', peer);
+    await ctx.insertSharedSpaceAsset(spaceId: 'shown', assetId: 'peerInSpace');
+    await remote('peerInHiddenSpace', peer);
+    await ctx.insertSharedSpaceAsset(spaceId: 'hidden', assetId: 'peerInHiddenSpace');
+    await remote('mineTrashed', me, deletedAt: date);
+    await remote('mineArchived', me, visibility: AssetVisibility.archive);
+    await remote('mineLocked', me, visibility: AssetVisibility.locked);
+    final album = await ctx.newLocalAlbum(backupSelection: BackupSelection.selected);
+    await ctx.newLocalAsset(id: 'deviceOnly', createdAt: date);
+    await ctx.newLocalAsset(id: 'mineInSpaceOnDevice', checksum: 'mine-in-space', createdAt: date);
+    await ctx.newLocalAlbumAsset(albumId: album.id, assetId: 'deviceOnly');
+    await ctx.newLocalAlbumAsset(albumId: album.id, assetId: 'mineInSpaceOnDevice');
+
+    final expected = {
+      LibraryViewMode.both: [
+        'deviceOnly',
+        'mine',
+        'mineInAlbum',
+        'mineInLibrary',
+        'mineInSpace',
+        'partner',
+        'partnerInSpace',
+        'peerInSpace',
+      ],
+      LibraryViewMode.personal: ['deviceOnly', 'mine'],
+      LibraryViewMode.spaces: ['mineInAlbum', 'mineInLibrary', 'mineInSpace', 'partnerInSpace', 'peerInSpace'],
+    };
+    for (final MapEntry(key: view, value: ids) in expected.entries) {
+      for (final scope in [const TimelineTemporalScope.none(), const TimelineTemporalScope.year(2025)]) {
+        final query = sut.main([me, partner], me, GroupAssetsBy.day, temporalScope: scope, libraryView: view);
+        final reason = '$view, ${scope.kind}';
+        expect((await assetIds(query))..sort(), ids, reason: reason);
+        expect(
+          (await timeBuckets(query)).fold(0, (sum, bucket) => sum + bucket.assetCount),
+          ids.length,
+          reason: reason,
+        );
+      }
+    }
   });
 
   test('main() year scope preserves merged local-only semantics', () async {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import ColorPicker from '#lib/components/spaces/color-picker.svelte';
   import { celebrate } from '#lib/gallery/motion/index.ts';
+  import { invalidateSpaces } from '#lib/gallery/spaces/space.query.ts';
   import { createSpace, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, Textarea } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';
@@ -24,6 +25,8 @@
         color,
       },
     });
+    // The new space can put the Photos library view on screen (#1038).
+    void invalidateSpaces();
     celebrate('success');
     onClose(space);
   };
