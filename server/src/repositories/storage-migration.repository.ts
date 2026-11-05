@@ -77,6 +77,19 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  /**
+   * Best frames of video faces (specs/2026-10-31-video-face-frames-design.md): the source person thumbnails are cut
+   * from, so they move with them.
+   */
+  streamVideoFaceFrames(direction: StorageMigrationDirection) {
+    return this.db
+      .selectFrom('asset_face_video_frame')
+      .select(['faceId', 'path'])
+      .$if(direction === 'toS3', (qb) => qb.where('path', 'like', '/%'))
+      .$if(direction === 'toDisk', (qb) => qb.where('path', 'not like', '/%'))
+      .stream();
+  }
+
   streamPersonThumbnails(direction: StorageMigrationDirection) {
     return this.db
       .selectFrom('person')
@@ -158,51 +171,58 @@ export class StorageMigrationRepository {
     const pathFilter = direction === 'toS3' ? 'like' : ('not like' as const);
     const pathPattern = '/%';
 
-    const [originals, assetFiles, depthMaps, encodedVideos, personThumbnails, profileImages] = await Promise.all([
-      this.db
-        .selectFrom('asset')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('originalPath', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
+    const [originals, assetFiles, depthMaps, encodedVideos, personThumbnails, videoFaceFrames, profileImages] =
+      await Promise.all([
+        this.db
+          .selectFrom('asset')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('originalPath', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
 
-      this.db
-        .selectFrom('asset_file')
-        .select((eb) => [
-          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Thumbnail).as('thumbnails'),
-          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Preview).as('previews'),
-          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.FullSize).as('fullsize'),
-          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Sidecar).as('sidecars'),
-        ])
-        .where('path', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
+        this.db
+          .selectFrom('asset_file')
+          .select((eb) => [
+            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Thumbnail).as('thumbnails'),
+            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Preview).as('previews'),
+            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.FullSize).as('fullsize'),
+            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Sidecar).as('sidecars'),
+          ])
+          .where('path', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
 
-      this.db
-        .selectFrom('asset_spatial_scene')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('path', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
+        this.db
+          .selectFrom('asset_spatial_scene')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('path', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
 
-      this.db
-        .selectFrom('asset_file')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('type', '=', AssetFileType.EncodedVideo)
-        .where('path', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
+        this.db
+          .selectFrom('asset_file')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('type', '=', AssetFileType.EncodedVideo)
+          .where('path', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
 
-      this.db
-        .selectFrom('person')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('thumbnailPath', '!=', '')
-        .where('thumbnailPath', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
+        this.db
+          .selectFrom('person')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('thumbnailPath', '!=', '')
+          .where('thumbnailPath', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
 
-      this.db
-        .selectFrom('user')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('profileImagePath', '!=', '')
-        .where('profileImagePath', pathFilter, pathPattern)
-        .executeTakeFirstOrThrow(),
-    ]);
+        this.db
+          .selectFrom('asset_face_video_frame')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('path', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
+
+        this.db
+          .selectFrom('user')
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where('profileImagePath', '!=', '')
+          .where('profileImagePath', pathFilter, pathPattern)
+          .executeTakeFirstOrThrow(),
+      ]);
     // Data Saver copies move with the encoded videos they sit beside
     const dataSaverVideos = await this.db
       .selectFrom('asset_data_saver_video')
@@ -218,7 +238,8 @@ export class StorageMigrationRepository {
       fullsize: assetFiles.fullsize,
       sidecars: assetFiles.sidecars,
       encodedVideos: Number(encodedVideos.count) + Number(dataSaverVideos.count),
-      personThumbnails: personThumbnails.count,
+      // video face frames move with the person thumbnails cut from them
+      personThumbnails: Number(personThumbnails.count) + Number(videoFaceFrames.count),
       profileImages: profileImages.count,
     };
   }
@@ -275,6 +296,17 @@ export class StorageMigrationRepository {
       .updateTable('asset_data_saver_video')
       .set({ path: newPath })
       .where('assetId', '=', assetId)
+      .where('path', '=', oldPath)
+      .executeTakeFirst();
+
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  async updateVideoFaceFramePath(faceId: string, oldPath: string, newPath: string): Promise<boolean> {
+    const result = await this.db
+      .updateTable('asset_face_video_frame')
+      .set({ path: newPath })
+      .where('faceId', '=', faceId)
       .where('path', '=', oldPath)
       .executeTakeFirst();
 
