@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaults } from 'src/dtos/config.dto.js';
 import * as forkConfig from 'src/gallery/dtos/config.dto.js';
+import { galleryDataSaverVideoDefaults } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { personGroupRejoinStatements } from 'src/gallery/utils/person-group-split.js';
 
 // Note: co-located under src/schema/ (not server/test/) so it runs under the server:unit vitest
@@ -91,6 +92,8 @@ const forkDefaultObjects = new Set<unknown>([
   ...Object.values(forkConfig.galleryTopLevelDefaults),
   ...Object.values(forkConfig.galleryBackupDatabaseDefaults),
   ...Object.values(forkConfig.galleryMachineLearningDefaults).filter((value) => typeof value === 'object'),
+  // Fork sections whose defaults live in their own leaf module rather than src/gallery/dtos/config.dto.ts.
+  galleryDataSaverVideoDefaults,
 ]);
 const forkConfigPaths: string[] = [
   ...Object.keys(forkConfig.galleryServerDefaults).map((key) => `server.${key}`),

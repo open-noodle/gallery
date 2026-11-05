@@ -847,6 +847,7 @@ UPDATE "system_metadata"
      #- '{memories}'
      #- '{storageUsage}'
      #- '{backup,database,s3}'
+     #- '{ffmpeg,dataSaver}'
      #- '{job,peopleBackfill}'
      #- '{job,petDetection}'
      #- '{job,classification}'
