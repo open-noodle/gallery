@@ -150,19 +150,19 @@ It is **on by default**, and only shows when your server has Data Saver video tu
 
 ## App and server versions
 
-| Mobile app               | Server                               | Result                                                           |
-| :----------------------- | :----------------------------------- | :--------------------------------------------------------------- |
-| Gallery with Data Saver  | Gallery with Data Saver, feature on  | Copy on mobile data, normal video on Wi-Fi                       |
-| Gallery with Data Saver  | Gallery with Data Saver, feature off | Normal video everywhere; the app setting is hidden               |
-| Gallery with Data Saver  | Older Gallery, or Immich             | Normal video everywhere                                          |
-| Older Gallery, or Immich | Gallery with Data Saver              | Normal video everywhere. These apps don't know about the copies. |
+| Mobile app                        | Server                               | Result                                                           |
+| :-------------------------------- | :----------------------------------- | :--------------------------------------------------------------- |
+| Gallery with Data Saver           | Gallery with Data Saver, feature on  | Copy on mobile data, normal video on Wi-Fi                       |
+| Gallery with Data Saver           | Gallery with Data Saver, feature off | Normal video everywhere; the app setting is hidden               |
+| Gallery with Data Saver           | Older Gallery, or an upstream server | Normal video everywhere                                          |
+| Older Gallery, or an upstream app | Gallery with Data Saver              | Normal video everywhere. These apps don't know about the copies. |
 
-## Switching back to Immich
+## Switching back to upstream
 
-The copies are a Gallery-only addition and don't affect Immich:
+The copies are a Gallery-only addition, so they don't get in the way if you [switch back to upstream](/guides/switch-back-to-immich):
 
-- A stock Immich server started on a Gallery database ignores the copies. They stay on disk as files Immich doesn't know about.
-- The [switch-back script](/guides/switch-back-to-immich) removes the list of copies from the database. The `_ds.mp4` files stay in `encoded-video/`, and you can delete them afterwards to free the space.
+- An upstream server started on a Gallery database ignores the copies. They stay on disk as files it doesn't know about.
+- The switch-back script removes the list of copies from the database. The `_ds.mp4` files stay in `encoded-video/`, and you can delete them afterwards to free the space.
 
 ## FAQ
 
