@@ -4,6 +4,8 @@
   import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
+  import LibraryViewFilter from '$lib/gallery/library-view/LibraryViewFilter.svelte';
+  import { libraryViewChips } from '$lib/gallery/library-view/library-view.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
   import { lang } from '$lib/stores/preferences.store';
@@ -62,7 +64,12 @@
 
   const selecting = $derived(assetMultiSelectManager.selectionActive);
   const pickerOpen = $derived(!!picker && picking);
+  const pinnedChips = $derived(controller.libraryViewActive ? libraryViewChips() : []);
 </script>
+
+{#snippet libraryViewSection()}
+  <LibraryViewFilter />
+{/snippet}
 
 {#snippet panel()}
   {#if picker && picking}
@@ -89,6 +96,7 @@
         personNames={controller.personNames}
         tagNames={controller.tagNames}
         onFiltersChange={controller.onFiltersChange}
+        top={controller.showLibraryView ? libraryViewSection : undefined}
       />
     {/key}
   {/if}
@@ -108,6 +116,7 @@
     onRemoveFilter={controller.onRemoveFilter}
     onClearAll={controller.onClearAll}
     onAddAllToCollection={controller.onAddAllToCollection}
+    pinned={pinnedChips}
   />
 {/snippet}
 
@@ -143,13 +152,13 @@
           grouping={controller.grouping}
           onGroupingChange={controller.onGroupingChange}
           showGrouping={controller.isBrowse && !controller.showSearchResults && !selecting}
-          showFilters={controller.hasActiveFilters}
+          showFilters={controller.hasActiveFilters || pinnedChips.length > 0}
           filters={filtersBar}
           showFilterButton={controller.filterCollapsed &&
             controller.isBrowse &&
             !controller.isTimelineEmpty &&
             !selecting}
-          filterActive={controller.activeFilterCount > 0}
+          filterActive={controller.activeFilterCount > 0 || controller.libraryViewActive}
           onExpandFilters={() => (controller.filterCollapsed = false)}
           showSearchButton={searchButton && controller.isBrowse && !selecting}
           onSearch={searchButton ? () => globalSearchManager.open() : undefined}

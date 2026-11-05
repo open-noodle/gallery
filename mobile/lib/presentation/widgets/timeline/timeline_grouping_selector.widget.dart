@@ -15,29 +15,17 @@ const timelineOverviewModeSelectorOrder = <TimelineOverviewMode>[
 ];
 
 class TimelineGroupingSelector extends ConsumerWidget {
-  const TimelineGroupingSelector({super.key, this.enabled = true, this.bare = false}) : compact = false;
-
-  /// Named constructor for the compact app-bar chip variant. Does not expose [bare] because the
-  /// chip always paints its own pill surface.
-  const TimelineGroupingSelector.compact({super.key, this.enabled = true}) : compact = true, bare = false;
+  const TimelineGroupingSelector({super.key, this.enabled = true, this.bare = false});
 
   static const double _maxWidth = 218;
   static const double _height = 48;
-  // The compact chip shows one localized initial rather than the whole word. Spelling out
-  // "Months" needed 98 px, and the app bar only has ~155 px of slack before the title slot starts
-  // squeezing the logo (#1030) — the chip alone ate two thirds of it. 48 is the Material minimum
-  // tap target, so it does not shrink further. The full word stays one long-press away in the
-  // menu, and in the accessibility label.
-  static const double _compactWidth = 48;
-  static const double _compactHeight = 40;
 
   final bool enabled;
-  final bool compact;
 
-  /// When true the full-variant selector renders with a transparent Material and no stadium side,
+  /// When true the selector renders with a transparent Material and no stadium side,
   /// because the host widget (e.g. [TimelineGroupingBottomPill]) already paints the pill surface
   /// and outline ring. Keeping both would produce a double border on device. Defaults to false so
-  /// the standalone app-bar usage retains its own surface and border. The transparent Material and
+  /// a standalone selector keeps its own surface and border. The transparent Material and
   /// stadium shape must stay even when bare: the segments' InkWells need a Material ancestor, and
   /// the shape clips their ripples to the pill.
   final bool bare;
@@ -47,17 +35,6 @@ class TimelineGroupingSelector extends ConsumerWidget {
     final selected = ref.watch(timelineOverviewModeProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-
-    if (compact) {
-      return _TimelineGroupingCompactSelector(
-        selected: selected,
-        enabled: enabled,
-        onSelected: (mode) async {
-          unawaited(HapticFeedback.selectionClick());
-          await ref.read(timelineOverviewModeProvider.notifier).set(mode);
-        },
-      );
-    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -107,128 +84,6 @@ class TimelineGroupingSelector extends ConsumerWidget {
   }
 }
 
-/// Bounce direction of the compact timeline-grouping chip: `true` means the next tap zooms in
-/// toward "All", `false` means it zooms out toward "Years". Kept in a provider rather than widget
-/// State because the timeline tears down and rebuilds the app-bar subtree on every segment reload
-/// (a grouping change flashes the loading state). Storing the direction in ephemeral State reset
-/// it on each reload, trapping the chip between "Months" and "All" so it never bounced back to
-/// "Years". The extremes are self-correcting (a tap on Years/All forces the direction), so only
-/// the ambiguous middle ("Months") relies on this surviving recreation.
-final timelineGroupingZoomingInProvider = StateProvider<bool>((ref) => true);
-
-class _TimelineGroupingCompactSelector extends ConsumerWidget {
-  const _TimelineGroupingCompactSelector({required this.selected, required this.enabled, required this.onSelected});
-
-  final TimelineOverviewMode selected;
-  final bool enabled;
-  final Future<void> Function(TimelineOverviewMode mode) onSelected;
-
-  Future<void> _selectNext(WidgetRef ref) async {
-    final direction = ref.read(timelineGroupingZoomingInProvider.notifier);
-    final TimelineOverviewMode next;
-    switch (selected) {
-      case TimelineOverviewMode.years:
-        next = TimelineOverviewMode.months;
-        direction.state = true; // continue zooming in toward All
-      case TimelineOverviewMode.months:
-        if (direction.state) {
-          next = TimelineOverviewMode.all;
-          direction.state = false; // reached the zoom-in extreme (All); bounce back up next
-        } else {
-          next = TimelineOverviewMode.years;
-          direction.state = true; // reached the zoom-out extreme (Years); bounce back down next
-        }
-      case TimelineOverviewMode.all:
-        next = TimelineOverviewMode.months;
-        direction.state = false; // continue zooming out toward Years
-    }
-    await onSelected(next);
-  }
-
-  Future<void> _showMenu(BuildContext context) async {
-    final renderBox = context.findRenderObject()! as RenderBox;
-    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-    final position = RelativeRect.fromRect(offset & renderBox.size, Offset.zero & overlay.size);
-    final selectedMode = await showMenu<TimelineOverviewMode>(
-      context: context,
-      position: position,
-      items: [
-        for (final mode in timelineOverviewModeSelectorOrder)
-          PopupMenuItem<TimelineOverviewMode>(
-            key: Key('timeline-grouping-menu-${mode.name}'),
-            value: mode,
-            child: Text(_label(context, mode)),
-          ),
-      ],
-    );
-
-    if (selectedMode != null && context.mounted) {
-      await onSelected(selectedMode);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    // Screen readers get the whole word; only the painted chip is abbreviated.
-    final label = _label(context, selected);
-    final initial = _shortLabel(context, selected);
-    final foreground = enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
-
-    return Semantics(
-      key: const Key('timeline-grouping-compact-selector'),
-      container: true,
-      button: true,
-      enabled: enabled,
-      label: _translated('timeline_grouping_selector', 'Timeline grouping'),
-      value: label,
-      onTap: enabled ? () => unawaited(_selectNext(ref)) : null,
-      onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
-      child: ExcludeSemantics(
-        child: Opacity(
-          opacity: enabled ? 1 : 0.45,
-          child: SizedBox(
-            width: TimelineGroupingSelector._compactWidth,
-            height: TimelineGroupingSelector._compactHeight,
-            child: Material(
-              color: enabled ? colors.primary : colors.surfaceContainerHighest,
-              shape: StadiumBorder(
-                side: BorderSide(
-                  color: enabled
-                      ? colors.primary.withValues(alpha: 0.42)
-                      : colors.outlineVariant.withValues(alpha: 0.7),
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: enabled ? () => unawaited(_selectNext(ref)) : null,
-                onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
-                borderRadius: BorderRadius.circular(999),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        initial,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: theme.textTheme.titleMedium?.copyWith(color: foreground, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _TimelineGroupingSegment extends StatelessWidget {
   const _TimelineGroupingSegment({
     required this.mode,
@@ -248,7 +103,7 @@ class _TimelineGroupingSegment extends StatelessWidget {
     final colors = theme.colorScheme;
     final foreground = selected ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.86);
     final duration = MediaQuery.disableAnimationsOf(context) ? Duration.zero : Durations.short3;
-    final label = _label(context, mode);
+    final label = timelineGroupingLabel(mode);
     final canTap = enabled && !selected;
 
     return Semantics(
@@ -290,27 +145,12 @@ class _TimelineGroupingSegment extends StatelessWidget {
 }
 
 // Labels mirror the web timeline grouping control (Years / Months / All) so the two
-// platforms read identically. Both the inline segments and the compact app-bar chip use
-// these; the chip is sized to fit the widest label ("Months") to avoid truncation.
-String _label(BuildContext context, TimelineOverviewMode mode) {
+// platforms read identically.
+String timelineGroupingLabel(TimelineOverviewMode mode) {
   return switch (mode) {
     TimelineOverviewMode.years => _translated('timeline_grouping_years', 'Years'),
     TimelineOverviewMode.months => _translated('timeline_grouping_months', 'Months'),
     TimelineOverviewMode.all => _translated('timeline_grouping_all', 'All'),
-  };
-}
-
-/// One-glyph form of [_label] for the compact app-bar chip.
-///
-/// These are translated rather than derived from the full label's first character: zh_Hans
-/// ("按年" / "按月") and zh_Hant ("依年份" / "依月份") both share their leading glyph, so slicing
-/// would render Years and Months identically. Each locale supplies three forms that are distinct
-/// within that locale.
-String _shortLabel(BuildContext context, TimelineOverviewMode mode) {
-  return switch (mode) {
-    TimelineOverviewMode.years => _translated('timeline_grouping_years_short', 'Y'),
-    TimelineOverviewMode.months => _translated('timeline_grouping_months_short', 'M'),
-    TimelineOverviewMode.all => _translated('timeline_grouping_all_short', 'A'),
   };
 }
 
