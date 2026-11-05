@@ -5392,6 +5392,62 @@
         "x-immich-state": "Beta"
       }
     },
+    "/assets/spaces": {
+      "post": {
+        "description": "For each given asset the caller can read, the IDs of the caller's spaces that show it by any path: added to the space, in an album linked to it, or in a library linked to it, hidden from the timeline or not. Assets in none of them are left out, and hidden, locked and trashed assets are in none.",
+        "operationId": "getAssetSpaces",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetSpacesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSpacesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Resolve which of the caller's spaces show the given assets",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/statistics": {
       "get": {
         "description": "Retrieve various statistics about the assets owned by the authenticated user.",
@@ -15208,6 +15264,14 @@
             }
           },
           {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -24726,6 +24790,14 @@
             }
           },
           {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -25153,6 +25225,14 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
             }
           },
           {
@@ -25588,6 +25668,14 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "libraryView",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryView"
             }
           },
           {
@@ -31776,6 +31864,60 @@
         ],
         "type": "object"
       },
+      "AssetSpacesDto": {
+        "properties": {
+          "assetIds": {
+            "description": "Asset IDs",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetIds"
+        ],
+        "type": "object"
+      },
+      "AssetSpacesItemDto": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "type": "string"
+          },
+          "spaceIds": {
+            "description": "IDs of the caller's spaces that show the asset",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetId",
+          "spaceIds"
+        ],
+        "type": "object"
+      },
+      "AssetSpacesResponseDto": {
+        "properties": {
+          "assets": {
+            "description": "The requested assets that at least one of the caller's spaces shows",
+            "items": {
+              "$ref": "#/components/schemas/AssetSpacesItemDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assets"
+        ],
+        "type": "object"
+      },
       "AssetStackResponseDto": {
         "properties": {
           "assetCount": {
@@ -35397,6 +35539,14 @@
         ],
         "type": "object"
       },
+      "LibraryView": {
+        "description": "Only your photos that are in no space, or only the photos of the spaces on your timeline (unset: both)",
+        "enum": [
+          "personal",
+          "spaces"
+        ],
+        "type": "string"
+      },
       "LicenseKeyDto": {
         "properties": {
           "activationKey": {
@@ -36434,6 +36584,9 @@
               }
             ],
             "x-immich-state": "Deprecated"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "deprecated": true,
@@ -39558,6 +39711,9 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
+          },
           "make": {
             "deprecated": true,
             "description": "Filter by camera make",
@@ -40848,6 +41004,9 @@
             "description": "Filter by lens model",
             "nullable": true,
             "type": "string"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "description": "Filter by camera make",
@@ -43456,6 +43615,9 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
+          },
           "make": {
             "deprecated": true,
             "description": "Filter by camera make",
@@ -44854,6 +45016,9 @@
               }
             ],
             "x-immich-state": "Deprecated"
+          },
+          "libraryView": {
+            "$ref": "#/components/schemas/LibraryView"
           },
           "make": {
             "deprecated": true,

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
+import 'package:immich_mobile/gallery/library_view.provider.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search.repository.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
@@ -69,8 +71,12 @@ class FakeSearchRepository implements GallerySearchRepository {
   Future<SearchServerCapabilities> capabilities() => onCapabilities();
 
   @override
-  Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) =>
-      _call(optionsKey(p, dimensions));
+  Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) {
+    optionsParams.add(p);
+    return _call(optionsKey(p, dimensions));
+  }
+
+  final optionsParams = <SearchParams>[];
 
   @override
   Future<SearchOptionsPart> fallbackOptions(SearchParams p) => _call('fallback:${p.city ?? '-'}');
@@ -118,14 +124,17 @@ Future<void> settle() async {
   }
 }
 
-ProviderContainer containerFor(FakeSearchRepository repository) => ProviderContainer(
-  overrides: [
-    gallerySearchRepositoryProvider.overrideWithValue(repository),
-    searchOptionsDebounceProvider.overrideWithValue(Duration.zero),
-    searchResultsDebounceProvider.overrideWithValue(Duration.zero),
-    searchClockProvider.overrideWithValue(() => DateTime(2026, 10, 23)),
-  ],
-);
+ProviderContainer containerFor(FakeSearchRepository repository, {LibraryViewMode view = LibraryViewMode.both}) =>
+    ProviderContainer(
+      overrides: [
+        // The Photos scope reads the library view (#1038), which needs the store; Both is no view.
+        activeLibraryViewProvider.overrideWithValue(view),
+        gallerySearchRepositoryProvider.overrideWithValue(repository),
+        searchOptionsDebounceProvider.overrideWithValue(Duration.zero),
+        searchResultsDebounceProvider.overrideWithValue(Duration.zero),
+        searchClockProvider.overrideWithValue(() => DateTime(2026, 10, 23)),
+      ],
+    );
 
 const dimensionNames = ['total', 'time', 'people', 'tags', 'places', 'cameras', 'ratings', 'mediaTypes'];
 
@@ -254,6 +263,19 @@ void main() {
       await warmUp;
       await container.read(searchWarmUpProvider.future);
       expect(repository.log, ['options:-:availability', for (final d in dimensionNames) 'options:-:$d']);
+    });
+
+    test('warms the library view the Photos search will ask for (#1038)', () async {
+      final repository = FakeSearchRepository(gallery);
+      final container = containerFor(repository, view: LibraryViewMode.personal);
+      addTearDown(container.dispose);
+      unawaited(container.read(searchWarmUpProvider.future));
+      await settle();
+
+      expect(repository.optionsParams.single.libraryView, LibraryViewMode.personal);
+      repository.answer('options:-:availability', const SearchOptionsPart(availability: availabilityAll));
+      await settle();
+      expect(repository.optionsParams.map((p) => p.libraryView).toSet(), {LibraryViewMode.personal});
     });
 
     test('sends nothing to an older Gallery server or a stock server', () async {
@@ -425,5 +447,14 @@ void main() {
     album.read(searchStateProvider.notifier).setFavoritesOnly(true);
     expect(root.read(searchStateProvider).filters.favoritesOnly, isFalse);
     expect(album.read(searchScopeProvider), const AlbumSearchScope('album-1'));
+  });
+
+  test('the Photos scope browses within the library view (#1038)', () {
+    for (final view in LibraryViewMode.values) {
+      final container = ProviderContainer(overrides: [activeLibraryViewProvider.overrideWithValue(view)]);
+      addTearDown(container.dispose);
+
+      expect(container.read(searchScopeProvider), PhotosSearchScope(libraryView: view));
+    }
   });
 }

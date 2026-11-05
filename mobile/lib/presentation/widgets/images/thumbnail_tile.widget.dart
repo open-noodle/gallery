@@ -6,6 +6,7 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/duration_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/gallery/motion/gallery_tile.dart';
+import 'package:immich_mobile/gallery/space_badge.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
@@ -200,6 +201,7 @@ class _ThumbnailTileState extends ConsumerState<ThumbnailTile> {
                       ),
                     ),
                   ),
+                if (asset != null) SpaceBadge(asset, hidden: _hideIndicators || isSelected || widget.lockSelection),
                 if (uploadProgress != null) _UploadProgressOverlay(progress: uploadProgress),
               ],
             ),

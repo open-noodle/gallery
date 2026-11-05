@@ -44,6 +44,7 @@ const dropSpaceAlbumCache = (spaceId: string) => {
 eventManager.on({
   SpaceAddAssets: () => resetRecentSpaces(),
   SpaceRemoveAssets: () => resetRecentSpaces(),
+  SpaceUpdate: () => resetRecentSpaces(),
   SpaceLinkAlbum: ({ spaceId }) => {
     resetRecentSpaces();
     dropSpaceAlbumCache(spaceId);
