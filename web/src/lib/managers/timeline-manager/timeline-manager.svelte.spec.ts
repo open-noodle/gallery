@@ -1176,6 +1176,100 @@ describe('TimelineManager', () => {
     });
   });
 
+  describe('album timeline with stacked photos', () => {
+    let timelineManager: TimelineManager;
+    const albumMember = () =>
+      deriveLocalDateTimeFromFileCreatedAt(
+        factory.timelineAsset({ fileCreatedAt: fromISODateTimeUTCToObject('2024-02-10T12:00:00.000Z') }),
+      );
+    const stackOf = (...assets: AssetResponseDto[]) => ({
+      id: 'stack-1',
+      primaryAssetId: assets[0].id,
+      assets,
+    });
+
+    beforeEach(async () => {
+      timelineManager = new TimelineManager();
+      sdkMock.getTimeBuckets.mockResolvedValue([]);
+      await timelineManager.updateViewport({ width: 1588, height: 1000 });
+      await timelineManager.updateOptions({ albumId: 'album-1', withStacked: true });
+    });
+
+    afterEach(() => {
+      timelineManager.destroy();
+    });
+
+    // The server picks which album member stands for a stack, so the album reloads rather than patching locally.
+    it.each(['StackCreate', 'StackUpdate'] as const)('reloads the album on %s', async (event) => {
+      const member = albumMember();
+      timelineManager.upsertAssets([member]);
+      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+
+      eventManager.emit(event, stackOf(factory.asset({ id: member.id }), factory.asset()));
+      await tick();
+
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      expect(sdkMock.getTimeBuckets).toHaveBeenLastCalledWith(
+        expect.objectContaining({ albumId: 'album-1', withStacked: true }),
+        expect.anything(),
+      );
+    });
+
+    it('does not insert stack members the album does not hold on StackDelete', async () => {
+      const outsider = factory.asset();
+      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+
+      eventManager.emit('StackDelete', { id: 'stack-1', assets: [outsider] });
+      await tick();
+
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      expect(timelineManager.getTimelineMonthByAssetId(outsider.id)).toBeUndefined();
+    });
+
+    // Removing (from the album, or to the trash) the photo that stands for a stack: a stack-mate may take its place.
+    it('reloads the album when a removed photo stood for a stack, and only then', async () => {
+      const stacked = { ...albumMember(), stack: { id: 'stack-1', primaryAssetId: 'p', assetCount: 3 } };
+      const plain = albumMember();
+      timelineManager.upsertAssets([stacked, plain]);
+      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+
+      timelineManager.removeAssets([plain.id]);
+      await tick();
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads);
+
+      eventManager.emit('AlbumRemoveAssets', { assetIds: [stacked.id], albumIds: ['album-1'] });
+      await tick();
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+    });
+
+    // The manager's own listener and the album page's AlbumStackEvents both fire for one event (Safari can miss the
+    // former): one reload, and the page's options effect during it does not start another.
+    it('runs one reload for triggers in the same task, and keeps its options while reloading', async () => {
+      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+
+      expect(timelineManager.reloadAlbumStacks()).toBe(true);
+      expect(timelineManager.reloadAlbumStacks()).toBe(true);
+      eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['album-1'] });
+      await timelineManager.updateOptions({ albumId: 'album-1', withStacked: true });
+      await tick();
+
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+    });
+
+    // Adding a photo (say the stack's primary, from the viewer's strip) can change which stack-mate shows.
+    it('reloads the album when photos are added to it, not to another album', async () => {
+      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+
+      eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['other-album'] });
+      await tick();
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads);
+
+      eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['album-1'] });
+      await tick();
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+    });
+  });
+
   describe('album picker timeline', () => {
     let timelineManager: TimelineManager;
     const pickerOnlyAssets: Record<string, TimelineAsset[]> = {

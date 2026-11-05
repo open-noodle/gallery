@@ -49,4 +49,27 @@ describe(GalleryAlbumController.name, () => {
       expect(body).toEqual({ albums: [], shareableAssetCount: 0 });
     });
   });
+
+  describe('GET /albums/:id/stacks/:stackId', () => {
+    const albumId = '00000000-0000-4000-8000-000000000001';
+    const stackId = '00000000-0000-4000-8000-000000000002';
+
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/albums/${albumId}/stacks/${stackId}`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should reject an invalid stack id', async () => {
+      const { status } = await request(ctx.getHttpServer()).get(`/albums/${albumId}/stacks/invalid`);
+      expect(status).toEqual(400);
+      expect(service.getStack).not.toHaveBeenCalled();
+    });
+
+    it('should pass the album and stack ids', async () => {
+      service.getStack.mockResolvedValue({ id: stackId, primaryAssetId: stackId, assets: [] });
+      const { status } = await request(ctx.getHttpServer()).get(`/albums/${albumId}/stacks/${stackId}`);
+      expect(status).toEqual(200);
+      expect(service.getStack).toHaveBeenCalledWith(undefined, albumId, stackId);
+    });
+  });
 });
