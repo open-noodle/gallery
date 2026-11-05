@@ -1,6 +1,7 @@
 import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder } from 'kysely';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import type { ViewerScope } from 'src/utils/viewer-scope.js';
+import { withLibraryView } from 'src/gallery/utils/library-view.js';
 import { DB } from 'src/schema/index.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
@@ -97,7 +98,8 @@ export function withAssetFilter<T extends SelectQueryBuilder<DB, any, any>>(
 
 /**
 Upstream search (`searchAssetBuilderLegacy`) with its taken range swapped for this module's, so
-search results agree with the timeline, suggestions and facets. Everything else stays upstream.
+search results agree with the timeline, suggestions and facets, and narrowed to the timeline's
+library view (#1038). Everything else stays upstream.
 A stock or third-party client (`upstreamTakenRange`, set by resolveViewerScope) builds its range from
 device-local instants for upstream's inclusive `fileCreatedAt` bounds, so it gets upstream's builder unchanged.
 */
@@ -105,11 +107,13 @@ export function searchAssetBuilderWithLocalTaken(
   kysely: Kysely<DB>,
   options: AssetSearchBuilderOptions & Pick<ViewerScope, 'upstreamTakenRange'>,
 ) {
+  const libraryView = { ...options, callerId: options.authUserId };
   if (options.upstreamTakenRange) {
-    return searchAssetBuilderLegacy(kysely, options);
+    return withLibraryView(searchAssetBuilderLegacy(kysely, options), libraryView);
   }
-  return withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
+  const query = withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
     takenAfter: options.takenAfter,
     takenBefore: options.takenBefore,
   });
+  return withLibraryView(query, libraryView);
 }

@@ -12,6 +12,7 @@ import { getFormatter } from '#lib/utils/i18n.ts';
 import { factory } from '#test/unit/factories.ts';
 import {
   getAssetInfo,
+  LibraryView,
   updateAsset,
   updateAssetFavorites,
   type AssetResponseDto,
@@ -19,6 +20,7 @@ import {
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
+import { libraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 
 const { downloadUrlMock } = vitest.hoisted(() => ({
   downloadUrlMock: vitest.fn(),
@@ -66,6 +68,8 @@ vitest.mock('#lib/utils.js', async () => {
     downloadUrl: downloadUrlMock,
   };
 });
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 describe('AssetService', () => {
   describe('getAssetActions', () => {
@@ -178,6 +182,17 @@ describe('AssetService', () => {
       expect(downloadUrlMock.mock.calls[0][0]).toContain('edited=false');
       expect(downloadUrlMock.mock.calls[0][0]).toContain('c=cache-1');
     });
+  });
+});
+
+describe('view in timeline', () => {
+  it('#1038: goes back to both library views, so the photo is on the timeline', async () => {
+    libraryView.current = LibraryView.Personal;
+    const action = getAssetActions(() => '', factory.asset()).ViewInTimeline;
+
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(libraryView.current).toBe('both');
   });
 });
 

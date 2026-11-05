@@ -4,7 +4,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
   import { mdiClose, mdiTune } from '@mdi/js';
-  import { untrack } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import type {
     FilterPanelConfig,
     FilterSection as FilterSectionType,
@@ -52,6 +52,8 @@
     // reclaims the horizontal space (used on timeline pages). When false, the built-in collapsed
     // button is shown (default; used e.g. by the map's filter drawer).
     externalToggle?: boolean;
+    /** A surface's own block above the sections (the Photos library view, #1038); not one of the sections. */
+    top?: Snippet;
   }
 
   let {
@@ -66,6 +68,7 @@
     persistCollapsed = true,
     collapsed = $bindable(),
     externalToggle = false,
+    top,
   }: Props = $props();
 
   // Respect persistCollapsed for the initial value when the parent doesn't control `collapsed`.
@@ -796,6 +799,7 @@
         </div>
 
         <div class="pt-4">
+          {@render top?.()}
           {#each renderableSections as section (section)}
             {#if visibleSections.has(section)}
               <!-- The "(0)" / disable gate answers "has a CROSS-SECTION filter narrowed the panel?",
