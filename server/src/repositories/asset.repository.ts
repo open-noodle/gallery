@@ -16,6 +16,7 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { type LockableProperty, Stack, lockableProperties } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -140,7 +141,7 @@ interface AssetBuilderOptions {
   takenBefore?: string;
 }
 
-export interface TimeBucketOptions extends AssetBuilderOptions {
+export interface TimeBucketOptions extends AssetBuilderOptions, LibraryViewOptions {
   order?: AssetOrder;
   orderBy?: AssetOrderBy;
   bucketSize?: TimeBucketSize;

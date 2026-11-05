@@ -13,6 +13,7 @@ import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/map.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/viewer_visibility.dart';
