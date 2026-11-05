@@ -237,7 +237,7 @@
 
           <div>
             {#if asset.exifInfo?.make || asset.exifInfo?.model}
-              {const cameraName = getCameraName(asset.exifInfo.make, asset.exifInfo.model)}
+              {const cameraName = $derived(getCameraName(asset.exifInfo.make, asset.exifInfo.model))}
               <p class="flex items-center gap-1">
                 <FilterValue label={$t('filter_by_camera')} filter={cameraFilter(asset)} searchEverywhere>
                   {cameraName}
