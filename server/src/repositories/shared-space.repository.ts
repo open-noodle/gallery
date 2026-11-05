@@ -31,6 +31,7 @@ import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import {
   albumMembership,
+  sharedWithViewer,
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceContributedAssetExists,
@@ -800,6 +801,33 @@ export class SharedSpaceRepository {
       .returning('assetId')
       .execute();
     return rows.map((r) => r.assetId);
+  }
+
+  /**
+   * The spaces of `userId` that show each of `assetIds`, by any path (added to the space, in a linked album, in a
+   * linked library), whether or not the space or album is hidden from the user's timeline: the thumbnail space
+   * badge. One row per (asset, space). Hidden, locked and trashed assets are in no space, as everywhere else.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  @ChunkedArray({ paramIndex: 1 })
+  async getMemberSpaceIdsByAssetIds(
+    userId: string,
+    assetIds: string[],
+  ): Promise<{ assetId: string; spaceId: string }[]> {
+    if (assetIds.length === 0) {
+      return [];
+    }
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('shared_space_member', (join) => join.on('shared_space_member.userId', '=', asUuid(userId)))
+      .select(['asset.id as assetId', 'shared_space_member.spaceId'])
+      .where('asset.id', '=', anyUuid(assetIds))
+      .where((eb) =>
+        sharedWithViewer(eb, { scope: { spaceIdRef: 'shared_space_member.spaceId' }, albumTimelineGate: 'none' }),
+      )
+      .orderBy('asset.id')
+      .orderBy('shared_space_member.spaceId')
+      .execute();
   }
 
   // The subset of assetIds that are DIRECT members of the space (shared_space_asset rows). Used by

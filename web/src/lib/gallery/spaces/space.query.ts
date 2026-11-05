@@ -46,6 +46,8 @@ const onSpaceAlbumsChange = (spaceId: string) =>
 eventManager.on({
   SpaceAddAssets: () => void invalidateSpaces(),
   SpaceRemoveAssets: () => void invalidateSpaces(),
+  // A new colour or name, for the space badges and the sidebar.
+  SpaceUpdate: () => void invalidateSpaces(),
   SpaceLinkAlbum: ({ spaceId }) => void onSpaceAlbumsChange(spaceId),
   SpaceUnlinkAlbum: ({ spaceId }) => void onSpaceAlbumsChange(spaceId),
 });

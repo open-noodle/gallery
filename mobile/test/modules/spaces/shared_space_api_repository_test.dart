@@ -433,6 +433,52 @@ void main() {
     });
   });
 
+  group('space changes', () {
+    late int changes;
+
+    setUp(() {
+      changes = 0;
+      repository = SharedSpaceApiRepository(mockApiService, onSpaceChanged: () => changes++);
+    });
+
+    test('tells the app once the server has added, removed or edited', () async {
+      when(() => mockApi.addAssets('space-1', any())).thenAnswer((_) async => true);
+      when(() => mockApi.removeAssets('space-1', any())).thenAnswer((_) async => <String>['asset-1']);
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer(
+        (_) async => api.SharedSpaceResponseDto(
+          id: 'space-1',
+          name: 'Trips',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+          createdById: 'user-1',
+        ),
+      );
+
+      await repository.addAssets('space-1', ['asset-1']);
+      expect(changes, 1);
+      await repository.removeAssets('space-1', ['asset-1']);
+      expect(changes, 2);
+      await repository.update('space-1', color: api.UserAvatarColor.pink);
+      expect(changes, 3);
+    });
+
+    test('says nothing when the server refuses', () async {
+      when(() => mockApi.addAssets('space-1', any())).thenThrow(api.ApiException(403, 'no'));
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => null);
+
+      await expectLater(repository.addAssets('space-1', ['asset-1']), throwsA(isA<api.ApiException>()));
+      await expectLater(repository.update('space-1', name: 'Trips'), throwsA(anything));
+      expect(changes, 0);
+    });
+
+    test('leaves album links to their own nudge', () async {
+      when(() => mockApi.linkAlbum('album-1', 'space-1')).thenAnswer((_) async {});
+
+      await repository.linkAlbum('space-1', 'album-1');
+      expect(changes, 0);
+    });
+  });
+
   group('linkAlbum', () {
     test('calls SDK linkAlbum(albumId, spaceId) — note arg order', () async {
       when(() => mockApi.linkAlbum('album-1', 'space-1')).thenAnswer((_) async {});

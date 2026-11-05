@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Thumbhash from '#lib/components/Thumbhash.svelte';
   import { ProjectionType } from '#lib/constants.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
@@ -25,9 +24,10 @@
   import { onMount } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
   import { fade } from 'svelte/transition';
+  import Thumbhash from '#lib/components/Thumbhash.svelte';
+  import SpaceBadge from '#lib/gallery/space-badge/SpaceBadge.svelte';
   import ImageThumbnail from './ImageThumbnail.svelte';
   import VideoThumbnail from './VideoThumbnail.svelte';
-
   interface Props {
     asset: TimelineAsset;
     groupIndex?: number;
@@ -318,10 +318,11 @@
           ></div>
         {/if}
 
+        <SpaceBadge assetId={asset.id} enabled={!readonly} covered={mouseOver || selected || selectionCandidate} />
         <!-- Favorite asset star -->
         {#if !authManager.isSharedLink && asset.isFavorite}
           <div class="absolute inset-s-2 bottom-2 z-2">
-            <Icon data-testid="favorite-icon" icon={mdiHeart} size="24" class="text-white" />
+            <Icon data-icon-favorite icon={mdiHeart} size="24" class="text-white" />
           </div>
         {/if}
 
@@ -335,7 +336,7 @@
 
         {#if !authManager.isSharedLink && showArchiveIcon && asset.visibility === AssetVisibility.Archive}
           <div class={['absolute inset-s-2 z-2', asset.isFavorite ? 'bottom-10' : 'bottom-2']}>
-            <Icon data-testid="archive-icon" icon={mdiArchiveArrowDownOutline} size="24" class="text-white" />
+            <Icon data-icon-archive icon={mdiArchiveArrowDownOutline} size="24" class="text-white" />
           </div>
         {/if}
 
@@ -385,7 +386,6 @@
 
     {#if selectionCandidate}
       <div
-        data-testid="selection-candidate"
         class={['absolute top-0 z-2 size-full bg-immich-primary opacity-40', { 'rounded-xl': selected }]}
         in:fade={{ duration: 100 }}
         out:fade={{ duration: 100 }}
@@ -404,13 +404,13 @@
         {disabled}
       >
         {#if disabled}
-          <Icon icon={mdiCheckCircle} size="24" class="text-zinc-800" />
+          <Icon data-icon-select icon={mdiCheckCircle} size="24" class="text-zinc-800" />
         {:else if selected}
           <div class="rounded-full bg-[#D9DCEF] dark:bg-[#232932]">
-            <Icon icon={mdiCheckCircle} size="24" class="text-primary" />
+            <Icon data-icon-select icon={mdiCheckCircle} size="24" class="text-primary" />
           </div>
         {:else}
-          <Icon icon={mdiCheckCircle} size="24" class="text-white/80 group-hover/select:text-white" />
+          <Icon data-icon-select icon={mdiCheckCircle} size="24" class="text-white/80 group-hover/select:text-white" />
         {/if}
       </button>
     {/if}
