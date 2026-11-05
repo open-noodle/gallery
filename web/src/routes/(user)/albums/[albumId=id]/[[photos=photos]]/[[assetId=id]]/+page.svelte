@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, onNavigate } from '$app/navigation';
-  import { scrollMemoryClearer } from '#lib/actions/scroll-memory.ts';
+  import { scrollMemoryClearer } from '#lib/actions/scroll-memory.svelte.ts';
   import ArchiveAction from '#lib/gallery/actions/ArchiveAction.svelte';
   import AlbumMap from '#lib/components/album-page/AlbumMap.svelte';
   import AlbumSharedSpaceLinks from '#lib/components/album-page/AlbumSharedSpaceLinks.svelte';
@@ -338,7 +338,7 @@
 
 <CommandPaletteDefaultProvider name={$t('album')} actions={[AddAssets, Upload, Close, ...Object.values(Actions)]} />
 
-<div class="flex overflow-hidden" use:scrollMemoryClearer={{ routeStartsWith: Route.albums() }}>
+<div class="flex overflow-hidden" {@attach scrollMemoryClearer({ routeStartsWith: Route.albums() })}>
   <div class="relative w-full shrink">
     <FilteredTimeline
       controller={filtered}
