@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import { AssetTypeSchema, TimeBucketSize, TimeBucketSizeSchema } from 'src/enum.js';
+import { AssetTypeSchema, LibraryViewSchema, TimeBucketSize, TimeBucketSizeSchema } from 'src/enum.js';
 import { boundedTextFilter, stringToBool } from 'src/validation.js';
 
 // Fork timeline query fields and the fork-only cover response, merged into src/dtos/time-bucket.dto.ts with one spread
@@ -68,6 +68,7 @@ export const GalleryTimeBucketQueryExtension = {
     .string()
     .optional()
     .describe('Only include assets taken before this local date and time (ISO 8601, exclusive)'),
+  libraryView: LibraryViewSchema.optional(),
 };
 
 export const TimeBucketCoverResponseSchema = z

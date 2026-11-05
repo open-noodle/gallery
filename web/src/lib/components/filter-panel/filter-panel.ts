@@ -1,5 +1,6 @@
 import { AssetTypeEnum } from '@immich/sdk';
 import { browser } from '$app/env';
+import type { Translations } from 'svelte-i18n';
 
 const COLLAPSED_KEY = 'gallery-filter-collapsed';
 
@@ -136,6 +137,19 @@ export interface FilterPanelConfig {
     cameraModels?: (make: string, context?: FilterContext) => Promise<string[]>;
     tags?: (context?: FilterContext) => Promise<TagOption[]>;
   };
+}
+
+/**
+ * A chip for a choice that is remembered between visits rather than held in the URL (the Photos library view,
+ * #1038). It is not part of the FilterState, so Clear all leaves it; only its own close button removes it.
+ */
+export interface PinnedFilterChip {
+  type: string;
+  icon: string;
+  labelKey: Translations;
+  /** Tooltip saying the choice is remembered. */
+  titleKey: Translations;
+  onRemove: () => void;
 }
 
 export interface FilterState {

@@ -10,6 +10,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
+import 'package:immich_mobile/gallery/library_view.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:immich_mobile/utils/async_mutex.dart';
@@ -58,8 +59,15 @@ class TimelineFactory {
     String currentUserId, {
     GroupAssetsBy? groupBy,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+    LibraryViewMode libraryView = LibraryViewMode.both,
   }) => TimelineService(
-    _timelineRepository.main(timelineUsers, currentUserId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+    _timelineRepository.main(
+      timelineUsers,
+      currentUserId,
+      groupBy ?? this.groupBy,
+      temporalScope: temporalScope,
+      libraryView: libraryView,
+    ),
   );
 
   TimelineService localAlbum({

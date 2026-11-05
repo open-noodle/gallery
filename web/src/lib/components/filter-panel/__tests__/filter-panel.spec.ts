@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
-import { tick } from 'svelte';
+import { createRawSnippet, tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import type { FilterPanelConfig, FilterSection } from '../filter-panel';
 import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
@@ -40,6 +40,24 @@ describe('FilterPanel', () => {
     expect(queryByTestId('filter-section-rating')).toBeTruthy();
     expect(queryByTestId('filter-section-location')).toBeNull();
     expect(queryByTestId('filter-section-camera')).toBeNull();
+  });
+
+  it("renders a surface's own block above the sections, even with every section hidden", async () => {
+    const top = createRawSnippet(() => ({ render: () => '<div data-testid="panel-top">top</div>' }));
+    const { getByTestId } = render(FilterPanel, {
+      props: { config: { sections: ['rating'], providers: {} }, timeBuckets: [], top },
+    });
+
+    const rating = getByTestId('filter-section-rating');
+    expect(getByTestId('panel-top').compareDocumentPosition(rating) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    localStorage.setItem('hidden-sections', JSON.stringify({ selected: [], known: ['rating'] }));
+    const hidden = render(FilterPanel, {
+      props: { config: { sections: ['rating'], providers: {} }, timeBuckets: [], top, storageKey: 'hidden-sections' },
+    });
+    await tick();
+    expect(within(hidden.container).queryByTestId('filter-section-rating')).toBeNull();
+    expect(within(hidden.container).getByTestId('panel-top')).toBeInTheDocument();
   });
 
   it('should hide sections not in config', () => {
