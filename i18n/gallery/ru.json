@@ -1098,6 +1098,7 @@
   "purchase_github_button": "Поставить звезду на GitHub",
   "purchase_github_description": "Поставьте нам звезду на GitHub, чтобы другие узнали о проекте.",
   "purchase_github_title": "Поставьте нам звезду на GitHub",
+  "remove_assets_from_named_space_confirmation": "Удалить {count, plural, one {# объект} few {# объекта} many {# объектов} other {# объекта}} из «{space}»?",
   "remove_assets_shared_space_confirmation": "Удалить {count, plural, one {# объект} few {# объекта} many {# объектов} other {# объекта}} из этого Space?",
   "remove_from_a_space": "Удалить из выбранного Space…",
   "remove_from_named_space": "Удалить из «{space}»",

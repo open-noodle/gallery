@@ -1099,6 +1099,7 @@
   "purchase_github_button": "Auf GitHub mit Stern markieren",
   "purchase_github_description": "Gib uns einen Stern auf GitHub, damit andere das Projekt leichter entdecken.",
   "purchase_github_title": "Gib uns einen Stern auf GitHub",
+  "remove_assets_from_named_space_confirmation": "{count, plural, one {# Datei} other {# Dateien}} aus {space} entfernen?",
   "remove_assets_shared_space_confirmation": "{count, plural, one {# Datei} other {# Dateien}} aus diesem Space entfernen?",
   "remove_from_a_space": "Aus einem Space entfernen…",
   "remove_from_named_space": "Aus {space} entfernen",

@@ -1113,6 +1113,7 @@
   "purchase_github_button": "在 GitHub 上加星",
   "purchase_github_description": "在 GitHub 上給我們一顆星，幫助更多人發現這個專案。",
   "purchase_github_title": "在 GitHub 上給我們加星",
+  "remove_assets_from_named_space_confirmation": "要從 {space} 中移除 {count, plural, one {# 個項目} other {# 個項目}} 嗎？",
   "remove_assets_shared_space_confirmation": "要從此 Space 中移除 {count, plural, one {# 個項目} other {# 個項目}} 嗎？",
   "remove_from_a_space": "從 Space 中移除…",
   "remove_from_named_space": "從 {space} 中移除",

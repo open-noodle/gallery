@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/utils/long_snackbar.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/services/toast.service.dart';
@@ -66,6 +67,7 @@ FutureOr<void> showSpaceRemovalToast(ToastService toast, SpaceRemoval removal) {
   if (removal.kept == 0) {
     return toast.success(message);
   }
-  // Some photos stayed: the explanation is longer, and it is not a success.
-  return toast.error(message, toast: const ToastOption(timeout: Duration(seconds: 6)));
+  // Some photos stayed: it is not a success, and the explanation (an album's name, what to edit) needs more than the
+  // shared snackbar's two lines.
+  showLongErrorSnackbar(message);
 }

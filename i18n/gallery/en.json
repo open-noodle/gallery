@@ -1101,6 +1101,7 @@
   "purchase_github_button": "Star on GitHub",
   "purchase_github_description": "Give us a star on GitHub to help others discover the project.",
   "purchase_github_title": "Star us on GitHub",
+  "remove_assets_from_named_space_confirmation": "Remove {count, plural, one {# asset} other {# assets}} from {space}?",
   "remove_assets_shared_space_confirmation": "Remove {count, plural, one {# asset} other {# assets}} from this space?",
   "remove_from_a_space": "Remove from a space…",
   "remove_from_named_space": "Remove from {space}",

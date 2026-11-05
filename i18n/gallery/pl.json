@@ -1100,6 +1100,7 @@
   "purchase_github_button": "Zostaw gwiazdkę na GitHubie",
   "purchase_github_description": "Zostaw nam gwiazdkę na GitHubie, aby pomóc innym odkryć projekt.",
   "purchase_github_title": "Zostaw nam gwiazdkę na GitHubie",
+  "remove_assets_from_named_space_confirmation": "Usunąć {count, plural, one {# zasób} few {# zasoby} many {# zasobów} other {# zasobów}} z „{space}”?",
   "remove_assets_shared_space_confirmation": "Usunąć {count, plural, one {# zasób} few {# zasoby} many {# zasobów} other {# zasobów}} z tego Space?",
   "remove_from_a_space": "Usuń z wybranego Space…",
   "remove_from_named_space": "Usuń z „{space}”",

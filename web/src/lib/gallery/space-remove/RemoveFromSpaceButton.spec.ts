@@ -77,7 +77,7 @@ describe('RemoveFromSpaceButton', () => {
     await fireEvent.click(button()!);
 
     expect(modalManager.show).not.toHaveBeenCalled();
-    expect(removeFromSpace).toHaveBeenCalledWith('family', ['a1', 'a2']);
+    expect(removeFromSpace).toHaveBeenCalledWith('family', ['a1', 'a2'], 'Family');
   });
 
   it('asks which space when there are several, then removes from that one', async () => {
@@ -95,7 +95,7 @@ describe('RemoveFromSpaceButton', () => {
       counts: { family: 2, trips: 1 },
       title: 'remove_from_space',
     });
-    expect(removeFromSpace).toHaveBeenCalledWith('trips', ['a1']);
+    expect(removeFromSpace).toHaveBeenCalledWith('trips', ['a1'], 'Trips');
   });
 
   it('removes nothing when the choice is dismissed', async () => {
@@ -140,11 +140,43 @@ describe('RemoveFromSpaceButton', () => {
     vi.mocked(modalManager.show).mockResolvedValue(family as never);
 
     vi.mocked(removeFromSpace).mockResolvedValueOnce(['a1', 'a2', 'a3', 'stack-sibling']);
+    // Asked again after the removal: a2 is in none of the user's spaces now, a3 still in Trips.
+    vi.mocked(fetchSelectionSpaces).mockResolvedValueOnce([{ assetId: 'a3', spaceIds: ['trips'] }]);
     await fireEvent.click(button()!);
     await vi.advanceTimersByTimeAsync(10);
 
     // a1 is the user's own, a3 still shows through Trips; a sibling the server expanded is not on the grid.
+    expect(fetchSelectionSpaces).toHaveBeenLastCalledWith(['a2', 'a3']);
     expect(onLeaveTimeline).toHaveBeenCalledExactlyOnceWith(['a2']);
+  });
+
+  it("keeps another member's photo that is still in the space through a linked album", async () => {
+    const onLeaveTimeline = vi.fn();
+    answer({ a2: ['family'] });
+    renderWithTooltips(RemoveFromSpaceButton, { onLeaveTimeline });
+    await settle();
+
+    // The server removed the photo it held directly; a linked album still brings it into Family.
+    vi.mocked(removeFromSpace).mockResolvedValueOnce(['a2']);
+    vi.mocked(fetchSelectionSpaces).mockResolvedValueOnce([{ assetId: 'a2', spaceIds: ['family'] }]);
+    await fireEvent.click(button()!);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onLeaveTimeline).not.toHaveBeenCalled();
+  });
+
+  it('leaves the timeline alone when asking again fails', async () => {
+    const onLeaveTimeline = vi.fn();
+    answer({ a2: ['family'] });
+    renderWithTooltips(RemoveFromSpaceButton, { onLeaveTimeline });
+    await settle();
+
+    vi.mocked(removeFromSpace).mockResolvedValueOnce(['a2']);
+    vi.mocked(fetchSelectionSpaces).mockRejectedValueOnce(new Error('offline'));
+    await fireEvent.click(button()!);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onLeaveTimeline).not.toHaveBeenCalled();
   });
 
   it('leaves the timeline alone when only the user own photos went', async () => {

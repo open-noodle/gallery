@@ -1098,6 +1098,7 @@
   "purchase_github_button": "Mettre une étoile sur GitHub",
   "purchase_github_description": "Mettez-nous une étoile sur GitHub pour aider les autres à découvrir le projet.",
   "purchase_github_title": "Mettez-nous une étoile sur GitHub",
+  "remove_assets_from_named_space_confirmation": "Retirer {count, plural, one {# média} other {# médias}} de {space} ?",
   "remove_assets_shared_space_confirmation": "Retirer {count, plural, one {# média} other {# médias}} de cet espace ?",
   "remove_from_a_space": "Retirer d'un espace…",
   "remove_from_named_space": "Retirer de {space}",

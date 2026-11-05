@@ -72,12 +72,16 @@ export const fetchSelectionSpaces = async (assetIds: string[], signal?: AbortSig
  * Removes assets from a space after a confirmation, the same from inside the space and from the timeline. The server
  * removes only the assets added directly (with their stacks); the rest reach the space through a linked album or
  * library, and the message says which. The selection is cleared when everything went, and otherwise keeps the rest.
- * Returns the IDs the server removed.
+ * Returns the IDs the server removed. `spaceName` names the space in the confirmation, for callers outside it.
  */
-export const removeFromSpace = async (spaceId: string, assetIds: string[]): Promise<string[]> => {
+export const removeFromSpace = async (spaceId: string, assetIds: string[], spaceName?: string): Promise<string[]> => {
   const $t = get(t);
+  const count = assetIds.length;
   const isConfirmed = await modalManager.showDialog({
-    prompt: $t('remove_assets_shared_space_confirmation', { values: { count: assetIds.length } }),
+    prompt:
+      spaceName === undefined
+        ? $t('remove_assets_shared_space_confirmation', { values: { count } })
+        : $t('remove_assets_from_named_space_confirmation', { values: { count, space: spaceName } }),
   });
   if (!isConfirmed) {
     return [];

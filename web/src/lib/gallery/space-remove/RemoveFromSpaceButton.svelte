@@ -72,19 +72,28 @@
     }
     // Read before the await: a full removal clears the selection and the answers with it.
     const owners = new Map(assetMultiSelectManager.assets.map((asset) => [asset.id, asset.ownerId]));
-    const spacesOf = new Map(answers.map(({ assetId, spaceIds }) => [assetId, spaceIds]));
-    const removedAssetIds = await removeFromSpace(target.space.id, target.assetIds);
-    // The user's own photos stay on their timeline, and so does one still in another of their spaces. Another
-    // member's photo that showed only through this space leaves it: taken off in place, as a reload would scroll
-    // the timeline back to the top. A stack sibling the server expanded is not on the grid.
-    const gone = removedAssetIds.filter(
-      (id) =>
-        owners.has(id) &&
-        owners.get(id) !== userId &&
-        (spacesOf.get(id) ?? []).every((spaceId) => spaceId === target.space.id),
+    const removedAssetIds = await removeFromSpace(target.space.id, target.assetIds, target.space.name);
+    // The user's own photos stay on their timeline. Another member's photo leaves it once it is in none of the
+    // user's spaces: taken off in place, as a reload would scroll the timeline back to the top. The server is asked
+    // again, since a photo it removed can still be in that space through a linked album or library, or in another
+    // space. A stack sibling the server expanded is not on the grid.
+    const candidates = removedAssetIds.filter((id) => owners.has(id) && owners.get(id) !== userId);
+    if (candidates.length === 0 || !onLeaveTimeline) {
+      return;
+    }
+    let stillInSpaces: AssetSpacesItemDto[];
+    try {
+      stillInSpaces = await fetchSelectionSpaces(candidates);
+    } catch {
+      // Left on the grid; the next load drops them.
+      return;
+    }
+    const stillShown = new Set(
+      stillInSpaces.filter(({ spaceIds }) => spaceIds.length > 0).map(({ assetId }) => assetId),
     );
+    const gone = candidates.filter((id) => !stillShown.has(id));
     if (gone.length > 0) {
-      onLeaveTimeline?.(gone);
+      onLeaveTimeline(gone);
     }
   };
 </script>

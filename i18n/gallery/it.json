@@ -1096,6 +1096,7 @@
   "purchase_github_button": "Metti una stella su GitHub",
   "purchase_github_description": "Lasciaci una stella su GitHub per aiutare altri a scoprire il progetto.",
   "purchase_github_title": "Metti una stella su GitHub",
+  "remove_assets_from_named_space_confirmation": "Rimuovere {count, plural, one {# risorsa} other {# risorse}} da {space}?",
   "remove_assets_shared_space_confirmation": "Rimuovere {count, plural, one {# risorsa} other {# risorse}} da questo Space?",
   "remove_from_a_space": "Rimuovi da uno Space…",
   "remove_from_named_space": "Rimuovi da {space}",

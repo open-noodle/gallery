@@ -120,6 +120,19 @@ describe('removeFromSpace', () => {
     expect(removeAssets).not.toHaveBeenCalled();
   });
 
+  it('asks about "this space" from inside it, and names the space from elsewhere', async () => {
+    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+
+    await removeFromSpace('family', ['a1']);
+    await removeFromSpace('family', ['a1', 'a2'], 'Family');
+
+    // The test locale shows keys.
+    expect(vi.mocked(modalManager.showDialog).mock.calls.map(([options]) => options.prompt)).toEqual([
+      'remove_assets_shared_space_confirmation',
+      'remove_assets_from_named_space_confirmation',
+    ]);
+  });
+
   it('removes, tells the badges and the timelines, and clears the selection', async () => {
     vi.mocked(removeAssets).mockResolvedValue(['a1', 'a2']);
 

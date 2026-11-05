@@ -1096,6 +1096,7 @@
   "purchase_github_button": "Ster geven op GitHub",
   "purchase_github_description": "Geef ons een ster op GitHub zodat anderen het project ontdekken.",
   "purchase_github_title": "Geef ons een ster op GitHub",
+  "remove_assets_from_named_space_confirmation": "{count, plural, one {# item} other {# items}} uit {space} verwijderen?",
   "remove_assets_shared_space_confirmation": "{count, plural, one {# item} other {# items}} uit deze Space verwijderen?",
   "remove_from_a_space": "Uit een Space verwijderen…",
   "remove_from_named_space": "Uit {space} verwijderen",
