@@ -13,6 +13,7 @@
   import { Route } from '#lib/route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
+  import { invalidateSpaces } from '#lib/gallery/spaces/space.query.ts';
   import {
     bulkAddAssets,
     getTimelineHidePreview,
@@ -148,6 +149,8 @@
         id: space.id,
         sharedSpaceMemberTimelineDto: { showInTimeline: !showInTimeline },
       });
+      // The Photos library view follows the spaces on the timeline (#1038).
+      void invalidateSpaces();
       await invalidateAll();
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_timeline_display_status'));
@@ -203,6 +206,7 @@
     }
     try {
       await removeMember({ id: space.id, userId: authManager.user.id });
+      void invalidateSpaces();
       toastManager.success($t('spaces_leave_success', { values: { name: space.name } }));
       await goto(Route.spaces());
     } catch (error) {
