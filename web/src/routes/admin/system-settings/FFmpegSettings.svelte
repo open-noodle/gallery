@@ -7,6 +7,7 @@
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import { SettingInputFieldType } from '$lib/constants';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
+  import DataSaverVideoSettings from '$lib/gallery/components/admin/data-saver-video-settings.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
   import {
@@ -443,6 +444,8 @@
             />
           </div>
         </SettingAccordion>
+
+        <DataSaverVideoSettings bind:configToEdit {config} {disabled} />
       </div>
 
       <div class="ms-4">

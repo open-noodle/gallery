@@ -160,6 +160,7 @@ export class ServerService extends BaseService {
       searchOptions: true,
       searchFavoritesAcrossSpaces: true,
       ...spatialSceneServerFeatures(machineLearning),
+      dataSaverVideo: ffmpeg.dataSaver.enabled,
     };
   }
 

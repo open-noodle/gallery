@@ -93,6 +93,13 @@ from
   "asset_spatial_scene"
 where
   "asset_spatial_scene"."path" in $4
+union
+select
+  "asset_data_saver_video"."path" as "path"
+from
+  "asset_data_saver_video"
+where
+  "asset_data_saver_video"."path" in $5
 
 -- IntegrityRepository.getAssetCount
 select

@@ -44,6 +44,12 @@ The default configuration looks like this:
     "bframes": -1,
     "cqMode": "auto",
     "crf": 23,
+    "dataSaver": {
+      "enabled": false,
+      "maxBitrate": "1500k",
+      "targetResolution": "720",
+      "targetVideoCodec": "hevc"
+    },
     "gopSize": 0,
     "maxBitrate": "0",
     "preferredHwDevice": "auto",
