@@ -1,5 +1,6 @@
 import { Expression, ExpressionBuilder, SelectQueryBuilder, SqlBool, sql } from 'kysely';
 import { AssetStatus, TimeBucketSize } from 'src/enum.js';
+import { withAlbumStackCollapse } from 'src/gallery/utils/album-stack-collapse.js';
 import { withOwnArchiveOnly } from 'src/gallery/utils/favorites-scope.js';
 import { withLibraryView } from 'src/gallery/utils/library-view.js';
 import { type TimeBucketOptions, getBoundingCircle, withBoundingBox } from 'src/repositories/asset.repository.js';
@@ -208,7 +209,9 @@ export function withTimeBucketAssetFilters<O>(
         ),
       )
       .$if(!!options.identityIds?.length, (qb) => hasFaceIdentities(qb, options.identityIds!))
-      .$if(!!options.withStacked, (qb) =>
+      // An album collapses its stacks by its own rule (album-stack-collapse.ts), not to the stack's primary.
+      .$call((qb) => withAlbumStackCollapse(qb, options, viewerId))
+      .$if(!!options.withStacked && !options.albumId, (qb) =>
         qb
           .leftJoin('stack', (join) =>
             join.onRef('stack.id', '=', 'asset.stackId').onRef('stack.primaryAssetId', '=', 'asset.id'),
