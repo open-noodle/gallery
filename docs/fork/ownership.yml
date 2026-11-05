@@ -230,6 +230,7 @@ features:
       - server/src/gallery/utils/storage-template-s3*.ts
       - server/src/gallery/services/storage-template-s3.service*.ts
       - docs/docs/features/storage-migration.md
+      - docs/docs/features/data-saver-video.md
       - server/src/gallery/services/video-trim.service*.ts
       - web/src/lib/gallery/asset-actions*.ts
     upstream_extension_paths:
