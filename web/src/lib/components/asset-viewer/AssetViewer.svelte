@@ -10,6 +10,7 @@
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { AssetAction, ProjectionType } from '$lib/constants';
   import { getViewerSpace } from '$lib/gallery/viewer-space';
+  import { loadAlbumStackStripIds, stackStrip, viewerAlbumId } from '$lib/gallery/stack/album-stack-strip';
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -109,7 +110,8 @@
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
   let stack: StackResponseDto | undefined = $state();
-
+  let stackStripIds: Set<string> | undefined = $state();
+  const strip = $derived(stackStrip(stack, stackStripIds));
   const asset = $derived(previewStackedAsset ?? cursor.current);
   useViewerZoom(() => asset.id);
   const nextAsset = $derived(cursor.nextAsset);
@@ -132,6 +134,7 @@
 
     if (asset.stack) {
       stack = await getStack({ id: asset.stack.id });
+      stackStripIds = await loadAlbumStackStripIds(asset.stack.id, viewerAlbumId(album));
     }
 
     if (!stack?.assets.some(({ id }) => id === asset.id)) {
@@ -295,10 +298,10 @@
   };
 
   const navigateStack = (direction: 'previous' | 'next') => {
-    if (!stack || !withStacked || assetViewerManager.isShowEditor) {
+    if (!strip || !withStacked || assetViewerManager.isShowEditor) {
       return;
     }
-    const assets = stack.assets;
+    const assets = strip.assets;
     const currentIndex = assets.findIndex(({ id }) => id === asset.id);
     if (currentIndex === -1) {
       return;
@@ -665,8 +668,8 @@
     </div>
   {/if}
 
-  {#if stack && withStacked && !assetViewerManager.isShowEditor && $slideshowState === SlideshowState.None}
-    {@const stackedAssets = stack.assets}
+  {#if strip && withStacked && !assetViewerManager.isShowEditor && $slideshowState === SlideshowState.None}
+    {@const stackedAssets = strip.assets}
     <div id="stack-slideshow" class="absolute bottom-0 col-span-4 col-start-1 w-fit max-w-full">
       <div class="no-wrap horizontal-scrollbar relative flex flex-row overflow-x-auto overflow-y-hidden">
         {#each stackedAssets as stackedAsset (stackedAsset.id)}

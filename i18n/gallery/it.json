@@ -444,6 +444,8 @@
     "transcoding_data_saver_video_codec_description": "HEVC richiede circa metà del bitrate di H.264 per la stessa immagine, e ogni telefono recente lo riproduce."
   },
   "album_linked_to_space": "Collegato a \"{space}\"",
+  "album_stack_count_in_album": "Conta solo le foto di questo album nei gruppi",
+  "album_stack_strip_in_album": "Mostra solo le foto di questo album quando apri un gruppo",
   "all_albums_and_spaces": "Tutti",
   "apply_changes": "Applica modifiche",
   "asset_count": "Numero di risorse",
@@ -793,6 +795,7 @@
   "cmdk_typed_search_choices_heading": "Scegli il valore del filtro",
   "cmdk_typed_search_issues_heading": "Filtri di ricerca",
   "cmdk_unnamed_person": "Persona senza nome",
+  "confirm_keep_this_delete_others_in_album": "{count, plural, one {L'altra risorsa del gruppo verrà eliminata dalla tua libreria, non solo rimossa da questo album.} other {Le altre # risorse del gruppo verranno eliminate dalla tua libreria, non solo rimosse da questo album.}} Sei sicuro di voler continuare?",
   "create_group": "Crea gruppo",
   "create_space": "Crea Space condiviso",
   "crop_faces_from_photo": "Ritaglia i volti dalla foto",

@@ -1,6 +1,7 @@
 import { AssetOrder, AssetOrderBy, getAssetInfo, type AssetResponseDto } from '@immich/sdk';
 import { clamp, isEqual } from 'lodash-es';
 import { SvelteDate, SvelteSet } from 'svelte/reactivity';
+import { AlbumStackReload } from '$lib/gallery/stack/album-stack-reload';
 import { TimelineBucket, TimelineBucketLayout } from '$lib/gallery/timeline/timeline-bucket.svelte';
 import { VirtualScrollManager } from '$lib/managers/VirtualScrollManager/VirtualScrollManager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -104,6 +105,11 @@ export class TimelineManager extends VirtualScrollManager {
   #unsubscribes: Array<() => void> = [];
   #initSequence = 0;
   #destroyed = false;
+  readonly #albumStacks = new AlbumStackReload({
+    options: () => this.#options,
+    reload: () => this.#reload(this.#options),
+    destroyed: () => this.#destroyed,
+  });
 
   get showAssetOwners() {
     return userPreferencesManager.showAssetOwners;
@@ -136,13 +142,17 @@ export class TimelineManager extends VirtualScrollManager {
             this.removeAssets(assetIds);
           }
         },
+        AlbumAddAssets: ({ albumIds }) => this.#albumStacks.onAlbumAddAssets(albumIds),
         StackCreate: (stack) => {
+          if (this.reloadAlbumStacks()) {
+            return;
+          }
           if (this.#options.withStacked) {
             updateStackedAssetInTimeline(this, stack);
           }
         },
         StackDelete: ({ assets }) => {
-          if (!this.#options.withStacked) {
+          if (!this.#options.withStacked || this.reloadAlbumStacks()) {
             return;
           }
           this.update(
@@ -152,7 +162,7 @@ export class TimelineManager extends VirtualScrollManager {
           this.upsertAssets(assets.map((asset) => toTimelineAsset(asset)));
         },
         StackUpdate: (stack) => {
-          if (!this.#options.withStacked) {
+          if (!this.#options.withStacked || this.reloadAlbumStacks()) {
             return;
           }
           // unstack and re-stack
@@ -340,7 +350,10 @@ export class TimelineManager extends VirtualScrollManager {
     if (this.#options !== TimelineManager.#INIT_OPTIONS && isEqual(this.#options, options)) {
       return;
     }
+    await this.#reload(options);
+  }
 
+  async #reload(options: TimelineManagerOptions) {
     this.suspendTransitions = true;
     try {
       await this.initTask.reset();
@@ -350,6 +363,11 @@ export class TimelineManager extends VirtualScrollManager {
     } finally {
       this.suspendTransitions = false;
     }
+  }
+
+  /** Gallery: reload a stacked album rather than patch it (AlbumStackReload). Returns whether it is one. */
+  reloadAlbumStacks() {
+    return this.#albumStacks.request();
   }
 
   async #init(options: TimelineManagerOptions) {
@@ -584,8 +602,16 @@ export class TimelineManager extends VirtualScrollManager {
       return ids;
     }
 
+    let removedStack = false;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const result = this.#runAssetCallback(new Set(ids), () => ({ remove: true }));
+    const result = this.#runAssetCallback(new Set(ids), (asset) => {
+      removedStack ||= !!asset.stack;
+      return { remove: true };
+    });
+    if (removedStack) {
+      // Gallery: the photo stood for a stack in an album; the server picks which stack-mate shows next.
+      this.reloadAlbumStacks();
+    }
     return [...result.notUpdated];
   }
 

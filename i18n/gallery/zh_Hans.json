@@ -448,6 +448,8 @@
     "transcoding_data_saver_video_codec_description": "同样的画质下，HEVC 所需码率约为 H.264 的一半，且近年的手机都能播放。"
   },
   "album_linked_to_space": "已关联到“{space}”",
+  "album_stack_count_in_album": "堆叠中仅统计此相册的照片",
+  "album_stack_strip_in_album": "打开堆叠时仅显示此相册的照片",
   "all_albums_and_spaces": "全部",
   "apply_changes": "应用更改",
   "asset_count": "资源数量",
@@ -797,6 +799,7 @@
   "cmdk_typed_search_choices_heading": "选择筛选值",
   "cmdk_typed_search_issues_heading": "搜索筛选条件",
   "cmdk_unnamed_person": "未命名人物",
+  "confirm_keep_this_delete_others_in_album": "堆叠中的其他 {count} 个项目将从您的资源库中删除，而不仅仅是从此相册中移除。确定要继续吗？",
   "create_group": "创建群组",
   "create_space": "创建共享 Space",
   "crop_faces_from_photo": "从照片中裁剪人脸",

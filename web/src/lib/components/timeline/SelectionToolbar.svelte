@@ -6,6 +6,7 @@
   import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
+  import AlbumStackBulkActions from '$lib/gallery/stack/AlbumStackBulkActions.svelte';
   import DeleteAssets from '$lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
@@ -265,6 +266,11 @@
         {#if onVisibilitySet}
           <SetVisibilityAction menuItem {onVisibilitySet} />
         {/if}
+      {/if}
+      <!-- Stacking is owner-only filing (server: StackService.create). Album pages only; hidden over search
+           results, which the page passes without a timeline. -->
+      {#if album && timelineManager && assetInteraction.isAllUserOwned}
+        <AlbumStackBulkActions />
       {/if}
       {#if caps.canSetCover && onSetCover}
         {#if album}

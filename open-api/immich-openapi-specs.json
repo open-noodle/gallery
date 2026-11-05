@@ -3927,6 +3927,73 @@
         "x-immich-permission": "album.read"
       }
     },
+    "/albums/{id}/stacks/{stackId}": {
+      "get": {
+        "description": "The stack, with only the members that are in this album. Needs read access to both the album and the stack.",
+        "operationId": "getAlbumStack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "stackId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StackResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve a stack as an album holds it",
+        "tags": [
+          "Albums"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "album.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/albums/{id}/user/{userId}": {
       "delete": {
         "description": "Remove a user from an album. Use an ID of \"me\" to leave a shared album.",
@@ -24943,6 +25010,15 @@
             }
           },
           {
+            "name": "stackCountInAlbum",
+            "required": false,
+            "in": "query",
+            "description": "With albumId and withStacked: a stack's count covers only the stack members this album holds. Otherwise it covers the whole stack.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "state",
             "required": false,
             "in": "query",
@@ -25378,6 +25454,15 @@
                 "format": "uuid",
                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
               }
+            }
+          },
+          {
+            "name": "stackCountInAlbum",
+            "required": false,
+            "in": "query",
+            "description": "With albumId and withStacked: a stack's count covers only the stack members this album holds. Otherwise it covers the whole stack.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -25821,6 +25906,15 @@
                 "format": "uuid",
                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
               }
+            }
+          },
+          {
+            "name": "stackCountInAlbum",
+            "required": false,
+            "in": "query",
+            "description": "With albumId and withStacked: a stack's count covers only the stack members this album holds. Otherwise it covers the whole stack.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {

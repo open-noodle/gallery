@@ -444,6 +444,8 @@
     "transcoding_data_saver_video_codec_description": "HEVC heeft voor hetzelfde beeld ongeveer de helft van de bitrate van H.264 nodig, en elke recente telefoon speelt het af."
   },
   "album_linked_to_space": "Gekoppeld aan \"{space}\"",
+  "album_stack_count_in_album": "Alleen de foto's van dit album tellen in stacks",
+  "album_stack_strip_in_album": "Alleen de foto's van dit album tonen bij het openen van een stack",
   "all_albums_and_spaces": "Alle",
   "apply_changes": "Wijzigingen toepassen",
   "asset_count": "Aantal items",
@@ -793,6 +795,7 @@
   "cmdk_typed_search_choices_heading": "Kies filterwaarde",
   "cmdk_typed_search_issues_heading": "Zoekfilters",
   "cmdk_unnamed_person": "Naamloze persoon",
+  "confirm_keep_this_delete_others_in_album": "{count, plural, one {Het andere item in de stack wordt} other {De # andere items in de stack worden}} uit je bibliotheek verwijderd, niet alleen uit dit album gehaald. Weet je zeker dat je wilt doorgaan?",
   "create_group": "Groep aanmaken",
   "create_space": "Gedeelde Space aanmaken",
   "crop_faces_from_photo": "Gezichten uit de foto bijsnijden",

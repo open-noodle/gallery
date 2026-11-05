@@ -19,6 +19,12 @@ describe(TimelineController.name, () => {
   });
 
   describe('GET /timeline/buckets', () => {
+    it('tells browsers to revalidate before reusing a cached copy', async () => {
+      service.getTimeBuckets.mockResolvedValue([]);
+      const { headers } = await request(ctx.getHttpServer()).get('/timeline/buckets');
+      expect(headers['cache-control']).toBe('private, no-cache');
+    });
+
     it('should parse bbox query string into an object', async () => {
       const { status } = await request(ctx.getHttpServer())
         .get('/timeline/buckets')
@@ -73,6 +79,14 @@ describe(TimelineController.name, () => {
   });
 
   describe('GET /timeline/bucket', () => {
+    it('tells browsers to revalidate before reusing a cached copy', async () => {
+      service.getTimeBucket.mockResolvedValue('{}');
+      const { headers } = await request(ctx.getHttpServer())
+        .get('/timeline/bucket')
+        .query({ timeBucket: '2026-03-01' });
+      expect(headers['cache-control']).toBe('private, no-cache');
+    });
+
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).get('/timeline/bucket?timeBucket=1900-01-01');
       expect(ctx.authenticate).toHaveBeenCalled();

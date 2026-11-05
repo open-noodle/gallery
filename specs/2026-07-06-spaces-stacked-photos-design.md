@@ -75,7 +75,9 @@ albums work; only line numbers moved.
 - **Space-album _detail_ view collapse.** The per-album detail view inside a Space intentionally
   does **not** collapse stacks — it mirrors normal album behavior (web `album-filter-options.ts`
   never sets `withStacked`; the space-album detail page shows every frame). We keep it that way
-  on all platforms.
+  on all platforms. _Superseded on web by `2026-11-01-album-stack-collapse-design.md`: every album
+  page, space-album detail included, now collapses stacks to a photo the album holds, keeping the
+  parity with normal albums; mobile collapses both album views too (E21 changed the same way)._
 - **Reconciling membership when a stack's composition changes _after_ it's in a Space**
   (re-stacking, adding a frame to an in-Space stack). MVP scope — see Accepted Limitations.
 - **Backfilling existing partial stacks** already in Spaces. MVP scope — see Accepted Limitations.

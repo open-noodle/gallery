@@ -443,6 +443,8 @@
     "transcoding_data_saver_video_codec_description": "HEVC needs about half the bitrate of H.264 for the same picture, and every recent phone plays it."
   },
   "album_linked_to_space": "Linked to \"{space}\"",
+  "album_stack_count_in_album": "Count only this album's photos in stacks",
+  "album_stack_strip_in_album": "Show only this album's photos when opening a stack",
   "all_albums_and_spaces": "All",
   "apply_changes": "Apply changes",
   "asset_count": "Asset count",
@@ -793,6 +795,7 @@
   "cmdk_typed_search_choices_heading": "Choose filter value",
   "cmdk_typed_search_issues_heading": "Search filters",
   "cmdk_unnamed_person": "Unnamed person",
+  "confirm_keep_this_delete_others_in_album": "The other {count, plural, one {# asset} other {# assets}} in this stack will be deleted from your library, not just removed from this album. Are you sure you want to continue?",
   "create_group": "Create group",
   "create_space": "Create shared space",
   "crop_faces_from_photo": "Crop faces from the photo",
