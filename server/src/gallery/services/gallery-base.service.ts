@@ -67,6 +67,7 @@ export abstract class GalleryBaseService {
   declare protected cleanupRepository: GalleryRepositories['cleanupRepository'];
   declare protected spatialSceneRepository: GalleryRepositories['spatialSceneRepository'];
   declare protected dataSaverVideoRepository: GalleryRepositories['dataSaverVideoRepository'];
+  declare protected faceDissolveRepository: GalleryRepositories['faceDissolveRepository'];
 
   declare protected identityMergePropagationService: IdentityMergePropagationService;
   declare protected faceAssignmentService: FaceAssignmentService;

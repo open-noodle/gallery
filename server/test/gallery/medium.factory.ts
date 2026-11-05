@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import type { ClassConstructor } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
@@ -67,7 +68,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryAssetRepository:
     case GalleryPersonRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case FaceDissolveRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -102,7 +104,8 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case GalleryPersonRepository:
     case CleanupRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case FaceDissolveRepository: {
       return automock(key);
     }
 

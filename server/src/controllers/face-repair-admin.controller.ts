@@ -44,6 +44,16 @@ import {
   FaceRepairUnconfirmRequestDto,
 } from 'src/dtos/face-repair.dto.js';
 import { ApiTag } from 'src/enum.js';
+import {
+  DissolveListQueryDto,
+  DissolveListResponseDto,
+  DissolveRequestDto,
+  DissolveResponseDto,
+  DissolveRestoreResponseDto,
+  PeopleHealthQueryDto,
+  PeopleHealthResponseDto,
+} from 'src/gallery/dtos/face-dissolve.dto.js';
+import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
@@ -54,6 +64,7 @@ import { sendFile } from 'src/utils/file.js';
 export class FaceRepairAdminController {
   constructor(
     private service: FaceRepairService,
+    private dissolveService: FaceDissolveService,
     private logger: LoggingRepository,
   ) {}
 
@@ -263,5 +274,67 @@ export class FaceRepairAdminController {
     @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
   ): Promise<void> {
     await sendFile(res, next, () => this.service.getAdminFacePreview(assetFaceId), this.logger);
+  }
+
+  // Discovery (Task 8): the contamination signal a scan can never surface, since the scan requires an
+  // embedding and an EXIF-imported face never has one. Deliberately its own route, not the move-to-person
+  // picker above (`owner/:ownerId/people`) — that one is name-search only and was never meant to rank people
+  // by how contaminated they are.
+  @Get('people')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'List people with per-source face counts, to find a person worth dissolving',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getFaceRepairPeopleHealth(@Query() dto: PeopleHealthQueryDto): Promise<PeopleHealthResponseDto> {
+    return this.dissolveService.getPeopleHealth(dto);
+  }
+
+  @Post('person/:personId/dissolve/preview')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Preview what dissolving a person would change',
+    history: new HistoryBuilder().added('v1'),
+  })
+  previewDissolvePerson(
+    @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
+    @Body() dto: DissolveRequestDto,
+  ): Promise<DissolveResponseDto> {
+    return this.dissolveService.preview(personId, dto) as Promise<DissolveResponseDto>;
+  }
+
+  @Get('dissolves')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'List dissolved people, newest first, with how many hidden faces can still be restored',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getFaceDissolves(@Query() dto: DissolveListQueryDto): Promise<DissolveListResponseDto> {
+    return this.dissolveService.listDissolves(dto);
+  }
+
+  // No uuid version: dissolve ids are v7.
+  @Post('dissolves/:id/restore')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Restore the faces a dissolve hid, as unnamed faces',
+    history: new HistoryBuilder().added('v1'),
+  })
+  restoreFaceDissolve(@Param('id', new ParseUUIDPipe()) id: string): Promise<DissolveRestoreResponseDto> {
+    return this.dissolveService.restore(id);
+  }
+
+  @Post('person/:personId/dissolve')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Dissolve a person',
+    history: new HistoryBuilder().added('v1'),
+  })
+  dissolvePerson(
+    @Auth() auth: AuthDto,
+    @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
+    @Body() dto: DissolveRequestDto,
+  ): Promise<DissolveResponseDto> {
+    return this.dissolveService.apply(auth, personId, dto) as Promise<DissolveResponseDto>;
   }
 }

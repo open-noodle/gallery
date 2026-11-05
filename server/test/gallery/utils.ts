@@ -2,6 +2,7 @@ import { Mocked } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
@@ -66,6 +67,7 @@ export type GalleryServiceOverrides = {
   cleanup: CleanupRepository;
   spatialScene: SpatialSceneRepository;
   dataSaverVideo: DataSaverVideoRepository;
+  faceDissolve: FaceDissolveRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -100,6 +102,7 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
     cleanup: automock(CleanupRepository, { args: [, loggerMock], strict: false }),
     spatialScene: automock(SpatialSceneRepository, { strict: false }),
     dataSaverVideo: automock(DataSaverVideoRepository, { strict: false }),
+    faceDissolve: automock(FaceDissolveRepository, { strict: false }),
   };
 
   mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
@@ -144,4 +147,5 @@ export const newGalleryRepositories = (
     overrides.cleanup || (mocks.cleanup as As<CleanupRepository>),
     overrides.spatialScene || (mocks.spatialScene as As<SpatialSceneRepository>),
     overrides.dataSaverVideo || (mocks.dataSaverVideo as As<DataSaverVideoRepository>),
+    overrides.faceDissolve || (mocks.faceDissolve as As<FaceDissolveRepository>),
   );
