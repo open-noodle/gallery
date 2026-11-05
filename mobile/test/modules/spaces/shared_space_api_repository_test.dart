@@ -419,6 +419,12 @@ void main() {
   });
 
   group('removeAssets', () {
+    test('returns the IDs the server removed', () async {
+      when(() => mockApi.removeAssets('space-1', any())).thenAnswer((_) async => <String>['asset-1']);
+
+      expect(await repository.removeAssets('space-1', ['asset-1', 'asset-2']), ['asset-1']);
+    });
+
     test('calls removeAssets on API with correct DTO', () async {
       when(() => mockApi.removeAssets('space-1', any())).thenAnswer((_) async => <String>['asset-1']);
 
@@ -476,6 +482,26 @@ void main() {
 
       await repository.linkAlbum('space-1', 'album-1');
       expect(changes, 0);
+    });
+  });
+
+  group('linkedAlbumNames', () {
+    test('names the linked albums that hold the assets, once each and in order', () async {
+      when(() => mockApi.getSharedSpaceAssetLinkedAlbums('space-1', any())).thenAnswer(
+        (_) async => [
+          api.SharedSpaceAssetLinkedAlbumDto(albumId: 'album-1', albumName: 'Trip'),
+          api.SharedSpaceAssetLinkedAlbumDto(albumId: 'album-1', albumName: 'Trip'),
+          api.SharedSpaceAssetLinkedAlbumDto(albumId: 'album-2', albumName: 'Beach'),
+        ],
+      );
+
+      expect(await repository.linkedAlbumNames('space-1', ['asset-1', 'asset-2']), ['Trip', 'Beach']);
+      verify(
+        () => mockApi.getSharedSpaceAssetLinkedAlbums(
+          'space-1',
+          any(that: isA<api.SharedSpaceAssetRemoveDto>().having((d) => d.assetIds, 'assetIds', ['asset-1', 'asset-2'])),
+        ),
+      ).called(1);
     });
   });
 
