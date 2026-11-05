@@ -118,6 +118,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
       videoCodecs: [VideoCodec.H264, VideoCodec.Hevc],
       resolutions: [HlsVideoResolution.p480, HlsVideoResolution.p720, HlsVideoResolution.p1080],
     },
+    dataSaver: { enabled: false, targetVideoCodec: VideoCodec.Hevc, targetResolution: '720', maxBitrate: '1500k' },
   },
   integrityChecks: {
     untrackedFiles: {
@@ -497,6 +498,28 @@ describe(SystemConfigService.name, () => {
       await expect(sut.getAdminConfig()).resolves.toMatchObject({
         ffmpeg: expect.objectContaining({ threads: 42 }),
       });
+    });
+
+    it('should accept the Data Saver video settings from a config file, keeping defaults for the rest', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ ffmpeg: { dataSaver: { enabled: true, maxBitrate: '800k' } } }),
+      );
+
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
+        ffmpeg: expect.objectContaining({
+          dataSaver: { enabled: true, targetVideoCodec: 'hevc', targetResolution: '720', maxBitrate: '800k' },
+        }),
+      });
+    });
+
+    it('should refuse a config file with an invalid Data Saver bitrate cap', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ ffmpeg: { dataSaver: { enabled: true, maxBitrate: '1.5 Mbit/s' } } }),
+      );
+
+      await expect(sut.getAdminConfig()).rejects.toThrow('ffmpeg.dataSaver.maxBitrate');
     });
 
     it('should accept storageUsage from a config file', async () => {

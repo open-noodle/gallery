@@ -10,6 +10,7 @@
   import { SettingInputFieldType } from '#lib/constants.ts';
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import DataSaverVideoSettings from '#lib/gallery/components/admin/data-saver-video-settings.svelte';
   import {
     AudioCodec,
     CQMode,
@@ -446,6 +447,8 @@
             />
           </div>
         </SettingAccordion>
+
+        <DataSaverVideoSettings bind:configToEdit {config} {disabled} />
       </div>
 
       <div class="ms-4">
