@@ -11,7 +11,6 @@
     title,
     description,
     scrollbar,
-    use,
     actions,
     leading,
     descriptionTrailing,
@@ -27,7 +26,6 @@
   {title}
   {description}
   {scrollbar}
-  {use}
   {actions}
   {leading}
   {descriptionTrailing}
