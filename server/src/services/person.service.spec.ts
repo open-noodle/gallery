@@ -15,6 +15,7 @@ import {
   SystemMetadataKey,
   UserMetadataKey,
 } from 'src/enum.js';
+import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { FaceSearchResult } from 'src/repositories/search.repository.js';
 import { PersonService } from 'src/services/person.service.js';
@@ -38,6 +39,8 @@ import {
 } from 'test/mappers.js';
 import { factory, newDate, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
+
+vi.mock('src/gallery/utils/person-type.js', () => ({ updatePersonWithType: vi.fn() }));
 
 const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
   factory.queueStatistics({
@@ -70,6 +73,10 @@ describe(PersonService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(PersonService));
+    vi.mocked(updatePersonWithType).mockImplementation(async (_databaseRepository, personRepository, person) => {
+      const { type: _type, ...personUpdate } = person;
+      return personRepository.update(personUpdate);
+    });
     mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
     const faceIdentityMock = mocks.faceIdentity as any;
     faceIdentityMock.getAccessiblePeople ??= vi.fn();
@@ -840,6 +847,37 @@ describe(PersonService.name, () => {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: { identityId: 'identity-1' },
       });
+    });
+
+    it.each([
+      { currentType: 'person', nextType: 'pet' },
+      { currentType: 'pet', nextType: 'person' },
+    ] as const)('should change a $currentType cluster to $nextType', async ({ currentType, nextType }) => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ type: currentType });
+      const updatedPerson = PersonFactory.create({ ...person, type: nextType, species: null });
+
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      vi.mocked(updatePersonWithType).mockResolvedValue(updatedPerson);
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+
+      await expect(sut.update(auth, person.personGroupId, { type: nextType })).resolves.toEqual(
+        expect.objectContaining({ id: person.personGroupId, type: nextType }),
+      );
+
+      expect(updatePersonWithType).toHaveBeenCalledWith(
+        mocks.database,
+        mocks.person,
+        expect.objectContaining({
+          ownerId: person.ownerId,
+          personGroupId: person.personGroupId,
+          type: nextType,
+        }),
+      );
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it("should update a person's date of birth", async () => {

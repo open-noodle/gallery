@@ -2404,15 +2404,26 @@ export class SharedSpaceRepository {
         // pet whose only embedding-carrying face was soft-deleted or left the space still reads as an
         // individual rather than a bucket. Benign over-inclusion, matches the global list arm exactly
         // (person.repository.ts:647-660) — do not "fix" only here without doing so there too.
+        // A human cluster an owner reclassified as a pet keeps its face_search rows instead, so it
+        // counts as an individual too (see PersonRepository.getAllForUser).
         .$if(options.type === 'pet', (qb) =>
           qb.where((eb) =>
-            eb.exists(
-              eb
-                .selectFrom('shared_space_person_face as spf')
-                .innerJoin('pet_search', 'pet_search.faceId', 'spf.assetFaceId')
-                .select(sql`1`.as('one'))
-                .whereRef('spf.personId', '=', 'shared_space_person.id'),
-            ),
+            eb.or([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_person_face as spf')
+                  .innerJoin('pet_search', 'pet_search.faceId', 'spf.assetFaceId')
+                  .select(sql`1`.as('one'))
+                  .whereRef('spf.personId', '=', 'shared_space_person.id'),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_person_face as spf')
+                  .innerJoin('face_search', 'face_search.faceId', 'spf.assetFaceId')
+                  .select(sql`1`.as('one'))
+                  .whereRef('spf.personId', '=', 'shared_space_person.id'),
+              ),
+            ]),
           ),
         )
         .$if(!!options.named, (qb) => qb.where('shared_space_person.name', '!=', ''))
@@ -2537,11 +2548,19 @@ export class SharedSpaceRepository {
     const petIndividualFilter =
       options.type === 'pet'
         ? sql`
-            AND EXISTS (
-              SELECT 1
-              FROM "shared_space_person_face" "spf"
-              INNER JOIN "pet_search" ON "pet_search"."faceId" = "spf"."assetFaceId"
-              WHERE "spf"."personId" = "shared_space_person"."id"
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM "shared_space_person_face" "spf"
+                INNER JOIN "pet_search" ON "pet_search"."faceId" = "spf"."assetFaceId"
+                WHERE "spf"."personId" = "shared_space_person"."id"
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM "shared_space_person_face" "spf"
+                INNER JOIN "face_search" ON "face_search"."faceId" = "spf"."assetFaceId"
+                WHERE "spf"."personId" = "shared_space_person"."id"
+              )
             )
           `
         : sql``;

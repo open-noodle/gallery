@@ -2487,6 +2487,37 @@ describe(SharedSpaceRepository.name, () => {
         expect(result.map((p) => p.id)).toContain(bucket.id);
       });
 
+      it('keeps a pet whose faces carry a face embedding in the pets view and its count', async () => {
+        // a human cluster reclassified as a pet: face_search rows, no pet_search row
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const reclassified = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+        });
+        const faces = await ctx.database
+          .selectFrom('shared_space_person_face')
+          .select('assetFaceId')
+          .where('personId', '=', reclassified.id)
+          .execute();
+        await ctx.database
+          .insertInto('face_search')
+          .values(faces.map(({ assetFaceId }) => ({ faceId: assetFaceId, embedding: newEmbedding() })))
+          .execute();
+
+        const list = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(list.map((p) => p.id)).toEqual([reclassified.id]);
+        expect(counts.total).toBe(1);
+      });
+
       it('returns an unnamed single-face pet under the pets view despite minimumFaceCount (S6)', async () => {
         const { ctx, sut } = setup();
         const { user } = await ctx.newUser();
