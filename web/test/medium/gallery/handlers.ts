@@ -8,6 +8,8 @@ import type { Handlers } from '#test/medium/mock/types.ts';
 export const galleryHandlers = (data: MockData): Handlers => ({
   ...galleryTimeBucketHandlers(data),
   getAllSpaces: () => ({ json: [] }),
+  // Every mounted thumbnail asks which spaces hold its asset (the space badge); none here.
+  getAssetSpaces: () => ({ json: { assets: [] } }),
   getFilterSuggestions: () => ({
     json: {
       cameraMakes: [],

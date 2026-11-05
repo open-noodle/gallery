@@ -325,6 +325,70 @@ where
 returning
   "assetId"
 
+-- SharedSpaceRepository.getMemberSpaceIdsByAssetIds
+select
+  "asset"."id" as "assetId",
+  "shared_space_member"."spaceId"
+from
+  "asset"
+  inner join "shared_space_member" on "shared_space_member"."userId" = $1::uuid
+where
+  "asset"."id" = any ($2::uuid[])
+  and (
+    "asset"."visibility" in ($3, $4)
+    and "asset"."deletedAt" is null
+    and (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_asset"
+        where
+          "shared_space_asset"."assetId" = "asset"."id"
+          and "shared_space_asset"."spaceId" = "shared_space_member"."spaceId"
+      )
+      or exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_library"
+        where
+          "shared_space_library"."libraryId" = "asset"."libraryId"
+          and "shared_space_library"."spaceId" = "shared_space_member"."spaceId"
+      )
+      or (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+            inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+            and "linked_album"."deletedAt" is null
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+            and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+            inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+            and "linked_album"."deletedAt" is null
+          where
+            "album_space_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+      )
+    )
+  )
+order by
+  "asset"."id",
+  "shared_space_member"."spaceId"
+
 -- SharedSpaceRepository.getDirectAssetIds
 select
   "assetId"
