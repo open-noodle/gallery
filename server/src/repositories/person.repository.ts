@@ -8,6 +8,7 @@ import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { AssetFileType, AssetVisibility, SourceType, UserMetadataKey } from 'src/enum.js';
 import {
   PersonSidecarFields,
+  personIsListed,
   personIsPet,
   personSidecarColumns,
   personType,
@@ -474,21 +475,9 @@ export class PersonRepository {
       .$if(options?.name !== undefined, (qb) =>
         qb.where(sql<boolean>`word_similarity(f_unaccent(${options!.name!}), f_unaccent("person"."name")) >= 0.5`),
       )
-      // A pet is listed only as an individual pet recognition identified, never as the per-species
-      // bucket the detector alone produces, on every view: the bucket's species name would otherwise
-      // pass the named-person arm above. A bucket has no pet_search row on any of its faces.
-      .where((eb) =>
-        eb.or([
-          eb.not(personIsPet()),
-          eb.exists(
-            eb
-              .selectFrom('asset_face as pet_face')
-              .innerJoin('pet_search', 'pet_search.faceId', 'pet_face.id')
-              .select(sql`1`.as('one'))
-              .whereRef('pet_face.personGroupId', '=', 'person.personGroupId'),
-          ),
-        ]),
-      )
+      // Never the per-species pet bucket, on every view: the bucket's species name would otherwise pass
+      // the named-person arm above.
+      .where(personIsListed())
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
       .execute();
@@ -754,14 +743,7 @@ export class PersonRepository {
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
           AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
-          AND (
-            NOT ${personIsPet()}
-            OR EXISTS (
-              SELECT 1 FROM "asset_face" "pet_face"
-              INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
-              WHERE "pet_face"."personGroupId" = "person"."personGroupId"
-            )
-          )
+          AND ${personIsListed()}
         -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
         GROUP BY "person"."ownerId", "person"."personGroupId"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL

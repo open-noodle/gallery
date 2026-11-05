@@ -211,6 +211,26 @@ describe(PersonRepository.name, () => {
         ctx.database.selectFrom('asset_face').select('personGroupId').where('id', '=', assetFace.id).executeTakeFirst(),
       ).resolves.toEqual({ personGroupId: person.personGroupId });
     });
+    it('keeps a human cluster switched to pet on the People list', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Rex' });
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await seedFace(ctx, { assetId: asset.id, personGroupId: person.personGroupId, embedding: axis(0) });
+      }
+
+      await updatePersonWithType(ctx.get(DatabaseRepository), sut, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        type: 'pet',
+      });
+
+      for (const type of [undefined, 'pet'] as const) {
+        const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type });
+        expect(items.map(({ personGroupId }) => personGroupId)).toEqual([person.personGroupId]);
+      }
+    });
   });
 
   describe('createAll', () => {

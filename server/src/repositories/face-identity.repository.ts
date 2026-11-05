@@ -24,6 +24,16 @@ import { targetTokens } from 'src/utils/face-repair.js';
 import { rekeyVerdictIdentity } from 'src/utils/face-verdict-merge.js';
 import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
 
+// A pet profile is listed only when it is an individual, not a species bucket (whose faces carry no embedding).
+// Pet recognition gives an individual pet_search rows (embedded_pet_identities); a human cluster the owner
+// reclassified as a pet keeps its face_search rows, checked here per identity.
+const humanEmbeddedIdentity = (identityId: RawBuilder<unknown>) => sql<boolean>`EXISTS (
+  SELECT 1
+  FROM face_identity_face AS embedded_face
+  INNER JOIN face_search ON face_search."faceId" = embedded_face."assetFaceId"
+  WHERE embedded_face."identityId" = ${identityId}
+)`;
+
 export type FaceIdentity = Selectable<FaceIdentityTable>;
 export type FaceIdentityFace = Selectable<FaceIdentityFaceTable>;
 
@@ -1829,6 +1839,7 @@ export class FaceIdentityRepository {
           AND (
             NOT ${personIsPet()}
             OR ${personIdentityId()} IN (SELECT "identityId" FROM embedded_pet_identities)
+            OR ${humanEmbeddedIdentity(personIdentityId())}
           )
         UNION ALL
         SELECT
@@ -1862,6 +1873,7 @@ export class FaceIdentityRepository {
           AND (
             shared_space_person.type <> 'pet'
             OR shared_space_person."identityId" IN (SELECT "identityId" FROM embedded_pet_identities)
+            OR ${humanEmbeddedIdentity(sql.ref('shared_space_person.identityId'))}
           )
       ),
       eligible_profiles AS (
