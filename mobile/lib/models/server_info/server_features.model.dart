@@ -23,6 +23,9 @@ abstract class ServerFeatures with _$ServerFeatures {
     @Default(false) bool localTakenRange,
     // Fork: Spatial Scene is on (`GET /server/features` → `spatialScene`). False on servers that predate it.
     @Default(false) bool spatialScene,
+    // Fork: videos may have a Data Saver copy (`GET /server/features` → `dataSaverVideo`). False on servers that
+    // predate it.
+    @Default(false) bool dataSaverVideo,
   }) = _ServerFeatures;
 
   factory ServerFeatures.fromDto(ServerFeaturesDto dto) => ServerFeatures(
@@ -35,5 +38,6 @@ abstract class ServerFeatures with _$ServerFeatures {
     syncRequestTypes: dto.syncRequestTypes.orElse(null)?.toSet(),
     localTakenRange: dto.localTakenRange.orElse(null) ?? false,
     spatialScene: dto.spatialScene.orElse(null) ?? false,
+    dataSaverVideo: dto.dataSaverVideo.orElse(null) ?? false,
   );
 }
