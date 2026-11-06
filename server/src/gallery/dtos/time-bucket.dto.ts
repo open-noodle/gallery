@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { AssetTypeSchema, LibraryViewSchema, TimeBucketSize, TimeBucketSizeSchema } from 'src/enum.js';
+import { aspectClassesQuery } from 'src/gallery/dtos/aspect-class.dto.js';
 import { boundedTextFilter, stringToBool } from 'src/validation.js';
 
 // Fork timeline query fields and the fork-only cover response, merged into src/dtos/time-bucket.dto.ts with one spread
@@ -19,6 +20,7 @@ export const GalleryTimeBucketQueryExtension = {
     .describe('Timeline bucket granularity. Defaults to month for backwards compatibility'),
   isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
   isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
+  aspectClasses: aspectClassesQuery,
   withSharedSpaces: stringToBool
     .optional()
     .describe('Include assets from shared spaces where the user has timeline enabled'),

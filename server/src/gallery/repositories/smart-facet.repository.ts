@@ -3,7 +3,7 @@ import { type Kysely, type SelectQueryBuilder, type SqlBool, sql } from 'kysely'
 import { InjectKysely } from 'nestjs-kysely';
 import { isDeepStrictEqual } from 'node:util';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
-import { AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
+import { AssetAspectClass, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
 import { SearchOptionsDimension, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import {
   FilterSuggestionPerson,
@@ -11,6 +11,7 @@ import {
   getFilteredIdentityPeople,
   getFilteredIdentityPeopleWithCounts,
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { ASPECT_CLASSES, ASPECT_CLASS_QUALIFIED_SQL } from 'src/gallery/utils/aspect-class-sql.js';
 import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { SEARCH_OPTIONS_PROBE, isSearchOptionsProbeTimeout } from 'src/gallery/utils/search-options-probe.js';
 import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
@@ -38,7 +39,8 @@ type SmartFacetExclude =
   | 'rating'
   | 'media'
   | 'favorites'
-  | 'albums';
+  | 'albums'
+  | 'aspect';
 
 const smartFacetFilterExcludes: Partial<Record<SmartFacetExclude, (keyof AssetFilter)[]>> = {
   time: ['takenAfter', 'takenBefore'],
@@ -47,6 +49,7 @@ const smartFacetFilterExcludes: Partial<Record<SmartFacetExclude, (keyof AssetFi
   camera: ['make', 'model'],
   cameraModel: ['model'],
   rating: ['rating'],
+  aspect: ['aspectClasses'],
 };
 
 /** Query mode: what `/search/smart` hands `searchAssetBuilderLegacy` (scope included), plus the embedding it ranks by. */
@@ -308,6 +311,7 @@ export interface SmartSearchFacetsResult {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  aspectClasses?: AssetAspectClass[];
 }
 
 @Injectable()
@@ -351,6 +355,7 @@ export class SmartFacetRepository {
       const mediaTypes = await this.getSmartFacetMediaTypes(trx, options);
       const hasFavorites = await this.getSmartFacetHasFavorites(trx, options);
       const albumMembership = await this.getSmartFacetAlbumMembership(trx, options);
+      const aspectClasses = await this.getSmartFacetAspectClasses(trx, options);
 
       return {
         total,
@@ -366,6 +371,7 @@ export class SmartFacetRepository {
         hasUnnamedPeople: peopleResult.hasUnnamedPeople,
         hasFavorites,
         ...albumMembership,
+        aspectClasses,
       };
     });
   }
@@ -1223,6 +1229,20 @@ export class SmartFacetRepository {
       .orderBy('rating')
       .execute();
     return rows.map((row) => row.rating!);
+  }
+
+  private async getSmartFacetAspectClasses(
+    trx: Kysely<DB>,
+    options: SmartSearchFacetsOptions,
+  ): Promise<AssetAspectClass[]> {
+    const rows = await trx
+      .selectFrom('asset')
+      .select(sql.raw<AssetAspectClass | null>(ASPECT_CLASS_QUALIFIED_SQL).as('aspectClass'))
+      .distinct()
+      .where('id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'aspect'))
+      .execute();
+    const present = new Set(rows.map((row) => row.aspectClass));
+    return ASPECT_CLASSES.filter((value) => present.has(value));
   }
 
   private async getSmartFacetMediaTypes(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<AssetType[]> {

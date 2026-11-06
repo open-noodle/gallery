@@ -611,9 +611,9 @@ describe(SearchRepository.name, () => {
       await repository.getFilterSuggestions([userId], { ...allDimensions });
 
       // countries, cameraMakes, tags, people, ratings, mediaTypes, hasFavorites, then the two
-      // album-membership probes (filed / unfiled) — in construction order.
+      // album-membership probes (filed / unfiled) and the aspect class probe — in construction order.
       const [countries, ...rest] = options();
-      expect(rest).toHaveLength(8);
+      expect(rest).toHaveLength(9);
 
       expect(countries.state).toBeUndefined();
       expect(countries.lensModel).toBe('RF24-105mm F4 L IS USM');

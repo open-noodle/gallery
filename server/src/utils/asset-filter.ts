@@ -1,6 +1,8 @@
-import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder } from 'kysely';
+import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder, sql } from 'kysely';
+import type { AssetAspectClass } from 'src/enum.js';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import type { ViewerScope } from 'src/utils/viewer-scope.js';
+import { ASPECT_CLASS_QUALIFIED_SQL } from 'src/gallery/utils/aspect-class-sql.js';
 import { withLibraryView } from 'src/gallery/utils/library-view.js';
 import { DB } from 'src/schema/index.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
@@ -18,6 +20,7 @@ import { without } from 'src/utils/filter-suggestions.js';
  *   the day after the last one (web filter-panel.ts, mobile search_api.repository.dart).
  * - place/camera: `null` means "has no value" (IS NULL), `undefined` and `''` mean "no filter".
  * - rating: a minimum (`>=`); `null` means unrated.
+ * - aspectClasses: any of the classes; an empty list means "no filter". An asset without dimensions has no class.
  *
  * `searchAssetBuilderLegacy` itself is upstream and untouched (fileCreatedAt, inclusive bound, exact
  * rating unless `ratingIsMinimum`); see specs/2026-07-23-search-v3-coexistence-design.md.
@@ -32,6 +35,7 @@ export interface AssetFilter {
   model?: string | null;
   lensModel?: string | null;
   rating?: number | null;
+  aspectClasses?: AssetAspectClass[];
 }
 
 export const assetFilterKeys = [
@@ -44,9 +48,17 @@ export const assetFilterKeys = [
   'model',
   'lensModel',
   'rating',
+  'aspectClasses',
 ] as const satisfies (keyof AssetFilter)[];
 
 const exifColumns = ['country', 'state', 'city', 'make', 'model', 'lensModel'] as const;
+
+/**
+ * The class condition, in the exact form asset_aspectClass_idx needs. The values are literals so the index is used
+ * regardless of plan caching; they are validated against the enum before they get here.
+ */
+export const aspectClassCondition = (classes: readonly AssetAspectClass[]) =>
+  sql<SqlBool>`${sql.raw(ASPECT_CLASS_QUALIFIED_SQL)} in (${sql.join(classes.map((value) => sql.lit(value)))})`;
 
 /** One condition per active filter, minus the `exclude`d keys (a facet listing its own values). */
 export function assetFilterConditions(
@@ -80,6 +92,10 @@ export function assetFilterConditions(
     );
   }
 
+  if (f.aspectClasses?.length) {
+    conditions.push(aspectClassCondition(f.aspectClasses));
+  }
+
   return conditions;
 }
 
@@ -105,15 +121,17 @@ export function withAssetFilter<T extends SelectQueryBuilder<DB, any, any>>(
  */
 export function searchAssetBuilderWithLocalTaken(
   kysely: Kysely<DB>,
-  options: AssetSearchBuilderOptions & Pick<ViewerScope, 'upstreamTakenRange'>,
+  options: AssetSearchBuilderOptions & Pick<ViewerScope, 'upstreamTakenRange'> & Pick<AssetFilter, 'aspectClasses'>,
 ) {
   const libraryView = { ...options, callerId: options.authUserId };
+  const { aspectClasses } = options;
   if (options.upstreamTakenRange) {
-    return withLibraryView(searchAssetBuilderLegacy(kysely, options), libraryView);
+    return withLibraryView(withAssetFilter(searchAssetBuilderLegacy(kysely, options), { aspectClasses }), libraryView);
   }
   const query = withAssetFilter(searchAssetBuilderLegacy(kysely, without(options, 'takenAfter', 'takenBefore')), {
     takenAfter: options.takenAfter,
     takenBefore: options.takenBefore,
+    aspectClasses,
   });
   return withLibraryView(query, libraryView);
 }
