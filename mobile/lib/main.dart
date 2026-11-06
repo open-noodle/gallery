@@ -25,7 +25,9 @@ import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
 import 'package:immich_mobile/platform/native_sync_api.g.dart';
 import 'package:immich_mobile/platform/permission_api.g.dart';
+import 'package:immich_mobile/presentation/widgets/app_lock/app_lock_overlay.widget.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
+import 'package:immich_mobile/providers/app_lock.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/share_intent_upload.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
@@ -144,12 +146,14 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         dPrint(() => "[APP STATE] resumed");
         unawaited(ref.read(appStateProvider.notifier).handleAppResume());
         unawaited(ref.read(viewIntentHandlerProvider).onAppResumed());
+        ref.read(appLockProvider.notifier).handleAppResumed();
       case AppLifecycleState.inactive:
         dPrint(() => "[APP STATE] inactive");
         ref.read(appStateProvider.notifier).handleAppInactivity();
       case AppLifecycleState.paused:
         dPrint(() => "[APP STATE] paused");
         unawaited(ref.read(appStateProvider.notifier).handleAppPause());
+        ref.read(appLockProvider.notifier).handleAppPaused();
       case AppLifecycleState.detached:
         dPrint(() => "[APP STATE] detached");
         unawaited(ref.read(appStateProvider.notifier).handleAppDetached());
@@ -294,7 +298,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
           ),
           child: ImmichThemeProvider(
             colorScheme: context.colorScheme,
-            child: GalleryHeroScope(child: child!),
+            child: AppLockOverlay(child: GalleryHeroScope(child: child!)),
           ),
         ),
         routerConfig: router.config(
