@@ -1742,6 +1742,7 @@ export class SharedSpaceService extends BaseService {
       identityIds: scope.identityIds,
       forceEmptyResult: scope.forceEmptyResult,
       tagIds: dto.tagIds,
+      aspectClasses: dto.aspectClasses,
       make: dto.make,
       model: dto.model,
       rating: dto.rating,
