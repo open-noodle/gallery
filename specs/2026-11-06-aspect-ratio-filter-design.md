@@ -1,8 +1,8 @@
 # Aspect ratio filter
 
-Status: draft for review, written 2026-11-06 against `upstream/main` at `ae178054c` (Immich base 3.3.5). `3983e4381`
+Status: spec and mockup approved by the requester on 2026-11-06. Written against `upstream/main` at `ae178054c` (Immich base 3.3.5). `3983e4381`
 changes none of the filter, DTO, schema, revert or web filter panel files cited here.
-Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html`, to be approved before any component code.
+Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html`, approved.
 
 Source labels used below: a file path with a line is read from the code at that commit. "M1" and "M2" are the measurement
 runs defined under Performance. Every M1 and M2 number in this spec is measured with integer codes, not with the final
