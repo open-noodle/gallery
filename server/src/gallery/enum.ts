@@ -1,4 +1,5 @@
 import z from 'zod';
+import { ASPECT_CLASSES } from 'src/gallery/utils/aspect-class-sql.js';
 
 // Wholly fork-defined enums. src/enum.ts re-exports this module, so import them from 'src/enum.js' as usual.
 export enum SharedSpaceRole {
@@ -61,3 +62,11 @@ export const LibraryViewSchema = z
   .enum(LibraryView)
   .describe('Only your photos that are in no space, or only the photos of the spaces on your timeline (unset: both)')
   .meta({ id: 'LibraryView' });
+
+/** The shape classes of the Aspect ratio filter (specs/2026-11-06-aspect-ratio-filter-design.md). */
+export const AssetAspectClassSchema = z
+  .enum(ASPECT_CLASSES)
+  .describe('Picture shape: landscape, square, portrait, panorama-wide or panorama-tall')
+  .meta({ id: 'AssetAspectClass' });
+
+export type AssetAspectClass = z.infer<typeof AssetAspectClassSchema>;
