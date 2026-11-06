@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/widgets/settings/preference_settings/app_lock_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/haptic_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/nav_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/share_setting.dart';
@@ -10,7 +11,7 @@ class PreferenceSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const preferenceSettings = [ThemeSetting(), NavSetting(), HapticSetting(), ShareSetting()];
+    const preferenceSettings = [ThemeSetting(), NavSetting(), HapticSetting(), ShareSetting(), AppLockSetting()];
 
     return const SettingsSubPageScaffold(settings: preferenceSettings, showDivider: true);
   }
