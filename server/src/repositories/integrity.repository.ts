@@ -121,6 +121,12 @@ export class IntegrityRepository {
           .select((eb) => eb.ref('asset_data_saver_video.path').$castTo<string>().as('path'))
           .where('asset_data_saver_video.path', 'in', paths),
       )
+      .union((eb) =>
+        eb
+          .selectFrom('asset_face_video_frame')
+          .select('asset_face_video_frame.path as path')
+          .where('asset_face_video_frame.path', 'in', paths),
+      )
       .execute();
   }
 

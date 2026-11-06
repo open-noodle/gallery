@@ -99,7 +99,7 @@ export interface ISharedSpaceAlbumGrantReconcileJob extends IBaseJob {
 }
 
 export interface IStorageMigrationJob {
-  entityType: 'asset' | 'assetFile' | 'person' | 'user';
+  entityType: 'asset' | 'assetFace' | 'assetFile' | 'person' | 'user';
   entityId: string;
   fileType: string | null;
   sourcePath: string;
