@@ -4,7 +4,8 @@ Status: draft for review, written 2026-11-06 against `upstream/main` at `ae17805
 Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html` (planned, required before any component code).
 
 Source labels used below: a file path with a line is read from the code at that commit. "M1" and "M2" are the measurement
-runs defined under Performance. "Open" marks anything not verified.
+runs defined under Performance. Every M1 and M2 number in this spec is measured with integer codes, not with the final
+helper expression (see Performance). "Open" marks anything not verified.
 
 ## Summary
 
@@ -29,7 +30,7 @@ Evidence:
   info"), and approved the full expression index on one condition (Discord, 2026-11-06: "Yeah if it's benchmarked at
   that size, looks good"). The upstream reviewer on immich-28739 asked for a stored, indexed value too.
 - Filter loading is already slow (#960, #1108, #1125, #1234). The existing media type statement alone takes 1,123 to
-  1,187 ms for a space member (M2), so the budget for new work is tight.
+  1,187 ms for a space member (M2, measured with integer codes), so the budget for new work is tight.
 
 ## Goals and non-goals
 
@@ -93,7 +94,7 @@ other filters or of "add all results".
 
 ## Options considered
 
-All numbers are M2 unless marked otherwise, as change against the unfiltered timeline for the member Photos timeline /
+All numbers are M2, measured with integer codes, as change against the unfiltered timeline for the member Photos timeline /
 largest Space timeline.
 
 | Option | Result | Decision |
@@ -114,7 +115,8 @@ tag, a client version check or web feature flag on the request side, two web PRs
 ### Classes
 
 L is the longer side and S the shorter side, cast to bigint on the operand. Width or height NULL, zero or negative means
-no class. Otherwise an asset has exactly one class (proven over all pairs 1 to 2000 plus edge values).
+no class. Otherwise an asset has exactly one class. A test over all pairs 1 to 2000 plus edge values proves this for the final
+expression (see Testing).
 
 | Order | API value | en | de | Rule |
 | --- | --- | --- | --- | --- |
@@ -141,32 +143,29 @@ Known limitations, both inherited from the stored dimensions:
 No new table and no new column. The stored class is the index `asset_aspectClass_idx`, a full expression index on `asset`
 with no WHERE clause. PostgreSQL maintains it on every write path (upload, metadata extraction, edits, a stock Immich
 server on a Gallery database) with no trigger and no backfill job. A write loses its HOT update only when it changes
-`width` or `height`. The index also gives the planner statistics for the class: in M1 the class without an index made
-Landscape 34 percent slower than unfiltered, with the full index 12 percent faster.
+`width` or `height`. The index also gives the planner statistics for the class: in M1 (measured with integer codes) the class
+without an index made Landscape 34 percent slower than unfiltered, with the full index 12 percent faster.
 
 New dependency-free module `server/src/gallery/utils/aspect-class-sql.ts`, on the pattern of `cleanup-sql.ts`:
 
 ```sql
 (CASE
-  WHEN "asset"."width" IS NULL OR "asset"."height" IS NULL THEN NULL
-  WHEN "asset"."width" <= 0 OR "asset"."height" <= 0 THEN NULL
-  WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint)
-    <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
-  WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint)
-    >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint)
-    THEN CASE WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide' ELSE 'panorama-tall' END
-  WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+  WHEN "width" IS NULL OR "height" IS NULL THEN NULL
+  WHEN "width" <= 0 OR "height" <= 0 THEN NULL
+  WHEN 50 * GREATEST("width"::bigint, "height"::bigint)
+    <= 51 * LEAST("width"::bigint, "height"::bigint) THEN 'square'
+  WHEN GREATEST("width"::bigint, "height"::bigint)
+    >= 2 * LEAST("width"::bigint, "height"::bigint)
+    THEN CASE WHEN "width" > "height" THEN 'panorama-wide' ELSE 'panorama-tall' END
+  WHEN "width" > "height" THEN 'landscape'
   ELSE 'portrait'
 END)
 ```
 
-The expression carries its own outer parentheses and uses qualified columns, so it is safe in joined queries. The module
-exports the expression and the five values in table order. `asset.table.ts` imports it for the `@Index`.
-
-Open: the Cleanup precedent keeps its expression unqualified and qualifies it for queries
-(`cleanup.repository.ts:74-75`). The qualified form in an index definition is expected to work, because PostgreSQL
-resolves both to the same column, but it has not been run against `schema-drift.spec.ts`. If that test rejects it, the
-module follows the precedent.
+The expression carries its own outer parentheses. It follows the Cleanup precedent (`cleanup.repository.ts:74-75`): the
+constant is unqualified and `asset.table.ts` imports it for the `@Index`, and the queries use the `"asset"`-qualified form
+derived from the same constant, so they are safe in joined queries. The module exports the expression, the derived
+qualified form and the five values in table order.
 
 `AssetAspectClass` and `AssetAspectClassSchema = z.enum(values).meta({ id: 'AssetAspectClass' })` go in
 `server/src/gallery/enum.ts`, built from the helper's values.
@@ -185,11 +184,10 @@ File `server/src/schema/migrations-gallery/1800100000000-AddAssetAspectClassInde
 - `scripts/revert-to-immich.sql`: `DROP INDEX IF EXISTS` next to line 811 (step 4), the override name next to line 938
   (step 6), the migration name next to line 1233 (step 8).
 
-`ANALYZE` is an addition by this spec and needs approval. Expression statistics exist only after an analyze, and on a
-large, quiet library autovacuum may not run one soon, so until then the planner has no class statistics. That is the
-condition under which M1 saw Landscape regress. Upstream has the precedent
-(`server/src/schema/migrations/1792213725597-AddAssetFaceAssetState.ts:49`). Open: whether the M1 and M2 runs analyzed
-after building the index, and how long `ANALYZE "asset"` takes at 634,000 assets.
+`ANALYZE` is needed because expression statistics exist only after an analyze, and on a large, quiet library autovacuum
+may not run one soon. Both measurement runs analyzed after building the index, so the migration matches what was measured.
+Upstream has the precedent (`server/src/schema/migrations/1792213725597-AddAssetFaceAssetState.ts:49`). Its duration at
+634,000 assets is on the measurement list under Performance.
 
 ### API
 
@@ -239,13 +237,18 @@ below prove this.
   `without(options, 'aspectClasses')`:
 
   ```sql
-  SELECT EXISTS (... class = 'landscape'), ..., EXISTS (... class = 'panorama-tall')
+  SELECT EXISTS (<buildFilteredAssetIds query> AND <class expr> = 'landscape'),
+         ...,
+         EXISTS (<buildFilteredAssetIds query> AND <class expr> = 'panorama-tall')
   ```
 
-  Each `EXISTS` runs over `buildFilteredAssetIds`, stops at the first match and can use the index. The new statement
+  Each probe adds the class predicate inside the filtered-id query, which is the form M2 measured. It stops at the first
+  match and can use the index. The form `asset WHERE id IN (<subquery>) AND <class expr> = ...`, which the #910 probes
+  use, is not allowed here: it can force the whole subquery before stopping. The EXPLAIN plan test covers this. The new
+  statement
   joins the `sortQueries` list of the `@GenerateSql` decorator, and `mise sql` regenerates the query file. The media type
   statement stays unchanged. **The probes never ship without the index**: without it they take 221 to 227 ms when a class
-  is absent.
+  is absent (measured with integer codes).
 - Smart facets: the class list comes from the temp set inside the existing transaction, either as one DISTINCT or as
   probes. The PR measures both and keeps the cheaper.
 - Stop condition: if EXPLAIN on a real VectorChord database shows smart search leaving the vector index because of the
@@ -365,6 +368,11 @@ stock Immich.
 
 The numbers come from runs on the requester's production library.
 
+**Validity.** M1 and M2 computed the class as integer codes 1 to 5 (`pg_temp.cls()` in `aspect-bench-v2.sql`), not as the
+text values of the final helper. Every number below is therefore "measured with integer codes". They justify the design,
+but they do not yet meet the maintainer's benchmark condition: the server PR re-measures with the final helper expression,
+and only those numbers count.
+
 | Field | Run M1 (owner view) | Run M2 (space member view) |
 | --- | --- | --- |
 | Environment | PostgreSQL 14.19, same major as `docker/docker-compose.yml:59` (14, VectorChord 0.4.3); shared_buffers 2 GB, work_mem 32 MB, jit off, random_page_cost 1.1 | same |
@@ -373,7 +381,7 @@ The numbers come from runs on the requester's production library.
 | Method | each variant in its own transaction ending in ROLLBACK; one warm-up, three interleaved runs, median; all output columns evaluated; plan checked for index use | same |
 | Script, date | `aspect-bench.sql`, 2026-11-05 | `aspect-bench-v2.sql`, 2026-11-05 |
 
-Results (M2):
+Results (M2, all measured with integer codes):
 
 - Unfiltered timeline: 730 to 975 ms.
 - Square and both panoramas: 4.0 to 6.7 ms. Landscape: 612 / 488 ms (-33 / -39 percent). Portrait: 172 / 125 ms (-81 / -83
@@ -387,6 +395,7 @@ Still to measure, for the server PR, with the final helper expression:
 
 | Item | Status |
 | --- | --- |
+| Every M2 number above, again with the text values of the final helper | Required before the numbers count as the maintainer's benchmark condition |
 | Smart facets, DISTINCT over the temp set against probes | Open |
 | Map markers | Open |
 | Metadata search | Open |
@@ -394,7 +403,7 @@ Still to measure, for the server PR, with the final helper expression:
 | Smart search with the class predicate on a real VectorChord database | Open, stop condition above |
 | Write cost on upload and metadata extraction | Synthetic only, within noise |
 | Assets without dimensions on a real migrated library | Open |
-| Effect and cost of `ANALYZE "asset"` in the migration | Open |
+| Duration of `ANALYZE "asset"` at 634,000 assets | Open |
 
 The harness (`aspect-sql-capture.spec.ts`, `aspect-bench-v2.sql`) is never committed. It is adapted to the final
 expression and extended to these paths, the requester runs it, and the output goes into the PR. The numbers must come
@@ -414,10 +423,13 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
 - New `server/test/medium/specs/gallery/aspect-ratio-filter.medium.spec.ts`: self-exclusion, narrowing, NULL and boundary
   rows, and that availability for a non-member never reveals classes of assets outside its scope.
 - EXPLAIN plan medium test after `cleanup.repository.spec.ts:113`: square and both panorama selections and the probe
-  statement use `asset_aspectClass_idx`.
+  statement use `asset_aspectClass_idx`, and the probes keep the class predicate inside the filtered-id query.
 - `schema-drift.spec.ts` is the parity guard between the helper and the index. It needs no separate parity test.
 - `rbac-oracle.medium.spec.ts`: the forced snapshot change is reviewed and explained in the PR.
-- Unit tests: the class boundaries in a fork spec, DTO validation (unknown value, empty string, empty array), the V3 mix
+- Class boundaries: a test over all pairs 1 to 2000 plus edge values runs the final expression and checks that each pair
+  gets exactly the class of the table above. The expression is SQL, so it runs in PostgreSQL through `generate_series`, in
+  the gallery medium spec.
+- Unit tests: DTO validation (unknown value, empty string, empty array), the V3 mix
   rejection, and the `Promise.all` entry.
 - Web: `filter-availability` truth table above, the section component, URL round trip, chips, and one assertion per
   hand-written place. The #910 guard test stays unchanged.
@@ -449,8 +461,5 @@ For the maintainer, each with the default this spec applies. Any of them can be 
 4. Per-row greying for aspect rows, next to the #910 decision for rating and media.
 5. The budget in goal 5 (measured: 5 to 8 ms added per filter panel load).
 
-For the requester:
-
-6. `ANALYZE "asset"` in `up()`, an addition to the brief (see Migration).
-7. Whether `CONTRIBUTING.md`'s feature freezes apply to this change. They name sharing and asset ownership and external
-   libraries; this filter touches neither model, but it runs on the same surfaces.
+Feature freezes (`CONTRIBUTING.md`) do not apply: the filter only narrows and changes neither the sharing, ownership nor
+external library model.
