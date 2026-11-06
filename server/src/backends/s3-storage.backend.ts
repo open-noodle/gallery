@@ -22,7 +22,7 @@ import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { Readable, Transform, addAbortSignal, pipeline as pipelineCallback } from 'node:stream';
 import { buffer } from 'node:stream/consumers';
 import { pipeline } from 'node:stream/promises';
@@ -486,7 +486,11 @@ export class S3StorageBackend implements StorageBackend {
   }
 
   async downloadToTemp(key: string): Promise<{ tempPath: string; cleanup: () => Promise<void> }> {
-    const tempPath = join(tmpdir(), `immich-${randomUUID()}.tmp`);
+    // Keep the key's extension: libvips picks its loader by extension, and RAW files are TIFF-shaped,
+    // so a `.ARW` staged as `.tmp` goes to magickload and fails to decode.
+    const extension = extname(key);
+    const suffix = /^\.[A-Za-z0-9]{1,10}$/.test(extension) ? extension : '.tmp';
+    const tempPath = join(tmpdir(), `immich-${randomUUID()}${suffix}`);
     const { stream } = await this.get(key);
     const writeStream = createWriteStream(tempPath);
     await pipeline(stream, writeStream);
