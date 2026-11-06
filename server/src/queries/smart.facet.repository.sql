@@ -834,6 +834,66 @@ where
   )
 limit
   $9
+select distinct
+  (
+    CASE
+      WHEN "asset"."width" IS NULL
+      OR "asset"."height" IS NULL THEN NULL
+      WHEN "asset"."width" <= 0
+      OR "asset"."height" <= 0 THEN NULL
+      WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+      WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+        WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+        ELSE 'panorama-tall'
+      END
+      WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+      ELSE 'portrait'
+    END
+  ) as "aspectClass"
+from
+  "asset"
+where
+  "id" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($1::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $2
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
+  )
 commit
 
 -- SmartFacetRepository.getSearchOptions
