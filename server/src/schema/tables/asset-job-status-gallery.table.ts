@@ -17,4 +17,9 @@ export class AssetJobStatusGalleryTable {
   // Library Cleanup quality analysis
   @Column({ type: 'timestamp with time zone', nullable: true })
   qualityAnalyzedAt!: Timestamp | null;
+
+  // Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md). Set even when the video
+  // has no faces, so turning the feature on again does not rescan it.
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  videoFacesSampledAt!: Timestamp | null;
 }

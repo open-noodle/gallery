@@ -18,6 +18,7 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -66,6 +67,7 @@ export type GalleryServiceOverrides = {
   cleanup: CleanupRepository;
   spatialScene: SpatialSceneRepository;
   dataSaverVideo: DataSaverVideoRepository;
+  videoFace: VideoFaceRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -100,6 +102,7 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
     cleanup: automock(CleanupRepository, { args: [, loggerMock], strict: false }),
     spatialScene: automock(SpatialSceneRepository, { strict: false }),
     dataSaverVideo: automock(DataSaverVideoRepository, { strict: false }),
+    videoFace: automock(VideoFaceRepository, { strict: false }),
   };
 
   mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
@@ -107,6 +110,7 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
   // IntegrityService.handleUntrackedFiles reads it on every scan batch.
   mocks.spatialScene.getPathsByPaths.mockResolvedValue([]);
   mocks.dataSaverVideo.getPathsByPaths.mockResolvedValue([]);
+  mocks.videoFace.getPathsByPaths.mockResolvedValue([]);
 
   return mocks;
 };
@@ -144,4 +148,5 @@ export const newGalleryRepositories = (
     overrides.cleanup || (mocks.cleanup as As<CleanupRepository>),
     overrides.spatialScene || (mocks.spatialScene as As<SpatialSceneRepository>),
     overrides.dataSaverVideo || (mocks.dataSaverVideo as As<DataSaverVideoRepository>),
+    overrides.videoFace || (mocks.videoFace as As<VideoFaceRepository>),
   );
