@@ -8,6 +8,14 @@ on:
         required: false
         type: string
         default: ''
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/gallery-mobile-smoke.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/gallery-mobile-smoke.yml'
 
 concurrency:
   group: gallery-mobile-smoke-${{ github.ref }}
@@ -58,7 +66,7 @@ jobs:
       - name: Run mobile tests
         run: mise //mobile:test
 
-      - name: Build unsigned Android APK
+      - name: Build Android Release APK
         working-directory: ./mobile
         # mobile/android/gradle.properties (upstream-owned, no fork drift) pairs
         # android.enableJetifier=true with org.gradle.jvmargs=-Xmx4096M and
@@ -69,4 +77,11 @@ jobs:
         # daemon heap here so upstream's gradle.properties stays byte-identical.
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g
-        run: flutter build apk --debug
+        run: flutter build apk --release --build-number=$(( $(date +%s) / 60 ))
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: noodle-gallery-apk
+          path: mobile/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
