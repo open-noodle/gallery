@@ -1093,13 +1093,36 @@ describe('S3StorageBackend', () => {
       const { tempPath, cleanup } = await backend.downloadToTemp('key.jpg');
 
       expect(tempPath).toContain('immich-');
-      expect(tempPath.endsWith('.tmp')).toBe(true);
+      expect(tempPath.endsWith('.jpg')).toBe(true);
 
       const content = await readFile(tempPath, 'utf8');
       expect(content).toBe('temp file content');
 
       await cleanup();
       expect(existsSync(tempPath)).toBe(false);
+    });
+
+    it('keeps the key extension so decoders pick the right loader', async () => {
+      // libvips chooses a loader by extension; a RAW staged as `.tmp` goes to magickload and fails (#1276).
+      mockSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('raw')]) });
+
+      const { tempPath, cleanup } = await backend.downloadToTemp('upload/admin/ab/cd/photo.ARW');
+
+      expect(tempPath).toMatch(/immich-[0-9a-f-]+\.ARW$/);
+      await cleanup();
+    });
+
+    it('falls back to .tmp when the key has no usable extension', async () => {
+      mockSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('a')]) });
+      mockSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('b')]) });
+
+      const noExt = await backend.downloadToTemp('upload/admin/ab/cd/photo');
+      const oddExt = await backend.downloadToTemp('upload/admin/ab/cd/photo.j pg');
+
+      expect(noExt.tempPath.endsWith('.tmp')).toBe(true);
+      expect(oddExt.tempPath.endsWith('.tmp')).toBe(true);
+      await noExt.cleanup();
+      await oddExt.cleanup();
     });
   });
 
