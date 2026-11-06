@@ -2718,7 +2718,7 @@ export class SharedSpaceService extends BaseService {
         throw new NotFoundException();
       }
 
-      const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
+      const sourcePath = await this.backendMedia.getFaceThumbnailSource(face);
       if (!sourcePath) {
         throw new NotFoundException();
       }
@@ -2761,7 +2761,7 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face);
     if (!sourcePath) {
       throw new NotFoundException();
     }
@@ -2785,7 +2785,7 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face);
     if (!sourcePath) {
       throw new NotFoundException();
     }

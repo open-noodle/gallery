@@ -252,6 +252,21 @@ export class StorageMigrationService extends BaseService {
       }
     }
 
+    // Stream the best frames of video faces, which move with the person thumbnails cut from them
+    if (fileTypes.personThumbnails) {
+      for await (const row of this.storageMigrationRepository.streamVideoFaceFrames(direction)) {
+        await enqueue({
+          entityType: 'assetFace',
+          entityId: row.faceId,
+          fileType: 'videoFaceFrame',
+          sourcePath: row.path,
+          batchId,
+          direction,
+          deleteSource,
+        });
+      }
+    }
+
     // Stream profile images
     if (fileTypes.profileImages) {
       for await (const row of this.storageMigrationRepository.streamProfileImages(direction)) {
@@ -445,6 +460,9 @@ export class StorageMigrationService extends BaseService {
           return this.storageMigrationRepository.updateDataSaverVideoPath(entityId, oldPath, newPath);
         }
         return this.storageMigrationRepository.updateAssetOriginalPath(entityId, oldPath, newPath);
+      }
+      case 'assetFace': {
+        return this.storageMigrationRepository.updateVideoFaceFramePath(entityId, oldPath, newPath);
       }
       case 'assetFile': {
         return this.storageMigrationRepository.updateAssetFilePath(entityId, oldPath, newPath);
