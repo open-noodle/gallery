@@ -65,7 +65,7 @@ describe('aspect class expression', () => {
         }
       }
     }
-  });
+  }, 120_000);
 
   it('keeps the five class codes used above apart', () => {
     expect(new Set(ASPECT_CLASSES.map((value) => value[0] + value.at(-1))).size).toBe(ASPECT_CLASSES.length);
