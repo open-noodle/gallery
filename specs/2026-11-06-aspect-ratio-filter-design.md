@@ -271,8 +271,11 @@ A second PR, after the mockup is approved.
   greyed, click clears the selection. Then the five classes in table order, each with a shape icon, as multi-select
   toggles with `aria-pressed` in a labelled `role="group"`. Selecting a class deselects All, deselecting the last class
   reselects it.
+- The section is revealed and expanded automatically for existing users, and can be hidden through the cog.
+- `getActiveFilterCount` counts the section once however many classes are selected, as it does for tags.
 - All rows stay visible. A class absent from the current set is greyed and not clickable. A selected class that is absent
-  is shown selected and dimmed, in the orphan style of people, places, cameras and tags, and stays clickable. The rule in
+  is shown selected and dimmed (the active style with `opacity-50`, as `isOrphaned` in `media-type-filter.svelte:30-36`), in
+  the orphan style of people, places, cameras and tags, and stays clickable. The rule in
   section 2.4 of the #910 spec covers rating stars and media buttons, whose meaning comes from position or which e2e
   suites click directly. These rows are labelled values, so it does not apply, and its guard test stays unchanged.
 - Section availability is a new case in `filter-availability.ts`, on the #910 model:
@@ -468,3 +471,6 @@ For the maintainer, each with the default this spec applies. Any of them can be 
 
 Feature freezes (`CONTRIBUTING.md`) do not apply: the filter only narrows and changes neither the sharing, ownership nor
 external library model.
+
+Open for the implementation phase: the implementer's environment has no Docker. `mise sql` needs a running database, and
+medium tests need one too, so how the regenerated query files are produced is not settled. Medium tests run in CI.
