@@ -8,7 +8,7 @@ import { Kysely, SqlBool, Transaction, sql } from 'kysely';
 import type { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SearchFilter } from 'src/dtos/search.dto.js';
-import { AssetAspectClass, AssetVisibility } from 'src/enum.js';
+import { AssetVisibility } from 'src/enum.js';
 import { type LibraryViewOptions, checkLibraryView } from 'src/gallery/utils/library-view.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
@@ -272,7 +272,7 @@ export type StructuredSearchRequest = LibraryViewOptions & {
   spacePersonIds?: string[];
   ownerId?: string;
   isInAlbum?: boolean;
-  aspectClasses?: AssetAspectClass[];
+  aspectClasses?: string[];
 };
 
 /**

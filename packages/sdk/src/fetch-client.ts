@@ -3170,8 +3170,8 @@ export type SearchOrder = {
 export type MetadataSearchDto = {
     /** Filter by album IDs */
     albumIds?: string[];
-    /** Filter by aspect class: an asset matches when it is in any of them */
-    aspectClasses?: AssetAspectClass[];
+    /** Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall */
+    aspectClasses?: string[];
     /** Filter by file checksum */
     checksum?: string;
     /** Filter by city name */
@@ -3576,8 +3576,8 @@ export type RandomSearchDto = {
 export type SmartSearchDto = {
     /** Filter by album IDs */
     albumIds?: string[];
-    /** Filter by aspect class: an asset matches when it is in any of them */
-    aspectClasses?: AssetAspectClass[];
+    /** Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall */
+    aspectClasses?: string[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */
@@ -3660,8 +3660,8 @@ export type SmartSearchDto = {
 export type SmartSearchFacetsDto = {
     /** Filter by album IDs */
     albumIds?: string[];
-    /** Filter by aspect class: an asset matches when it is in any of them */
-    aspectClasses?: AssetAspectClass[];
+    /** Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall */
+    aspectClasses?: string[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */

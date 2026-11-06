@@ -1,4 +1,6 @@
+import z from 'zod';
 import { aspectClassesBody, aspectClassesQuery } from 'src/gallery/dtos/aspect-class.dto.js';
+import { ASPECT_CLASSES } from 'src/gallery/utils/aspect-class-sql.js';
 
 describe('aspectClasses request field', () => {
   describe('query', () => {
@@ -24,6 +26,17 @@ describe('aspectClasses request field', () => {
   describe('body', () => {
     it('accepts an empty list, which means no filter', () => {
       expect(aspectClassesBody.parse([])).toEqual([]);
+    });
+
+    it('accepts every class', () => {
+      expect(aspectClassesBody.parse([...ASPECT_CLASSES])).toEqual([...ASPECT_CLASSES]);
+    });
+
+    it('is described as strings, so the Dart client leaves it out when it is empty', () => {
+      const schema = z.toJSONSchema(aspectClassesBody, { io: 'input' }) as { items: { type: string; enum?: string[] } };
+
+      expect(schema.items).toMatchObject({ type: 'string' });
+      expect(schema.items.enum).toBeUndefined();
     });
 
     it('rejects an unknown class and a bare value', () => {
