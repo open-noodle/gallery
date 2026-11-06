@@ -7,7 +7,7 @@ enum AppSettingsEnum<T> {
   enableHapticFeedback<bool>(StoreKey.enableHapticFeedback, true),
   readonlyModeEnabled<bool>(StoreKey.readonlyModeEnabled, false),
   appLockEnabled<bool>(StoreKey.appLockEnabled, false),
-  appLockTimeout<int>(StoreKey.appLockTimeout, 60);
+  appLockTimeout<int>(StoreKey.appLockTimeout, 0);
 
   const AppSettingsEnum(this.storeKey, this.defaultValue);
 

@@ -39,7 +39,7 @@ class AppLockNotifier extends StateNotifier<AppLockState> {
   }
 
   bool get isAppLockEnabled => Store.get(StoreKey.appLockEnabled, false);
-  int get timeoutSeconds => Store.get(StoreKey.appLockTimeout, 60);
+  int get timeoutSeconds => Store.get(StoreKey.appLockTimeout, 0);
 
   void handleAppPaused() {
     if (!isAppLockEnabled || state.isAuthenticating) {
