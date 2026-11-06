@@ -29,6 +29,7 @@ fork_surface:
       - machine-learning/test_pet_detection.py
       - machine-learning/test_metrics.py
       - machine-learning/test_depth_estimation.py
+      - machine-learning/test_letterbox.py
     database:
       - server/src/schema/migrations-gallery/**
     ci:
@@ -421,6 +422,7 @@ features:
       - machine-learning/test_pet_detection.py
       - machine-learning/test_metrics.py
       - machine-learning/test_depth_estimation.py
+      - machine-learning/test_letterbox.py
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
@@ -437,6 +439,7 @@ features:
       - server/src/repositories/search.repository.ts
       - machine-learning/pyproject.toml
       - machine-learning/immich_ml/main.py
+      - machine-learning/immich_ml/models/transforms.py
     optional_paths:
       - machine-learning/**
       - server/src/services/**
