@@ -9427,6 +9427,18 @@
             }
           },
           {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
+            }
+          },
+          {
             "name": "city",
             "required": false,
             "in": "query",
@@ -16896,6 +16908,18 @@
             }
           },
           {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
+            }
+          },
+          {
             "name": "city",
             "required": false,
             "in": "query",
@@ -17170,6 +17194,18 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
               "type": "string"
+            }
+          },
+          {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
             }
           },
           {
@@ -25205,6 +25241,18 @@
             }
           },
           {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
+            }
+          },
+          {
             "name": "bbox",
             "required": false,
             "in": "query",
@@ -25649,6 +25697,18 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
               "type": "string"
+            }
+          },
+          {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
             }
           },
           {
@@ -26101,6 +26161,18 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
               "type": "string"
+            }
+          },
+          {
+            "name": "aspectClasses",
+            "required": false,
+            "in": "query",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AssetAspectClass"
+              }
             }
           },
           {
@@ -31077,6 +31149,17 @@
         },
         "type": "object"
       },
+      "AssetAspectClass": {
+        "description": "Picture shape: landscape, square, portrait, panorama-wide or panorama-tall",
+        "enum": [
+          "landscape",
+          "square",
+          "portrait",
+          "panorama-wide",
+          "panorama-tall"
+        ],
+        "type": "string"
+      },
       "AssetBulkDeleteDto": {
         "properties": {
           "force": {
@@ -35488,6 +35571,13 @@
       },
       "FilterSuggestionsResponseDto": {
         "properties": {
+          "aspectClasses": {
+            "description": "Aspect classes present in the filtered set, ignoring aspectClasses",
+            "items": {
+              "$ref": "#/components/schemas/AssetAspectClass"
+            },
+            "type": "array"
+          },
           "cameraMakes": {
             "description": "Available camera makes",
             "items": {
@@ -36866,6 +36956,13 @@
               }
             ],
             "x-immich-state": "Deprecated"
+          },
+          "aspectClasses": {
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "items": {
+              "$ref": "#/components/schemas/AssetAspectClass"
+            },
+            "type": "array"
           },
           "checksum": {
             "deprecated": true,
@@ -44237,6 +44334,13 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "aspectClasses": {
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "items": {
+              "$ref": "#/components/schemas/AssetAspectClass"
+            },
+            "type": "array"
+          },
           "city": {
             "deprecated": true,
             "description": "Filter by city name",
@@ -44954,6 +45058,13 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "aspectClasses": {
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
+            "items": {
+              "$ref": "#/components/schemas/AssetAspectClass"
+            },
+            "type": "array"
+          },
           "city": {
             "deprecated": true,
             "description": "Filter by city name",
@@ -45269,6 +45380,13 @@
       },
       "SmartSearchFacetsResponseDto": {
         "properties": {
+          "aspectClasses": {
+            "description": "Aspect classes present in the filtered set, ignoring aspectClasses",
+            "items": {
+              "$ref": "#/components/schemas/AssetAspectClass"
+            },
+            "type": "array"
+          },
           "cameraMakes": {
             "description": "Available camera makes",
             "items": {
