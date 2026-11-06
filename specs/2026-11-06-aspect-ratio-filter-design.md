@@ -1,6 +1,7 @@
 # Aspect ratio filter
 
-Status: draft for review, written 2026-11-06 against `upstream/main` at `ae178054c` (Immich base 3.3.5).
+Status: draft for review, written 2026-11-06 against `upstream/main` at `ae178054c` (Immich base 3.3.5). `3983e4381`
+changes none of the filter, DTO, schema, revert or web filter panel files cited here.
 Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html` (planned, required before any component code).
 
 Source labels used below: a file path with a line is read from the code at that commit. "M1" and "M2" are the measurement
@@ -245,12 +246,14 @@ below prove this.
   Each probe adds the class predicate inside the filtered-id query, which is the form M2 measured. It stops at the first
   match and can use the index. The form `asset WHERE id IN (<subquery>) AND <class expr> = ...`, which the #910 probes
   use, is not allowed here: it can force the whole subquery before stopping. The EXPLAIN plan test covers this. The new
-  statement
-  joins the `sortQueries` list of the `@GenerateSql` decorator, and `mise sql` regenerates the query file. The media type
-  statement stays unchanged. **The probes never ship without the index**: without it they take 221 to 227 ms when a class
-  is absent (measured with integer codes).
-- Smart facets: the class list comes from the temp set inside the existing transaction, either as one DISTINCT or as
-  probes. The PR measures both and keeps the cheaper.
+  statement joins the `sortQueries` list of the `@GenerateSql` decorator, and `mise sql` regenerates the query file. The
+  media type statement stays unchanged. **The probes never ship without the index**: without it they take 221 to 227 ms
+  when a class is absent (measured with integer codes).
+- Smart facets: the class list comes from `buildSmartFacetFilteredAssetIds(trx, options, 'aspect')` inside the existing
+  transaction, either as one DISTINCT or as probes. The PR measures both and keeps the cheaper. It must not read the temp
+  table directly, because the other filters are applied outside it, and goal 4 needs them. The candidate query
+  (`smart-facet.repository.ts:918`) calls `searchAssetBuilderLegacy`, which ignores `aspectClasses`, so the selection never
+  bakes into the temp table and self-exclusion works with no change to its `without(...)` list.
 - Stop condition: if EXPLAIN on a real VectorChord database shows smart search leaving the vector index because of the
   class predicate, implementation stops and reports.
 
@@ -278,6 +281,7 @@ A second PR, after the mockup is approved.
   | --- | --- | --- | --- |
   | fewer than two | fewer than two | none | `unavailable`, hidden |
   | two or more | fewer than two | none | `empty`, greyed with (0) |
+  | not known | fewer than two | none | `empty`, greyed with (0), never hidden on missing information |
   | any | two or more | any | `available` |
   | any | any | present | `available`, never hidden or greyed (#910 section 4.4 rule 1) |
 
@@ -429,8 +433,9 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
 - Class boundaries: a test over all pairs 1 to 2000 plus edge values runs the final expression and checks that each pair
   gets exactly the class of the table above. The expression is SQL, so it runs in PostgreSQL through `generate_series`, in
   the gallery medium spec.
-- Unit tests: DTO validation (unknown value, empty string, empty array), the V3 mix
-  rejection, and the `Promise.all` entry.
+- Unit tests: DTO validation (unknown value, empty string, empty array), the V3 mix rejection, and the `Promise.all` entry.
+- The gallery medium spec also checks that the smart facets class list honours the other active filters and ignores its own
+  selection.
 - Web: `filter-availability` truth table above, the section component, URL round trip, chips, and one assertion per
   hand-written place. The #910 guard test stays unchanged.
 - e2e: a sized-image helper in a fork file, and `aspect` in the section lists of the five suites that assert sections
