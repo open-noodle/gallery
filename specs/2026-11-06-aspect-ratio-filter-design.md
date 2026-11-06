@@ -116,7 +116,7 @@ tag, a client version check or web feature flag on the request side, two web PRs
 ### Classes
 
 L is the longer side and S the shorter side, cast to bigint on the operand. Width or height NULL, zero or negative means
-no class. Otherwise an asset has exactly one class. A test over all pairs 1 to 2000 plus edge values proves this for the final
+no class. Otherwise an asset has exactly one class. A test over all pairs 1 to 300 plus edge values proves this for the final
 expression (see Testing).
 
 | Order | API value | en | de | Rule |
@@ -206,6 +206,13 @@ Additive only. Optional request field `aspectClasses: AssetAspectClass[]` in:
 
 It is not in `GallerySearchFilterExtension`, so statistics, random and large-assets search do not get it, and not in the
 `POST /search/options` schema.
+
+**Decision:** the three POST body fields (metadata, smart, facets) are described in OpenAPI as a string array, with the
+allowed values named in the description. GET parameters and responses keep the enum. The server validates all of them just
+as strictly, so an unknown value returns 400. The reason: the generated Dart client sends an optional list of enum values
+even when it is empty, so the app would add `aspectClasses: []` to its search requests, and mobile requests to stock servers
+must stay byte-identical. Changing the shared Dart template would also affect other enum lists. The cost is that the SDK
+types these three request fields as `string[]`.
 
 Validation follows `tagIds`: GET requests use the existing array preprocess (`gallery/dtos/search.dto.ts:65-66`), an
 unknown value and an empty string return 400, and an empty array means no filter. The field is not tagged
@@ -434,9 +441,10 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
 - `schema-drift.spec.ts` is the parity guard between the helper and the index. It needs no separate parity test.
 - `rbac-oracle.medium.spec.ts`: the forced snapshot change adds only `aspectClasses: []` to each facets block, because the
   oracle assets have no dimensions. No visibility changes. The PR explains this.
-- Class boundaries: a test over all pairs 1 to 2000 plus edge values runs the final expression and checks that each pair
+- Class boundaries: a test over all pairs 1 to 300 plus edge values runs the final expression and checks that each pair
   gets exactly the class of the table above. The expression is SQL, so it runs in PostgreSQL through `generate_series`, in
-  the gallery medium spec.
+  the gallery medium spec. The edge values cover both thresholds at large sizes and the integer limit. The grid stays small
+  so it does not slow down other medium tests, which share the database.
 - Unit tests: DTO validation (unknown value, empty string, empty array), the V3 mix rejection, and the `Promise.all` entry.
 - The gallery medium spec also checks that the smart facets class list honours the other active filters and ignores its own
   selection.
