@@ -890,13 +890,15 @@ export class FilterSuggestionRepository {
     userIds: string[],
     options: FilterSuggestionsOptions,
   ): Promise<AssetAspectClass[]> {
-    const filteredIds = this.buildFilteredAssetIds(userIds, options);
-    const present = await this.db
-      .selectNoFrom((eb) =>
-        ASPECT_CLASSES.map((value) => eb.exists(filteredIds.where(aspectClassCondition([value]))).as(value)),
-      )
-      .executeTakeFirst();
+    const present = await this.aspectClassProbes(userIds, options).executeTakeFirst();
     return ASPECT_CLASSES.filter((value) => present?.[value]);
+  }
+
+  private aspectClassProbes(userIds: string[], options: FilterSuggestionsOptions) {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    return this.db.selectNoFrom((eb) =>
+      ASPECT_CLASSES.map((value) => eb.exists(filteredIds.where(aspectClassCondition([value]))).as(value)),
+    );
   }
 
   private async getFilteredMediaTypes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
