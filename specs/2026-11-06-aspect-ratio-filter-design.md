@@ -432,7 +432,8 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
 - EXPLAIN plan medium test after `cleanup.repository.spec.ts:113`: square and both panorama selections and the probe
   statement use `asset_aspectClass_idx`, and the probes keep the class predicate inside the filtered-id query.
 - `schema-drift.spec.ts` is the parity guard between the helper and the index. It needs no separate parity test.
-- `rbac-oracle.medium.spec.ts`: the forced snapshot change is reviewed and explained in the PR.
+- `rbac-oracle.medium.spec.ts`: the forced snapshot change adds only `aspectClasses: []` to each facets block, because the
+  oracle assets have no dimensions. No visibility changes. The PR explains this.
 - Class boundaries: a test over all pairs 1 to 2000 plus edge values runs the final expression and checks that each pair
   gets exactly the class of the table above. The expression is SQL, so it runs in PostgreSQL through `generate_series`, in
   the gallery medium spec.
@@ -443,10 +444,12 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
   hand-written place. The #910 guard test stays unchanged.
 - e2e: a sized-image helper in a fork file, and `aspect` in the section lists of the five suites that assert sections
   (`e2e/src/specs/web/*-filter*.e2e-spec.ts`, `e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts`).
-- The search contract fixtures in `mobile/test/fixtures/search_contract/` are re-recorded if the optional response field
-  changes them.
-- Every test goes in a fork test file, never in `server/src/services/search.service.spec.ts` or the upstream search and
-  timeline medium specs (fork rule 8).
+- The search contract fixtures in `mobile/test/fixtures/search_contract/` that answer `GET /search/suggestions/filters`
+  gain the optional response field.
+- Fork rule 8: new tests go in fork test files, and upstream-owned tests stay unchanged, such as
+  `server/src/services/search.service.spec.ts`. Fork-added tests inside shared files may be extended: the exact assertions
+  in `server/test/medium/specs/repositories/search.repository.spec.ts` test the fork methods `getSmartSearchFacets` and
+  `getFilterSuggestions` (added in #456) and gain `aspectClasses: []`.
 
 ## Documentation
 

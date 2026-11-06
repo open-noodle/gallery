@@ -354,6 +354,7 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        aspectClasses: [],
       });
     });
 
@@ -912,6 +913,7 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        aspectClasses: [],
       });
     });
 

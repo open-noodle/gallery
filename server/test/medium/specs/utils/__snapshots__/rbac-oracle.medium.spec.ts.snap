@@ -10167,6 +10167,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "albumEditor": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10183,6 +10184,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -10215,6 +10217,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10231,6 +10234,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10259,6 +10263,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "albumLink": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -10345,6 +10350,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -10381,6 +10387,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -10461,6 +10468,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -10533,6 +10541,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "albumViewer": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10549,6 +10558,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -10581,6 +10591,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10597,6 +10608,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -10625,6 +10637,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "individualLink": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -10720,6 +10733,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -10800,6 +10814,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -10872,6 +10887,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "owner": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -10958,6 +10974,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -10994,6 +11011,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -11074,6 +11092,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -11130,6 +11149,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -11187,6 +11207,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -11217,6 +11238,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "ownerElevated": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -11309,6 +11331,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -11345,6 +11368,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -11431,6 +11455,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -11487,6 +11512,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -11547,6 +11573,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -11577,6 +11604,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "partner": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -11671,6 +11699,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -11757,6 +11786,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "dupAsset2",
           "ownAsset",
@@ -11807,6 +11837,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "spaceAlbumLink": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -11902,6 +11933,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -11982,6 +12014,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -12043,6 +12076,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -12073,6 +12107,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "spaceEditor": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "editorAsset",
@@ -12115,6 +12150,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12166,6 +12202,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "editorAsset",
           "spaceAsset",
@@ -12205,6 +12242,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12259,6 +12297,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -12288,6 +12327,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "spaceLink": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -12383,6 +12423,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12463,6 +12504,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -12535,6 +12577,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "spaceViewer": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -12559,6 +12602,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12610,6 +12654,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "libraryAsset",
@@ -12648,6 +12693,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12702,6 +12748,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -12731,6 +12778,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "spaceViewerOff": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -12752,6 +12800,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -12768,6 +12817,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [],
         "countries": [],
         "hasAssetsInAlbum": false,
@@ -12784,6 +12834,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -12838,6 +12889,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -12864,6 +12916,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "stockOwner": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "dupAsset",
@@ -12950,6 +13003,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "ownAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "ownArchived",
           "ownAsset",
@@ -12986,6 +13040,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -13066,6 +13121,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "contributedAsset",
           "dupAsset",
@@ -13122,6 +13178,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "space": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
           "contributedAsset",
@@ -13179,6 +13236,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "spaceAlbum": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "albumSpaceAsset",
         ],
@@ -13209,6 +13267,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
   "stranger": {
     "default": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "strangerAsset",
         ],
@@ -13238,6 +13297,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "shared": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "strangerAsset",
         ],
@@ -13262,6 +13322,7 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
     },
     "sharedFavorites": {
       "facets": {
+        "aspectClasses": [],
         "cameraMakes": [
           "strangerAsset",
         ],
