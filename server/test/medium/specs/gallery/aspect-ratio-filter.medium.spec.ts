@@ -42,9 +42,10 @@ beforeAll(async () => {
 });
 
 describe('aspect class expression', () => {
-  it('gives every pair from 1 to 2000 exactly the class of the table', async () => {
-    const limit = 2000;
-    // One row per width with a two-letter code per height, so four million pairs arrive as 2,000 rows.
+  it('gives every pair from 1 to 300 exactly the class of the table', async () => {
+    // Small on purpose: this shares the database with every other medium spec. It holds both thresholds many times
+    // over, and the edge values below cover sizes beyond it. A two-letter code per height keeps it to 300 rows.
+    const limit = 300;
     const { rows } = await sql<{ width: number; classes: string }>`
       select "width", string_agg(left(class, 1) || right(class, 1), '' order by "height") as classes
       from (
@@ -65,7 +66,7 @@ describe('aspect class expression', () => {
         }
       }
     }
-  }, 120_000);
+  });
 
   it('keeps the five class codes used above apart', () => {
     expect(new Set(ASPECT_CLASSES.map((value) => value[0] + value.at(-1))).size).toBe(ASPECT_CLASSES.length);
@@ -94,6 +95,16 @@ describe('aspect class expression', () => {
     [MAX_INT, 1],
     [1, MAX_INT],
     [MAX_INT, Math.floor(MAX_INT / 2)],
+    [5100, 5000],
+    [5101, 5000],
+    [5000, 5101],
+    [6000, 3000],
+    [5999, 3000],
+    [3000, 6000],
+    [10_200, 10_000],
+    [10_201, 10_000],
+    [19_999, 10_000],
+    [20_000, 10_000],
   ])('classifies %s x %s', async (width, height) => {
     const { rows } = await sql<{ class: string | null }>`
       select ${classExpression} as class
@@ -238,14 +249,16 @@ describe('query plans', () => {
 
   beforeAll(async () => {
     seeded = await setup();
-    // Enough common rows that the class is the selective condition, not the owner.
+    const { ctx, owner } = seeded;
+    // Enough common rows that the class is the selective condition, not the owner. Assets only: nothing here reads
+    // their exif or embeddings.
     for (let i = 0; i < 300; i++) {
-      await seeded.add(400, 300, 'Canon', 1);
+      await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline, width: 400, height: 300 });
     }
-    await seeded.add(600, 100, 'Canon', 1);
-    await seeded.add(100, 600, 'Canon', 1);
-    await sql`ANALYZE "asset"`.execute(seeded.ctx.database);
-  });
+    await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline, width: 600, height: 100 });
+    await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline, width: 100, height: 600 });
+    await sql`ANALYZE "asset"`.execute(ctx.database);
+  }, 30_000);
 
   it.each<AssetAspectClass>(['square', 'panorama-wide', 'panorama-tall'])(
     'a %s selection uses the index',
