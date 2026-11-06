@@ -19,6 +19,7 @@
       ],
       "forkForeignKeys": [
         "asset_face_creator_assetFaceId_fkey",
+        "asset_face_video_frame_faceId_fkey",
         "face_identity_face_assetFaceId_fkey",
         "face_identity_representativeFaceId_fkey",
         "face_person_verdict_assetFaceId_fkey",

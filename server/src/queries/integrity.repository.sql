@@ -100,6 +100,13 @@ from
   "asset_data_saver_video"
 where
   "asset_data_saver_video"."path" in $5
+union
+select
+  "asset_face_video_frame"."path" as "path"
+from
+  "asset_face_video_frame"
+where
+  "asset_face_video_frame"."path" in $6
 
 -- IntegrityRepository.getAssetCount
 select

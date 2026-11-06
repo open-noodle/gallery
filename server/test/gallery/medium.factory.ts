@@ -16,6 +16,7 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
+import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -67,7 +68,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryAssetRepository:
     case GalleryPersonRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case VideoFaceRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -102,7 +104,8 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case GalleryPersonRepository:
     case CleanupRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case VideoFaceRepository: {
       return automock(key);
     }
 

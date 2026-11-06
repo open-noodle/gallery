@@ -264,6 +264,9 @@ describe(StorageMigrationService.name, () => {
           },
         ]),
       );
+      mocks.storageMigration.streamVideoFaceFrames.mockReturnValue(
+        makeStream([{ faceId: 'face-1', path: '/usr/src/app/upload/thumbs/user/ab/cd/asset-2_faces/face-1.jpeg' }]),
+      );
       mocks.storageMigration.streamProfileImages.mockReturnValue(
         makeStream([{ id: 'user-1', profileImagePath: '/usr/src/app/upload/profile/user/ab/cd/profile.jpg' }]),
       );
@@ -275,7 +278,7 @@ describe(StorageMigrationService.name, () => {
 
       // Verify the jobs were queued
       const queuedJobs = mocks.job.queueAll.mock.calls.flat().flat();
-      expect(queuedJobs).toHaveLength(7);
+      expect(queuedJobs).toHaveLength(8);
       expect(queuedJobs).toContainEqual(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -283,6 +286,16 @@ describe(StorageMigrationService.name, () => {
             entityId: 'asset-2',
             fileType: 'dataSaverVideo',
             sourcePath: '/usr/src/app/upload/encoded-video/user/ab/cd/asset-2_ds.mp4',
+          }),
+        }),
+      );
+      expect(queuedJobs).toContainEqual(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            entityType: 'assetFace',
+            entityId: 'face-1',
+            fileType: 'videoFaceFrame',
+            sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/asset-2_faces/face-1.jpeg',
           }),
         }),
       );
@@ -316,6 +329,7 @@ describe(StorageMigrationService.name, () => {
       mocks.storageMigration.streamAssetFiles.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamEncodedVideos.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(makeStream([]));
+      mocks.storageMigration.streamVideoFaceFrames.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamProfileImages.mockReturnValue(makeStream([]));
 
       const fileTypes = {
@@ -338,6 +352,7 @@ describe(StorageMigrationService.name, () => {
       expect(mocks.storageMigration.streamEncodedVideos).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamDataSaverVideos).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamPersonThumbnails).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.streamVideoFaceFrames).not.toHaveBeenCalled();
       expect(mocks.storageMigration.streamProfileImages).not.toHaveBeenCalled();
     });
 
@@ -347,6 +362,7 @@ describe(StorageMigrationService.name, () => {
       mocks.storageMigration.streamDepthMaps.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamEncodedVideos.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(makeStream([]));
+      mocks.storageMigration.streamVideoFaceFrames.mockReturnValue(makeStream([]));
       mocks.storageMigration.streamProfileImages.mockReturnValue(makeStream([]));
 
       const fileTypes = {
@@ -712,6 +728,33 @@ describe(StorageMigrationService.name, () => {
         'encoded-video/user/ab/cd/asset-1_ds.mp4',
       );
       expect(mocks.storageMigration.updateAssetEncodedVideoPath).not.toHaveBeenCalled();
+    });
+
+    it('should update the best frame path for a video face', async () => {
+      const frameJob = {
+        ...baseJob,
+        entityType: 'assetFace' as const,
+        entityId: 'face-1',
+        fileType: 'videoFaceFrame',
+        sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/asset-1_faces/face-1.jpeg',
+      };
+
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.exists.mockResolvedValue(false);
+      mockDiskBackend.get.mockResolvedValue({ stream: Readable.from([]) });
+      mockS3Backend.put.mockResolvedValue(void 0);
+      mocks.storageMigration.updateVideoFaceFramePath.mockResolvedValue(true);
+      mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+      const result = await sut.handleMigration(frameJob);
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.storageMigration.updateVideoFaceFramePath).toHaveBeenCalledWith(
+        'face-1',
+        frameJob.sourcePath,
+        'thumbs/user/ab/cd/asset-1_faces/face-1.jpeg',
+      );
+      expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
     });
 
     it('should update asset file path for assetFile entity type', async () => {

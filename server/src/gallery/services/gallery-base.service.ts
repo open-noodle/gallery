@@ -3,9 +3,11 @@ import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hoo
 import type { AccessRepository } from 'src/repositories/access.repository.js';
 import type { AlbumRepository } from 'src/repositories/album.repository.js';
 import type { AssetRepository } from 'src/repositories/asset.repository.js';
+import type { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import type { DatabaseRepository } from 'src/repositories/database.repository.js';
 import type { JobRepository } from 'src/repositories/job.repository.js';
 import type { LoggingRepository } from 'src/repositories/logging.repository.js';
+import type { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import type { MediaRepository } from 'src/repositories/media.repository.js';
 import type { PersonRepository } from 'src/repositories/person.repository.js';
 import type { StorageRepository } from 'src/repositories/storage.repository.js';
@@ -14,6 +16,7 @@ import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
+import { VideoFaceDetector } from 'src/gallery/utils/video-face-detector.js';
 import { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
@@ -29,8 +32,10 @@ export abstract class GalleryBaseService {
   protected abstract accessRepository: AccessRepository;
   protected abstract albumRepository: AlbumRepository;
   protected abstract assetRepository: AssetRepository;
+  protected abstract cryptoRepository: CryptoRepository;
   protected abstract databaseRepository: DatabaseRepository;
   protected abstract jobRepository: JobRepository;
+  protected abstract machineLearningRepository: MachineLearningRepository;
   protected abstract mediaRepository: MediaRepository;
   protected abstract personRepository: PersonRepository;
   protected abstract storageRepository: StorageRepository;
@@ -67,10 +72,12 @@ export abstract class GalleryBaseService {
   declare protected cleanupRepository: GalleryRepositories['cleanupRepository'];
   declare protected spatialSceneRepository: GalleryRepositories['spatialSceneRepository'];
   declare protected dataSaverVideoRepository: GalleryRepositories['dataSaverVideoRepository'];
+  declare protected videoFaceRepository: GalleryRepositories['videoFaceRepository'];
 
   declare protected identityMergePropagationService: IdentityMergePropagationService;
   declare protected faceAssignmentService: FaceAssignmentService;
   declare protected backendMedia: BackendMediaServer;
+  declare protected videoFaces: VideoFaceDetector;
 
   // Called once at the end of BaseService's constructor, when the upstream repositories are set.
   protected initGallery() {
@@ -98,6 +105,19 @@ export abstract class GalleryBaseService {
       logger: this.logger,
       mediaRepository: this.mediaRepository,
       storageRepository: this.storageRepository,
+      videoFaceRepository: this.videoFaceRepository,
+      getConfig: (options) => this.getConfig(options),
+    });
+    this.videoFaces = new VideoFaceDetector({
+      assetRepository: this.assetRepository,
+      cryptoRepository: this.cryptoRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      jobRepository: this.jobRepository,
+      machineLearningRepository: this.machineLearningRepository,
+      mediaRepository: this.mediaRepository,
+      videoFaceRepository: this.videoFaceRepository,
+      backendMedia: this.backendMedia,
+      logger: this.logger,
       getConfig: (options) => this.getConfig(options),
     });
   }
@@ -114,6 +134,18 @@ export abstract class GalleryBaseService {
       logger: this.logger,
       sharedSpaceRepository: this.sharedSpaceRepository,
     };
+  }
+
+  /**
+   * Fork files the thumbnail folder holds beside upstream's asset files, for IntegrityService's untracked-files scan:
+   * Spatial Scene depth maps and the best frames of video faces.
+   */
+  protected async getGalleryThumbnailFolderPaths(paths: string[]): Promise<{ path: string }[]> {
+    const [depthMaps, videoFaceFrames] = await Promise.all([
+      this.spatialSceneRepository.getPathsByPaths(paths),
+      this.videoFaceRepository.getPathsByPaths(paths),
+    ]);
+    return [...depthMaps, ...videoFaceFrames];
   }
 
   /** Fork: what this viewer may see on a surface — see src/utils/viewer-scope.ts. */

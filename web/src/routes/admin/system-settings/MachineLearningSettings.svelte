@@ -10,6 +10,7 @@
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import SpatialSceneSettings from '#lib/gallery/admin/SpatialSceneSettings.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import VideoFaceSettings from '#lib/gallery/components/admin/video-face-settings.svelte';
   import { Button, IconButton, modalManager, Text } from '@immich/ui';
   import { mdiPlus, mdiTrashCanOutline } from '@mdi/js';
   import { isEqual, cloneDeep } from 'lodash-es';
@@ -334,6 +335,8 @@
             isEdited={configToEdit.machineLearning.facialRecognition.minFaces !==
               config.machineLearning.facialRecognition.minFaces}
           />
+
+          <VideoFaceSettings bind:configToEdit {config} {disabled} />
         </div>
       </SettingAccordion>
 
