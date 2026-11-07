@@ -1,4 +1,5 @@
 import type { BoundingBox } from 'src/repositories/machine-learning.repository.js';
+import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 
 // Pure parts of video face sampling (specs/2026-10-31-video-face-frames-design.md): which frames to look at, which
 // detections are the same person, which view of them is best, and which existing face a new one replaces.
@@ -517,3 +518,232 @@ export const widenSmallFace = (box: BoundingBox, frame: { width: number; height:
     y2: Math.min(frame.height, Math.round(centreY + halfHeight)),
   };
 };
+
+type StoredSightings = {
+  sightings: VideoFaceSighting[];
+  timeSeconds: number;
+  imageWidth: number;
+  imageHeight: number;
+  trimStart: number | null;
+  trimEnd: number | null;
+};
+
+/** Sightings this close (in seconds) are the same moment: the player's times are rounded to the millisecond. */
+const SIGHTING_TIME_TOLERANCE = 0.001;
+
+const toPlayerTime = (t: number, trimStart: number) => Math.round((t - trimStart) * 1000) / 1000;
+
+const isInTrim = (t: number, start: number, end: number) =>
+  t >= start - SIGHTING_TIME_TOLERANCE && t <= end + SIGHTING_TIME_TOLERANCE;
+
+const toFrameFraction = (value: number, size: number) =>
+  Math.min(1, Math.max(0, Math.round((value / size) * 1e4) / 1e4));
+
+/**
+ * A face's sightings on the player's timeline, in time order (Phase 2). A trimmed video plays its trimmed encode, whose
+ * zero is the trim start, so each time is shifted by it, and sightings outside the trim are left out. The trim is the
+ * current one, not the one the video was sampled under.
+ */
+export const sightingsForPlayer = ({
+  sightings,
+  timeSeconds,
+  imageWidth,
+  imageHeight,
+  trimStart,
+  trimEnd,
+}: StoredSightings) => {
+  // The boxes are in the sampled frame's pixels, which imageWidth/imageHeight describe; without them no box can be
+  // placed, and such a face was not written by video sampling.
+  if (!(imageWidth > 0 && imageHeight > 0)) {
+    return [];
+  }
+
+  const start = trimStart ?? 0;
+  const end = trimEnd ?? Infinity;
+  return sightings
+    .filter(({ t, removed }) => !removed && isInTrim(t, start, end))
+    .sort((a, b) => a.t - b.t)
+    .map(({ t, score, x1, y1, x2, y2 }) => ({
+      time: Math.max(0, toPlayerTime(t, start)),
+      score,
+      isBest: Math.abs(t - timeSeconds) < SIGHTING_TIME_TOLERANCE,
+      // As fractions of the frame, so the player can draw the box at whatever size it shows the video.
+      box: {
+        x1: toFrameFraction(x1, imageWidth),
+        y1: toFrameFraction(y1, imageHeight),
+        x2: toFrameFraction(x2, imageWidth),
+        y2: toFrameFraction(y2, imageHeight),
+      },
+    }));
+};
+
+/**
+ * The stored sighting at `time` on the player's timeline, as sightingsForPlayer reported it, or undefined when no
+ * sighting is at that moment (a re-scan or a new trim moved them). Looked up by time rather than by position, so a
+ * cached URL can never show another moment's face.
+ */
+export const findSightingAt = (stored: StoredSightings, time: number): VideoFaceSighting | undefined => {
+  const start = stored.trimStart ?? 0;
+  const playable = new Set(sightingsForPlayer(stored).map((sighting) => sighting.time));
+  return stored.sightings.find((sighting) => {
+    const playerTime = Math.max(0, toPlayerTime(sighting.t, start));
+    return playable.has(playerTime) && Math.abs(playerTime - time) < SIGHTING_TIME_TOLERANCE;
+  });
+};
+
+/** What removing or restoring a sighting writes: every stored sighting, and the new best view when it moves. */
+export type SightingChange = { sightings: VideoFaceSighting[]; best?: VideoFaceSighting };
+
+/** The stored sighting, removed or not, at `time` on the player's timeline and inside the current trim. */
+const storedAt = (stored: StoredSightings, time: number) => {
+  const start = stored.trimStart ?? 0;
+  const end = stored.trimEnd ?? Infinity;
+  return stored.sightings.find(
+    ({ t }) =>
+      isInTrim(t, start, end) && Math.abs(Math.max(0, toPlayerTime(t, start)) - time) < SIGHTING_TIME_TOLERANCE,
+  );
+};
+
+const isBestView = (stored: StoredSightings, sighting: VideoFaceSighting) =>
+  Math.abs(sighting.t - stored.timeSeconds) < SIGHTING_TIME_TOLERANCE;
+
+/**
+ * Takes the sighting at `time` out of the face (Phase 2), keeping it with `removed` so `restoreSightingAt` can bring
+ * it back. Removing the best view moves it to the remaining sighting with the highest score, preferring one inside the
+ * trim, and marks the removed one `wasBest`. Undefined when no sighting is shown at `time`; `last` when it is the
+ * face's only one left, which stays: a face needs a frame to be cut from.
+ */
+export const removeSightingAt = (stored: StoredSightings, time: number): SightingChange | 'last' | undefined => {
+  const target = storedAt(stored, time);
+  if (!target || target.removed) {
+    return;
+  }
+
+  const remaining = stored.sightings.filter((sighting) => sighting !== target && !sighting.removed);
+  if (remaining.length === 0) {
+    return 'last';
+  }
+
+  const wasBest = isBestView(stored, target);
+  const sightings = stored.sightings.map((sighting) =>
+    sighting === target ? { ...sighting, removed: true, ...(wasBest && { wasBest: true }) } : sighting,
+  );
+  if (!wasBest) {
+    return { sightings };
+  }
+
+  const start = stored.trimStart ?? 0;
+  const end = stored.trimEnd ?? Infinity;
+  const [best] = remaining.toSorted(
+    (a, b) => Number(isInTrim(b.t, start, end)) - Number(isInTrim(a.t, start, end)) || b.score - a.score,
+  );
+  return { sightings, best };
+};
+
+/**
+ * Brings back the removed sighting at `time`, as the best view again when it was the best when removed. Undefined when
+ * no removed sighting is at `time`.
+ */
+export const restoreSightingAt = (stored: StoredSightings, time: number): SightingChange | undefined => {
+  const target = storedAt(stored, time);
+  if (!target?.removed) {
+    return;
+  }
+
+  const restored: VideoFaceSighting = {
+    t: target.t,
+    x1: target.x1,
+    y1: target.y1,
+    x2: target.x2,
+    y2: target.y2,
+    score: target.score,
+  };
+  const sightings = stored.sightings.map((sighting) => (sighting === target ? restored : sighting));
+  return target.wasBest ? { sightings, best: restored } : { sightings };
+};
+
+/** A sighting moved out of a face, with what removing it from that face writes (Phase 2). */
+export type SightingSplit = SightingChange & { moved: VideoFaceSighting };
+
+/**
+ * Moves the sighting at `time` out of the face, to become a face of its own: the face loses it as `removeSightingAt`
+ * takes it out (best view promoted, `removed` kept so it can come back), and `moved` is the sighting as it was found.
+ */
+export const splitSightingAt = (stored: StoredSightings, time: number): SightingSplit | 'last' | undefined => {
+  const change = removeSightingAt(stored, time);
+  if (!change || change === 'last') {
+    return change;
+  }
+
+  const { t, x1, y1, x2, y2, score } = storedAt(stored, time)!;
+  return { ...change, moved: { t, x1, y1, x2, y2, score } };
+};
+
+/** Detections at least this much over a sighting's box are the same face. */
+const SPLIT_MIN_IOU = 0.3;
+
+/** The detection in a frame that is the sighting's face: the one overlapping its box most, if enough. */
+export const detectionAt = <T extends { boundingBox: BoundingBox }>(detections: T[], box: BoundingBox) => {
+  let found: T | undefined;
+  let bestIou = SPLIT_MIN_IOU;
+  for (const detection of detections) {
+    const overlap = iou(detection.boundingBox, box);
+    if (overlap < bestIou) {
+      continue;
+    }
+
+    found = detection;
+    bestIou = overlap;
+  }
+  return found;
+};
+
+const asFound = ({ t, x1, y1, x2, y2, score }: VideoFaceSighting): VideoFaceSighting => ({ t, x1, y1, x2, y2, score });
+
+/**
+ * Takes the sighting at `time` out of a face to move it into another face of the same video: as `removeSightingAt` does,
+ * but the face's last sighting may go too, which leaves no `change` (the face goes). `moved` is the sighting as found.
+ */
+export const takeSightingAt = (
+  stored: StoredSightings,
+  time: number,
+): { moved: VideoFaceSighting; change?: SightingChange } | undefined => {
+  const change = removeSightingAt(stored, time);
+  if (!change) {
+    return;
+  }
+
+  const moved = asFound(storedAt(stored, time)!);
+  return change === 'last' ? { moved } : { moved, change };
+};
+
+/**
+ * Adds sightings moved in from other faces of the same video. One the face already stored at that moment and had moved
+ * away (marked removed) comes back in place, as the best view again if it was that; one it shows already stays as is;
+ * any other is appended. The face's best view otherwise stays.
+ */
+export const addSightings = (stored: StoredSightings, added: VideoFaceSighting[]): SightingChange => {
+  const sightings = [...stored.sightings];
+  let best: VideoFaceSighting | undefined;
+  for (const sighting of added) {
+    const index = sightings.findIndex(({ t }) => Math.abs(t - sighting.t) < SIGHTING_TIME_TOLERANCE);
+    if (index === -1) {
+      sightings.push(asFound(sighting));
+      continue;
+    }
+
+    const existing = sightings[index];
+    if (!existing.removed) {
+      continue;
+    }
+
+    sightings[index] = asFound(existing);
+    if (existing.wasBest) {
+      best = sightings[index];
+    }
+  }
+  return best ? { sightings, best } : { sightings };
+};
+
+/** The sightings a face shows, removed ones left out: what merging it into another face moves. */
+export const liveSightings = (stored: StoredSightings) => stored.sightings.filter(({ removed }) => !removed);

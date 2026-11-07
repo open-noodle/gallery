@@ -16,7 +16,7 @@
     detachSpacePersonFace,
     getSpaceAssetFaces,
     getSpacePeople,
-    type AssetTypeEnum,
+    AssetTypeEnum,
     type SharedSpacePersonResponseDto,
     type SpaceAssetFaceResponseDto,
   } from '@immich/sdk';
@@ -324,6 +324,7 @@
       onSelect={(candidate) => attachToPerson(activeFace, candidate)}
       onClose={closePicker}
       bind:query={personQuery}
+      videoFace={assetType === AssetTypeEnum.Video ? { id: activeFace.id, canEdit: false } : undefined}
     >
       {#snippet searchActions()}
         <Button

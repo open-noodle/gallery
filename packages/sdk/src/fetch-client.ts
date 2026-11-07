@@ -2406,6 +2406,36 @@ export type AssetFaceCreateDto = {
     /** Face bounding box Y coordinate */
     y: number;
 };
+export type VideoFaceMergeDto = {
+    /** Faces of one video to combine into one; faces not sampled from the video are left as they are */
+    faceIds: string[];
+};
+export type VideoFaceSightingBoxDto = {
+    /** Left edge, as a fraction of the frame width */
+    x1: number;
+    /** Right edge, as a fraction of the frame width */
+    x2: number;
+    /** Top edge, as a fraction of the frame height */
+    y1: number;
+    /** Bottom edge, as a fraction of the frame height */
+    y2: number;
+};
+export type VideoFaceSightingDto = {
+    /** Where the face was in the frame at that moment */
+    box: VideoFaceSightingBoxDto;
+    /** Whether this is the best view, the one the face crop is cut from */
+    isBest: boolean;
+    /** Detector confidence for this sighting */
+    score: number;
+    /** When the face was seen, in seconds on the player's timeline: from the trim start for a trimmed video */
+    time: number;
+};
+export type VideoFaceMergeResponseDto = {
+    /** The face that was kept: the one with the most sightings */
+    faceId: string;
+    /** Its sightings, now including those of the merged faces */
+    sightings: VideoFaceSightingDto[];
+};
 export type AssetFaceDeleteDto = {
     /** Force delete even if person has other faces */
     force: boolean;
@@ -2413,6 +2443,22 @@ export type AssetFaceDeleteDto = {
 export type FaceDto = {
     /** Face ID */
     id: string;
+};
+export type VideoFaceSightingsResponseDto = {
+    /** Every sighting inside the current trim, in time order; empty for a face not sampled from a video */
+    sightings: VideoFaceSightingDto[];
+};
+export type VideoFaceSightingMoveResponseDto = {
+    /** The sightings the face has left; empty when its last one moved and the face was deleted */
+    sightings: VideoFaceSightingDto[];
+    /** The sightings of the face the sighting moved into */
+    targetSightings: VideoFaceSightingDto[];
+};
+export type VideoFaceSightingSplitResponseDto = {
+    /** The new face the sighting moved to: unassigned, made by hand */
+    faceId: string;
+    /** The sightings the original face has left, as GET /faces/{id}/sightings lists them */
+    sightings: VideoFaceSightingDto[];
 };
 export type QueueStatisticsDto = {
     /** Number of active jobs */
@@ -7906,6 +7952,21 @@ export function createFace({ assetFaceCreateDto }: {
     })));
 }
 /**
+ * Combine video faces
+ */
+export function mergeVideoFaces({ videoFaceMergeDto }: {
+    videoFaceMergeDto: VideoFaceMergeDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceMergeResponseDto;
+    }>("/faces/sightings/merge", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: videoFaceMergeDto
+    })));
+}
+/**
  * Delete a face
  */
 export function deleteFace({ id, assetFaceDeleteDto }: {
@@ -7933,6 +7994,105 @@ export function reassignFacesById({ id, faceDto }: {
         method: "PUT",
         body: faceDto
     })));
+}
+/**
+ * Remove a face sighting
+ */
+export function removeAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get face sightings
+ */
+export function getAssetFaceSightings({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings`, {
+        ...opts
+    }));
+}
+/**
+ * Move a face sighting into another face
+ */
+export function moveAssetFaceSighting({ id, time, toFaceId }: {
+    id: string;
+    time: number;
+    toFaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingMoveResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/move${QS.query(QS.explode({
+        time,
+        toFaceId
+    }))}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Restore a face sighting
+ */
+export function restoreAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/restore${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Move a face sighting to a new face
+ */
+export function splitAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingSplitResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/split${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Get face sighting thumbnail
+ */
+export function getAssetFaceSightingThumbnail({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/thumbnail${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Get face thumbnail

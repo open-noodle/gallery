@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, sql } from 'kysely';
+import { Insertable, Kysely, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
-import { AssetType, AssetVisibility } from 'src/enum.js';
+import { AssetType, AssetVisibility, SourceType } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
-import { AssetFaceVideoFrameTable } from 'src/schema/tables/asset-face-video-frame.table.js';
+import { AssetFaceVideoFrameTable, type VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { asUuid, petFacePredicate } from 'src/utils/database.js';
 
@@ -25,6 +25,27 @@ export type VideoFaceChanges = {
   deleteIds: string[];
   embeddings: { faceId: string; embedding: string }[];
   frames: Insertable<AssetFaceVideoFrameTable>[];
+};
+
+type SightingBest = {
+  timeSeconds: number;
+  box: Pick<VideoFaceBox, 'boundingBoxX1' | 'boundingBoxY1' | 'boundingBoxX2' | 'boundingBoxY2'>;
+};
+
+const writeSightings = async (
+  trx: Transaction<DB>,
+  faceId: string,
+  sightings: VideoFaceSighting[],
+  best?: SightingBest,
+) => {
+  await trx
+    .updateTable('asset_face_video_frame')
+    .set({ sightings, ...(best && { timeSeconds: best.timeSeconds }) })
+    .where('faceId', '=', asUuid(faceId))
+    .execute();
+  if (best) {
+    await trx.updateTable('asset_face').set(best.box).where('asset_face.id', '=', asUuid(faceId)).execute();
+  }
 };
 
 // Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md).
@@ -126,6 +147,108 @@ export class VideoFaceRepository {
       .where('faceId', '=', asUuid(faceId))
       .executeTakeFirst();
     return row?.path;
+  }
+
+  /**
+   * Everything one face's sightings need: the stored sightings and best time, the video's current trim, and its
+   * original. Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSightings(faceId: string) {
+    return this.db
+      .selectFrom('asset_face_video_frame')
+      .innerJoin('asset_face', 'asset_face.id', 'asset_face_video_frame.faceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('asset_video_trim', 'asset_video_trim.assetId', 'asset.id')
+      .select([
+        'asset_face_video_frame.sightings',
+        'asset_face_video_frame.timeSeconds',
+        'asset_face_video_frame.path as framePath',
+        'asset_face.assetId',
+        'asset_face.imageWidth',
+        'asset_face.imageHeight',
+        'asset.originalPath',
+        'asset_video_trim.startTime as trimStart',
+        'asset_video_trim.endTime as trimEnd',
+      ])
+      .where('asset_face_video_frame.faceId', '=', asUuid(faceId))
+      .where('asset.deletedAt', 'is', null)
+      .executeTakeFirst();
+  }
+
+  /**
+   * Writes a face's sightings after one was removed or restored, and with `best`, moves the face's box and best time
+   * to that sighting (its frame already written to the face's frame path), in one transaction.
+   */
+  async setSightings(faceId: string, sightings: VideoFaceSighting[], best?: SightingBest): Promise<void> {
+    await this.db.transaction().execute((trx) => writeSightings(trx, faceId, sightings, best));
+  }
+
+  /**
+   * Moves a sighting out of a face into a new face of its own, in one transaction: the old face's sightings (and best
+   * view, when that moved) as `setSightings` writes them, and the new face, made by hand as the user chose it, with its
+   * frame and, when the detector found it again, its embedding. Unassigned until the user names it.
+   */
+  async splitSighting({
+    faceId,
+    sightings,
+    best,
+    face,
+    frame,
+    embedding,
+  }: {
+    faceId: string;
+    sightings: VideoFaceSighting[];
+    best?: SightingBest;
+    face: { id: string; assetId: string } & VideoFaceBox;
+    frame: Insertable<AssetFaceVideoFrameTable>;
+    embedding?: string;
+  }): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      await writeSightings(trx, faceId, sightings, best);
+      await trx
+        .insertInto('asset_face')
+        .values({ ...face, sourceType: SourceType.Manual })
+        .execute();
+      if (embedding) {
+        await trx.insertInto('face_search').values({ faceId: face.id, embedding }).execute();
+      }
+      await trx.insertInto('asset_face_video_frame').values(frame).execute();
+    });
+  }
+
+  /**
+   * Moves sightings between faces of one video, in one transaction: writes each face's sightings (and best view when
+   * that moved), points a person whose representative face is going at `faceId` instead, and deletes the faces left
+   * with nothing (`deleteFaceIds`; their frame rows and embeddings go with them). Returns the repointed people, whose
+   * thumbnails are now cut from another face.
+   */
+  async moveSightings({
+    faces,
+    faceId,
+    deleteFaceIds,
+  }: {
+    faces: { faceId: string; sightings: VideoFaceSighting[]; best?: SightingBest }[];
+    faceId: string;
+    deleteFaceIds: string[];
+  }) {
+    return this.db.transaction().execute(async (trx) => {
+      for (const face of faces) {
+        await writeSightings(trx, face.faceId, face.sightings, face.best);
+      }
+      if (deleteFaceIds.length === 0) {
+        return [];
+      }
+
+      const repointed = await trx
+        .updateTable('person')
+        .set({ faceAssetId: asUuid(faceId) })
+        .where('person.faceAssetId', 'in', deleteFaceIds)
+        .returning(['person.ownerId', 'person.personGroupId'])
+        .execute();
+      await trx.deleteFrom('asset_face').where('asset_face.id', 'in', deleteFaceIds).execute();
+      return repointed;
+    });
   }
 
   /** The best frame of a person's representative face, for the person thumbnail. */
