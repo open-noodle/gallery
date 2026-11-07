@@ -1,3 +1,6 @@
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import {
   getAssetSpaces,
   getSharedSpaceAssetLinkedAlbums,
@@ -9,9 +12,6 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
-import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-import { eventManager } from '#lib/managers/event-manager.svelte.ts';
-import { handleError } from '#lib/utils/handle-error.ts';
 
 /** A space the selection can be removed from, with the selected assets it holds. */
 export type RemovableSpace = { space: SharedSpaceResponseDto; assetIds: string[] };
@@ -69,11 +69,11 @@ export const fetchSelectionSpaces = async (assetIds: string[], signal?: AbortSig
 };
 
 /**
- * Removes assets from a space after a confirmation, the same from inside the space and from the timeline. The server
- * removes only the assets added directly (with their stacks); the rest reach the space through a linked album or
- * library, and the message says which. The selection is cleared when everything went, and otherwise keeps the rest.
- * Returns the IDs the server removed. `spaceName` names the space in the confirmation, for callers outside it.
- */
+Removes assets from a space after a confirmation, the same from inside the space and from the timeline. The server
+removes only the assets added directly (with their stacks); the rest reach the space through a linked album or
+library, and the message says which. The selection is cleared when everything went, and otherwise keeps the rest.
+Returns the IDs the server removed. `spaceName` names the space in the confirmation, for callers outside it.
+*/
 export const removeFromSpace = async (spaceId: string, assetIds: string[], spaceName?: string): Promise<string[]> => {
   const $t = get(t);
   const count = assetIds.length;

@@ -5,6 +5,7 @@ import {
   type FilterState,
 } from '#lib/components/filter-panel/filter-panel.ts';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
@@ -14,7 +15,6 @@ import { factory } from '#test/unit/factories.ts';
 import { LibraryView, type SmartSearchFacetsResponseDto } from '@immich/sdk';
 import type { ActionItem } from '@immich/ui';
 import { flushSync } from 'svelte';
-import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { createAlbumTimeline } from './album-timeline';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
 import { createPhotosTimeline } from './photos-timeline';

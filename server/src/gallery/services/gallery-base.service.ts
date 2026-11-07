@@ -137,9 +137,9 @@ export abstract class GalleryBaseService {
   }
 
   /**
-   * Fork files the thumbnail folder holds beside upstream's asset files, for IntegrityService's untracked-files scan:
-   * Spatial Scene depth maps and the best frames of video faces.
-   */
+  Fork files the thumbnail folder holds beside upstream's asset files, for IntegrityService's untracked-files scan:
+  Spatial Scene depth maps and the best frames of video faces.
+  */
   protected async getGalleryThumbnailFolderPaths(paths: string[]): Promise<{ path: string }[]> {
     const [depthMaps, videoFaceFrames] = await Promise.all([
       this.spatialSceneRepository.getPathsByPaths(paths),

@@ -31,7 +31,7 @@ export class GalleryAlbumService extends BaseService {
   how many of `assetIds`, so the add-to-album picker offers only valid targets. An asset counts for
   an album when the caller has AssetShare on it, or when it is a #764 contribution the album would
   take (already-contributed ones included — the write path reports those as DUPLICATE).
-  /
+  */
   async getAddTargets(auth: AuthDto, dto: AlbumAddTargetsDto): Promise<AlbumAddTargetsResponseDto> {
     const assetIds = [...new Set(dto.assetIds)];
     const [allowedAlbumIds, shareableIds] = await Promise.all([
