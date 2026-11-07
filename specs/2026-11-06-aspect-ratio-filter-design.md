@@ -566,13 +566,14 @@ validated against the enum before they reach `sql.lit`, so no user text reaches 
 Decided: the maintainer accepted the full expression index as the stored class, on condition of the benchmark at this
 size (Discord, 2026-11-06).
 
+Resolved: building in the fork now. The design was agreed with the maintainer on Discord before implementation.
+
 For the maintainer, each with the default this spec applies. Any of them can be overridden in spec or PR review:
 
-1. Build in the fork now; a UX discussion on the Immich Discord stays optional.
-2. Five classes.
-3. Panorama threshold 2.0, square tolerance 2 percent.
-4. Per-row greying for aspect rows, next to the #910 decision for rating and media.
-5. The budget in goal 5 (measured: 5 to 8 ms added per filter panel load).
+1. Five classes.
+2. Panorama threshold 2.0, square tolerance 2 percent.
+3. Per-row greying for aspect rows, next to the #910 decision for rating and media.
+4. The budget in goal 5 (measured with the final helper: 5 to 12 ms added per filter panel load).
 
 Feature freezes (`CONTRIBUTING.md`) do not apply: the filter only narrows and changes neither the sharing, ownership nor
 external library model.
