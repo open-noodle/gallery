@@ -9550,6 +9550,74 @@
         "x-immich-state": "Stable"
       }
     },
+    "/faces/{id}/sightings/split": {
+      "post": {
+        "description": "Move one moment out of a video face into a new, unassigned face of its own, at a time GET /faces/{id}/sightings returned; name it with PUT /faces/{id}. Moving the best view makes the next best one it. A face keeps at least one sighting. Undo by deleting the new face and restoring the sighting.",
+        "operationId": "splitAssetFaceSighting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "time",
+            "required": true,
+            "in": "query",
+            "description": "The sighting's time, as GET /faces/{id}/sightings returned it, or as it was when removed",
+            "schema": {
+              "minimum": 0,
+              "format": "double",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoFaceSightingSplitResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Move a face sighting to a new face",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.delete",
+        "x-immich-state": "Stable"
+      }
+    },
     "/faces/{id}/sightings/thumbnail": {
       "get": {
         "description": "Retrieve a crop of one sighting of a video face, at a time GET /faces/{id}/sightings returned.",
@@ -50544,6 +50612,28 @@
           "isBest",
           "score",
           "time"
+        ],
+        "type": "object"
+      },
+      "VideoFaceSightingSplitResponseDto": {
+        "properties": {
+          "faceId": {
+            "description": "The new face the sighting moved to: unassigned, made by hand",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "sightings": {
+            "description": "The sightings the original face has left, as GET /faces/{id}/sightings lists them",
+            "items": {
+              "$ref": "#/components/schemas/VideoFaceSightingDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "faceId",
+          "sightings"
         ],
         "type": "object"
       },

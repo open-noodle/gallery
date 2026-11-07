@@ -1,6 +1,7 @@
 <script lang="ts">
   import VideoFaceSightings from '$lib/gallery/asset-viewer/VideoFaceSightings.svelte';
   import { videoPersonSightings } from '$lib/gallery/asset-viewer/video-person-sightings.svelte';
+  import { faceManager } from '$lib/stores/face.svelte';
   import type { AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
@@ -12,11 +13,17 @@
    */
   interface Props {
     asset: AssetResponseDto;
-    /** The asset's owner, who holds face delete: each moment gets a button to take it out of the person's face. */
-    canRemove?: boolean;
+    /** The asset's owner, who holds face delete: each moment gets a menu to move it or take it out of the face. */
+    canEdit?: boolean;
   }
 
-  let { asset, canRemove = false }: Props = $props();
+  let { asset, canEdit = false }: Props = $props();
+
+  // A move adds a face to the asset (and maybe a person), and its undo takes it away: the People grid reads these.
+  const reloadFaces = async () => {
+    faceManager.clear();
+    await faceManager.getAssetFaces(asset.id);
+  };
 
   const selection = $derived(
     videoPersonSightings.current?.assetId === asset.id ? videoPersonSightings.current : undefined,
@@ -37,7 +44,12 @@
         onclick={() => videoPersonSightings.clear()}
       />
     </div>
-    <VideoFaceSightings faceIds={selection.faceIds} {canRemove}>
+    <VideoFaceSightings
+      faceIds={selection.faceIds}
+      {canEdit}
+      personId={selection.personId}
+      onFacesChanged={() => void reloadFaces()}
+    >
       {#snippet empty()}
         <Text size="small" color="muted" class="mb-4">{$t('video_person_sightings_none')}</Text>
       {/snippet}

@@ -259,6 +259,7 @@ describe(VideoFaceRepository.name, () => {
         sightings,
         timeSeconds: 3.25,
         framePath: `thumbs/owner/aa/bb/asset_faces/${faceId}.jpeg`,
+        assetId: asset.id,
         imageWidth: 1920,
         imageHeight: 1080,
         originalPath: asset.originalPath,
@@ -329,6 +330,55 @@ describe(VideoFaceRepository.name, () => {
         boundingBoxY2: 290,
         imageWidth: 1920,
       });
+    });
+  });
+
+  describe('splitSighting', () => {
+    it('moves a sighting into a new unassigned face made by hand, with its frame and embedding', async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const newFaceId = newUuid();
+      const kept = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const moved = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings: [kept, moved] })],
+      });
+
+      await sut.splitSighting({
+        faceId,
+        sightings: [kept, { ...moved, removed: true }],
+        face: {
+          id: newFaceId,
+          assetId: asset.id,
+          imageWidth: 1920,
+          imageHeight: 1080,
+          boundingBoxX1: 300,
+          boundingBoxY1: 220,
+          boundingBoxX2: 360,
+          boundingBoxY2: 290,
+        },
+        frame: frame(newFaceId, { timeSeconds: 7.5, quality: 0, sightings: [moved] }),
+        embedding: `[${Array.from({ length: 512 }, () => 0.01).join(',')}]`,
+      });
+
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ sightings: [kept, { ...moved, removed: true }] });
+      await expect(sut.getSightings(newFaceId)).resolves.toMatchObject({ sightings: [moved], timeSeconds: 7.5 });
+      const face = await defaultDatabase
+        .selectFrom('asset_face')
+        .leftJoin('face_search', 'face_search.faceId', 'asset_face.id')
+        .select([
+          'asset_face.sourceType',
+          'asset_face.personGroupId',
+          'asset_face.boundingBoxX1',
+          'face_search.faceId as searchFaceId',
+        ])
+        .where('asset_face.id', '=', newFaceId)
+        .executeTakeFirstOrThrow();
+      expect(face).toEqual({ sourceType: 'manual', personGroupId: null, boundingBoxX1: 300, searchFaceId: newFaceId });
     });
   });
 

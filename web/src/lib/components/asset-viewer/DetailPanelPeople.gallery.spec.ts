@@ -1,6 +1,6 @@
 import { AssetTypeEnum, type PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
+import { screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { videoPersonSightings } from '$lib/gallery/asset-viewer/video-person-sightings.svelte';
 import { renderWithTooltips } from '$tests/helpers';
@@ -10,13 +10,16 @@ import DetailPanelPeople from './DetailPanelPeople.svelte';
 // The film button on a video's People tiles and the moments it opens under the grid
 // (specs/2026-10-31-video-face-frames-design.md, Phase 2).
 
-const { faceManagerMock, getAssetFaceSightings } = vi.hoisted(() => ({
+const { faceManagerMock, getAssetFaceSightings, splitAssetFaceSighting } = vi.hoisted(() => ({
   faceManagerMock: {
     data: [] as unknown[],
     facesByPersonId: new Map<string, unknown[]>(),
     people: [] as PersonResponseDto[],
+    clear: vi.fn(),
+    getAssetFaces: vi.fn(),
   },
   getAssetFaceSightings: vi.fn(),
+  splitAssetFaceSighting: vi.fn(),
 }));
 
 vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
@@ -46,6 +49,7 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
 vi.mock('@immich/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@immich/sdk')>()),
   getAssetFaceSightings,
+  splitAssetFaceSighting,
 }));
 
 const box = { x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.5 };
@@ -146,7 +150,7 @@ describe('DetailPanelPeople, a person’s moments in a video', () => {
     expect(momentsButton('Alice')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('lets only the owner remove a moment', async () => {
+  it('lets only the owner move or remove a moment', async () => {
     const sightings = [
       { time: 4, score: 0.9, isBest: true, box },
       { time: 9, score: 0.8, isBest: false, box },
@@ -154,7 +158,7 @@ describe('DetailPanelPeople, a person’s moments in a video', () => {
     getAssetFaceSightings.mockResolvedValue({ sightings });
     const owner = renderPanel(AssetTypeEnum.Video, { Alice: ['face-1'] });
     await userEvent.click(momentsButton('Alice'));
-    await waitFor(() => expect(screen.getAllByTestId('remove-sighting')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByTestId('sighting-menu')).toHaveLength(2));
     owner.unmount();
     videoPersonSightings.clear();
 
@@ -163,6 +167,28 @@ describe('DetailPanelPeople, a person’s moments in a video', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: /^video_face_sightings_show_at/ })).toHaveLength(2),
     );
-    expect(screen.queryByTestId('remove-sighting')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sighting-menu')).not.toBeInTheDocument();
+  });
+
+  it('reloads the faces of the asset after a move, so the People grid shows where the moment went', async () => {
+    getAssetFaceSightings.mockResolvedValue({
+      sightings: [
+        { time: 4, score: 0.9, isBest: true, box },
+        { time: 9, score: 0.8, isBest: false, box },
+      ],
+    });
+    splitAssetFaceSighting.mockResolvedValue({
+      faceId: 'new-face',
+      sightings: [{ time: 4, score: 0.9, isBest: true, box }],
+    });
+    renderPanel(AssetTypeEnum.Video, { Alice: ['face-1'] });
+    await userEvent.click(momentsButton('Alice'));
+
+    const [, menu] = await screen.findAllByTestId('sighting-menu');
+    await userEvent.click(within(menu).getByRole('button', { name: 'video_face_sighting_options' }));
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'video_face_sighting_move_unassigned' }));
+
+    await waitFor(() => expect(faceManagerMock.getAssetFaces).toHaveBeenCalledWith('asset-1'));
+    expect(faceManagerMock.clear).toHaveBeenCalled();
   });
 });

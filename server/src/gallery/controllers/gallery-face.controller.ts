@@ -5,6 +5,7 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import {
+  VideoFaceSightingSplitResponseDto,
   VideoFaceSightingThumbnailDto,
   VideoFaceSightingTimeDto,
   VideoFaceSightingsResponseDto,
@@ -87,6 +88,23 @@ export class GalleryFaceController {
     @Query() { time }: VideoFaceSightingTimeDto,
   ): Promise<VideoFaceSightingsResponseDto> {
     return this.service.restoreSighting(auth, id, time);
+  }
+
+  @Post(':id/sightings/split')
+  @HttpCode(HttpStatus.OK)
+  @Authenticated({ permission: Permission.FaceDelete })
+  @Endpoint({
+    summary: 'Move a face sighting to a new face',
+    description:
+      'Move one moment out of a video face into a new, unassigned face of its own, at a time GET /faces/{id}/sightings returned; name it with PUT /faces/{id}. Moving the best view makes the next best one it. A face keeps at least one sighting. Undo by deleting the new face and restoring the sighting.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  splitAssetFaceSighting(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() { time }: VideoFaceSightingTimeDto,
+  ): Promise<VideoFaceSightingSplitResponseDto> {
+    return this.service.splitSighting(auth, id, time);
   }
 
   @Get(':id/sightings/thumbnail')

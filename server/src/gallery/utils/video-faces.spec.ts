@@ -3,6 +3,7 @@ import {
   type Detection,
   FaceTracker,
   acceptTrack,
+  detectionAt,
   findAgain,
   findSightingAt,
   isSharpenTimeFor,
@@ -17,6 +18,7 @@ import {
   sampleIntervalFor,
   sightingQuality,
   sightingsForPlayer,
+  splitSightingAt,
   trackEmbedding,
   widenSmallFace,
   withSighting,
@@ -549,8 +551,38 @@ describe('removing and restoring a sighting', () => {
     });
   });
 
+  it('moves a sighting out as removing would, handing over the sighting as it was found', () => {
+    expect(splitSightingAt(stored, 30)).toEqual({ sightings: [best, early, { ...late, removed: true }], moved: late });
+    expect(splitSightingAt(stored, 12.5)).toEqual({
+      sightings: [{ ...best, removed: true, wasBest: true }, early, late],
+      best: early,
+      moved: best,
+    });
+  });
+
+  it("does not move a face's last sighting, or one that is not shown", () => {
+    expect(splitSightingAt({ ...stored, sightings: [best] }, 12.5)).toBe('last');
+    expect(splitSightingAt(stored, 13)).toBeUndefined();
+  });
+
   it('finds nothing to restore at a sighting that was not removed', () => {
     expect(restoreSightingAt(stored, 30)).toBeUndefined();
     expect(restoreSightingAt(stored, 13)).toBeUndefined();
+  });
+});
+
+describe('detectionAt', () => {
+  const sightingBox = { x1: 100, y1: 100, x2: 200, y2: 200 };
+
+  it('picks the detection overlapping the box most', () => {
+    const near = { boundingBox: { x1: 120, y1: 110, x2: 220, y2: 210 }, id: 'near' };
+    const nearest = { boundingBox: { x1: 102, y1: 98, x2: 198, y2: 202 }, id: 'nearest' };
+    const elsewhere = { boundingBox: { x1: 600, y1: 100, x2: 700, y2: 200 }, id: 'elsewhere' };
+    expect(detectionAt([near, elsewhere, nearest], sightingBox)?.id).toBe('nearest');
+  });
+
+  it('finds nothing when no detection overlaps the box enough', () => {
+    expect(detectionAt([{ boundingBox: { x1: 180, y1: 180, x2: 280, y2: 280 } }], sightingBox)).toBeUndefined();
+    expect(detectionAt([], sightingBox)).toBeUndefined();
   });
 });

@@ -29,6 +29,7 @@ select
   "asset_face_video_frame"."sightings",
   "asset_face_video_frame"."timeSeconds",
   "asset_face_video_frame"."path" as "framePath",
+  "asset_face"."assetId",
   "asset_face"."imageWidth",
   "asset_face"."imageHeight",
   "asset"."originalPath",

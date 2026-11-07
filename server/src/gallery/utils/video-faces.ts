@@ -661,3 +661,39 @@ export const restoreSightingAt = (stored: StoredSightings, time: number): Sighti
   const sightings = stored.sightings.map((sighting) => (sighting === target ? restored : sighting));
   return target.wasBest ? { sightings, best: restored } : { sightings };
 };
+
+/** A sighting moved out of a face, with what removing it from that face writes (Phase 2). */
+export type SightingSplit = SightingChange & { moved: VideoFaceSighting };
+
+/**
+ * Moves the sighting at `time` out of the face, to become a face of its own: the face loses it as `removeSightingAt`
+ * takes it out (best view promoted, `removed` kept so it can come back), and `moved` is the sighting as it was found.
+ */
+export const splitSightingAt = (stored: StoredSightings, time: number): SightingSplit | 'last' | undefined => {
+  const change = removeSightingAt(stored, time);
+  if (!change || change === 'last') {
+    return change;
+  }
+
+  const { t, x1, y1, x2, y2, score } = storedAt(stored, time)!;
+  return { ...change, moved: { t, x1, y1, x2, y2, score } };
+};
+
+/** Detections at least this much over a sighting's box are the same face. */
+const SPLIT_MIN_IOU = 0.3;
+
+/** The detection in a frame that is the sighting's face: the one overlapping its box most, if enough. */
+export const detectionAt = <T extends { boundingBox: BoundingBox }>(detections: T[], box: BoundingBox) => {
+  let found: T | undefined;
+  let bestIou = SPLIT_MIN_IOU;
+  for (const detection of detections) {
+    const overlap = iou(detection.boundingBox, box);
+    if (overlap < bestIou) {
+      continue;
+    }
+
+    found = detection;
+    bestIou = overlap;
+  }
+  return found;
+};

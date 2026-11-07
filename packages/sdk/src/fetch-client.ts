@@ -2411,6 +2411,12 @@ export type VideoFaceSightingsResponseDto = {
     /** Every sighting inside the current trim, in time order; empty for a face not sampled from a video */
     sightings: VideoFaceSightingDto[];
 };
+export type VideoFaceSightingSplitResponseDto = {
+    /** The new face the sighting moved to: unassigned, made by hand */
+    faceId: string;
+    /** The sightings the original face has left, as GET /faces/{id}/sightings lists them */
+    sightings: VideoFaceSightingDto[];
+};
 export type QueueStatisticsDto = {
     /** Number of active jobs */
     active: number;
@@ -7911,6 +7917,23 @@ export function restoreAssetFaceSighting({ id, time }: {
         status: 200;
         data: VideoFaceSightingsResponseDto;
     }>(`/faces/${encodeURIComponent(id)}/sightings/restore${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Move a face sighting to a new face
+ */
+export function splitAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingSplitResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/split${QS.query(QS.explode({
         time
     }))}`, {
         ...opts,

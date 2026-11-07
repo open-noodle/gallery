@@ -94,6 +94,7 @@ describe(GalleryFaceController.name, () => {
   describe.each([
     { method: 'delete', path: '', call: 'removeSighting' },
     { method: 'post', path: '/restore', call: 'restoreSighting' },
+    { method: 'post', path: '/split', call: 'splitSighting' },
   ] as const)('$method /faces/:id/sightings$path', ({ method, path, call }) => {
     const url = `/faces/6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60/sightings${path}`;
 
@@ -105,12 +106,12 @@ describe(GalleryFaceController.name, () => {
     });
 
     it('should pass the face and the time to the service', async () => {
-      service[call].mockResolvedValue({ sightings: [] });
+      service[call].mockResolvedValue({ faceId: '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f61', sightings: [] });
       const { status, body } = await request(ctx.getHttpServer())
         [method](`${url}?time=1.5`)
         .set('Authorization', 'Bearer token');
 
-      expect(body).toEqual({ sightings: [] });
+      expect(body).toMatchObject({ sightings: [] });
       expect(status).toBe(200);
       expect(service[call]).toHaveBeenCalledWith(undefined, '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60', 1.5);
     });

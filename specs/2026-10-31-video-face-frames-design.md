@@ -467,18 +467,32 @@ because here the user asked. Added after the first real-video test: the user nam
 then the small pencil a long way round to where they are in the clip. Anyone who can read the asset can read the
 sightings, so viewers get the button too.
 
-The asset's owner can take a moment out of a face. Each tile of a face that has more than one moment gets a small
-trash button in its top-left corner, labelled "Remove the moment at 0:42" (`video_face_sighting_remove`), in the
-owner's picker and in the info panel's strip; a Space editor's picker and other viewers do not get it, since removing
-holds `FaceDelete`, which only the owner has. A click takes the tile out at once and shows "Moment removed"
+The asset's owner can move a moment to someone else or take it out of a face. Each tile of a face that has more than
+one moment gets a small menu button in its top-left corner ("Moment options", `video_face_sighting_options`), in the
+owner's picker and in the info panel's strip; a Space editor's picker and other viewers do not get it, since both
+hold `FaceDelete`, which only the owner has. The menu has "Move to another person…", "Move to a new person", "Move to
+unassigned" and "Remove the moment at 0:42" (`video_face_sighting_move_person`, `_move_new`, `_move_unassigned`,
+`video_face_sighting_remove`).
+
+A move splits the moment off into a face of its own, then gives that face to the target through the reassign the
+face editor already uses (`PUT /faces/{id}` with the person; `POST /people` first for a new person, which starts
+unnamed). "Another person" picks from the owner's people in the existing `PeoplePickerModal`, leaving out the
+strip's own person in the info panel. The tile leaves the strip, the info panel reloads the asset's faces so the
+People grid shows where it went, and a toast says "Moment moved to Bob", "Moment moved to a new person" or "Moment
+moved to unassigned" (`video_face_sighting_moved_person`, `_moved_new`, `_moved_unassigned`; `_moved` for a person
+with no name) with an Undo for 5 seconds, which deletes the new face and restores the moment. If giving the new face
+to the person fails, the moment stays moved, unassigned, and says so. A picker closed without a choice moves
+nothing. Added after the first real-video tests, as the "Not this person" action the open question below asked for,
+one moment at a time.
+
+Removing takes the tile out at once and shows "Moment removed"
 (`video_face_sighting_removed`) with an Undo button for 5 seconds (`undo`), which puts it back. Removing the starred
 moment makes the remaining moment with the highest score the best view: the star moves, and the face crop and box
 follow it. The face's last moment has no button, because a face needs a frame to be cut from; to drop a wrong face
 entirely, delete or reassign it as today. A failure says "Could not remove the moment" or "Could not bring the moment
 back" (`video_face_sighting_remove_failed`, `video_face_sighting_restore_failed`) and leaves the strip as it was.
 Added after the first real-video test, for the case the open question below describes: a moment in a person's strip
-that is someone else. It is the small version of "Not this person": the moment leaves the face, but no new face is
-made from it, and the face's embedding is not recomputed.
+that is someone else and should belong to nobody. Neither a move nor a removal recomputes the old face's embedding.
 
 The order was "a handful, best first" in the Phase 1 summary. Showing all of them changes that: in time order the
 strip reads as a timeline the user scrubs through, and the star finds the best one.
@@ -542,6 +556,30 @@ brings it back; both return the face's sightings as `GET` does:
   describes.
 - No schema change: the flags are optional fields of the fork table's jsonb, which a revert drops with the table.
 
+**`POST /faces/{id}/sightings/split?time=`** moves a moment out into a new face and returns
+`{ faceId, sightings }`: the new face's id and the old face's remaining sightings.
+
+- Same access as removing (`FaceDelete` on the old face, owner only), and the same refusals: the face's last sighting
+  stays (400; moving all of a face is reassigning it), and a time with nothing shown is 404.
+- The old face loses the sighting exactly as `DELETE` takes it out, with the best view promoted when that one moved
+  and `removed` kept, so the Undo (delete the new face with `force`, then restore) puts the face back as it was.
+- The new face is on the same asset, in the same frame pixel space (`imageWidth`/`imageHeight` of the old face), with
+  the sighting's box, unassigned, and `sourceType` **manual**: the user made it. Upstream's recognition skips
+  non-machine-learning faces (`PersonService` "Skipping face due to source"), so an unassigned moved moment is never
+  assigned back automatically, and a full "detect faces again" deletes only machine-learning faces, so a move
+  survives it; a rescan of the video still rebuilds the old face's track, moment included, as it does after a
+  removal.
+- Its frame is the moment's frame cut from the original, stored beside the old face's frame as `<newFaceId>.jpeg`,
+  with a frame row holding that one sighting (`quality` 0: not measured), so its crop, the thumbnail route and the
+  strip work as for any sampled face.
+- Its embedding comes from running face detection on that frame again and taking the detection overlapping the
+  sighting's box most (IoU at least 0.3, `detectionAt`), with the same lowered minimum score sampling uses. When
+  recognition is off, the service fails, or the detector misses the face (a small one sampling found only in a
+  tile), the face has no embedding: it can still be named and shown, but face search and merge suggestions do not
+  see it.
+- The old face's sightings, the new face, its `face_search` row and its frame row are written in one transaction
+  (`VideoFaceRepository.splitSighting`), after both frame files are written.
+
 ### Seeking the player
 
 The side panel and the player have no reference to each other. A fork module,
@@ -573,17 +611,17 @@ timeline is the original's), and the playback and original URLs of a trimmed vid
 - **Mobile and stock Immich clients:** no assign UI calls these routes; nothing changes.
 - **Database:** no schema change. Phase 1's rows already carry the sightings; a removed one is a flag inside them,
   which an older Gallery build would ignore and show again.
-- **Remove and restore:** the routes ship with the strip. No released server has the read route, so a web build that
+- **Remove, restore and move:** the routes ship with the strip. No released server has the read route, so a web build that
   shows the strip is always talking to a server that has these too.
 
 ### Layering
 
 Server work is all fork code (`GalleryFaceController`, `VideoFaceService`, `VideoFaceRepository`, a fork DTO).
-Upstream files: `AssignFaceSidePanel.svelte` passes the face to the picker, with whether its moments may be removed
-(one prop line, `videoFace={{ id, canRemove: true }}`), and
+Upstream files: `AssignFaceSidePanel.svelte` passes the face to the picker, with whether its moments may be moved
+and removed (one prop line, `videoFace={{ id, canEdit: true }}`), and
 `VideoNativeViewer.svelte` registers its player by swapping the fork's volume attachment for `galleryViewerVideo` (no
 change in size) and renders `VideoFaceBox` (an import and one line, +2 against the upstream tag), and
-`DetailPanelPeople.svelte` renders `VideoPersonMoments` under the People grid, passing `canRemove={isOwner}` (an
+`DetailPanelPeople.svelte` renders `VideoPersonMoments` under the People grid, passing `canEdit={isOwner}` (an
 import and one line, +2); the film
 button lives in the fork's `PersonTile.svelte`. `PersonPickerPanel.svelte` and
 `SpacePersonSidePanel.svelte` are fork files. The open-api spec and SDK are generated.
@@ -616,18 +654,25 @@ browser cache.
   own face, one face failing, the empty message only once loaded. `DetailPanelPeople.gallery.spec.ts`: no film button
   on a photo or for a person with no face in the video; the button opens all the person's moments, shows pressed,
   closes on a second click or the close button, switches between people, says when nothing was recorded, does not
-  carry over to another asset, and shows the remove button to the owner only. `VideoFaceSightings.spec.ts` also: no
-  remove button without permission or on a face's last moment, removal replacing the face's moments with the
-  server's (star moved), the Undo toast restoring them, the face box going with its moment, a failure reported with
-  nothing to undo.
+  carry over to another asset, shows the moment menu to the owner only, and reloads the asset's faces after a move.
+  `VideoFaceSightings.spec.ts` also: no menu without permission or on a face's last moment; removal replacing the
+  face's moments with the server's (star moved), the Undo toast restoring them, the face box going with its moment, a
+  failure reported with nothing to undo; a move to a picked person (the strip's own person left out of the picker),
+  to a new person and to unassigned, a closed picker moving nothing, the Undo deleting the new face and restoring the
+  moment, a failed reassign leaving the moment unassigned with its Undo, a failed split moving nothing.
 - Unit (`video-faces.spec.ts`): removing marks the sighting and keeps the best; removing the best promotes the
   highest score left, preferring the trim, and marks `wasBest`; the last one is kept; nothing found at a time with no
   shown sighting; restore brings a sighting back as it was, and a `wasBest` one as the best; removed sightings are
   not listed. `video-face.service.spec.ts`: remove without and with a promotion (frame extracted at the new best,
   written over the face's frame path before the box moves, person thumbnail queued), the last sighting kept, 404s,
   `FaceDelete` required for both routes, restore of a plain and of a best sighting. Controller: both routes under
-  `FaceDelete`, the time passed through, invalid ids and times rejected. Medium (`video-face.repository.spec.ts`):
-  `setSightings` with and without a new best view (not run locally: needs Docker).
+  `FaceDelete`, the time passed through, invalid ids and times rejected (split too). Unit also: `splitSightingAt`
+  as removal plus the moved sighting, refusing the last; `detectionAt` picking the most overlapping detection or none.
+  `video-face.service.spec.ts`: a split writing the new face's frame beside the old one, with the embedding of the
+  matching detection; promoting the next best when the best moved, with its frame and person thumbnail; no embedding
+  when detection misses or fails; the last sighting kept, 404s, `FaceDelete` required. Medium
+  (`video-face.repository.spec.ts`): `setSightings` with and without a new best view, and `splitSighting` making an
+  unassigned manual face with its frame row and `face_search` row (not run locally: needs Docker).
 
 ## Open questions
 
@@ -643,13 +688,12 @@ browser cache.
   joining two tracks that never share a frame. The name then goes on the face cut from the best view, and the other
   person has no face in that video, so a search for them misses it. If a merged sighting is among the best three, it
   also pulls the averaged embedding toward the wrong person. A rescan builds the same track again. The Phase 2 strip
-  shows such a mix, and the owner can remove the wrong moments from the face, which moves the best view off a wrong
-  one, but the embedding stays averaged and the other person still has no face. A fuller fix would be a "Not this
-  person" action on a sighting that splits it, and
-  the sightings nearer to it than to the best view, into a new face. The new face's embedding would come from the frame
-  cut at that moment, since sightings store no embeddings, and the split would be stored as a constraint the tracker
-  honours on rescan so the next "Refresh faces" does not merge them again. The threshold is the one recognition already
-  uses to tie two photos to one person, so merges are expected to be rarer than head-turn splits. This waits until
-  real videos show mixed strips.
+  shows such a mix, and the owner can move a wrong moment to its own face and give it to the right person, or remove
+  it. That is one moment at a time, the old face's embedding stays averaged, and a rescan merges the moment back into
+  the old track (the moved face stays, so it then shows twice). The fuller fix would split a sighting together with
+  the sightings nearer to it than to the best view, and store the split as a constraint the tracker honours on
+  rescan, so the next "Refresh faces" does not merge them again. The threshold is the one recognition already uses to
+  tie two photos to one person, so merges are expected to be rarer than head-turn splits. This waits until moving one
+  moment at a time proves too slow, or rescans undo moves in practice.
 - A dedicated queue would keep a long video from holding a face-detection slot for minutes. That costs upstream queue
   registrations, so it waits until it is needed.

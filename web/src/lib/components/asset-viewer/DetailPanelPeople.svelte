@@ -126,6 +126,6 @@
         />
       {/each}
     </div>
-    <VideoPersonMoments {asset} canRemove={isOwner} />
+    <VideoPersonMoments {asset} canEdit={isOwner} />
   </section>
 {/if}

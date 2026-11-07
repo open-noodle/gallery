@@ -1,30 +1,48 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import type { VideoFaceSightingsResponseDto } from 'src/gallery/dtos/video-face.dto.js';
+import type {
+  VideoFaceSightingSplitResponseDto,
+  VideoFaceSightingsResponseDto,
+} from 'src/gallery/dtos/video-face.dto.js';
+import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
+import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import type { ImmichMediaResponse } from 'src/utils/file.js';
 import { OnEvent } from 'src/decorators.js';
 import { JobName, Permission } from 'src/enum.js';
 import { videoFaceFrameFolder } from 'src/gallery/utils/video-face-detector.js';
 import {
   type SightingChange,
+  VIDEO_FACE_LOW_SCORE,
+  VIDEO_FACE_SAMPLER_VERSION,
+  detectionAt,
   findSightingAt,
   removeSightingAt,
   restoreSightingAt,
   sightingsForPlayer,
+  splitSightingAt,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import { isFacialRecognitionEnabled } from 'src/utils/misc.js';
+
+type StoredFaceSightings = NonNullable<Awaited<ReturnType<VideoFaceRepository['getSightings']>>>;
+
+/** A sighting as the face's best view: the time and box the face moves to. */
+const toBestView = ({ t, x1, y1, x2, y2 }: VideoFaceSighting) => ({
+  timeSeconds: t,
+  box: { boundingBoxX1: x1, boundingBoxY1: y1, boundingBoxX2: x2, boundingBoxY2: y2 },
+});
 
 /**
  * Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,
  * the face-keyed crop the asset viewer shows, and each face's sightings for the assign picker (Phase 2). Detection
  * itself runs inside upstream's face detection job, through VideoFaceDetector. The owner can take a sighting out of a
- * face and bring it back (Phase 2).
+ * face, bring it back, or move it to a face of its own (Phase 2).
  */
 @Injectable()
 export class VideoFaceService extends BaseService {
@@ -121,44 +139,136 @@ export class VideoFaceService extends BaseService {
     return this.applySightingChange(id, stored, change);
   }
 
+  /**
+   * Moves the sighting at `time` out of the face into a new, unassigned face of its own: a face made by hand, so
+   * recognition and re-detection leave it to the user. Its frame is cut from the original at that moment, and its
+   * embedding comes from detecting faces in that frame again, when the detector finds the face there. The old face
+   * loses the sighting as `removeSighting` takes it out. The face's only remaining sighting stays: moving all of a
+   * face is reassigning it.
+   */
+  async splitSighting(auth: AuthDto, id: string, time: number): Promise<VideoFaceSightingSplitResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.FaceDelete, ids: [id] });
+    const stored = await this.videoFaceRepository.getSightings(id);
+    const split = stored ? splitSightingAt(stored, time) : undefined;
+    if (!stored || !split) {
+      throw new NotFoundException();
+    }
+    if (split === 'last') {
+      throw new BadRequestException('A face keeps at least one sighting');
+    }
+
+    const { sightings, best, moved } = split;
+    const faceId = this.cryptoRepository.randomUUID();
+    const framePath = join(dirname(stored.framePath), `${faceId}.jpeg`);
+    const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-split-'));
+    let embedding: string | undefined;
+    try {
+      const localFrame = join(tempDir, 'frame.jpeg');
+      await this.extractFrame(stored.originalPath, moved.t, localFrame);
+      embedding = await this.embeddingAt(localFrame, moved);
+      const backend = await this.backendMedia.backendFor(stored.framePath);
+      await backend.put(framePath, await readFile(localFrame), { contentType: 'image/jpeg' });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+    if (best) {
+      await this.writeBestFrame(stored, best);
+    }
+
+    await this.videoFaceRepository.splitSighting({
+      faceId: id,
+      sightings,
+      best: best && toBestView(best),
+      face: {
+        id: faceId,
+        assetId: stored.assetId,
+        imageWidth: stored.imageWidth,
+        imageHeight: stored.imageHeight,
+        ...toBestView(moved).box,
+      },
+      frame: {
+        faceId,
+        path: framePath,
+        timeSeconds: moved.t,
+        quality: 0,
+        sightings: [moved],
+        version: VIDEO_FACE_SAMPLER_VERSION,
+      },
+      embedding,
+    });
+    if (best) {
+      await this.queuePersonThumbnails(id);
+    }
+
+    return {
+      faceId,
+      sightings: sightingsForPlayer({ ...stored, sightings, timeSeconds: best ? best.t : stored.timeSeconds }),
+    };
+  }
+
   private async applySightingChange(
     id: string,
-    stored: NonNullable<Awaited<ReturnType<VideoFaceService['videoFaceRepository']['getSightings']>>>,
+    stored: StoredFaceSightings,
     { sightings, best }: SightingChange,
   ): Promise<VideoFaceSightingsResponseDto> {
     if (best) {
-      // Written over the face's frame path before the box moves, so the box never points into another moment's frame
-      // for longer than this request.
-      const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-best-'));
-      try {
-        const framePath = join(tempDir, 'frame.jpeg');
-        await this.extractFrame(stored.originalPath, best.t, framePath);
-        const backend = await this.backendMedia.backendFor(stored.framePath);
-        await backend.put(stored.framePath, await readFile(framePath), { contentType: 'image/jpeg' });
-      } finally {
-        await rm(tempDir, { recursive: true, force: true });
-      }
+      await this.writeBestFrame(stored, best);
     }
-
-    await this.videoFaceRepository.setSightings(
-      id,
-      sightings,
-      best && {
-        timeSeconds: best.t,
-        box: { boundingBoxX1: best.x1, boundingBoxY1: best.y1, boundingBoxX2: best.x2, boundingBoxY2: best.y2 },
-      },
-    );
-
+    await this.videoFaceRepository.setSightings(id, sightings, best && toBestView(best));
     if (best) {
-      const people = await this.videoFaceRepository.getPeopleRepresentedBy([id]);
-      if (people.length > 0) {
-        await this.jobRepository.queueAll(people.map((data) => ({ name: JobName.PersonGenerateThumbnail, data })));
-      }
+      await this.queuePersonThumbnails(id);
     }
 
     return {
       sightings: sightingsForPlayer({ ...stored, sightings, timeSeconds: best ? best.t : stored.timeSeconds }),
     };
+  }
+
+  /**
+   * Cuts the new best view's frame from the original over the face's frame path. Written before the box moves, so the
+   * box never points into another moment's frame for longer than the request.
+   */
+  private async writeBestFrame(stored: StoredFaceSightings, best: VideoFaceSighting) {
+    const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-best-'));
+    try {
+      const framePath = join(tempDir, 'frame.jpeg');
+      await this.extractFrame(stored.originalPath, best.t, framePath);
+      const backend = await this.backendMedia.backendFor(stored.framePath);
+      await backend.put(stored.framePath, await readFile(framePath), { contentType: 'image/jpeg' });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  /** A person shown by this face is cut from its best frame, so their thumbnail follows a new best view. */
+  private async queuePersonThumbnails(faceId: string) {
+    const people = await this.videoFaceRepository.getPeopleRepresentedBy([faceId]);
+    if (people.length > 0) {
+      await this.jobRepository.queueAll(people.map((data) => ({ name: JobName.PersonGenerateThumbnail, data })));
+    }
+  }
+
+  /**
+   * The embedding of the face at the sighting's box in a frame, from detecting faces in it again; undefined when
+   * recognition is off, the service fails, or the detector does not find that face (a small one sampling found in a
+   * tile). The new face then has no embedding: it can still be named, but face search does not find it.
+   */
+  private async embeddingAt(framePath: string, sighting: VideoFaceSighting): Promise<string | undefined> {
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    if (!isFacialRecognitionEnabled(machineLearning)) {
+      return;
+    }
+
+    try {
+      const { faces } = await this.machineLearningRepository.detectFaces(framePath, {
+        ...machineLearning.facialRecognition,
+        minScore: Math.min(machineLearning.facialRecognition.minScore, VIDEO_FACE_LOW_SCORE),
+      });
+      return detectionAt(faces, sighting)?.embedding;
+    } catch (error) {
+      this.logger.warn(`Could not detect the face moved out at ${sighting.t}s: ${error}`);
+      return;
+    }
   }
 
   /**

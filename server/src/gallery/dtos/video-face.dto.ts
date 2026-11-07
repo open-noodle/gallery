@@ -36,6 +36,15 @@ const VideoFaceSightingsResponseSchema = z
   })
   .meta({ id: 'VideoFaceSightingsResponseDto' });
 
+const VideoFaceSightingSplitResponseSchema = z
+  .object({
+    faceId: z.uuidv4().describe('The new face the sighting moved to: unassigned, made by hand'),
+    sightings: z
+      .array(VideoFaceSightingSchema)
+      .describe('The sightings the original face has left, as GET /faces/{id}/sightings lists them'),
+  })
+  .meta({ id: 'VideoFaceSightingSplitResponseDto' });
+
 const VideoFaceSightingThumbnailSchema = z
   .object({
     time: z.coerce
@@ -58,4 +67,5 @@ const VideoFaceSightingTimeSchema = z
 
 export class VideoFaceSightingsResponseDto extends createZodDto(VideoFaceSightingsResponseSchema) {}
 export class VideoFaceSightingTimeDto extends createZodDto(VideoFaceSightingTimeSchema) {}
+export class VideoFaceSightingSplitResponseDto extends createZodDto(VideoFaceSightingSplitResponseSchema) {}
 export class VideoFaceSightingThumbnailDto extends createZodDto(VideoFaceSightingThumbnailSchema) {}

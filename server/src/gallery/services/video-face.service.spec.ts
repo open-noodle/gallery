@@ -22,6 +22,7 @@ const storedWith = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
   timeSeconds,
   imageWidth: 1000,
   imageHeight: 500,
+  assetId: 'asset-1',
   originalPath: 'upload/owner/video.mp4',
   framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
   trimStart: null,
@@ -153,6 +154,7 @@ describe(VideoFaceService.name, () => {
         timeSeconds: 8,
         imageWidth: 100,
         imageHeight: 200,
+        assetId: 'asset-1',
         originalPath: '/data/library/video.mp4',
         framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
         trimStart: 2,
@@ -209,6 +211,7 @@ describe(VideoFaceService.name, () => {
       timeSeconds: 4,
       imageWidth: 2560,
       imageHeight: 1440,
+      assetId: 'asset-1',
       originalPath: 'upload/owner/video.mp4',
       framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
       trimStart: 1.5,
@@ -400,6 +403,134 @@ describe(VideoFaceService.name, () => {
       mocks.videoFace.getSightings.mockResolvedValue(storedWith([best, other]));
 
       await expect(sut.restoreSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('splitSighting', () => {
+    const auth = AuthFactory.create();
+    const best = { t: 4, score: 0.9, x1: 100, y1: 100, x2: 200, y2: 200 };
+    const other = { t: 6, score: 0.5, x1: 300, y1: 100, x2: 400, y2: 200 };
+    const nextBest = { t: 9, score: 0.8, x1: 500, y1: 100, x2: 600, y2: 200 };
+    let extractFrame: ReturnType<typeof vi.fn>;
+    let put: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
+      mocks.videoFace.getPeopleRepresentedBy.mockResolvedValue([]);
+      mocks.crypto.randomUUID.mockReturnValue('new-face');
+      mocks.media.probe.mockResolvedValue({ videoStreams: [{ index: 0 }] } as any);
+      mocks.systemMetadata.get.mockResolvedValue({});
+      vi.spyOn((sut as any).backendMedia, 'getProbeInput').mockResolvedValue('/data/upload/owner/video.mp4');
+      put = vi.fn().mockResolvedValue(undefined);
+      vi.spyOn((sut as any).backendMedia, 'backendFor').mockResolvedValue({ put });
+      extractFrame = vi.fn(async (_input: string, output: string, t: number) => {
+        await writeFile(output, Buffer.from(`frame at ${t}`));
+      });
+      (sut as any).frames = { extractFrame };
+      mocks.machineLearning.detectFaces.mockResolvedValue({
+        imageWidth: 1000,
+        imageHeight: 500,
+        faces: [
+          { boundingBox: { x1: 700, y1: 100, x2: 800, y2: 200 }, embedding: '[0,1]', score: 0.9 },
+          { boundingBox: { x1: 302, y1: 98, x2: 398, y2: 202 }, embedding: '[1,0]', score: 0.7 },
+        ],
+      });
+    });
+
+    it('moves the sighting into a new unassigned face with its own frame and the embedding found there', async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(storedWith([best, other, nextBest]));
+
+      const response = await sut.splitSighting(auth, 'face-1', 6);
+
+      expect(response.faceId).toBe('new-face');
+      expect(response.sightings.map(({ time }) => time)).toEqual([4, 9]);
+      expect(extractFrame).toHaveBeenCalledTimes(1);
+      expect(mocks.machineLearning.detectFaces).toHaveBeenCalledWith(
+        expect.stringMatching(/frame\.jpeg$/),
+        expect.anything(),
+      );
+      expect(put).toHaveBeenCalledWith('thumbs/owner/fa/ce/new-face.jpeg', Buffer.from('frame at 6'), {
+        contentType: 'image/jpeg',
+      });
+      expect(mocks.videoFace.splitSighting).toHaveBeenCalledWith({
+        faceId: 'face-1',
+        sightings: [best, { ...other, removed: true }, nextBest],
+        best: undefined,
+        face: {
+          id: 'new-face',
+          assetId: 'asset-1',
+          imageWidth: 1000,
+          imageHeight: 500,
+          boundingBoxX1: 300,
+          boundingBoxY1: 100,
+          boundingBoxX2: 400,
+          boundingBoxY2: 200,
+        },
+        frame: {
+          faceId: 'new-face',
+          path: 'thumbs/owner/fa/ce/new-face.jpeg',
+          timeSeconds: 6,
+          quality: 0,
+          sightings: [other],
+          version: expect.any(Number),
+        },
+        embedding: '[1,0]',
+      });
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('promotes the next best view when the best one moves, and regenerates its person thumbnail', async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(storedWith([best, other, nextBest]));
+      mocks.videoFace.getPeopleRepresentedBy.mockResolvedValue([{ ownerId: 'owner-1', personGroupId: 'group-1' }]);
+
+      const response = await sut.splitSighting(auth, 'face-1', 4);
+
+      expect(response.sightings.find(({ isBest }) => isBest)?.time).toBe(9);
+      expect(put).toHaveBeenCalledWith('thumbs/owner/fa/ce/new-face.jpeg', Buffer.from('frame at 4'), {
+        contentType: 'image/jpeg',
+      });
+      expect(put).toHaveBeenCalledWith('thumbs/owner/fa/ce/face-1.jpeg', Buffer.from('frame at 9'), {
+        contentType: 'image/jpeg',
+      });
+      expect(mocks.videoFace.splitSighting).toHaveBeenCalledWith(
+        expect.objectContaining({
+          best: {
+            timeSeconds: 9,
+            box: { boundingBoxX1: 500, boundingBoxY1: 100, boundingBoxX2: 600, boundingBoxY2: 200 },
+          },
+        }),
+      );
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: 'PersonGenerateThumbnail', data: { ownerId: 'owner-1', personGroupId: 'group-1' } },
+      ]);
+    });
+
+    it('makes the face without an embedding when the detector does not find it again, or fails', async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(storedWith([best, other, nextBest]));
+      mocks.machineLearning.detectFaces.mockResolvedValue({ imageWidth: 1000, imageHeight: 500, faces: [] });
+      await sut.splitSighting(auth, 'face-1', 6);
+      expect(mocks.videoFace.splitSighting).toHaveBeenLastCalledWith(expect.objectContaining({ embedding: undefined }));
+
+      mocks.machineLearning.detectFaces.mockRejectedValue(new Error('ML down'));
+      await sut.splitSighting(auth, 'face-1', 6);
+      expect(mocks.videoFace.splitSighting).toHaveBeenLastCalledWith(expect.objectContaining({ embedding: undefined }));
+    });
+
+    it("keeps a face's last sighting, and is not found at a time with no sighting shown", async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(storedWith([best]));
+      await expect(sut.splitSighting(auth, 'face-1', 4)).rejects.toBeInstanceOf(BadRequestException);
+
+      mocks.videoFace.getSightings.mockResolvedValue(storedWith([best, other]));
+      await expect(sut.splitSighting(auth, 'face-1', 5)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mocks.videoFace.splitSighting).not.toHaveBeenCalled();
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    it('needs face delete access', async () => {
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
+
+      await expect(sut.splitSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.videoFace.getSightings).not.toHaveBeenCalled();
     });
   });
 });

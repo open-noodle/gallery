@@ -324,7 +324,7 @@
       onSelect={(candidate) => attachToPerson(activeFace, candidate)}
       onClose={closePicker}
       bind:query={personQuery}
-      videoFace={assetType === AssetTypeEnum.Video ? { id: activeFace.id, canRemove: false } : undefined}
+      videoFace={assetType === AssetTypeEnum.Video ? { id: activeFace.id, canEdit: false } : undefined}
     >
       {#snippet searchActions()}
         <Button
