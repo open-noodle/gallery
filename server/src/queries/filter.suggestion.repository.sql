@@ -953,6 +953,457 @@ where
 limit
   $11
 select
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($1::uuid[])
+        or (
+          "asset"."visibility" = $2
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($3::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($4::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($5::uuid[])
+                  and "shared_space_album"."showInTimeline" = $6
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($7::uuid[])
+                  and "shared_space_album"."showInTimeline" = $8
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $9
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $10::uuid
+      )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('landscape')
+  ) as "landscape",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($11::uuid[])
+        or (
+          "asset"."visibility" = $12
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($13::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($14::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($15::uuid[])
+                  and "shared_space_album"."showInTimeline" = $16
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($17::uuid[])
+                  and "shared_space_album"."showInTimeline" = $18
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $19
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $20::uuid
+      )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('square')
+  ) as "square",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($21::uuid[])
+        or (
+          "asset"."visibility" = $22
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($23::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($24::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($25::uuid[])
+                  and "shared_space_album"."showInTimeline" = $26
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($27::uuid[])
+                  and "shared_space_album"."showInTimeline" = $28
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $29
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $30::uuid
+      )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('portrait')
+  ) as "portrait",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($31::uuid[])
+        or (
+          "asset"."visibility" = $32
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($33::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($34::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($35::uuid[])
+                  and "shared_space_album"."showInTimeline" = $36
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($37::uuid[])
+                  and "shared_space_album"."showInTimeline" = $38
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $39
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $40::uuid
+      )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('panorama-wide')
+  ) as "panorama-wide",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($41::uuid[])
+        or (
+          "asset"."visibility" = $42
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($43::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($44::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($45::uuid[])
+                  and "shared_space_album"."showInTimeline" = $46
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($47::uuid[])
+                  and "shared_space_album"."showInTimeline" = $48
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $49
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $50::uuid
+      )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('panorama-tall')
+  ) as "panorama-tall"
+select
   "asset"."id"
 from
   "asset"

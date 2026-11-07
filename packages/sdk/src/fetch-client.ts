@@ -3170,6 +3170,8 @@ export type SearchOrder = {
 export type MetadataSearchDto = {
     /** Filter by album IDs */
     albumIds?: string[];
+    /** Filter by aspect class: an asset matches when it is in any of them */
+    aspectClasses?: AssetAspectClass[];
     /** Filter by file checksum */
     checksum?: string;
     /** Filter by city name */
@@ -3574,6 +3576,8 @@ export type RandomSearchDto = {
 export type SmartSearchDto = {
     /** Filter by album IDs */
     albumIds?: string[];
+    /** Filter by aspect class: an asset matches when it is in any of them */
+    aspectClasses?: AssetAspectClass[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */
@@ -3656,6 +3660,8 @@ export type SmartSearchDto = {
 export type SmartSearchFacetsDto = {
     /** Filter by album IDs */
     albumIds?: string[];
+    /** Filter by aspect class: an asset matches when it is in any of them */
+    aspectClasses?: AssetAspectClass[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */
@@ -3709,6 +3715,8 @@ export type FilterSuggestionsTagDto = {
     value: string;
 };
 export type SmartSearchFacetsResponseDto = {
+    /** Aspect classes present in the filtered set, ignoring aspectClasses */
+    aspectClasses?: AssetAspectClass[];
     /** Available camera makes */
     cameraMakes: string[];
     /** Available camera models for the current smart-search make scope */
@@ -3811,6 +3819,8 @@ export type SearchStatisticsResponseDto = {
     total: number;
 };
 export type FilterSuggestionsResponseDto = {
+    /** Aspect classes present in the filtered set, ignoring aspectClasses */
+    aspectClasses?: AssetAspectClass[];
     /** Available camera makes */
     cameraMakes: string[];
     /** Available countries */
@@ -7862,8 +7872,9 @@ export function getAssetFaceThumbnail({ id }: {
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ albumId, city, country, description, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, ocr, originalFileName, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export function getFilteredMapMarkers({ albumId, aspectClasses, city, country, description, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, ocr, originalFileName, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     city?: string;
     country?: string;
     description?: string;
@@ -7891,6 +7902,7 @@ export function getFilteredMapMarkers({ albumId, city, country, description, isF
         data: MapMarkerResponseDto[];
     }>(`/gallery/map/markers${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         city,
         country,
         description,
@@ -9365,8 +9377,9 @@ export function searchAssetStatistics({ statisticsSearchDto }: {
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ albumId, city, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export function getSearchSuggestions({ albumId, aspectClasses, city, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     city?: string;
     country?: string;
     includeNull?: boolean;
@@ -9393,6 +9406,7 @@ export function getSearchSuggestions({ albumId, city, country, includeNull, isFa
         data: string[];
     }>(`/search/suggestions${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         city,
         country,
         includeNull,
@@ -9420,8 +9434,9 @@ export function getSearchSuggestions({ albumId, city, country, includeNull, isFa
 /**
  * Retrieve dynamic filter suggestions
  */
-export function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+export function getFilterSuggestions({ albumId, aspectClasses, city, country, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     city?: string;
     country?: string;
     isFavorite?: boolean;
@@ -9446,6 +9461,7 @@ export function getFilterSuggestions({ albumId, city, country, isFavorite, isInA
         data: FilterSuggestionsResponseDto;
     }>(`/search/suggestions/filters${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         city,
         country,
         isFavorite,
@@ -11191,8 +11207,9 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, aspectClasses, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
@@ -11239,6 +11256,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
         data: TimeBucketAssetResponseDto;
     }>(`/timeline/bucket${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         bbox,
         bucketSize,
         city,
@@ -11286,8 +11304,9 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
 /**
  * Get time bucket covers
  */
-export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucketCovers({ albumId, aspectClasses, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
@@ -11334,6 +11353,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
         data: TimeBucketCoverResponseDto[];
     }>(`/timeline/bucket-covers${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         bbox,
         bucketSize,
         city,
@@ -11381,8 +11401,9 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, aspectClasses, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
+    aspectClasses?: AssetAspectClass[];
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
@@ -11428,6 +11449,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
         data: TimeBucketsResponseDto[];
     }>(`/timeline/buckets${QS.query(QS.explode({
         albumId,
+        aspectClasses,
         bbox,
         bucketSize,
         city,
@@ -12443,6 +12465,13 @@ export enum SourceType {
     MachineLearning = "machine-learning",
     Exif = "exif",
     Manual = "manual"
+}
+export enum AssetAspectClass {
+    Landscape = "landscape",
+    Square = "square",
+    Portrait = "portrait",
+    PanoramaWide = "panorama-wide",
+    PanoramaTall = "panorama-tall"
 }
 export enum MapMediaType {
     Image = "IMAGE",

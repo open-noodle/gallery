@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { type Kysely, type SelectQueryBuilder, type SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
-import { AssetType, AssetVisibility } from 'src/enum.js';
+import { AssetAspectClass, AssetType, AssetVisibility } from 'src/enum.js';
+import { ASPECT_CLASSES } from 'src/gallery/utils/aspect-class-sql.js';
 import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { DB } from 'src/schema/index.js';
-import { withAssetFilter } from 'src/utils/asset-filter.js';
+import { aspectClassCondition, withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, hasPeople } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { without } from 'src/utils/filter-suggestions.js';
@@ -67,6 +68,7 @@ interface FilterSuggestionFilterOptions {
   ownerId?: string;
   tagIds?: string[];
   rating?: number;
+  aspectClasses?: AssetAspectClass[];
   mediaType?: AssetType;
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
@@ -107,6 +109,7 @@ export interface FilterSuggestionsResult {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  aspectClasses?: AssetAspectClass[];
 }
 
 type IdentityPersonRow = {
@@ -505,25 +508,36 @@ export class FilterSuggestionRepository {
       'and "asset"."isFavorite" = $',
       '  and exists (\n    select\n    from\n      "album_asset"',
       '  and not exists (\n    select\n    from\n      "album_asset"',
+      'as "landscape"',
     ],
   })
   async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
-    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes, hasFavorites, albumMembership] =
-      await Promise.all([
-        // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
-        // country, so leaving it applied would collapse the country selector to a single row —
-        // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
-        this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
-        // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
-        // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
-        this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
-        this.getFilteredTags(userIds, without(options, 'tagIds')),
-        this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
-        this.getFilteredRatings(userIds, without(options, 'rating')),
-        this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
-        this.getFilteredHasFavorites(userIds, without(options, 'isFavorite')),
-        this.getFilteredAlbumMembership(userIds, without(options, 'isInAlbum', 'isNotInAlbum')),
-      ]);
+    const [
+      countries,
+      cameraMakes,
+      tags,
+      peopleResult,
+      ratings,
+      mediaTypes,
+      hasFavorites,
+      albumMembership,
+      aspectClasses,
+    ] = await Promise.all([
+      // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
+      // country, so leaving it applied would collapse the country selector to a single row —
+      // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
+      this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
+      // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
+      // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
+      this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
+      this.getFilteredTags(userIds, without(options, 'tagIds')),
+      this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
+      this.getFilteredRatings(userIds, without(options, 'rating')),
+      this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
+      this.getFilteredHasFavorites(userIds, without(options, 'isFavorite')),
+      this.getFilteredAlbumMembership(userIds, without(options, 'isInAlbum', 'isNotInAlbum')),
+      this.getFilteredAspectClasses(userIds, without(options, 'aspectClasses')),
+    ]);
 
     return {
       countries,
@@ -535,6 +549,7 @@ export class FilterSuggestionRepository {
       hasUnnamedPeople: peopleResult.hasUnnamedPeople,
       hasFavorites,
       ...albumMembership,
+      aspectClasses,
     };
   }
 
@@ -865,6 +880,25 @@ export class FilterSuggestionRepository {
       .orderBy('rating')
       .execute();
     return res.map((row) => row.rating!);
+  }
+
+  /**
+   * One probe per class. The class condition goes inside the filtered-id query, so each probe stops at its first match
+   * and can use asset_aspectClass_idx; `asset where id in (<filtered ids>)` can force the whole subquery first.
+   */
+  private async getFilteredAspectClasses(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<AssetAspectClass[]> {
+    const present = await this.aspectClassProbes(userIds, options).executeTakeFirst();
+    return ASPECT_CLASSES.filter((value) => present?.[value]);
+  }
+
+  private aspectClassProbes(userIds: string[], options: FilterSuggestionsOptions) {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    return this.db.selectNoFrom((eb) =>
+      ASPECT_CLASSES.map((value) => eb.exists(filteredIds.where(aspectClassCondition([value]))).as(value)),
+    );
   }
 
   private async getFilteredMediaTypes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {

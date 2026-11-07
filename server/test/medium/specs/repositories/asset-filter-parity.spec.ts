@@ -54,12 +54,14 @@ const setup = async () => {
     lensModel?: string;
     rating: number | null;
   };
-  const add = async (localDateTime: string, fileCreatedAt: string, exif: Exif) => {
+  const add = async (localDateTime: string, fileCreatedAt: string, exif: Exif, width: number, height: number) => {
     const { asset } = await ctx.newAsset({
       ownerId: user.id,
       localDateTime: new Date(localDateTime),
       fileCreatedAt: new Date(fileCreatedAt),
       visibility: AssetVisibility.Timeline,
+      width,
+      height,
     });
     await ctx.newExif({ assetId: asset.id, latitude: 1, longitude: 1, ...exif });
     await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
@@ -68,40 +70,64 @@ const setup = async () => {
 
   const ids = {
     // Taken Jan 1 05:00 at UTC+10: January by the timeline's localDateTime, December 31 by fileCreatedAt.
-    newYearSydney: await add('2024-01-01T05:00:00Z', '2023-12-31T19:00:00Z', {
-      country: 'Australia',
-      state: 'NSW',
-      city: 'Sydney',
-      make: 'Canon',
-      model: 'R5',
-      lensModel: 'RF50',
-      rating: 5,
-    }),
-    midJanuary: await add('2024-01-15T12:00:00Z', '2024-01-15T12:00:00Z', {
-      country: null,
-      state: null,
-      city: null,
-      make: 'Nikon',
-      model: 'Z6',
-      rating: 3,
-    }),
+    newYearSydney: await add(
+      '2024-01-01T05:00:00Z',
+      '2023-12-31T19:00:00Z',
+      {
+        country: 'Australia',
+        state: 'NSW',
+        city: 'Sydney',
+        make: 'Canon',
+        model: 'R5',
+        lensModel: 'RF50',
+        rating: 5,
+      },
+      400,
+      300,
+    ),
+    midJanuary: await add(
+      '2024-01-15T12:00:00Z',
+      '2024-01-15T12:00:00Z',
+      {
+        country: null,
+        state: null,
+        city: null,
+        make: 'Nikon',
+        model: 'Z6',
+        rating: 3,
+      },
+      300,
+      400,
+    ),
     // Exactly the exclusive upper bound the clients send for January.
-    februaryMidnight: await add('2024-02-01T00:00:00Z', '2024-02-01T00:00:00Z', {
-      country: 'France',
-      state: 'IDF',
-      city: 'Paris',
-      make: 'Nikon',
-      model: 'Z6',
-      rating: null,
-    }),
-    december: await add('2023-12-20T12:00:00Z', '2023-12-20T12:00:00Z', {
-      country: 'France',
-      state: 'IDF',
-      city: 'Paris',
-      make: 'Canon',
-      model: 'R5',
-      rating: 1,
-    }),
+    februaryMidnight: await add(
+      '2024-02-01T00:00:00Z',
+      '2024-02-01T00:00:00Z',
+      {
+        country: 'France',
+        state: 'IDF',
+        city: 'Paris',
+        make: 'Nikon',
+        model: 'Z6',
+        rating: null,
+      },
+      100,
+      100,
+    ),
+    december: await add(
+      '2023-12-20T12:00:00Z',
+      '2023-12-20T12:00:00Z',
+      {
+        country: 'France',
+        state: 'IDF',
+        city: 'Paris',
+        make: 'Canon',
+        model: 'R5',
+        rating: 1,
+      },
+      600,
+      200,
+    ),
   };
 
   const auth = factory.auth({ user: { id: user.id } });
@@ -140,7 +166,7 @@ const setup = async () => {
       });
       return markers.map((marker) => marker.id);
     },
-    smartSearch: async (filter: AssetFilter) => {
+    smartSearch: async (filter: AssetFilter, stock?: { upstreamTakenRange: boolean }) => {
       const { items } = await searchRepository.searchSmart(
         { page: 1, size: 100 },
         {
@@ -149,11 +175,12 @@ const setup = async () => {
           ...filter,
           takenAfter: filter.takenAfter as Date | undefined,
           takenBefore: filter.takenBefore as Date | undefined,
+          ...stock,
         },
       );
       return items.map((item) => item.id);
     },
-    metadataSearch: async (filter: AssetFilter) => {
+    metadataSearch: async (filter: AssetFilter, stock?: { upstreamTakenRange: boolean }) => {
       const { items } = await searchRepository.searchMetadata(
         { page: 1, size: 100 },
         {
@@ -163,6 +190,7 @@ const setup = async () => {
           takenBefore: filter.takenBefore as Date | undefined,
           // Metadata search keeps upstream's exact rating unless asked; only its taken range moved.
           ratingIsMinimum: true,
+          ...stock,
         },
       );
       return items.map((item) => item.id);
@@ -201,6 +229,19 @@ describe('asset filter parity', () => {
     ['rating is a minimum', { rating: 3 }, ['newYearSydney', 'midJanuary']],
     ['rating: null means unrated', { rating: null }, ['februaryMidnight']],
     ['January and a make', { ...january, make: 'Nikon' }, ['midJanuary']],
+    ['one aspect class', { aspectClasses: ['portrait'] }, ['midJanuary']],
+    [
+      'aspect classes are any of them',
+      { aspectClasses: ['landscape', 'square'] },
+      ['newYearSydney', 'februaryMidnight'],
+    ],
+    ['an aspect class and a make', { aspectClasses: ['portrait', 'landscape'], make: 'Nikon' }, ['midJanuary']],
+    ['an absent aspect class', { aspectClasses: ['panorama-tall'] }, []],
+    [
+      'an empty aspect class list is no filter',
+      { aspectClasses: [] },
+      ['newYearSydney', 'midJanuary', 'februaryMidnight', 'december'],
+    ],
   ];
 
   it.each(cases)('%s', async (_, filter, expected) => {
@@ -221,4 +262,19 @@ describe('asset filter parity', () => {
       facetTotal: expectedIds.length,
     });
   });
+
+  it.each(cases.filter(([, filter]) => filter.aspectClasses))(
+    '%s, on the stock search branch',
+    async (_, filter, expected) => {
+      const { ids, surfaces } = await setup();
+      const expectedIds = expected.map((key) => ids[key]).toSorted((a, b) => a.localeCompare(b));
+      const stock = { upstreamTakenRange: true };
+
+      const smartSearch = await surfaces.smartSearch(filter, stock);
+      const metadataSearch = await surfaces.metadataSearch(filter, stock);
+
+      expect(smartSearch.toSorted((a, b) => a.localeCompare(b))).toEqual(expectedIds);
+      expect(metadataSearch.toSorted((a, b) => a.localeCompare(b))).toEqual(expectedIds);
+    },
+  );
 });

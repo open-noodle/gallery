@@ -2,7 +2,14 @@ import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { HistoryBuilder } from 'src/decorators.js';
 import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
-import { AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema, LibraryViewSchema } from 'src/enum.js';
+import {
+  AssetAspectClassSchema,
+  AssetOrderSchema,
+  AssetTypeSchema,
+  AssetVisibilitySchema,
+  LibraryViewSchema,
+} from 'src/enum.js';
+import { aspectClassesBody, aspectClassesQuery } from 'src/gallery/dtos/aspect-class.dto.js';
 import { ScopedPrimaryProfileSchema } from 'src/gallery/dtos/person.dto.js';
 import { IsNotSiblingOf, boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
@@ -57,6 +64,7 @@ export const GallerySearchPeopleExtension = {
 /** SearchSuggestionRequestSchema */
 export const GallerySearchSuggestionExtension = {
   albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
+  aspectClasses: aspectClassesQuery,
   city: z.string().optional().describe('Filter by city'),
   personIds: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
@@ -92,6 +100,7 @@ const descriptionFilter = boundedTextFilter(z.string().trim())
 
 /** MetadataSearchSchema */
 export const GalleryMetadataSearchExtension = {
+  aspectClasses: aspectClassesBody,
   description: descriptionFilter,
   originalFileName: boundedTextFilter(z.string().trim())
     .optional()
@@ -107,6 +116,7 @@ export const GalleryStatisticsSearchExtension = { description: descriptionFilter
  * neither field has one (`order` here means relevance-vs-date on smart search).
  */
 export const GallerySmartSearchExtension = {
+  aspectClasses: aspectClassesBody,
   order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
   // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
   withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
@@ -181,6 +191,10 @@ const FilterSuggestionsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    aspectClasses: z
+      .array(AssetAspectClassSchema)
+      .optional()
+      .describe('Aspect classes present in the filtered set, ignoring aspectClasses'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -202,10 +216,15 @@ const SmartSearchFacetsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    aspectClasses: z
+      .array(AssetAspectClassSchema)
+      .optional()
+      .describe('Aspect classes present in the filtered set, ignoring aspectClasses'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
 const FilterSuggestionsRequestBaseSchema = z.object({
+  aspectClasses: aspectClassesQuery,
   personIds: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
     .optional()
