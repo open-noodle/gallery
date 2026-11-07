@@ -1,7 +1,8 @@
 import SpacesTable from '#lib/components/spaces/spaces-table.svelte';
 import { SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 
 vi.mock('#lib/route.js', () => ({
   Route: {
@@ -29,45 +30,45 @@ const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpace
 const currentUserId = 'user-1';
 
 describe('SpacesTable', () => {
-  it('renders space name', () => {
+  it('renders space name', async () => {
     const spaces = [makeSpace({ name: 'My Space' })];
-    const { getByText } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByText('My Space')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByText('My Space', { exact: true })).toBeInTheDocument();
   });
 
-  it('renders asset count as a number', () => {
+  it('renders asset count as a number', async () => {
     const spaces = [makeSpace({ assetCount: 42 })];
-    const { getByText } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByText('42')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByText('42', { exact: true })).toBeInTheDocument();
   });
 
-  it('renders member count as a number', () => {
+  it('renders member count as a number', async () => {
     const spaces = [makeSpace({ memberCount: 5 })];
-    const { getByText } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByText('5')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByText('5', { exact: true })).toBeInTheDocument();
   });
 
-  it('renders new-badge when newAssetCount > 0', () => {
+  it('renders new-badge when newAssetCount > 0', async () => {
     const spaces = [makeSpace({ id: 'sp1', newAssetCount: 3 })];
-    const { getByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByTestId('new-badge-sp1')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByTestId('new-badge-sp1')).toBeInTheDocument();
   });
 
-  it('renders em-dash in new-cell when newAssetCount === 0', () => {
+  it('renders em-dash in new-cell when newAssetCount === 0', async () => {
     const spaces = [makeSpace({ id: 'sp2', newAssetCount: 0 })];
-    const { getByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    const cell = getByTestId('new-cell-sp2');
-    expect(cell.textContent).toContain('—');
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    const cell = screen.getByTestId('new-cell-sp2');
+    expect(cell.element().textContent).toContain('—');
   });
 
-  it('renders em-dash in new-cell when newAssetCount is undefined', () => {
+  it('renders em-dash in new-cell when newAssetCount is undefined', async () => {
     const spaces = [makeSpace({ id: 'sp3', newAssetCount: undefined })];
-    const { getByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    const cell = getByTestId('new-cell-sp3');
-    expect(cell.textContent).toContain('—');
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    const cell = screen.getByTestId('new-cell-sp3');
+    expect(cell.element().textContent).toContain('—');
   });
 
-  it('renders role badge for the current user (owner)', () => {
+  it('renders role badge for the current user (owner)', async () => {
     const spaces = [
       makeSpace({
         id: 'sp4',
@@ -84,63 +85,61 @@ describe('SpacesTable', () => {
         ],
       }),
     ];
-    const { getByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByTestId('role-badge-owner')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByTestId('role-badge-owner')).toBeInTheDocument();
   });
 
-  it('renders color-bar for each space', () => {
+  it('renders color-bar for each space', async () => {
     const spaces = [makeSpace({ id: 'sp5' })];
-    const { getByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getByTestId('color-bar-sp5')).toBeDefined();
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    await expect.element(screen.getByTestId('color-bar-sp5')).toBeInTheDocument();
   });
 
-  it('renders correct number of rows for multiple spaces', () => {
+  it('renders correct number of rows for multiple spaces', async () => {
     const spaces = [
       makeSpace({ id: 's1', name: 'A' }),
       makeSpace({ id: 's2', name: 'B' }),
       makeSpace({ id: 's3', name: 'C' }),
     ];
-    const { getAllByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
-    expect(getAllByTestId('space-row')).toHaveLength(3);
+    const screen = await render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
+    expect(screen.getByTestId('space-row').elements()).toHaveLength(3);
   });
 
-  it('should show pin icon in name cell when pinned', () => {
+  it('should show pin icon in name cell when pinned', async () => {
     const space = makeSpace({ id: 'pinned-1' });
-    const { getByTestId } = render(SpacesTable, {
+    const screen = await render(SpacesTable, {
       props: { spaces: [space], currentUserId, pinnedIds: ['pinned-1'], onTogglePin: vi.fn() },
     });
-    expect(getByTestId('pin-icon-pinned-1')).toBeDefined();
+    await expect.element(screen.getByTestId('pin-icon-pinned-1')).toBeInTheDocument();
   });
 
-  it('should not show pin icon when not pinned', () => {
+  it('should not show pin icon when not pinned', async () => {
     const space = makeSpace({ id: 'unpinned-1' });
-    const { queryByTestId } = render(SpacesTable, {
+    const screen = await render(SpacesTable, {
       props: { spaces: [space], currentUserId, pinnedIds: [], onTogglePin: vi.fn() },
     });
-    expect(queryByTestId('pin-icon-unpinned-1')).toBeNull();
+    expect(screen.getByTestId('pin-icon-unpinned-1').query()).toBeNull();
   });
 
   it('should show three-dot menu button on row hover', async () => {
-    const user = userEvent.setup();
     const space = makeSpace({ id: 'hover-1' });
-    const { getByTestId, queryByTestId } = render(SpacesTable, {
+    const screen = await render(SpacesTable, {
       props: { spaces: [space], currentUserId, pinnedIds: [], onTogglePin: vi.fn() },
     });
-    expect(queryByTestId('row-menu-button-hover-1')).toBeNull();
-    await user.hover(getByTestId('space-row'));
-    expect(getByTestId('row-menu-button-hover-1')).toBeDefined();
+    expect(screen.getByTestId('row-menu-button-hover-1').query()).toBeNull();
+    await userEvent.hover(screen.getByTestId('space-row'));
+    await expect.element(screen.getByTestId('row-menu-button-hover-1')).toBeInTheDocument();
   });
 
   it('should call onTogglePin when Pin to top clicked in row menu', async () => {
-    const user = userEvent.setup();
     const onTogglePin = vi.fn();
     const space = makeSpace({ id: 'pin-1' });
-    const { getByTestId, getByText } = render(SpacesTable, {
+    const screen = await render(SpacesTable, {
       props: { spaces: [space], currentUserId, pinnedIds: [], onTogglePin },
     });
-    await user.hover(getByTestId('space-row'));
-    await user.click(getByTestId('row-menu-button-pin-1'));
-    await user.click(getByText('spaces_pin_to_top'));
+    await userEvent.hover(screen.getByTestId('space-row'));
+    await userEvent.click(screen.getByTestId('row-menu-button-pin-1'));
+    await userEvent.click(screen.getByText('spaces_pin_to_top', { exact: true }));
     expect(onTogglePin).toHaveBeenCalledWith('pin-1');
   });
 });

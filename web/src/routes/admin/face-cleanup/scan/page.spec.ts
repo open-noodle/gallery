@@ -8,9 +8,11 @@ import {
   type FaceRepairPersonFacesDto,
 } from '@immich/sdk';
 import { ConfirmModal, modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+import { find, getAll } from '../dom-queries.test-helpers';
+import { recordTranslations } from '../i18n-recorder.test-helpers';
 import Page from './+page.svelte';
 
 // The post-scan console, retriaged into two lanes (design
@@ -38,7 +40,7 @@ vi.mock('@immich/ui', async (original) => {
   const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
-    // Stub Icon to a no-op to avoid undefined-path errors in happy-dom
+    // Stub Icon to a no-op (matches the sibling face-cleanup specs)
     Icon: noop.default,
     toastManager: {
       primary: vi.fn(),
@@ -53,30 +55,11 @@ vi.mock('@immich/ui', async (original) => {
   };
 });
 
-// Every (key, options) pair the page asked to translate — same tracker as
+// Every (key, options) pair the page asked to translate — same recorder as
 // [personId]/page.spec.ts — so a test can assert what was INTERPOLATED (e.g. the cluster count in the
-// bulk-approve confirmation), not just which key rendered. The returned string is still just the bare key
-// (opts dropped), so every existing `getByText('admin.some_key')` assertion is unaffected.
-const { translations } = vi.hoisted(() => ({
-  translations: [] as { key: string; values?: Record<string, unknown> }[],
-}));
-
-// Mock svelte-i18n: return the key as the translation
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    t: {
-      subscribe: (run: (fn: (key: string, opts?: unknown) => string) => void) => {
-        run((key: string, opts?: unknown) => {
-          translations.push({ key, values: (opts as { values?: Record<string, unknown> })?.values });
-          return key;
-        });
-        return () => {};
-      },
-    },
-  };
-});
+// bulk-approve confirmation), not just which key rendered. The test locale still renders the bare key,
+// so every `getByText('admin.some_key')` assertion is unaffected.
+const translations = recordTranslations();
 
 // Mock $app/navigation to avoid SvelteKit runtime in tests
 vi.mock('$app/navigation', () => ({
@@ -222,10 +205,10 @@ describe('+page.svelte (face cleanup)', () => {
 
   it('shows "no scan" empty state when no scan has run', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_empty_no_scan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_empty_no_scan', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -235,32 +218,32 @@ describe('+page.svelte (face cleanup)', () => {
   // same thing on both pages.
   it('calls the first-run action "run first scan", never "re-scan"', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('first-scan-cta')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('first-scan-cta').element()).toBeInTheDocument();
     });
-    expect(screen.getAllByText('admin.face_cleanup_mode_run_first_scan').length).toBeGreaterThan(0);
-    expect(screen.queryByText('admin.face_cleanup_rescan')).not.toBeInTheDocument();
+    expect(getAll(page.getByText('admin.face_cleanup_mode_run_first_scan', { exact: true })).length).toBeGreaterThan(0);
+    expect(page.getByText('admin.face_cleanup_rescan', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   // Once a scan exists the label flips back — otherwise this would just be renaming the button outright.
   it('still calls it "re-scan" once a scan exists', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([]) as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_rescan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_rescan', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('first-scan-cta')).not.toBeInTheDocument();
+    expect(page.getByTestId('first-scan-cta').query()).not.toBeInTheDocument();
   });
 
   it('shows "nothing to clean up" when completed scan has 0 flagged persons', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([]) as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_empty_clean')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_empty_clean', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -279,14 +262,14 @@ describe('+page.svelte (face cleanup)', () => {
       createdAt: new Date().toISOString(),
     } as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Flush microtasks from onMount (the getLatestScan promise)
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(screen.getByText('admin.face_cleanup_scan_running')).toBeInTheDocument();
+    expect(page.getByText('admin.face_cleanup_scan_running', { exact: true }).element()).toBeInTheDocument();
     // Progress numbers are shown; use a regex match to be locale-flexible
-    expect(screen.getByText(/400/)).toBeInTheDocument();
+    expect(page.getByText(/400/).element()).toBeInTheDocument();
   });
 
   it('polls while scan is running and stops when completed', async () => {
@@ -307,11 +290,11 @@ describe('+page.svelte (face cleanup)', () => {
       .mockResolvedValueOnce(runningScan as unknown as object)
       .mockResolvedValue(completedScan as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Initial load shows running
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_scan_running')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_scan_running', { exact: true }).element()).toBeInTheDocument();
     });
 
     // Advance timer to trigger polls. First poll fires at +2000ms (POLL_MIN_MS) and still reports running,
@@ -358,15 +341,17 @@ describe('+page.svelte (face cleanup)', () => {
           }),
       ); // first poll — deliberately left unsettled to simulate "in flight at unmount"
 
-    const { unmount } = render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByText('admin.face_cleanup_scan_running')).toBeInTheDocument());
+    const { unmount } = await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() =>
+      expect(page.getByText('admin.face_cleanup_scan_running', { exact: true }).element()).toBeInTheDocument(),
+    );
 
     // Fire the first poll's setTimeout — its fetchLatestScan() call is now in flight (the mock above never
     // resolves on its own).
     await vi.advanceTimersByTimeAsync(2000);
-    await waitFor(() => expect(vi.mocked(getLatestScan).mock.calls.length).toBe(2));
+    await vi.waitFor(() => expect(vi.mocked(getLatestScan).mock.calls.length).toBe(2));
 
-    unmount();
+    await unmount();
     const callsAtUnmount = vi.mocked(getLatestScan).mock.calls.length;
 
     // Only NOW does the in-flight call settle — its `.then` is exactly where the old code unconditionally
@@ -392,12 +377,12 @@ describe('+page.svelte (face cleanup)', () => {
       createdAt: new Date().toISOString(),
     } as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_scan_failed')).toBeInTheDocument();
-      expect(screen.getByText('Some error occurred')).toBeInTheDocument();
-      expect(screen.getByText('admin.face_cleanup_retry_scan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_scan_failed', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Some error occurred', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('admin.face_cleanup_retry_scan', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -410,12 +395,15 @@ describe('+page.svelte (face cleanup)', () => {
     ];
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByTestId('confident-lane')).toBeInTheDocument());
-    expect(screen.getByTestId('review-lane')).toBeInTheDocument();
+    await vi.waitFor(() => expect(page.getByTestId('confident-lane').element()).toBeInTheDocument());
+    expect(page.getByTestId('review-lane').element()).toBeInTheDocument();
     // The whole review row is the link to the per-cluster review page.
-    expect(screen.getByTestId('review-row-r1')).toHaveAttribute('href', Route.viewFaceCleanupPerson({ id: 'r1' }));
+    expect(page.getByTestId('review-row-r1').element()).toHaveAttribute(
+      'href',
+      Route.viewFaceCleanupPerson({ id: 'r1' }),
+    );
   });
 
   // ---- confident bulk approve ----
@@ -428,11 +416,11 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
     mockFlaggedFaces([flagged('a1', 'own1'), flagged('a2', 'own2'), flagged('a3', 'own1')]);
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-approve').element());
 
-    await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(2));
     expect(resolveFaces).toHaveBeenCalledWith({
       faceRepairResolveRequestDto: {
         personId: 'c1',
@@ -449,11 +437,11 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
     mockFlaggedFaces([]);
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-approve').element());
 
-    await waitFor(() => expect(getFaceRepairPersonFaces).toHaveBeenCalledWith({ personId: 'c1' }));
+    await vi.waitFor(() => expect(getFaceRepairPersonFaces).toHaveBeenCalledWith({ personId: 'c1' }));
     expect(resolveFaces).not.toHaveBeenCalled();
   });
 
@@ -465,13 +453,13 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
     mockFlaggedFaces([flagged('a1', 'own1')]);
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-toggle')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-toggle').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
+    await userEvent.click(page.getByTestId('confident-approve').element());
 
-    await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
     expect(resolveFaces).toHaveBeenCalledWith(
       expect.objectContaining({ faceRepairResolveRequestDto: expect.objectContaining({ personId: 'c2' }) }),
     );
@@ -486,22 +474,24 @@ describe('+page.svelte (face cleanup)', () => {
     ];
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
 
-    const { unmount } = render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-toggle')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
+    const { unmount } = await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-toggle').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
 
-    await waitFor(() => expect(screen.getByTestId('confident-approve')).toHaveTextContent('1'));
-    unmount();
+    await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toMatchTextContent('1'));
+    await unmount();
 
     // Simulates navigating to the per-cluster review page and clicking back: the scan page remounts and
     // refetches the same completed scan (same id), so the exclusion must survive.
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-toggle')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-toggle').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-toggle').element());
 
-    await waitFor(() => expect(screen.getByTestId('confident-exclude-c1')).toHaveAttribute('aria-pressed', 'true'));
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('1');
+    await vi.waitFor(() =>
+      expect(page.getByTestId('confident-exclude-c1').element()).toHaveAttribute('aria-pressed', 'true'),
+    );
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('1');
   });
 
   it('a different scan id starts clean (does not inherit exclusions stored for a previous scan)', async () => {
@@ -513,12 +503,14 @@ describe('+page.svelte (face cleanup)', () => {
     const scan = { ...makeCompletedScan(persons), id: 'scan-new' };
     vi.mocked(getLatestScan).mockResolvedValue(scan as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-toggle')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-toggle').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-toggle').element());
 
-    await waitFor(() => expect(screen.getByTestId('confident-exclude-c1')).toHaveAttribute('aria-pressed', 'false'));
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('2');
+    await vi.waitFor(() =>
+      expect(page.getByTestId('confident-exclude-c1').element()).toHaveAttribute('aria-pressed', 'false'),
+    );
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('2');
   });
 
   it('ignores a malformed stored exclusions value and renders with nothing excluded', async () => {
@@ -526,12 +518,14 @@ describe('+page.svelte (face cleanup)', () => {
     const persons = [makeScanPerson({ personId: 'c1', recommendation: 'confident' })];
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-toggle')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-toggle').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-toggle').element());
 
-    await waitFor(() => expect(screen.getByTestId('confident-exclude-c1')).toHaveAttribute('aria-pressed', 'false'));
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('1');
+    await vi.waitFor(() =>
+      expect(page.getByTestId('confident-exclude-c1').element()).toHaveAttribute('aria-pressed', 'false'),
+    );
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('1');
   });
 
   it('Approve all 409 shows a non-destructive error and keeps the lanes', async () => {
@@ -540,12 +534,14 @@ describe('+page.svelte (face cleanup)', () => {
     mockFlaggedFaces([flagged('a1', 'own1')]);
     vi.mocked(resolveFaces).mockRejectedValue({ status: 409 });
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('confident-approve').element());
 
-    await waitFor(() => expect(screen.getByText('admin.face_cleanup_apply_conflict')).toBeInTheDocument());
-    expect(screen.getByTestId('confident-lane')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(page.getByText('admin.face_cleanup_apply_conflict', { exact: true }).element()).toBeInTheDocument(),
+    );
+    expect(page.getByTestId('confident-lane').element()).toBeInTheDocument();
   });
 
   // S11.12/F26: Promise.all used to reject on the FIRST failure, so a genuine partial success (2 of 3 applied)
@@ -562,16 +558,16 @@ describe('+page.svelte (face cleanup)', () => {
       .mockRejectedValueOnce({ status: 500 })
       .mockResolvedValue({ moved: 1, declined: 0, locked: 0, detached: 0, unknown: 0, skipped: 0 });
 
-    render(Page, { props: { data: makePageData() } });
-    await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
+    await render(Page, { props: { data: makePageData() } });
+    await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
     const before = vi.mocked(getLatestScan).mock.calls.length;
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await userEvent.click(page.getByTestId('confident-approve').element());
 
     // handleApprove's finally refetches even after a partial failure.
-    await waitFor(() => expect(vi.mocked(getLatestScan).mock.calls.length).toBeGreaterThan(before));
+    await vi.waitFor(() => expect(vi.mocked(getLatestScan).mock.calls.length).toBeGreaterThan(before));
     // Both calls actually ran (allSettled, not all-or-nothing) — c2 applied despite c1 rejecting.
     expect(resolveFaces).toHaveBeenCalledTimes(2);
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(
         translations.some(
           (t) =>
@@ -595,11 +591,11 @@ describe('+page.svelte (face cleanup)', () => {
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan(persons) as unknown as object);
       showModal.mockResolvedValueOnce(false); // decline
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
-      await fireEvent.click(screen.getByTestId('confident-approve'));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('confident-approve').element());
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(showModal).toHaveBeenCalledWith(
           ConfirmModal,
           expect.objectContaining({
@@ -625,11 +621,11 @@ describe('+page.svelte (face cleanup)', () => {
       mockFlaggedFaces([flagged('a1', 'own1')]);
       showModal.mockResolvedValueOnce(true);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('confident-approve')).toBeInTheDocument());
-      await fireEvent.click(screen.getByTestId('confident-approve'));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('confident-approve').element()).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('confident-approve').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
     });
   });
 
@@ -642,16 +638,16 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([]) as unknown as object);
     vi.mocked(triggerScan).mockResolvedValue({ scanId: 'new-scan-id' });
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_rescan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_rescan', { exact: true }).element()).toBeInTheDocument();
     });
 
-    const rescanBtn = screen.getByText('admin.face_cleanup_rescan');
-    await fireEvent.click(rescanBtn);
+    const rescanBtn = page.getByText('admin.face_cleanup_rescan', { exact: true }).element();
+    await userEvent.click(rescanBtn);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(triggerScan).toHaveBeenCalled();
     });
   });
@@ -660,11 +656,11 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
     vi.mocked(triggerScan).mockResolvedValue({ scanId: 'new-scan-id' });
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await fireEvent.click(await screen.findByTestId('first-scan-cta'));
+    await userEvent.click(await find(page.getByTestId('first-scan-cta')));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(triggerScan).toHaveBeenCalled();
     });
   });
@@ -681,22 +677,22 @@ describe('+page.svelte (face cleanup)', () => {
     vi.mocked(declineFaceRepair).mockResolvedValue({ created: 1 });
     vi.stubGlobal('confirm', () => true);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByTestId('review-dismiss-r1')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('review-dismiss-r1'));
+    await vi.waitFor(() => expect(page.getByTestId('review-dismiss-r1').element()).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('review-dismiss-r1').element());
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(declineFaceRepair).toHaveBeenCalledWith({
         faceRepairDeclineRequestDto: { persons: [{ personId: 'r1', suspectedOwnerIds: ['owner-person'] }] },
       });
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getLatestScan).toHaveBeenCalledTimes(2);
-      expect(screen.getByText('admin.face_cleanup_empty_clean')).toBeInTheDocument();
+      expect(page.getByText('admin.face_cleanup_empty_clean', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('review-dismiss-r1')).not.toBeInTheDocument();
+    expect(page.getByTestId('review-dismiss-r1').query()).not.toBeInTheDocument();
   });
 
   // ---- D17: a failed INITIAL load must not render as the reassuring "no scan yet" empty state ----
@@ -704,19 +700,19 @@ describe('+page.svelte (face cleanup)', () => {
   it('shows a load-error state (not the empty state) when the initial scan fetch fails, and Retry re-fetches', async () => {
     vi.mocked(getLatestScan).mockRejectedValueOnce(new Error('network down'));
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('load-error-banner')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('load-error-banner').element()).toBeInTheDocument();
     });
-    expect(screen.queryByText('admin.face_cleanup_empty_no_scan')).not.toBeInTheDocument();
+    expect(page.getByText('admin.face_cleanup_empty_no_scan', { exact: true }).query()).not.toBeInTheDocument();
 
     vi.mocked(getLatestScan).mockResolvedValueOnce(null as unknown as object);
-    await fireEvent.click(screen.getByTestId('load-error-retry'));
+    await userEvent.click(page.getByTestId('load-error-retry').element());
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_empty_no_scan')).toBeInTheDocument();
-      expect(screen.queryByTestId('load-error-banner')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_empty_no_scan', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByTestId('load-error-banner').query()).not.toBeInTheDocument();
     });
   });
 
@@ -736,29 +732,31 @@ describe('+page.svelte (face cleanup)', () => {
       .mockResolvedValueOnce(runningScan as unknown as object) // initial load: succeeds
       .mockRejectedValueOnce(new Error('blip')); // first poll: transient failure
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByText('admin.face_cleanup_scan_running')).toBeInTheDocument());
+    await vi.waitFor(() =>
+      expect(page.getByText('admin.face_cleanup_scan_running', { exact: true }).element()).toBeInTheDocument(),
+    );
 
     await vi.advanceTimersByTimeAsync(2000);
 
-    await waitFor(() => expect(getLatestScan).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(getLatestScan).toHaveBeenCalledTimes(2));
     // Still showing the running-scan state, not a load-error banner, despite the poll blip.
-    expect(screen.getByText('admin.face_cleanup_scan_running')).toBeInTheDocument();
-    expect(screen.queryByTestId('load-error-banner')).not.toBeInTheDocument();
+    expect(page.getByText('admin.face_cleanup_scan_running', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('load-error-banner').query()).not.toBeInTheDocument();
   });
 
-  it('renders a breadcrumb trail back to the face cleanup landing page', () => {
-    render(Page, { props: { data: makePageData() } });
+  it('renders a breadcrumb trail back to the face cleanup landing page', async () => {
+    await render(Page, { props: { data: makePageData() } });
 
-    const trail = within(screen.getByTestId('breadcrumbs'));
+    const trail = page.getByTestId('breadcrumbs');
 
     // The whole trail, in order — not merely "a link exists somewhere". A partial assertion would pass with
     // the guided level missing, which is half of what this change fixes.
-    const root = trail.getByRole('link', { name: 'admin.face_cleanup' });
+    const root = trail.getByRole('link', { name: 'admin.face_cleanup', exact: true }).element();
     expect(root).toHaveAttribute('href', Route.faceCleanup());
 
-    expect(trail.getByText('admin.face_cleanup_mode_guided')).toBeInTheDocument();
-    expect(trail.getAllByRole('link')).toHaveLength(1); // the leaf is not a link
+    expect(trail.getByText('admin.face_cleanup_mode_guided', { exact: true }).element()).toBeInTheDocument();
+    expect(getAll(trail.getByRole('link'))).toHaveLength(1); // the leaf is not a link
   });
 });

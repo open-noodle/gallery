@@ -2,9 +2,8 @@ import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -55,8 +54,6 @@ vi.mock('@immich/sdk', async (importOriginal) => {
     getAssetInfo: getAssetInfoMock,
   };
 });
-
-vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('#lib/utils/people-utils.js', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
 
@@ -131,7 +128,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
     zoomImageToBase64Mock.mockResolvedValue(null);
   });
 
-  it('renders SpacePersonSidePanel and NOT PersonSidePanel for a non-owner space editor', () => {
+  it('renders SpacePersonSidePanel and NOT PersonSidePanel for a non-owner space editor', async () => {
     const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
@@ -139,29 +136,29 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
+    await renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
-    expect(screen.getByTestId('space-person-side-panel-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('person-side-panel-stub')).toBeNull();
+    await expect.element(page.getByTestId('space-person-side-panel-stub')).toBeInTheDocument();
+    expect(page.getByTestId('person-side-panel-stub').query()).toBeNull();
 
-    const stub = screen.getByTestId('space-person-side-panel-stub');
-    expect(stub).toHaveAttribute('data-space-id', 'space-1');
-    expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
+    const stub = page.getByTestId('space-person-side-panel-stub');
+    await expect.element(stub).toHaveAttribute('data-space-id', 'space-1');
+    await expect.element(stub).toHaveAttribute('data-asset-id', 'asset-1');
   });
 
-  it('renders PersonSidePanel and NOT SpacePersonSidePanel for the asset owner, even inside a space', () => {
+  it('renders PersonSidePanel and NOT SpacePersonSidePanel for the asset owner, even inside a space', async () => {
     const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
+    await renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
-    expect(screen.getByTestId('person-side-panel-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-person-side-panel-stub')).toBeNull();
+    await expect.element(page.getByTestId('person-side-panel-stub')).toBeInTheDocument();
+    expect(page.getByTestId('space-person-side-panel-stub').query()).toBeNull();
 
-    const stub = screen.getByTestId('person-side-panel-stub');
-    expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
+    const stub = page.getByTestId('person-side-panel-stub');
+    await expect.element(stub).toHaveAttribute('data-asset-id', 'asset-1');
   });
 
-  it('renders the owner PersonSidePanel (never both) for a non-owner with no space context', () => {
+  it('renders the owner PersonSidePanel (never both) for a non-owner with no space context', async () => {
     const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
@@ -169,9 +166,9 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    expect(screen.getByTestId('person-side-panel-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-person-side-panel-stub')).toBeNull();
+    await expect.element(page.getByTestId('person-side-panel-stub')).toBeInTheDocument();
+    expect(page.getByTestId('space-person-side-panel-stub').query()).toBeNull();
   });
 });

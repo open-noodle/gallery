@@ -1,10 +1,11 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import SpaceActivityFeed from '#lib/components/spaces/space-activity-feed.svelte';
-import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
-function renderFeed(props: Record<string, unknown>) {
+async function renderFeed(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpaceActivityFeed; componentProps: typeof props }>, {
     component: SpaceActivityFeed,
     componentProps: props,
@@ -31,25 +32,25 @@ describe('SpaceActivityFeed', () => {
     await waitLocale('en-US');
   });
 
-  it('should show empty state when no activities', () => {
-    renderFeed({ activities: [], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-empty-state')).toBeInTheDocument();
+  it('should show empty state when no activities', async () => {
+    await renderFeed({ activities: [], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-empty-state').element()).toBeInTheDocument();
   });
 
-  it('should render asset_add event with user name and count', () => {
+  it('should render asset_add event with user name and count', async () => {
     const activities = [makeActivity({ type: 'asset_add', data: { count: 5, assetIds: ['a1', 'a2'] } })];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-item-act-1')).toBeInTheDocument();
-    expect(screen.getByTestId('activity-item-act-1')).toHaveTextContent('Pierre added 5 photos');
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-item-act-1').element()).toBeInTheDocument();
+    expect(page.getByTestId('activity-item-act-1').element()).toMatchTextContent('Pierre added 5 photos');
   });
 
-  it('should render member_join event', () => {
+  it('should render member_join event', async () => {
     const activities = [makeActivity({ id: 'act-2', type: 'member_join', data: { role: 'editor' } })];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-item-act-2')).toBeInTheDocument();
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-item-act-2').element()).toBeInTheDocument();
   });
 
-  it('should name the inviter when member_join carries invitedByName', () => {
+  it('should name the inviter when member_join carries invitedByName', async () => {
     const activities = [
       makeActivity({
         id: 'act-4',
@@ -58,17 +59,17 @@ describe('SpaceActivityFeed', () => {
         data: { role: 'viewer', invitedByName: 'Anna' },
       }),
     ];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-item-act-4')).toHaveTextContent('Anna added Ben as viewer');
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-item-act-4').element()).toMatchTextContent('Anna added Ben as viewer');
   });
 
-  it('should fall back to the joined-as line when member_join has no invitedByName', () => {
+  it('should fall back to the joined-as line when member_join has no invitedByName', async () => {
     const activities = [makeActivity({ id: 'act-5', type: 'member_join', userName: 'Ben', data: { role: 'viewer' } })];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-item-act-5')).toHaveTextContent('Ben joined as viewer');
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-item-act-5').element()).toMatchTextContent('Ben joined as viewer');
   });
 
-  it('should render space_rename event with compact styling', () => {
+  it('should render space_rename event with compact styling', async () => {
     const activities = [
       makeActivity({
         id: 'act-3',
@@ -77,25 +78,25 @@ describe('SpaceActivityFeed', () => {
         userName: 'Marie',
       }),
     ];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('activity-item-act-3')).toBeInTheDocument();
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('activity-item-act-3').element()).toBeInTheDocument();
   });
 
-  it('should show day headers', () => {
+  it('should show day headers', async () => {
     const today = new Date().toISOString();
     const activities = [makeActivity({ createdAt: today })];
-    renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.getByTestId('day-header-0')).toBeInTheDocument();
+    await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('day-header-0').element()).toBeInTheDocument();
   });
 
-  it('should show load more button when hasMore is true', () => {
-    renderFeed({ activities: [makeActivity()], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: true });
-    expect(screen.getByTestId('load-more-button')).toBeInTheDocument();
+  it('should show load more button when hasMore is true', async () => {
+    await renderFeed({ activities: [makeActivity()], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: true });
+    expect(page.getByTestId('load-more-button').element()).toBeInTheDocument();
   });
 
-  it('should NOT show load more button when hasMore is false', () => {
-    renderFeed({ activities: [makeActivity()], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-    expect(screen.queryByTestId('load-more-button')).not.toBeInTheDocument();
+  it('should NOT show load more button when hasMore is false', async () => {
+    await renderFeed({ activities: [makeActivity()], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+    expect(page.getByTestId('load-more-button').query()).not.toBeInTheDocument();
   });
 
   describe('getDescription — new activity types', () => {
@@ -110,49 +111,49 @@ describe('SpaceActivityFeed', () => {
     ];
 
     for (const { type, data, text } of cases) {
-      it(`renders "${type}" with correct description`, () => {
+      it(`renders "${type}" with correct description`, async () => {
         const id = `act-${type}`;
         const activities = [makeActivity({ id, type, data, userName: 'Bob' })];
-        renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-        expect(screen.getByTestId(`activity-item-${id}`)).toHaveTextContent(`Bob ${text}`);
+        await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+        expect(page.getByTestId(`activity-item-${id}`).element()).toMatchTextContent(`Bob ${text}`);
       });
     }
 
-    it('renders unknown type as "performed an action" fallback', () => {
+    it('renders unknown type as "performed an action" fallback', async () => {
       const activities = [makeActivity({ id: 'act-unknown', type: 'some_future_type', data: {}, userName: 'Bob' })];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      expect(screen.getByTestId('activity-item-act-unknown')).toHaveTextContent('Bob performed an action');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(page.getByTestId('activity-item-act-unknown').element()).toMatchTextContent('Bob performed an action');
     });
 
-    it('renders new-type activity with missing name field with empty quotes (no crash)', () => {
+    it('renders new-type activity with missing name field with empty quotes (no crash)', async () => {
       const activities = [makeActivity({ id: 'act-noname', type: 'album_link', data: {}, userName: 'Bob' })];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      expect(screen.getByTestId('activity-item-act-noname')).toHaveTextContent('Bob linked album ""');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(page.getByTestId('activity-item-act-noname').element()).toMatchTextContent('Bob linked album ""');
     });
 
     // F-24/F-25 (spec §6.7): the two new face-attribution types render their translated string.
-    it('renders "person_face_assign" with correct description', () => {
+    it('renders "person_face_assign" with correct description', async () => {
       const activities = [
         makeActivity({ id: 'act-assign', type: 'person_face_assign', data: { count: 1 }, userName: 'Bob' }),
       ];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      expect(screen.getByTestId('activity-item-act-assign')).toHaveTextContent('Bob named 1 face');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(page.getByTestId('activity-item-act-assign').element()).toMatchTextContent('Bob named 1 face');
     });
 
-    it('renders "person_face_assign" with plural count', () => {
+    it('renders "person_face_assign" with plural count', async () => {
       const activities = [
         makeActivity({ id: 'act-assign-plural', type: 'person_face_assign', data: { count: 3 }, userName: 'Bob' }),
       ];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      expect(screen.getByTestId('activity-item-act-assign-plural')).toHaveTextContent('Bob named 3 faces');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(page.getByTestId('activity-item-act-assign-plural').element()).toMatchTextContent('Bob named 3 faces');
     });
 
-    it('renders "person_face_detach" with correct description', () => {
+    it('renders "person_face_detach" with correct description', async () => {
       const activities = [
         makeActivity({ id: 'act-detach', type: 'person_face_detach', data: { count: 1 }, userName: 'Bob' }),
       ];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      expect(screen.getByTestId('activity-item-act-detach')).toHaveTextContent('Bob removed 1 face');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(page.getByTestId('activity-item-act-detach').element()).toMatchTextContent('Bob removed 1 face');
     });
   });
 
@@ -161,23 +162,23 @@ describe('SpaceActivityFeed', () => {
     // border accent (`border-l-2`, unique to the medium branch), never the high-impact card
     // wrapper (`rounded-lg`, unique to asset_add/asset_remove) and never the low-tier dot row
     // (no avatar `<figure>` at all).
-    it('renders "person_face_assign" in the medium-impact tier', () => {
+    it('renders "person_face_assign" in the medium-impact tier', async () => {
       const activities = [
         makeActivity({ id: 'act-assign-tier', type: 'person_face_assign', data: { count: 1 }, userName: 'Bob' }),
       ];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      const item = screen.getByTestId('activity-item-act-assign-tier');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      const item = page.getByTestId('activity-item-act-assign-tier').element();
       expect(item.className).toContain('border-l-2');
       expect(item.className).not.toContain('rounded-lg');
       expect(item.querySelector('figure')).not.toBeNull();
     });
 
-    it('renders "person_face_detach" in the medium-impact tier', () => {
+    it('renders "person_face_detach" in the medium-impact tier', async () => {
       const activities = [
         makeActivity({ id: 'act-detach-tier', type: 'person_face_detach', data: { count: 1 }, userName: 'Bob' }),
       ];
-      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
-      const item = screen.getByTestId('activity-item-act-detach-tier');
+      await renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      const item = page.getByTestId('activity-item-act-detach-tier').element();
       expect(item.className).toContain('border-l-2');
       expect(item.className).not.toContain('rounded-lg');
       expect(item.querySelector('figure')).not.toBeNull();

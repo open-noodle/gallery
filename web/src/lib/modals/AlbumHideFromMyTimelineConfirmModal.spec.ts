@@ -11,8 +11,8 @@
 //
 // `$t` is not initialised in these specs, so it returns the KEY, which makes "is the retained
 // sentence part of the prompt?" a clean assertion.
-import '#lib/__mocks__/sdk.mock.ts';
-import { render } from '@testing-library/svelte';
+import '#lib/gallery/__mocks__/sdk.mock.ts';
+import { render } from 'vitest-browser-svelte';
 import AlbumHideFromMyTimelineConfirmModal from './AlbumHideFromMyTimelineConfirmModal.svelte';
 
 const RETAINED_KEY = 'space_albums_hide_from_my_timeline_confirm_retained';
@@ -28,23 +28,24 @@ const renderModal = (props: { count: number; retainedCount?: number }) =>
 const renderedText = () => document.body.textContent ?? '';
 
 describe('AlbumHideFromMyTimelineConfirmModal', () => {
-  it('appends the retained sentence when another path into the space keeps photos on the timeline', () => {
-    renderModal({ count: 0, retainedCount: 412 });
+  it('appends the retained sentence when another path into the space keeps photos on the timeline', async () => {
+    await renderModal({ count: 0, retainedCount: 412 });
 
-    expect(renderedText()).toContain(PROMPT_KEY);
+    await expect.poll(renderedText).toContain(PROMPT_KEY);
     expect(renderedText()).toContain(RETAINED_KEY);
   });
 
-  it('omits the retained sentence when nothing is rescued', () => {
-    renderModal({ count: 3, retainedCount: 0 });
+  it('omits the retained sentence when nothing is rescued', async () => {
+    await renderModal({ count: 3, retainedCount: 0 });
 
-    expect(renderedText()).toContain(PROMPT_KEY);
+    await expect.poll(renderedText).toContain(PROMPT_KEY);
     expect(renderedText()).not.toContain(RETAINED_KEY);
   });
 
-  it('omits the retained sentence when the server did not send a count', () => {
-    renderModal({ count: 3 });
+  it('omits the retained sentence when the server did not send a count', async () => {
+    await renderModal({ count: 3 });
 
+    await expect.poll(renderedText).toContain(PROMPT_KEY);
     expect(renderedText()).not.toContain(RETAINED_KEY);
   });
 });

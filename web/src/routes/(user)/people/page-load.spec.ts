@@ -1,7 +1,10 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { PEOPLE_PAGE_SIZE } from '#lib/constants.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
-import { load } from './+page';
+
+// Loaded after sdk.mock.ts: browser mode links static imports in order, and any module that imports
+// @immich/sdk before sdk.mock.ts registers its vi.mock binds the real SDK for the whole file.
+const { PEOPLE_PAGE_SIZE } = await import('#lib/constants.ts');
+const { load } = await import('./+page');
 
 const { authenticate, getFormatter, featureFlagsMock } = vi.hoisted(() => ({
   authenticate: vi.fn(),

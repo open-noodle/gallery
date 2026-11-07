@@ -7,7 +7,6 @@ import {
   type SharedSpaceResponseDto,
   type UserResponseDto,
 } from '@immich/sdk';
-import { randomUUID } from 'node:crypto';
 
 // Gallery's own response builders, merged into upstream's `factory` in `#test/unit/factories.ts`.
 
@@ -19,10 +18,10 @@ const recently = (index: number) => new Date(Date.UTC(2025, 9, 29) - index * 86_
 const sharedSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => {
   const index = spaceIndex++;
   return {
-    id: randomUUID(),
+    id: crypto.randomUUID(),
     name: `Space ${index + 1}`,
     description: null,
-    createdById: randomUUID(),
+    createdById: crypto.randomUUID(),
     createdAt: recently(index + 30),
     updatedAt: recently(index + 30),
     color: UserAvatarColor.Primary,
@@ -43,7 +42,7 @@ const sharedSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpa
 const sharedSpaceLinkedAlbum = (overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSpaceLinkedAlbumDto => {
   const index = linkedAlbumIndex++;
   return {
-    id: randomUUID(),
+    id: crypto.randomUUID(),
     albumName: `Album ${index + 1}`,
     description: '',
     albumThumbnailAssetId: null,
@@ -56,10 +55,10 @@ const sharedSpaceLinkedAlbum = (overrides: Partial<SharedSpaceLinkedAlbumDto> = 
     hasSharedLink: false,
     isActivityEnabled: true,
     order: AssetOrder.Desc,
-    ownerId: randomUUID(),
+    ownerId: crypto.randomUUID(),
     showInTimeline: true,
     hiddenFromMyTimeline: false,
-    addedById: randomUUID(),
+    addedById: crypto.randomUUID(),
     linkedAt: recently(index),
     ...overrides,
   };
@@ -75,7 +74,7 @@ let userSummaryIndex = 0;
 const userSummary = (overrides: Partial<UserResponseDto> = {}): UserResponseDto => {
   const index = userSummaryIndex++;
   return {
-    id: randomUUID(),
+    id: crypto.randomUUID(),
     email: `user${index + 1}@example.com`,
     name: `User ${index + 1}`,
     profileImagePath: '',

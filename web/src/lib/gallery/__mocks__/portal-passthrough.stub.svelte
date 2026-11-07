@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  // Renders the portalled content in place (happy-dom has no paint order to reproduce) while
+  // Renders the portalled content in place (a unit test has no paint order to check) while
   // recording the target, so tests can assert *that* a subtree leaves the page's stacking context.
   interface Props {
     target?: HTMLElement | string;

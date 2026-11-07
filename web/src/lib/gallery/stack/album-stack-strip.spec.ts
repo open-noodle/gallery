@@ -1,5 +1,5 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
 import type { StackResponseDto } from '@immich/sdk';

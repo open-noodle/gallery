@@ -1,6 +1,8 @@
 import SpaceHogList from '#lib/gallery/cleanup/SpaceHogList.svelte';
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const asset = (id: string, fileSize: number, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,
@@ -25,50 +27,53 @@ const items = [
   asset('c', 1000, { type: AssetTypeEnum.Image, duration: null }),
 ];
 
-const renderList = () => {
+const renderList = async () => {
   const handlers = { onKeep: vi.fn(), onTrash: vi.fn(), onOpen: vi.fn() };
-  render(SpaceHogList, { items, ...handlers });
+  await render(SpaceHogList, { items, ...handlers });
   return handlers;
 };
 
-const row = (id: string) => within(screen.getByTestId(`cleanup-hog-row-${id}`));
+const row = (id: string) => page.getByTestId(`cleanup-hog-row-${id}`);
 
 describe('SpaceHogList', () => {
-  it('keeps the given order', () => {
-    renderList();
+  it('keeps the given order', async () => {
+    await renderList();
 
-    expect(screen.getAllByTestId(/^cleanup-hog-row-/).map((el) => el.dataset.testid)).toEqual([
-      'cleanup-hog-row-a',
-      'cleanup-hog-row-b',
-      'cleanup-hog-row-c',
-    ]);
+    expect(
+      page
+        .getByTestId(/^cleanup-hog-row-/)
+        .elements()
+        .map((el) => el.dataset.testid),
+    ).toEqual(['cleanup-hog-row-a', 'cleanup-hog-row-b', 'cleanup-hog-row-c']);
   });
 
-  it('sizes each bar relative to the first row', () => {
-    renderList();
+  it('sizes each bar relative to the first row', async () => {
+    await renderList();
 
-    const widths = ['a', 'b', 'c'].map((id) => row(id).getByTestId('cleanup-hog-bar').style.width);
+    const widths = ['a', 'b', 'c'].map((id) => row(id).getByTestId('cleanup-hog-bar').element().style.width);
     expect(widths).toEqual(['100%', '50%', '25%']);
   });
 
-  it('shows the file details and the album and favourite signals', () => {
-    renderList();
+  it('shows the file details and the album and favourite signals', async () => {
+    await renderList();
 
-    expect(row('a').getByText('a.mp4')).toBeInTheDocument();
-    expect(row('a').getByTestId('cleanup-hog-signals')).toHaveTextContent(
-      'video · 3840×2160 · 11:42 · 2019 · cleanup_in_album',
-    );
-    expect(row('b').getByTestId('cleanup-hog-signals')).toHaveTextContent('♥ favorite');
-    expect(row('c').getByTestId('cleanup-hog-signals')).toHaveTextContent('cleanup_photo · 3840×2160 · 2019');
-    expect(row('c').getByTestId('cleanup-hog-signals')).not.toHaveTextContent('cleanup_in_album');
+    await expect.element(row('a').getByText('a.mp4')).toBeInTheDocument();
+    await expect
+      .element(row('a').getByTestId('cleanup-hog-signals'))
+      .toMatchTextContent('video · 3840×2160 · 11:42 · 2019 · cleanup_in_album');
+    await expect.element(row('b').getByTestId('cleanup-hog-signals')).toMatchTextContent('♥ favorite');
+    await expect
+      .element(row('c').getByTestId('cleanup-hog-signals'))
+      .toMatchTextContent('cleanup_photo · 3840×2160 · 2019');
+    await expect.element(row('c').getByTestId('cleanup-hog-signals')).not.toMatchTextContent('cleanup_in_album');
   });
 
   it('calls the keep, trash and open handlers', async () => {
-    const { onKeep, onTrash, onOpen } = renderList();
+    const { onKeep, onTrash, onOpen } = await renderList();
 
-    await fireEvent.click(screen.getByTestId('cleanup-hog-keep-b'));
-    await fireEvent.click(screen.getByTestId('cleanup-hog-trash-c'));
-    await fireEvent.click(screen.getByTestId('cleanup-hog-open-a'));
+    await userEvent.click(page.getByTestId('cleanup-hog-keep-b'));
+    await userEvent.click(page.getByTestId('cleanup-hog-trash-c'));
+    await userEvent.click(page.getByTestId('cleanup-hog-open-a'));
 
     expect(onKeep).toHaveBeenCalledWith('b');
     expect(onTrash).toHaveBeenCalledWith('c');

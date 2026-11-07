@@ -1,8 +1,7 @@
 import type { PersonFacePageResponseDto, PersonFaceResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { afterEach } from 'vitest';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import RepresentativeFacePickerModal from './RepresentativeFacePickerModal.svelte';
 
 vi.mock('@immich/ui', async (importOriginal: () => Promise<typeof import('@immich/ui')>) => {
@@ -48,16 +47,9 @@ const makePage = (overrides: Partial<PersonFacePageResponseDto> = {}): PersonFac
 
 const getThumbnailUrl = (face: PersonFaceResponseDto) => `/thumbnail/${face.id}`;
 
-// Drain bits-ui Modal's deferred body-scroll-lock cleanup before happy-dom tears
-// down `document`. Otherwise CI can report an unhandled `document is not defined`
-// after all assertions in this file have passed.
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-});
-
 describe('RepresentativeFacePickerModal', () => {
-  it('shows a stable skeleton grid while loading', () => {
-    render(RepresentativeFacePickerModal, {
+  it('shows a stable skeleton grid while loading', async () => {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn(() => new Promise<PersonFacePageResponseDto>(() => {})),
       updateFace: vi.fn(),
@@ -65,7 +57,7 @@ describe('RepresentativeFacePickerModal', () => {
       onClose: vi.fn(),
     });
 
-    expect(screen.getAllByTestId('representative-face-skeleton')).toHaveLength(18);
+    await expect.element(page.getByTestId('representative-face-skeleton')).toHaveLength(18);
   });
 
   it('loads faces and updates the exact selected face', async () => {
@@ -73,7 +65,7 @@ describe('RepresentativeFacePickerModal', () => {
     const updateFace = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
 
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces,
       updateFace,
@@ -81,10 +73,13 @@ describe('RepresentativeFacePickerModal', () => {
       onClose,
     });
 
-    await waitFor(() => expect(loadFaces).toHaveBeenCalledWith({ page: 1, size: 50 }));
-    await screen.findAllByRole('button', { name: 'select_representative_face' });
-    expect(screen.getByTestId('representative-face-grid')).toHaveClass('grid-cols-[repeat(auto-fill,88px)]');
-    await userEvent.click(screen.getAllByRole('button', { name: 'select_representative_face' })[1]);
+    await vi.waitFor(() => expect(loadFaces).toHaveBeenCalledWith({ page: 1, size: 50 }));
+    const faceButtons = page.getByRole('button', { name: 'select_representative_face' });
+    await expect.element(faceButtons).toHaveLength(2);
+    await expect
+      .element(page.getByTestId('representative-face-grid'))
+      .toHaveClass('grid-cols-[repeat(auto-fill,88px)]');
+    await userEvent.click(faceButtons.nth(1));
 
     expect(updateFace).toHaveBeenCalledWith('face-2');
     expect(onClose).toHaveBeenCalledWith(true);
@@ -96,7 +91,7 @@ describe('RepresentativeFacePickerModal', () => {
       .mockResolvedValueOnce(makePage({ hasNextPage: true }))
       .mockResolvedValueOnce(makePage({ faces: [makeFace({ id: 'face-3' })], hasNextPage: false }));
 
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces,
       updateFace: vi.fn(),
@@ -104,13 +99,13 @@ describe('RepresentativeFacePickerModal', () => {
       onClose: vi.fn(),
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'load_more' }));
+    await userEvent.click(page.getByRole('button', { name: 'load_more' }));
 
-    expect(loadFaces).toHaveBeenCalledWith({ page: 2, size: 50 });
+    await vi.waitFor(() => expect(loadFaces).toHaveBeenCalledWith({ page: 2, size: 50 }));
   });
 
   it('shows reset only when a reset callback is provided', async () => {
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn().mockResolvedValue(makePage()),
       updateFace: vi.fn(),
@@ -119,11 +114,11 @@ describe('RepresentativeFacePickerModal', () => {
       onClose: vi.fn(),
     });
 
-    expect(await screen.findByRole('button', { name: 'use_inherited_thumbnail' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'use_inherited_thumbnail' })).toBeInTheDocument();
   });
 
   it('shows an empty state when no faces are selectable', async () => {
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn().mockResolvedValue({ faces: [], hasNextPage: false }),
       updateFace: vi.fn(),
@@ -131,11 +126,11 @@ describe('RepresentativeFacePickerModal', () => {
       onClose: vi.fn(),
     });
 
-    expect(await screen.findByText('no_faces_found')).toBeInTheDocument();
+    await expect.element(page.getByText('no_faces_found')).toBeInTheDocument();
   });
 
   it('shows an error state when the initial face load fails', async () => {
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn().mockRejectedValue(new Error('network failed')),
       updateFace: vi.fn(),
@@ -143,7 +138,7 @@ describe('RepresentativeFacePickerModal', () => {
       onClose: vi.fn(),
     });
 
-    expect(await screen.findByText('errors.unable_to_load_faces')).toBeInTheDocument();
+    await expect.element(page.getByText('errors.unable_to_load_faces')).toBeInTheDocument();
   });
 
   it('disables all picker actions while an update is pending', async () => {
@@ -156,7 +151,7 @@ describe('RepresentativeFacePickerModal', () => {
     );
     const onClose = vi.fn();
 
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn().mockResolvedValue(makePage()),
       updateFace,
@@ -165,20 +160,21 @@ describe('RepresentativeFacePickerModal', () => {
       onClose,
     });
 
-    const faceButtons = await screen.findAllByRole('button', { name: 'select_representative_face' });
-    await userEvent.click(faceButtons[1]);
+    const faceButtons = page.getByRole('button', { name: 'select_representative_face' });
+    await expect.element(faceButtons).toHaveLength(2);
+    await userEvent.click(faceButtons.nth(1));
 
-    expect(screen.getByRole('button', { name: 'use_inherited_thumbnail' })).toBeDisabled();
-    for (const button of screen.getAllByRole('button', { name: 'select_representative_face' })) {
-      expect(button).toBeDisabled();
+    await expect.element(page.getByRole('button', { name: 'use_inherited_thumbnail' })).toBeDisabled();
+    for (const button of faceButtons.all()) {
+      await expect.element(button).toBeDisabled();
     }
 
     resolveUpdate();
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith(true));
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledWith(true));
   });
 
   it('renders read-only when updates are not allowed', async () => {
-    render(RepresentativeFacePickerModal, {
+    await render(RepresentativeFacePickerModal, {
       title: 'select_representative_face',
       loadFaces: vi.fn().mockResolvedValue(makePage()),
       updateFace: vi.fn(),
@@ -188,9 +184,11 @@ describe('RepresentativeFacePickerModal', () => {
       canUpdate: false,
     });
 
-    for (const button of await screen.findAllByRole('button', { name: 'select_representative_face' })) {
-      expect(button).toBeDisabled();
+    const faceButtons = page.getByRole('button', { name: 'select_representative_face' });
+    await expect.element(faceButtons).toHaveLength(2);
+    for (const button of faceButtons.all()) {
+      await expect.element(button).toBeDisabled();
     }
-    expect(screen.queryByRole('button', { name: 'use_inherited_thumbnail' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'use_inherited_thumbnail' })).not.toBeInTheDocument();
   });
 });

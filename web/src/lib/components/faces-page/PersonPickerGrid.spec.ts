@@ -1,7 +1,6 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import '@testing-library/jest-dom';
-import { screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 import PersonPickerGrid from './PersonPickerGrid.svelte';
 
 // Structural copy of `PickerCandidate`: the type lives in the component's module script, which
@@ -31,12 +30,12 @@ const renderGrid = (props: {
 describe('PersonPickerGrid', () => {
   it('hands the clicked candidate back to the caller', async () => {
     const onSelect = vi.fn();
-    renderGrid({
+    await renderGrid({
       candidates: [candidate({ id: 'sp-1', name: 'Bob' }), candidate({ id: 'sp-2', name: 'Carol' })],
       onSelect,
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /Carol/ }));
+    await userEvent.click(page.getByRole('button', { name: /Carol/ }));
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'sp-2', name: 'Carol' }));
   });
@@ -46,29 +45,36 @@ describe('PersonPickerGrid', () => {
   // (a plain-HTTP tailnet instance, say) they saturate the six-connection pool, so the PUT the
   // next tap issues queues behind them and the tap reads as having done nothing.
   it('loads the candidate thumbnails lazily', async () => {
-    renderGrid({ candidates: [candidate({ id: 'sp-1', name: 'Bob' }), candidate({ id: 'sp-2', name: 'Carol' })] });
+    await renderGrid({
+      candidates: [candidate({ id: 'sp-1', name: 'Bob' }), candidate({ id: 'sp-2', name: 'Carol' })],
+    });
 
     // The card carries the name on both the image and its caption, so pick the image out by tag.
     const thumbnailFor = async (name: string) => {
-      const labelled = await screen.findAllByTitle(name);
-      return labelled.find((element) => element.tagName === 'IMG');
+      await expect.element(page.getByTitle(name).first()).toBeInTheDocument();
+      const image = page
+        .getByTitle(name)
+        .elements()
+        .find((element) => element.tagName === 'IMG');
+      expect(image).toBeDefined();
+      return image!;
     };
 
-    expect(await thumbnailFor('Bob')).toHaveAttribute('loading', 'lazy');
-    expect(await thumbnailFor('Carol')).toHaveAttribute('loading', 'lazy');
+    await expect.element(page.elementLocator(await thumbnailFor('Bob'))).toHaveAttribute('loading', 'lazy');
+    await expect.element(page.elementLocator(await thumbnailFor('Carol'))).toHaveAttribute('loading', 'lazy');
   });
 
-  it('shows the empty label when nothing matches', () => {
-    renderGrid({ candidates: [], emptyLabel: 'no_people_found' });
+  it('shows the empty label when nothing matches', async () => {
+    await renderGrid({ candidates: [], emptyLabel: 'no_people_found' });
 
-    expect(screen.getByText('no_people_found')).toBeInTheDocument();
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    await expect.element(page.getByText('no_people_found')).toBeInTheDocument();
+    expect(page.getByRole('button').elements()).toHaveLength(0);
   });
 
-  it('shows a spinner instead of the empty label while the candidates load', () => {
-    renderGrid({ candidates: [], isLoading: true });
+  it('shows a spinner instead of the empty label while the candidates load', async () => {
+    await renderGrid({ candidates: [], isLoading: true });
 
-    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-    expect(screen.queryByText('no_people_found')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('loading-spinner')).toBeInTheDocument();
+    await expect.element(page.getByText('no_people_found')).not.toBeInTheDocument();
   });
 });

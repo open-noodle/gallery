@@ -114,6 +114,15 @@ describe('TimelineManager', () => {
       expect(api.getTimeBucket.calls).toHaveLength(2);
     });
 
+    test('connects websocket events for main timeline', async ({ api }) => {
+      const freshManager = new TimelineManager();
+      const connectSpy = vi.spyOn(freshManager, 'connect');
+      api.on({ getTimeBuckets: () => ({ json: [] }) });
+      await freshManager.updateViewport({ width: 1588, height: 1000 });
+      expect(connectSpy).toHaveBeenCalled();
+      freshManager.destroy();
+    });
+
     test('calculates month height', () => {
       const plainMonths = timelineManager.months.map((month) => ({
         year: month.yearMonth.year,
@@ -136,8 +145,8 @@ describe('TimelineManager', () => {
   });
 
   describe('isEmptyForOptions', () => {
-    it('reports empty only for the options it actually loaded', async () => {
-      sdkMock.getTimeBuckets.mockResolvedValue([]);
+    test('reports empty only for the options it actually loaded', async ({ api }) => {
+      api.on({ getTimeBuckets: () => ({ json: [] }) });
 
       const timelineManager = new TimelineManager();
       const loadedOptions = { visibility: AssetVisibility.Timeline, personIds: ['person-1'] };
@@ -162,15 +171,17 @@ describe('TimelineManager', () => {
       );
     });
 
-    it('is not empty before any options have loaded', () => {
+    test('is not empty before any options have loaded', () => {
       const timelineManager = new TimelineManager();
       expect(timelineManager.isEmptyForOptions({ visibility: AssetVisibility.Timeline })).toBe(false);
     });
   });
 
   describe('reload', () => {
-    it('rebuilds the month objects on every reload, so views keyed on them remount their month DOM', async () => {
-      sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
+    test('rebuilds the month objects on every reload, so views keyed on them remount their month DOM', async ({
+      api,
+    }) => {
+      api.on({ getTimeBuckets: () => ({ json: [{ timeBucket: '2024-01-01', count: 1 }] }) });
       const timelineManager = new TimelineManager();
 
       await timelineManager.updateOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-1'] });
@@ -212,8 +223,8 @@ describe('TimelineManager', () => {
       mockTimeBuckets(
         api,
         [
-          { count: 1, timeBucket: '2024-03-01T00:00:00.000Z' },
-          { count: 3, timeBucket: '2024-01-01T00:00:00.000Z' },
+          { count: 1, timeBucket: '2024-03-01' },
+          { count: 3, timeBucket: '2024-01-01' },
         ],
         bucketAssetsResponse,
       );
@@ -609,6 +620,28 @@ describe('TimelineManager', () => {
       expect(timelineManager.assetCount).toEqual(0);
     });
 
+    // Gallery: Space-scoped timelines are scoped like upstream's album/person ones. Upstream's
+    // guard enumerates only its own scope options, so these two cases pin the fork's scopes.
+    test('does not insert unknown live event assets into Space timelines', async () => {
+      await timelineManager.updateOptions({ spaceId: 'space-id' });
+
+      const asset = deriveLocalDateTimeFromFileCreatedAt(factory.timelineAsset());
+
+      timelineManager.upsertAssetsFromLiveEvent([asset]);
+
+      expect(timelineManager.assetCount).toEqual(0);
+    });
+
+    test('does not insert unknown live event assets into Space album timelines', async () => {
+      await timelineManager.updateOptions({ timelineSpaceId: 'space-id' });
+
+      const asset = deriveLocalDateTimeFromFileCreatedAt(factory.timelineAsset());
+
+      timelineManager.upsertAssetsFromLiveEvent([asset]);
+
+      expect(timelineManager.assetCount).toEqual(0);
+    });
+
     test('updates existing live event assets in scoped timelines', async () => {
       await timelineManager.updateOptions({ albumId: 'album-id' });
 
@@ -759,9 +792,9 @@ describe('TimelineManager', () => {
       mockTimeBuckets(
         api,
         [
-          { count: 1, timeBucket: '2024-03-01T00:00:00.000Z' },
-          { count: 6, timeBucket: '2024-02-01T00:00:00.000Z' },
-          { count: 3, timeBucket: '2024-01-01T00:00:00.000Z' },
+          { count: 1, timeBucket: '2024-03-01' },
+          { count: 6, timeBucket: '2024-02-01' },
+          { count: 3, timeBucket: '2024-01-01' },
         ],
         bucketAssetsResponse,
       ).on({ getAssetInfo: () => ({ status: 404 }) });
@@ -1020,34 +1053,31 @@ describe('TimelineManager', () => {
       Object.entries(stackedAssets).map(([key, assets]) => [key, toResponseDto(...assets)]),
     );
 
-    beforeEach(() => {
+    beforeEach<Context>(({ api }) => {
       timelineManager = new TimelineManager();
-      sdkMock.getTimeBuckets.mockResolvedValue([{ count: 2, timeBucket: '2024-02-01' }]);
-      sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(stackedAssetsResponse[timeBucket]));
+      mockTimeBuckets(api, [{ count: 2, timeBucket: '2024-02-01' }], stackedAssetsResponse);
     });
 
-    it('passes spaceId and withStacked to getTimeBuckets', async () => {
+    test('passes spaceId and withStacked to getTimeBuckets', async ({ api }) => {
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ bucketSize: TimeBucketSize.Day, spaceId: 'space-1', withStacked: true }),
-        expect.anything(),
-      );
+      expect(api.getTimeBuckets).toHaveBeenCalledWith({
+        params: expect.objectContaining({ bucketSize: TimeBucketSize.Day, spaceId: 'space-1', withStacked: true }),
+      });
     });
 
-    it('passes spaceId and withStacked to getTimeBucket when loading a month', async () => {
+    test('passes spaceId and withStacked to getTimeBucket when loading a month', async ({ api }) => {
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
       await timelineManager.loadTimelineMonth({ year: 2024, month: 2 });
 
-      expect(sdkMock.getTimeBucket).toHaveBeenCalledWith(
-        expect.objectContaining({ bucketSize: TimeBucketSize.Month, spaceId: 'space-1', withStacked: true }),
-        expect.anything(),
-      );
+      expect(api.getTimeBucket).toHaveBeenCalledWith({
+        params: expect.objectContaining({ bucketSize: TimeBucketSize.Month, spaceId: 'space-1', withStacked: true }),
+      });
     });
 
-    it('loads stacked assets with stack data preserved', async () => {
+    test('loads stacked assets with stack data preserved', async () => {
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
       await timelineManager.loadTimelineMonth({ year: 2024, month: 2 });
@@ -1065,7 +1095,7 @@ describe('TimelineManager', () => {
       expect(nonStackedAsset).toBeDefined();
     });
 
-    it('does not connect websocket events for space timelines', async () => {
+    test('does not connect websocket events for space timelines', async () => {
       const connectSpy = vi.spyOn(timelineManager, 'connect');
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 1000 });
@@ -1073,16 +1103,16 @@ describe('TimelineManager', () => {
       expect(connectSpy).not.toHaveBeenCalled();
     });
 
-    it('does not pass withStacked when it is not set in options', async () => {
+    test('does not pass withStacked when it is not set in options', async ({ api }) => {
       await timelineManager.updateOptions({ spaceId: 'space-1' });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledWith(
+      expect(api.getTimeBuckets.calls).toHaveLength(1);
+      const [calledWith] = api.getTimeBuckets.calls;
+      expect(calledWith.params).toEqual(
         expect.objectContaining({ bucketSize: TimeBucketSize.Day, spaceId: 'space-1' }),
-        expect.anything(),
       );
-      const calledWith = sdkMock.getTimeBuckets.mock.calls[0][0];
-      expect(calledWith.withStacked).toBeUndefined();
+      expect(calledWith.params?.withStacked).toBeUndefined();
     });
   });
 
@@ -1098,9 +1128,9 @@ describe('TimelineManager', () => {
       assets,
     });
 
-    beforeEach(async () => {
+    beforeEach<Context>(async ({ api }) => {
       timelineManager = new TimelineManager();
-      sdkMock.getTimeBuckets.mockResolvedValue([]);
+      api.on({ getTimeBuckets: () => ({ json: [] }) });
       await timelineManager.updateViewport({ width: 1588, height: 1000 });
       await timelineManager.updateOptions({ albumId: 'album-1', withStacked: true });
     });
@@ -1110,73 +1140,75 @@ describe('TimelineManager', () => {
     });
 
     // The server picks which album member stands for a stack, so the album reloads rather than patching locally.
-    it.each(['StackCreate', 'StackUpdate'] as const)('reloads the album on %s', async (event) => {
+    test.for(['StackCreate', 'StackUpdate'] as const)('reloads the album on %s', async (event, { api, settle }) => {
       const member = albumMember();
       timelineManager.upsertAssets([member]);
-      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+      const reloads = api.getTimeBuckets.calls.length;
 
       eventManager.emit(event, stackOf(factory.asset({ id: member.id }), factory.asset()));
-      await tick();
+      await settle();
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
-      expect(sdkMock.getTimeBuckets).toHaveBeenLastCalledWith(
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads + 1);
+      expect(api.getTimeBuckets.calls.at(-1)?.params).toEqual(
         expect.objectContaining({ albumId: 'album-1', withStacked: true }),
-        expect.anything(),
       );
     });
 
-    it('does not insert stack members the album does not hold on StackDelete', async () => {
+    test('does not insert stack members the album does not hold on StackDelete', async ({ api, settle }) => {
       const outsider = factory.asset();
-      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+      const reloads = api.getTimeBuckets.calls.length;
 
       eventManager.emit('StackDelete', { id: 'stack-1', assets: [outsider] });
-      await tick();
+      await settle();
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads + 1);
       expect(timelineManager.getTimelineMonthByAssetId(outsider.id)).toBeUndefined();
     });
 
     // Removing (from the album, or to the trash) the photo that stands for a stack: a stack-mate may take its place.
-    it('reloads the album when a removed photo stood for a stack, and only then', async () => {
+    test('reloads the album when a removed photo stood for a stack, and only then', async ({ api, settle }) => {
       const stacked = { ...albumMember(), stack: { id: 'stack-1', primaryAssetId: 'p', assetCount: 3 } };
       const plain = albumMember();
       timelineManager.upsertAssets([stacked, plain]);
-      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+      const reloads = api.getTimeBuckets.calls.length;
 
       timelineManager.removeAssets([plain.id]);
-      await tick();
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads);
+      await settle();
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads);
 
       eventManager.emit('AlbumRemoveAssets', { assetIds: [stacked.id], albumIds: ['album-1'] });
-      await tick();
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      await settle();
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads + 1);
     });
 
     // The manager's own listener and the album page's AlbumStackEvents both fire for one event (Safari can miss the
     // former): one reload, and the page's options effect during it does not start another.
-    it('runs one reload for triggers in the same task, and keeps its options while reloading', async () => {
-      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+    test('runs one reload for triggers in the same task, and keeps its options while reloading', async ({
+      api,
+      settle,
+    }) => {
+      const reloads = api.getTimeBuckets.calls.length;
 
       expect(timelineManager.reloadAlbumStacks()).toBe(true);
       expect(timelineManager.reloadAlbumStacks()).toBe(true);
       eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['album-1'] });
       await timelineManager.updateOptions({ albumId: 'album-1', withStacked: true });
-      await tick();
+      await settle();
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads + 1);
     });
 
     // Adding a photo (say the stack's primary, from the viewer's strip) can change which stack-mate shows.
-    it('reloads the album when photos are added to it, not to another album', async () => {
-      const reloads = sdkMock.getTimeBuckets.mock.calls.length;
+    test('reloads the album when photos are added to it, not to another album', async ({ api, settle }) => {
+      const reloads = api.getTimeBuckets.calls.length;
 
       eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['other-album'] });
-      await tick();
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads);
+      await settle();
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads);
 
       eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['album-1'] });
-      await tick();
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledTimes(reloads + 1);
+      await settle();
+      expect(api.getTimeBuckets.calls).toHaveLength(reloads + 1);
     });
   });
 
@@ -1214,17 +1246,19 @@ describe('TimelineManager', () => {
       '2024-04-01': toResponseDto(...albumOnlyAssets['2024-04-01']),
     };
 
-    beforeEach(() => {
+    beforeEach<Context>(({ api }) => {
       timelineManager = new TimelineManager();
-      sdkMock.getTimeBuckets.mockImplementation(({ albumId }) =>
-        Promise.resolve(albumId ? [{ count: 1, timeBucket: '2024-04-01' }] : [{ count: 1, timeBucket: '2024-02-01' }]),
-      );
-      sdkMock.getTimeBucket.mockImplementation(({ albumId, timeBucket }) =>
-        Promise.resolve(albumId ? albumOnlyResponses[timeBucket] : pickerOnlyResponses[timeBucket]),
-      );
+      api.on({
+        getTimeBuckets: ({ params = {} }) => ({
+          json: params.albumId ? [{ count: 1, timeBucket: '2024-04-01' }] : [{ count: 1, timeBucket: '2024-02-01' }],
+        }),
+        getTimeBucket: ({ params }) => ({
+          json: params.albumId ? albumOnlyResponses[params.timeBucket] : pickerOnlyResponses[params.timeBucket],
+        }),
+      });
     });
 
-    it('unions filtered album months into picker timelines and marks them disabled', async () => {
+    test('unions filtered album months into picker timelines and marks them disabled', async ({ api }) => {
       await timelineManager.updateOptions({
         tagIds: ['tag-1'],
         timelineAlbumId: 'album-1',
@@ -1242,29 +1276,30 @@ describe('TimelineManager', () => {
       expect(loadedAssets.map((asset) => asset.id)).toEqual(['album-asset', 'picker-asset']);
       expect(timelineManager.albumAssets.has('album-asset')).toBe(true);
       expect(timelineManager.assetCount).toBe(2);
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(api.getTimeBuckets).toHaveBeenCalledWith({
+        params: expect.objectContaining({
           albumId: 'album-1',
           bucketSize: TimeBucketSize.Day,
           tagIds: ['tag-1'],
           visibility: AssetVisibility.Timeline,
         }),
-        expect.anything(),
-      );
-      expect(sdkMock.getTimeBucket).toHaveBeenCalledWith(
-        expect.objectContaining({
+      });
+      expect(api.getTimeBucket).toHaveBeenCalledWith({
+        params: expect.objectContaining({
           albumId: 'album-1',
           bucketSize: TimeBucketSize.Month,
           tagIds: ['tag-1'],
           timeBucket: '2024-04-01',
         }),
-        expect.anything(),
-      );
+      });
     });
   });
 
   describe('orderBy createdAt (recently-added)', () => {
-    it('places assets into the createdAt month even when their localDateTime is a different month', async () => {
+    test('places assets into the createdAt month even when their localDateTime is a different month', async ({
+      api,
+      settle,
+    }) => {
       const timelineManager = new TimelineManager();
       // "Recently added": assets created (added to Immich) in 2026-06 but TAKEN
       // (localDateTime) back in 2024-09 — exactly the staging /recently-added case.
@@ -1278,26 +1313,32 @@ describe('TimelineManager', () => {
         }));
       const response = toResponseDto(...assets);
 
-      sdkMock.getTimeBuckets.mockResolvedValue([{ count: 3, timeBucket: '2026-06-01' }]);
-      sdkMock.getTimeBucket.mockResolvedValue(response);
+      api.on({
+        getTimeBuckets: () => ({ json: [{ count: 3, timeBucket: '2026-06-01' }] }),
+        getTimeBucket: () => ({ json: response }),
+      });
 
       await timelineManager.updateOptions({ orderBy: AssetOrderBy.CreatedAt });
       await timelineManager.updateViewport({ width: 1588, height: 1000 });
-      await tick();
+      await settle();
 
-      const month = getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 });
-      expect(month?.getAssets().length).toEqual(3);
+      // The month's assets land a few tasks after its request settles.
+      await expect
+        .poll(() => getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 })?.getAssets().length)
+        .toEqual(3);
     });
 
-    it('buckets createdAt by its UTC month, not the browser-local month (boundary assets in a negative-offset timezone)', async () => {
+    test('buckets createdAt by its UTC month, not the browser-local month (boundary assets in a negative-offset timezone)', async ({
+      api,
+      settle,
+    }) => {
       // The server groups time buckets by date_trunc('MONTH', createdAt AT TIME ZONE 'UTC')
       // and serializes createdAt as a naive-UTC string (e.g. a bulk import at
       // 2026-06-01T03:00). A viewer whose timezone is behind UTC must still see those
       // assets in the June bucket — otherwise the whole /recently-added page renders empty.
-      // vite.config pins TZ=UTC for tests, so force a negative-offset zone here.
-      const previousTz = process.env.TZ;
-      process.env.TZ = 'America/Anchorage';
-      Settings.resetCaches();
+      // The browser runs in UTC for tests, so force luxon's local zone to a negative-offset one here.
+      const previousZone = Settings.defaultZone;
+      Settings.defaultZone = 'America/Anchorage';
       try {
         const timelineManager = new TimelineManager();
         const assets = factory
@@ -1311,18 +1352,21 @@ describe('TimelineManager', () => {
         // Exactly the server's naive-UTC createdAt format (03:00 UTC on the 1st).
         response.createdAt = response.createdAt.map(() => '2026-06-01T03:00:00.000');
 
-        sdkMock.getTimeBuckets.mockResolvedValue([{ count: 3, timeBucket: '2026-06-01' }]);
-        sdkMock.getTimeBucket.mockResolvedValue(response);
+        api.on({
+          getTimeBuckets: () => ({ json: [{ count: 3, timeBucket: '2026-06-01' }] }),
+          getTimeBucket: () => ({ json: response }),
+        });
 
         await timelineManager.updateOptions({ orderBy: AssetOrderBy.CreatedAt });
         await timelineManager.updateViewport({ width: 1588, height: 1000 });
-        await tick();
+        await settle();
 
-        const month = getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 });
-        expect(month?.getAssets().length).toEqual(3);
+        // The month's assets land a few tasks after its request settles.
+        await expect
+          .poll(() => getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 })?.getAssets().length)
+          .toEqual(3);
       } finally {
-        process.env.TZ = previousTz;
-        Settings.resetCaches();
+        Settings.defaultZone = previousZone;
       }
     });
   });
@@ -1357,15 +1401,17 @@ describe('TimelineManager scroll scaling', () => {
     Object.entries(bucketAssets).map(([key, assets]) => [key, toResponseDto(...assets)]),
   );
 
-  beforeEach(async () => {
-    vi.resetAllMocks();
+  beforeEach<Context>(async ({ api }) => {
     timelineManager = new TimelineManager();
-    sdkMock.getTimeBuckets.mockResolvedValue([
-      { count: 1, timeBucket: '2024-03-01' },
-      { count: 100, timeBucket: '2024-02-01' },
-      { count: 3, timeBucket: '2024-01-01' },
-    ]);
-    sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(bucketAssetsResponse[timeBucket]));
+    mockTimeBuckets(
+      api,
+      [
+        { count: 1, timeBucket: '2024-03-01' },
+        { count: 100, timeBucket: '2024-02-01' },
+        { count: 3, timeBucket: '2024-01-01' },
+      ],
+      bucketAssetsResponse,
+    );
     await timelineManager.updateViewport({ width: 1588, height: 1000 });
     await tick();
 
@@ -1378,7 +1424,7 @@ describe('TimelineManager scroll scaling', () => {
     timelineManager.scrollableElement = fakeEl as unknown as HTMLElement;
   });
 
-  it('9. is inert below the cap', () => {
+  test('9. is inert below the cap', () => {
     // totalViewerHeight == 8337, viewport == 1000, default cap is huge
     expect(timelineManager.domHeight).toBe(timelineManager.totalViewerHeight);
     expect(timelineManager.scrollScale).toBe(1);
@@ -1388,14 +1434,14 @@ describe('TimelineManager scroll scaling', () => {
     expect(timelineManager.renderOffset).toBe(0);
   });
 
-  it('10. reaches the tail under forced scaling (symptom #1)', () => {
+  test('10. reaches the tail under forced scaling (symptom #1)', () => {
     timelineManager.maxScrollHeight = 4000; // domHeight 4000, domScrollMax 3000, logicalScrollMax 7337
     timelineManager.scrollTo(timelineManager.maxScroll); // 7337
     expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // 3000
     expect(timelineManager.scrollTop).toBeCloseTo(timelineManager.maxScroll, 6); // 7337
   });
 
-  it('11. clamps scrollTo to [0, domScrollMax]', () => {
+  test('11. clamps scrollTo to [0, domScrollMax]', () => {
     timelineManager.maxScrollHeight = 4000;
     timelineManager.scrollTo(10 * timelineManager.totalViewerHeight);
     expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // clamped to bottom
@@ -1405,14 +1451,14 @@ describe('TimelineManager scroll scaling', () => {
     expect(fakeEl.scrollTop).toBe(0);
   });
 
-  it('12. scrollBy moves the logical position by the given delta', () => {
+  test('12. scrollBy moves the logical position by the given delta', () => {
     timelineManager.maxScrollHeight = 4000;
     timelineManager.scrollTo(2000);
     timelineManager.scrollBy(1000);
     expect(timelineManager.scrollTop).toBeCloseTo(3000, 6);
   });
 
-  it('13. exposes a logical scrollTop end-to-end', () => {
+  test('13. exposes a logical scrollTop end-to-end', () => {
     timelineManager.maxScrollHeight = 4000;
     fakeEl.scrollTop = timelineManager.domScrollMax; // 3000 (raw DOM)
     timelineManager.updateSlidingWindow();
@@ -1420,7 +1466,7 @@ describe('TimelineManager scroll scaling', () => {
     expect(timelineManager.visibleWindow.top).toBeCloseTo(timelineManager.maxScroll, 6);
   });
 
-  it('14. scrollBy preserves the logical delta the height compensation relies on', () => {
+  test('14. scrollBy preserves the logical delta the height compensation relies on', () => {
     timelineManager.maxScrollHeight = 4000;
     timelineManager.scrollTo(1500);
     const before = timelineManager.scrollTop;
@@ -1428,14 +1474,14 @@ describe('TimelineManager scroll scaling', () => {
     expect(timelineManager.scrollTop - before).toBeCloseTo(500, 6);
   });
 
-  it('15. preserves a deep anchor across Years/Months → All (symptom #2)', () => {
+  test('15. preserves a deep anchor across Years/Months → All (symptom #2)', () => {
     timelineManager.maxScrollHeight = 4000;
     const reached = scrollTimelineToTemporalAnchor(timelineManager, { year: 2024, month: 1 });
     expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // 3000, reachable — not clamped short
     expect(reached).toBe(true);
   });
 
-  it('16. re-derives the DOM↔logical mapping on a geometry change so renderOffset never goes stale', () => {
+  test('16. re-derives the DOM↔logical mapping on a geometry change so renderOffset never goes stale', () => {
     timelineManager.maxScrollHeight = 4000; // force scaling: domScrollMax 3000, logicalScrollMax 7337
     timelineManager.scrollTo(2000); // logical; DOM scrollTop is now well below the logical position
     // Invariant after any scroll: renderOffset === domScrollTop − logicalScrollTop.

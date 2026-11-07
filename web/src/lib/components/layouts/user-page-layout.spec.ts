@@ -1,9 +1,10 @@
 import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
+// The theme's source text, not the compiled stylesheet: the assertions below read the rule as written.
+import galleryThemeCss from '../../../styles/gallery-theme.css?raw';
 import UserPageLayoutDescriptionTrailingTestWrapper from './user-page-layout-description-trailing.test-wrapper.svelte';
 
 const layoutMocks = vi.hoisted(() => ({
@@ -23,37 +24,37 @@ vi.mock('#lib/components/shared-components/side-bar/UserSidebar.svelte', async (
 });
 
 describe('UserPageLayout header', () => {
-  it('keeps long people statistics visible beside a truncating title', () => {
-    render(UserPageLayout, {
+  it('keeps long people statistics visible beside a truncating title', async () => {
+    await render(UserPageLayout, {
       props: {
         title: 'People',
         description: '(60) \u{B7} 2,901 faces',
       },
     });
 
-    expect(screen.getByTestId('page-header-description')).toHaveTextContent('(60) \u{B7} 2,901 faces');
-    expect(screen.getByTestId('page-header-title-row')).toHaveClass('min-w-0', 'overflow-hidden');
-    expect(screen.getByTestId('page-header')).toHaveClass('min-w-0', 'truncate');
-    expect(screen.getByTestId('page-header-description')).toHaveClass('shrink-0', 'whitespace-nowrap');
+    await expect.element(page.getByTestId('page-header-description')).toHaveTextContent('(60) \u{B7} 2,901 faces');
+    await expect.element(page.getByTestId('page-header-title-row')).toHaveClass('min-w-0', 'overflow-hidden');
+    await expect.element(page.getByTestId('page-header')).toHaveClass('min-w-0', 'truncate');
+    await expect.element(page.getByTestId('page-header-description')).toHaveClass('shrink-0', 'whitespace-nowrap');
   });
 
-  it('renders a non-collapsing description trailing action beside the description', () => {
-    render(UserPageLayoutDescriptionTrailingTestWrapper);
+  it('renders a non-collapsing description trailing action beside the description', async () => {
+    await render(UserPageLayoutDescriptionTrailingTestWrapper);
 
-    const titleRow = screen.getByTestId('page-header-title-row');
-    const title = screen.getByTestId('page-header');
-    const description = screen.getByTestId('page-header-description');
-    const trailing = screen.getByTestId('page-header-description-trailing');
-    const button = screen.getByRole('button', { name: 'Info' });
+    const titleRow = page.getByTestId('page-header-title-row');
+    const title = page.getByTestId('page-header');
+    const description = page.getByTestId('page-header-description');
+    const trailing = page.getByTestId('page-header-description-trailing');
+    const button = page.getByRole('button', { name: 'Info' });
 
-    expect(trailing).toContainElement(button);
-    expect(titleRow).toHaveClass('min-w-0', 'overflow-hidden');
-    expect(title).toHaveClass('min-w-0', 'truncate');
-    expect(description).toHaveClass('whitespace-nowrap');
-    expect(trailing).toHaveClass('shrink-0');
-    expect(titleRow).toContainElement(description);
-    expect(titleRow).toContainElement(trailing);
-    expect(description.nextElementSibling).toBe(trailing);
+    await expect.element(trailing).toContainElement(button.element() as HTMLElement);
+    await expect.element(titleRow).toHaveClass('min-w-0', 'overflow-hidden');
+    await expect.element(title).toHaveClass('min-w-0', 'truncate');
+    await expect.element(description).toHaveClass('whitespace-nowrap');
+    await expect.element(trailing).toHaveClass('shrink-0');
+    await expect.element(titleRow).toContainElement(description.element() as HTMLElement);
+    await expect.element(titleRow).toContainElement(trailing.element() as HTMLElement);
+    expect(description.element().nextElementSibling).toBe(trailing.element());
   });
 });
 
@@ -63,29 +64,29 @@ describe('UserPageLayout sidebar width', () => {
     ${'overlay'}  | ${'0'}        | ${'0px'}
     ${'rail'}     | ${'rail'}     | ${'calc(var(--spacing) * 20)'}
     ${'expanded'} | ${'expanded'} | ${'calc(var(--spacing) * 64)'}
-  `('sets the grid width to $width for $layout', ({ layout, width, cssValue }) => {
+  `('sets the grid width to $width for $layout', async ({ layout, width, cssValue }) => {
     layoutMocks.sidebarModeStore.layout = layout;
 
-    render(UserPageLayout);
+    await render(UserPageLayout);
 
-    const grid = screen.getByTestId('user-page-grid');
-    expect(grid).toHaveAttribute('data-sidebar-width', width);
+    const grid = page.getByTestId('user-page-grid');
+    await expect.element(grid).toHaveAttribute('data-sidebar-width', width);
     // Guards the actual `--sidebar-width` custom property driving `grid-cols-[var(--sidebar-width)_auto]`,
     // not just the semantic label above - a rail/expanded value swap would otherwise pass unnoticed.
-    expect(grid.style.getPropertyValue('--sidebar-width')).toBe(cssValue);
+    expect((grid.element() as HTMLElement).style.getPropertyValue('--sidebar-width')).toBe(cssValue);
   });
 
   // Spec coverage 29: /tags and /folders pass their own tree-explorer sidebar wrapping
   // upstream Sidebar.svelte, which renders sidebar:w-64 regardless of our variable. Applying
   // the rail width there would put a 16rem sidebar in a 4rem column.
-  it('keeps the expanded width when a custom sidebar snippet is supplied', () => {
+  it('keeps the expanded width when a custom sidebar snippet is supplied', async () => {
     layoutMocks.sidebarModeStore.layout = 'rail';
 
-    render(UserPageLayout, {
+    await render(UserPageLayout, {
       props: { sidebar: createRawSnippet(() => ({ render: () => `<nav data-testid="tree">tree</nav>` })) },
     });
 
-    expect(screen.getByTestId('user-page-grid')).toHaveAttribute('data-sidebar-width', 'expanded');
+    await expect.element(page.getByTestId('user-page-grid')).toHaveAttribute('data-sidebar-width', 'expanded');
   });
 
   // Spec coverage 29 (navbar side). A custom sidebar snippet (/tags, /folders) keeps the
@@ -93,18 +94,18 @@ describe('UserPageLayout sidebar width', () => {
   // driven independently by the `railAware` prop - passing it unconditionally would still
   // shrink the navbar's logo/column and surface a hamburger that calls
   // `toggleRailOverlay()`, which those pages' upstream Sidebar.svelte has no wiring for.
-  it('does not pass railAware to the navbar when a custom sidebar snippet is supplied', () => {
-    render(UserPageLayout, {
+  it('does not pass railAware to the navbar when a custom sidebar snippet is supplied', async () => {
+    await render(UserPageLayout, {
       props: { sidebar: createRawSnippet(() => ({ render: () => `<nav data-testid="tree">tree</nav>` })) },
     });
 
-    expect(screen.getByTestId('navigation-bar-stub')).toHaveAttribute('data-rail-aware', 'false');
+    await expect.element(page.getByTestId('navigation-bar-stub')).toHaveAttribute('data-rail-aware', 'false');
   });
 
-  it('passes railAware to the navbar by default', () => {
-    render(UserPageLayout);
+  it('passes railAware to the navbar by default', async () => {
+    await render(UserPageLayout);
 
-    expect(screen.getByTestId('navigation-bar-stub')).toHaveAttribute('data-rail-aware', 'true');
+    await expect.element(page.getByTestId('navigation-bar-stub')).toHaveAttribute('data-rail-aware', 'true');
   });
 });
 
@@ -113,16 +114,15 @@ describe('UserPageLayout sidebar width', () => {
 // field in the band the two of them form. That makes the panel's top edge depend on whatever
 // stands above it, and the two routes have to agree - with a navbar the gutter is folded into
 // --navbar-height, without one it has to be added to the ControlAppBar reserve, which is spent
-// raw by full-bleed <main> elements elsewhere and so cannot absorb it. happy-dom has no cascade
-// or layout to measure, so the coupling is asserted against the stylesheet itself.
+// raw by full-bleed <main> elements elsewhere and so cannot absorb it. The test page loads neither
+// the theme nor the app's layout chrome, so the coupling is asserted against the stylesheet itself.
 describe('UserPageLayout chrome above the content panel', () => {
   // Read from gallery-theme.css rather than restated here: the point is that the layout's
   // reserve tracks the theme's gutter, which a copy of the number would not prove.
   const panelMarginBlock = () => {
-    const themePath = path.resolve(expect.getState().testPath!, '../../../../styles/gallery-theme.css');
     // Comments stripped first: the theme documents each rule above it, and one of those
     // comments names `margin-block` while explaining why the top of it is zero.
-    const css = readFileSync(themePath, 'utf8').replaceAll(/\/\*[\S\s]*?\*\//g, '');
+    const css = galleryThemeCss.replaceAll(/\/\*[\S\s]*?\*\//g, '');
     const rule = /main:has\(> div\.absolute\.overflow-y-auto\)\s*\{(?<body>[^{}]*)\}/.exec(css);
     return /margin-block:\s*(?<value>[^;]+);/.exec(rule!.groups!.body)!.groups!.value.trim();
   };
@@ -138,24 +138,24 @@ describe('UserPageLayout chrome above the content panel', () => {
 
   // With a navbar the band is the navbar, full stop - no padding may sit between it and the
   // panel, or the gutter would be counted twice and the field would look high instead of low.
-  it('takes the whole band from the navbar height when a navbar is rendered', () => {
-    render(UserPageLayout);
+  it('takes the whole band from the navbar height when a navbar is rendered', async () => {
+    await render(UserPageLayout);
 
-    const grid = screen.getByTestId('user-page-grid');
-    expect(grid.className).toContain('h-[calc(100dvh-var(--navbar-height))]');
-    expect(grid.className).not.toMatch(/\bp[ty]-/);
+    const grid = page.getByTestId('user-page-grid');
+    expect(grid.element().className).toContain('h-[calc(100dvh-var(--navbar-height))]');
+    expect(grid.element().className).not.toMatch(/\bp[ty]-/);
   });
 
   // With the navbar hidden an 80px ControlAppBar floats over the page instead, and the reserve
   // that clears it is 76px - it only ever cleared the bar because the panel's margin sat on top
   // of it. Losing that margin without adding it back here slides the panel under the bar.
-  it('adds the panel gutter to the ControlAppBar reserve when the navbar is hidden', () => {
+  it('adds the panel gutter to the ControlAppBar reserve when the navbar is hidden', async () => {
     const [, gutter] = panelMarginBlock().split(/\s+/, 2);
 
-    render(UserPageLayout, { props: { hideNavbar: true } });
+    await render(UserPageLayout, { props: { hideNavbar: true } });
 
-    const grid = screen.getByTestId('user-page-grid');
-    expect(grid.className).toContain(`pt-[calc(var(--control-bar-height)+${gutter})]`);
-    expect(grid.className).toContain(`max-md:pt-[calc(var(--control-bar-height-md)+${gutter})]`);
+    const grid = page.getByTestId('user-page-grid');
+    expect(grid.element().className).toContain(`pt-[calc(var(--control-bar-height)+${gutter})]`);
+    expect(grid.element().className).toContain(`max-md:pt-[calc(var(--control-bar-height-md)+${gutter})]`);
   });
 });

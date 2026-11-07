@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 import { STATE_COLOR, STATE_ICON } from '../../../routes/admin/face-cleanup/[personId]/review.svelte';
 import {
   MANUAL_STATE_COLOR,
@@ -23,7 +22,8 @@ import {
 const ALL_IDS: FaceActionId[] = ['owner', 'stay', 'lock', 'other', 'unknown', 'detach', 'keep', 'unmark'];
 const MODES: FaceReviewMode[] = ['guided', 'manual'];
 
-const en = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), '../i18n/gallery/merged/en.json'), 'utf8')) as {
+// Path relative to web/.
+const en = JSON.parse(await commands.readFile('../i18n/gallery/merged/en.json', 'utf8')) as {
   admin: Record<string, string>;
 };
 

@@ -1,10 +1,9 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { modalManager, toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import PeopleMergeSelector from './people-merge-selector.svelte';
 
 type TestPerson = {
@@ -39,8 +38,6 @@ function renderSelector(props: Record<string, unknown>) {
 describe('PeopleMergeSelector', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    Element.prototype.animate = getAnimateMock();
-    Element.prototype.getAnimations = vi.fn().mockReturnValue([]);
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
   });
 
@@ -52,7 +49,7 @@ describe('PeopleMergeSelector', () => {
     const mergePeople = vi.fn().mockResolvedValue(target);
     const onMerge = vi.fn();
 
-    renderSelector({
+    await renderSelector({
       person: target,
       getDisplayName,
       getThumbnailUrl,
@@ -62,11 +59,11 @@ describe('PeopleMergeSelector', () => {
       onMerge,
     });
 
-    await waitFor(() => expect(loadPeople).toHaveBeenCalledWith(false, target));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bob' }));
-    await userEvent.click(screen.getByRole('button', { name: 'merge' }));
+    await vi.waitFor(() => expect(loadPeople).toHaveBeenCalledWith(false, target));
+    await page.getByRole('button', { name: 'Bob' }).click();
+    await page.getByRole('button', { name: 'merge', exact: true }).click();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mergePeople).toHaveBeenCalledWith(target, [bob]);
     });
     expect(onMerge).toHaveBeenCalledWith(target);
@@ -79,7 +76,7 @@ describe('PeopleMergeSelector', () => {
     const mergePeople = vi.fn().mockResolvedValue(named);
     const onSwapPerson = vi.fn();
 
-    renderSelector({
+    await renderSelector({
       person: unnamed,
       getDisplayName,
       getThumbnailUrl,
@@ -90,12 +87,12 @@ describe('PeopleMergeSelector', () => {
       onSwapPerson,
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Alice' }));
+    await page.getByRole('button', { name: 'Alice' }).click();
 
     expect(onSwapPerson).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'merge' }));
+    await page.getByRole('button', { name: 'merge', exact: true }).click();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mergePeople).toHaveBeenCalledWith(named, [unnamed]);
     });
   });
@@ -106,7 +103,7 @@ describe('PeopleMergeSelector', () => {
     const loadPeople = vi.fn().mockResolvedValue([target, candidate]);
     const onSwapPerson = vi.fn();
 
-    renderSelector({
+    await renderSelector({
       person: target,
       getDisplayName,
       getThumbnailUrl,
@@ -117,8 +114,8 @@ describe('PeopleMergeSelector', () => {
       onSwapPerson,
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Bob' }));
-    await userEvent.click(screen.getByRole('button', { name: 'swap_merge_direction' }));
+    await page.getByRole('button', { name: 'Bob' }).click();
+    await page.getByRole('button', { name: 'swap_merge_direction' }).click();
 
     expect(onSwapPerson).toHaveBeenCalledWith(candidate);
   });
@@ -127,7 +124,7 @@ describe('PeopleMergeSelector', () => {
     const target = { id: 'p1', name: 'Alice' };
     const loadPeople = vi.fn().mockResolvedValue([]);
 
-    renderSelector({
+    await renderSelector({
       person: target,
       getDisplayName,
       getThumbnailUrl,
@@ -137,10 +134,10 @@ describe('PeopleMergeSelector', () => {
       onMerge: vi.fn(),
     });
 
-    await waitFor(() => expect(loadPeople).toHaveBeenCalledWith(false, target));
-    await userEvent.click(screen.getByRole('button', { name: 'sort_people_by_similarity' }));
+    await vi.waitFor(() => expect(loadPeople).toHaveBeenCalledWith(false, target));
+    await page.getByRole('button', { name: 'sort_people_by_similarity' }).click();
 
-    await waitFor(() => expect(loadPeople).toHaveBeenLastCalledWith(true, target));
+    await vi.waitFor(() => expect(loadPeople).toHaveBeenLastCalledWith(true, target));
   });
 
   it('warns instead of selecting more people than the merge limit', async () => {
@@ -149,7 +146,7 @@ describe('PeopleMergeSelector', () => {
     const second = { id: 'p3', name: 'Second' };
     const loadPeople = vi.fn().mockResolvedValue([first, second]);
 
-    renderSelector({
+    await renderSelector({
       person: target,
       getDisplayName,
       getThumbnailUrl,
@@ -160,8 +157,8 @@ describe('PeopleMergeSelector', () => {
       mergeLimit: 1,
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'First' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Second' }));
+    await page.getByRole('button', { name: 'First' }).click();
+    await page.getByRole('button', { name: 'Second' }).click();
 
     expect(toastManager.warning).toHaveBeenCalledWith('merge_people_limit');
   });

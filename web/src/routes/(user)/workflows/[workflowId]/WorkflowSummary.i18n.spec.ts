@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { commands } from 'vitest/browser';
 
-// __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
-const here = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(here, 'WorkflowSummary.svelte'), 'utf8');
+const source = await commands.readFile('src/routes/(user)/workflows/[workflowId]/WorkflowSummary.svelte');
 
 describe('WorkflowSummary.svelte close-button i18n', () => {
   it('does not hardcode the English close-button label', () => {

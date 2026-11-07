@@ -1,8 +1,9 @@
 import StorageSpace from '#lib/components/shared-components/side-bar/StorageSpace.svelte';
 import RailStorage from '#lib/components/shared-components/side-bar/rail-storage.svelte';
 import { getByteUnitString } from '#lib/utils/byte-units.ts';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const mocks = vi.hoisted(() => ({
   authManager: { authenticated: true, user: { quotaSizeInBytes: null as number | null, quotaUsageInBytes: 0 } },
@@ -29,7 +30,7 @@ vi.mock('#lib/utils/byte-units.js', async (importOriginal) => {
 });
 
 const bytes = () => {
-  const node = screen.getByTestId('rail-storage');
+  const node = page.getByTestId('rail-storage').element() as HTMLElement;
   return { used: Number(node.dataset.used), available: Number(node.dataset.available) };
 };
 
@@ -50,11 +51,11 @@ describe('rail-storage', () => {
     mocks.serverInfo = { diskSizeRaw: 50_000_000_000, diskUseRaw: 12_000_000_000 };
   });
 
-  it('renders the storage icon with an accessible label', () => {
-    render(RailStorage);
+  it('renders the storage icon with an accessible label', async () => {
+    await render(RailStorage);
 
-    expect(screen.getByTestId('rail-storage')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'storage' })).toBeInTheDocument();
+    await expect.element(page.getByTestId('rail-storage')).toBeInTheDocument();
+    await expect.element(page.getByRole('img', { name: 'storage' })).toBeInTheDocument();
   });
 
   // Spec coverage 21. This must assert NUMBERS, not the tooltip: under test $t() returns
@@ -68,28 +69,28 @@ describe('rail-storage', () => {
     ${'no quota, server disk'}  | ${null}           | ${0}             | ${50_000_000_000} | ${12_000_000_000} | ${12_000_000_000} | ${50_000_000_000}
     ${'quota overrides disk'}   | ${20_000_000_000} | ${5_000_000_000} | ${50_000_000_000} | ${12_000_000_000} | ${5_000_000_000}  | ${20_000_000_000}
     ${'zero quota is honoured'} | ${0}              | ${0}             | ${50_000_000_000} | ${12_000_000_000} | ${0}              | ${0}
-  `('derives bytes for $scenario', ({ quotaSize, quotaUsed, diskSize, diskUse, used, available }) => {
+  `('derives bytes for $scenario', async ({ quotaSize, quotaUsed, diskSize, diskUse, used, available }) => {
     mocks.authManager.user = { quotaSizeInBytes: quotaSize, quotaUsageInBytes: quotaUsed };
     mocks.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
 
-    render(RailStorage);
+    await render(RailStorage);
 
     expect(bytes()).toEqual({ used, available });
   });
 
-  it('falls back to zero when the server info has not arrived', () => {
+  it('falls back to zero when the server info has not arrived', async () => {
     mocks.serverInfo = undefined;
 
-    render(RailStorage);
+    await render(RailStorage);
 
     expect(bytes()).toEqual({ used: 0, available: 0 });
   });
 
-  it('uses server disk figures when unauthenticated even if a quota exists', () => {
+  it('uses server disk figures when unauthenticated even if a quota exists', async () => {
     mocks.authManager.authenticated = false;
     mocks.authManager.user = { quotaSizeInBytes: 20_000_000_000, quotaUsageInBytes: 5_000_000_000 };
 
-    render(RailStorage);
+    await render(RailStorage);
 
     expect(bytes()).toEqual({ used: 12_000_000_000, available: 50_000_000_000 });
   });
@@ -110,15 +111,15 @@ describe('rail-storage parity with StorageSpace', () => {
     scenario                   | quotaSize         | quotaUsed        | diskSize          | diskUse
     ${'quota set'}             | ${20_000_000_000} | ${5_000_000_000} | ${50_000_000_000} | ${12_000_000_000}
     ${'no quota, server disk'} | ${null}           | ${0}             | ${50_000_000_000} | ${12_000_000_000}
-  `('reports identical bytes to StorageSpace for $scenario', ({ quotaSize, quotaUsed, diskSize, diskUse }) => {
+  `('reports identical bytes to StorageSpace for $scenario', async ({ quotaSize, quotaUsed, diskSize, diskUse }) => {
     mocks.authManager.user = { quotaSizeInBytes: quotaSize, quotaUsageInBytes: quotaUsed };
     mocks.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
 
-    render(StorageSpace);
+    await render(StorageSpace);
     const storageSpaceBytes = precisionThreeTitleBytes();
     vi.mocked(getByteUnitString).mockClear();
 
-    render(RailStorage);
+    await render(RailStorage);
     const railStorageBytes = precisionThreeTitleBytes();
 
     expect(railStorageBytes).toEqual(storageSpaceBytes);

@@ -1,7 +1,6 @@
 import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // Three things the existing i18n guards cannot see, all of which this feature can get wrong:
 //
@@ -12,10 +11,16 @@ import path from 'node:path';
 // I7  no guard can see that a reworded English value left its nine translations describing the old wording.
 //     A test cannot diff against a value the file no longer holds, so this checks the old shape instead.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
+// Relative to web/. The specs run in the browser, so the files are read up front through Vitest's commands.
+const I18N_DIR = '../i18n/gallery/merged';
+const files = new Map(
+  await Promise.all(
+    ['en', ...FORK_LOCALES].map(async (code) => [code, await commands.readFile(`${I18N_DIR}/${code}.json`)] as const),
+  ),
+);
 
 const admin = (code: string): Record<string, string> =>
-  (JSON.parse(fs.readFileSync(path.join(I18N_DIR, `${code}.json`), 'utf8')) as { admin: Record<string, string> }).admin;
+  (JSON.parse(files.get(code)!) as { admin: Record<string, string> }).admin;
 
 const NEW_KEYS = [
   'face_cleanup_action_detach_tip',

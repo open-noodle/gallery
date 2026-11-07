@@ -2,12 +2,21 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
 import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
 import { pulse } from '#lib/gallery/motion/index.ts';
+import { navigate } from '#lib/utils/navigation.ts';
+import { setPage } from '#test/unit/mocks/app-state.svelte.ts';
 import { AssetTypeEnum, CleanupQueue, type CleanupAssetDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
-import type { Component, ComponentProps } from 'svelte';
+import { tick, type Component, type ComponentProps } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import type { BeforeNavigate } from '$app/navigation';
 import RewindDay from './RewindDay.svelte';
+
+/** Fires a keydown on the document as a key press would, then lets Svelte flush. */
+const keyDown = async (init: KeyboardEventInit) => {
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+  await tick();
+};
 
 const mocks = vi.hoisted(() => ({
   sdk: {
@@ -39,20 +48,19 @@ vi.mock('@immich/ui', async (importOriginal) => {
     isModalOpen: mocks.isModalOpen,
   };
 });
-vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: mocks.goto,
+  beforeNavigate: mocks.beforeNavigate,
+}));
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({ featureFlagsManager: mocks.flags }));
 vi.mock('#lib/gallery/motion/index.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   pulse: vi.fn(),
   celebrate: vi.fn(),
 }));
-vi.mock('$app/state', () => ({
-  page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
-}));
-vi.mock('#lib/utils/navigation.js', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  navigate: mocks.navigate,
-}));
+// Spy mode keeps every real export; spreading importOriginal into a factory hangs browser mode.
+vi.mock('#lib/utils/navigation.js', { spy: true });
 
 const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,
@@ -73,7 +81,7 @@ const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAss
 
 type DayProps = ComponentProps<typeof RewindDay>;
 
-const renderDay = (assets = [asset('a'), asset('bb'), asset('ccc')]) => {
+const renderDay = async (assets = [asset('a'), asset('bb'), asset('ccc')]) => {
   const componentProps: DayProps = {
     monthDay: 923,
     years: [{ year: 2024, count: assets.length }],
@@ -86,7 +94,7 @@ const renderDay = (assets = [asset('a'), asset('bb'), asset('ccc')]) => {
   });
 };
 
-const tile = (id: string) => screen.getByTestId(`cleanup-rewind-tile-${id}`);
+const tile = (id: string) => page.getByTestId(`cleanup-rewind-tile-${id}`);
 const guard = () => mocks.beforeNavigate.mock.calls.at(-1)![0] as (navigation: BeforeNavigate) => void;
 
 const navigation = (
@@ -116,35 +124,37 @@ describe('RewindDay', () => {
     mocks.goto.mockResolvedValue(undefined);
     mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [], externalAssetIds: [] });
     mocks.flags.value.trash = true;
+    vi.mocked(navigate).mockImplementation(mocks.navigate);
+    setPage({ route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } });
   });
 
   it('marks the focused tile from the keyboard and moves on to the next one', async () => {
-    renderDay();
+    await renderDay();
 
-    await fireEvent.keyDown(document, { key: 'Delete' });
-    await fireEvent.keyDown(document, { key: 'k' });
+    await keyDown({ key: 'Delete' });
+    await keyDown({ key: 'k' });
 
-    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
-    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
-    expect(tile('ccc')).toHaveAttribute('data-focused', 'true');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'trash');
+    await expect.element(tile('bb')).toHaveAttribute('data-mark', 'keep');
+    await expect.element(tile('ccc')).toHaveAttribute('data-focused', 'true');
   });
 
   it('moves the trash marks to the trash, removes the tiles and puts them back on undo', async () => {
     mocks.sdk.commitCleanup.mockResolvedValue({ trashed: ['a'], favorited: 0, kept: 0, skipped: [] });
-    renderDay();
-    await fireEvent.click(tile('a'));
-    await fireEvent.click(tile('a'));
-    await fireEvent.click(tile('a'));
-    await fireEvent.click(tile('bb'));
+    await renderDay();
+    await userEvent.click(tile('a'));
+    await userEvent.click(tile('a'));
+    await userEvent.click(tile('a'));
+    await userEvent.click(tile('bb'));
 
-    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+    await userEvent.click(page.getByTestId('cleanup-move-to-trash'));
 
-    await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull());
+    expect(page.getByTestId('cleanup-rewind-tile-a').query()).toBeNull();
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: { queue: CleanupQueue.Rewind, trashIds: ['a'], favoriteIds: [], keepIds: [] },
     });
     // The keep mark on "bb" stays local until the day is finished.
-    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
+    await expect.element(tile('bb')).toHaveAttribute('data-mark', 'keep');
 
     const [toast, options] = mocks.toast.primary.mock.calls[0];
     expect(toast.description).toBe('assets_trashed_count');
@@ -152,8 +162,11 @@ describe('RewindDay', () => {
     await toast.button.onclick();
 
     expect(mocks.sdk.restoreAssets).toHaveBeenCalledWith({ bulkIdsDto: { ids: ['a'] } });
-    await waitFor(() => expect(tile('a')).toHaveAttribute('data-mark', 'none'));
-    const order = screen.getAllByTestId(/^cleanup-rewind-tile-/).map((el) => el.dataset.assetId);
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'none');
+    const order = page
+      .getByTestId(/^cleanup-rewind-tile-/)
+      .elements()
+      .map((el) => el.dataset.assetId);
     expect(order).toEqual(['a', 'bb', 'ccc']);
   });
 
@@ -161,12 +174,12 @@ describe('RewindDay', () => {
     mocks.flags.value.trash = false;
     mocks.showDialog.mockResolvedValue(true);
     mocks.sdk.commitCleanup.mockResolvedValue({ trashed: ['a'], favorited: 0, kept: 0, skipped: [] });
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+    await userEvent.click(page.getByTestId('cleanup-move-to-trash'));
 
-    await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull());
+    expect(page.getByTestId('cleanup-rewind-tile-a').query()).toBeNull();
     expect(mocks.showDialog).toHaveBeenCalledWith({
       title: 'permanently_delete',
       prompt: 'cleanup_permanent_delete_prompt',
@@ -180,16 +193,16 @@ describe('RewindDay', () => {
   it('commits nothing when the permanent delete is cancelled', async () => {
     mocks.flags.value.trash = false;
     mocks.showDialog.mockResolvedValue(false);
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
+    await keyDown({ key: 'k' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
     expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
     expect(mocks.goto).not.toHaveBeenCalled();
-    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'trash');
   });
 
   it('reports skipped photos after a commit', async () => {
@@ -199,12 +212,12 @@ describe('RewindDay', () => {
       kept: 0,
       skipped: [{ id: 'a', reason: 'already_trashed' }],
     });
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+    await userEvent.click(page.getByTestId('cleanup-move-to-trash'));
 
-    await waitFor(() => expect(mocks.toast.warning).toHaveBeenCalledWith('cleanup_skipped_count'));
+    await vi.waitFor(() => expect(mocks.toast.warning).toHaveBeenCalledWith('cleanup_skipped_count'));
     expect(mocks.toast.primary).not.toHaveBeenCalled();
   });
 
@@ -218,12 +231,13 @@ describe('RewindDay', () => {
       daysReviewed: 0,
       streak: 0,
     });
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'k' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    const card = await screen.findByTestId('cleanup-day-done');
+    const card = page.getByTestId('cleanup-day-done');
+    await expect.element(card).toBeInTheDocument();
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: {
         queue: CleanupQueue.Rewind,
@@ -235,9 +249,9 @@ describe('RewindDay', () => {
     });
     // The card does not move on by itself.
     expect(mocks.goto).not.toHaveBeenCalled();
-    expect(card).toHaveTextContent('cleanup_day_done_title');
+    await expect.element(card).toMatchTextContent('cleanup_day_done_title');
 
-    await fireEvent.click(screen.getByTestId('cleanup-day-done-next'));
+    await userEvent.click(page.getByTestId('cleanup-day-done-next'));
     expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup/rewind/925');
   });
 
@@ -247,10 +261,10 @@ describe('RewindDay', () => {
       daysReviewed: 0,
       streak: 0,
     });
-    renderDay();
+    await renderDay();
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
-    await fireEvent.click(await screen.findByTestId('cleanup-day-done-hub'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-day-done-hub'));
 
     expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup');
   });
@@ -258,62 +272,62 @@ describe('RewindDay', () => {
   it('warns about photos in a Space before moving them to the trash, and keeps the marks on cancel', async () => {
     mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(false);
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+    await userEvent.click(page.getByTestId('cleanup-move-to-trash'));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'cleanup_space_warning' })),
     );
     expect(mocks.sdk.getCleanupAssetsInSpaces).toHaveBeenCalledWith({ cleanupInSpacesDto: { assetIds: ['a'] } });
     expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
-    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'trash');
   });
 
   it('moves Space photos to the trash once the warning is confirmed', async () => {
     mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(true);
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+    await userEvent.click(page.getByTestId('cleanup-move-to-trash'));
 
-    await waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
   });
 
   it('warns about Space photos before finishing a day with trash marks, and stays put on cancel', async () => {
     mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'], externalAssetIds: [] });
     mocks.showDialog.mockResolvedValue(false);
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'Delete' });
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'Delete' });
+    await keyDown({ key: 'k' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
     expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
     expect(mocks.goto).not.toHaveBeenCalled();
-    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
-    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'trash');
+    await expect.element(tile('bb')).toHaveAttribute('data-mark', 'keep');
   });
 
   it('does not ask about Spaces when finishing a day without trash marks', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'k' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    await screen.findByTestId('cleanup-day-done');
+    await expect.element(page.getByTestId('cleanup-day-done')).toBeInTheDocument();
     expect(mocks.sdk.getCleanupAssetsInSpaces).not.toHaveBeenCalled();
   });
 
   it('does not finish a date with no photos from the keyboard, just as the button is disabled', async () => {
-    renderDay([]);
-    expect(screen.getByTestId('cleanup-finish-day')).toBeDisabled();
+    await renderDay([]);
+    await expect.element(page.getByTestId('cleanup-finish-day')).toBeDisabled();
 
-    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+    await keyDown({ key: 'Enter', shiftKey: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
@@ -323,11 +337,11 @@ describe('RewindDay', () => {
 
   it('finishes a date with photos from the keyboard', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
-    renderDay();
+    await renderDay();
 
-    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+    await keyDown({ key: 'Enter', shiftKey: true });
 
-    await screen.findByTestId('cleanup-day-done');
+    await expect.element(page.getByTestId('cleanup-day-done')).toBeInTheDocument();
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: expect.objectContaining({ completeMonthDay: 923 }),
     });
@@ -335,45 +349,45 @@ describe('RewindDay', () => {
 
   it('offers only the way back to the hub when no other date needs a review', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
-    renderDay();
+    await renderDay();
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    expect(await screen.findByTestId('cleanup-day-done-hub')).toBeInTheDocument();
-    expect(screen.queryByTestId('cleanup-day-done-next')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-day-done-hub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-day-done-next')).not.toBeInTheDocument();
   });
 
   it('offers Finish again at the end of the day, once every year is loaded', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
-    renderDay();
+    await renderDay();
 
-    const end = screen.getByTestId('cleanup-rewind-end');
-    await fireEvent.click(within(end).getByRole('button'));
+    const end = page.getByTestId('cleanup-rewind-end');
+    await userEvent.click(end.getByRole('button'));
 
-    expect(await screen.findByTestId('cleanup-day-done')).toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-day-done')).toBeInTheDocument();
   });
 
   it('keeps the marks and stays put when finishing fails', async () => {
     mocks.sdk.commitCleanup.mockRejectedValue(new Error('boom'));
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'k' });
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    await waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
     expect(mocks.goto).not.toHaveBeenCalled();
-    expect(tile('a')).toHaveAttribute('data-mark', 'keep');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'keep');
   });
 
   it('asks before leaving the date with unsaved marks, but not when opening the viewer', async () => {
     mocks.showDialog.mockResolvedValue(true);
-    renderDay();
+    await renderDay();
 
     const clean = navigation({ monthDay: '924' });
     guard()(clean);
     expect(clean.cancel).not.toHaveBeenCalled();
 
-    await fireEvent.keyDown(document, { key: 'k' });
+    await keyDown({ key: 'k' });
 
     const viewer = navigation({ monthDay: '923', assetId: 'a' });
     guard()(viewer);
@@ -382,122 +396,123 @@ describe('RewindDay', () => {
     const leave = navigation({ monthDay: '924' });
     guard()(leave);
     expect(leave.cancel).toHaveBeenCalled();
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url, { replace: false }));
+    await vi.waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url, { replace: false }));
     expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ title: 'cleanup_unsaved_marks_title' }));
   });
 
   it('stays on the date when the user keeps their marks', async () => {
     mocks.showDialog.mockResolvedValue(false);
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'k' });
 
     const leave = navigation({ monthDay: '924' });
     guard()(leave);
 
-    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
     expect(leave.cancel).toHaveBeenCalled();
     expect(mocks.goto).not.toHaveBeenCalled();
   });
 
   it('ignores the shortcuts while a modal is open', async () => {
     mocks.isModalOpen.mockReturnValue(true);
-    renderDay();
+    await renderDay();
 
-    await fireEvent.keyDown(document, { key: 'k' });
-    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+    await keyDown({ key: 'k' });
+    await keyDown({ key: 'Enter', shiftKey: true });
 
-    expect(tile('a')).toHaveAttribute('data-mark', 'none');
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'none');
     expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
   });
 
   it('replays a confirmed back-button navigation through history instead of pushing a new entry', async () => {
     mocks.showDialog.mockResolvedValue(true);
     const go = vi.spyOn(history, 'go').mockImplementation(() => {});
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
+    await renderDay();
+    await keyDown({ key: 'k' });
 
     const back = navigation({ monthDay: '922' }, { type: 'popstate', delta: -1 });
     guard()(back);
 
-    await waitFor(() => expect(go).toHaveBeenCalledWith(-1));
+    await vi.waitFor(() => expect(go).toHaveBeenCalledWith(-1));
     expect(back.cancel).toHaveBeenCalled();
     expect(mocks.goto).not.toHaveBeenCalled();
     go.mockRestore();
   });
 
   it('asks the browser to confirm unloading only while marks are unsaved', async () => {
-    renderDay();
+    await renderDay();
     const unload = () => {
-      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      // A real BeforeUnloadEvent: on a plain Event, returnValue is the legacy boolean, not the prompt string.
+      const event = document.createEvent('BeforeUnloadEvent');
+      event.initEvent('beforeunload', false, true);
       dispatchEvent(event);
       return event;
     };
 
     expect(unload().defaultPrevented).toBe(false);
-    await fireEvent.keyDown(document, { key: 'k' });
+    await keyDown({ key: 'k' });
     const event = unload();
     expect(event.defaultPrevented).toBe(true);
-    // eslint-disable-next-line tscompat/tscompat
     expect(event.returnValue).toBe('');
   });
 
   it('opens the focused photo in the viewer with Space', async () => {
-    renderDay();
+    await renderDay();
 
-    await fireEvent.keyDown(document, { key: ' ' });
+    await keyDown({ key: ' ' });
 
     expect(mocks.navigate).toHaveBeenCalledWith({ targetRoute: 'current', assetId: 'a' });
   });
 
   it('hides photos kept on an earlier visit until "Hide reviewed" is turned off', async () => {
-    renderDay([asset('a'), asset('bb', { kept: true })]);
+    await renderDay([asset('a'), asset('bb', { kept: true })]);
 
-    expect(screen.queryByTestId('cleanup-rewind-tile-bb')).toBeNull();
-    await fireEvent.click(screen.getByTestId('cleanup-hide-reviewed'));
+    expect(page.getByTestId('cleanup-rewind-tile-bb').query()).toBeNull();
+    await userEvent.click(page.getByTestId('cleanup-hide-reviewed'));
 
-    expect(tile('bb')).toHaveAttribute('data-mark', 'kept');
+    await expect.element(tile('bb')).toHaveAttribute('data-mark', 'kept');
   });
 
   it('hints at the Bursts queue in one-at-a-time mode only for a photo taken within 2 s of another', async () => {
-    renderDay([
+    await renderDay([
       asset('a', { localDateTime: '2024-09-23T10:00:00.000Z' }),
       asset('bb', { localDateTime: '2024-09-23T10:00:01.500Z' }),
       asset('ccc', { localDateTime: '2024-09-23T18:00:00.000Z' }),
     ]);
-    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+    await userEvent.click(page.getByTestId('cleanup-mode-one'));
 
-    expect(screen.getByTestId('cleanup-hint-burst')).toBeVisible();
+    await expect.element(page.getByTestId('cleanup-hint-burst')).toBeVisible();
 
-    await fireEvent.click(screen.getByTestId('cleanup-rewind-next-ccc'));
-    expect(screen.getByTestId('cleanup-rewind-stage-ccc')).toBeVisible();
-    expect(screen.queryByTestId('cleanup-rewind-hints')).toBeNull();
+    await userEvent.click(page.getByTestId('cleanup-rewind-next-ccc'));
+    await expect.element(page.getByTestId('cleanup-rewind-stage-ccc')).toBeVisible();
+    expect(page.getByTestId('cleanup-rewind-hints').query()).toBeNull();
   });
 
   it('does not hint at the Bursts queue for a photo taken within 2 s of a video only', async () => {
-    renderDay([
+    await renderDay([
       asset('a', { localDateTime: '2024-09-23T10:00:00.000Z' }),
       asset('bb', { localDateTime: '2024-09-23T10:00:01.500Z', type: AssetTypeEnum.Video }),
     ]);
-    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+    await userEvent.click(page.getByTestId('cleanup-mode-one'));
 
-    expect(screen.getByTestId('cleanup-rewind-stage-a')).toBeVisible();
-    expect(screen.queryByTestId('cleanup-hint-burst')).toBeNull();
+    await expect.element(page.getByTestId('cleanup-rewind-stage-a')).toBeVisible();
+    expect(page.getByTestId('cleanup-hint-burst').query()).toBeNull();
   });
 
   it('remembers the chosen mode', async () => {
-    renderDay();
+    await renderDay();
 
-    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+    await userEvent.click(page.getByTestId('cleanup-mode-one'));
 
     expect(localStorage.getItem('cleanup.rewind.mode')).toBe('one');
-    expect(screen.getByTestId('cleanup-rewind-one')).toBeVisible();
-    expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull();
+    await expect.element(page.getByTestId('cleanup-rewind-one')).toBeVisible();
+    expect(page.getByTestId('cleanup-rewind-tile-a').query()).toBeNull();
   });
 
   describe('explainer', () => {
-    // resetAllMocks above clears the setup file's Element.animate stub, which the slide-out needs.
+    // The slide-out ends from the animation's onfinish; stub animate so it finishes on the next tick.
     beforeEach(() => {
-      vi.mocked(Element.prototype.animate).mockImplementation(() => {
+      vi.spyOn(Element.prototype, 'animate').mockImplementation(() => {
         // Svelte ends a transition from the animation's onfinish, so the stub finishes on the next tick.
         const animation = { cancel: () => {}, finished: Promise.resolve(), onfinish: null as (() => void) | null };
         setTimeout(() => animation.onfinish?.(), 0);
@@ -505,26 +520,26 @@ describe('RewindDay', () => {
       });
     });
 
-    it('shows on the first rewind and not on the second', () => {
-      const first = renderDay();
-      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
-      expect(screen.getByTestId('cleanup-rewind-explainer')).toHaveTextContent('cleanup_explainer_title');
-      first.unmount();
+    it('shows on the first rewind and not on the second', async () => {
+      const first = await renderDay();
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).toMatchTextContent('cleanup_explainer_title');
+      await first.unmount();
 
-      renderDay();
-      expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
+      await renderDay();
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
     });
 
     it('reopens from the info button and closes with ×', async () => {
       localStorage.setItem('cleanup.rewind.explainer-seen', 'true');
-      renderDay();
-      expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
+      await renderDay();
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
 
-      await fireEvent.click(screen.getByTestId('cleanup-rewind-info'));
-      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      await userEvent.click(page.getByTestId('cleanup-rewind-info'));
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).toBeVisible();
 
-      await fireEvent.click(screen.getByTestId('cleanup-rewind-explainer-close'));
-      await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument());
+      await userEvent.click(page.getByTestId('cleanup-rewind-explainer-close'));
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
     });
 
     it('works when storage throws', async () => {
@@ -536,84 +551,91 @@ describe('RewindDay', () => {
       vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw new Error('blocked');
       });
-      renderDay();
+      await renderDay();
 
-      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
-      await fireEvent.click(screen.getByTestId('cleanup-rewind-explainer-close'));
-      await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument());
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      await userEvent.click(page.getByTestId('cleanup-rewind-explainer-close'));
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).not.toBeInTheDocument();
       vi.restoreAllMocks();
     });
 
-    it('appears in one-at-a-time mode too', () => {
+    it('appears in one-at-a-time mode too', async () => {
       localStorage.setItem('cleanup.rewind.mode', 'one');
-      renderDay();
+      await renderDay();
 
-      expect(screen.getByTestId('cleanup-rewind-one')).toBeVisible();
-      expect(screen.getByTestId('cleanup-rewind-explainer')).toBeVisible();
+      await expect.element(page.getByTestId('cleanup-rewind-one')).toBeVisible();
+      await expect.element(page.getByTestId('cleanup-rewind-explainer')).toBeVisible();
     });
   });
 
-  it('titles the page with the date and says how many photos and years it holds', () => {
-    renderDay();
+  it('titles the page with the date and says how many photos and years it holds', async () => {
+    await renderDay();
 
-    expect(screen.getByTestId('cleanup-rewind-heading')).toHaveTextContent('September 23');
-    expect(screen.getByTestId('cleanup-rewind-heading')).toHaveAttribute('data-shared-element', 'cleanup-day-title');
-    expect(screen.getByTestId('cleanup-rewind-subtitle')).toHaveTextContent('cleanup_rewind_subtitle');
+    await expect.element(page.getByTestId('cleanup-rewind-heading')).toMatchTextContent('September 23');
+    await expect
+      .element(page.getByTestId('cleanup-rewind-heading'))
+      .toHaveAttribute('data-shared-element', 'cleanup-day-title');
+    await expect.element(page.getByTestId('cleanup-rewind-subtitle')).toMatchTextContent('cleanup_rewind_subtitle');
   });
 
   it('undoes the last mark from the Undo button, for phones without a Z key', async () => {
-    renderDay();
-    await fireEvent.keyDown(document, { key: 'k' });
-    expect(tile('a')).toHaveAttribute('data-mark', 'keep');
+    await renderDay();
+    await keyDown({ key: 'k' });
+    await expect.element(tile('a')).toHaveAttribute('data-mark', 'keep');
 
-    await fireEvent.click(screen.getByTestId('cleanup-rewind-undo'));
+    await userEvent.click(page.getByTestId('cleanup-rewind-undo'));
 
-    expect(tile('a')).not.toHaveAttribute('data-mark', 'keep');
+    await expect.element(tile('a')).not.toHaveAttribute('data-mark', 'keep');
   });
 
   it('records the finished date for the hub', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
     finishedDay.take();
-    renderDay();
+    await renderDay();
 
-    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+    await userEvent.click(page.getByTestId('cleanup-finish-day'));
 
-    await screen.findByTestId('cleanup-day-done');
+    await expect.element(page.getByTestId('cleanup-day-done')).toBeInTheDocument();
     expect(finishedDay.take()).toBe(923);
   });
 
   it('pulses "Move to trash" once when the first photo is marked for trash, not on later marks', async () => {
-    renderDay();
+    await renderDay();
     expect(pulse).not.toHaveBeenCalled();
 
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await keyDown({ key: 'Delete' });
     expect(pulse).toHaveBeenCalledTimes(1);
-    expect(pulse).toHaveBeenCalledWith(screen.getByTestId('cleanup-move-to-trash'));
+    expect(pulse).toHaveBeenCalledWith(page.getByTestId('cleanup-move-to-trash').element());
 
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await keyDown({ key: 'Delete' });
     expect(pulse).toHaveBeenCalledTimes(1);
   });
 
   it('marks the progress bar complete once every photo is reviewed', async () => {
-    renderDay();
-    const bar = screen.getByTestId('cleanup-rewind-progress-bar');
-    expect(bar).not.toHaveAttribute('data-complete');
+    await renderDay();
+    const bar = page.getByTestId('cleanup-rewind-progress-bar');
+    await expect.element(bar).not.toHaveAttribute('data-complete');
 
     for (let i = 0; i < 3; i++) {
-      await fireEvent.keyDown(document, { key: 'k' });
+      await keyDown({ key: 'k' });
     }
 
-    expect(bar).toHaveAttribute('data-complete', 'true');
+    await expect.element(bar).toHaveAttribute('data-complete', 'true');
   });
 
   it('records the direction of travel when moving to the next or previous date', async () => {
     rewindDirection.take();
-    renderDay();
+    await renderDay();
+    // The arrows are real links: stop the browser following them, which would navigate the test frame away.
+    // This listener runs after the page's own handlers, so they still see an ordinary click.
+    const stay = (event: Event) => event.preventDefault();
+    document.addEventListener('click', stay);
+    onTestFinished(() => document.removeEventListener('click', stay));
 
-    await fireEvent.click(screen.getByTestId('cleanup-rewind-next'));
+    await userEvent.click(page.getByTestId('cleanup-rewind-next'));
     expect(rewindDirection.take()).toBe(1);
 
-    await fireEvent.click(screen.getByTestId('cleanup-rewind-previous'));
+    await userEvent.click(page.getByTestId('cleanup-rewind-previous'));
     expect(rewindDirection.take()).toBe(-1);
   });
 });

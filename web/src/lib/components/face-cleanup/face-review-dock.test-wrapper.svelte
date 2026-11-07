@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Snippet props can't be supplied from a plain props object in @testing-library/svelte, so this wrapper
+  // Snippet props can't be supplied from a plain props object passed to render(), so this wrapper
   // supplies `summary` and `apply` and forwards everything else verbatim. Same convention as
   // src/lib/components/people/person-tile.test-wrapper.svelte.
   import type { ComponentProps } from 'svelte';

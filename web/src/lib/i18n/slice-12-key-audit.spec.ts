@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // S12.10/F31: a repo-wide check for this slice specifically — every `$t('…')` key referenced in the files this
 // slice touched must exist in `en.json`, and none of the seven keys this slice REMOVED from en.json may still
 // be referenced anywhere in `web/` or `mobile/` (the removal would otherwise silently regress those call
 // sites to rendering a raw i18n key at a real user).
 
-const REPO_ROOT = path.resolve(process.cwd(), '..');
-const I18N_DIR = path.join(REPO_ROOT, 'i18n', 'gallery', 'merged');
-const WEB_SRC = path.join(REPO_ROOT, 'web/src');
-const MOBILE_LIB = path.join(REPO_ROOT, 'mobile/lib');
-
-const en = JSON.parse(fs.readFileSync(path.join(I18N_DIR, 'en.json'), 'utf8')) as Record<string, unknown>;
+// The specs run in the browser: en.json is read through Vitest's commands (path relative to web/), and the
+// sources come in through Vite as raw text. Web keys are root-relative (`/src/…`); mobile keys are relative to
+// this file (`../../../../mobile/lib/…`). Vite skips node_modules and dot-folders, as the old disk walk did.
+const en = JSON.parse(await commands.readFile('../i18n/gallery/merged/en.json', 'utf8')) as Record<string, unknown>;
+const WEB_SOURCES = import.meta.glob<string>('/src/**/*.{svelte,ts}', { query: '?raw', import: 'default' });
+const MOBILE_SOURCES = import.meta.glob<string>('../../../../mobile/lib/**/*.dart', {
+  query: '?raw',
+  import: 'default',
+});
 
 // Flattens the nested en.json object into dotted key paths (e.g. "admin.face_cleanup_unnamed").
 const flattenKeys = (obj: Record<string, unknown>, prefix = ''): Set<string> => {
@@ -44,7 +46,7 @@ const TOUCHED_FILES = [
   'routes/admin/face-cleanup/resolutions/+page.svelte',
   'lib/components/faces-page/person-suggestion-banner.svelte',
   'routes/admin/system-settings/MachineLearningSettings.svelte',
-].map((p) => path.join(WEB_SRC, p));
+];
 
 // Matches `$t('key')` / `$t("key")` / `$t(\`key\`)`, including the template-literal form used for a computed
 // tally key (`` $t(`admin.face_cleanup_review_tally_${…}`) ``) — those are excluded (dynamic, can't be
@@ -62,10 +64,10 @@ const extractKeys = (source: string): string[] => {
 
 describe('S12.10: $t keys referenced by slice-12-touched files exist in en.json', () => {
   for (const file of TOUCHED_FILES) {
-    const relative = path.relative(WEB_SRC, file);
-    it(relative, () => {
-      expect(fs.existsSync(file), `file not found: ${file}`).toBe(true);
-      const source = fs.readFileSync(file, 'utf8');
+    it(file, async () => {
+      const load = WEB_SOURCES[`/src/${file}`];
+      expect(load, `file not found: ${file}`).toBeDefined();
+      const source = await load();
       const keys = extractKeys(source);
       // Positive control: this file must actually reference at least one key, or the check below is vacuous.
       expect(keys.length).toBeGreaterThan(0);
@@ -102,42 +104,27 @@ const REMOVED_KEYS = [
   'admin.face_cleanup_review_back',
 ];
 
-const walkFiles = (dir: string, exts: string[]): string[] => {
-  if (!fs.existsSync(dir)) {
-    return [];
-  }
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
-      continue;
-    }
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...walkFiles(full, exts));
-    } else if (exts.some((ext) => entry.name.endsWith(ext))) {
-      out.push(full);
-    }
-  }
-  return out;
-};
+const loadAll = (sources: Record<string, () => Promise<string>>) =>
+  Promise.all(Object.entries(sources).map(async ([file, load]) => ({ file, source: await load() })));
 
 describe('S12.10: keys removed by this slice are unreferenced in web/ and mobile/', () => {
   // Excludes `.spec.ts`/`.spec.svelte` (test files may legitimately reference a removed key's literal string
   // as fixture/documentation data — including, harmlessly, this very audit file's own REMOVED_KEYS list).
   // Production `$t(...)` call sites never live in a spec file.
   const isProductionFile = (file: string) => !file.includes('.spec.');
-  const webFiles = walkFiles(WEB_SRC, ['.svelte', '.ts']).filter((file) => isProductionFile(file));
-  const mobileFiles = walkFiles(MOBILE_LIB, ['.dart']);
+  const webFiles = loadAll(Object.fromEntries(Object.entries(WEB_SOURCES).filter(([file]) => isProductionFile(file))));
+  const mobileFiles = loadAll(MOBILE_SOURCES);
 
-  it('scans a non-trivial number of files (control on the scan itself)', () => {
-    expect(webFiles.length).toBeGreaterThan(100);
+  it('scans a non-trivial number of files (control on the scan itself)', async () => {
+    const [web, mobile] = await Promise.all([webFiles, mobileFiles]);
+    expect(web.length).toBeGreaterThan(100);
+    expect(mobile.length).toBeGreaterThan(100);
   });
 
-  it.each(REMOVED_KEYS)('%s is not referenced anywhere in web/src or mobile/lib', (key) => {
+  it.each(REMOVED_KEYS)('%s is not referenced anywhere in web/src or mobile/lib', async (key) => {
     const bareKey = key.split('.').pop()!;
     const hits: string[] = [];
-    for (const file of [...webFiles, ...mobileFiles]) {
-      const source = fs.readFileSync(file, 'utf8');
+    for (const { file, source } of [...(await webFiles), ...(await mobileFiles)]) {
       if (source.includes(bareKey)) {
         hits.push(file);
       }
@@ -147,10 +134,9 @@ describe('S12.10: keys removed by this slice are unreferenced in web/ and mobile
 
   // Positive control: a key that IS still very much referenced (used by these same touched files) must be
   // found by the identical scan mechanism — proving the scan can find a hit, not just fail to find anything.
-  it('control: a key that IS still referenced is found by the same scan', () => {
+  it('control: a key that IS still referenced is found by the same scan', async () => {
     const hits: string[] = [];
-    for (const file of webFiles) {
-      const source = fs.readFileSync(file, 'utf8');
+    for (const { file, source } of await webFiles) {
       if (source.includes('face_cleanup_resolutions_not_person')) {
         hits.push(file);
       }

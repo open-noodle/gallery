@@ -35,8 +35,9 @@ test('keeps toggled hidden state when loading more people', async ({ api, render
   await settle();
 
   await expect.element(app.people.manage.hidden.nth(1)).toBeVisible();
-  await expect.element(app.people.manage.hidden.first().getByText('Alice')).toBeVisible();
-  await expect.element(app.people.manage.hidden.nth(1).getByText('Carol')).toBeVisible();
+  // Gallery: the thumbnail also carries the name as its hidden icon's <title>; the visible label comes last.
+  await expect.element(app.people.manage.hidden.first().getByText('Alice').last()).toBeVisible();
+  await expect.element(app.people.manage.hidden.nth(1).getByText('Carol').last()).toBeVisible();
 });
 
 test('shows newly loaded hidden people as hidden', async ({ api, render, settle, app }) => {
@@ -45,7 +46,8 @@ test('shows newly loaded hidden people as hidden', async ({ api, render, settle,
   await app.people.manage.hideButtons.last().hover();
   await settle();
 
-  await expect.element(app.people.manage.hidden.first().getByText('Carol')).toBeVisible();
+  // Gallery: the thumbnail also carries the name as its hidden icon's <title>; the visible label comes last.
+  await expect.element(app.people.manage.hidden.first().getByText('Carol').last()).toBeVisible();
   expect(app.people.manage.hidden.elements()).toHaveLength(1);
 });
 

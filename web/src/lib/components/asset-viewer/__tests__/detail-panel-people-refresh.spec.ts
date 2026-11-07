@@ -1,9 +1,8 @@
 import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { factory } from '#test/unit/factories.ts';
 import { AssetTypeEnum } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -59,7 +58,10 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('#lib/utils/people-utils.js', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
 
@@ -156,9 +158,9 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
     const refreshed = { ...asset, people: [] };
     getAssetInfoMock.mockResolvedValue(refreshed);
 
-    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
+    await renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
-    await fireEvent.click(screen.getByTestId('trigger-refresh'));
+    await page.getByTestId('trigger-refresh').click();
 
     expect(getAssetInfoMock).toHaveBeenCalledWith({ id: 'asset-1', spaceId: 'space-1' });
     expect(eventManagerMock.emit).toHaveBeenCalledWith('AssetUpdate', refreshed);
@@ -175,9 +177,9 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
     });
     getAssetInfoMock.mockResolvedValue({ ...asset, people: [] });
 
-    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
+    await renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
-    await fireEvent.click(screen.getByTestId('trigger-refresh'));
+    await page.getByTestId('trigger-refresh').click();
 
     await vi.waitFor(() => expect(eventManagerMock.emit).toHaveBeenCalledWith('AssetUpdate', expect.anything()));
     expect(assetViewerManagerMock.closeEditFacesPanel).not.toHaveBeenCalled();

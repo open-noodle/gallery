@@ -1,6 +1,18 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { factory } from '#test/unit/factories.ts';
 import { spacesApiMock } from './spaces-api.mock';
+
+// sdk.mock.ts registers its `@immich/sdk` mock only when it is evaluated, after the real SDK has already
+// loaded (its own import and the factories load it first). Hoist the same mock here.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocks = Object.fromEntries(
+    Object.entries(module)
+      .filter(([, value]) => typeof value === 'function')
+      .map(([key]) => [key, vi.fn()]),
+  );
+  return { ...module, ...mocks };
+});
 
 describe('spaces API mock', () => {
   beforeEach(() => {

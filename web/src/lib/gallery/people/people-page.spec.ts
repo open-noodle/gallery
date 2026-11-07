@@ -1,9 +1,7 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
 import { PEOPLE_PAGE_SIZE } from '#lib/constants.ts';
 import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -21,10 +19,10 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PeoplePage from './PeoplePage.svelte';
 
 const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
@@ -34,7 +32,20 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+// sdk.mock.ts registers its `@immich/sdk` mock only when it is evaluated, and the imports sorted above it
+// (people-face-statistics-info-cache, constants, ...) load the real SDK first. Hoist the same mock here.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocks = Object.fromEntries(
+    Object.entries(module)
+      .filter(([, value]) => typeof value === 'function')
+      .map(([key]) => [key, vi.fn()]),
+  );
+  return { ...module, ...mocks };
+});
+
+// Browser mode rejects an import of a name a mock does not export, so keep the global fake's other exports.
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: gotoMock }));
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock, navigating: { to: null } };
@@ -154,11 +165,27 @@ function renderPage(
   });
 }
 
+// Locators have no display-value query; a tile's name input is found by its live `value`.
+const findInputByValue = (value: string) =>
+  [...document.querySelectorAll<HTMLInputElement>('input[placeholder="add_a_name"]')].find(
+    (input) => input.value === value,
+  ) ?? null;
+const getInputByValue = (value: string) =>
+  vi.waitFor(() => {
+    const input = findInputByValue(value);
+    if (!input) {
+      throw new Error(`no input with value "${value}"`);
+    }
+    return page.elementLocator(input);
+  });
+const nameInputs = () => page.getByPlaceholder('add_a_name').elements() as HTMLInputElement[];
+const nameValues = () => nameInputs().map((input) => input.value);
+
 /**
 Renders the page with page 1 loaded and a second page available, and hands back a trigger that
 reports the infinite-scroll sentinel as intersecting so pagination can be driven deterministically.
 */
-function renderPaginatedPage() {
+async function renderPaginatedPage() {
   let intersectionCallback: IntersectionObserverCallback | undefined;
   let observedSentinel: Element | undefined;
   vi.stubGlobal(
@@ -174,7 +201,7 @@ function renderPaginatedPage() {
     }),
   );
 
-  const rendered = renderPage(
+  const rendered = await renderPage(
     [
       makePerson({ id: 'p1', name: 'Alice', numberOfAssets: 5 }),
       makePerson({ id: 'p2', name: 'Bob', numberOfAssets: 4 }),
@@ -184,7 +211,7 @@ function renderPaginatedPage() {
   );
 
   const intersect = async () => {
-    await waitFor(() => expect(observedSentinel).toBeDefined());
+    await vi.waitFor(() => expect(observedSentinel).toBeDefined());
     intersectionCallback?.(
       [{ target: observedSentinel, isIntersecting: true } as IntersectionObserverEntry],
       {} as IntersectionObserver,
@@ -202,8 +229,6 @@ describe('Global people page', () => {
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(factory.user({ id: 'current-user-id' }));
     authManager.setPreferences(factory.preferences());
-    Element.prototype.animate = getAnimateMock();
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
     reactivePageMock.reset('http://localhost/people', { routeId: '/(user)/people' });
     gotoMock.mockResolvedValue(undefined);
     sdkMock.searchPerson.mockResolvedValue([]);
@@ -222,16 +247,23 @@ describe('Global people page', () => {
     );
   });
 
-  it('renders people with the shared tile link and editable name footer', () => {
-    const person = makePerson({ id: 'p1', name: 'Alice' });
-    renderPage([person]);
-
-    expect(screen.getByRole('link', { name: 'Alice' })).toHaveAttribute('href', '/people/p1?previousRoute=%2Fpeople');
-    expect(screen.getByDisplayValue('Alice')).toHaveAttribute('placeholder', 'add_a_name');
+  // renderPaginatedPage stubs IntersectionObserver to drive the sentinel; every other test uses the real one.
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('renders favorites first, then named and unnamed people by photo count by default', () => {
-    renderPage([
+  it('renders people with the shared tile link and editable name footer', async () => {
+    const person = makePerson({ id: 'p1', name: 'Alice' });
+    await renderPage([person]);
+
+    await expect
+      .element(page.getByRole('link', { name: 'Alice' }))
+      .toHaveAttribute('href', '/people/p1?previousRoute=%2Fpeople');
+    await expect.element(await getInputByValue('Alice')).toHaveAttribute('placeholder', 'add_a_name');
+  });
+
+  it('renders favorites first, then named and unnamed people by photo count by default', async () => {
+    await renderPage([
       makePerson({ id: 'unnamed-low', name: '', isFavorite: false, numberOfAssets: 1 }),
       makePerson({ id: 'named-z', name: 'Zoe', isFavorite: false, numberOfAssets: 99 }),
       makePerson({ id: 'favorite-unnamed', name: '', isFavorite: true, numberOfAssets: 7 }),
@@ -240,14 +272,7 @@ describe('Global people page', () => {
       makePerson({ id: 'favorite-named', name: 'Anna', isFavorite: true, numberOfAssets: 1 }),
     ]);
 
-    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-      'Anna',
-      '',
-      'Zoe',
-      'Alice',
-      '',
-      '',
-    ]);
+    expect(nameValues()).toEqual(['Anna', '', 'Zoe', 'Alice', '', '']);
     expect(
       [...document.querySelectorAll<HTMLAnchorElement>('a[href^="/people/"]')].map((link) => {
         const url = new URL(link.href);
@@ -264,35 +289,28 @@ describe('Global people page', () => {
   });
 
   it('switches to Name ordering via the sort dropdown and persists the choice', async () => {
-    const user = userEvent.setup();
-    renderPage([
+    await renderPage([
       makePerson({ id: 'named-z', name: 'Zoe', numberOfAssets: 99 }),
       makePerson({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
     ]);
 
-    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-      'Zoe',
-      'Alice',
-    ]);
+    expect(nameValues()).toEqual(['Zoe', 'Alice']);
 
     // The trigger's accessible name is the selected option's label (@immich/ui Button
     // turns `title` into a hover Tooltip, NOT a title attribute — do not use getByTitle).
-    await user.click(screen.getByRole('button', { name: 'sort_people_most_photos' }));
-    await user.click(screen.getByRole('button', { name: 'name' }));
+    await userEvent.click(page.getByRole('button', { name: 'sort_people_most_photos' }));
+    await userEvent.click(page.getByRole('button', { name: 'name' }));
 
-    await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-        'Alice',
-        'Zoe',
-      ]);
+    await vi.waitFor(() => {
+      expect(nameValues()).toEqual(['Alice', 'Zoe']);
     });
     expect(get(peopleViewSettings).sortBy).toBe(PeopleSortBy.Name);
   });
 
-  it('hides the sort control when there are no people', () => {
-    renderPage([]);
+  it('hides the sort control when there are no people', async () => {
+    await renderPage([]);
 
-    expect(screen.queryByRole('button', { name: 'sort_people_most_photos' })).toBeNull();
+    await expect.element(page.getByRole('button', { name: 'sort_people_most_photos' })).not.toBeInTheDocument();
   });
 
   // A library with people but no pets, loaded under a persisted Pets filter — what a user is left
@@ -303,27 +321,26 @@ describe('Global people page', () => {
     return renderPage([], { total: 12, hidden: 0, detectedFaceCount: 340 }, false, { total: 0, hidden: 0 });
   };
 
-  it('keeps the type filter reachable when the active filter matches nobody', () => {
+  it('keeps the type filter reachable when the active filter matches nobody', async () => {
     // An empty filtered list says nothing about whether the library has people. Gating the toolbar
     // on the loaded rows takes the filter dropdown down with them, stranding the user on the empty
     // view with no control to get back to All.
-    renderEmptyPetFilter();
+    await renderEmptyPetFilter();
 
-    expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'pets' })).toBeInTheDocument();
   });
 
-  it('names pets, not people, in the empty state under the Pets filter', () => {
-    renderEmptyPetFilter();
+  it('names pets, not people, in the empty state under the Pets filter', async () => {
+    await renderEmptyPetFilter();
 
     // "No people" under an empty Pets filter reads as a claim about the whole library, which is
     // exactly backwards: the library still has people, it just has no pets.
-    expect(screen.getByText('search_no_pets')).toBeInTheDocument();
-    expect(screen.queryByText('search_no_people')).toBeNull();
+    await expect.element(page.getByText('search_no_pets')).toBeInTheDocument();
+    await expect.element(page.getByText('search_no_people')).not.toBeInTheDocument();
   });
 
   it('reloads the unfiltered people when an empty pet filter is switched back to All', async () => {
-    const user = userEvent.setup();
-    renderEmptyPetFilter();
+    await renderEmptyPetFilter();
     sdkMock.getAllPeople.mockResolvedValue({
       people: [makePerson({ id: 'p1', name: 'Alice' })],
       total: 1,
@@ -331,10 +348,10 @@ describe('Global people page', () => {
       hasNextPage: false,
     });
 
-    await user.click(screen.getByRole('button', { name: 'pets' }));
-    await user.click(screen.getByRole('button', { name: 'all' }));
+    await userEvent.click(page.getByRole('button', { name: 'pets' }));
+    await userEvent.click(page.getByRole('button', { name: 'all' }));
 
-    await waitFor(() => expect(screen.getByDisplayValue('Alice')).toBeInTheDocument());
+    await getInputByValue('Alice');
     expect(sdkMock.getAllPeople).toHaveBeenLastCalledWith({
       withHidden: true,
       withSharedSpaces: true,
@@ -344,17 +361,14 @@ describe('Global people page', () => {
     });
   });
 
-  it('falls back to the default order when the stored preference is corrupt', () => {
+  it('falls back to the default order when the stored preference is corrupt', async () => {
     peopleViewSettings.set({ sortBy: 'garbage' as PeopleSortBy });
-    renderPage([
+    await renderPage([
       makePerson({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
       makePerson({ id: 'named-z', name: 'Zoe', numberOfAssets: 99 }),
     ]);
 
-    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-      'Zoe',
-      'Alice',
-    ]);
+    expect(nameValues()).toEqual(['Zoe', 'Alice']);
   });
 
   it('sorts searched results by photo count in the default mode', async () => {
@@ -365,13 +379,10 @@ describe('Global people page', () => {
       makePerson({ id: 'search-b', name: 'Alicia', numberOfAssets: 99 }),
     ]);
 
-    renderPage([makePerson({ id: 'p1', name: 'Someone', numberOfAssets: 5 })]);
+    await renderPage([makePerson({ id: 'p1', name: 'Someone', numberOfAssets: 5 })]);
 
-    await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-        'Alicia',
-        'Alice',
-      ]);
+    await vi.waitFor(() => {
+      expect(nameValues()).toEqual(['Alicia', 'Alice']);
     });
   });
 
@@ -381,69 +392,82 @@ describe('Global people page', () => {
   it('issues no request on mount under a persisted non-All filter', async () => {
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
 
-    renderPage([makePerson({ id: 'pet-1', name: 'Rex' })], { total: 1, hidden: 0, detectedFaceCount: 0 }, false, {
+    await renderPage([makePerson({ id: 'pet-1', name: 'Rex' })], { total: 1, hidden: 0, detectedFaceCount: 0 }, false, {
       total: 1,
       hidden: 0,
     });
 
-    await waitFor(() => expect(screen.getByTestId('user-page-layout')).toBeInTheDocument());
+    await expect.element(page.getByTestId('user-page-layout')).toBeInTheDocument();
     expect(sdkMock.getAllPeople).not.toHaveBeenCalled();
   });
 
   // Under a filter the unfiltered overview statistics would report the whole library above a
   // filtered grid, so the header has to read the totals `load` returned with the filtered list.
-  it('reads the header totals from the filtered load rather than the overview statistics', () => {
+  it('reads the header totals from the filtered load rather than the overview statistics', async () => {
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
 
-    renderPage([makePerson({ id: 'pet-1', name: 'Rex' })], { total: 120, hidden: 20, detectedFaceCount: 2901 }, false, {
-      total: 4,
-      hidden: 1,
-    });
+    await renderPage(
+      [makePerson({ id: 'pet-1', name: 'Rex' })],
+      { total: 120, hidden: 20, detectedFaceCount: 2901 },
+      false,
+      {
+        total: 4,
+        hidden: 1,
+      },
+    );
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(3) \u{B7} 2,901 faces');
+    await expect
+      .element(page.getByTestId('user-page-layout'))
+      .toHaveAttribute('data-description', '(3) \u{B7} 2,901 faces');
   });
 
-  it('shows visible people and detected faces in the heading', () => {
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+  it('shows visible people and detected faces in the heading', async () => {
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u{B7} 2,901 faces');
+    await expect
+      .element(page.getByTestId('user-page-layout'))
+      .toHaveAttribute('data-description', '(10) \u{B7} 2,901 faces');
   });
 
-  it('derives the heading person count from overview statistics instead of loaded rows', () => {
-    renderPage([makePerson({ id: 'p1' })], { total: 60, hidden: 4, detectedFaceCount: 100 });
+  it('derives the heading person count from overview statistics instead of loaded rows', async () => {
+    await renderPage([makePerson({ id: 'p1' })], { total: 60, hidden: 4, detectedFaceCount: 100 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u{B7} 100 faces');
+    await expect
+      .element(page.getByTestId('user-page-layout'))
+      .toHaveAttribute('data-description', '(56) \u{B7} 100 faces');
   });
 
-  it('shows detected faces when all people are hidden', () => {
-    renderPage([makePerson({ id: 'p1', isHidden: true })], { total: 1, hidden: 1, detectedFaceCount: 42 });
+  it('shows detected faces when all people are hidden', async () => {
+    await renderPage([makePerson({ id: 'p1', isHidden: true })], { total: 1, hidden: 1, detectedFaceCount: 42 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u{B7} 42 faces');
+    await expect
+      .element(page.getByTestId('user-page-layout'))
+      .toHaveAttribute('data-description', '(0) \u{B7} 42 faces');
   });
 
-  it('omits the heading description for an empty scope with no detected faces', () => {
-    renderPage([], { total: 0, hidden: 0, detectedFaceCount: 0 });
+  it('omits the heading description for an empty scope with no detected faces', async () => {
+    await renderPage([], { total: 0, hidden: 0, detectedFaceCount: 0 });
 
-    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+    await expect.element(page.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
   });
 
-  it('keeps rendering people and falls back to the list count when statistics are unavailable', () => {
-    renderPage([makePerson({ id: 'p1', name: 'Alice' })], null);
+  it('keeps rendering people and falls back to the list count when statistics are unavailable', async () => {
+    await renderPage([makePerson({ id: 'p1', name: 'Alice' })], null);
 
-    expect(screen.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
+    await expect.element(page.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
+    await expect.element(page.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
   });
 
-  it('does not call detailed face statistics on initial render', () => {
-    renderPage([makePerson()]);
+  it('does not call detailed face statistics on initial render', async () => {
+    await renderPage([makePerson()]);
 
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
-  it('renders a face statistics details button when overview stats exist and no global search is active', () => {
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+  it('renders a face statistics details button when overview stats exist and no global search is active', async () => {
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
   });
 
   it('loads and renders detailed global face statistics when the info button is clicked', async () => {
@@ -456,94 +480,95 @@ describe('Global people page', () => {
         unassignedFaceCount: 4567,
       }),
     );
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details' }));
 
     expect(sdkMock.getPeopleFaceStatistics).toHaveBeenCalledWith({ withSharedSpaces: true });
-    expect(await screen.findByText('detected_faces')).toBeInTheDocument();
-    expect(screen.getByText('1,234')).toBeInTheDocument();
-    expect(screen.getByText('assigned_to_visible_people')).toBeInTheDocument();
-    expect(screen.getByText('2,345')).toBeInTheDocument();
-    expect(screen.getByText('named_visible_people')).toBeInTheDocument();
-    expect(screen.getByText('154')).toBeInTheDocument();
-    expect(screen.getByText('assigned_to_hidden_people')).toBeInTheDocument();
-    expect(screen.getByText('3,456')).toBeInTheDocument();
-    expect(screen.getByText('unassigned')).toBeInTheDocument();
-    expect(screen.getByText('4,567')).toBeInTheDocument();
+    await expect.element(page.getByText('detected_faces')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('assigned_to_visible_people')).toBeInTheDocument();
+    await expect.element(page.getByText('2,345')).toBeInTheDocument();
+    await expect.element(page.getByText('named_visible_people')).toBeInTheDocument();
+    await expect.element(page.getByText('154')).toBeInTheDocument();
+    await expect.element(page.getByText('assigned_to_hidden_people')).toBeInTheDocument();
+    await expect.element(page.getByText('3,456')).toBeInTheDocument();
+    await expect.element(page.getByText('unassigned')).toBeInTheDocument();
+    await expect.element(page.getByText('4,567')).toBeInTheDocument();
   });
 
   it('uses cached detailed global face statistics when the info UI is closed and reopened', async () => {
     sdkMock.getPeopleFaceStatistics.mockResolvedValue(makeFaceStatistics({ detectedFaceCount: 1234 }));
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    const trigger = page.getByRole('button', { name: 'view_face_statistics_details' });
     await userEvent.click(trigger);
-    expect(await screen.findByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
 
     await userEvent.click(trigger);
     await userEvent.click(trigger);
 
     expect(sdkMock.getPeopleFaceStatistics).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
   });
 
   it('loads detailed global face statistics separately after the authenticated user changes', async () => {
     sdkMock.getPeopleFaceStatistics
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 1111 }))
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 2222 }));
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    const trigger = page.getByRole('button', { name: 'view_face_statistics_details' });
     await userEvent.click(trigger);
-    expect(await screen.findByText('1,111')).toBeInTheDocument();
+    await expect.element(page.getByText('1,111')).toBeInTheDocument();
 
     await userEvent.click(trigger);
     authManager.setUser(factory.user({ id: 'other-user-id' }));
     await userEvent.click(trigger);
 
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    await expect.element(page.getByText('2,222')).toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).toHaveBeenCalledTimes(2);
   });
 
   it('renders a detailed face statistics error while keeping the primary face count in the header', async () => {
     sdkMock.getPeopleFaceStatistics.mockRejectedValue(new Error('network'));
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u{B7} 2,901 faces');
+    await expect.element(page.getByRole('alert')).toMatchTextContent('unable_to_load_face_statistics');
+    await expect
+      .element(page.getByTestId('user-page-layout'))
+      .toHaveAttribute('data-description', '(10) \u{B7} 2,901 faces');
   });
 
   it('hides the face count while global name search is active because it is unsupported by overview stats', async () => {
     reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     sdkMock.searchPerson.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
 
-    renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Ali', withSharedSpaces: true }, expect.any(Object));
     });
-    await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
-    });
-    expect(screen.getByTestId('user-page-layout').dataset.description ?? '').not.toContain('faces');
+    await expect.element(page.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
+    const layout = page.getByTestId('user-page-layout').element() as HTMLElement;
+    expect(layout.dataset.description ?? '').not.toContain('faces');
   });
 
   it('hides the face statistics details button during unsupported global name search', async () => {
     reactivePageMock.reset('http://localhost/people?searchedPeople=Ali', { routeId: '/(user)/people' });
     sdkMock.searchPerson.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
 
-    renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Ali', withSharedSpaces: true }, expect.any(Object));
     });
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
@@ -566,7 +591,7 @@ describe('Global people page', () => {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    renderPage([makePerson({ id: 'p1', name: 'Alice' })], {
+    await renderPage([makePerson({ id: 'p1', name: 'Alice' })], {
       total: 12,
       hidden: 2,
       detectedFaceCount: 2901,
@@ -575,50 +600,48 @@ describe('Global people page', () => {
     observer.disconnect();
 
     expect(renderedButtonLabels).not.toContain('view_face_statistics_details');
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
-  it('hides the face statistics details button when overview statistics are unavailable', () => {
-    renderPage([makePerson({ id: 'p1', name: 'Alice' })], null);
+  it('hides the face statistics details button when overview statistics are unavailable', async () => {
+    await renderPage([makePerson({ id: 'p1', name: 'Alice' })], null);
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
   });
 
-  it('hides the face statistics details button when no face count is visible in the header', () => {
-    renderPage([], { total: 0, hidden: 0, detectedFaceCount: 0 });
+  it('hides the face statistics details button when no face count is visible in the header', async () => {
+    await renderPage([], { total: 0, hidden: 0, detectedFaceCount: 0 });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
   });
 
-  it('omits the face count from the header when the peopleStatistics feature flag is disabled', () => {
+  it('omits the face count from the header when the peopleStatistics feature flag is disabled', async () => {
     featureFlagsMock.value.peopleStatistics = false;
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10)');
+    await expect.element(page.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10)');
   });
 
-  it('hides the face statistics details button when the peopleStatistics feature flag is disabled', () => {
+  it('hides the face statistics details button when the peopleStatistics feature flag is disabled', async () => {
     featureFlagsMock.value.peopleStatistics = false;
-    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+    await renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
   it('saves global person names through the shared editable footer', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice' });
-    renderPage([person]);
+    await renderPage([person]);
 
-    const input = screen.getByDisplayValue('Alice');
-    const user = userEvent.setup();
+    const input = await getInputByValue('Alice');
 
-    await user.click(input);
-    await user.clear(input);
-    await user.type(input, 'Alicia');
-    await fireEvent.focusOut(input);
+    await userEvent.click(input);
+    await userEvent.fill(input, 'Alicia');
+    input.element().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updatePerson).toHaveBeenCalledWith({
         id: 'p1',
         personUpdateDto: { name: 'Alicia' },
@@ -628,25 +651,24 @@ describe('Global people page', () => {
 
   it('keeps global person actions on the shared tile action slot', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice', isFavorite: false });
-    const { baseElement } = renderPage([person]);
+    await renderPage([person]);
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.getByRole('group'));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
+    await userEvent.click(page.getByLabelText('show_person_options'));
 
-    expect(screen.getByText('hide_person')).toBeInTheDocument();
-    expect(screen.getByText('set_date_of_birth')).toBeInTheDocument();
-    expect(screen.getByText('merge_people')).toBeInTheDocument();
-    expect(screen.getByText('to_favorite')).toBeInTheDocument();
+    await expect.element(page.getByText('hide_person')).toBeInTheDocument();
+    await expect.element(page.getByText('set_date_of_birth')).toBeInTheDocument();
+    await expect.element(page.getByText('merge_people')).toBeInTheDocument();
+    await expect.element(page.getByText('to_favorite')).toBeInTheDocument();
 
-    await user.click(screen.getByText('merge_people'));
+    await userEvent.click(page.getByText('merge_people'));
 
     expect(gotoMock).toHaveBeenCalledWith('/people/p1?previousRoute=%2Fpeople&action=merge');
   });
 
-  it('routes a space-primary person to identity-wide person detail', () => {
-    renderPage([
+  it('routes a space-primary person to identity-wide person detail', async () => {
+    await renderPage([
       makePerson({
         id: 'space-person-1',
         name: 'Shared Alice',
@@ -656,11 +678,10 @@ describe('Global people page', () => {
       }),
     ]);
 
-    expect(screen.getByRole('link', { name: 'Shared Alice' })).toHaveAttribute(
-      'href',
-      '/people/space-person-1?previousRoute=%2Fpeople',
-    );
-    expect(screen.getByTitle('Shared Alice').getAttribute('src')).toContain(
+    await expect
+      .element(page.getByRole('link', { name: 'Shared Alice' }))
+      .toHaveAttribute('href', '/people/space-person-1?previousRoute=%2Fpeople');
+    expect(page.getByTitle('Shared Alice').element().getAttribute('src')).toContain(
       '/shared-spaces/space-1/people/space-person-1/thumbnail?updatedAt=2026-01-02T00%3A00%3A00.000Z',
     );
   });
@@ -674,17 +695,15 @@ describe('Global people page', () => {
     });
     sdkMock.updateSpacePerson.mockResolvedValue(makeSpacePerson({ name: 'Shared Alicia' }));
     mockSpaceRole('space-1', SharedSpaceRole.Editor);
-    renderPage([person]);
+    await renderPage([person]);
 
-    const input = await screen.findByDisplayValue('Shared Alice');
-    const user = userEvent.setup();
+    const input = await getInputByValue('Shared Alice');
 
-    await user.click(input);
-    await user.clear(input);
-    await user.type(input, 'Shared Alicia');
-    await fireEvent.focusOut(input);
+    await userEvent.click(input);
+    await userEvent.fill(input, 'Shared Alicia');
+    input.element().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'space-person-1',
@@ -705,25 +724,22 @@ describe('Global people page', () => {
     const unnamed = makePerson({ id: 'p-unnamed', name: '' });
     sdkMock.searchPerson.mockResolvedValue([norgy]);
     vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
-    renderPage([norgy, unnamed]);
+    await renderPage([norgy, unnamed]);
 
-    const user = userEvent.setup();
-    const input = screen
-      .getAllByPlaceholderText('add_a_name')
-      .find((element) => (element as HTMLInputElement).value === '')!;
-    await user.click(input);
-    await user.type(input, 'Norg');
+    const input = await getInputByValue('');
+    await userEvent.click(input);
+    await userEvent.type(input, 'Norg');
 
-    const option = await screen.findByRole('option', { name: 'Norgy' });
+    const option = page.getByRole('option', { name: 'Norgy' });
+    await expect.element(option).toBeInTheDocument();
     expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Norg', withSharedSpaces: true });
-    expect(option.querySelector('img')).toHaveAttribute(
-      'src',
-      expect.stringContaining('/shared-spaces/space-1/people/space-person-norgy/thumbnail'),
-    );
+    await expect
+      .element(page.elementLocator(option.element().querySelector('img')!))
+      .toHaveAttribute('src', expect.stringContaining('/shared-spaces/space-1/people/space-person-norgy/thumbnail'));
 
-    await user.click(option);
+    await userEvent.click(option);
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(modalManager.show).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ personToMerge: unnamed, personToBeMergedInto: norgy }),
@@ -750,20 +766,17 @@ describe('Global people page', () => {
     });
     sdkMock.searchPerson.mockResolvedValue([norgy]);
     vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
-    renderPage([norgy, unnamed]);
+    await renderPage([norgy, unnamed]);
 
-    const user = userEvent.setup();
-    const input = screen
-      .getAllByPlaceholderText('add_a_name')
-      .find((element) => (element as HTMLInputElement).value === '')!;
-    await user.click(input);
-    await user.type(input, 'norgy');
-    await fireEvent.focusOut(input);
+    const input = await getInputByValue('');
+    await userEvent.click(input);
+    await userEvent.type(input, 'norgy');
+    input.element().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'norgy', withHidden: true, withSharedSpaces: true }),
     );
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(modalManager.show).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ personToMerge: unnamed, personToBeMergedInto: norgy }),
@@ -773,7 +786,7 @@ describe('Global people page', () => {
 
   it('blocks inline renames for space-primary rows when the user is a viewer', async () => {
     mockSpaceRole('viewer-space-grid', SharedSpaceRole.Viewer);
-    renderPage([
+    await renderPage([
       makePerson({
         id: 'space-person-2',
         name: 'Shared Alice',
@@ -782,9 +795,9 @@ describe('Global people page', () => {
       }),
     ]);
 
-    await waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
-    expect(screen.queryByDisplayValue('Shared Alice')).toBeNull();
-    expect(screen.getByText('Shared Alice')).toBeInTheDocument();
+    await vi.waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
+    expect(findInputByValue('Shared Alice')).toBeNull();
+    await expect.element(page.getByText('Shared Alice')).toBeInTheDocument();
     expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce();
     expect(sdkMock.getMembers).not.toHaveBeenCalled();
   });
@@ -792,7 +805,7 @@ describe('Global people page', () => {
   it('keeps space-primary names editable until the spaces list says the viewer cannot edit', async () => {
     let resolveSpaces!: (spaces: SharedSpaceResponseDto[]) => void;
     sdkMock.getAllSpaces.mockReturnValue(new Promise((resolve) => (resolveSpaces = resolve)));
-    renderPage([
+    await renderPage([
       makePerson({
         id: 'space-person-1',
         name: 'Shared Alice',
@@ -801,18 +814,18 @@ describe('Global people page', () => {
       }),
     ]);
 
-    await waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce());
-    expect(await screen.findByDisplayValue('Shared Alice')).toBeInTheDocument();
+    await vi.waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce());
+    await getInputByValue('Shared Alice');
 
     resolveSpaces([makeSpace('space-1', SharedSpaceRole.Viewer)]);
 
-    await waitFor(() => expect(screen.queryByDisplayValue('Shared Alice')).toBeNull());
-    expect(screen.getByText('Shared Alice')).toBeInTheDocument();
+    await vi.waitFor(() => expect(findInputByValue('Shared Alice')).toBeNull());
+    await expect.element(page.getByText('Shared Alice')).toBeInTheDocument();
   });
 
   it('keeps personal actions off shared-space-only rows', async () => {
     mockSpaceRole('space-1', SharedSpaceRole.Editor);
-    const { baseElement } = renderPage([
+    await renderPage([
       makePerson({
         id: 'space-person-1',
         name: 'Shared Alice',
@@ -821,12 +834,12 @@ describe('Global people page', () => {
       }),
     ]);
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.getByRole('group'));
 
-    expect(await screen.findByDisplayValue('Shared Alice')).toHaveAttribute('placeholder', 'add_a_name');
-    expect(screen.queryByLabelText('show_person_options')).not.toBeInTheDocument();
-    expect(screen.queryByText('to_favorite')).not.toBeInTheDocument();
-    expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
+    await expect.element(await getInputByValue('Shared Alice')).toHaveAttribute('placeholder', 'add_a_name');
+    await expect.element(page.getByLabelText('show_person_options')).not.toBeInTheDocument();
+    await expect.element(page.getByText('to_favorite')).not.toBeInTheDocument();
+    await expect.element(page.getByText('hide_person')).not.toBeInTheDocument();
   });
 
   it('requests the next page at the shared size and merges the rows across the boundary', async () => {
@@ -842,10 +855,10 @@ describe('Global people page', () => {
       hasNextPage: false,
     });
 
-    const { intersect } = renderPaginatedPage();
+    const { intersect } = await renderPaginatedPage();
     await intersect();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getAllPeople).toHaveBeenCalledWith({
         withHidden: true,
         withSharedSpaces: true,
@@ -855,13 +868,11 @@ describe('Global people page', () => {
     });
 
     // Page 2's rows are appended to page 1's — all four render, none dropped or duplicated.
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Carol')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Dave')).toBeInTheDocument();
-    });
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+    await getInputByValue('Carol');
+    await getInputByValue('Dave');
+    expect(findInputByValue('Alice')).not.toBeNull();
+    expect(findInputByValue('Bob')).not.toBeNull();
+    expect(nameInputs()).toHaveLength(4);
   });
 
   it('requests a page only once while that request is still in flight', async () => {
@@ -876,7 +887,7 @@ describe('Global people page', () => {
       }),
     );
 
-    const { intersect } = renderPaginatedPage();
+    const { intersect } = await renderPaginatedPage();
     await intersect();
     await intersect();
 
@@ -892,8 +903,8 @@ describe('Global people page', () => {
       hasNextPage: false,
     });
 
-    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
-    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+    await getInputByValue('Carol');
+    expect(nameInputs()).toHaveLength(4);
   });
 
   it('releases the in-flight guard so scrolling keeps paging past the second page', async () => {
@@ -912,20 +923,20 @@ describe('Global people page', () => {
         hasNextPage: false,
       });
 
-    const { intersect } = renderPaginatedPage();
+    const { intersect } = await renderPaginatedPage();
     await intersect();
-    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
+    await getInputByValue('Carol');
 
     await intersect();
 
-    await waitFor(() => expect(screen.getByDisplayValue('Dave')).toBeInTheDocument());
+    await getInputByValue('Dave');
     expect(sdkMock.getAllPeople).toHaveBeenNthCalledWith(2, {
       withHidden: true,
       withSharedSpaces: true,
       page: 3,
       size: PEOPLE_PAGE_SIZE,
     });
-    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+    expect(nameInputs()).toHaveLength(4);
   });
 
   it('renders each person once when the server repeats a row across the page boundary', async () => {
@@ -943,14 +954,10 @@ describe('Global people page', () => {
       hasNextPage: false,
     });
 
-    const { intersect } = renderPaginatedPage();
+    const { intersect } = await renderPaginatedPage();
     await intersect();
 
-    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
-    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-      'Alice',
-      'Bob',
-      'Carol',
-    ]);
+    await getInputByValue('Carol');
+    expect(nameValues()).toEqual(['Alice', 'Bob', 'Carol']);
   });
 });

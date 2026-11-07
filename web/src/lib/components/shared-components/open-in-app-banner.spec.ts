@@ -1,8 +1,9 @@
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import OpenInAppBanner from './open-in-app-banner.svelte';
 
 type Nav = {
@@ -21,18 +22,21 @@ const ASSET_VIEWER_TARGET = {
   params: { assetId: '550e8400-e29b-41d4-a716-446655440000' },
 };
 
-vi.mock('@immich/ui', async () => {
-  const actual = await vi.importActual<typeof import('@immich/ui')>('@immich/ui');
+vi.mock('@immich/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@immich/ui')>();
   return { ...actual, IconButton: actual.Button };
 });
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   afterNavigate: (cb: (nav: { type: string }) => void) => {
     navState.callback = cb;
   },
 }));
 
-vi.mock('$app/state', () => ({ page: pageState }));
+vi.mock('$app/state', async () => ({ ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: pageState }));
+
+const banner = () => page.getByRole('region', { name: 'open_in_app_banner_aria_label' });
 
 const setUser = (id: string | null) => {
   if (id === null) {
@@ -58,43 +62,43 @@ describe('OpenInAppBanner', () => {
   });
 
   it('renders the banner when all gates pass', async () => {
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
-    const openLink = screen.getByRole('link', { name: 'open_in_app_banner_open' });
-    expect(openLink).toHaveAttribute('href', expect.stringMatching(/^immich:\/\/asset\?id=/));
+    await expect.element(banner()).toBeInTheDocument();
+    const openLink = page.getByRole('link', { name: 'open_in_app_banner_open' });
+    await expect.element(openLink).toHaveAttribute('href', expect.stringMatching(/^immich:\/\/asset\?id=/));
   });
 
   it('renders nothing when path does not match a deep-link route', async () => {
     pageState.url.pathname = '/admin/users';
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
   });
 
   it('appears after auth resolves (auth-late race)', async () => {
     setUser(null);
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
 
     setUser('user-1');
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
   });
 
   it('does not hide on the initial enter-fire of afterNavigate', async () => {
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
 
     navState.callback!({ type: 'enter' });
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
   });
 
   it('hides on subsequent navigation away from the deep-link route', async () => {
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
     (navState.callback as (nav: Nav) => void)({
       type: 'link',
@@ -102,13 +106,13 @@ describe('OpenInAppBanner', () => {
       to: { route: { id: '/(user)/search' }, params: {} },
     });
     await tick();
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
   });
 
   it('keeps banner visible when navigating between asset-viewer routes (swipe between photos)', async () => {
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
 
     (navState.callback as (nav: Nav) => void)({
       type: 'link',
@@ -119,12 +123,12 @@ describe('OpenInAppBanner', () => {
       },
     });
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
   });
 
   it('re-arms cold-entry when auth resolves after a prior navigation', async () => {
     setUser(null);
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
 
     // A pre-auth nav fires (e.g. OAuth callback redirect) — would normally clear coldEntry.
@@ -134,26 +138,26 @@ describe('OpenInAppBanner', () => {
       to: ASSET_VIEWER_TARGET,
     });
     await tick();
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
 
     // Now auth resolves — banner should still appear.
     setUser('user-1');
     await tick();
-    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+    await expect.element(banner()).toBeInTheDocument();
   });
 
   it('dismiss writes localStorage with ~30 day expiry', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-16T12:00:00Z'));
 
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
 
-    const dismiss = screen.getByRole('button', { name: 'open_in_app_banner_dismiss' });
-    await fireEvent.click(dismiss);
+    const dismiss = page.getByRole('button', { name: 'open_in_app_banner_dismiss' }).element() as HTMLElement;
+    dismiss.click();
     await tick();
 
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
 
     const stored = localStorage.getItem('gallery.openInApp.dismissedUntil');
     expect(stored).toBe('2026-05-16T12:00:00.000Z');
@@ -164,8 +168,8 @@ describe('OpenInAppBanner', () => {
   it('does not render when dismissal is in the future', async () => {
     const future = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
     localStorage.setItem('gallery.openInApp.dismissedUntil', future);
-    render(OpenInAppBanner);
+    await render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+    expect(banner().query()).toBeNull();
   });
 });

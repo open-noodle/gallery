@@ -1,9 +1,8 @@
 import { queryClient } from '#lib/queries/client.ts';
 import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import FeatureSettings from './FeatureSettings.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -50,21 +49,21 @@ describe('FeatureSettings memory types', () => {
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
   });
 
-  it('renders a toggle per available memory type reflecting the preference', () => {
-    render(FeatureSettings);
+  it('renders a toggle per available memory type reflecting the preference', async () => {
+    await render(FeatureSettings);
 
-    expect(screen.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'memory_type_month_recap' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'memory_type_recent_trip' })).toBeChecked();
+    await expect.element(page.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeChecked();
+    await expect.element(page.getByRole('switch', { name: 'memory_type_month_recap' })).not.toBeChecked();
+    await expect.element(page.getByRole('switch', { name: 'memory_type_recent_trip' })).toBeChecked();
   });
 
   it('saves memory type changes without altering enabled or duration', async () => {
-    const user = userEvent.setup();
-    render(FeatureSettings);
+    await render(FeatureSettings);
 
-    await user.click(screen.getByRole('switch', { name: 'memory_type_month_recap' }));
-    await user.click(screen.getByRole('button', { name: 'save' }));
+    await userEvent.click(page.getByRole('switch', { name: 'memory_type_month_recap' }));
+    await userEvent.click(page.getByRole('button', { name: 'save' }));
 
+    await expect.poll(() => mocks.updateMyPreferences.mock.calls.length).toBeGreaterThan(0);
     expect(mocks.updateMyPreferences).toHaveBeenCalledWith({
       userPreferencesUpdateDto: expect.objectContaining({
         memories: {
@@ -77,13 +76,13 @@ describe('FeatureSettings memory types', () => {
     });
   });
 
-  it('does not render a toggle for an unavailable memory type', () => {
+  it('does not render a toggle for an unavailable memory type', async () => {
     mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'month_recap'] };
     queryClient.setQueryData(getServerConfigQuery().queryKey, mocks.serverConfig as never);
-    render(FeatureSettings);
+    await render(FeatureSettings);
 
-    expect(screen.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeInTheDocument();
-    expect(screen.queryByRole('switch', { name: 'memory_type_recent_trip' })).toBeNull();
+    await expect.element(page.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeInTheDocument();
+    expect(page.getByRole('switch', { name: 'memory_type_recent_trip' }).query()).toBeNull();
   });
 });
 
@@ -103,9 +102,9 @@ describe('memories preference payload', () => {
     queryClient.setQueryData(getServerConfigQuery().queryKey, mocks.serverConfig as never);
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
 
-    const user = userEvent.setup();
-    render(FeatureSettings);
-    await user.click(screen.getByRole('button', { name: 'save' }));
+    await render(FeatureSettings);
+    await userEvent.click(page.getByRole('button', { name: 'save' }));
+    await expect.poll(() => mocks.updateMyPreferences.mock.calls.length).toBeGreaterThan(0);
 
     const payload = mocks.updateMyPreferences.mock.calls.at(-1)?.[0].userPreferencesUpdateDto;
     expect(payload.memories).toEqual({

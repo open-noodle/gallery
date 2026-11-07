@@ -1,16 +1,20 @@
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import PhotoPreview from '../previews/photo-preview.svelte';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+}));
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
   return { ...mod, Button: mod.Button };
 });
 
 describe('photo-preview', () => {
-  it('renders filename + exif lines', () => {
-    render(PhotoPreview, {
+  it('renders filename + exif lines', async () => {
+    await render(PhotoPreview, {
       props: {
         photo: {
           id: 'a1',
@@ -25,19 +29,19 @@ describe('photo-preview', () => {
         } as never,
       },
     });
-    expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
-    expect(screen.getByText(/Santa Cruz/)).toBeInTheDocument();
-    expect(screen.getByText(/Canon/)).toBeInTheDocument();
+    await expect.element(page.getByText('sunset.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText(/Santa Cruz/)).toBeInTheDocument();
+    await expect.element(page.getByText(/Canon/)).toBeInTheDocument();
   });
 
-  it('renders without exif subtitle when exifInfo is missing', () => {
-    render(PhotoPreview, {
+  it('renders without exif subtitle when exifInfo is missing', async () => {
+    await render(PhotoPreview, {
       props: { photo: { id: 'a1', originalFileName: 'plain.jpg' } as never },
     });
-    expect(screen.getByText('plain.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText('plain.jpg')).toBeInTheDocument();
   });
 
-  it('wraps the image in an explicit-height flex-centered frame (not aspect-ratio)', () => {
+  it('wraps the image in an explicit-height flex-centered frame (not aspect-ratio)', async () => {
     // Regression guard for the long chain of preview-clipping bugs:
     //   1. object-cover cropped portraits/landscapes.
     //   2. aspect-[4/3] + h-full overflowed because percent heights don't resolve
@@ -48,7 +52,7 @@ describe('photo-preview', () => {
     // and the img capped at max-h-full / max-w-full with object-contain. Every
     // dimension is definite (pixels, not percents or aspect ratios) so the image can
     // never overflow or clip its container regardless of source aspect ratio.
-    const { container } = render(PhotoPreview, {
+    const { container } = await render(PhotoPreview, {
       props: { photo: { id: 'a1', originalFileName: 'plain.jpg' } as never },
     });
     const img = container.querySelector('img');

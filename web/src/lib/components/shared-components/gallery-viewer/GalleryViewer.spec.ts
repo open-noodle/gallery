@@ -1,10 +1,13 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import { validThumbhash } from '#test/common/factories.ts';
+import { MockRouter } from '#test/unit/mocks/router.ts';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import GalleryViewer from './GalleryViewer.svelte';
 
 const { assetViewerPropsCalls, mockAssetInteraction, mockAssetViewerManager } = vi.hoisted(() => {
@@ -100,11 +103,6 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { trash: true } },
 }));
 
-vi.mock('#lib/utils/navigation.js', () => ({
-  isSharedLinkRoute: vi.fn(() => false),
-  navigate: vi.fn(),
-}));
-
 vi.mock('lodash-es', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lodash-es')>();
   return {
@@ -125,7 +123,7 @@ function asset(id: string, localDateTime: string, overrides: Partial<AssetRespon
     isTrashed: false,
     fileCreatedAt: localDateTime,
     localDateTime,
-    thumbhash: `${id}-thumbhash`,
+    thumbhash: validThumbhash,
     width: 1600,
     height: 900,
     ...overrides,
@@ -264,6 +262,18 @@ describe('GalleryViewer grouping', () => {
     await waitLocale('en-US');
   });
 
+  // `onRandom` navigates to the picked asset; the global `$app/navigation` fake records it on
+  // the active mock router.
+  const router = new MockRouter();
+
+  beforeEach(() => {
+    router.setup();
+  });
+
+  afterEach(() => {
+    router.teardown();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAssetInteraction.selectionActive = false;
@@ -275,60 +285,60 @@ describe('GalleryViewer grouping', () => {
     assetViewerPropsCalls.length = 0;
   });
 
-  it('renders the grouping control when grouping is enabled and assets exist', () => {
-    renderViewer();
+  it('renders the grouping control when grouping is enabled and assets exist', async () => {
+    await renderViewer();
 
-    expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').element()).toBeInTheDocument();
   });
 
-  it('does not render an orphaned grouping control for an empty asset list', () => {
-    renderViewer({ assets: [], enableGrouping: true });
+  it('does not render an orphaned grouping control for an empty asset list', async () => {
+    await renderViewer({ assets: [], enableGrouping: true });
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).not.toBeInTheDocument();
   });
 
-  it('does not render the grouping control when grouping is disabled', () => {
-    renderViewer({ enableGrouping: false });
+  it('does not render the grouping control when grouping is disabled', async () => {
+    await renderViewer({ enableGrouping: false });
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).not.toBeInTheDocument();
   });
 
   it('manual grouping changes render representative year cards without temporal chips', async () => {
-    renderViewer();
+    await renderViewer();
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    await userEvent.click(page.getByTestId('timeline-grouping-year').element());
 
-    await waitFor(() => {
-      expect(screen.getAllByTestId('timeline-bucket-card')).toHaveLength(2);
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('thumbnail-asset-2015-aug')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('timeline-bucket-card').elements()).toHaveLength(2);
+      expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2015-aug').query()).not.toBeInTheDocument();
     });
   });
 
   it('zooms from year to month to detailed mode without narrowing the local asset array', async () => {
     const assets = defaultAssets();
-    renderViewer({ assets });
+    await renderViewer({ assets });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-    await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
+    await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+    await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getAllByTestId('timeline-bucket-card')).toHaveLength(3);
-      expect(screen.getByRole('button', { name: /Jan 2016, 1 photo/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Aug 2015, 1 photo/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Jan 2015, 1 photo/i })).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
+      expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true');
+      expect(page.getByTestId('timeline-bucket-card').elements()).toHaveLength(3);
+      expect(page.getByRole('button', { name: /Jan 2016, 1 photo/i }).element()).toBeInTheDocument();
+      expect(page.getByRole('button', { name: /Aug 2015, 1 photo/i }).element()).toBeInTheDocument();
+      expect(page.getByRole('button', { name: /Jan 2015, 1 photo/i }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: /Aug 2015, 1 photo/i }));
+    await userEvent.click(page.getByRole('button', { name: /Aug 2015, 1 photo/i }).element());
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByTestId('thumbnail-asset-2016')).toBeInTheDocument();
-      expect(screen.getByTestId('thumbnail-asset-2015-aug')).toBeInTheDocument();
-      expect(screen.getByTestId('thumbnail-asset-2015-jan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
+      expect(page.getByTestId('timeline-grouping-day').element()).toHaveAttribute('aria-pressed', 'true');
+      expect(page.getByTestId('thumbnail-asset-2016').element()).toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2015-aug').element()).toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2015-jan').element()).toBeInTheDocument();
     });
 
     expect(assets.map((asset) => asset.id)).toEqual(['asset-2016', 'asset-2015-aug', 'asset-2015-jan']);
@@ -339,36 +349,36 @@ describe('GalleryViewer grouping', () => {
     const scrollTracker = trackScrolledElement();
 
     try {
-      renderViewer();
+      await renderViewer();
 
-      await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-      await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
+      await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+      await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
 
-      await waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
+      await vi.waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
       await frameQueue.flush();
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(scrollTracker.scrolledElement).toHaveAttribute('data-gallery-bucket-year', '2015');
         expect(scrollTracker.scrolledElement).toHaveAttribute('data-gallery-bucket-month', '8');
-        expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
+        expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true');
       });
 
       frameQueue.requestAnimationFrame.mockClear();
       scrollTracker.reset();
 
-      await fireEvent.click(screen.getByRole('button', { name: /Aug 2015, 1 photo/i }));
+      await userEvent.click(page.getByRole('button', { name: /Aug 2015, 1 photo/i }).element());
 
-      await waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
+      await vi.waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
       await frameQueue.flush();
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(scrollTracker.scrolledElement).toHaveAttribute('data-gallery-asset-year', '2015');
         expect(scrollTracker.scrolledElement).toHaveAttribute('data-gallery-asset-month', '8');
         expect(scrollTracker.scrolledElement).toHaveAttribute(
           'data-testid',
           'gallery-viewer-asset-anchor-asset-2015-aug',
         );
-        expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+        expect(page.getByTestId('timeline-grouping-day').element()).toHaveAttribute('aria-pressed', 'true');
       });
     } finally {
       frameQueue.restore();
@@ -381,18 +391,20 @@ describe('GalleryViewer grouping', () => {
     const scrollTracker = trackScrolledElement();
 
     try {
-      renderViewer();
+      await renderViewer();
 
-      await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-      await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
+      await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+      await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(frameQueue.requestAnimationFrame).toHaveBeenCalled();
-        expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
+        expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true');
       });
 
-      await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-      await waitFor(() => expect(screen.getByTestId('timeline-grouping-year')).toHaveAttribute('aria-pressed', 'true'));
+      await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+      await vi.waitFor(() =>
+        expect(page.getByTestId('timeline-grouping-year').element()).toHaveAttribute('aria-pressed', 'true'),
+      );
 
       await frameQueue.flush();
 
@@ -409,23 +421,23 @@ describe('GalleryViewer grouping', () => {
     const assets = assetsWithOffscreenAugustTarget();
 
     try {
-      renderViewer({ assets });
+      await renderViewer({ assets });
 
-      await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-      await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
-      await waitFor(() =>
-        expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true'),
+      await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+      await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
+      await vi.waitFor(() =>
+        expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true'),
       );
 
       frameQueue.requestAnimationFrame.mockClear();
       scrollTracker.reset();
 
-      await fireEvent.click(screen.getByRole('button', { name: /Aug 2015, 1 photo/i }));
+      await userEvent.click(page.getByRole('button', { name: /Aug 2015, 1 photo/i }).element());
 
-      await waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
+      await vi.waitFor(() => expect(frameQueue.requestAnimationFrame).toHaveBeenCalled());
       await frameQueue.flush();
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(scrollTracker.scrolledElement).toHaveAttribute(
           'data-testid',
           'gallery-viewer-asset-anchor-asset-2015-aug-offscreen',
@@ -445,14 +457,14 @@ describe('GalleryViewer grouping', () => {
     const assets = defaultAssets();
 
     try {
-      const view = renderViewer({ assets });
+      const view = await renderViewer({ assets });
 
-      await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-      await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
+      await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+      await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(frameQueue.requestAnimationFrame).toHaveBeenCalled();
-        expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
+        expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true');
       });
 
       await view.rerender({
@@ -466,11 +478,11 @@ describe('GalleryViewer grouping', () => {
       });
       await frameQueue.flush();
 
-      await waitFor(() => {
-        expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
-        expect(screen.getAllByTestId('timeline-bucket-card')).toHaveLength(1);
-        expect(screen.getByRole('button', { name: /Jan 2016, 1 photo/i })).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('timeline-grouping-month').element()).toHaveAttribute('aria-pressed', 'true');
+        expect(page.getByTestId('timeline-bucket-card').elements()).toHaveLength(1);
+        expect(page.getByRole('button', { name: /Jan 2016, 1 photo/i }).element()).toBeInTheDocument();
       });
       expect(scrollTracker.scrolledElement).toBeUndefined();
     } finally {
@@ -479,21 +491,21 @@ describe('GalleryViewer grouping', () => {
     }
   });
 
-  it('keeps single-asset GalleryViewer grids in normal day mode', () => {
-    renderViewer({ assets: [asset('single-asset', '2015-08-03T00:00:00.000Z')] });
+  it('keeps single-asset GalleryViewer grids in normal day mode', async () => {
+    await renderViewer({ assets: [asset('single-asset', '2015-08-03T00:00:00.000Z')] });
 
-    expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('thumbnail-single-asset')).toBeInTheDocument();
-    expect(screen.queryByTestId('gallery-viewer-representative-buckets')).not.toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').element()).toBeInTheDocument();
+    expect(page.getByTestId('thumbnail-single-asset').element()).toBeInTheDocument();
+    expect(page.getByTestId('gallery-viewer-representative-buckets').query()).not.toBeInTheDocument();
   });
 
   it('does not request more assets while representative buckets are displayed', async () => {
     const onIntersected = vi.fn();
-    renderViewer({ onIntersected });
+    await renderViewer({ onIntersected });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    await userEvent.click(page.getByTestId('timeline-grouping-year').element());
     onIntersected.mockClear();
-    await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
+    await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(onIntersected).not.toHaveBeenCalled();
@@ -507,17 +519,17 @@ describe('GalleryViewer grouping', () => {
       asset('asset-2015-aug-extra', '2015-08-04T00:00:00.000Z'),
       asset('asset-2016', '2016-01-02T00:00:00.000Z'),
     ];
-    const view = renderViewer({ assets, viewerAssets: widerViewerAssets });
+    const view = await renderViewer({ assets, viewerAssets: widerViewerAssets });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
-    await fireEvent.click(screen.getByRole('button', { name: /2015, 2 photos/i }));
-    await fireEvent.click(screen.getByRole('button', { name: /Aug 2015, 1 photo/i }));
+    await userEvent.click(page.getByTestId('timeline-grouping-year').element());
+    await userEvent.click(page.getByRole('button', { name: /2015, 2 photos/i }).element());
+    await userEvent.click(page.getByRole('button', { name: /Aug 2015, 1 photo/i }).element());
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('thumbnail-asset-2016')).toBeInTheDocument();
-      expect(screen.getByTestId('thumbnail-asset-2015-aug')).toBeInTheDocument();
-      expect(screen.getByTestId('thumbnail-asset-2015-jan')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2016').element()).toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2015-aug').element()).toBeInTheDocument();
+      expect(page.getByTestId('thumbnail-asset-2015-jan').element()).toBeInTheDocument();
     });
 
     assetViewerPropsCalls.length = 0;
@@ -534,7 +546,7 @@ describe('GalleryViewer grouping', () => {
       },
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const latestAssetViewerProps = assetViewerPropsCalls.at(-1) as {
         cursor: { nextAsset?: AssetResponseDto };
       };
@@ -554,8 +566,8 @@ describe('GalleryViewer grouping', () => {
 
   it('hides controls and disables representative card activation during selection mode', async () => {
     const assets = defaultAssets();
-    const view = renderViewer({ assets });
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    const view = await renderViewer({ assets });
+    await userEvent.click(page.getByTestId('timeline-grouping-year').element());
 
     const selectionInteraction = asAssetInteraction({ ...mockAssetInteraction, selectionActive: true });
     await view.rerender({
@@ -568,18 +580,19 @@ describe('GalleryViewer grouping', () => {
       },
     });
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    const yearCard = screen.getByRole('button', { name: /2015, 2 photos/i });
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).not.toBeInTheDocument();
+    const yearCard = page.getByRole('button', { name: /2015, 2 photos/i }).element();
     expect(yearCard).toBeDisabled();
-    await fireEvent.click(yearCard);
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    // A disabled button is not actionable for a real pointer; dispatch the click directly.
+    yearCard.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(page.getByTestId('active-filters-bar').query()).not.toBeInTheDocument();
   });
 
-  it('preserves ungrouped day-mode GalleryViewer behavior when grouping is disabled', () => {
-    renderViewer({ enableGrouping: false });
+  it('preserves ungrouped day-mode GalleryViewer behavior when grouping is disabled', async () => {
+    await renderViewer({ enableGrouping: false });
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    expect(screen.getByTestId('thumbnail-asset-2016')).toBeInTheDocument();
-    expect(screen.getByTestId('thumbnail-asset-2015-aug')).toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).not.toBeInTheDocument();
+    expect(page.getByTestId('thumbnail-asset-2016').element()).toBeInTheDocument();
+    expect(page.getByTestId('thumbnail-asset-2015-aug').element()).toBeInTheDocument();
   });
 });

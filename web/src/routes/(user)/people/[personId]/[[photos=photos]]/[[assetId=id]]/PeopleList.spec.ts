@@ -1,8 +1,9 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { type PersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PeopleList from './PeopleList.svelte';
 
 vi.mock('#lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
@@ -26,13 +27,13 @@ describe('PeopleList', () => {
     const bob = person('p2', 'Bob');
     const carol = person('p3', 'Carol');
 
-    renderList({ people: [alice, bob, carol], peopleToNotShow: [bob], onSelect });
+    await renderList({ people: [alice, bob, carol], peopleToNotShow: [bob], onSelect });
 
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Carol')).toBeInTheDocument();
-    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('Carol')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).not.toBeInTheDocument();
 
-    await fireEvent.click(screen.getByText('Carol'));
+    await userEvent.click(page.getByText('Carol'));
 
     expect(onSelect).toHaveBeenCalledWith(carol);
   });
@@ -42,17 +43,16 @@ describe('PeopleList', () => {
   class was the singular of `grid-cols-2`, which Tailwind does not recognise and so compiles to
   nothing, and below `md` the grid fell back to a single column and rendered one enormous face
   per row on a phone (#1082). Dropping the base `grid-cols-*` again, or making the smallest one
-  breakpoint-prefixed, brings that straight back, and neither the dead-utility guard (the
-  remaining names would all still compile) nor happy-dom (it resolves no stylesheets) would
-  notice.
+  breakpoint-prefixed, brings that straight back, and the dead-utility guard would not notice
+  (the remaining names would all still compile).
   
   The dead spelling is deliberately not written out here: the dead-utility guard scans comments
   too, so naming it would fail that guard from this file.
   */
-  it('declares a column count for the smallest screens, not only from a breakpoint up', () => {
-    renderList({ people: [person('p1', 'Alice')] });
+  it('declares a column count for the smallest screens, not only from a breakpoint up', async () => {
+    await renderList({ people: [person('p1', 'Alice')] });
 
-    const grid = screen.getByTestId('reassign-people-grid');
+    const grid = page.getByTestId('reassign-people-grid').element();
 
     expect(grid.className).toMatch(/(?:^|\s)grid-cols-[1-9]/);
     // The regression shipped as "columns only from `md:` up", so pin that the base count is more

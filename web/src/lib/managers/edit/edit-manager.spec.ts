@@ -7,13 +7,30 @@ import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
 
-vi.mock('@immich/sdk');
-vi.mock('#lib/stores/websocket.js');
-vi.mock('#lib/utils/i18n.js', () => ({
+// Browser mode cannot automock `@immich/sdk` (its build uses `export *`): replace each function with a mock.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocks = Object.fromEntries(
+    Object.entries(module)
+      .filter(([, value]) => typeof value === 'function')
+      .map(([key]) => [key, vi.fn()]),
+  );
+  return { ...module, ...mocks };
+});
+vi.mock(import('#lib/stores/websocket.ts'), async (importOriginal) => {
+  const module = await importOriginal();
+  return Object.fromEntries(
+    Object.entries(module).map(([key, value]) => [key, typeof value === 'function' ? vi.fn() : value]),
+  ) as unknown as typeof module;
+});
+vi.mock('#lib/utils/i18n.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/i18n.ts')>()),
   getFormatter: vi.fn(),
   getPreferredLocale: vi.fn(),
 }));
-vi.mock('@immich/ui', () => ({
+// Browser mode rejects an import of a name the mock does not export, so keep the module's other exports.
+vi.mock('@immich/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/ui')>()),
   toastManager: { success: vi.fn(), danger: vi.fn(), primary: vi.fn() },
   modalManager: { show: vi.fn() },
   ConfirmModal: {},

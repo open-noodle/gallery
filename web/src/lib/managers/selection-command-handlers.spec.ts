@@ -4,7 +4,7 @@ import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
 import AssetDeleteConfirmModal from '#lib/modals/AssetDeleteConfirmModal.svelte';
 import { showDeleteModal } from '#lib/stores/preferences.store.ts';
-import * as handleErrorModule from '#lib/utils/handle-error.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import {
   AssetVisibility,
   deleteAssets as deleteBulk,
@@ -47,6 +47,8 @@ vi.mock('@immich/sdk', async (orig) => ({
   deleteAssets: vi.fn().mockResolvedValue(undefined),
   restoreAssets: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock(import('#lib/utils/handle-error.ts'), { spy: true });
 
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: { value: { trash: true } },
@@ -124,7 +126,7 @@ const makeWritableSpaceContext = (): NonNullable<CommandContext['space']> => ({
   members: [],
 });
 
-let handleErrorSpy: ReturnType<typeof vi.spyOn>;
+const handleErrorSpy = vi.mocked(handleError);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -136,7 +138,7 @@ beforeEach(() => {
   featureFlagsManager.value.trash = true;
   showDeleteModal.set(false);
   expect(get(showDeleteModal)).toBe(false);
-  handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
+  handleErrorSpy.mockImplementation(() => {});
 });
 
 afterEach(() => {

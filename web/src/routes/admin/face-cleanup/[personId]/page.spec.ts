@@ -10,10 +10,12 @@ import {
   type FaceRepairPersonFacesDto,
 } from '@immich/sdk';
 import { ConfirmModal, modalManager, toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { goto } from '$app/navigation';
+import { getAll } from '../dom-queries.test-helpers';
+import { recordTranslations } from '../i18n-recorder.test-helpers';
 import Page from './+page.svelte';
 import type { SuspectedOwner } from './destination';
 
@@ -59,27 +61,8 @@ vi.mock('@immich/ui', async (original) => {
 
 // Every (key, options) pair the page asked to translate, so a test can assert which STRING was chosen and what
 // was interpolated into it — the difference between "shows a translated reason" and "echoes English server text"
-// is invisible otherwise, since the mock below renders keys verbatim.
-const { translations } = vi.hoisted(() => ({
-  translations: [] as { key: string; values?: Record<string, unknown> }[],
-}));
-
-// Mock svelte-i18n: return the key as the translation
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    t: {
-      subscribe: (run: (fn: (key: string, opts?: unknown) => string) => void) => {
-        run((key: string, opts?: unknown) => {
-          translations.push({ key, values: (opts as { values?: Record<string, unknown> })?.values });
-          return key;
-        });
-        return () => {};
-      },
-    },
-  };
-});
+// is invisible otherwise, since the test locale renders keys verbatim.
+const translations = recordTranslations();
 
 // The reason interpolated into the apply banner, or undefined if the banner was never rendered.
 const bannerReason = () =>
@@ -255,11 +238,11 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
   });
 
   it('renders one flagged-grid tile per flagged face, defaulting to the owner state', async () => {
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('flagged-grid')).toBeInTheDocument();
-      const tiles = screen.getAllByTestId('face-tile');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('flagged-grid').element()).toBeInTheDocument();
+      const tiles = getAll(page.getByTestId('face-tile'));
       expect(tiles).toHaveLength(3);
       for (const tile of tiles) {
         expect(tile).toHaveAttribute('data-state', 'owner');
@@ -271,41 +254,41 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
   // mistaken for staging a decision, on either grid.
   describe('source-photo access', () => {
     it('T7.1/T7.4: every flagged tile carries a labelled magnifier and a date pill', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      const tiles = screen.getAllByTestId('face-tile');
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      const tiles = getAll(page.getByTestId('face-tile'));
 
-      expect(screen.getAllByTestId('face-tile-view-photo')).toHaveLength(tiles.length);
-      expect(screen.getAllByTestId('face-tile-date')).toHaveLength(tiles.length);
+      expect(getAll(page.getByTestId('face-tile-view-photo'))).toHaveLength(tiles.length);
+      expect(getAll(page.getByTestId('face-tile-date'))).toHaveLength(tiles.length);
     });
 
     it('T7.2: clicking the magnifier opens the photo modal at that face', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile-view-photo')[1]);
+      await userEvent.click(getAll(page.getByTestId('face-tile-view-photo'))[1]);
 
       expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.objectContaining({ index: 1 }));
     });
 
     it('T7.3: clicking the magnifier changes NO selection or state on the flagged grid', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      const tile = screen.getAllByTestId('face-tile')[0];
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      const tile = getAll(page.getByTestId('face-tile'))[0];
       const stateBefore = tile.dataset.state;
 
-      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      await userEvent.click(page.elementLocator(tile.parentElement!).getByTestId('face-tile-view-photo').element());
 
       // Two probes, deliberately: `data-state` catches a state mutation on THIS tile, and the bulk bar catches
       // a selection anywhere. `face-bulk-bar` (not `face-dock`) is the selection-gated element — the dock's
       // outer div is mounted whenever there are flagged faces at all, regardless of selection (R13).
       expect(tile.dataset.state).toBe(stateBefore);
-      expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
+      expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
 
       // Positive control: the bulk-bar probe must actually respond to a real selection, or its absence above
       // is meaningless — click the tile itself (not the magnifier) and confirm the bar appears.
-      await fireEvent.click(tile);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(tile);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
     });
 
     it('T7.5/T7.6: the rest grid’s magnifier opens the modal and stages nothing, with no destination chosen', async () => {
@@ -318,12 +301,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(2));
-      const tile = screen.getAllByTestId('rest-tile')[0];
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))).toHaveLength(2));
+      const tile = getAll(page.getByTestId('rest-tile'))[0];
       expect(tile.dataset.selected).toBe('false'); // positive control
 
-      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      await userEvent.click(page.elementLocator(tile.parentElement!).getByTestId('face-tile-view-photo').element());
 
       expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.anything());
       expect(tile.dataset.selected).toBe('false');
@@ -333,12 +316,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     // PAGE actually handed it and assert the grid reacted — without them, a refactor could drop the selection
     // props entirely and every test above would stay green.
     it('hands the flagged grid a working selection toggle', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      const tile = screen.getAllByTestId('face-tile')[0];
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      const tile = getAll(page.getByTestId('face-tile'))[0];
       const faceId = tile.dataset.faceid!;
 
-      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      await userEvent.click(page.elementLocator(tile.parentElement!).getByTestId('face-tile-view-photo').element());
       const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
         isSelected: (id: string) => boolean;
         onToggleSelect: (id: string) => void;
@@ -346,7 +329,7 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
       expect(props.isSelected(faceId)).toBe(false); // positive control: nothing staged by opening
       props.onToggleSelect(faceId);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
       expect(props.isSelected(faceId)).toBe(true);
     });
 
@@ -357,11 +340,11 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(1));
-      const tile = screen.getAllByTestId('rest-tile')[0];
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))).toHaveLength(1));
+      const tile = getAll(page.getByTestId('rest-tile'))[0];
 
-      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      await userEvent.click(page.elementLocator(tile.parentElement!).getByTestId('face-tile-view-photo').element());
       const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
         isSelected: (id: string) => boolean;
         canSelect: (id: string) => boolean;
@@ -376,18 +359,18 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(props.isSelected('rest-1')).toBe(false); // positive control
 
       props.onToggleSelect('rest-1');
-      await waitFor(() => expect(tile.dataset.selected).toBe('true'));
+      await vi.waitFor(() => expect(tile.dataset.selected).toBe('true'));
       expect(props.isSelected('rest-1')).toBe(true);
 
       // And back out again — the shared toggleRestSelection handles both directions.
       props.onToggleSelect('rest-1');
-      await waitFor(() => expect(tile.dataset.selected).toBe('false'));
+      await vi.waitFor(() => expect(tile.dataset.selected).toBe('false'));
     });
 
     it('T7.7: the magnifier is a SIBLING of the tile button, never nested inside it', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      const magnifier = screen.getAllByTestId('face-tile-view-photo')[0];
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      const magnifier = getAll(page.getByTestId('face-tile-view-photo'))[0];
 
       // A button inside a button is invalid HTML and browsers recover from it unpredictably.
       expect(magnifier.closest('[data-testid="face-tile"]')).toBeNull();
@@ -398,68 +381,68 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('P1 selection', () => {
     it('click toggles a single tile selected, and toggling again deselects it', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument());
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument());
     });
 
     it('shift-click selects the whole range between the last click and this one', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await fireEvent.click(tiles[2], { shiftKey: true });
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await userEvent.click(tiles[2], { modifiers: ['Shift'] });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('3');
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').element()).toMatchTextContent('3');
       });
     });
 
     it('Select all selects every tile', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('select-all'));
+      await userEvent.click(page.getByTestId('select-all').element());
 
-      await waitFor(() => {
-        expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('3');
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').element()).toMatchTextContent('3');
       });
     });
 
     it('Clear empties the selection and swaps the dock back to the summary', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('select-all'));
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('select-all').element());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('face-bulk-clear'));
+      await userEvent.click(page.getByTestId('face-bulk-clear').element());
 
-      await waitFor(() => {
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
       });
     });
 
     it('Reset returns every tile to the owner state and clears the selection', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('select-all'));
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('select-all').element());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('reset'));
+      await userEvent.click(page.getByTestId('reset').element());
 
-      await waitFor(() => {
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        for (const tile of screen.getAllByTestId('face-tile')) {
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        for (const tile of getAll(page.getByTestId('face-tile'))) {
           expect(tile).toHaveAttribute('data-state', 'owner');
         }
       });
@@ -470,40 +453,40 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('P2 dock swap', () => {
     it('shows the summary (tally + apply-btn) when nothing is selected', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('face-dock')).toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
-        expect(screen.getByTestId('apply-btn')).toBeInTheDocument();
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-dock').element()).toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
+        expect(page.getByTestId('apply-btn').element()).toBeInTheDocument();
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
       });
     });
 
     it('swaps to the bulk bar once at least one tile is selected, hiding the summary', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument();
-        expect(screen.queryByTestId('apply-btn')).not.toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument();
+        expect(page.getByTestId('apply-btn').query()).not.toBeInTheDocument();
       });
     });
 
     it('swaps back to the summary once the selection is cleared', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('face-bulk-clear'));
+      await userEvent.click(page.getByTestId('face-bulk-clear').element());
 
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-btn')).toBeInTheDocument();
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('apply-btn').element()).toBeInTheDocument();
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
       });
     });
   });
@@ -512,12 +495,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('P4 Apply', () => {
     it('posts resolveFaces with every flagged face grouped by its own suspected owner (default, untouched state)', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -536,12 +519,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     });
 
     it('never calls resolveFaces with an undefined body', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
       const [arg] = vi.mocked(resolveFaces).mock.calls[0];
       expect(arg).toBeDefined();
       expect(arg.faceRepairResolveRequestDto).toBeDefined();
@@ -558,19 +541,21 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         }),
       );
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const applyBtn = screen.getByTestId('apply-btn');
-      await fireEvent.click(applyBtn);
+      const applyBtn = page.getByTestId('apply-btn').element();
+      await userEvent.click(applyBtn);
       expect(applyBtn).toBeDisabled();
 
       rejectApply();
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_conflict')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(
+          page.getByText('admin.face_cleanup_review_apply_conflict', { exact: true }).element(),
+        ).toBeInTheDocument();
       });
-      expect(screen.getAllByTestId('face-tile')).toHaveLength(3);
+      expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3);
     });
 
     // Every non-409 failure used to collapse into one reason-less sentence, so a PERMANENT failure (the resolve
@@ -592,13 +577,15 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         }),
       );
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_error_reason')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(
+          page.getByText('admin.face_cleanup_review_apply_error_reason', { exact: true }).element(),
+        ).toBeInTheDocument();
       });
       // The reason is a translation key, NOT the server's English Zod text — this is exactly what makes a
       // German admin see a German sentence. The server's own limit is carried through as a value.
@@ -606,7 +593,7 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(
         translations.find((entry) => entry.key === 'admin.face_cleanup_review_apply_reason_too_many')?.values,
       ).toEqual({ max: 25_000 });
-      expect(screen.queryByText('admin.face_cleanup_review_apply_error')).not.toBeInTheDocument();
+      expect(page.getByText('admin.face_cleanup_review_apply_error', { exact: true }).query()).not.toBeInTheDocument();
       expect(goto).not.toHaveBeenCalled();
     });
 
@@ -620,13 +607,15 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     ])('translates the %s failure instead of echoing the server text', async (code, message) => {
       vi.mocked(resolveFaces).mockRejectedValueOnce(httpError(400, { message, code, statusCode: 400 }));
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_error_reason')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(
+          page.getByText('admin.face_cleanup_review_apply_error_reason', { exact: true }).element(),
+        ).toBeInTheDocument();
       });
       // A translation key, not the server's English sentence: the code is what buys the translated banner.
       expect(bannerReason()).toMatch(/^admin\.face_cleanup_review_apply_reason_/);
@@ -639,13 +628,15 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       const message = 'entireCluster cannot be combined with per-face resolution buckets';
       vi.mocked(resolveFaces).mockRejectedValueOnce(httpError(400, { message, statusCode: 400 }));
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_error_reason')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(
+          page.getByText('admin.face_cleanup_review_apply_error_reason', { exact: true }).element(),
+        ).toBeInTheDocument();
       });
       expect(bannerReason()).toBe(message);
     });
@@ -655,15 +646,17 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('falls back to the generic banner when the failure carries no server message', async () => {
       vi.mocked(resolveFaces).mockRejectedValueOnce(new Error('network down'));
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_error')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByText('admin.face_cleanup_review_apply_error', { exact: true }).element()).toBeInTheDocument();
       });
-      expect(screen.queryByText('admin.face_cleanup_review_apply_error_reason')).not.toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_review_apply_error_reason', { exact: true }).query(),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -671,44 +664,49 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Bulk actions — Keep here (stay)', () => {
     it('tags the selected tile stay (green ribbon) and updates the tally, clearing the selection', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-stay'));
+      await userEvent.click(page.getByTestId('bulk-stay').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Bulk actions clear the selection, swapping the dock back to the summary.
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
       });
 
-      const refreshedTiles = screen.getAllByTestId('face-tile');
+      const refreshedTiles = getAll(page.getByTestId('face-tile'));
       expect(refreshedTiles[0]).toHaveAttribute('data-state', 'stay');
-      expect(screen.getByText('admin.face_cleanup_review_tile_stay_ribbon')).toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_review_tile_stay_ribbon', { exact: true }).element(),
+      ).toBeInTheDocument();
 
       // The tally's "Keep" chip now reads 1 and is no longer dimmed (opacity-40 = zero-count).
-      const tally = screen.getByTestId('tally');
-      const stayLabel = within(tally).getByText('admin.face_cleanup_review_tally_stay');
+      const tally = page.getByTestId('tally').element();
+      const stayLabel = page
+        .elementLocator(tally)
+        .getByText('admin.face_cleanup_review_tally_stay', { exact: true })
+        .element();
       const stayChip = stayLabel.parentElement!;
       expect(stayChip).not.toHaveClass('opacity-40');
-      expect(stayChip).toHaveTextContent('1');
+      expect(stayChip).toMatchTextContent('1');
     });
 
     it('includes the kept face in `stay` and excludes it from `moveToPerson` on Apply', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-stay'));
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-stay').element());
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -730,44 +728,49 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Bulk actions — Confirm / lock', () => {
     it('tags the selected tile lock (violet ribbon) and updates the tally, clearing the selection', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-lock'));
+      await userEvent.click(page.getByTestId('bulk-lock').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Bulk actions clear the selection, swapping the dock back to the summary.
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
       });
 
-      const refreshedTiles = screen.getAllByTestId('face-tile');
+      const refreshedTiles = getAll(page.getByTestId('face-tile'));
       expect(refreshedTiles[0]).toHaveAttribute('data-state', 'lock');
-      expect(screen.getByText('admin.face_cleanup_review_tile_lock_ribbon')).toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_review_tile_lock_ribbon', { exact: true }).element(),
+      ).toBeInTheDocument();
 
       // The tally's "Locked" chip now reads 1 and is no longer dimmed (opacity-40 = zero-count).
-      const tally = screen.getByTestId('tally');
-      const lockLabel = within(tally).getByText('admin.face_cleanup_review_tally_lock');
+      const tally = page.getByTestId('tally').element();
+      const lockLabel = page
+        .elementLocator(tally)
+        .getByText('admin.face_cleanup_review_tally_lock', { exact: true })
+        .element();
       const lockChip = lockLabel.parentElement!;
       expect(lockChip).not.toHaveClass('opacity-40');
-      expect(lockChip).toHaveTextContent('1');
+      expect(lockChip).toMatchTextContent('1');
     });
 
     it('includes the locked face in `lock` and excludes it from `moveToPerson` on Apply', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-lock'));
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-lock').element());
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -792,16 +795,16 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Bulk actions — Move to person (other)', () => {
     it('opens the picker with the owner id, selection count and the scan-suggested owner', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-other'));
+      await userEvent.click(page.getByTestId('bulk-other').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(showModal).toHaveBeenCalledWith(
           expect.anything(),
           expect.objectContaining({ ownerId: 'owner-user-1', faceCount: 1, suggestedPersonId: OWNER_A_ID }),
@@ -812,47 +815,55 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('tags the selected tile "other" (amber ribbon) with the chosen destination, and tallies it under "→ other"', async () => {
       showModal.mockResolvedValueOnce({ personId: 'chosen-1', name: 'Chosen Person' });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-other'));
+      await userEvent.click(page.getByTestId('bulk-other').element());
 
-      await waitFor(() => {
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
       });
 
-      const refreshedTiles = screen.getAllByTestId('face-tile');
+      const refreshedTiles = getAll(page.getByTestId('face-tile'));
       expect(refreshedTiles[0]).toHaveAttribute('data-state', 'other');
       // Scoped to the tile itself: the 'owner'-state tiles reuse the same `..._tile_dest` key, so an
       // unscoped query would match more than one element.
-      expect(within(refreshedTiles[0]).getByText('admin.face_cleanup_review_tile_dest')).toBeInTheDocument();
+      expect(
+        page
+          .elementLocator(refreshedTiles[0])
+          .getByText('admin.face_cleanup_review_tile_dest', { exact: true })
+          .element(),
+      ).toBeInTheDocument();
 
-      const tally = screen.getByTestId('tally');
-      const otherLabel = within(tally).getByText('admin.face_cleanup_review_tally_other');
+      const tally = page.getByTestId('tally').element();
+      const otherLabel = page
+        .elementLocator(tally)
+        .getByText('admin.face_cleanup_review_tally_other', { exact: true })
+        .element();
       const otherChip = otherLabel.parentElement!;
       expect(otherChip).not.toHaveClass('opacity-40');
-      expect(otherChip).toHaveTextContent('1');
+      expect(otherChip).toMatchTextContent('1');
     });
 
     it('groups the chosen destination into its own moveToPerson entry on Apply', async () => {
       showModal.mockResolvedValueOnce({ personId: 'chosen-1', name: 'Chosen Person' });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-other'));
-      await waitFor(() => expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-other').element());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -876,17 +887,17 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it("W1: threads the picker's lock:true onto the chosen-person group only, never onto owner-state groups", async () => {
       showModal.mockResolvedValueOnce({ personId: 'chosen-1', name: 'Chosen Person', lock: true });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-other'));
-      await waitFor(() => expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-other').element());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -907,18 +918,18 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('leaves the selection untouched if the picker is closed without choosing a destination', async () => {
       showModal.mockResolvedValueOnce(undefined);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await fireEvent.click(screen.getByTestId('bulk-other'));
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await userEvent.click(page.getByTestId('bulk-other').element());
 
-      await waitFor(() => expect(showModal).toHaveBeenCalled());
+      await vi.waitFor(() => expect(showModal).toHaveBeenCalled());
 
       // Selection (and its "owner" state) survives an uncommitted picker — the bulk bar is still showing.
-      expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument();
-      expect(screen.getAllByTestId('face-tile')[0]).toHaveAttribute('data-state', 'owner');
+      expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument();
+      expect(getAll(page.getByTestId('face-tile'))[0]).toHaveAttribute('data-state', 'owner');
     });
   });
 
@@ -926,24 +937,26 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Bulk actions — Not a face (detach)', () => {
     it('tags the selected tile detach (slate ribbon, grayscale) and updates the tally, clearing the selection', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-detach'));
+      await userEvent.click(page.getByTestId('bulk-detach').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Bulk actions clear the selection, swapping the dock back to the summary.
-        expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tally')).toBeInTheDocument();
+        expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+        expect(page.getByTestId('tally').element()).toBeInTheDocument();
       });
 
-      const refreshedTiles = screen.getAllByTestId('face-tile');
+      const refreshedTiles = getAll(page.getByTestId('face-tile'));
       expect(refreshedTiles[0]).toHaveAttribute('data-state', 'detach');
-      expect(screen.getByText('admin.face_cleanup_review_tile_detach_ribbon')).toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_review_tile_detach_ribbon', { exact: true }).element(),
+      ).toBeInTheDocument();
 
       // The tile's thumbnail is grayed out (mockup: filter: grayscale(1) opacity(0.55)). alt="" gives the
       // image role="presentation" (no accessible name), so query it directly rather than via getByRole.
@@ -953,26 +966,29 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(image?.getAttribute('style')).toContain('opacity(0.55)');
 
       // The tally's "Detach" chip now reads 1 and is no longer dimmed (opacity-40 = zero-count).
-      const tally = screen.getByTestId('tally');
-      const detachLabel = within(tally).getByText('admin.face_cleanup_review_tally_detach');
+      const tally = page.getByTestId('tally').element();
+      const detachLabel = page
+        .elementLocator(tally)
+        .getByText('admin.face_cleanup_review_tally_detach', { exact: true })
+        .element();
       const detachChip = detachLabel.parentElement!;
       expect(detachChip).not.toHaveClass('opacity-40');
-      expect(detachChip).toHaveTextContent('1');
+      expect(detachChip).toMatchTextContent('1');
     });
 
     it('includes the detached face in `detach` and excludes it from `moveToPerson` on Apply', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      const tiles = screen.getAllByTestId('face-tile');
-      await fireEvent.click(tiles[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-detach'));
+      const tiles = getAll(page.getByTestId('face-tile'));
+      await userEvent.click(tiles[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-detach').element());
 
       // Detaching is irreversible, so Apply routes through the confirmation first.
       showModal.mockResolvedValueOnce(true);
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -1001,10 +1017,10 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
   // `resolveFaces` call, and a confirm (`onClose(true)`) issues exactly one with the expected payload.
   describe('Destructive Apply — confirmation before discarding faces', () => {
     const stageDetach = async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await fireEvent.click(screen.getByTestId('bulk-detach'));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await userEvent.click(page.getByTestId('bulk-detach').element());
     };
 
     it('does NOT commit anything when Apply carries a detached face — it asks first, with the right copy', async () => {
@@ -1016,9 +1032,9 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       );
       await stageDetach();
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(showModal).toHaveBeenCalledWith(
           ConfirmModal,
           expect.objectContaining({
@@ -1039,28 +1055,28 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(bodyTranslation?.values?.count).toBeUndefined();
 
       settleConfirm(false);
-      await waitFor(() => expect(resolveFaces).not.toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).not.toHaveBeenCalled());
     });
 
     it('cancelling (Escape/backdrop/Cancel all resolve false) commits nothing and leaves the staged review intact', async () => {
       showModal.mockResolvedValueOnce(false);
       await stageDetach();
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(showModal).toHaveBeenCalledWith(ConfirmModal, expect.anything()));
+      await vi.waitFor(() => expect(showModal).toHaveBeenCalledWith(ConfirmModal, expect.anything()));
       expect(resolveFaces).not.toHaveBeenCalled();
       // The staged decision survives the cancel — the admin returns to their review, not to a blank slate.
-      expect(screen.getAllByTestId('face-tile')[0]).toHaveAttribute('data-state', 'detach');
+      expect(getAll(page.getByTestId('face-tile'))[0]).toHaveAttribute('data-state', 'detach');
     });
 
     it('confirming issues exactly one resolveFaces call carrying the detached face', async () => {
       showModal.mockResolvedValueOnce(true);
       await stageDetach();
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
       expect(resolveFaces).toHaveBeenCalledWith({
         faceRepairResolveRequestDto: {
           personId: PERSON_ID,
@@ -1077,30 +1093,30 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       // S11 (slice 12d): a successful apply on the GUIDED page navigates back to the scan console — its OWN
       // destination, Route.faceCleanupScan(), which differs from the manual sibling's Route.faceCleanupPeople().
       // Every other goto assertion on this page is negative (error/pending paths); this is the positive control.
-      await waitFor(() => expect(goto).toHaveBeenCalledWith(Route.faceCleanupScan()));
+      await vi.waitFor(() => expect(goto).toHaveBeenCalledWith(Route.faceCleanupScan()));
     });
 
     it('does NOT ask when nothing is being discarded — a routine Apply goes straight through', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
       // Every face stays in the default `owner` state: nothing destructive, so no confirmation. Prompting on
       // every Apply would train the admin to click past the one prompt that matters.
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalled());
       expect(showModal).not.toHaveBeenCalledWith(ConfirmModal, expect.anything());
     });
 
     it('does NOT ask for the Unknown person action — parking a stranger is reversible', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await fireEvent.click(screen.getByTestId('bulk-unknown'));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await userEvent.click(page.getByTestId('bulk-unknown').element());
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalled());
       expect(showModal).not.toHaveBeenCalledWith(ConfirmModal, expect.anything());
     });
   });
@@ -1109,39 +1125,44 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Bulk actions — Unknown person', () => {
     it('tags the selected tile unknown WITHOUT graying it out (it is a real face) and updates the tally', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('bulk-unknown'));
+      await userEvent.click(page.getByTestId('bulk-unknown').element());
 
-      await waitFor(() => expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument());
 
-      const refreshedTiles = screen.getAllByTestId('face-tile');
+      const refreshedTiles = getAll(page.getByTestId('face-tile'));
       expect(refreshedTiles[0]).toHaveAttribute('data-state', 'unknown');
-      expect(screen.getByText('admin.face_cleanup_review_tile_unknown_ribbon')).toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_review_tile_unknown_ribbon', { exact: true }).element(),
+      ).toBeInTheDocument();
 
       // Unlike "Not a face", the crop is NOT desaturated — this face is a real person, just an unnamed one.
       const image = refreshedTiles[0].querySelector('img');
       expect(image?.getAttribute('style') ?? '').not.toContain('grayscale(1)');
 
-      const tally = screen.getByTestId('tally');
-      const unknownChip = within(tally).getByText('admin.face_cleanup_review_tally_unknown').parentElement!;
+      const tally = page.getByTestId('tally').element();
+      const unknownChip = page
+        .elementLocator(tally)
+        .getByText('admin.face_cleanup_review_tally_unknown', { exact: true })
+        .element().parentElement!;
       expect(unknownChip).not.toHaveClass('opacity-40');
-      expect(unknownChip).toHaveTextContent('1');
+      expect(unknownChip).toMatchTextContent('1');
     });
 
     it('sends the face in `unknown` and excludes it from `moveToPerson` on Apply', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]); // face-1, suspected owner-a
-      await fireEvent.click(screen.getByTestId('bulk-unknown'));
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]); // face-1, suspected owner-a
+      await userEvent.click(page.getByTestId('bulk-unknown').element());
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(resolveFaces).toHaveBeenCalledWith({
           faceRepairResolveRequestDto: {
             personId: PERSON_ID,
@@ -1172,12 +1193,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         }) as never,
       );
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('move-entire-btn'));
+      await userEvent.click(page.getByTestId('move-entire-btn').element());
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(showModal).toHaveBeenCalledWith(
           ConfirmModal,
           expect.objectContaining({
@@ -1190,17 +1211,17 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(resolveFaces).not.toHaveBeenCalled();
 
       settleConfirm(false);
-      await waitFor(() => expect(resolveFaces).not.toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).not.toHaveBeenCalled());
     });
 
     it('Move entire cluster: confirming the modal calls resolveFaces exactly once with entireCluster', async () => {
       showModal.mockResolvedValueOnce(true);
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('move-entire-btn'));
+      await userEvent.click(page.getByTestId('move-entire-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
       expect(resolveFaces).toHaveBeenCalledWith({
         faceRepairResolveRequestDto: {
           personId: PERSON_ID,
@@ -1219,10 +1240,10 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(2));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))).toHaveLength(2));
 
-      await fireEvent.click(screen.getAllByTestId('rest-tile')[0]);
+      await userEvent.click(getAll(page.getByTestId('rest-tile'))[0]);
 
       expect(resolveFaces).not.toHaveBeenCalled();
     });
@@ -1234,22 +1255,24 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(2));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))).toHaveLength(2));
 
-      await fireEvent.click(screen.getAllByTestId('rest-tile')[0]);
+      await userEvent.click(getAll(page.getByTestId('rest-tile'))[0]);
 
       // The dock now tells the admin the added face is part of what Apply will do — it swaps to the
       // "+ N added" label and tallies the addition (this spec's t() echoes keys, so the count itself is
       // asserted on the chip, which renders it literally).
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-btn')).toHaveTextContent('admin.face_cleanup_review_apply_label_added');
-        expect(screen.getByTestId('tally-added')).toHaveTextContent('+1');
+      await vi.waitFor(() => {
+        expect(page.getByTestId('apply-btn').element()).toMatchTextContent(
+          'admin.face_cleanup_review_apply_label_added',
+        );
+        expect(page.getByTestId('tally-added').element()).toMatchTextContent('+1');
       });
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalledTimes(1));
       const request = vi.mocked(resolveFaces).mock.calls[0][0].faceRepairResolveRequestDto;
       // face-1/face-2 (flagged, suspecting owner A) and the staged rest face all ride the owner-A group.
       const ownerAGroup = request.moveToPerson?.find((group) => group.destinationPersonId === OWNER_A_ID);
@@ -1265,13 +1288,15 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       vi.mocked(resolveFaces).mockRejectedValue({ status: 409 });
       showModal.mockResolvedValueOnce(true);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('move-entire-btn'));
+      await userEvent.click(page.getByTestId('move-entire-btn').element());
 
-      await waitFor(() => {
-        expect(screen.getByText('admin.face_cleanup_review_apply_conflict')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(
+          page.getByText('admin.face_cleanup_review_apply_conflict', { exact: true }).element(),
+        ).toBeInTheDocument();
       });
       expect(goto).not.toHaveBeenCalled();
     });
@@ -1286,12 +1311,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         skipped: 0,
       });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(toastManager.primary).toHaveBeenCalledWith(
           expect.stringContaining('admin.face_cleanup_review_apply_summary'),
         );
@@ -1304,14 +1329,14 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('S11.9: with the rest-load failed, the whole-cluster action is disabled with an explanation, and the flagged grid still renders', async () => {
       vi.mocked(getFaceRepairClusterFaces).mockRejectedValue(new Error('network blip'));
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeDisabled());
-      expect(screen.getByTestId('rest-load-error')).toBeInTheDocument();
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeDisabled());
+      expect(page.getByTestId('rest-load-error').element()).toBeInTheDocument();
       // Positive control: the flagged grid (unrelated to the rest-of-cluster load) still renders normally —
       // the failure is scoped to the rest section, not a full-page failure.
-      expect(screen.getAllByTestId('face-tile')).toHaveLength(3);
+      expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3);
     });
 
     it('retrying a failed rest-load re-enables the whole-cluster action once it succeeds', async () => {
@@ -1323,14 +1348,14 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
           hasMore: false,
         } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('rest-load-error')).toBeInTheDocument());
-      expect(screen.getByTestId('move-entire-btn')).toBeDisabled();
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('rest-load-error').element()).toBeInTheDocument());
+      expect(page.getByTestId('move-entire-btn').element()).toBeDisabled();
 
-      await fireEvent.click(screen.getByTestId('rest-load-error-retry'));
+      await userEvent.click(page.getByTestId('rest-load-error-retry').element());
 
-      await waitFor(() => expect(screen.queryByTestId('rest-load-error')).not.toBeInTheDocument());
-      expect(screen.getByTestId('move-entire-btn')).toBeEnabled();
+      await vi.waitFor(() => expect(page.getByTestId('rest-load-error').query()).not.toBeInTheDocument());
+      expect(page.getByTestId('move-entire-btn').element()).toBeEnabled();
     });
 
     // S11.10 (pin): with a successful rest load, the confirm copy's count is restTotal + flagged.length (2 rest
@@ -1343,12 +1368,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       } as unknown as FaceRepairClusterFacesResponseDto);
       showModal.mockResolvedValueOnce(true);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeEnabled());
 
-      await fireEvent.click(screen.getByTestId('move-entire-btn'));
+      await userEvent.click(page.getByTestId('move-entire-btn').element());
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(
           translations.some(
             // B3: a NUMBER, not '5'. The count used to be pre-formatted with toLocaleString(), which made
@@ -1367,39 +1392,39 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('Actions help modal', () => {
     it('opens the help modal from the review banner, before anything is selected', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
-      await fireEvent.click(screen.getByTestId('banner-help'));
+      expect(page.getByTestId('face-bulk-bar').query()).not.toBeInTheDocument();
+      await userEvent.click(page.getByTestId('banner-help').element());
 
       expect(showModal).toHaveBeenCalledWith(FaceActionsHelpModal, expect.objectContaining({ mode: 'guided' }));
     });
 
     it('opens the same help modal from the bulk bar once a face is selected', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
 
-      await fireEvent.click(screen.getByTestId('face-bulk-help'));
+      await userEvent.click(page.getByTestId('face-bulk-help').element());
 
       expect(showModal).toHaveBeenCalledWith(FaceActionsHelpModal, expect.objectContaining({ mode: 'guided' }));
     });
 
     it('keeps the selection intact when the help modal is dismissed', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
 
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
-      await fireEvent.click(screen.getByTestId('face-bulk-help'));
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('face-bulk-help').element());
 
       // The bar only renders while something is selected, so its survival IS the selection surviving.
-      expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument();
-      expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('1');
-      expect(screen.getAllByTestId('face-tile')[0]).toHaveAttribute('data-state', 'owner');
+      expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument();
+      expect(page.getByTestId('face-bulk-bar').element()).toMatchTextContent('1');
+      expect(getAll(page.getByTestId('face-tile'))[0]).toHaveAttribute('data-state', 'owner');
     });
   });
 
@@ -1411,17 +1436,17 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       flaggedFaces: [],
     } as unknown as FaceRepairPersonFacesDto);
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('admin.face_cleanup_review_no_flagged')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('admin.face_cleanup_review_no_flagged', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.queryAllByTestId('face-tile')).toHaveLength(0);
-    expect(screen.queryByTestId('face-dock')).not.toBeInTheDocument();
+    expect(page.getByTestId('face-tile').elements()).toHaveLength(0);
+    expect(page.getByTestId('face-dock').query()).not.toBeInTheDocument();
 
     // S11 (slice 12d): the empty state's back button is the OTHER goto call site on this page (handleCancel) —
     // unconditional, unlike the Apply success path above.
-    await fireEvent.click(screen.getByRole('button', { name: 'admin.face_cleanup_mode_guided' }));
+    await userEvent.click(page.getByRole('button', { name: 'admin.face_cleanup_mode_guided', exact: true }).element());
     expect(goto).toHaveBeenCalledWith(Route.faceCleanupScan());
   });
 
@@ -1430,32 +1455,32 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
   it('shows a load-error state (not the graceful empty state) when the initial load fails, and Retry re-fetches', async () => {
     vi.mocked(getFaceRepairPersonFaces).mockRejectedValueOnce(new Error('network down'));
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('load-error-banner')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('load-error-banner').element()).toBeInTheDocument();
     });
-    expect(screen.queryByText('admin.face_cleanup_review_no_flagged')).not.toBeInTheDocument();
+    expect(page.getByText('admin.face_cleanup_review_no_flagged', { exact: true }).query()).not.toBeInTheDocument();
 
     vi.mocked(getFaceRepairPersonFaces).mockResolvedValueOnce({
       personId: PERSON_ID,
       flaggedFaces: makeFlaggedFaces(),
     } as unknown as FaceRepairPersonFacesDto);
-    await fireEvent.click(screen.getByTestId('load-error-retry'));
+    await userEvent.click(page.getByTestId('load-error-retry').element());
 
-    await waitFor(() => {
-      expect(screen.getAllByTestId('face-tile')).toHaveLength(3);
-      expect(screen.queryByTestId('load-error-banner')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3);
+      expect(page.getByTestId('load-error-banner').query()).not.toBeInTheDocument();
     });
   });
 
   describe('Destination identity', () => {
-    const cards = () => screen.getAllByTestId('destination-card');
+    const cards = () => getAll(page.getByTestId('destination-card'));
 
     it('identifies each destination by thumbnail, name and its own face count', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(2));
+      await vi.waitFor(() => expect(cards()).toHaveLength(2));
       const first = cards()[0];
       // Not getByRole('img'): every other person/face thumbnail in this admin console (ConfidentLane,
       // people/+page, the reviewed-person header on this very page) pairs an `alt=""` decorative <img> with
@@ -1464,26 +1489,26 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       // thumbnail was never meant to have.
       const image = first.querySelector('img');
       expect(image).toHaveAttribute('src', '/api/admin/face-repair/faces/thumb-a/thumbnail');
-      expect(within(first).getByText('Armin')).toBeInTheDocument();
+      expect(page.elementLocator(first).getByText('Armin', { exact: true }).element()).toBeInTheDocument();
       expect(
         translations.some((t) => t.key === 'admin.face_cleanup_review_dest_size' && t.values?.count === 1204),
       ).toBe(true);
     });
 
     it('states the routing share separately from the destination size', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(2));
+      await vi.waitFor(() => expect(cards()).toHaveLength(2));
       expect(translations.some((t) => t.key === 'admin.face_cleanup_review_dest_routes' && t.values?.count === 2)).toBe(
         true,
       );
     });
 
     it('links each destination to its cluster page in a new tab, so staged decisions survive', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(2));
-      const link = within(cards()[0]).getByTestId('destination-open');
+      await vi.waitFor(() => expect(cards()).toHaveLength(2));
+      const link = page.elementLocator(cards()[0]).getByTestId('destination-open').element();
       expect(link).toHaveAttribute('href', `/admin/face-cleanup/people/${OWNER_A_ID}`);
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
@@ -1502,13 +1527,13 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([many]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(3));
-      expect(within(cards()[0]).getByText('Owner 4')).toBeInTheDocument();
+      await vi.waitFor(() => expect(cards()).toHaveLength(3));
+      expect(page.elementLocator(cards()[0]).getByText('Owner 4', { exact: true }).element()).toBeInTheDocument();
 
-      await fireEvent.click(screen.getByTestId('destination-more'));
-      await waitFor(() => expect(cards()).toHaveLength(5));
+      await userEvent.click(page.getByTestId('destination-more').element());
+      await vi.waitFor(() => expect(cards()).toHaveLength(5));
     });
 
     it('orders two equally-sized destinations deterministically', async () => {
@@ -1534,20 +1559,20 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([tied]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(2));
-      expect(within(cards()[0]).getByText('Ada')).toBeInTheDocument();
+      await vi.waitFor(() => expect(cards()).toHaveLength(2));
+      expect(page.elementLocator(cards()[0]).getByText('Ada', { exact: true }).element()).toBeInTheDocument();
     });
 
     it('names no destination at all when the scan could not attribute the faces', async () => {
       const orphan = makeScanPerson({ suspectedOwners: [] });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([orphan]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('destination-none')).toBeInTheDocument());
-      expect(screen.queryAllByTestId('destination-card')).toHaveLength(0);
+      await vi.waitFor(() => expect(page.getByTestId('destination-none').element()).toBeInTheDocument());
+      expect(page.getByTestId('destination-card').elements()).toHaveLength(0);
       // No card means no destination is named. Do NOT assert that the "unnamed cluster" KEY went untranslated:
       // the page's ownerName/destinationName derivations still fall back to it for the tile ribbons, so that
       // assertion would fail for a reason unrelated to what this test is about.
@@ -1568,28 +1593,28 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([gone]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('destination-gone')).toBeInTheDocument());
-      expect(screen.queryByTestId('destination-open')).not.toBeInTheDocument();
+      await vi.waitFor(() => expect(page.getByTestId('destination-gone').element()).toBeInTheDocument());
+      expect(page.getByTestId('destination-open').query()).not.toBeInTheDocument();
     });
 
     it('renders a placeholder rather than a broken image when a destination has no thumbnail', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(cards()).toHaveLength(2));
+      await vi.waitFor(() => expect(cards()).toHaveLength(2));
       // Owner B has thumbnailFaceId: null. The person-scoped fallback 403s for a cluster the admin does not
-      // own, so there must be no <img> at all. Not queryByRole('img'): an <img alt=""> (this component's own
+      // own, so there must be no <img> at all. Not getByRole('img'): an <img alt=""> (this component's own
       // placeholder-less thumbnail markup, and the convention used everywhere else in this admin console) maps
-      // to role "presentation", not "img" — queryByRole('img') returns null whether or not an <img> is
+      // to role "presentation", not "img" — getByRole('img') finds nothing whether or not an <img> is
       // present, so it can never catch a broken image slipping back in here. A direct DOM query has teeth.
       expect(cards()[1].querySelector('img')).toBeNull();
-      expect(within(cards()[1]).getByTestId('destination-placeholder')).toBeInTheDocument();
+      expect(page.elementLocator(cards()[1]).getByTestId('destination-placeholder').element()).toBeInTheDocument();
     });
   });
 
   describe('Destination chooser', () => {
-    const chooser = () => screen.getByTestId('destination-select') as HTMLSelectElement;
+    const chooser = () => page.getByTestId('destination-select').element() as HTMLSelectElement;
     const restFace = (id: string) => ({ assetFaceId: id });
 
     beforeEach(() => {
@@ -1601,33 +1626,33 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     });
 
     it('defaults to the destination most flagged faces route to', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(chooser().value).toBe(OWNER_A_ID));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(chooser().value).toBe(OWNER_A_ID));
     });
 
     it("sends staged rest-of-cluster faces to the chosen destination, not the scan's first guess", async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('select-all-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('select-all-btn').element()).toBeEnabled());
 
-      await fireEvent.change(chooser(), { target: { value: OWNER_B_ID } });
-      await fireEvent.click(screen.getByTestId('select-all-btn'));
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      await userEvent.selectOptions(chooser(), OWNER_B_ID);
+      await userEvent.click(page.getByTestId('select-all-btn').element());
+      await userEvent.click(page.getByTestId('apply-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalled());
       const request = vi.mocked(resolveFaces).mock.calls[0][0].faceRepairResolveRequestDto;
       const group = request.moveToPerson!.find((g) => g.faceIds.includes('rest-1'))!;
       expect(group.destinationPersonId).toBe(OWNER_B_ID);
     });
 
     it('re-routes already-staged faces when the destination changes, and says so on the dock chip', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('select-all-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('select-all-btn').element()).toBeEnabled());
 
-      await fireEvent.click(screen.getByTestId('select-all-btn'));
-      await waitFor(() => expect(screen.getByTestId('tally-added')).toBeInTheDocument());
-      await fireEvent.change(chooser(), { target: { value: OWNER_B_ID } });
+      await userEvent.click(page.getByTestId('select-all-btn').element());
+      await vi.waitFor(() => expect(page.getByTestId('tally-added').element()).toBeInTheDocument());
+      await userEvent.selectOptions(chooser(), OWNER_B_ID);
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(
           translations.some((t) => t.key === 'admin.face_cleanup_review_tally_added' && t.values?.name === 'Berta'),
         ).toBe(true),
@@ -1636,13 +1661,13 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
     it('names the chosen destination in the move-entire confirmation', async () => {
       showModal.mockResolvedValueOnce(true);
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeEnabled());
 
-      await fireEvent.change(chooser(), { target: { value: OWNER_B_ID } });
-      await fireEvent.click(screen.getByTestId('move-entire-btn'));
+      await userEvent.selectOptions(chooser(), OWNER_B_ID);
+      await userEvent.click(page.getByTestId('move-entire-btn').element());
 
-      await waitFor(() => expect(resolveFaces).toHaveBeenCalled());
+      await vi.waitFor(() => expect(resolveFaces).toHaveBeenCalled());
       const request = vi.mocked(resolveFaces).mock.calls[0][0].faceRepairResolveRequestDto;
       expect(request.entireCluster).toEqual({ destinationPersonId: OWNER_B_ID });
       expect(
@@ -1675,9 +1700,9 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([gone]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(chooser()).toBeInTheDocument());
+      await vi.waitFor(() => expect(chooser()).toBeInTheDocument());
       const values = [...chooser().options].map((o) => o.value);
       expect(values).not.toContain(OWNER_A_ID);
       // …and the default moved on to the surviving suggestion rather than a doomed one.
@@ -1699,10 +1724,10 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([allGone]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeDisabled());
-      expect(screen.getByTestId('select-all-btn')).toBeDisabled();
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeDisabled());
+      expect(page.getByTestId('select-all-btn').element()).toBeDisabled();
     });
 
     it('enables the bulk actions on an unattributable cluster once a person is chosen', async () => {
@@ -1710,23 +1735,23 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([orphan]) as unknown as object);
       showModal.mockResolvedValue({ personId: 'chosen-1', name: 'Chosen', lock: false });
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeDisabled());
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeEnabled());
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeDisabled());
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeEnabled());
     });
 
     it('refuses to move a cluster into itself, explaining why', async () => {
       showModal.mockResolvedValue({ personId: PERSON_ID, name: 'Jula', lock: false });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeEnabled());
 
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
 
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeDisabled());
-      expect(screen.getByTestId('destination-self-warning')).toBeInTheDocument();
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeDisabled());
+      expect(page.getByTestId('destination-self-warning').element()).toBeInTheDocument();
     });
 
     // A self-move is refused, but individual rest tiles (unlike select-all-btn) were never gated on the same
@@ -1742,20 +1767,21 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       } as unknown as FaceRepairClusterFacesResponseDto);
       showModal.mockResolvedValue({ personId: PERSON_ID, name: 'Jula', lock: false });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(2));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))).toHaveLength(2));
 
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
-      await waitFor(() => expect(screen.getByTestId('destination-self-warning')).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
+      await vi.waitFor(() => expect(page.getByTestId('destination-self-warning').element()).toBeInTheDocument());
 
       // The tile now also carries its own inert affordance (disabled + dimmed) — before this, the clicks at
       // least appeared to work even though they silently did nothing.
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')[0]).toBeDisabled());
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))[0]).toBeDisabled());
 
-      await fireEvent.click(screen.getAllByTestId('rest-tile')[0]);
+      // A real click cannot reach a disabled tile; dispatch one at it to prove nothing is wired around that.
+      getAll(page.getByTestId('rest-tile'))[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-      expect(screen.getAllByTestId('rest-tile')[0]).toHaveAttribute('data-selected', 'false');
-      expect(screen.queryByTestId('tally-added')).not.toBeInTheDocument();
+      expect(getAll(page.getByTestId('rest-tile'))[0]).toHaveAttribute('data-selected', 'false');
+      expect(page.getByTestId('tally-added').query()).not.toBeInTheDocument();
     });
 
     // Reproduces the exact sequence the review found live: stage rest faces onto a VALID destination first,
@@ -1770,34 +1796,40 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('select-all-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('select-all-btn').element()).toBeEnabled());
 
-      await fireEvent.click(screen.getByTestId('select-all-btn'));
-      await waitFor(() => expect(screen.getByTestId('tally-added')).toHaveTextContent('+2'));
+      await userEvent.click(page.getByTestId('select-all-btn').element());
+      await vi.waitFor(() => expect(page.getByTestId('tally-added').element()).toMatchTextContent('+2'));
 
       showModal.mockResolvedValue({ personId: PERSON_ID, name: 'Jula', lock: false });
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
 
-      await waitFor(() => expect(screen.getByTestId('destination-self-warning')).toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByTestId('destination-self-warning').element()).toBeInTheDocument());
 
       // Kept, not discarded.
-      expect(screen.getByTestId('tally-added')).toHaveTextContent('+2');
+      expect(page.getByTestId('tally-added').element()).toMatchTextContent('+2');
       // ...and the chip stops affirmatively naming a destination Apply will not use.
       expect(
-        within(screen.getByTestId('tally-added')).getByText('admin.face_cleanup_review_tally_added_pending'),
+        page
+          .elementLocator(page.getByTestId('tally-added').element())
+          .getByText('admin.face_cleanup_review_tally_added_pending', { exact: true })
+          .element(),
       ).toBeInTheDocument();
 
       // Closes a gap where this test passed on EITHER guard alone: handleApply's own early return on
       // restBlocked, or the button's `disabled` attribute. A click never reaches the handler on a disabled
       // button, so deleting only `disabled` would ship a visually-enabled Apply that silently does nothing —
       // and this test would still stay green without this assertion.
-      expect(screen.getByTestId('apply-btn')).toBeDisabled();
+      expect(page.getByTestId('apply-btn').element()).toBeDisabled();
 
-      await fireEvent.click(screen.getByTestId('apply-btn'));
+      page
+        .getByTestId('apply-btn')
+        .element()
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
       expect(resolveFaces).not.toHaveBeenCalled();
-      expect(screen.getByTestId('apply-blocked-reason')).toBeInTheDocument();
+      expect(page.getByTestId('apply-blocked-reason').element()).toBeInTheDocument();
     });
 
     // The gate only ever blocks NEW staging — deselecting must always work, or the admin would be stranded
@@ -1809,21 +1841,23 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('select-all-btn')).toBeEnabled());
-      await fireEvent.click(screen.getByTestId('select-all-btn'));
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')[0]).toHaveAttribute('data-selected', 'true'));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('select-all-btn').element()).toBeEnabled());
+      await userEvent.click(page.getByTestId('select-all-btn').element());
+      await vi.waitFor(() => expect(getAll(page.getByTestId('rest-tile'))[0]).toHaveAttribute('data-selected', 'true'));
 
       showModal.mockResolvedValue({ personId: PERSON_ID, name: 'Jula', lock: false });
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
-      await waitFor(() => expect(screen.getByTestId('destination-self-warning')).toBeInTheDocument());
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
+      await vi.waitFor(() => expect(page.getByTestId('destination-self-warning').element()).toBeInTheDocument());
 
       // Already-selected tiles are never disabled — only staging NEW ones is gated.
-      expect(screen.getAllByTestId('rest-tile')[0]).toBeEnabled();
+      expect(getAll(page.getByTestId('rest-tile'))[0]).toBeEnabled();
 
-      await fireEvent.click(screen.getAllByTestId('rest-tile')[0]);
+      await userEvent.click(getAll(page.getByTestId('rest-tile'))[0]);
 
-      await waitFor(() => expect(screen.getAllByTestId('rest-tile')[0]).toHaveAttribute('data-selected', 'false'));
+      await vi.waitFor(() =>
+        expect(getAll(page.getByTestId('rest-tile'))[0]).toHaveAttribute('data-selected', 'false'),
+      );
     });
 
     // Item 5 from the review: the no-destination path (an orphan cluster, or every suggestion ownerMissing)
@@ -1838,11 +1872,11 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
         hasMore: false,
       } as unknown as FaceRepairClusterFacesResponseDto);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('destination-pick-warning')).toBeInTheDocument());
-      expect(screen.queryByTestId('destination-self-warning')).not.toBeInTheDocument();
-      expect(screen.getByTestId('rest-tile')).toBeDisabled();
+      await vi.waitFor(() => expect(page.getByTestId('destination-pick-warning').element()).toBeInTheDocument());
+      expect(page.getByTestId('destination-self-warning').query()).not.toBeInTheDocument();
+      expect(page.getByTestId('rest-tile').element()).toBeDisabled();
     });
 
     // The Promise.all in loadPersonData can land getFaceRepairPersonFaces on one scan and getLatestScan on
@@ -1854,10 +1888,10 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('disables "Choose someone else..." when scanPerson failed to resolve, even with flagged faces present', async () => {
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('destination-pick-warning')).toBeInTheDocument());
-      expect(screen.getByTestId('destination-choose-other')).toBeDisabled();
+      await vi.waitFor(() => expect(page.getByTestId('destination-pick-warning').element()).toBeInTheDocument());
+      expect(page.getByTestId('destination-choose-other').element()).toBeDisabled();
     });
 
     // A prior version of this test only re-chose the default (OWNER_A_ID) after a dismiss with nothing ever
@@ -1868,33 +1902,33 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('leaves an already-chosen destination in place when a later picker is dismissed', async () => {
       showModal.mockResolvedValueOnce({ personId: 'chosen-1', name: 'Chosen', lock: false });
 
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(chooser().value).toBe(OWNER_A_ID));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(chooser().value).toBe(OWNER_A_ID));
 
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
-      await waitFor(() => expect(chooser().value).toBe('chosen-1'));
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
+      await vi.waitFor(() => expect(chooser().value).toBe('chosen-1'));
 
       showModal.mockResolvedValueOnce(undefined);
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
 
-      await waitFor(() => expect(chooser().value).toBe('chosen-1'));
+      await vi.waitFor(() => expect(chooser().value).toBe('chosen-1'));
     });
 
     it('opens the destination picker without the re-flag lock it cannot honour', async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getByTestId('move-entire-btn')).toBeEnabled());
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('move-entire-btn').element()).toBeEnabled());
 
-      await fireEvent.click(screen.getByTestId('destination-choose-other'));
+      await userEvent.click(page.getByTestId('destination-choose-other').element());
 
-      await waitFor(() => expect(showModal).toHaveBeenCalled());
+      await vi.waitFor(() => expect(showModal).toHaveBeenCalled());
       const props = showModal.mock.calls.at(-1)![1] as { showLock?: boolean };
       expect(props.showLock).toBe(false);
     });
 
     it('labels the tally generically when faces are bound for several destinations', async () => {
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('tally')).toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByTestId('tally').element()).toBeInTheDocument());
       expect(translations.some((t) => t.key === 'admin.face_cleanup_review_tally_owner_multi')).toBe(true);
     });
 
@@ -1913,9 +1947,9 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       });
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([single]) as unknown as object);
 
-      render(Page, { props: { data: makePageData() } });
+      await render(Page, { props: { data: makePageData() } });
 
-      await waitFor(() => expect(screen.getByTestId('tally')).toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByTestId('tally').element()).toBeInTheDocument());
       expect(
         translations.some((t) => t.key === 'admin.face_cleanup_review_tally_owner' && t.values?.name === 'Armin'),
       ).toBe(true);
@@ -1924,13 +1958,13 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
   describe('shared dock', () => {
     const renderAndLoad = async () => {
-      render(Page, { props: { data: makePageData() } });
-      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(getAll(page.getByTestId('face-tile'))).toHaveLength(3));
     };
 
     const selectFirstTile = async () => {
-      await fireEvent.click(screen.getAllByTestId('face-tile')[0]);
-      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      await userEvent.click(getAll(page.getByTestId('face-tile'))[0]);
+      await vi.waitFor(() => expect(page.getByTestId('face-bulk-bar').element()).toBeInTheDocument());
     };
 
     // G5 — the one button in either bar that had no testid before this change.
@@ -1938,9 +1972,9 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       await renderAndLoad();
       await selectFirstTile();
 
-      await fireEvent.click(screen.getByTestId('bulk-owner'));
+      await userEvent.click(page.getByTestId('bulk-owner').element());
 
-      expect(screen.getAllByTestId('face-tile')[0]).toHaveAttribute('data-state', 'owner');
+      expect(getAll(page.getByTestId('face-tile'))[0]).toHaveAttribute('data-state', 'owner');
     });
 
     // G1
@@ -1948,10 +1982,12 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       await renderAndLoad();
       await selectFirstTile();
 
-      await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+      await userEvent.hover(page.getByTestId('bulk-lock').element());
 
-      expect(screen.getByTestId('face-bulk-popover')).toHaveTextContent('admin.face_cleanup_action_lock_tip');
-      expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('admin.face_cleanup_review_bulk_hint_effect');
+      expect(page.getByTestId('face-bulk-popover').element()).toMatchTextContent('admin.face_cleanup_action_lock_tip');
+      expect(page.getByTestId('face-bulk-hint').element()).toMatchTextContent(
+        'admin.face_cleanup_review_bulk_hint_effect',
+      );
     });
 
     // G4 — the page passes guided mode. Paired with the manual page's M5, this is what proves the two pages
@@ -1959,7 +1995,7 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('opens the help modal in guided mode, with guided’s six actions', async () => {
       await renderAndLoad();
 
-      await fireEvent.click(screen.getByTestId('banner-help'));
+      await userEvent.click(page.getByTestId('banner-help').element());
 
       expect(showModal).toHaveBeenCalledWith(
         FaceActionsHelpModal,
@@ -1974,11 +2010,11 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     it('opens the same modal from the bulk bar as from the banner', async () => {
       await renderAndLoad();
 
-      await fireEvent.click(screen.getByTestId('banner-help'));
+      await userEvent.click(page.getByTestId('banner-help').element());
       const fromBanner = showModal.mock.calls.at(-1);
 
       await selectFirstTile();
-      await fireEvent.click(screen.getByTestId('face-bulk-help'));
+      await userEvent.click(page.getByTestId('face-bulk-help').element());
       const fromBar = showModal.mock.calls.at(-1);
 
       // `.at(-1)` alone can't tell "the bar's launcher opened its own call" from "the bar's launcher is
@@ -1994,7 +2030,7 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
 
       const ids = ['bulk-owner', 'bulk-stay', 'bulk-lock', 'bulk-other', 'bulk-unknown', 'bulk-detach'];
       for (const id of ids) {
-        expect(screen.getAllByTestId(id)).toHaveLength(1);
+        expect(getAll(page.getByTestId(id))).toHaveLength(1);
       }
     });
   });
@@ -2004,22 +2040,24 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       makeCompletedScan([makeScanPerson({ personName: 'Aurelia' })]) as unknown as object,
     );
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    const trail = () => within(screen.getByTestId('breadcrumbs'));
+    const trail = () => page.getByTestId('breadcrumbs');
 
-    await waitFor(() => {
-      expect(trail().getByText('Aurelia')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(trail().getByText('Aurelia', { exact: true }).element()).toBeInTheDocument();
     });
 
     // The root must go to the landing page — it used to be labelled "Face cleanup" while pointing at /scan.
-    expect(trail().getByRole('link', { name: 'admin.face_cleanup' })).toHaveAttribute('href', Route.faceCleanup());
-    // The guided level used to be missing from this trail entirely.
-    expect(trail().getByRole('link', { name: 'admin.face_cleanup_mode_guided' })).toHaveAttribute(
+    expect(trail().getByRole('link', { name: 'admin.face_cleanup', exact: true }).element()).toHaveAttribute(
       'href',
-      Route.faceCleanupScan(),
+      Route.faceCleanup(),
     );
-    expect(trail().getAllByRole('link')).toHaveLength(2);
+    // The guided level used to be missing from this trail entirely.
+    expect(
+      trail().getByRole('link', { name: 'admin.face_cleanup_mode_guided', exact: true }).element(),
+    ).toHaveAttribute('href', Route.faceCleanupScan());
+    expect(getAll(trail().getByRole('link'))).toHaveLength(2);
   });
 
   it.each([
@@ -2031,15 +2069,15 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       makeCompletedScan([makeScanPerson({ personName })]) as unknown as object,
     );
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Wait for the scan to RESOLVE before asserting. `waitFor` runs its first attempt synchronously, so an
     // assertion made straight after `render` is satisfied by the transient pre-resolution fallback (what the
     // loading-state test below pins) and would pass whether or not the name guard exists at all.
-    await waitFor(() => expect(screen.getByTestId('flagged-grid')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByTestId('flagged-grid').element()).toBeInTheDocument());
 
     expect(
-      within(screen.getByTestId('breadcrumbs')).getByText('admin.face_cleanup_review_unnamed'),
+      page.getByTestId('breadcrumbs').getByText('admin.face_cleanup_review_unnamed', { exact: true }).element(),
     ).toBeInTheDocument();
   });
 
@@ -2048,33 +2086,33 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       makeCompletedScan([makeScanPerson({ personName: 'Aurelia' })]) as unknown as object,
     );
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Accepted pre-existing behaviour, pinned so a later refactor cannot turn the transient leaf into an
     // empty crumb. Mirrors the sibling assertion on people/[personId].
     expect(
-      within(screen.getByTestId('breadcrumbs')).getByText('admin.face_cleanup_review_unnamed'),
+      page.getByTestId('breadcrumbs').getByText('admin.face_cleanup_review_unnamed', { exact: true }).element(),
     ).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(within(screen.getByTestId('breadcrumbs')).getByText('Aurelia')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('breadcrumbs').getByText('Aurelia', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
   // Not `async`: the back link is rendered unconditionally, so nothing here awaits, and the zero-warnings
   // lint gate's @typescript-eslint/require-await rejects an async function with no await.
-  it('labels the in-page back link with where it actually goes', () => {
+  it('labels the in-page back link with where it actually goes', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(
       makeCompletedScan([makeScanPerson({ personName: 'Aurelia' })]) as unknown as object,
     );
 
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Two links share this name and href by design — the crumb and the in-page back link. Exclude the trail
     // and assert on what is left, so this test is about the in-page link specifically.
-    const backLinks = screen
-      .getAllByRole('link', { name: 'admin.face_cleanup_mode_guided' })
-      .filter((link) => !screen.getByTestId('breadcrumbs').contains(link));
+    const backLinks = getAll(page.getByRole('link', { name: 'admin.face_cleanup_mode_guided', exact: true })).filter(
+      (link) => !page.getByTestId('breadcrumbs').element().contains(link),
+    );
 
     expect(backLinks).toHaveLength(1);
     expect(backLinks[0]).toHaveAttribute('href', Route.faceCleanupScan());

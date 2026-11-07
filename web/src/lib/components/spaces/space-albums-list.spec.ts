@@ -7,19 +7,9 @@ import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
-import { screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
-
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
-vi.mock('$app/stores', () => ({
-  page: {
-    subscribe: (run: (v: unknown) => void) => {
-      run({ url: new URL('http://localhost/spaces/space-1/albums'), route: { id: '' } });
-      return () => {};
-    },
-  },
-}));
+import { page } from 'vitest/browser';
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
@@ -54,7 +44,10 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
 }
 
 const idsInCoverOrder = () =>
-  screen.getAllByTestId('space-album-card-link').map((a) => a.getAttribute('href')!.split('/').pop());
+  page
+    .getByTestId('space-album-card-link')
+    .elements()
+    .map((a) => a.getAttribute('href')!.split('/').pop());
 
 // Excludes `space-album-row-menu-*` (the kebab cell, which now renders for every member, not just
 // canManage) — that prefix also matches `^space-album-row-` and would otherwise pollute the order.
@@ -79,57 +72,57 @@ describe('SpaceAlbumsList', () => {
 
   it('renders cover cards by default and switches to the table on view=List', async () => {
     const albums = [makeAlbum({ id: 'a-1' }), makeAlbum({ id: 'a-2' })];
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
-    expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    expect(page.getByTestId('space-album-card').elements()).toHaveLength(2);
     spaceAlbumViewSettings.update((s) => ({ ...s, view: AlbumViewMode.List }));
-    expect(await screen.findByTestId('space-album-row-a-1')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByTestId('space-album-row-a-1').element())).toBeInTheDocument();
   });
 
-  it('never writes the global albumViewSettings (isolation)', () => {
+  it('never writes the global albumViewSettings (isolation)', async () => {
     const before = get(albumViewSettings);
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums: [makeAlbum({ id: 'a-1' })], canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums: [makeAlbum({ id: 'a-1' })], canManage: false });
     spaceAlbumViewSettings.update((s) => ({ ...s, view: AlbumViewMode.List }));
     expect(get(albumViewSettings)).toEqual(before);
   });
 
-  it('sorts by Title ascending in cover mode', () => {
+  it('sorts by Title ascending in cover mode', async () => {
     const albums = [makeAlbum({ id: 'b', albumName: 'Bravo' }), makeAlbum({ id: 'a', albumName: 'Alpha' })];
     spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.Title, sortOrder: SortOrder.Asc }));
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
     expect(idsInCoverOrder()).toEqual(['a', 'b']);
   });
 
-  it('sorts by item count descending in cover mode', () => {
+  it('sorts by item count descending in cover mode', async () => {
     const albums = [makeAlbum({ id: 'lo', assetCount: 2 }), makeAlbum({ id: 'hi', assetCount: 9 })];
     spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.ItemCount, sortOrder: SortOrder.Desc }));
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
     expect(idsInCoverOrder()).toEqual(['hi', 'lo']);
   });
 
-  it('sorts by MostRecentPhoto on endDate, pushing null-date albums last', () => {
+  it('sorts by MostRecentPhoto on endDate, pushing null-date albums last', async () => {
     const albums = [
       makeAlbum({ id: 'none' }), // no startDate/endDate
       makeAlbum({ id: 'old', endDate: '2020-01-01T00:00:00.000Z' }),
       makeAlbum({ id: 'new', endDate: '2024-01-01T00:00:00.000Z' }),
     ];
     spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.MostRecentPhoto, sortOrder: SortOrder.Desc }));
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
     const order = idsInCoverOrder();
     expect(order.slice(0, 2)).toEqual(['new', 'old']);
     expect(order[2]).toBe('none'); // null-date last
   });
 
-  it('sorts by OldestPhoto on startDate in cover mode', () => {
+  it('sorts by OldestPhoto on startDate in cover mode', async () => {
     const albums = [
       makeAlbum({ id: 'y2024', startDate: '2024-01-01T00:00:00.000Z' }),
       makeAlbum({ id: 'y2020', startDate: '2020-01-01T00:00:00.000Z' }),
     ];
     spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.OldestPhoto, sortOrder: SortOrder.Asc }));
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
     expect(idsInCoverOrder()).toEqual(['y2020', 'y2024']);
   });
 
-  it('sorts by Title ascending in list mode', () => {
+  it('sorts by Title ascending in list mode', async () => {
     const albums = [makeAlbum({ id: 'b', albumName: 'Bravo' }), makeAlbum({ id: 'a', albumName: 'Alpha' })];
     spaceAlbumViewSettings.update((s) => ({
       ...s,
@@ -137,57 +130,56 @@ describe('SpaceAlbumsList', () => {
       sortBy: AlbumSortBy.Title,
       sortOrder: SortOrder.Asc,
     }));
-    renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+    await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
     expect(idsInListOrder()).toEqual(['a', 'b']);
   });
 
   describe('search filtering', () => {
-    it('filters by album name (case-insensitive)', () => {
+    it('filters by album name (case-insensitive)', async () => {
       const albums = [makeAlbum({ id: 'v', albumName: 'Vacation' }), makeAlbum({ id: 'w', albumName: 'Work' })];
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, searchQuery: 'vac' });
-      expect(screen.getAllByTestId('space-album-card-link')).toHaveLength(1);
-      expect(screen.getByText('Vacation')).toBeInTheDocument();
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, searchQuery: 'vac' });
+      expect(page.getByTestId('space-album-card-link').elements()).toHaveLength(1);
+      expect(page.getByText('Vacation', { exact: true }).element()).toBeInTheDocument();
     });
-    it('filters by description and does not throw on null description', () => {
+    it('filters by description and does not throw on null description', async () => {
       const albums = [
         makeAlbum({ id: 'a', albumName: 'A', description: 'beach trip' }),
         makeAlbum({ id: 'b', albumName: 'B', description: null as unknown as string }),
       ];
-      expect(() =>
-        renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, searchQuery: 'beach' }),
-      ).not.toThrow();
-      expect(screen.getAllByTestId('space-album-card-link')).toHaveLength(1);
+      // A throw while filtering rejects the render, which fails the test.
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, searchQuery: 'beach' });
+      expect(page.getByTestId('space-album-card-link').elements()).toHaveLength(1);
     });
-    it('shows a no-matching message when the query matches nothing', () => {
-      renderWithTooltips(SpaceAlbumsList, {
+    it('shows a no-matching message when the query matches nothing', async () => {
+      await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums: [makeAlbum({ id: 'a', albumName: 'Alpha' })],
         canManage: false,
         searchQuery: 'zzz',
       });
-      expect(screen.getByTestId('space-albums-no-results')).toBeInTheDocument();
-      expect(screen.queryAllByTestId('space-album-card-link')).toHaveLength(0);
+      expect(page.getByTestId('space-albums-no-results').element()).toBeInTheDocument();
+      expect(page.getByTestId('space-album-card-link').elements()).toHaveLength(0);
     });
-    it('an empty query shows everything', () => {
-      renderWithTooltips(SpaceAlbumsList, {
+    it('an empty query shows everything', async () => {
+      await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums: [makeAlbum({ id: 'a' }), makeAlbum({ id: 'b' })],
         canManage: false,
         searchQuery: '',
       });
-      expect(screen.getAllByTestId('space-album-card-link')).toHaveLength(2);
+      expect(page.getByTestId('space-album-card-link').elements()).toHaveLength(2);
     });
   });
 
   describe('grouping (cover mode)', () => {
-    it('renders no group headers when groupBy is None', () => {
+    it('renders no group headers when groupBy is None', async () => {
       const albums = [makeAlbum({ id: 'a-1' }), makeAlbum({ id: 'a-2' })];
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
-      expect(screen.queryByTestId(/^space-album-group-/)).not.toBeInTheDocument();
-      expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+      expect(page.getByTestId(/^space-album-group-/).query()).not.toBeInTheDocument();
+      expect(page.getByTestId('space-album-card').elements()).toHaveLength(2);
     });
 
-    it('renders a header per year with names and counts when groupBy is Year', () => {
+    it('renders a header per year with names and counts when groupBy is Year', async () => {
       const albums = [
         makeAlbum({ id: 'y2020', endDate: '2020-06-01T00:00:00.000Z' }),
         makeAlbum({ id: 'y2024a', endDate: '2024-06-01T00:00:00.000Z' }),
@@ -199,13 +191,13 @@ describe('SpaceAlbumsList', () => {
         sortBy: AlbumSortBy.MostRecentPhoto,
         sortOrder: SortOrder.Desc,
       }));
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
-      const header2024 = screen.getByTestId('space-album-group-2024');
-      const header2020 = screen.getByTestId('space-album-group-2020');
-      expect(header2024).toHaveTextContent('2024');
-      expect(header2024).toHaveTextContent('2');
-      expect(header2020).toHaveTextContent('2020');
-      expect(header2020).toHaveTextContent('1');
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+      const header2024 = page.getByTestId('space-album-group-2024').element();
+      const header2020 = page.getByTestId('space-album-group-2020').element();
+      expect(header2024).toMatchTextContent('2024');
+      expect(header2024).toMatchTextContent('2');
+      expect(header2020).toMatchTextContent('2020');
+      expect(header2020).toMatchTextContent('1');
     });
 
     it('collapsing a group marks its header collapsed (aria-expanded=false)', async () => {
@@ -220,21 +212,21 @@ describe('SpaceAlbumsList', () => {
         groupBy: SpaceAlbumGroupBy.Year,
         sortBy: AlbumSortBy.MostRecentPhoto,
       }));
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
-      expect(screen.getByTestId('space-album-group-2020')).toHaveAttribute('aria-expanded', 'true');
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false });
+      expect(page.getByTestId('space-album-group-2020').element()).toHaveAttribute('aria-expanded', 'true');
       toggleAlbumGroupCollapsing('2020', spaceAlbumViewSettings);
-      await waitFor(() =>
-        expect(screen.getByTestId('space-album-group-2020')).toHaveAttribute('aria-expanded', 'false'),
+      await vi.waitFor(() =>
+        expect(page.getByTestId('space-album-group-2020').element()).toHaveAttribute('aria-expanded', 'false'),
       );
     });
 
-    it('renders member-name headers plus an Unassigned group when groupBy is LinkedBy', () => {
+    it('renders member-name headers plus an Unassigned group when groupBy is LinkedBy', async () => {
       const members = [{ userId: 'u1', name: 'Alice' }] as unknown as SharedSpaceMemberResponseDto[];
       const albums = [makeAlbum({ id: 'a', addedById: 'u1' }), makeAlbum({ id: 'b', addedById: null })];
       spaceAlbumViewSettings.update((s) => ({ ...s, groupBy: SpaceAlbumGroupBy.LinkedBy }));
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, members });
-      expect(screen.getByTestId('space-album-group-u1')).toHaveTextContent('Alice');
-      expect(screen.getByTestId('space-album-group-Unassigned')).toHaveTextContent('Unassigned');
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, canManage: false, members });
+      expect(page.getByTestId('space-album-group-u1').element()).toMatchTextContent('Alice');
+      expect(page.getByTestId('space-album-group-Unassigned').element()).toMatchTextContent('Unassigned');
     });
   });
 
@@ -248,7 +240,7 @@ describe('SpaceAlbumsList', () => {
       sortOrder: SortOrder.Desc,
       groupBy: SpaceAlbumGroupBy.None,
     }));
-    renderWithTooltips(SpaceAlbumsList, {
+    await renderWithTooltips(SpaceAlbumsList, {
       spaceId: 'space-1',
       canManage: false,
       albums: [
@@ -265,8 +257,11 @@ describe('SpaceAlbumsList', () => {
 
     // Assert DOM order via the card testid rather than a text regex, so the
     // assertion cannot be satisfied by incidental matches elsewhere in the tree.
-    await waitFor(() => expect(screen.getAllByTestId('space-album-card')).toHaveLength(2));
-    const order = screen.getAllByTestId('space-album-card').map((card) => card.textContent);
+    await vi.waitFor(() => expect(page.getByTestId('space-album-card').elements()).toHaveLength(2));
+    const order = page
+      .getByTestId('space-album-card')
+      .elements()
+      .map((card) => card.textContent);
     expect(order[0]).toContain('HasPhotos');
     expect(order[1]).toContain('Empty');
   });
@@ -283,7 +278,7 @@ describe('SpaceAlbumsList', () => {
       sortOrder: SortOrder.Desc,
       groupBy: SpaceAlbumGroupBy.None,
     }));
-    renderWithTooltips(SpaceAlbumsList, {
+    await renderWithTooltips(SpaceAlbumsList, {
       spaceId: 'space-1',
       canManage: false,
       albums: [
@@ -303,8 +298,11 @@ describe('SpaceAlbumsList', () => {
       members: [] as SharedSpaceMemberResponseDto[],
     });
 
-    await waitFor(() => expect(screen.getAllByTestId('space-album-card')).toHaveLength(2));
-    const order = screen.getAllByTestId('space-album-card').map((card) => card.textContent);
+    await vi.waitFor(() => expect(page.getByTestId('space-album-card').elements()).toHaveLength(2));
+    const order = page
+      .getByTestId('space-album-card')
+      .elements()
+      .map((card) => card.textContent);
     expect(order[0]).toContain('RecentLink');
     expect(order[1]).toContain('OldLink');
   });
@@ -331,10 +329,15 @@ describe('SpaceAlbumsList', () => {
     });
 
     // W-01: folders are the primary organisational layer, so they always come first.
-    it('W-01: renders folders before albums', () => {
+    it('W-01: renders folders before albums', async () => {
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
       const albums = [makeAlbum({ id: 'a1', albumName: 'Rome' }), makeAlbum({ id: 'a2', albumName: 'Venice' })];
-      const { container } = renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      const { container } = await renderWithTooltips(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders,
+        canManage: false,
+      });
 
       const rendered = [
         ...container.querySelectorAll('[data-testid="space-album-folder-card"],[data-testid="space-album-card"]'),
@@ -343,23 +346,23 @@ describe('SpaceAlbumsList', () => {
       expect(rendered.at(-1)).toHaveAttribute('data-testid', 'space-album-card');
     });
 
-    it('W-01: shows only this level — the album inside Trips is not at the root', () => {
+    it('W-01: shows only this level — the album inside Trips is not at the root', async () => {
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
       const albums = [
         makeAlbum({ id: 'a1', albumName: 'Rome' }),
         makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
       ];
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+      expect(page.getByText('Rome', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Venice', { exact: true }).query()).not.toBeInTheDocument();
     });
 
     // W-08: reusing the space-level empty state here would wrongly claim the space has no
     // albums at all, when it only means THIS folder is empty.
-    it('W-08: renders the folder-specific empty state for an empty folder', () => {
+    it('W-08: renders the folder-specific empty state for an empty folder', async () => {
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
-      renderWithTooltips(SpaceAlbumsList, {
+      await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums: [],
         folders,
@@ -369,8 +372,8 @@ describe('SpaceAlbumsList', () => {
 
       // Unlike space-albums-page.spec.ts, this file's beforeAll registers the real en-US locale
       // (see above), so $t() resolves actual copy here rather than raw i18n keys.
-      expect(screen.getByTestId('space-album-folder-empty')).toHaveTextContent('No albums in this folder yet');
-      expect(screen.queryByTestId('empty-state-message')).not.toBeInTheDocument();
+      expect(page.getByTestId('space-album-folder-empty').element()).toMatchTextContent('No albums in this folder yet');
+      expect(page.getByTestId('empty-state-message').query()).not.toBeInTheDocument();
     });
 
     // W-07: group-by regroups the ALBUMS at this level; folders are never grouped, and their grid
@@ -378,7 +381,7 @@ describe('SpaceAlbumsList', () => {
     // this: the group testid lives on the header BUTTON, which never wraps any card (grouped
     // album cards included) under any implementation, so that check is vacuous — assert real DOM
     // order instead.
-    it('W-07: leaves folders ungrouped, rendered above the grouped album list', () => {
+    it('W-07: leaves folders ungrouped, rendered above the grouped album list', async () => {
       spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
       const albums = [
@@ -386,22 +389,22 @@ describe('SpaceAlbumsList', () => {
         makeAlbum({ id: 'a2', endDate: '2024-06-01T00:00:00.000Z' }),
       ];
 
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
-      expect(screen.getAllByTestId('space-album-folder-card')).toHaveLength(2);
-      const foldersGrid = screen.getByTestId('space-album-folders-grid');
-      const firstGroupHeader = screen.getAllByTestId(/^space-album-group-/)[0];
+      expect(page.getByTestId('space-album-folder-card').elements()).toHaveLength(2);
+      const foldersGrid = page.getByTestId('space-album-folders-grid').element();
+      const firstGroupHeader = page.getByTestId(/^space-album-group-/).elements()[0];
       expect(foldersGrid.compareDocumentPosition(firstGroupHeader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // W-18: while searching, the path subtitle is already the organising signal — grouping the
     // space-wide hits on top of it would bury it.
-    it('W-18: renders flattened hits ungrouped even when group-by is active', () => {
+    it('W-18: renders flattened hits ungrouped even when group-by is active', async () => {
       spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      const { container } = renderWithTooltips(SpaceAlbumsList, {
+      const { container } = await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders,
@@ -410,17 +413,17 @@ describe('SpaceAlbumsList', () => {
       });
 
       expect(container.querySelectorAll('[data-testid^="space-album-group-"]')).toHaveLength(0);
-      expect(screen.getByText('Venice')).toBeInTheDocument();
+      expect(page.getByText('Venice', { exact: true }).element()).toBeInTheDocument();
     });
 
     // W-09: search escapes the current folder entirely and labels each hit with its path. (The
     // breadcrumb itself lives on the page, not this component — see
     // "W-09: hides the breadcrumb while searching" in space-albums-page.spec.ts.)
-    it('W-09: hides folders while searching, and labels each hit with its path', () => {
+    it('W-09: hides folders while searching, and labels each hit with its path', async () => {
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      const { container } = renderWithTooltips(SpaceAlbumsList, {
+      const { container } = await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders,
@@ -429,17 +432,17 @@ describe('SpaceAlbumsList', () => {
       });
 
       expect(container.querySelectorAll('[data-testid="space-album-folder-card"]')).toHaveLength(0);
-      expect(screen.getByTestId('space-album-search-path-a2')).toHaveTextContent('Trips');
+      expect(page.getByTestId('space-album-search-path-a2').element()).toMatchTextContent('Trips');
     });
 
     // Finding: flattenForSearch returns raw server order; a search must not silently discard the
     // active sort (grouping is the only thing search is allowed to drop, per W-18).
-    it('sorts search hits using the active sort order rather than raw server order', () => {
+    it('sorts search hits using the active sort order rather than raw server order', async () => {
       spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.Title, sortOrder: SortOrder.Asc }));
       // Deliberately inserted out of alpha order, so a passing test proves re-sorting happened.
       const albums = [makeAlbum({ id: 'b', albumName: 'Bravo Trip' }), makeAlbum({ id: 'a', albumName: 'Alpha Trip' })];
 
-      renderWithTooltips(SpaceAlbumsList, {
+      await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders: [],
@@ -452,47 +455,53 @@ describe('SpaceAlbumsList', () => {
 
     // Finding: a List-view user's explicit preference must survive a search — it was previously
     // discarded in favour of cover cards for the duration of the query.
-    it('respects List view while searching, rendering the table instead of cover cards', () => {
+    it('respects List view while searching, rendering the table instead of cover cards', async () => {
       spaceAlbumViewSettings.update((s) => ({ ...s, view: AlbumViewMode.List }));
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false, searchQuery: 'ven' });
+      await renderWithTooltips(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders,
+        canManage: false,
+        searchQuery: 'ven',
+      });
 
-      expect(screen.getByTestId('space-album-row-a2')).toBeInTheDocument();
-      expect(screen.queryByTestId('space-album-card')).not.toBeInTheDocument();
+      expect(page.getByTestId('space-album-row-a2').element()).toBeInTheDocument();
+      expect(page.getByTestId('space-album-card').query()).not.toBeInTheDocument();
     });
 
     // Finding: with no terminal {:else}, a level with zero folders and zero albums (root, before
     // the caller's on-mount folder fetch resolves) rendered nothing at all instead of some kind
     // of feedback.
-    it('renders a fallback instead of leaving the pane blank when nothing exists at the root level', () => {
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders: [], canManage: false });
+    it('renders a fallback instead of leaving the pane blank when nothing exists at the root level', async () => {
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders: [], canManage: false });
 
-      expect(screen.getByTestId('space-albums-loading')).toBeInTheDocument();
+      expect(page.getByTestId('space-albums-loading').element()).toBeInTheDocument();
     });
 
     // T-08 (mirrored from mobile, see space-album-folders.ts): an album whose folderId names a
     // folder we have not synced/fetched yet is shown at the root instead of hidden — this used to
     // be indistinguishable from "nothing exists at this level" (the case above), which made the
     // album vanish behind the loading fallback for as long as its folder stayed unknown.
-    it('shows an album at the root instead of the loading fallback when its folder is not loaded', () => {
+    it('shows an album at the root instead of the loading fallback when its folder is not loaded', async () => {
       const albums = [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'unknown-folder' })];
-      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
+      await renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
 
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.queryByTestId('space-albums-loading')).not.toBeInTheDocument();
+      expect(page.getByText('Rome', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByTestId('space-albums-loading').query()).not.toBeInTheDocument();
     });
 
     // Finding: when the folders fetch has failed, we can't trust `contents.albums`' level-scoping
     // (we don't know which folder any given folderId belongs under), so degrade to showing every
     // album in the space flat rather than hiding anything with a non-null folderId.
-    it('foldersUnavailable: falls back to a flat, unscoped album list', () => {
+    it('foldersUnavailable: falls back to a flat, unscoped album list', async () => {
       const albums = [
         makeAlbum({ id: 'a1', albumName: 'Rome' }),
         makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
       ];
-      renderWithTooltips(SpaceAlbumsList, {
+      await renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders: [],
@@ -500,9 +509,9 @@ describe('SpaceAlbumsList', () => {
         foldersUnavailable: true,
       });
 
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.getByText('Venice')).toBeInTheDocument();
-      expect(screen.queryByTestId('space-albums-loading')).not.toBeInTheDocument();
+      expect(page.getByText('Rome', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Venice', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByTestId('space-albums-loading').query()).not.toBeInTheDocument();
     });
   });
 });

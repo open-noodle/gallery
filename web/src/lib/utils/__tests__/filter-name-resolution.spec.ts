@@ -1,7 +1,12 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import { resolveFilterNames } from '#lib/utils/filter-name-resolution.ts';
+import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The browser links static imports in source order before any module body runs, so a statically
+// imported module that reaches @immich/sdk would load the real SDK before sdk.mock.ts registers its
+// vi.mock. Load the modules under test after that registration so they get the mocked SDK.
+const { createFilterState } = await import('#lib/components/filter-panel/filter-panel.ts');
+const { resolveFilterNames } = await import('#lib/utils/filter-name-resolution.ts');
 
 // The "fails soft" test below is only non-vacuous if the error-handling module is a NAMED mock we
 // can assert against: without this, "shows no toast" would pass against any implementation that
