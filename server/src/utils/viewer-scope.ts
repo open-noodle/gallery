@@ -7,7 +7,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Kysely, SqlBool, Transaction, sql } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SearchFilter } from 'src/dtos/search.dto.js';
-import { AssetVisibility } from 'src/enum.js';
+import { AssetAspectClass, AssetVisibility } from 'src/enum.js';
 import { checkLibraryView, type LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import type { AssetSearchScope } from 'src/repositories/search.repository.js';
@@ -272,7 +272,7 @@ export type StructuredSearchRequest = LibraryViewOptions & {
   spacePersonIds?: string[];
   ownerId?: string;
   isInAlbum?: boolean;
-  aspectClasses?: string[];
+  aspectClasses?: AssetAspectClass[];
 };
 
 /**

@@ -207,12 +207,9 @@ Additive only. Optional request field `aspectClasses: AssetAspectClass[]` in:
 It is not in `GallerySearchFilterExtension`, so statistics, random and large-assets search do not get it, and not in the
 `POST /search/options` schema.
 
-**Decision:** the three POST body fields (metadata, smart, facets) are described in OpenAPI as a string array, with the
-allowed values named in the description. GET parameters and responses keep the enum. The server validates all of them just
-as strictly, so an unknown value returns 400. The reason: the generated Dart client sends an optional list of enum values
-even when it is empty, so the app would add `aspectClasses: []` to its search requests, and mobile requests to stock servers
-must stay byte-identical. Changing the shared Dart template would also affect other enum lists. The cost is that the SDK
-types these three request fields as `string[]`.
+**Mobile requests:** the Dart generator (openapi-generator 7.25.0, `AbstractDartCodegen.toDefaultValue`) defaults every
+optional list to `Optional.present(const [])`, so a new list field on a request DTO reaches the wire as `[]` unless the
+caller leaves it absent. Existing list fields are set explicitly at every call site. See Mobile below.
 
 Validation follows `tagIds`: GET requests use the existing array preprocess (`gallery/dtos/search.dto.ts:65-66`), an
 unknown value and an empty string return 400, and an empty array means no filter. The field is not tagged
@@ -316,7 +313,12 @@ A second PR, after the mockup is approved.
 
 ### Mobile
 
-Out of scope. One deferred row goes into the "Web → mobile after" parity table of
+Out of scope: no mobile feature is added. The app code explicitly leaves `aspectClasses` absent, in both `withGallery`
+extensions (`mobile/lib/gallery/search/search_dto.extension.dart`) and in the `SmartSearchDto` and `MetadataSearchDto`
+constructors of `mobile/lib/gallery/search/search.repository.dart`, so its requests stay byte-identical, also to stock
+servers. Both upstream literals in `search_api.repository.dart` go through `withGallery`, so that file does not change.
+
+One deferred row goes into the "Web → mobile after" parity table of
 `specs/2026-10-23-mobile-search-redesign-design.md`: "Aspect ratio | deferred (later slice through `POST /search/options`,
 with a server feature flag)".
 
@@ -348,7 +350,7 @@ Square (de Quadratisch, fr Carré, it Quadrato, nl Vierkant, pl Kwadrat, es Cuad
 | --- | --- |
 | Older Gallery app, new server | Never sends the field, ignores the optional response field. No change |
 | New web, older server | Does not occur in normal operation, because the server serves the web app. A stale tab sends a field the server ignores. A response without `aspectClasses` hides the section (fails closed) |
-| Gallery mobile, any version | Optional response field, no request field. No change |
+| Gallery mobile, any version | Optional response field. The app leaves the request field absent, so its requests stay byte-identical |
 | Stock Immich app, Gallery server | Never sends the field. The stock branch of the search builder only matters to a client that does. No change |
 | Stock Immich server, Gallery database | The index stays correct, because PostgreSQL maintains it on stock writes too. Stock queries ignore it. Its override row shows as the documented drift warning. The revert drops both |
 

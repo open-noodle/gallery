@@ -36958,9 +36958,9 @@
             "x-immich-state": "Deprecated"
           },
           "aspectClasses": {
-            "description": "Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AssetAspectClass"
             },
             "type": "array"
           },
@@ -44335,9 +44335,9 @@
             "x-immich-state": "Deprecated"
           },
           "aspectClasses": {
-            "description": "Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AssetAspectClass"
             },
             "type": "array"
           },
@@ -45059,9 +45059,9 @@
             "x-immich-state": "Deprecated"
           },
           "aspectClasses": {
-            "description": "Filter by aspect class: an asset matches when it is in any of them. One of: landscape, square, portrait, panorama-wide, panorama-tall",
+            "description": "Filter by aspect class: an asset matches when it is in any of them",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AssetAspectClass"
             },
             "type": "array"
           },
