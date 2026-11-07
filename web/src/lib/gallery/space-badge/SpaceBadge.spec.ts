@@ -1,6 +1,6 @@
+import { factory } from '#test/unit/factories.ts';
 import { UserAvatarColor } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
-import { factory } from '#test/unit/factories.ts';
 import SpaceBadge from './SpaceBadge.svelte';
 
 const { mockPage, badges } = vi.hoisted(() => ({

@@ -13,7 +13,7 @@
 
   interface Props {
     /** Called with the removed photos that have left the user's timeline: other members' photos it showed only
-     * through that space. */
+    through that space. */
     onLeaveTimeline?: (assetIds: string[]) => void;
   }
 

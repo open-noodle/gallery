@@ -9,10 +9,10 @@ import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 
 /**
- * Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,
- * and the face-keyed crop the asset viewer shows. Detection itself runs inside upstream's face detection job, through
- * VideoFaceDetector.
- */
+Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,
+and the face-keyed crop the asset viewer shows. Detection itself runs inside upstream's face detection job, through
+VideoFaceDetector.
+*/
 @Injectable()
 export class VideoFaceService extends BaseService {
   // The cascade has already removed the rows, so the folder is found by its deterministic path, as Spatial Scene

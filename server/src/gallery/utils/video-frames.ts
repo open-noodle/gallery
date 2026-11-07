@@ -16,15 +16,15 @@ const SHARPNESS_SIZE = 112;
 const LAPLACIAN = { width: 3, height: 3, kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0], scale: 1, offset: 128 };
 
 /**
- * ffmpeg and sharp work for video face sampling (specs/2026-10-31-video-face-frames-design.md), behind one object so the
- * detector's logic can be tested without either.
- */
+ffmpeg and sharp work for video face sampling (specs/2026-10-31-video-face-frames-design.md), behind one object so the
+detector's logic can be tested without either.
+*/
 export class VideoFrameReader {
   /**
-   * Times of hard cuts, from one pass over keyframes only, at a fraction of the cost of a full decode. It finds the
-   * cuts an encoder marked with a keyframe, which x264 and x265 usually do; a cut it did not mark is left to the
-   * interval samples.
-   */
+  Times of hard cuts, from one pass over keyframes only, at a fraction of the cost of a full decode. It finds the
+  cuts an encoder marked with a keyframe, which x264 and x265 usually do; a cut it did not mark is left to the
+  interval samples.
+  */
   findSceneCuts(input: string): Promise<number[]> {
     return new Promise((resolve, reject) => {
       const cuts: number[] = [];
@@ -45,9 +45,9 @@ export class VideoFrameReader {
   }
 
   /**
-   * One frame at `timeSeconds`, rotated upright, scaled and tone-mapped with the same filters the video poster uses,
-   * so an HDR phone video is not washed out.
-   */
+  One frame at `timeSeconds`, rotated upright, scaled and tone-mapped with the same filters the video poster uses,
+  so an HDR phone video is not washed out.
+  */
   extractFrame(
     input: string,
     output: string,

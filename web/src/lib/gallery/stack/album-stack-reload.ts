@@ -7,13 +7,13 @@ type Dependencies = {
 };
 
 /**
- * When a stacked album timeline reloads instead of patching itself (specs/2026-11-01-album-stack-collapse-design.md).
- * An album collapses each stack to one of its own members, picked by the server (`album-stack-collapse.ts`), so a
- * local patch cannot know which member to show and would insert stack members the album does not hold. TimelineManager
- * reloads instead, after stack edits and after album membership changes that can change the pick. The album pages also
- * trigger it from `AlbumStackEvents`, because in Safari the manager's own event subscription can miss events; triggers
- * in the same task share one reload.
- */
+When a stacked album timeline reloads instead of patching itself (specs/2026-11-01-album-stack-collapse-design.md).
+An album collapses each stack to one of its own members, picked by the server (`album-stack-collapse.ts`), so a
+local patch cannot know which member to show and would insert stack members the album does not hold. TimelineManager
+reloads instead, after stack edits and after album membership changes that can change the pick. The album pages also
+trigger it from `AlbumStackEvents`, because in Safari the manager's own event subscription can miss events; triggers
+in the same task share one reload.
+*/
 export class AlbumStackReload {
   #queued = false;
 

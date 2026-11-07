@@ -1,8 +1,8 @@
-import { render } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 
 describe('AlbumStackEvents', () => {
   const reloadAlbumStacks = vi.fn();

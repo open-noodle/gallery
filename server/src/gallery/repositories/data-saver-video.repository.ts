@@ -13,9 +13,9 @@ export class DataSaverVideoRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * What the job needs beyond upstream's getForVideoConversion: whether the video is one anybody views on its own, the
-   * trimmed file when there is one (the copy follows the trim), and the copy it already has.
-   */
+  What the job needs beyond upstream's getForVideoConversion: whether the video is one anybody views on its own, the
+  trimmed file when there is one (the copy follows the trim), and the copy it already has.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getForJob(id: string) {
     return this.db

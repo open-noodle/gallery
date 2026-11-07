@@ -1,9 +1,9 @@
 import { PersistedLocalStorage } from '#lib/utils/persisted.ts';
 
 /**
- * How an album shows its collapsed stacks (specs/2026-11-01-album-stack-collapse-design.md), kept per browser like the
- * album's "show owners" toggle. Both default to the whole stack.
- */
+How an album shows its collapsed stacks (specs/2026-11-01-album-stack-collapse-design.md), kept per browser like the
+album's "show owners" toggle. Both default to the whole stack.
+*/
 class AlbumStackPreferences {
   #countInAlbum = new PersistedLocalStorage<boolean>('gallery-album-stack-count-in-album', false);
   #stripInAlbum = new PersistedLocalStorage<boolean>('gallery-album-stack-strip-in-album', false);

@@ -7,17 +7,17 @@ import type { BoundingBox } from 'src/repositories/machine-learning.repository.j
 export const VIDEO_FACE_SAMPLER_VERSION = 2;
 
 /**
- * Relaxation of the distance threshold for a detection where the track was in the previous sample: its centre within
- * one face of the old centre, at no more than twice or half the size. A box overlap test would miss small faces, which
- * a second's drift moves off their old box while their embeddings are at their noisiest.
- */
+Relaxation of the distance threshold for a detection where the track was in the previous sample: its centre within
+one face of the old centre, at no more than twice or half the size. A box overlap test would miss small faces, which
+a second's drift moves off their old box while their embeddings are at their noisiest.
+*/
 const CONTINUITY_RELAXATION = 0.1;
 const CONTINUITY_MAX_SIZE_RATIO = 2;
 
 /**
- * Offsets (seconds) from a person's best sample at which a sharper view is looked for. A sample a second apart can
- * catch someone mid-turn or blurred, with a clearer moment a quarter of a second away.
- */
+Offsets (seconds) from a person's best sample at which a sharper view is looked for. A sample a second apart can
+catch someone mid-turn or blurred, with a clearer moment a quarter of a second away.
+*/
 const SHARPEN_OFFSETS = [-0.5, -0.25, 0.25, 0.5];
 
 /** Sightings averaged into a face's embedding. */
@@ -36,20 +36,20 @@ const SHORT_CLIP_SECONDS = 60;
 const SHORT_CLIP_INTERVAL = 1;
 
 /**
- * Per-person confidence. Frames are searched at this lower detector score, and a person is kept when their best frame
- * reaches the configured minimum score, as a photo face must, or when they are seen again and again: in at least
- * `CONSISTENT_SIGHTINGS` frames, with a median score of at least this one and a median face of at least
- * `CONSISTENT_MIN_FACE` px. A face detected at 0.5 in ten frames in a row is almost certainly real; the size floor keeps
- * a crowd of faces too small to recognise out of the People list.
- */
+Per-person confidence. Frames are searched at this lower detector score, and a person is kept when their best frame
+reaches the configured minimum score, as a photo face must, or when they are seen again and again: in at least
+`CONSISTENT_SIGHTINGS` frames, with a median score of at least this one and a median face of at least
+`CONSISTENT_MIN_FACE` px. A face detected at 0.5 in ten frames in a row is almost certainly real; the size floor keeps
+a crowd of faces too small to recognise out of the People list.
+*/
 export const VIDEO_FACE_LOW_SCORE = 0.45;
 const CONSISTENT_SIGHTINGS = 3;
 const CONSISTENT_MIN_FACE = 32;
 
 /**
- * A person whose largest face is narrower than this (short side, frame px) is dropped however confident the detector
- * was: no crop of it, even widened, shows who it is, so it would only add a person nobody can name.
- */
+A person whose largest face is narrower than this (short side, frame px) is dropped however confident the detector
+was: no crop of it, even widened, shows who it is, so it would only add a person nobody can name.
+*/
 const MIN_FACE = 20;
 
 /** Faces smaller than this (longest side, frame px) are cropped with surrounding context: up to 2.5x at half of it. */
@@ -74,9 +74,9 @@ export type SamplePlanOptions = {
 };
 
 /**
- * Times to sample: every `interval` seconds starting half an interval in, plus just after each cut. When that is more
- * than `maxFrames`, the interval stretches until it fits, so a long video is still covered from start to end.
- */
+Times to sample: every `interval` seconds starting half an interval in, plus just after each cut. When that is more
+than `maxFrames`, the interval stretches until it fits, so a long video is still covered from start to end.
+*/
 export const planSampleTimes = ({ start, end, interval, maxFrames, cuts = [] }: SamplePlanOptions): number[] => {
   const span = end - start;
   if (!(span > 0) || maxFrames < 1) {
@@ -165,10 +165,10 @@ export type FaceTrack = {
 type MutableTrack = FaceTrack & { sum: number[]; last: Sighting };
 
 /**
- * Groups detections into one track per person, frame by frame in time order. A detection joins the nearest track
- * by embedding (its centroid or its latest sighting), with a looser threshold when it is where that track was in the
- * previous sample. Each frame is matched one-to-one, so two faces in one frame are never the same person.
- */
+Groups detections into one track per person, frame by frame in time order. A detection joins the nearest track
+by embedding (its centroid or its latest sighting), with a looser threshold when it is where that track was in the
+previous sample. Each frame is matched one-to-one, so two faces in one frame are never the same person.
+*/
 export class FaceTracker {
   private tracks: MutableTrack[] = [];
 
@@ -292,10 +292,10 @@ const mergeTracks = (a: MutableTrack, b: MutableTrack): MutableTrack => {
 const roundTime = (t: number) => Math.round(t * 1000) / 1000;
 
 /**
- * The extra frames that may hold a sharper view of the kept people: a few around each one's best sample, inside the
- * span, and not ones already sampled. People best seen at the same moment share them, so a crowd shot costs four
- * frames, not four per person.
- */
+The extra frames that may hold a sharper view of the kept people: a few around each one's best sample, inside the
+span, and not ones already sampled. People best seen at the same moment share them, so a crowd shot costs four
+frames, not four per person.
+*/
 export const planSharpenTimes = (
   tracks: FaceTrack[],
   { start, end, sampled }: { start: number; end: number; sampled: number[] },
@@ -318,9 +318,9 @@ export const isSharpenTimeFor = (t: number, bestT: number) =>
   Math.abs(t - bestT) <= Math.max(...SHARPEN_OFFSETS.map((offset) => Math.abs(offset))) + 0.001;
 
 /**
- * The track's person among an extra frame's detections, by the tracker's continuity rule: where their best view was
- * and close enough in looks with the relaxation. The closest in looks when several qualify, as in a crowd.
- */
+The track's person among an extra frame's detections, by the tracker's continuity rule: where their best view was
+and close enough in looks with the relaxation. The closest in looks when several qualify, as in a crowd.
+*/
 export const findAgain = (track: FaceTrack, detections: Detection[], maxDistance: number): Detection | undefined => {
   let found: Detection | undefined;
   let foundDistance = maxDistance + CONTINUITY_RELAXATION;
@@ -372,10 +372,10 @@ export type ExistingVideoFace = {
 };
 
 /**
- * Pairs existing faces with new tracks, one-to-one, best first, so a re-scan keeps face ids and with them people.
- * A face matches by embedding (its distance to the nearest sighting), or, for a single-frame face, by overlapping a
- * sighting from the first few seconds after `start`, where the poster it was found in comes from.
- */
+Pairs existing faces with new tracks, one-to-one, best first, so a re-scan keeps face ids and with them people.
+A face matches by embedding (its distance to the nearest sighting), or, for a single-frame face, by overlapping a
+sighting from the first few seconds after `start`, where the poster it was found in comes from.
+*/
 export const matchExistingFaces = (
   existing: ExistingVideoFace[],
   tracks: FaceTrack[],
@@ -440,9 +440,9 @@ const median = (values: number[]) => {
 };
 
 /**
- * Whether a track is a person worth keeping: large enough to recognise (MIN_FACE), and confident once or consistent
- * across frames (see VIDEO_FACE_LOW_SCORE).
- */
+Whether a track is a person worth keeping: large enough to recognise (MIN_FACE), and confident once or consistent
+across frames (see VIDEO_FACE_LOW_SCORE).
+*/
 export const acceptTrack = (track: FaceTrack, minScore: number): boolean => {
   const sizes = track.sightings.map(({ box }) => Math.min(box.x2 - box.x1, box.y2 - box.y1));
   if (Math.max(...sizes) < MIN_FACE) {
@@ -461,10 +461,10 @@ export const acceptTrack = (track: FaceTrack, minScore: number): boolean => {
 export type Tile = { left: number; top: number; width: number; height: number };
 
 /**
- * Four overlapping quarters of a frame, for tiled detection: the detector shrinks its input to 640 px, so a quarter of
- * a 1080p frame shows each face at about twice the size the whole frame does. Empty for a frame small enough already.
- * The overlap lets a face cut by one quarter's edge appear whole in its neighbour.
- */
+Four overlapping quarters of a frame, for tiled detection: the detector shrinks its input to 640 px, so a quarter of
+a 1080p frame shows each face at about twice the size the whole frame does. Empty for a frame small enough already.
+The overlap lets a face cut by one quarter's edge appear whole in its neighbour.
+*/
 export const planTiles = ({ width, height }: { width: number; height: number }): Tile[] => {
   if (Math.max(width, height) <= TILE_MIN_LONG_EDGE) {
     return [];
@@ -481,9 +481,9 @@ export const planTiles = ({ width, height }: { width: number; height: number }):
 };
 
 /**
- * One list of detections from the whole frame and its tiles, boxes in frame pixels. Where two overlap they are the
- * same face found twice, and the more confident one is kept.
- */
+One list of detections from the whole frame and its tiles, boxes in frame pixels. Where two overlap they are the
+same face found twice, and the more confident one is kept.
+*/
 export const mergeDetections = <T extends { boundingBox: BoundingBox; score: number }>(detections: T[]): T[] => {
   const kept: T[] = [];
   for (const detection of [...detections].sort((a, b) => b.score - a.score)) {
@@ -495,10 +495,10 @@ export const mergeDetections = <T extends { boundingBox: BoundingBox; score: num
 };
 
 /**
- * The region a small video face is cropped from: the face box widened around its centre, by up to 2.5x for a face half
- * of CONTEXT_FACE_SIZE or smaller, so the crop shows head, hair and shoulders instead of an upscaled smudge. A face at
- * CONTEXT_FACE_SIZE or larger is returned unchanged. The box stored on the face is never widened, only the crop.
- */
+The region a small video face is cropped from: the face box widened around its centre, by up to 2.5x for a face half
+of CONTEXT_FACE_SIZE or smaller, so the crop shows head, hair and shoulders instead of an upscaled smudge. A face at
+CONTEXT_FACE_SIZE or larger is returned unchanged. The box stored on the face is never widened, only the crop.
+*/
 export const widenSmallFace = (box: BoundingBox, frame: { width: number; height: number }): BoundingBox => {
   const side = Math.max(box.x2 - box.x1, box.y2 - box.y1);
   if (!(side > 0) || side >= CONTEXT_FACE_SIZE) {

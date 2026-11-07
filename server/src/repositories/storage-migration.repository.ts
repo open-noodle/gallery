@@ -78,9 +78,9 @@ export class StorageMigrationRepository {
   }
 
   /**
-   * Best frames of video faces (specs/2026-10-31-video-face-frames-design.md): the source person thumbnails are cut
-   * from, so they move with them.
-   */
+  Best frames of video faces (specs/2026-10-31-video-face-frames-design.md): the source person thumbnails are cut
+  from, so they move with them.
+  */
   streamVideoFaceFrames(direction: StorageMigrationDirection) {
     return this.db
       .selectFrom('asset_face_video_frame')

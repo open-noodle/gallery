@@ -22,10 +22,10 @@ interface Answer {
 }
 
 /**
- * Which of the user's spaces show each thumbnail's asset. Mounted thumbnails ask in batches; answers are kept and
- * asked again when they may have changed: at once for the assets a space or album change names, and for every
- * mounted thumbnail after a change that names none or a move to another page.
- */
+Which of the user's spaces show each thumbnail's asset. Mounted thumbnails ask in batches; answers are kept and
+asked again when they may have changed: at once for the assets a space or album change names, and for every
+mounted thumbnail after a change that names none or a move to another page.
+*/
 class SpaceBadges {
   #answers = new SvelteMap<string, Answer>();
   #round = $state(0);

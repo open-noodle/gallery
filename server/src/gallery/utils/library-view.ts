@@ -26,9 +26,9 @@ export const checkLibraryView = (
 };
 
 /**
- * #1038: `personal` keeps the caller's photos that reach none of their spaces, by any path; `spaces` keeps what reaches
- * them through a space on their timeline, their own photos included.
- */
+#1038: `personal` keeps the caller's photos that reach none of their spaces, by any path; `spaces` keeps what reaches
+them through a space on their timeline, their own photos included.
+*/
 export const withLibraryView = <O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   options: LibraryViewOptions & { callerId?: string; timelineSpaceIds?: string[] },

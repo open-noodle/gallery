@@ -1,6 +1,6 @@
+import DataSaverVideoSettings from '#lib/gallery/components/admin/data-saver-video-settings.svelte';
 import { DataSaverVideoCodec, DataSaverVideoResolution, type AdminConfigDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import DataSaverVideoSettings from '#lib/gallery/components/admin/data-saver-video-settings.svelte';
 
 const makeConfig = (enabled = false) =>
   ({

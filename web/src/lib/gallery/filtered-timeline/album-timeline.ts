@@ -1,4 +1,5 @@
 import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '#lib/utils/album-filter-config.ts';
@@ -8,7 +9,6 @@ import { decodeFilterParams } from '#lib/utils/filter-url.ts';
 import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
 import { AssetOrder, type AlbumResponseDto } from '@immich/sdk';
 import { page } from '$app/state';
-import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { AssetPickerFilters } from './asset-picker-filters.svelte';
 import { FilteredTimelineController } from './filtered-timeline-controller.svelte';
 

@@ -1,3 +1,4 @@
+import { AlbumStackReload } from '#lib/gallery/stack/album-stack-reload.ts';
 import { TimelineBucket, TimelineBucketLayout } from '#lib/gallery/timeline/timeline-bucket.svelte.ts';
 import { VirtualScrollManager } from '#lib/managers/VirtualScrollManager/VirtualScrollManager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -6,7 +7,6 @@ import { GroupInsertionCache } from '#lib/managers/timeline-manager/group-insert
 import { updateTimelineMonthViewportProximity } from '#lib/managers/timeline-manager/internal/intersection-support.svelte.ts';
 import { updateGeometry } from '#lib/managers/timeline-manager/internal/layout-support.svelte.ts';
 import { loadFromTimeBuckets } from '#lib/managers/timeline-manager/internal/load-support.svelte.ts';
-import { AlbumStackReload } from '#lib/gallery/stack/album-stack-reload.ts';
 import {
   findClosestTimelineMonthForDate,
   findTimelineMonthForAsset as findTimelineMonthForAssetUtil,

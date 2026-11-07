@@ -1,15 +1,15 @@
+import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
+import { queryClient } from '#lib/queries/client.ts';
+import { factory } from '#test/unit/factories.ts';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { SharedSpaceRole } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { fireEvent, screen } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
-import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
-import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
-import { queryClient } from '#lib/queries/client.ts';
-import { renderWithTooltips } from '#test/unit/helpers.ts';
 import RemoveFromSpaceButton from './RemoveFromSpaceButton.svelte';
 import { fetchSelectionSpaces, removeFromSpace } from './space-removal';
-import { factory } from '#test/unit/factories.ts';
 
 vi.mock('./space-removal', async (orig) => ({
   ...(await orig<typeof import('./space-removal')>()),

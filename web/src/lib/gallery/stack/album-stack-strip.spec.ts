@@ -1,9 +1,9 @@
-import type { StackResponseDto } from '@immich/sdk';
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
-import { albumStackSuccessor, loadAlbumStackStripIds, stackStrip, viewerAlbumId } from './album-stack-strip';
+import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
+import type { StackResponseDto } from '@immich/sdk';
+import { albumStackSuccessor, loadAlbumStackStripIds, stackStrip, viewerAlbumId } from './album-stack-strip';
 
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');

@@ -3,14 +3,14 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { createUrl } from '#lib/utils.ts';
 
 /**
- * A server-rendered crop of a video face, as a data URL. A face sampled across the whole video is cut from its best
- * frame at full resolution (specs/2026-10-31-video-face-frames-design.md); cropping in the browser could only cut the
- * box out of the video's poster thumbnail, which may show a different moment. Null when the server cannot serve it
- * (an older server without the route, or no access), so the caller falls back to cropping the thumbnail.
- *
- * The server lets the browser cache a crop, but a refresh of a video keeps each matched face's id and moves it to a
- * better frame, so the face's box goes in the URL: a moved face is a new URL, an unchanged one stays cached.
- */
+A server-rendered crop of a video face, as a data URL. A face sampled across the whole video is cut from its best
+frame at full resolution (specs/2026-10-31-video-face-frames-design.md); cropping in the browser could only cut the
+box out of the video's poster thumbnail, which may show a different moment. Null when the server cannot serve it
+(an older server without the route, or no access), so the caller falls back to cropping the thumbnail.
+
+The server lets the browser cache a crop, but a refresh of a video keeps each matched face's id and moves it to a
+better frame, so the face's box goes in the URL: a moved face is a new URL, an unchanged one stays cached.
+*/
 export const fetchVideoFaceCrop = async (face: Faces): Promise<string | null> => {
   const { id, imageWidth, imageHeight, boundingBoxX1, boundingBoxY1, boundingBoxX2, boundingBoxY2 } = face;
   const c = [imageWidth, imageHeight, boundingBoxX1, boundingBoxY1, boundingBoxX2, boundingBoxY2].join('-');
