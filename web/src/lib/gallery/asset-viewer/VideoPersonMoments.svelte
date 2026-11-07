@@ -20,9 +20,14 @@
   let { asset, canEdit = false }: Props = $props();
 
   // A move adds a face to the asset (and maybe a person), and its undo takes it away: the People grid reads these.
+  // When the person has no face left in the asset (their only one moved or deleted), their moments close.
   const reloadFaces = async () => {
     faceManager.clear();
     await faceManager.getAssetFaces(asset.id);
+    const personId = videoPersonSightings.current?.personId;
+    if (personId && faceManager.people.every((person) => person.id !== personId)) {
+      videoPersonSightings.clear();
+    }
   };
 
   const selection = $derived(

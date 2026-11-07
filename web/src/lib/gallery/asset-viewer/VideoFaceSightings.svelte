@@ -37,13 +37,17 @@
    * for faces with no sightings, on any error, and against a server without the route, so the picker looks as it did
    * before. With `canEdit` (the asset's owner), each moment of a face that has more than one gets a menu that moves it
    * to another person, a new person or unassigned (a face of its own), or takes it out of the face, each with a few
-   * seconds to undo it; taking out the best view makes the next best one it.
+   * seconds to undo it; taking out the best view makes the next best one it. A face's only moment is the whole face:
+   * given `personId`, its menu moves the face to another or a new person (undone by giving it back) or deletes it.
    */
   interface Props {
     faceIds: string[];
     empty?: Snippet;
     canEdit?: boolean;
-    /** The person the faces belong to, left out of the people a moment can move to. */
+    /**
+     * The person the faces belong to: left out of the people a moment can move to, and where a whole face goes back to
+     * on undo. Without it a face's only moment has no menu (the picker, which is already naming that face).
+     */
     personId?: string;
     /** After a move or its undo, which add and remove faces on the asset. */
     onFacesChanged?: () => void;
@@ -78,6 +82,18 @@
       (a, b) => a.time - b.time,
     );
   };
+
+  // One star per strip: with several faces (one person tracked twice, or moments moved to them one by one), each face
+  // has a best view, and the strip stars the one the detector was surest of.
+  const starredKey = $derived.by(() => {
+    let top: Sighting | undefined;
+    for (const sighting of sightings) {
+      if (sighting.isBest && (!top || sighting.score > top.score)) {
+        top = sighting;
+      }
+    }
+    return top?.key;
+  });
 
   const sightingsPerFace = $derived.by(() => {
     const counts = new SvelteMap<string, number>();
@@ -176,12 +192,80 @@
     });
   };
 
-  const moveToPerson = async (sighting: Sighting) => {
+  /** A face this strip no longer shows: moved to someone else, or deleted. */
+  const dropFace = (faceId: string, key: string) => {
+    takeOut(key);
+    replaceFace(faceId, []);
+    onFacesChanged?.();
+  };
+
+  /** Gives a face's only moment, and so the whole face, to another or a new person; undone by giving it back. */
+  const moveFace = async ({ faceId, key }: Sighting, target: Exclude<MoveTarget, { kind: 'unassigned' }>) => {
+    const owner = personId;
+    if (!owner) {
+      return;
+    }
+
+    try {
+      let id = target.kind === 'person' ? target.id : undefined;
+      if (!id) {
+        const person = await createPerson({ personCreateDto: {} });
+        id = person.id;
+      }
+      await reassignFacesById({ id, faceDto: { id: faceId } });
+    } catch (error) {
+      handleError(error, $t('video_face_sighting_move_failed'));
+      return;
+    }
+    dropFace(faceId, key);
+
+    const description =
+      target.kind === 'new'
+        ? $t('video_face_sighting_moved_new')
+        : target.name
+          ? $t('video_face_sighting_moved_person', { values: { name: target.name } })
+          : $t('video_face_sighting_moved');
+    showUndo(description, async () => {
+      try {
+        await reassignFacesById({ id: owner, faceDto: { id: faceId } });
+        const response = await getAssetFaceSightings({ id: faceId });
+        replaceFace(faceId, response.sightings);
+      } catch (error) {
+        handleError(error, $t('video_face_sighting_restore_failed'));
+      }
+      onFacesChanged?.();
+    });
+  };
+
+  /** Deletes the face whose only moment this is, as the face editor deletes a face: asked first, with no undo. */
+  const deleteWholeFace = async ({ faceId, key }: Sighting) => {
+    const confirmed = await modalManager.showDialog({
+      prompt: $t('video_face_sighting_delete_face_prompt'),
+      confirmText: $t('delete'),
+      confirmColor: 'danger',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteFace({ id: faceId, assetFaceDeleteDto: { force: false } });
+    } catch (error) {
+      handleError(error, $t('error_delete_face'));
+      return;
+    }
+    dropFace(faceId, key);
+    toastManager.primary($t('video_face_sighting_face_deleted'));
+  };
+
+  const moveToPerson = async (sighting: Sighting, wholeFace: boolean) => {
     const people = await modalManager.show(PeoplePickerModal, { excludedIds: personId ? [personId] : [] });
     const person = people?.[0];
-    if (person) {
-      await move(sighting, { kind: 'person', id: person.id, name: person.name });
+    if (!person) {
+      return;
     }
+    const target = { kind: 'person', id: person.id, name: person.name } as const;
+    await (wholeFace ? moveFace(sighting, target) : move(sighting, target));
   };
 
   $effect(() => {
@@ -221,6 +305,7 @@
     <div class="flex gap-2 overflow-x-auto pb-2">
       {#each sightings as sighting (sighting.key)}
         {@const label = formatSightingTime(sighting.time)}
+        {@const wholeFace = (sightingsPerFace.get(sighting.faceId) ?? 0) <= 1}
         <div class="relative shrink-0">
           <button
             type="button"
@@ -238,14 +323,14 @@
                 ? 'ring-2 ring-primary'
                 : ''}"
             />
-            {#if sighting.isBest}
+            {#if sighting.key === starredKey}
               <span class="absolute inset-e-1 top-1 rounded-full bg-black/60 p-0.5 text-yellow-300" data-testid="best">
                 <Icon icon={mdiStar} size="12" />
               </span>
             {/if}
             <span class="mt-1 block text-center text-xs tabular-nums">{label}</span>
           </button>
-          {#if canEdit && (sightingsPerFace.get(sighting.faceId) ?? 0) > 1}
+          {#if canEdit && (!wholeFace || personId)}
             <div class="absolute inset-s-0.5 top-0.5" data-testid="sighting-menu">
               <ButtonContextMenu
                 icon={mdiDotsVertical}
@@ -258,23 +343,31 @@
                 <MenuOption
                   icon={mdiAccountArrowRightOutline}
                   text={$t('video_face_sighting_move_person')}
-                  onClick={() => moveToPerson(sighting)}
+                  onClick={() => moveToPerson(sighting, wholeFace)}
                 />
                 <MenuOption
                   icon={mdiAccountPlusOutline}
                   text={$t('video_face_sighting_move_new')}
-                  onClick={() => move(sighting, { kind: 'new' })}
+                  onClick={() => (wholeFace ? moveFace(sighting, { kind: 'new' }) : move(sighting, { kind: 'new' }))}
                 />
-                <MenuOption
-                  icon={mdiAccountQuestionOutline}
-                  text={$t('video_face_sighting_move_unassigned')}
-                  onClick={() => move(sighting, { kind: 'unassigned' })}
-                />
-                <MenuOption
-                  icon={mdiTrashCanOutline}
-                  text={$t('video_face_sighting_remove', { values: { time: label } })}
-                  onClick={() => remove(sighting)}
-                />
+                {#if wholeFace}
+                  <MenuOption
+                    icon={mdiTrashCanOutline}
+                    text={$t('video_face_sighting_delete_face')}
+                    onClick={() => deleteWholeFace(sighting)}
+                  />
+                {:else}
+                  <MenuOption
+                    icon={mdiAccountQuestionOutline}
+                    text={$t('video_face_sighting_move_unassigned')}
+                    onClick={() => move(sighting, { kind: 'unassigned' })}
+                  />
+                  <MenuOption
+                    icon={mdiTrashCanOutline}
+                    text={$t('video_face_sighting_remove', { values: { time: label } })}
+                    onClick={() => remove(sighting)}
+                  />
+                {/if}
               </ButtonContextMenu>
             </div>
           {/if}

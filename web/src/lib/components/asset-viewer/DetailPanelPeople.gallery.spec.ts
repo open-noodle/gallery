@@ -10,17 +10,21 @@ import DetailPanelPeople from './DetailPanelPeople.svelte';
 // The film button on a video's People tiles and the moments it opens under the grid
 // (specs/2026-10-31-video-face-frames-design.md, Phase 2).
 
-const { faceManagerMock, getAssetFaceSightings, splitAssetFaceSighting } = vi.hoisted(() => ({
-  faceManagerMock: {
-    data: [] as unknown[],
-    facesByPersonId: new Map<string, unknown[]>(),
-    people: [] as PersonResponseDto[],
-    clear: vi.fn(),
-    getAssetFaces: vi.fn(),
-  },
-  getAssetFaceSightings: vi.fn(),
-  splitAssetFaceSighting: vi.fn(),
-}));
+const { faceManagerMock, getAssetFaceSightings, splitAssetFaceSighting, createPerson, reassignFacesById } = vi.hoisted(
+  () => ({
+    faceManagerMock: {
+      data: [] as unknown[],
+      facesByPersonId: new Map<string, unknown[]>(),
+      people: [] as PersonResponseDto[],
+      clear: vi.fn(),
+      getAssetFaces: vi.fn(),
+    },
+    getAssetFaceSightings: vi.fn(),
+    splitAssetFaceSighting: vi.fn(),
+    createPerson: vi.fn(),
+    reassignFacesById: vi.fn(),
+  }),
+);
 
 vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
 vi.mock('$lib/utils/people-utils', () => ({ zoomImageToBase64: vi.fn().mockResolvedValue(undefined) }));
@@ -50,6 +54,8 @@ vi.mock('@immich/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@immich/sdk')>()),
   getAssetFaceSightings,
   splitAssetFaceSighting,
+  createPerson,
+  reassignFacesById,
 }));
 
 const box = { x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.5 };
@@ -190,5 +196,26 @@ describe('DetailPanelPeople, a person’s moments in a video', () => {
 
     await waitFor(() => expect(faceManagerMock.getAssetFaces).toHaveBeenCalledWith('asset-1'));
     expect(faceManagerMock.clear).toHaveBeenCalled();
+  });
+
+  it("closes a person's moments once their only face in the video has gone to someone else", async () => {
+    getAssetFaceSightings.mockResolvedValue({ sightings: [{ time: 4, score: 0.9, isBest: true, box }] });
+    createPerson.mockResolvedValue({ id: 'person-new' });
+    reassignFacesById.mockResolvedValue([]);
+    faceManagerMock.getAssetFaces.mockImplementation(() => {
+      faceManagerMock.people = [];
+      return Promise.resolve();
+    });
+    renderPanel(AssetTypeEnum.Video, { Alice: ['face-1'] });
+    await userEvent.click(momentsButton('Alice'));
+
+    const menu = await screen.findByTestId('sighting-menu');
+    await userEvent.click(within(menu).getByRole('button', { name: 'video_face_sighting_options' }));
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'video_face_sighting_move_new' }));
+
+    await waitFor(() =>
+      expect(reassignFacesById).toHaveBeenCalledWith({ id: 'person-new', faceDto: { id: 'face-1' } }),
+    );
+    await waitFor(() => expect(videoPersonSightings.current).toBeUndefined());
   });
 });

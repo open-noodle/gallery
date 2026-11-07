@@ -64,7 +64,8 @@ people found to 24. It takes about five times as long per frame, so leave it off
   someone appears without editing faces, open the info panel and click the film button on their picture under
   People. If a moment shows someone else, the video's owner can open the menu on its corner to move it to another
   person, a new person or unassigned, or to remove it, each with a few seconds to undo. Moving or removing the
-  starred one makes the next clearest moment the face's picture. Running face detection on that video again brings
+  starred one makes the next clearest moment the face's picture. A person's only moment in the video moves or
+  deletes their whole face there. Running face detection on that video again brings
   removed moments back, and adds moved ones back to the face they came from.
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no

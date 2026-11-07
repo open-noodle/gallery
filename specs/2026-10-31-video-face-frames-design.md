@@ -488,11 +488,24 @@ one moment at a time.
 Removing takes the tile out at once and shows "Moment removed"
 (`video_face_sighting_removed`) with an Undo button for 5 seconds (`undo`), which puts it back. Removing the starred
 moment makes the remaining moment with the highest score the best view: the star moves, and the face crop and box
-follow it. The face's last moment has no button, because a face needs a frame to be cut from; to drop a wrong face
-entirely, delete or reassign it as today. A failure says "Could not remove the moment" or "Could not bring the moment
+follow it.
+
+A face's only moment cannot be split off or removed, since a face needs a frame to be cut from: it stands for the whole
+face. In the info panel's strip, where the person is known, its menu acts on the face instead: "Move to another
+person…" and "Move to a new person" reassign the face itself (`PUT /faces/{id}`), undone by giving it back to the
+strip's person, and "Delete the face" (`video_face_sighting_delete_face`) asks first
+(`video_face_sighting_delete_face_prompt`) and deletes it as the face editor does (`DELETE /faces/{id}`, not forced),
+with no undo ("Face deleted", `video_face_sighting_face_deleted`). There is no "Move to unassigned" for it: Immich has
+no way to unassign a face. In the picker, which is already naming that face, its only moment has no menu. When the
+person has no face left in the asset afterwards, their moments close. Added after the second test: a moment moved to
+a new person is that person's only moment, and could not be moved on or deleted from the strip. A failure says "Could not remove the moment" or "Could not bring the moment
 back" (`video_face_sighting_remove_failed`, `video_face_sighting_restore_failed`) and leaves the strip as it was.
 Added after the first real-video test, for the case the open question below describes: a moment in a person's strip
 that is someone else and should belong to nobody. Neither a move nor a removal recomputes the old face's embedding.
+
+A strip over several faces (the info panel's, for a person tracked more than once, or given moments one move at a
+time, each its own face) stars one moment: the best view the detector was surest of, not each face's. Found in the
+second test, where two moments moved to one new person both showed a star.
 
 The order was "a handful, best first" in the Phase 1 summary. Showing all of them changes that: in time order the
 strip reads as a timeline the user scrubs through, and the star finds the best one.
@@ -659,7 +672,10 @@ browser cache.
   face's moments with the server's (star moved), the Undo toast restoring them, the face box going with its moment, a
   failure reported with nothing to undo; a move to a picked person (the strip's own person left out of the picker),
   to a new person and to unassigned, a closed picker moving nothing, the Undo deleting the new face and restoring the
-  moment, a failed reassign leaving the moment unassigned with its Undo, a failed split moving nothing.
+  moment, a failed reassign leaving the moment unassigned with its Undo, a failed split moving nothing; a face's only
+  moment getting the whole-face menu (with the person known), the face moved to a picked or new person and given back
+  on undo, the face deleted only once confirmed; one star across several faces. `DetailPanelPeople.gallery.spec.ts`
+  also: a person's moments closing once their only face has gone to someone else.
 - Unit (`video-faces.spec.ts`): removing marks the sighting and keeps the best; removing the best promotes the
   highest score left, preferring the trim, and marks `wasBest`; the last one is kept; nothing found at a time with no
   shown sighting; restore brings a sighting back as it was, and a `wasBest` one as the best; removed sightings are
