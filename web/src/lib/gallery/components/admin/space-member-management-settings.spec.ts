@@ -1,33 +1,40 @@
 import SpaceMemberManagementSettings from '#lib/gallery/components/admin/space-member-management-settings.svelte';
 import type { AdminConfigServerDto } from '@immich/sdk';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const makeServer = () =>
   ({ spaceEditorsCanAddMembers: false, spaceEditorsCanChangeRoles: false }) as AdminConfigServerDto;
 
 describe('SpaceMemberManagementSettings', () => {
-  it('renders both switches with their titles', () => {
-    render(SpaceMemberManagementSettings, { server: makeServer(), disabled: false });
-    expect(screen.getByText('admin.server_space_editors_can_add_members')).toBeInTheDocument();
-    expect(screen.getByText('admin.server_space_editors_can_change_roles')).toBeInTheDocument();
-    expect(screen.getAllByRole('switch')).toHaveLength(2);
+  it('renders both switches with their titles', async () => {
+    await render(SpaceMemberManagementSettings, { server: makeServer(), disabled: false });
+    await expect
+      .element(page.getByText('admin.server_space_editors_can_add_members', { exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(page.getByText('admin.server_space_editors_can_change_roles', { exact: true }))
+      .toBeInTheDocument();
+    expect(page.getByRole('switch').elements()).toHaveLength(2);
   });
 
   it('updates the bound object when toggled', async () => {
     const server = makeServer();
-    render(SpaceMemberManagementSettings, { server, disabled: false });
-    const [add, roles] = screen.getAllByRole('switch');
-    await fireEvent.click(add);
+    await render(SpaceMemberManagementSettings, { server, disabled: false });
+    const switches = page.getByRole('switch');
+    await switches.nth(0).click();
     expect(server.spaceEditorsCanAddMembers).toBe(true);
     expect(server.spaceEditorsCanChangeRoles).toBe(false);
-    await fireEvent.click(roles);
+    await switches.nth(1).click();
     expect(server.spaceEditorsCanChangeRoles).toBe(true);
   });
 
-  it('disables both switches when disabled', () => {
-    render(SpaceMemberManagementSettings, { server: makeServer(), disabled: true });
-    for (const s of screen.getAllByRole('switch')) {
-      expect(s).toBeDisabled();
-    }
+  it('disables both switches when disabled', async () => {
+    await render(SpaceMemberManagementSettings, { server: makeServer(), disabled: true });
+    const switches = page.getByRole('switch');
+    expect(switches.elements()).toHaveLength(2);
+    await expect.element(switches.nth(0)).toBeDisabled();
+    await expect.element(switches.nth(1)).toBeDisabled();
   });
 });

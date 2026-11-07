@@ -1,8 +1,9 @@
 import { createFaceRepairOwnerPerson, getFaceRepairOwnerPeople } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+import { find } from '../dom-queries.test-helpers';
 import PersonPicker from './PersonPicker.svelte';
 
 // Slice 4 (move to a chosen person — owner-scoped picker). Mirrors the mockup
@@ -16,12 +17,6 @@ vi.mock('@immich/sdk', async (importOriginal) => {
     createFaceRepairOwnerPerson: vi.fn(),
     getPeopleThumbnailPath: (id: string) => `/people/${id}/thumbnail`,
   };
-});
-
-// Drain bits-ui Modal's deferred body-scroll-lock cleanup before happy-dom tears down `document` (same
-// convention as AdvancedScanModal.spec.ts / RepresentativeFacePickerModal.spec.ts).
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
 });
 
 beforeAll(async () => {
@@ -50,17 +45,19 @@ describe('PersonPicker', () => {
       ]),
     );
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenCalledWith({ ownerId: OWNER_ID, page: 0, query: undefined });
-      expect(screen.getByText('Marco Weber')).toBeInTheDocument();
-      expect(screen.getByText('Lena Hofer')).toBeInTheDocument();
+      expect(page.getByText('Marco Weber', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Lena Hofer', { exact: true }).element()).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Move 3 faces to...')).toBeInTheDocument();
+    expect(page.getByText('Move 3 faces to...', { exact: true }).element()).toBeInTheDocument();
     expect(
-      screen.getByText('Any person or cluster in the library, including ones this scan did not suggest.'),
+      page
+        .getByText('Any person or cluster in the library, including ones this scan did not suggest.', { exact: true })
+        .element(),
     ).toBeInTheDocument();
   });
 
@@ -72,15 +69,15 @@ describe('PersonPicker', () => {
       ]),
     );
 
-    render(PersonPicker, {
+    await render(PersonPicker, {
       props: { ownerId: OWNER_ID, faceCount: 3, suggestedPersonId: SUGGESTED_ID, onClose: vi.fn() },
     });
 
-    const suggestedRow = await screen.findByTestId(`person-picker-row-${SUGGESTED_ID}`);
-    expect(within(suggestedRow).getByText("this scan's suggestion")).toBeInTheDocument();
+    const suggestedRow = await find(page.getByTestId(`person-picker-row-${SUGGESTED_ID}`));
+    expect(page.elementLocator(suggestedRow).getByText("this scan's suggestion").element()).toBeInTheDocument();
 
-    const otherRow = screen.getByTestId('person-picker-row-p2');
-    expect(within(otherRow).getByText('88 faces')).toBeInTheDocument();
+    const otherRow = page.getByTestId('person-picker-row-p2').element();
+    expect(page.elementLocator(otherRow).getByText('88 faces', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('shows the face count and a short id for unnamed clusters', async () => {
@@ -88,11 +85,11 @@ describe('PersonPicker', () => {
       makePeopleResponse([{ id: 'unnamed-cluster-12345678', name: '', faceCount: 920, thumbnailFaceId: 'f9' }]),
     );
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
 
-    await waitFor(() => {
-      expect(screen.getByText('Unnamed cluster')).toBeInTheDocument();
-      expect(screen.getByText('920 faces · unnamed-')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('Unnamed cluster', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('920 faces · unnamed-', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -101,28 +98,28 @@ describe('PersonPicker', () => {
       makePeopleResponse([{ id: 'p1', name: 'Marco Weber', faceCount: 412, thumbnailFaceId: 'f1' }]),
     );
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
-    await screen.findByText('Marco Weber');
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
+    await find(page.getByText('Marco Weber', { exact: true }));
 
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValueOnce(
       makePeopleResponse([{ id: 'p2', name: 'Lena Hofer', faceCount: 1204, thumbnailFaceId: 'f2' }]),
     );
 
-    await fireEvent.input(screen.getByTestId('person-picker-search'), { target: { value: 'Lena' } });
+    await userEvent.fill(page.getByTestId('person-picker-search').element(), 'Lena');
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenCalledWith({ ownerId: OWNER_ID, page: 0, query: 'Lena' });
-      expect(screen.getByText('Lena Hofer')).toBeInTheDocument();
-      expect(screen.queryByText('Marco Weber')).not.toBeInTheDocument();
+      expect(page.getByText('Lena Hofer', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Marco Weber', { exact: true }).query()).not.toBeInTheDocument();
     });
   });
 
   it('shows "No matches" only when there is no query and nothing matched', async () => {
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makePeopleResponse([]));
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
 
-    await waitFor(() => expect(screen.getByText('No matches')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('No matches', { exact: true }).element()).toBeInTheDocument());
   });
 
   it('selecting an existing person routes the selection via onClose', async () => {
@@ -131,8 +128,8 @@ describe('PersonPicker', () => {
     );
     const onClose = vi.fn();
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
-    await fireEvent.click(await screen.findByText('Marco Weber'));
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
+    await userEvent.click(await find(page.getByText('Marco Weber', { exact: true })));
 
     // lock:true — the "Lock so it won't re-flag" checkbox defaults to checked (P1).
     expect(onClose).toHaveBeenCalledWith({ personId: 'p1', name: 'Marco Weber', lock: true });
@@ -141,13 +138,13 @@ describe('PersonPicker', () => {
 
   // ---- P1 (Slice 3, move-and-lock): the "Lock so it won't re-flag" checkbox ----
 
-  it('P1: renders the lock checkbox checked by default', () => {
+  it('P1: renders the lock checkbox checked by default', async () => {
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makePeopleResponse([]));
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose: vi.fn() } });
 
-    expect(screen.getByText("Lock so it won't re-flag")).toBeInTheDocument();
-    const checkbox = screen.getByRole('checkbox');
+    expect(page.getByText("Lock so it won't re-flag").element()).toBeInTheDocument();
+    const checkbox = page.getByRole('checkbox').element();
     expect(checkbox).toBeChecked();
   });
 
@@ -157,9 +154,9 @@ describe('PersonPicker', () => {
     );
     const onClose = vi.fn();
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
-    await fireEvent.click(await screen.findByRole('checkbox'));
-    await fireEvent.click(await screen.findByText('Marco Weber'));
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
+    await userEvent.click(await find(page.getByRole('checkbox')));
+    await userEvent.click(await find(page.getByText('Marco Weber', { exact: true })));
 
     expect(onClose).toHaveBeenCalledWith({ personId: 'p1', name: 'Marco Weber', lock: false });
   });
@@ -169,15 +166,15 @@ describe('PersonPicker', () => {
     vi.mocked(createFaceRepairOwnerPerson).mockResolvedValue({ id: 'new-person-1' });
     const onClose = vi.fn();
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
-    await waitFor(() => expect(getFaceRepairOwnerPeople).toHaveBeenCalled());
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
+    await vi.waitFor(() => expect(getFaceRepairOwnerPeople).toHaveBeenCalled());
 
-    await fireEvent.input(screen.getByTestId('person-picker-search'), { target: { value: 'Brand New' } });
-    const createRow = await screen.findByText('Create new person "Brand New"');
+    await userEvent.fill(page.getByTestId('person-picker-search').element(), 'Brand New');
+    const createRow = await find(page.getByText('Create new person "Brand New"', { exact: true }));
 
-    await fireEvent.click(createRow);
+    await userEvent.click(createRow);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(createFaceRepairOwnerPerson).toHaveBeenCalledWith({
         ownerId: OWNER_ID,
         faceRepairOwnerPersonCreateRequestDto: { name: 'Brand New' },
@@ -194,28 +191,30 @@ describe('PersonPicker', () => {
     vi.mocked(createFaceRepairOwnerPerson).mockRejectedValue(new Error('boom'));
     const onClose = vi.fn();
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
-    await waitFor(() => expect(getFaceRepairOwnerPeople).toHaveBeenCalled());
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, onClose } });
+    await vi.waitFor(() => expect(getFaceRepairOwnerPeople).toHaveBeenCalled());
 
-    await fireEvent.input(screen.getByTestId('person-picker-search'), { target: { value: 'Brand New' } });
-    const createRow = await screen.findByText('Create new person "Brand New"');
-    await fireEvent.click(createRow);
+    await userEvent.fill(page.getByTestId('person-picker-search').element(), 'Brand New');
+    const createRow = await find(page.getByText('Create new person "Brand New"', { exact: true }));
+    await userEvent.click(createRow);
 
-    await waitFor(() => {
-      expect(screen.getByText('Failed to create the new person. Please try again.')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(
+        page.getByText('Failed to create the new person. Please try again.', { exact: true }).element(),
+      ).toBeInTheDocument();
     });
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it('offers the re-flag lock by default', async () => {
-    render(PersonPicker, { props: { ownerId: 'owner-1', faceCount: 3, onClose: vi.fn() } });
-    await waitFor(() => expect(screen.getByTestId('person-picker-lock-toggle')).toBeInTheDocument());
+    await render(PersonPicker, { props: { ownerId: 'owner-1', faceCount: 3, onClose: vi.fn() } });
+    await vi.waitFor(() => expect(page.getByTestId('person-picker-lock-toggle').element()).toBeInTheDocument());
   });
 
   it('hides the re-flag lock when the caller cannot honour it', async () => {
-    render(PersonPicker, { props: { ownerId: 'owner-1', faceCount: 3, showLock: false, onClose: vi.fn() } });
-    await waitFor(() => expect(screen.getByTestId('person-picker-search')).toBeInTheDocument());
-    expect(screen.queryByTestId('person-picker-lock-toggle')).not.toBeInTheDocument();
+    await render(PersonPicker, { props: { ownerId: 'owner-1', faceCount: 3, showLock: false, onClose: vi.fn() } });
+    await vi.waitFor(() => expect(page.getByTestId('person-picker-search').element()).toBeInTheDocument());
+    expect(page.getByTestId('person-picker-lock-toggle').query()).not.toBeInTheDocument();
   });
 
   // The internal `lockOnMove` state defaults to true and is unreachable with the toggle hidden — without its
@@ -227,8 +226,8 @@ describe('PersonPicker', () => {
     );
     const onClose = vi.fn();
 
-    render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, showLock: false, onClose } });
-    await fireEvent.click(await screen.findByText('Marco Weber'));
+    await render(PersonPicker, { props: { ownerId: OWNER_ID, faceCount: 3, showLock: false, onClose } });
+    await userEvent.click(await find(page.getByText('Marco Weber', { exact: true })));
 
     expect(onClose).toHaveBeenCalledWith({ personId: 'p1', name: 'Marco Weber', lock: false });
   });

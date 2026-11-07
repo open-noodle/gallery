@@ -1,6 +1,6 @@
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { getPersonActions } from '#lib/services/person.service.ts';
-import * as handleErrorModule from '#lib/utils/handle-error.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
 import { factory } from '#test/unit/factories.ts';
 import {
@@ -39,6 +39,9 @@ vi.mock('@immich/ui', async (orig) => {
   };
 });
 
+// An ES module namespace cannot be spied on in the browser; spy on the module's exports instead.
+vi.mock(import('#lib/utils/handle-error.ts'), { spy: true });
+
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
   getMembers: vi.fn(),
@@ -65,17 +68,16 @@ const spacePersonResponse = (overrides: Partial<SharedSpacePersonResponseDto>): 
   ...overrides,
 });
 
-let handleErrorSpy: ReturnType<typeof vi.spyOn>;
+const handleErrorSpy = vi.mocked(handleError);
 let emitSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
+  handleErrorSpy.mockImplementation(() => {});
   emitSpy = vi.spyOn(eventManager, 'emit');
 });
 
 afterEach(() => {
-  handleErrorSpy.mockRestore();
   emitSpy.mockRestore();
 });
 

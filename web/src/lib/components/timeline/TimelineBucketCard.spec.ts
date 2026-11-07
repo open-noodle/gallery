@@ -1,22 +1,32 @@
 import TimelineBucketCard from '#lib/components/timeline/TimelineBucketCard.svelte';
 import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
 import { AssetMediaSize } from '@immich/sdk';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
-
-const utilsMock = vi.hoisted(() => ({
-  getAssetMediaUrl: vi.fn(({ id }: { id: string }) => `/thumbnail/${id}`),
-}));
-
-vi.mock('#lib/utils.js', async (importOriginal) => ({
-  ...((await importOriginal()) as Record<string, unknown>),
-  getAssetMediaUrl: utilsMock.getAssetMediaUrl,
-}));
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 vi.mock('#lib/components/Thumbhash.svelte', async () => {
   const module = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { default: module.default };
+});
+
+// The test images never load (unit pages serve no media), so the browser fires a real `error` on each
+// one. Swallow those trusted events so the test alone decides when an image loads or fails.
+const swallowNetworkImageEvents = (event: Event) => {
+  if (event.isTrusted && event.target instanceof HTMLImageElement) {
+    event.stopImmediatePropagation();
+  }
+};
+
+beforeAll(() => {
+  addEventListener('error', swallowNetworkImageEvents, { capture: true });
+  addEventListener('load', swallowNetworkImageEvents, { capture: true });
+});
+
+afterAll(() => {
+  removeEventListener('error', swallowNetworkImageEvents, { capture: true });
+  removeEventListener('load', swallowNetworkImageEvents, { capture: true });
 });
 
 type TimelineBucketCardBucket = ActivatableTimelineBucket & {
@@ -39,47 +49,42 @@ const makeBucket = (overrides: Partial<TimelineBucketCardBucket> = {}): Timeline
 });
 
 describe('TimelineBucketCard component', () => {
-  beforeEach(() => {
-    utilsMock.getAssetMediaUrl.mockClear();
-  });
-
-  it('renders a year bucket with a localized count and representative image', () => {
-    render(TimelineBucketCard, {
+  it('renders a year bucket with a localized count and representative image', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
-    expect(screen.getByText('2015')).toBeInTheDocument();
-    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
-    const image = screen.getByTestId('timeline-bucket-card-image');
-    expect(image).toHaveAttribute('src', '/thumbnail/asset-2015');
-    expect(image).toHaveAttribute('alt', '');
-    expect(image).toHaveAttribute('draggable', 'false');
-    expect(utilsMock.getAssetMediaUrl).toHaveBeenCalledWith({
-      id: 'asset-2015',
-      size: AssetMediaSize.Thumbnail,
-      cacheKey: 'thumbhash-2015',
-    });
+    await expect.element(page.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
+    await expect.element(page.getByText('2015')).toBeInTheDocument();
+    await expect.element(page.getByText('timeline_overview_photo_count')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
+    const image = page.getByTestId('timeline-bucket-card-image');
+    await expect.element(image).toHaveAttribute('alt', '');
+    await expect.element(image).toHaveAttribute('draggable', 'false');
+    // The thumbnail URL is the representative asset's thumbnail, keyed by its thumbhash.
+    const src = new URL(image.element().getAttribute('src')!, location.origin);
+    expect(src.pathname).toBe('/api/assets/asset-2015/thumbnail');
+    expect(src.searchParams.get('size')).toBe(AssetMediaSize.Thumbnail);
+    expect(src.searchParams.get('c')).toBe('thumbhash-2015');
   });
 
-  it('keeps year labels in an always-visible overlay over representative images', () => {
-    render(TimelineBucketCard, {
+  it('keeps year labels in an always-visible overlay over representative images', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    const overlay = screen.getByTestId('timeline-bucket-card-overlay');
-    expect(overlay).toHaveClass('absolute', 'inset-x-0', 'bottom-0');
-    expect(within(overlay).getByTestId('timeline-bucket-card-title')).toHaveTextContent('2015');
-    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent(
-      'timeline_overview_photo_count',
-    );
+    const overlay = page.getByTestId('timeline-bucket-card-overlay');
+    await expect.element(overlay).toHaveClass('absolute', 'inset-x-0', 'bottom-0');
+    await expect.element(overlay.getByTestId('timeline-bucket-card-title')).toHaveTextContent('2015');
+    await expect
+      .element(overlay.getByTestId('timeline-bucket-card-count'))
+      .toHaveTextContent('timeline_overview_photo_count');
   });
 
-  it('renders a month bucket with a locale-specific title', () => {
-    render(TimelineBucketCard, {
+  it('renders a month bucket with a locale-specific title', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({
         grouping: 'month',
         date: { year: 2015, month: 8 },
@@ -90,13 +95,13 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
-    expect(screen.getByText('Aug 2015')).toBeInTheDocument();
-    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
+    await expect.element(page.getByText('Aug 2015')).toBeInTheDocument();
+    await expect.element(page.getByText('timeline_overview_photo_count')).toBeInTheDocument();
   });
 
-  it('keeps month labels in the representative card overlay', () => {
-    render(TimelineBucketCard, {
+  it('keeps month labels in the representative card overlay', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({
         grouping: 'month',
         date: { year: 2015, month: 8 },
@@ -107,47 +112,46 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    const overlay = screen.getByTestId('timeline-bucket-card-overlay');
-    expect(within(overlay).getByTestId('timeline-bucket-card-title')).toHaveTextContent('Aug 2015');
-    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent(
-      'timeline_overview_photo_count',
-    );
+    const overlay = page.getByTestId('timeline-bucket-card-overlay');
+    await expect.element(overlay.getByTestId('timeline-bucket-card-title')).toHaveTextContent('Aug 2015');
+    await expect
+      .element(overlay.getByTestId('timeline-bucket-card-count'))
+      .toHaveTextContent('timeline_overview_photo_count');
   });
 
-  it('crops portrait representatives inside fixed bucket geometry', () => {
-    render(TimelineBucketCard, {
+  it('crops portrait representatives inside fixed bucket geometry', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({ representativeRatio: 0.5 }),
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('relative', 'size-full', 'min-h-56');
-    expect(screen.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
-    expect(screen.getByTestId('timeline-bucket-card-media')).not.toHaveAttribute(
-      'style',
-      expect.stringContaining('aspect-ratio'),
-    );
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveClass('object-cover');
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveClass('relative', 'size-full', 'min-h-56');
+    await expect.element(page.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-media'))
+      .not.toHaveAttribute('style', expect.stringContaining('aspect-ratio'));
+    await expect.element(page.getByTestId('timeline-bucket-card-image')).toHaveClass('object-cover');
   });
 
-  it('uses a singular count label for one photo', () => {
-    render(TimelineBucketCard, {
+  it('uses a singular count label for one photo', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({ count: 1 }),
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
-    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
+    await expect.element(page.getByText('timeline_overview_photo_count')).toBeInTheDocument();
   });
 
   it('announces representative bucket activation as timeline zoom navigation, not filtering', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    const yearCard = screen.getByRole('button', { name: 'timeline_overview_card_semantics' });
-    expect(yearCard).toBeInTheDocument();
-    expect(yearCard).not.toHaveAccessibleName(/filter/i);
+    const yearCard = page.getByRole('button', { name: 'timeline_overview_card_semantics' });
+    await expect.element(yearCard).toBeInTheDocument();
+    await expect.element(yearCard).not.toHaveAccessibleName(/filter/i);
 
     await rerender({
       bucket: makeBucket({
@@ -160,26 +164,25 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    const monthCard = screen.getByRole('button', {
+    const monthCard = page.getByRole('button', {
       name: 'timeline_overview_card_semantics',
     });
-    expect(monthCard).toBeInTheDocument();
-    expect(monthCard).not.toHaveAccessibleName(/filter/i);
+    await expect.element(monthCard).toBeInTheDocument();
+    await expect.element(monthCard).not.toHaveAccessibleName(/filter/i);
   });
 
   it('activates by click, Enter, and Space with the bucket grouping and date', async () => {
-    const user = userEvent.setup();
     const onActivate = vi.fn();
 
-    render(TimelineBucketCard, {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate,
     });
 
-    const card = screen.getByTestId('timeline-bucket-card');
-    await user.click(card);
-    await user.keyboard('{Enter}');
-    await user.keyboard(' ');
+    const card = page.getByTestId('timeline-bucket-card');
+    await card.click();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
 
     expect(onActivate).toHaveBeenCalledTimes(3);
     expect(onActivate).toHaveBeenNthCalledWith(1, { grouping: 'year', date: { year: 2015 } });
@@ -188,26 +191,26 @@ describe('TimelineBucketCard component', () => {
   });
 
   it('does not activate when disabled', async () => {
-    const user = userEvent.setup();
     const onActivate = vi.fn();
 
-    render(TimelineBucketCard, {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       disabled: true,
       onActivate,
     });
 
-    const card = screen.getByTestId('timeline-bucket-card');
-    await user.click(card);
-    await user.keyboard('{Enter}');
-    await user.keyboard(' ');
+    const card = page.getByTestId('timeline-bucket-card');
+    // A disabled button is not actionable for a real user click, so dispatch the click directly.
+    card.element().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
 
-    expect(card).toBeDisabled();
+    await expect.element(card).toBeDisabled();
     expect(onActivate).not.toHaveBeenCalled();
   });
 
-  it('renders a loading placeholder without a centred title or URL request while the cover is not yet loaded', () => {
-    render(TimelineBucketCard, {
+  it('renders a loading placeholder without a centred title or URL request while the cover is not yet loaded', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({
         representativeAssetId: null,
         representativeThumbhash: null,
@@ -215,73 +218,70 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
-    expect(screen.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
+    await expect.element(page.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
     // The period label lives only in the bottom-left overlay — no big centred title to flash.
-    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
-    expect(utilsMock.getAssetMediaUrl).not.toHaveBeenCalled();
+    await expect.element(page.getByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
   });
 
   it('keeps the zoom label and activation when a representative image fails', async () => {
-    const user = userEvent.setup();
     const onActivate = vi.fn();
 
-    render(TimelineBucketCard, {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate,
     });
 
-    await fireEvent.error(screen.getByTestId('timeline-bucket-card-image'));
+    page.getByTestId('timeline-bucket-card-image').element().dispatchEvent(new Event('error'));
     await tick();
 
-    const card = screen.getByRole('button', { name: 'timeline_overview_card_semantics' });
-    expect(card).toHaveAttribute('data-state', 'fallback');
+    const card = page.getByRole('button', { name: 'timeline_overview_card_semantics' });
+    await expect.element(card).toHaveAttribute('data-state', 'fallback');
 
-    await user.click(card);
+    await card.click();
 
     expect(onActivate).toHaveBeenCalledWith({ grouping: 'year', date: { year: 2015 } });
   });
 
-  it('renders a loading placeholder without a centred title while the loading prop is set', () => {
-    render(TimelineBucketCard, {
+  it('renders a loading placeholder without a centred title while the loading prop is set', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       loading: true,
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
-    expect(screen.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
-    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
-    expect(utilsMock.getAssetMediaUrl).not.toHaveBeenCalled();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
+    await expect.element(page.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
   });
 
   it('renders a thumbhash placeholder until the representative image loads', async () => {
-    render(TimelineBucketCard, {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
-    expect(screen.getByTestId('noop-component')).toHaveAttribute('data-prop-count');
+    await expect.element(page.getByTestId('noop-component')).toBeInTheDocument();
+    await expect.element(page.getByTestId('noop-component')).toHaveAttribute('data-prop-count');
 
-    await fireEvent.load(screen.getByTestId('timeline-bucket-card-image'));
+    page.getByTestId('timeline-bucket-card-image').element().dispatchEvent(new Event('load'));
     await tick();
 
-    expect(screen.queryByTestId('noop-component')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('noop-component')).not.toBeInTheDocument();
   });
 
   it('shows the next image thumbhash placeholder after a previously loaded image changes', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    await fireEvent.load(screen.getByTestId('timeline-bucket-card-image'));
+    page.getByTestId('timeline-bucket-card-image').element().dispatchEvent(new Event('load'));
     await tick();
 
-    expect(screen.queryByTestId('noop-component')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('noop-component')).not.toBeInTheDocument();
 
     await rerender({
       bucket: makeBucket({
@@ -291,17 +291,19 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2016');
-    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-image'))
+      .toHaveAttribute('src', expect.stringContaining('/api/assets/asset-2016/thumbnail?'));
+    await expect.element(page.getByTestId('noop-component')).toBeInTheDocument();
   });
 
   it('ignores stale load events from a previous representative image', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    const previousImage = screen.getByTestId('timeline-bucket-card-image');
+    const previousImage = page.getByTestId('timeline-bucket-card-image').element();
 
     await rerender({
       bucket: makeBucket({
@@ -311,36 +313,38 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    await fireEvent.load(previousImage);
+    previousImage.dispatchEvent(new Event('load'));
     await tick();
 
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2016');
-    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-image'))
+      .toHaveAttribute('src', expect.stringContaining('/api/assets/asset-2016/thumbnail?'));
+    await expect.element(page.getByTestId('noop-component')).toBeInTheDocument();
   });
 
   it('falls back when the representative image errors', async () => {
-    render(TimelineBucketCard, {
+    await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    await fireEvent.error(screen.getByTestId('timeline-bucket-card-image'));
+    page.getByTestId('timeline-bucket-card-image').element().dispatchEvent(new Event('error'));
     await tick();
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'fallback');
-    expect(screen.getByTestId('timeline-bucket-card-fallback')).toHaveTextContent('2015');
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'fallback');
+    await expect.element(page.getByTestId('timeline-bucket-card-fallback')).toHaveTextContent('2015');
   });
 
   it('shows the next representative image after a previously errored image changes', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    await fireEvent.error(screen.getByTestId('timeline-bucket-card-image'));
+    page.getByTestId('timeline-bucket-card-image').element().dispatchEvent(new Event('error'));
     await tick();
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'fallback');
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'fallback');
 
     await rerender({
       bucket: makeBucket({
@@ -350,18 +354,20 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2016');
-    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-image'))
+      .toHaveAttribute('src', expect.stringContaining('/api/assets/asset-2016/thumbnail?'));
+    await expect.element(page.getByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
   });
 
   it('ignores stale error events from a previous representative image', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket(),
       onActivate: vi.fn(),
     });
 
-    const previousImage = screen.getByTestId('timeline-bucket-card-image');
+    const previousImage = page.getByTestId('timeline-bucket-card-image').element();
 
     await rerender({
       bucket: makeBucket({
@@ -371,37 +377,38 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    await fireEvent.error(previousImage);
+    previousImage.dispatchEvent(new Event('error'));
     await tick();
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2016');
-    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-image'))
+      .toHaveAttribute('src', expect.stringContaining('/api/assets/asset-2016/thumbnail?'));
+    await expect.element(page.getByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
   });
 
-  it('keeps stable full-height crop geometry when the representative ratio is missing', () => {
-    render(TimelineBucketCard, {
+  it('keeps stable full-height crop geometry when the representative ratio is missing', async () => {
+    await render(TimelineBucketCard, {
       bucket: makeBucket({ representativeRatio: null }),
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('size-full', 'min-h-56');
-    expect(screen.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
-    expect(screen.getByTestId('timeline-bucket-card-media')).not.toHaveAttribute(
-      'style',
-      expect.stringContaining('aspect-ratio'),
-    );
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveClass('size-full', 'min-h-56');
+    await expect.element(page.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-media'))
+      .not.toHaveAttribute('style', expect.stringContaining('aspect-ratio'));
   });
 
   it('transitions from loading skeleton to cover image when representative is applied', async () => {
-    const { rerender } = render(TimelineBucketCard, {
+    const { rerender } = await render(TimelineBucketCard, {
       bucket: makeBucket({ representativeAssetId: null, representativeThumbhash: null }),
       loading: true,
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
-    expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
+    await expect.element(page.getByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
 
     await rerender({
       bucket: makeBucket({ representativeAssetId: 'asset-2015', representativeThumbhash: 'thumbhash-2015' }),
@@ -409,7 +416,9 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
-    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2015');
+    await expect.element(page.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
+    await expect
+      .element(page.getByTestId('timeline-bucket-card-image'))
+      .toHaveAttribute('src', expect.stringContaining('/api/assets/asset-2015/thumbnail?'));
   });
 });

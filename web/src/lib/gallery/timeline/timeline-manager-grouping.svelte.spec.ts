@@ -1,4 +1,4 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import { fromISODateTimeUTCToObject } from '#lib/utils/timeline-util.ts';
 import { factory } from '#test/unit/factories.ts';
@@ -15,6 +15,16 @@ import {
   getTimeBucketSizeForGrouping,
   layoutTimelineBuckets,
 } from './timeline-bucket.svelte';
+
+// In browser mode a spec's static imports are linked before an imported module's vi.mock runs, unless the spec
+// hoists a vi.mock of its own. This one defers them, so the timeline manager gets sdk.mock.ts's spied SDK.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocked = Object.fromEntries(
+    Object.entries(module).map(([key, value]) => [key, typeof value === 'function' ? vi.fn() : value]),
+  );
+  return { ...mocked, default: mocked };
+});
 
 function buildTimelineAssetAt(id: string, isoDate: string) {
   const date = fromISODateTimeUTCToObject(isoDate);

@@ -1,7 +1,7 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
 import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { lang } from '#lib/stores/preferences.store.ts';
@@ -14,10 +14,11 @@ import {
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
 import { SvelteURL } from 'svelte/reactivity';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import SpacesPage from './+page.svelte';
 
 const OVER_SPACE_ASSET_LIMIT = 50_001;
@@ -55,7 +56,11 @@ const {
   mockOpenSearchPalette: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+  invalidateAll: invalidateAllMock,
+}));
 // The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
 // what the page's $effect sees. A plain vi.hoisted object registers no signal for a Svelte 5
 // `$effect` reading `page.url.search` — without this reactive stand-in, a test that changes the URL
@@ -150,13 +155,9 @@ vi.mock('#lib/managers/global-search-manager.svelte.js', () => ({
   },
 }));
 
-vi.mock('#lib/utils/space-filter-options.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#lib/utils/space-filter-options.ts')>();
-  return {
-    ...actual,
-    buildSpaceTimelineOptions: vi.fn(actual.buildSpaceTimelineOptions),
-  };
-});
+// Spied, not replaced by a factory: spreading importOriginal() here deadlocks the browser-mode module
+// graph. Every export keeps its real implementation.
+vi.mock('#lib/utils/space-filter-options.js', { spy: true });
 
 // eslint-disable-next-line unicorn/no-unnecessary-parameters
 function makeSpace(overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto {
@@ -239,7 +240,7 @@ function renderPage(overrides: { space?: SharedSpaceResponseDto; members?: Share
 // through the space-ui-manager intent, which the page consumes to enter select-assets mode.
 async function enterSelectAssets() {
   spaceUiManager.requestAddPhotos();
-  await waitFor(() => expect(screen.getByLabelText('add_to_space')).toBeInTheDocument());
+  await expect.element(page.getByLabelText('add_to_space')).toBeInTheDocument();
 }
 
 describe('Spaces page search URL state', () => {
@@ -295,27 +296,27 @@ describe('Spaces page search URL state', () => {
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
   });
 
-  it('renders search results from q without a local search input', () => {
+  it('renders search results from q without a local search input', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'relevance');
+    await expect.element(page.getByPlaceholder(/search/i)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('sort-toggle')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'relevance');
   });
 
   // #1028: on a phone the cover + tabs left search results a sliver of the screen, because only
   // the browse timeline reported its scroll offset — the results grid never did, so the shell's
-  // collapse-on-scroll never fired while a search was on screen.
+  // collapse-on-scroll never fired while a search was on page.
   it('collapses the space cover once the search results are scrolled', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
     expect(spaceUiManager.coverCollapsed).toBe(false);
 
-    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+    await userEvent.click(page.getByTestId('search-results-scroll-down'));
 
     expect(spaceUiManager.coverCollapsed).toBe(true);
   });
@@ -323,10 +324,10 @@ describe('Spaces page search URL state', () => {
   it('restores the space cover when the search results are scrolled back to the top', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('search-results-scroll-down'));
 
-    await fireEvent.click(screen.getByTestId('search-results-scroll-top'));
+    await userEvent.click(page.getByTestId('search-results-scroll-top'));
 
     expect(spaceUiManager.coverCollapsed).toBe(false);
   });
@@ -336,24 +337,24 @@ describe('Spaces page search URL state', () => {
   // one hides the cover with nothing scrolled under it.
   it('shows the cover again when clearing the search swaps back to the timeline', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
-    renderPage();
-    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('search-results-scroll-down'));
     expect(spaceUiManager.coverCollapsed).toBe(true);
 
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    await waitFor(() => expect(spaceUiManager.coverCollapsed).toBe(false));
+    await vi.waitFor(() => expect(spaceUiManager.coverCollapsed).toBe(false));
   });
 
-  it('hydrates an explicit search sort from the URL', () => {
+  it('hydrates an explicit search sort from the URL', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&sort=asc');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
+    await expect.element(page.getByPlaceholder(/search/i)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('sort-toggle')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
   });
 
   it('hydrates typed filter URL params into the space FilterState', async () => {
@@ -361,19 +362,21 @@ describe('Spaces page search URL state', () => {
       'https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video',
     );
 
-    renderPage({ space: makeSpace(), members: [makeMember()] });
+    await renderPage({ space: makeSpace(), members: [makeMember()] });
 
-    expect(await screen.findByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-person-ids', 'space-person-1');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+    await expect
+      .element(page.getByTestId('smart-search-results'))
+      .toHaveAttribute('data-filter-person-ids', 'space-person-1');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
   });
 
   it('removes only the selected typed filter from the space URL', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=person-1&city=Berlin');
 
-    renderPage({ space: makeSpace(), members: [makeMember()] });
-    await fireEvent.click(await screen.findByTestId('active-filters-remove-person'));
+    await renderPage({ space: makeSpace(), members: [makeMember()] });
+    await userEvent.click(page.getByTestId('active-filters-remove-person'));
 
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos?q=beach&city=Berlin', {
       replace: true,
@@ -384,8 +387,8 @@ describe('Spaces page search URL state', () => {
   it('syncs the URL when a location typed filter is cleared from the space filter panel', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?city=New+York+City');
 
-    renderPage({ space: makeSpace(), members: [makeMember()] });
-    await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
+    await renderPage({ space: makeSpace(), members: [makeMember()] });
+    await userEvent.click(page.getByTestId('filter-panel-clear-location'));
 
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos', {
       replace: true,
@@ -393,73 +396,70 @@ describe('Spaces page search URL state', () => {
     });
   });
 
-  it('exposes favorites in the spaces filter panel', () => {
-    renderPage();
+  it('exposes favorites in the spaces filter panel', async () => {
+    await renderPage();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites,albums,text',
-    );
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-sections', 'timeline,people,location,camera,tags,rating,media,favorites,albums,text');
   });
 
-  it('hydrates has-no-album from the space URL into search results', () => {
+  it('hydrates has-no-album from the space URL into search results', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&album=none');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-not-in-album', 'true');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-not-in-album', 'true');
   });
 
-  it('hydrates has-album from the space URL into search results', () => {
+  it('hydrates has-album from the space URL into search results', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&album=has');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-in-album', 'true');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-in-album', 'true');
   });
 
   it('registers current space filters for global sort changes', async () => {
-    renderPage();
-    await waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
+    await renderPage();
+    await vi.waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
     const calls = mockRegisterSearchablePageFilters.mock.calls as unknown as Array<[() => FilterState]>;
     const getFilters = calls[0][0];
 
     expect(getFilters().isFavorite).toBeUndefined();
     expect(getFilters().sortOrder).toBe('desc');
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+    await userEvent.click(page.getByTestId('select-favorites-filter'));
 
-    await waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
+    await vi.waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
   });
 
-  it('passes typed search names into the space filter panel', () => {
+  it('passes typed search names into the space filter panel', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=person-cat&tags=tag-nature');
     storeTypedSearchNames('/spaces/space-1/photos?people=person-cat&tags=tag-nature', {
       personNames: new Map([['person-cat', 'cat']]),
       tagNames: new Map([['tag-nature', 'nature']]),
     });
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-person-names',
-      JSON.stringify([['person-cat', 'cat']]),
-    );
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-tag-names',
-      JSON.stringify([['tag-nature', 'nature']]),
-    );
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-person-names', JSON.stringify([['person-cat', 'cat']]));
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-tag-names', JSON.stringify([['tag-nature', 'nature']]));
   });
 
   it('narrows space search results and facets to favorites within the space when selected', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+    await userEvent.click(page.getByTestId('select-favorites-filter'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', 'space-1');
+    await vi.waitFor(async () => {
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', 'space-1');
       expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(2);
     });
     expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).toMatchObject({
@@ -473,12 +473,12 @@ describe('Spaces page search URL state', () => {
   it('narrows space suggestions and dependent providers to has-no-album when selected', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-has-no-album-filter'));
-    await fireEvent.click(screen.getByTestId('load-city-suggestions'));
-    await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('select-has-no-album-filter'));
+    await userEvent.click(page.getByTestId('load-city-suggestions'));
+    await userEvent.click(page.getByTestId('load-camera-model-suggestions'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
         expect.objectContaining({ spaceId: 'space-1', isNotInAlbum: true }),
       );
@@ -494,12 +494,12 @@ describe('Spaces page search URL state', () => {
   it('narrows space suggestions and dependent providers to has-album when selected', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-has-album-filter'));
-    await fireEvent.click(screen.getByTestId('load-city-suggestions'));
-    await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('select-has-album-filter'));
+    await userEvent.click(page.getByTestId('load-city-suggestions'));
+    await userEvent.click(page.getByTestId('load-camera-model-suggestions'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
         expect.objectContaining({ spaceId: 'space-1', isInAlbum: true }),
       );
@@ -520,7 +520,7 @@ describe('Spaces page search URL state', () => {
       `https://gallery.test/spaces/space-1/photos?state=Bavaria&lens=RF24-105mm%20F4%20L%20IS%20USM&owner=${ownerId}`,
     );
 
-    renderPage();
+    await renderPage();
 
     await vi.waitFor(() =>
       expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
@@ -535,36 +535,32 @@ describe('Spaces page search URL state', () => {
   });
 
   it('offers a browse-mode baseline computed with no filters, scoped to the space (#910)', async () => {
-    renderPage();
-    await waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
+    await renderPage();
+    await vi.waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
 
     // The whole point: the baseline ignores whatever filters are active.
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
-    await waitFor(() =>
+    await userEvent.click(page.getByTestId('select-favorites-filter'));
+    await vi.waitFor(() =>
       expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true })),
     );
     sdkMock.getFilterSuggestions.mockClear();
 
-    await fireEvent.click(screen.getByTestId('load-baseline'));
+    await userEvent.click(page.getByTestId('load-baseline'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'undefined');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'undefined');
     expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });
 
   it('offers no baseline in query mode, and leaves the space facets alone (#910)', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
     sdkMock.searchSmartFacets.mockClear();
 
-    await fireEvent.click(screen.getByTestId('load-baseline'));
+    await userEvent.click(page.getByTestId('load-baseline'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'undefined');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'undefined');
     // Regression guard for spec §4.5: a baseline request here would abort the in-flight facet
     // fetch and then overwrite smartFacets, corrupting the timeline and the result count.
     expect(sdkMock.searchSmartFacets).not.toHaveBeenCalled();
@@ -573,27 +569,23 @@ describe('Spaces page search URL state', () => {
   it('remounts the filter panel on the browse-to-query transition, dropping the stale baseline (#910)', async () => {
     mockPage.url = new SvelteURL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
-    await fireEvent.click(screen.getByTestId('load-baseline'));
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'not-loaded');
-    });
+    await renderPage();
+    await vi.waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
+    await userEvent.click(page.getByTestId('load-baseline'));
+    await expect.element(page.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'not-loaded');
 
     // Commit a query without unmounting the page: the panel's {#key} must remount it so the
     // browse-mode baseline (cached on the stub for the component's lifetime) doesn't survive into
     // query mode, where §4.5 says the baseline provider must return undefined.
     mockPage.url.search = '?q=beach';
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'not-loaded');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'not-loaded');
   });
 
   it('fetches smart facets with spaceId for committed space search', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
 
     await vi.waitFor(() => {
       expect(sdkMock.searchSmartFacets).toHaveBeenCalledWith(
@@ -607,14 +599,14 @@ describe('Spaces page search URL state', () => {
         expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
-    await vi.waitFor(() => expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7'));
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'de');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'de');
   });
 
   it('does not include withSharedSpaces or order in the space facets payload', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&sort=asc');
 
-    renderPage();
+    await renderPage();
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalled());
     const dto = sdkMock.searchSmartFacets.mock.calls[0][0].smartSearchFacetsDto;
@@ -625,9 +617,9 @@ describe('Spaces page search URL state', () => {
   it('does not fetch smart facets when the committed space query is whitespace only', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=%20%20');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByTestId('smart-search-results')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('smart-search-results')).not.toBeInTheDocument();
     expect(sdkMock.searchSmartFacets).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
   });
@@ -635,66 +627,60 @@ describe('Spaces page search URL state', () => {
   it('does not refetch space smart facets for sort-only filter changes', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
 
-    await fireEvent.click(screen.getByTestId('filter-panel-set-sort-asc'));
+    await userEvent.click(page.getByTestId('filter-panel-set-sort-asc'));
 
-    await waitFor(() => expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc'));
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
     expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1);
   });
 
   it('uses smart facet timeBuckets in space search mode', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
+    await renderPage();
 
-    await vi.waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-        'data-time-buckets',
-        JSON.stringify([{ timeBucket: '2024-03-01', count: 7 }]),
-      );
-    });
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-time-buckets', JSON.stringify([{ timeBucket: '2024-03-01', count: 7 }]));
   });
 
   it('rejects rather than reporting an empty library when the facet fetch fails (#910)', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
     sdkMock.searchSmartFacets.mockRejectedValue(new Error('boom'));
 
-    renderPage();
+    await renderPage();
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalled());
     // The stub's suggestionsProvider effect sets data-suggestions to 'error' on rejection, and to a
     // JSON dump of the resolved value otherwise — an empty-sentinel resolution would show up here as
     // JSON, not 'error'. #910: on a first-ever failure (no previous smartFacets to fall back to),
     // the provider must reject rather than resolve with a fabricated empty response.
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-suggestions', 'error');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-suggestions', 'error');
   });
 
   it('preserves previous space facet total and buckets when a later facet fetch fails', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
-    renderPage();
-    await vi.waitFor(() => expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7'));
+    await renderPage();
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7');
 
     sdkMock.searchSmartFacets.mockRejectedValueOnce(new Error('facets failed'));
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await userEvent.click(page.getByTestId('filter-panel-set-country'));
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(2));
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7');
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-time-buckets',
-      JSON.stringify([{ timeBucket: '2024-03-01', count: 7 }]),
-    );
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-total', '7');
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-time-buckets', JSON.stringify([{ timeBucket: '2024-03-01', count: 7 }]));
   });
 
   it('refetches space smart facets when an active filter changes', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
-    renderPage();
+    await renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
 
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await userEvent.click(page.getByTestId('filter-panel-set-country'));
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(2));
     expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).toMatchObject({
@@ -702,12 +688,12 @@ describe('Spaces page search URL state', () => {
       country: 'Germany',
       spaceId: 'space-1',
     });
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-country', 'Germany');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-country', 'Germany');
   });
 
   it('refetches space smart facets when the search language changes', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
-    renderPage();
+    await renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
 
     lang.set('fr');
@@ -718,23 +704,23 @@ describe('Spaces page search URL state', () => {
       language: 'fr',
       spaceId: 'space-1',
     });
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'fr');
+    await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'fr');
   });
 
   it('space cmdk add-photos command enters select-assets mode for writable users', async () => {
-    renderPage();
+    await renderPage();
     const options = mockRegisterSpaceContext.mock.calls[0][2];
     const addPhotosToCurrentSpace = options.getAddPhotosToCurrentSpace();
 
     expect(addPhotosToCurrentSpace).toEqual(expect.any(Function));
     addPhotosToCurrentSpace?.();
 
-    await waitFor(() => expect(screen.getByLabelText('add_to_space')).toBeInTheDocument());
+    await expect.element(page.getByLabelText('add_to_space')).toBeInTheDocument();
     expect(options.getAddPhotosToCurrentSpace()).toBeUndefined();
   });
 
-  it('registers normal space view favorite/archive callbacks and no add-to-current-space', () => {
-    renderPage();
+  it('registers normal space view favorite/archive callbacks and no add-to-current-space', async () => {
+    await renderPage();
 
     expect(mockRegisterSelectionContext).toHaveBeenCalledOnce();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
@@ -749,19 +735,19 @@ describe('Spaces page search URL state', () => {
   });
 
   it('select-assets mode exposes only addSelectedToCurrentSpace for writable users', async () => {
-    renderPage();
+    await renderPage();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
 
     await enterSelectAssets();
 
-    await waitFor(() => expect(options.getAddSelectedToCurrentSpace()).toEqual(expect.any(Function)));
+    await vi.waitFor(() => expect(options.getAddSelectedToCurrentSpace()).toEqual(expect.any(Function)));
     expect(options.getOnFavorite()).toBeUndefined();
     expect(options.getOnArchive()).toBeUndefined();
     expect(options.getOnDelete?.()).toBeUndefined();
   });
 
-  it('viewer users cannot expose addSelectedToCurrentSpace', () => {
-    renderPage({
+  it('viewer users cannot expose addSelectedToCurrentSpace', async () => {
+    await renderPage({
       members: [makeMember({ role: SharedSpaceRole.Viewer })],
     });
     const options = mockRegisterSelectionContext.mock.calls[0][0];
@@ -774,7 +760,7 @@ describe('Spaces page search URL state', () => {
   });
 
   it('addSelectedToCurrentSpace rejects empty and over-limit selections', async () => {
-    renderPage();
+    await renderPage();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
     await enterSelectAssets();
     const addSelected = options.getAddSelectedToCurrentSpace() as () => Promise<boolean>;
@@ -790,7 +776,7 @@ describe('Spaces page search URL state', () => {
   });
 
   it('addSelectedToCurrentSpace and plus button share the awaited helper', async () => {
-    renderPage();
+    await renderPage();
     mockAssetMultiSelectManager.assets = [makeTimelineAsset({ id: 'asset-1' })];
     const options = mockRegisterSelectionContext.mock.calls[0][0];
 
@@ -818,7 +804,7 @@ describe('Spaces page search URL state', () => {
     mockAssetMultiSelectManager.assets = [makeTimelineAsset({ id: 'asset-2' })];
     await enterSelectAssets();
     mockAssetMultiSelectManager.selectionActive = true;
-    await fireEvent.click(screen.getByLabelText('add_to_space'));
+    await userEvent.click(page.getByLabelText('add_to_space'));
     expect(sdkMock.addAssets).toHaveBeenCalledWith({
       id: 'space-1',
       sharedSpaceAssetAddDto: { assetIds: ['asset-2'] },
@@ -828,27 +814,23 @@ describe('Spaces page search URL state', () => {
   it('passes default day grouping into space timeline options', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
   });
 
   it('clicking a space year bucket zooms without mutating filters or URL state', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=person-1');
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"spaceId":"space-1"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"spaceId":"space-1"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
     expect(buildSpaceTimelineOptions).toHaveBeenLastCalledWith(
       'space-1',
       expect.objectContaining({
@@ -865,9 +847,9 @@ describe('Spaces page search URL state', () => {
   it('passes description/filename/ocr text filters into space timeline options from the URL', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?description=beach&filename=IMG&ocr=invoice');
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(buildSpaceTimelineOptions).toHaveBeenCalledWith(
         'space-1',
         expect.objectContaining({ description: 'beach', originalFileName: 'IMG', ocr: 'invoice' }),
@@ -878,18 +860,16 @@ describe('Spaces page search URL state', () => {
   it('clicking a space month bucket zooms without mutating filters or URL state', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=person-1');
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('activate-month-bucket'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('activate-month-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"spaceId":"space-1"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015,"month":8}');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"spaceId":"space-1"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015,"month":8}');
     expect(buildSpaceTimelineOptions).toHaveBeenLastCalledWith(
       'space-1',
       expect.objectContaining({
@@ -906,21 +886,17 @@ describe('Spaces page search URL state', () => {
   it('keeps explicit space temporal filters across URL sync for non-time filter changes', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '2015');
-    });
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-set-year'));
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '2015');
 
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await userEvent.click(page.getByTestId('filter-panel-set-country'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('null');
     // D2 — the year rides along in the URL now, rather than in a carry-over slot beside it.
     expect(gotoMock).toHaveBeenLastCalledWith('/spaces/space-1/photos?country=Germany&year=2015', {
       replace: true,
@@ -931,20 +907,18 @@ describe('Spaces page search URL state', () => {
   it('lets explicit custom space date filters apply and clear a pending zoom anchor', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
-    await waitFor(() => expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
 
-    await fireEvent.click(screen.getByTestId('filter-panel-set-custom-range'));
+    await userEvent.click(page.getByTestId('filter-panel-set-custom-range'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-date-after', '2024-01-01');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-date-before', '2024-12-31');
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-date-after', '2024-01-01');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-date-after', '2024-01-01');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-date-before', '2024-12-31');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-date-after', '2024-01-01');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('null');
     expect(buildSpaceTimelineOptions).toHaveBeenLastCalledWith(
       'space-1',
       expect.objectContaining({
@@ -959,26 +933,24 @@ describe('Spaces page search URL state', () => {
   it('clearing an explicit space temporal chip keeps the current grouping and clears the anchor', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('timeline-grouping-month'));
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
-    await fireEvent.click(await screen.findByTestId('active-filters-remove-timeline'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('timeline-grouping-month'));
+    await userEvent.click(page.getByTestId('filter-panel-set-year'));
+    await userEvent.click(page.getByTestId('active-filters-remove-timeline'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('null');
   });
 
   it('select-assets mode keeps space timeline options without grouping', async () => {
-    renderPage();
+    await renderPage();
 
     await enterSelectAssets();
 
-    await waitFor(() => {
-      const optionsText = screen.getByTestId('timeline-options').textContent ?? '';
+    await vi.waitFor(() => {
+      const optionsText = page.getByTestId('timeline-options').element().textContent ?? '';
       expect(optionsText).toContain('"visibility":"timeline"');
       expect(optionsText).toContain('"timelineSpaceId":"space-1"');
       expect(optionsText).not.toContain('"grouping"');
@@ -986,99 +958,93 @@ describe('Spaces page search URL state', () => {
   });
 
   it('ignores space bucket activation outside view mode', async () => {
-    renderPage();
+    await renderPage();
 
     await enterSelectAssets();
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => {
-      const optionsText = screen.getByTestId('timeline-options').textContent ?? '';
+    await vi.waitFor(async () => {
+      const optionsText = page.getByTestId('timeline-options').element().textContent ?? '';
       expect(optionsText).not.toContain('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+      await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('null');
     });
   });
 
   it('select-cover mode switches grouped timelines back to day mode so photos remain selectable', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('timeline-grouping-year'));
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-    });
+    await userEvent.click(page.getByTestId('timeline-grouping-year'));
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"year"');
 
     // The change-cover affordance now lives in the shell cover (not this page); it signals the page
     // through the space-ui-manager intent, which the page consumes to enter select-cover mode.
     spaceUiManager.requestChangeCover();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-        JSON.stringify({ grouping: 'day', hasHandler: true }),
-      );
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toHaveTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
   });
 
   it('renders a desktop grouping control on the space browse timeline', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('changes space grouping from the desktop control without changing filters or URL params', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=space-person-1');
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('timeline-grouping-year'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('timeline-grouping-year'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"year"');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('timeline-anchor')).toHaveTextContent('null');
     expect(gotoMock).not.toHaveBeenCalledWith(expect.stringContaining('selectedYear'), expect.anything());
   });
 
   it('does not render grouping controls in space select-assets mode', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
     await enterSelectAssets();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"grouping"');
-    });
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"grouping"');
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
   it('shows grouping and the filters bar in one merged toolbar (no separate spacing wrapper)', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?country=Germany');
 
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('active-filters-bar-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-active-filters-bar-spacing')).toBeNull();
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toBeInTheDocument();
+    expect(page.getByTestId('space-active-filters-bar-spacing').query()).toBeNull();
   });
 
   it('keeps active filters visually separated from grouped space timeline cards', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
 
-    const groupingControl = await screen.findByTestId('timeline-desktop-grouping-control');
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+
+    const groupingControl = page.getByTestId('timeline-desktop-grouping-control').element() as HTMLElement;
     const toolbarRoot = groupingControl.parentElement!;
     expect(toolbarRoot).toHaveClass('mb-2');
   });
 
-  it('does not show the desktop grouping control during space search results', () => {
+  it('does not show the desktop grouping control during space search results', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=nature');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
   // #1051: the space timeline searches the space, but nothing on the surface said so — the only
@@ -1087,16 +1053,16 @@ describe('Spaces page search URL state', () => {
     it('sits beside the grouping control on the space browse timeline', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-      renderPage();
+      await renderPage();
 
-      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
     it('opens the page-scoped search palette when clicked', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-      renderPage();
-      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+      await renderPage();
+      await userEvent.click(page.getByTestId('scoped-search-button'));
 
       expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
     });
@@ -1104,55 +1070,55 @@ describe('Spaces page search URL state', () => {
     it('stays available while space search results are showing, so the query can be changed', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=nature');
 
-      renderPage();
+      await renderPage();
 
-      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
     it('is hidden in select-assets mode, where the toolbar belongs to the selection', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-      renderPage();
+      await renderPage();
       await enterSelectAssets();
 
-      await waitFor(() => expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument());
+      await expect.element(page.getByTestId('scoped-search-button')).not.toBeInTheDocument();
     });
   });
 
-  it('shows the filtered empty state for a filtered space timeline with no assets', () => {
+  it('shows the filtered empty state for a filtered space timeline with no assets', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=empty-person');
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByTestId('empty-state-message')).toHaveTextContent('spaces_no_filtered_assets');
-    expect(screen.queryByTestId('timeline-stub')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('empty-state-message')).toMatchTextContent('spaces_no_filtered_assets');
+    await expect.element(page.getByTestId('timeline-stub')).not.toBeInTheDocument();
   });
 
   it('passes grouping state and change handler into the space Timeline for mobile placement', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: true }),
-    );
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toHaveTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
 
-    await fireEvent.click(screen.getByTestId('timeline-mobile-set-year'));
+    await userEvent.click(page.getByTestId('timeline-mobile-set-year'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-      expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-        JSON.stringify({ grouping: 'year', hasHandler: true }),
-      );
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"year"');
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toHaveTextContent(JSON.stringify({ grouping: 'year', hasHandler: true }));
   });
 
   it('wires the add-all handler into the active filters bar', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=person-cat&tags=tag-nature');
 
-    renderPage();
+    await renderPage();
 
-    const bar = await screen.findByTestId('active-filters-bar-stub');
+    await expect.element(page.getByTestId('active-filters-bar-stub')).toBeInTheDocument();
+
+    const bar = page.getByTestId('active-filters-bar-stub').element() as HTMLElement;
     expect(bar).toHaveAttribute('data-has-add-all', 'true');
   });
 
@@ -1162,12 +1128,12 @@ describe('Spaces page search URL state', () => {
   it('passes the withStacked prop into the space Timeline so stacks show a badge', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-withstacked')).toHaveTextContent('true');
+    await expect.element(page.getByTestId('timeline-withstacked')).toHaveTextContent('true');
     // The query option must remain set too (the server only returns stack data
     // when withStacked is requested).
-    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withStacked":true');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"withStacked":true');
   });
 
   // #889 — the asset viewer opened from this timeline has to know it is on a space surface and
@@ -1175,21 +1141,21 @@ describe('Spaces page search URL state', () => {
   it('passes the space capability into the space Timeline for an editor', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage({ members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    expect(await screen.findByTestId('timeline-space')).toHaveTextContent(
-      JSON.stringify({ id: 'space-1', canWrite: true }),
-    );
+    await expect
+      .element(page.getByTestId('timeline-space'))
+      .toHaveTextContent(JSON.stringify({ id: 'space-1', canWrite: true }));
   });
 
   it('passes the space capability into the space Timeline as read-only for a viewer', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-    renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+    await renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
-    expect(await screen.findByTestId('timeline-space')).toHaveTextContent(
-      JSON.stringify({ id: 'space-1', canWrite: false }),
-    );
+    await expect
+      .element(page.getByTestId('timeline-space'))
+      .toHaveTextContent(JSON.stringify({ id: 'space-1', canWrite: false }));
   });
 
   // D2 — the picked year/month is IN the URL codec. It used to be transient, which meant a shared
@@ -1199,12 +1165,12 @@ describe('Spaces page search URL state', () => {
     it('hydrates a shared ?year= link into the picker, the chip and the timeline query', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?year=2023');
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
-        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '2023');
-        const options = screen.getByTestId('timeline-options').textContent ?? '';
+      await vi.waitFor(async () => {
+        await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+        await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '2023');
+        const options = page.getByTestId('timeline-options').element().textContent ?? '';
         expect(options).toContain('"spaceId":"space-1"');
         expect(options).toContain('"takenAfter":"2023-01-01T00:00:00.000Z"');
         expect(options).toContain('"takenBefore":"2024-01-01T00:00:00.000Z"');
@@ -1214,12 +1180,12 @@ describe('Spaces page search URL state', () => {
     it('hydrates a shared ?year=&month= link', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?year=2023&month=6');
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
-        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
-        const options = screen.getByTestId('timeline-options').textContent ?? '';
+      await vi.waitFor(async () => {
+        await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+        await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
+        const options = page.getByTestId('timeline-options').element().textContent ?? '';
         expect(options).toContain('"takenAfter":"2023-06-01T00:00:00.000Z"');
         expect(options).toContain('"takenBefore":"2023-07-01T00:00:00.000Z"');
       });
@@ -1228,10 +1194,10 @@ describe('Spaces page search URL state', () => {
     it('writes the picked year to the URL', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-      renderPage();
-      await fireEvent.click(await screen.findByTestId('filter-panel-set-year'));
+      await renderPage();
+      await userEvent.click(page.getByTestId('filter-panel-set-year'));
 
-      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
       const [target] = gotoMock.mock.calls.at(-1) as [string];
       expect(target).toContain('year=2015');
     });
@@ -1243,16 +1209,14 @@ describe('Spaces page search URL state', () => {
     it('keeps a picked year when the asset viewer closes and writes ?at=', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
-      renderPage();
-      await fireEvent.click(await screen.findByTestId('filter-panel-set-year'));
+      await renderPage();
+      await userEvent.click(page.getByTestId('filter-panel-set-year'));
 
       // goto() is mocked, so land page.url on the page's own write the way SvelteKit would.
-      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
       const [target] = gotoMock.mock.calls.at(-1) as [string];
       mockPage.url = new URL(target, 'https://gallery.test');
-      await waitFor(() =>
-        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'),
-      );
+      await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
 
       // Closing the asset viewer: replaceScrollTarget appends `at` to the CURRENT url. This is a raw
       // property set (not a fireEvent), so nothing implicitly flushes the pending $effect — tick()
@@ -1264,8 +1228,10 @@ describe('Spaces page search URL state', () => {
       mockPage.url = withAt;
       await tick();
 
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2015-01-01T00:00:00.000Z"');
+      await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+      expect(page.getByTestId('timeline-options').element().textContent).toContain(
+        '"takenAfter":"2015-01-01T00:00:00.000Z"',
+      );
     });
   });
 
@@ -1278,27 +1244,25 @@ describe('Spaces page search URL state', () => {
     it('removes a lens filter from the URL when its chip is dismissed', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?lens=RF24-70mm+F2.8');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-lens', 'RF24-70mm F2.8');
+      await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-lens', 'RF24-70mm F2.8');
 
-      await fireEvent.click(screen.getByTestId('active-filters-remove-lens'));
+      await userEvent.click(page.getByTestId('active-filters-remove-lens'));
 
-      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
       const [target] = gotoMock.mock.calls.at(-1) as [string];
       expect(target).not.toContain('lens');
       // It was the only filter, so the count drops to zero and the whole bar goes with it.
-      expect(screen.queryByTestId('active-filters-bar-stub')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('active-filters-bar-stub')).not.toBeInTheDocument();
     });
 
     it('names the owner chip from the members already in scope, without a request', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?owner=user-1');
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() =>
-        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-owner-label', 'Owner'),
-      );
+      await expect.element(page.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-owner-label', 'Owner');
       expect(sdkMock.getUser).not.toHaveBeenCalled();
     });
 
@@ -1306,16 +1270,18 @@ describe('Spaces page search URL state', () => {
       sdkMock.getAlbumInfo.mockResolvedValue({ id: 'album-1', albumName: 'Hütte 2026' } as never);
       mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?albumId=album-1');
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() => {
+      await vi.waitFor(async () => {
         expect(sdkMock.getAlbumInfo).toHaveBeenCalledWith({ id: 'album-1' });
-        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-album-label', 'Hütte 2026');
+        await expect
+          .element(page.getByTestId('active-filters-bar-stub'))
+          .toHaveAttribute('data-album-label', 'Hütte 2026');
       });
 
-      await fireEvent.click(screen.getByTestId('active-filters-remove-album'));
+      await userEvent.click(page.getByTestId('active-filters-remove-album'));
 
-      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
       const [target] = gotoMock.mock.calls.at(-1) as [string];
       expect(target).not.toContain('albumId');
     });

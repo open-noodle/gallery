@@ -4,8 +4,7 @@ import { IntlMessageFormat } from 'intl-messageformat';
 import { _, init, locale, register, waitLocale, type Translations } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { beforeAll, describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // S12.9/F31: 17 count-bearing `admin.face_cleanup_*` keys used bare `{count}` with no ICU plural clause, so
 // they rendered "1 clusters" / "1 faces" for an admin whose review queue happened to be down to one.
@@ -23,8 +22,20 @@ beforeAll(async () => {
   await waitLocale('en');
 });
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
-const en = JSON.parse(fs.readFileSync(path.join(I18N_DIR, 'en.json'), 'utf8')) as { admin: Record<string, string> };
+// Relative to web/. The specs run in the browser, so the files are read up front through Vitest's commands.
+const I18N_DIR = '../i18n/gallery/merged';
+const files = new Map(
+  await Promise.all(
+    ['en', ...FORK_LOCALES].map(async (code) => [code, await commands.readFile(`${I18N_DIR}/${code}.json`)] as const),
+  ),
+);
+const en = JSON.parse(files.get('en')!) as { admin: Record<string, string> };
+
+// The face-cleanup route sources, as raw text through Vite (keys are root-relative, e.g. `/src/routes/…`).
+const FACE_CLEANUP_SOURCES = import.meta.glob<string>('/src/routes/admin/face-cleanup/**/*.{svelte,ts}', {
+  query: '?raw',
+  import: 'default',
+});
 
 const KEYS = [
   'face_cleanup_confident_count',
@@ -167,26 +178,17 @@ describe('count arguments must be raw numbers, not formatted strings', () => {
 
   // Source-level guard: catches a NEW call site that reintroduces the pattern, which the render tests
   // above cannot see because they call $t directly rather than going through the component.
-  it('no face-cleanup route passes toLocaleString() into a translation count', () => {
+  it('no face-cleanup route passes toLocaleString() into a translation count', async () => {
     const offenders: string[] = [];
-    const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(full);
-          continue;
-        }
-        if (!entry.name.endsWith('.svelte') && !entry.name.endsWith('.ts')) {
-          continue;
-        }
-        // Match `toLocaleString(` not `toLocaleString()` — a locale-aware call such as
-        // toLocaleString('de-DE') also inserts separators and would evade the narrower pattern.
-        if (/count:\s*[^,}]*toLocaleString\(/.test(fs.readFileSync(full, 'utf8'))) {
-          offenders.push(path.relative(process.cwd(), full));
-        }
+    // Control on the scan itself: the route folder must actually be found.
+    expect(Object.keys(FACE_CLEANUP_SOURCES).length).toBeGreaterThan(0);
+    for (const [file, load] of Object.entries(FACE_CLEANUP_SOURCES)) {
+      // Match `toLocaleString(` not `toLocaleString()` — a locale-aware call such as
+      // toLocaleString('de-DE') also inserts separators and would evade the narrower pattern.
+      if (/count:\s*[^,}]*toLocaleString\(/.test(await load())) {
+        offenders.push(file);
       }
-    };
-    walk(path.resolve(process.cwd(), 'src/routes/admin/face-cleanup'));
+    }
     expect(offenders).toEqual([]);
   });
 });
@@ -196,7 +198,7 @@ describe('count arguments must be raw numbers, not formatted strings', () => {
 // translations (de/fr/it/nl/pl/es/ru/zh_Hans/zh_Hant) while that guard stayed green, because it never read
 // a translated file at all. This block reads them.
 const readAdmin = (code: string): Record<string, string> =>
-  (JSON.parse(fs.readFileSync(path.join(I18N_DIR, `${code}.json`), 'utf8')) as { admin: Record<string, string> }).admin;
+  (JSON.parse(files.get(code)!) as { admin: Record<string, string> }).admin;
 
 // Derived from en.json rather than hardcoded: a hardcoded list silently stops covering every key added
 // after it was written. Any admin.face_cleanup_* whose English value carries an ICU plural clause is in

@@ -1,11 +1,10 @@
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
 import SchemaConfiguration from '#lib/components/SchemaConfiguration.svelte';
 import type { JSONSchemaProperty } from '#lib/types.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
-import { screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 vi.mock('@immich/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@immich/sdk')>()),
@@ -31,22 +30,8 @@ beforeAll(async () => {
 
 describe('SchemaConfiguration', () => {
   beforeEach(() => {
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    vi.stubGlobal('visualViewport', {
-      height: 900,
-      width: 1400,
-      scale: 1,
-      offsetLeft: 0,
-      offsetTop: 0,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    });
     vi.mocked(getAllSpaces).mockReset().mockResolvedValue([]);
     vi.mocked(getSharedSpaceAlbums).mockReset().mockResolvedValue([]);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   const renderSchema = (config: Record<string, unknown>) =>
@@ -55,18 +40,20 @@ describe('SchemaConfiguration', () => {
   it('scopes a SpaceAlbumName field to the sibling space that was chosen', async () => {
     // C1 — the branch reads the sibling property off the shared parent object. A missing branch
     // silently degrades to the plain string <Input>, which is exactly the field we replaced.
-    renderSchema({ spaceId: 'space-1' });
+    await renderSchema({ spaceId: 'space-1' });
 
     await vi.waitFor(() => expect(getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' }));
-    expect(screen.getByRole('combobox')).toBeEnabled();
+    expect(page.getByRole('combobox').element()).toBeEnabled();
   });
 
   it('leaves a SpaceAlbumName field disabled until a space is chosen', async () => {
     // C2
-    renderSchema({});
+    await renderSchema({});
 
-    expect(await screen.findByText('Choose a space first')).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(
+      await vi.waitFor(() => page.getByText('Choose a space first', { exact: true }).element()),
+    ).toBeInTheDocument();
+    expect(page.getByRole('combobox').element()).toBeDisabled();
     expect(getSharedSpaceAlbums).not.toHaveBeenCalled();
   });
 });

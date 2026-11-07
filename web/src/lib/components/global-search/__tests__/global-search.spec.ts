@@ -1,12 +1,14 @@
+import { isApplePlatform } from '#lib/gallery/search/search-hotkey.ts';
 import { commandContextManager } from '#lib/managers/command-context-manager.svelte.ts';
 import { GlobalSearchManager, type Provider, type Sections } from '#lib/managers/global-search-manager.svelte.ts';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '#lib/stores/cmdk-recent.ts';
 import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchSmart } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { tick } from 'svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { goto } from '$app/navigation';
 import GlobalSearch from '../global-search.svelte';
 
@@ -53,7 +55,10 @@ const { mockPage } = vi.hoisted(() => ({
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+}));
 
 // svelte/reactivity's MediaQuery captures matchMedia at module load time — mocking
 // window.matchMedia in a test doesn't retroactively update existing instances.
@@ -140,21 +145,7 @@ function stubAllEntitySections(m: GlobalSearchManager) {
     Promise.resolve({ status: 'ok' as const, items: [{ id: 't1', name: 'beach' } as never], total: 1 });
 }
 
-// Drain bits-ui's body-scroll-lock deferred cleanup (setTimeout with 24ms delay
-// in bits-ui/dist/internal/body-scroll-lock.svelte.js) before happy-dom tears
-// down the document. Without this, the cleanup fires after teardown and throws
-// `ReferenceError: document is not defined` as an unhandled error, which Vitest
-// surfaces as a whole-file failure even though every test passed. 500ms is 20×
-// the bits-ui delay — deliberately generous so CI scheduler jitter under load
-// can never race the drain. Module-scoped so every describe block in this file
-// gets the drain (not just `global-search root`).
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-});
-
 describe('global-search root', () => {
-  let user: ReturnType<typeof userEvent.setup>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -171,20 +162,19 @@ describe('global-search root', () => {
     // override `isAdmin` explicitly; anonymous-user edge cases flip to `null`.
     mockUser.current = { id: 'test-user', isAdmin: false };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
-    user = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
-  it('renders dialog containing the palette', () => {
+  it('renders dialog containing the palette', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Modal provides role="dialog"; the global-search-label span provides the sr-only heading
     // for the nested Command.Root. Assert the dialog mounts and the label span exists.
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument();
     expect(document.querySelector('#global-search-label')).not.toBeNull();
   });
 
-  it('left column has min-w-0 so flex-1 shrinks below long-filename content', () => {
+  it('left column has min-w-0 so flex-1 shrinks below long-filename content', async () => {
     // Regression guard: flex children default to min-width: auto (= content size),
     // so without explicit min-w-0 on the `flex-1` left column, rows with long
     // filenames (e.g. pexels-kirsten-buhne-682055-1521306.jpg) force the whole
@@ -193,7 +183,7 @@ describe('global-search root', () => {
     // actually kicks in.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Locate the left column: the first child of the palette's row div that is
     // NOT the preview pane (which has data-cmdk-preview).
     // Modal portals into document.body, not the render container — search the whole document.
@@ -208,7 +198,7 @@ describe('global-search root', () => {
     // regression, only the left column's constraint matters.
   });
 
-  it('row is responsive: flex-1 on mobile, fixed sm:h-[520px] on desktop', () => {
+  it('row is responsive: flex-1 on mobile, fixed sm:h-[520px] on desktop', async () => {
     // Regression guard for two layout bugs:
     //   1. The pre-Task-X pattern was `flex min-h-[420px] max-h-[60vh] flex-1` which
     //      grew to content because `flex-1` in a column without a definite parent
@@ -221,7 +211,7 @@ describe('global-search root', () => {
     //   `flex-1` would otherwise have no basis).
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Modal portals into document.body, not the render container — search the whole document.
     const row = document.querySelector<HTMLElement>('div.flex[class*="sm:h-[520px]"]');
     expect(row).not.toBeNull();
@@ -232,10 +222,10 @@ describe('global-search root', () => {
     expect(row?.className).toContain('min-h-0');
   });
 
-  it('does NOT render a visible Modal title header', () => {
+  it('does NOT render a visible Modal title header', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    const { container } = render(GlobalSearch, { props: { manager: m } });
+    const { container } = await render(GlobalSearch, { props: { manager: m } });
     const visibleHeaders = container.querySelectorAll('h1, h2, h3, [role="heading"]');
     for (const h of visibleHeaders) {
       expect(h.textContent).not.toMatch(/global search/i);
@@ -248,61 +238,61 @@ describe('global-search root', () => {
     // input on the first tap, closes the modal on the second.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
-    await user.type(input, 'hello');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
+    await userEvent.type(input, 'hello');
     expect(input.value).toBe('hello');
     // aria-label flips to "clear" when there is text in the input.
-    const clearBtn = screen.getByRole('button', { name: /clear/i });
-    await user.click(clearBtn);
+    const clearBtn = page.getByRole('button', { name: /clear/i });
+    await userEvent.click(clearBtn);
     expect(input.value).toBe('');
     expect(m.isOpen).toBe(true);
     // After clearing, the same button's aria-label flips to "close".
-    const closeBtn = screen.getByRole('button', { name: /close/i });
-    await user.click(closeBtn);
+    const closeBtn = page.getByRole('button', { name: /close/i });
+    await userEvent.click(closeBtn);
     expect(m.isOpen).toBe(false);
   });
 
-  it('does not render the search sort control inside the palette', () => {
+  it('does not render the search sort control inside the palette', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
     const m = new GlobalSearchManager();
     m.open();
 
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('search-sort-btn')).not.toBeInTheDocument();
   });
 
   it('Esc once clears input, twice closes (APG two-stage)', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
-    await user.type(input, 'hello');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
+    await userEvent.type(input, 'hello');
     expect(input.value).toBe('hello');
-    await user.keyboard('{Escape}');
+    await userEvent.keyboard('{Escape}');
     expect(input.value).toBe('');
     expect(m.isOpen).toBe(true);
-    await user.keyboard('{Escape}');
+    await userEvent.keyboard('{Escape}');
     expect(m.isOpen).toBe(false);
   });
 
   it('Esc while pending confirm cancels confirm but does NOT close palette', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     // Type something so the two-stage Escape path would not close even without the
     // pending-guard. Isolates the assertion to "pending cleared" — if the palette
     // stays open because inputValue was non-empty, we still see pendingConfirmId
     // cleared by the new intercept.
-    await user.type(input, 'x');
+    await userEvent.type(input, 'x');
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
     input.focus();
     type WithPrivateStart = { startConfirm: (id: string) => void };
     (m as unknown as WithPrivateStart).startConfirm('cmd:destruct_x');
     expect(m.pendingConfirmId).toBe('cmd:destruct_x');
-    await user.keyboard('{Escape}');
+    await userEvent.keyboard('{Escape}');
     expect(m.pendingConfirmId).toBeNull();
     expect(m.isOpen).toBe(true);
   });
@@ -329,32 +319,34 @@ describe('global-search root', () => {
 
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Single word on purpose: svelte-i18n is uninitialised here so labels render
     // as their raw keys (`cmdk_cmd_selection_delete_label`), which contain
     // "delete" but not "selected". Selection is the only context set, so
     // "delete" resolves unambiguously to the selection-delete command.
-    await user.type(screen.getByRole('combobox'), 'delete');
+    await userEvent.type(page.getByRole('combobox'), 'delete');
 
     await vi.waitFor(() => expect(m.topCommandMatch?.id).toBe('cmd:selection_delete'));
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
 
     expect(m.pendingConfirmId).toBe('cmd:selection_delete');
-    expect(screen.getByText(/cmdk_cmd_confirm_hint/)).toBeInTheDocument();
-    expect(screen.queryByText('cmdk_cmd_selection_delete_description')).toBeNull();
+    await expect.element(page.getByText(/cmdk_cmd_confirm_hint/)).toBeInTheDocument();
+    expect(page.getByText('cmdk_cmd_selection_delete_description').query()).toBeNull();
   });
 
   it('Ctrl+K inside the palette closes (not captured by vimBindings)', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.focus();
-    await user.keyboard('{Control>}k{/Control}');
+    // The launcher chord is Cmd+K on Apple platforms and Ctrl+K elsewhere; the test
+    // browser reports the host platform, so press the one this host uses.
+    await userEvent.keyboard(isApplePlatform() ? '{Meta>}k{/Meta}' : '{Control>}k{/Control}');
     expect(m.isOpen).toBe(false);
   });
 
-  it('helper row is replaced by the quick-links fallback on cold open (no recents, blank query)', () => {
+  it('helper row is replaced by the quick-links fallback on cold open (no recents, blank query)', async () => {
     // The previous UX showed only a "Start typing — ..." helper string on a
     // cold palette open with no recents. That left users staring at a mostly
     // empty surface, so we now surface the user-pages navigation catalog
@@ -362,30 +354,32 @@ describe('global-search root', () => {
     // when the catalog has at least one entry.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.queryByText(/cmdk_helper|Start typing/)).toBeNull();
-    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
+    await render(GlobalSearch, { props: { manager: m } });
+    expect(page.getByText(/cmdk_helper|Start typing/).query()).toBeNull();
+    await expect.element(page.getByText(/^photos$/i)).toBeInTheDocument();
   });
 
   it('helper row disappears after first keystroke', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'a');
-    expect(screen.queryByText(/cmdk_helper|Start typing/)).toBeNull();
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'a');
+    expect(page.getByText(/cmdk_helper|Start typing/).query()).toBeNull();
   });
 
   it('renders typed search tokens while typing without resolving suggestion-backed filters', async () => {
     const m = new GlobalSearchManager();
     const parseSpy = vi.spyOn(m, 'parseTypedSearchDraft');
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'beach camera:nikon from:2025');
+    await userEvent.type(page.getByRole('combobox'), 'beach camera:nikon from:2025');
 
     expect(parseSpy).toHaveBeenCalled();
-    expect(screen.getByTestId('typed-search-token-rail')).toBeInTheDocument();
-    expect(screen.getByTestId('typed-search-token-camera')).toHaveAttribute('data-status', 'pending-entity');
+    await expect.element(page.getByTestId('typed-search-token-rail')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('typed-search-token-camera'))
+      .toHaveAttribute('data-status', 'pending-entity');
     expect(getFilterSuggestions).not.toHaveBeenCalled();
   });
 
@@ -404,13 +398,13 @@ describe('global-search root', () => {
       ];
       return Promise.resolve();
     });
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'person:anna');
-    await user.keyboard('{Enter}');
+    await userEvent.type(page.getByRole('combobox'), 'person:anna');
+    await userEvent.keyboard('{Enter}');
 
-    expect(screen.getByText('No person found for "anna"')).toBeVisible();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expect.element(page.getByText('No person found for "anna"')).toBeVisible();
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('renders ambiguity choices and sends selection to the manager', async () => {
@@ -430,9 +424,9 @@ describe('global-search root', () => {
       { tokenRaw: 'person:anna', key: 'person', id: 'person-1', label: 'Anna', value: 'anna' },
       { tokenRaw: 'person:anna', key: 'person', id: 'person-2', label: 'Anna Maria', value: 'anna' },
     ];
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.click(screen.getByRole('button', { name: 'Anna Maria' }));
+    await userEvent.click(page.getByRole('button', { name: 'Anna Maria' }));
 
     expect(selectSpy).toHaveBeenCalledWith({
       tokenRaw: 'person:anna',
@@ -463,18 +457,18 @@ describe('global-search root', () => {
         },
       ],
     };
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const liveFilterHeading = screen.getByText(/cmdk_filter_match_person|person filter matches/i);
-    const topResultHeading = screen.getByText(/cmdk_top_result|top result/i);
+    const liveFilterHeading = page.getByText(/cmdk_filter_match_person|person filter matches/i).element();
+    const topResultHeading = page.getByText(/cmdk_top_result|top result/i).element();
     expect(liveFilterHeading.compareDocumentPosition(topResultHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    await user.click(screen.getByRole('option', { name: /Anna Maria/i }));
+    await userEvent.click(page.getByRole('option', { name: /Anna Maria/i }));
 
     expect(selectSpy).toHaveBeenCalled();
   });
 
-  it('renders filter matches before top result and keeps live rows out of normal people results', () => {
+  it('renders filter matches before top result and keeps live rows out of normal people results', async () => {
     const manager = new GlobalSearchManager();
     manager.open();
     manager.setQuery('person:ann');
@@ -500,23 +494,25 @@ describe('global-search root', () => {
       items: [{ id: 'p2', name: 'Ann Normal' } as never],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    const liveSection = screen.getByTestId('live-typed-filter-section');
-    const liveFilterGroup = screen.getByRole('group', {
+    const liveSection = page.getByTestId('live-typed-filter-section');
+    const liveFilterGroup = page.getByRole('group', {
       name: /cmdk_filter_match_person|person filter matches/i,
     });
-    const topResult = screen.getByTestId('cmdk-top-result');
-    expect(liveSection.compareDocumentPosition(topResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(liveSection).toContainElement(liveFilterGroup);
-    expect(within(liveSection).getByText(/cmdk_filter_match_person|person filter matches/i)).toBeInTheDocument();
+    const topResult = page.getByTestId('cmdk-top-result');
+    expect(
+      liveSection.element().compareDocumentPosition(topResult.element()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await expect.element(liveSection).toContainElement(liveFilterGroup);
+    await expect.element(liveSection.getByText(/cmdk_filter_match_person|person filter matches/i)).toBeInTheDocument();
 
-    const peopleGroup = screen.getByRole('group', { name: /cmdk_people_heading|people/i });
-    expect(within(peopleGroup).getByText(/Ann Normal/i)).toBeInTheDocument();
-    expect(within(peopleGroup).queryByText(/Ann Live/i)).toBeNull();
+    const peopleGroup = page.getByRole('group', { name: /cmdk_people_heading|people/i });
+    await expect.element(peopleGroup.getByText(/Ann Normal/i)).toBeInTheDocument();
+    expect(peopleGroup.getByText(/Ann Live/i).query()).toBeNull();
   });
 
-  it('keeps live tag filter rows out of normal tag results', () => {
+  it('keeps live tag filter rows out of normal tag results', async () => {
     const manager = new GlobalSearchManager();
     manager.open();
     manager.setQuery('tag:tra');
@@ -542,14 +538,14 @@ describe('global-search root', () => {
       items: [{ id: 't2', name: 'Travel Normal' } as never],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    const tagFilterGroup = screen.getByRole('group', { name: /cmdk_filter_match_tag|tag filter matches/i });
-    expect(within(tagFilterGroup).getByText(/Travel Live/i)).toBeInTheDocument();
+    const tagFilterGroup = page.getByRole('group', { name: /cmdk_filter_match_tag|tag filter matches/i });
+    await expect.element(tagFilterGroup.getByText(/Travel Live/i)).toBeInTheDocument();
 
-    const tagsGroup = screen.getByRole('group', { name: /cmdk_tags_heading|^tags$/i });
-    expect(within(tagsGroup).getByText(/Travel Normal/i)).toBeInTheDocument();
-    expect(within(tagsGroup).queryByText(/Travel Live/i)).toBeNull();
+    const tagsGroup = page.getByRole('group', { name: /cmdk_tags_heading|^tags$/i });
+    await expect.element(tagsGroup.getByText(/Travel Normal/i)).toBeInTheDocument();
+    expect(tagsGroup.getByText(/Travel Live/i).query()).toBeNull();
   });
 
   it('Enter on a highlighted live filter row rewrites the filter without submitting search', async () => {
@@ -575,15 +571,15 @@ describe('global-search root', () => {
       ],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     Object.defineProperties(input, {
       selectionStart: { configurable: true, get: () => 'person:ann'.length },
       selectionEnd: { configurable: true, get: () => 'person:ann'.length },
     });
     input.focus();
-    await user.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:10:p1:Ann Live'));
     manager.liveTypedSearchStatus = {
       status: 'ok',
@@ -601,7 +597,10 @@ describe('global-search root', () => {
         },
       ],
     };
-    await fireEvent.keyDown(document.querySelector('[data-command-root]') as HTMLElement, { key: 'Enter' });
+    (document.querySelector('[data-command-root]') as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    await tick();
 
     expect(manager.query).toBe('person:"Ann Live" ');
     expect(activateSearchSpy).not.toHaveBeenCalled();
@@ -639,11 +638,14 @@ describe('global-search root', () => {
       ],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:a:a'));
 
-    await fireEvent.keyDown(document.querySelector('[data-command-root]') as HTMLElement, { key: 'Enter' });
+    (document.querySelector('[data-command-root]') as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    await tick();
 
     expect(manager.query).toBe('person:a ');
     expect(manager.activeTypedSearchToken).toBeUndefined();
@@ -679,10 +681,10 @@ describe('global-search root', () => {
       ],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:city:0:5:Paris:Paris'));
-    expect(screen.getByRole('option', { name: /Paris/i })).toBeInTheDocument();
+    await expect.element(page.getByRole('option', { name: /Paris/i })).toBeInTheDocument();
   });
 
   it('submits search on the next Enter after keyboard-selecting a live person filter value', async () => {
@@ -717,21 +719,24 @@ describe('global-search root', () => {
       ],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:a:a'));
-    screen.getByRole('combobox').focus();
-    await user.keyboard('{ArrowDown}');
+    page.getByRole('combobox').element().focus();
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:b:b'));
 
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
 
     expect(manager.query).toBe('person:b ');
     expect(manager.activeTypedSearchToken).toBeUndefined();
     expect(activateSearchSpy).not.toHaveBeenCalled();
 
     await vi.waitFor(() => expect(manager.activeItemId).toBe('top-search'));
-    await fireEvent.keyDown(document.querySelector('[data-command-root]') as HTMLElement, { key: 'Enter' });
+    (document.querySelector('[data-command-root]') as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    await tick();
 
     expect(activateSearchSpy).toHaveBeenCalledWith('person:b');
   });
@@ -776,14 +781,14 @@ describe('global-search root', () => {
       ],
     };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:a:a'));
-    screen.getByRole('combobox').focus();
-    await user.keyboard('{ArrowDown}');
+    page.getByRole('combobox').element().focus();
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:b:b'));
 
-    await user.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:7:person:c:c'));
   });
 
@@ -795,9 +800,12 @@ describe('global-search root', () => {
     manager.setInputCaret('person:'.length);
     manager.liveTypedSearchStatus = { status: 'loading', key: 'person' };
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    await fireEvent.keyDown(document.querySelector('[data-command-root]') as HTMLElement, { key: 'Enter' });
+    (document.querySelector('[data-command-root]') as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    await tick();
 
     expect(activateSearchSpy).not.toHaveBeenCalled();
     expect(manager.query).toBe('person:');
@@ -825,9 +833,9 @@ describe('global-search root', () => {
         },
       ],
     };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    await user.click(screen.getByRole('option', { name: /Anna Maria/i }));
+    await userEvent.click(page.getByRole('option', { name: /Anna Maria/i }));
 
     expect(manager.query).toBe('beach person:"Anna Maria" ');
     expect(goto).not.toHaveBeenCalled();
@@ -861,9 +869,13 @@ describe('global-search root', () => {
         },
       ],
     };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    await user.click(screen.getByRole('option', { name: /Travel/i }));
+    // A DOM click: the browser's real pointer is shared with other spec files running at the same time.
+    const option = page.getByRole('option', { name: /Travel/i });
+    await expect.element(option).toBeVisible();
+    (option.element() as HTMLElement).click();
+    await tick();
 
     expect(manager.query).toBe('beach tag:Travel ');
     expect(goto).not.toHaveBeenCalled();
@@ -891,14 +903,14 @@ describe('global-search root', () => {
         },
       ],
     };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
-    await user.click(screen.getByRole('option', { name: /Paris/i }));
+    await userEvent.click(page.getByRole('option', { name: /Paris/i }));
 
     expect(manager.query).toBe('city:Paris ');
   });
 
-  it('renders live typed filter section before normal results in dropdown variant', () => {
+  it('renders live typed filter section before normal results in dropdown variant', async () => {
     const m = new GlobalSearchManager();
     m.open('dropdown');
     m.setQuery('beach person:ann');
@@ -917,10 +929,10 @@ describe('global-search root', () => {
         },
       ],
     };
-    render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
-    const liveFilterHeading = screen.getByText(/cmdk_filter_match_person|person filter matches/i);
-    const topResultHeading = screen.getByText(/cmdk_top_result|top result/i);
+    const liveFilterHeading = page.getByText(/cmdk_filter_match_person|person filter matches/i).element();
+    const topResultHeading = page.getByText(/cmdk_top_result|top result/i).element();
     expect(liveFilterHeading.compareDocumentPosition(topResultHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -930,27 +942,28 @@ describe('global-search root', () => {
     m.open();
     m.setQuery(query);
     m.setInputCaret('beach person:ann'.length);
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
     expect(m.activeTypedSearchToken).toMatchObject({ key: 'person', raw: 'person:ann' });
 
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     Object.defineProperties(input, {
       selectionStart: { configurable: true, get: () => query.length },
       selectionEnd: { configurable: true, get: () => query.length },
     });
     expect(m.activeTypedSearchToken).toMatchObject({ key: 'person', raw: 'person:ann' });
 
-    await fireEvent.pointerUp(input);
+    input.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    await tick();
 
     expect(m.activeTypedSearchToken).toMatchObject({ key: 'tag', raw: 'tag:family' });
   });
 
-  it('combobox has maxlength="256"', () => {
+  it('combobox has maxlength="256"', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     expect(input.maxLength).toBe(256);
   });
 
@@ -958,8 +971,8 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }]);
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     // Wait for debounce (150ms) + provider resolution
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'), { timeout: 2000 });
   });
@@ -971,19 +984,19 @@ describe('global-search root', () => {
     // Give the probe a tick to resolve before rendering so mlHealthy flips to false.
     await Promise.resolve();
     await Promise.resolve();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     // Banner key renders the key text under i18n fallback mode
     await vi.waitFor(() =>
-      expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).not.toBeNull(),
+      expect(page.getByText(/cmdk_smart_unavailable|smart search is unavailable/i).query()).not.toBeNull(),
     );
     m.setMode('metadata');
     await vi.waitFor(() =>
-      expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).toBeNull(),
+      expect(page.getByText(/cmdk_smart_unavailable|smart search is unavailable/i).query()).toBeNull(),
     );
     m.setMode('smart');
     await vi.waitFor(() =>
-      expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).not.toBeNull(),
+      expect(page.getByText(/cmdk_smart_unavailable|smart search is unavailable/i).query()).not.toBeNull(),
     );
   });
 
@@ -999,7 +1012,7 @@ describe('global-search root', () => {
   // `scrollIntoView` override effect in global-search.svelte (the defense against
   // bits-ui's "first of group" early-return), but the test setup kept racing:
   // bits-ui's DOM mount + Svelte's effect microtask + the override's rAF form a
-  // three-stage pipeline that's hard to drive deterministically in jsdom. Every
+  // three-stage pipeline that's hard to drive deterministically under DOM emulation. Every
   // timing mitigation we tried — waitFor data-command-item count, setActiveItem
   // instead of keyboard, extra rAF waits — either flipped the failure mode or
   // passed locally but not in CI. The override itself is 6 lines of production
@@ -1013,7 +1026,7 @@ describe('global-search root', () => {
   // enabled on Command.Root; wrap behavior is covered by manual testing and would
   // regress visibly on any bits-ui upgrade.
 
-  it('empty-empty state (no recents, blank query) shows a quick-links nav fallback', () => {
+  it('empty-empty state (no recents, blank query) shows a quick-links nav fallback', async () => {
     // Cold-open UX: if the user has no history AND has not typed anything, the
     // palette should not just sit at the helper text — surface the user-pages
     // navigation catalog so there is something to click and keyboard-navigate
@@ -1021,50 +1034,50 @@ describe('global-search root', () => {
     // most obvious entry points and always admin-independent.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // svelte-i18n fallbackLocale 'dev' renders literal keys — match either the
     // raw label key or the English label.
-    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^spaces$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^albums$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^photos$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^spaces$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^albums$/i)).toBeInTheDocument();
   });
 
-  it('quick-links fallback is replaced by recents once any recent exists', () => {
+  it('quick-links fallback is replaced by recents once any recent exists', async () => {
     // Recents take priority — the empty-empty nav fallback is only the cold
     // path, so a single recent entry must collapse it.
     addEntry({ kind: 'query', id: 'query:beach-query-text', text: 'beach-query-text', lastUsed: 1 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.getByText('beach-query-text')).toBeInTheDocument();
+    await render(GlobalSearch, { props: { manager: m } });
+    await expect.element(page.getByText('beach-query-text')).toBeInTheDocument();
     // No quick-links album entry — recents take over. Match the USER_PAGES
     // "albums" label specifically (lowercase literal key / label) to ensure
     // the nav fallback is gone.
-    expect(screen.queryByText(/^albums$/i)).toBeNull();
+    expect(page.getByText(/^albums$/i).query()).toBeNull();
   });
 
-  it('quick-links fallback respects disabled feature flags (map hidden)', () => {
+  it('quick-links fallback respects disabled feature flags (map hidden)', async () => {
     mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Photos always visible — admin-independent, no feature flag.
-    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^photos$/i)).toBeInTheDocument();
     // Map gated behind the `map` feature flag.
-    expect(screen.queryByText(/^map$/i)).toBeNull();
+    expect(page.getByText(/^map$/i).query()).toBeNull();
   });
 
   it('Enter on a highlighted quick-links item calls manager.activate("nav", item)', async () => {
     const m = new GlobalSearchManager();
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.focus();
     // Highlight the Photos nav fallback row explicitly — auto-highlight may
     // pick any ordering, so drive the cursor directly for determinism.
     m.setActiveItem('nav:userPages:photos');
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
     expect(activateSpy).toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:photos' }));
   });
 
@@ -1074,8 +1087,8 @@ describe('global-search root', () => {
     // "Search for ..." row must disappear so Enter activates the nav target.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'people');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'people');
     await vi.waitFor(() => expect(document.querySelector('[data-cmdk-top-result-navigation]')).not.toBeNull());
     expect(document.querySelector('[data-cmdk-top-result-search]')).toBeNull();
     await vi.waitFor(() => expect(m.activeItemId).toBe('nav:userPages:people'));
@@ -1088,14 +1101,12 @@ describe('global-search root', () => {
     // keyboard selection correctly.
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    // Pasted rather than typed: the nav section wrapper has an `out:fade`, and
-    // Svelte outros never complete under happy-dom. Typing character by
-    // character renders People in the section before the promotion gate opens,
-    // leaving a permanently fading ghost row that no amount of waiting clears.
+    await render(GlobalSearch, { props: { manager: m } });
+    // Filled in one input event rather than typed: typing character by character
+    // renders People in the Navigation section before the promotion gate opens, and
+    // the section wrapper's `out:fade` keeps that row in the DOM while it fades.
     // A single input event goes straight to the promoted state.
-    await user.click(screen.getByRole('combobox'));
-    await user.paste('people');
+    await userEvent.fill(page.getByRole('combobox'), 'people');
     await vi.waitFor(() => expect(document.querySelector('[data-cmdk-top-result-navigation]')).not.toBeNull());
     // There should be exactly one row carrying the People nav id.
     const rows = document.querySelectorAll('[data-command-item][data-value="nav:userPages:people"]');
@@ -1106,9 +1117,9 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'beach{enter}');
+    await userEvent.type(page.getByRole('combobox'), 'beach{enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('beach');
   });
@@ -1118,13 +1129,13 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open('modal');
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const input = screen.getByRole('combobox');
-    expect(input).toHaveValue('mountain');
+    const input = page.getByRole('combobox');
+    await expect.element(input).toHaveValue('mountain');
 
-    await user.clear(input);
-    await user.keyboard('{Enter}');
+    await userEvent.clear(input);
+    await userEvent.keyboard('{Enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('');
   });
@@ -1133,9 +1144,9 @@ describe('global-search root', () => {
     mockPage.url = new URL('https://gallery.test/photos');
     const m = new GlobalSearchManager();
     m.open('modal');
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     await m.activateSearch('beach');
     m.close();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1144,18 +1155,18 @@ describe('global-search root', () => {
 
     m.open('modal');
 
-    await vi.waitFor(() => expect(screen.getByRole('combobox')).toHaveValue(''));
+    await expect.element(page.getByRole('combobox')).toHaveValue('');
   });
 
   it('keeps modal presentation when modal focus runs with dropdown input mounted', async () => {
     const m = new GlobalSearchManager();
-    render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
     m.open('modal');
-    render(GlobalSearch, { props: { manager: m, variant: 'modal' } });
+    await render(GlobalSearch, { props: { manager: m, variant: 'modal' } });
     await Promise.resolve();
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument();
     expect(m.presentation).toBe('modal');
   });
 
@@ -1163,9 +1174,9 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'beach camera:nikon{enter}');
+    await userEvent.type(page.getByRole('combobox'), 'beach camera:nikon{enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('beach camera:nikon');
   });
@@ -1175,9 +1186,9 @@ describe('global-search root', () => {
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockResolvedValue();
     m.open();
     m.setQuery('beach city:Paris');
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('beach city:Paris');
   });
@@ -1187,9 +1198,9 @@ describe('global-search root', () => {
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'tags:nature{enter}');
+    await userEvent.type(page.getByRole('combobox'), 'tags:nature{enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('tags:nature');
     expect(activateSpy).not.toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:tags' }));
@@ -1200,12 +1211,12 @@ describe('global-search root', () => {
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'theme');
+    await userEvent.type(page.getByRole('combobox'), 'theme');
     await vi.waitFor(() => expect(m.activeItemId).toBe('cmd:theme'));
 
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
 
     expect(activateSearchSpy).not.toHaveBeenCalled();
     expect(activateSpy).toHaveBeenCalledWith('command', expect.objectContaining({ id: 'cmd:theme' }));
@@ -1215,17 +1226,17 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const input = screen.getByRole('combobox') as HTMLInputElement;
-    await user.type(input, 'beach');
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
+    await userEvent.type(input, 'beach');
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
     await vi.waitFor(
       () => expect(document.querySelector('[data-command-item][data-value="photo:photo-1"]')).not.toBeNull(),
       { timeout: 2000 },
     );
 
-    await user.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:photo-1'));
 
     input.value = 'beachx';
@@ -1242,17 +1253,17 @@ describe('global-search root', () => {
     installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
     m.mode = 'metadata';
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const input = screen.getByRole('combobox') as HTMLInputElement;
-    await user.type(input, 'beach');
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
+    await userEvent.type(input, 'beach');
 
     // svelte-i18n is uninitialised in this spec, so $t echoes the key — asserting the
     // seeAllLabel key (not the count-form `cmdk_see_all`) proves the count-less path.
-    const seeAll = await screen.findByTestId('see-all-button', undefined, { timeout: 2000 });
+    const seeAll = await page.getByTestId('see-all-button').findElement({ timeout: 2000 });
     expect(seeAll.textContent).toContain('cmdk_see_all_results');
 
-    await user.click(seeAll);
+    await userEvent.click(seeAll);
     await vi.waitFor(() =>
       expect(vi.mocked(goto).mock.calls.some((c) => String(c[0]).includes('filename=beach'))).toBe(true),
     );
@@ -1262,17 +1273,17 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const input = screen.getByRole('combobox');
-    await user.type(input, 'beach');
+    const input = page.getByRole('combobox');
+    await userEvent.type(input, 'beach');
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
     await vi.waitFor(
       () => expect(document.querySelector('[data-command-item][data-value="photo:photo-1"]')).not.toBeNull(),
       { timeout: 2000 },
     );
 
-    await user.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:photo-1'));
 
     m.sections.photos = {
@@ -1284,7 +1295,7 @@ describe('global-search root', () => {
 
     expect(m.activeItemId).toBe('photo:photo-1');
 
-    await user.type(input, 's');
+    await userEvent.type(input, 's');
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
   });
 
@@ -1292,12 +1303,12 @@ describe('global-search root', () => {
     mediaState.minLg = true;
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await userEvent.type(page.getByRole('combobox'), 'beach');
 
     expect(m.activeItemId).toBe('top-search');
-    expect(screen.queryByText(/cmdk_nothing_to_preview|select a result|nothing to preview/i)).not.toBeNull();
+    expect(page.getByText(/cmdk_nothing_to_preview|select a result|nothing to preview/i).query()).not.toBeNull();
   });
 
   it('clearing typed text returns selection to the newest recent row', async () => {
@@ -1305,25 +1316,25 @@ describe('global-search root', () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 2 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
-    const input = screen.getByRole('combobox');
-    await user.type(input, 'b');
+    const input = page.getByRole('combobox');
+    await userEvent.type(input, 'b');
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
 
-    await user.clear(input);
+    await userEvent.clear(input);
 
     await vi.waitFor(() => expect(m.activeItemId).toBe('query:sunset'));
   });
 
-  it('renders recent entries when store is non-empty and query is blank', () => {
+  it('renders recent entries when store is non-empty and query is blank', async () => {
     addEntry({ kind: 'query', id: 'query:beach', text: 'beach', lastUsed: 1 });
     addEntry({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 2 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.getByText('beach')).toBeInTheDocument();
-    expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
+    await render(GlobalSearch, { props: { manager: m } });
+    await expect.element(page.getByText('beach')).toBeInTheDocument();
+    await expect.element(page.getByText('sunset.jpg')).toBeInTheDocument();
   });
 
   it('Delete on a highlighted recent removes it from the visible list', async () => {
@@ -1334,17 +1345,17 @@ describe('global-search root', () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 2 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Focus the input so key events are routed to the combobox handler.
-    const input = screen.getByRole('combobox');
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.focus();
     // Highlight the newer entry — mirrors what the auto-highlight / ArrowDown
     // path would do. `{Delete}` is the forward-delete key on full keyboards; on
     // Mac laptops the OS maps Fn+Backspace to it.
     m.setActiveItem('query:sunset');
-    await user.keyboard('{Delete}');
-    await vi.waitFor(() => expect(screen.queryByText('sunset')).toBeNull());
-    expect(screen.getByText('beach')).toBeInTheDocument();
+    await userEvent.keyboard('{Delete}');
+    await vi.waitFor(() => expect(page.getByText('sunset').query()).toBeNull());
+    await expect.element(page.getByText('beach')).toBeInTheDocument();
     expect(getEntries().map((e) => e.id)).toEqual(['query:beach']);
   });
 
@@ -1356,12 +1367,12 @@ describe('global-search root', () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 2 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.focus();
     m.setActiveItem('query:sunset');
-    await user.keyboard('{Backspace}');
-    await vi.waitFor(() => expect(screen.queryByText('sunset')).toBeNull());
+    await userEvent.keyboard('{Backspace}');
+    await vi.waitFor(() => expect(page.getByText('sunset').query()).toBeNull());
     expect(getEntries().map((e) => e.id)).toEqual(['query:beach']);
   });
 
@@ -1372,11 +1383,11 @@ describe('global-search root', () => {
     addEntry({ kind: 'query', id: 'query:beach', text: 'beach', lastUsed: 1 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
-    await user.type(input, 'hi');
+    await render(GlobalSearch, { props: { manager: m } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
+    await userEvent.type(input, 'hi');
     expect(input.value).toBe('hi');
-    await user.keyboard('{Backspace}');
+    await userEvent.keyboard('{Backspace}');
     // Backspace ate the 'i'; the recent entry is still in the store.
     expect(input.value).toBe('h');
     expect(getEntries().map((e) => e.id)).toEqual(['query:beach']);
@@ -1391,12 +1402,14 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     const activateSpy = vi.spyOn(m, 'activateRecent').mockImplementation(() => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // svelte-i18n runs with fallbackLocale 'dev' in tests, so aria-labels render
     // as the literal i18n key — match against the key or the English fallback.
-    const removeBtn = await screen.findByRole('button', { name: /cmdk_remove_from_recents|remove from recents/i });
-    await user.click(removeBtn);
-    await vi.waitFor(() => expect(screen.queryByText('beach')).toBeNull());
+    const removeBtn = await page
+      .getByRole('button', { name: /cmdk_remove_from_recents|remove from recents/i })
+      .findElement();
+    await userEvent.click(removeBtn);
+    await vi.waitFor(() => expect(page.getByText('beach').query()).toBeNull());
     expect(activateSpy).not.toHaveBeenCalled();
     expect(getEntries()).toEqual([]);
   });
@@ -1406,43 +1419,43 @@ describe('global-search root', () => {
     installPhotoStub(m, [{ id: 'a1', originalFileName: 'x.jpg' }]);
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     await vi.waitFor(
       () => expect(document.querySelector('[data-command-item][data-value="photo:a1"]')).not.toBeNull(),
       { timeout: 2000 },
     );
-    await user.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
-    await user.keyboard('{Enter}');
+    await userEvent.keyboard('{Enter}');
     expect(activateSpy).toHaveBeenCalledWith('photo', expect.objectContaining({ id: 'a1' }));
   });
 
-  it('activateRecent("query", ...) replays through activateSearch on the current page', () => {
+  it('activateRecent("query", ...) replays through activateSearch on the current page', async () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 1 });
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
     m.activateRecent({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 1 });
 
     expect(activateSearchSpy).toHaveBeenCalledWith('sunset');
   });
 
-  it('preview pane is not mounted below 1024 px', () => {
+  it('preview pane is not mounted below 1024 px', async () => {
     mediaState.minLg = false;
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     expect(document.querySelector('[data-cmdk-preview]')).toBeNull();
   });
 
-  it('preview pane mounts at ≥ 1024 px', () => {
+  it('preview pane mounts at ≥ 1024 px', async () => {
     mediaState.minLg = true;
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     expect(document.querySelector('[data-cmdk-preview]')).not.toBeNull();
   });
 
@@ -1450,14 +1463,14 @@ describe('global-search root', () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Type a query that matches a navigation item (admin=true per beforeEach).
-    await user.type(screen.getByRole('combobox'), 'classific');
+    await userEvent.type(page.getByRole('combobox'), 'classific');
     // svelte-i18n fallbackLocale 'dev' renders literal keys.
-    const navHeading = await screen.findByText('cmdk_section_system_settings', {}, { timeout: 2000 });
-    expect(navHeading).toBeInTheDocument();
+    const navHeading = await page.getByText('cmdk_section_system_settings').findElement({ timeout: 2000 });
+    await expect.element(page.elementLocator(navHeading)).toBeInTheDocument();
     // Photos heading should exist in the DOM (loading-branch renders it too).
-    const photosHeading = screen.queryByText('cmdk_photos_heading');
+    const photosHeading = page.getByText('cmdk_photos_heading').query();
     if (photosHeading) {
       // Nav heading must appear AFTER photos heading in DOM order.
       expect(photosHeading.compareDocumentPosition(navHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1467,9 +1480,9 @@ describe('global-search root', () => {
   it('progress stripe is hidden for fast-settling queries (batch actually settles before grace)', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // All providers mock-resolve instantly → debounce (150ms) + microtasks → batch settles.
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     // Wait for batchInFlight to actually flip false — proves the batch settled, not that
     // we polled too early. Must happen before the 200ms grace would have armed the stripe.
     await vi.waitFor(() => expect(m.batchInFlight).toBe(false), { timeout: 500 });
@@ -1485,14 +1498,14 @@ describe('global-search root', () => {
     (m as unknown as { providers: Record<keyof Sections, Provider> }).providers.photos.run = () =>
       new Promise(() => {});
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     // Wait past debounce (150ms) + grace (200ms) + a bit of slack.
     await new Promise((r) => setTimeout(r, 500));
     expect(document.querySelector('[data-cmdk-progress]')).not.toBeNull();
   });
 
-  it('render-time filter hides stale admin navigate entries for non-admins', () => {
+  it('render-time filter hides stale admin navigate entries for non-admins', async () => {
     mockUser.current = { id: 'test-user', isAdmin: false };
     addEntry({
       kind: 'navigate',
@@ -1514,15 +1527,15 @@ describe('global-search root', () => {
     });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Non-admin should see photos but NOT users in the recents list.
-    expect(screen.getByText('photos')).toBeInTheDocument();
-    expect(screen.queryByText('users')).toBeNull();
+    await expect.element(page.getByText('photos')).toBeInTheDocument();
+    expect(page.getByText('users').query()).toBeNull();
   });
 
   // NF2: the filter uses the LIVE NavigationItem.adminOnly, not the stored entry.adminOnly,
   // so a stale `adminOnly: false` entry pointing at a currently-admin-only item is dropped.
-  it('render-time filter uses live NavigationItem.adminOnly, not the stale saved entry field', () => {
+  it('render-time filter uses live NavigationItem.adminOnly, not the stale saved entry field', async () => {
     mockUser.current = { id: 'test-user', isAdmin: false };
     // classification_settings is live adminOnly=true, but the saved entry has stale adminOnly=false.
     addEntry({
@@ -1536,13 +1549,13 @@ describe('global-search root', () => {
     });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Live catalog says adminOnly=true, user is non-admin → entry must not render.
-    expect(screen.queryByText('admin.classification_settings')).toBeNull();
+    expect(page.getByText('admin.classification_settings').query()).toBeNull();
   });
 
   // CG6: feature-flag-disabled navigate recents must also be hidden pre-click.
-  it('render-time filter hides navigate recents whose feature flag is now disabled', () => {
+  it('render-time filter hides navigate recents whose feature flag is now disabled', async () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     addEntry({
@@ -1565,13 +1578,13 @@ describe('global-search root', () => {
     });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.getByText('photos')).toBeInTheDocument();
-    expect(screen.queryByText('map')).toBeNull();
+    await render(GlobalSearch, { props: { manager: m } });
+    await expect.element(page.getByText('photos')).toBeInTheDocument();
+    expect(page.getByText('map').query()).toBeNull();
   });
 
   // NF2: the filter also drops ghost entries whose NavigationItem was removed upstream.
-  it('render-time filter hides navigate recents for unknown (ghost) NavigationItems', () => {
+  it('render-time filter hides navigate recents for unknown (ghost) NavigationItems', async () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     addEntry({
       kind: 'navigate',
@@ -1584,19 +1597,19 @@ describe('global-search root', () => {
     });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.queryByText('removed_feature_label')).toBeNull();
+    await render(GlobalSearch, { props: { manager: m } });
+    expect(page.getByText('removed_feature_label').query()).toBeNull();
   });
 
   // CG8: cold open (empty query) must not render any navigation sub-section headings.
-  it('cold open (empty query) does NOT render navigation sub-sections', () => {
+  it('cold open (empty query) does NOT render navigation sub-sections', async () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.queryByText('cmdk_section_system_settings')).toBeNull();
-    expect(screen.queryByText('cmdk_section_admin')).toBeNull();
-    expect(screen.queryByText('cmdk_section_user_pages')).toBeNull();
+    await render(GlobalSearch, { props: { manager: m } });
+    expect(page.getByText('cmdk_section_system_settings').query()).toBeNull();
+    expect(page.getByText('cmdk_section_admin').query()).toBeNull();
+    expect(page.getByText('cmdk_section_user_pages').query()).toBeNull();
   });
 
   // CG7: closing the palette mid-batch must unmount and clean up the stripe effect.
@@ -1606,16 +1619,16 @@ describe('global-search root', () => {
     (m as unknown as { providers: Record<keyof Sections, Provider> }).providers.photos.run = () =>
       new Promise(() => {});
     m.open();
-    const firstRender = render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    const firstRender = await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     await new Promise((r) => setTimeout(r, 500));
     expect(document.querySelector('[data-cmdk-progress]')).not.toBeNull();
     // Unmount simulates palette close — $effect cleanup should run.
-    firstRender.unmount();
+    await firstRender.unmount();
     // Re-mount a fresh instance. Stripe must NOT be leaking across mounts.
     const fresh = new GlobalSearchManager();
     fresh.open();
-    const secondRender = render(GlobalSearch, { props: { manager: fresh } });
+    const secondRender = await render(GlobalSearch, { props: { manager: fresh } });
     expect(secondRender.container.querySelector('[data-cmdk-progress]')).toBeNull();
   });
 
@@ -1629,8 +1642,8 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     stubAllEntitySections(m);
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'beach');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'beach');
     // Wait for photos to flip to ok — guarantees at least one batch has resolved,
     // all other stubbed providers resolve synchronously alongside.
     await vi.waitFor(() => expect(m.sections.photos.status).toBe('ok'), { timeout: 2000 });
@@ -1678,8 +1691,8 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'add-photo.jpg' }]);
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'add');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'add');
 
     await vi.waitFor(() => expect(m.topCommandMatch?.id).toBe('cmd:selection_add_to_album'));
     await vi.waitFor(() =>
@@ -1687,7 +1700,7 @@ describe('global-search root', () => {
     );
     const commandsSection = document.querySelector('[data-cmdk-commands-section]');
     const addToSpaceRow = document.querySelector('[data-command-item][data-value="cmd:selection_add_to_space"]');
-    const photosHeading = screen.getByText(/^cmdk_photos_heading$|^Photos$/i);
+    const photosHeading = page.getByText(/^cmdk_photos_heading$|^Photos$/i).element();
 
     expect(commandsSection).not.toBeNull();
     expect(addToSpaceRow).not.toBeNull();
@@ -1714,8 +1727,8 @@ describe('global-search root', () => {
     providers.places.run = placesSpy;
     providers.tags.run = tagsSpy;
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'a');
+    await render(GlobalSearch, { props: { manager: m } });
+    await userEvent.type(page.getByRole('combobox'), 'a');
     // Wait for the photos provider to have been called once — proves the batch
     // debounce has fired and the dispatch tuple has been iterated.
     await vi.waitFor(() => expect(photosSpy).toHaveBeenCalledTimes(1), { timeout: 2000 });
@@ -1732,7 +1745,7 @@ describe('global-search root', () => {
     expect(m.sections.tags.status).toBe('idle');
   });
 
-  it('respects prefers-reduced-motion class on palette shell', () => {
+  it('respects prefers-reduced-motion class on palette shell', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockImplementation((query: string) => ({
@@ -1748,7 +1761,7 @@ describe('global-search root', () => {
     );
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
     // Modal portals its content to body, not the render container, so query the whole document.
     const hasReducedMotion = [...document.querySelectorAll<HTMLElement>('*')].some((el) =>
       (el.className?.toString() ?? '').includes('motion-reduce:'),
@@ -1758,7 +1771,7 @@ describe('global-search root', () => {
 });
 
 describe('prefix scoping — UI scope gating', () => {
-  it('scope all still renders existing full section stack (regression pin)', () => {
+  it('scope all still renders existing full section stack (regression pin)', async () => {
     // Scope derives to 'all' for any bare query (no leading prefix), so seed
     // `manager.query` with a plain string and populate a couple of entity sections.
     // The gating Task 12a adds must be a pure no-op for unscoped queries: every
@@ -1769,10 +1782,10 @@ describe('prefix scoping — UI scope gating', () => {
     manager.query = 'alice';
     manager.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
     manager.sections.people = { status: 'ok', items: [{ id: 'person1', name: 'Alice' } as never], total: 1 };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(manager.scope).toBe('all');
-    expect(screen.getByText(/^cmdk_photos_heading$|^Photos$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^cmdk_people_heading$|^People$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^cmdk_photos_heading$|^Photos$/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/^cmdk_people_heading$|^People$/i)).toBeInTheDocument();
   });
 });
 
@@ -1783,42 +1796,42 @@ describe('prefix scoping — scoped rendering', () => {
     return m;
   }
 
-  it('scope people: only People section renders; others hidden', () => {
+  it('scope people: only People section renders; others hidden', async () => {
     const manager = makeWithScope('@alice');
     manager.sections.people = { status: 'ok', items: [{ id: 'p1', name: 'Alice' } as never], total: 1 };
     manager.sections.photos = { status: 'ok', items: [{ id: 'x1' } as never], total: 1 };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     // People heading renders (literal key or English label).
-    expect(screen.queryByText(/^cmdk_people_heading$|^People$/i)).not.toBeNull();
+    expect(page.getByText(/^cmdk_people_heading$|^People$/i).query()).not.toBeNull();
     // Every other entity heading absent.
-    expect(screen.queryByText(/^cmdk_photos_heading$|^Photos$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_section_albums$|^Albums$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_section_spaces$|^Spaces$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_places_heading$|^Places$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_tags_heading$|^Tags$/i)).toBeNull();
+    expect(page.getByText(/^cmdk_photos_heading$|^Photos$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_section_albums$|^Albums$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_section_spaces$|^Spaces$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_places_heading$|^Places$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_tags_heading$|^Tags$/i).query()).toBeNull();
   });
 
-  it('scope tags: only Tags section renders', () => {
+  it('scope tags: only Tags section renders', async () => {
     const manager = makeWithScope('#xmas');
     manager.sections.tags = { status: 'ok', items: [{ id: 't1', name: 'xmas' } as never], total: 1 };
-    render(GlobalSearch, { props: { manager } });
-    expect(screen.queryByText(/^cmdk_tags_heading$|^Tags$/i)).not.toBeNull();
-    expect(screen.queryByText(/^cmdk_people_heading$|^People$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_photos_heading$|^Photos$/i)).toBeNull();
+    await render(GlobalSearch, { props: { manager } });
+    expect(page.getByText(/^cmdk_tags_heading$|^Tags$/i).query()).not.toBeNull();
+    expect(page.getByText(/^cmdk_people_heading$|^People$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_photos_heading$|^Photos$/i).query()).toBeNull();
   });
 
-  it('scope collections: Albums + Spaces render; nothing else', () => {
+  it('scope collections: Albums + Spaces render; nothing else', async () => {
     const manager = makeWithScope('/trip');
     manager.sections.albums = { status: 'ok', items: [{ id: 'a1', albumName: 'Trip' } as never], total: 1 };
     manager.sections.spaces = { status: 'ok', items: [{ id: 's1', name: 'Trip club' } as never], total: 1 };
-    render(GlobalSearch, { props: { manager } });
-    expect(screen.queryByText(/^cmdk_section_albums$|^Albums$/i)).not.toBeNull();
-    expect(screen.queryByText(/^cmdk_section_spaces$|^Spaces$/i)).not.toBeNull();
-    expect(screen.queryByText(/^cmdk_people_heading$|^People$/i)).toBeNull();
-    expect(screen.queryByText(/^cmdk_photos_heading$|^Photos$/i)).toBeNull();
+    await render(GlobalSearch, { props: { manager } });
+    expect(page.getByText(/^cmdk_section_albums$|^Albums$/i).query()).not.toBeNull();
+    expect(page.getByText(/^cmdk_section_spaces$|^Spaces$/i).query()).not.toBeNull();
+    expect(page.getByText(/^cmdk_people_heading$|^People$/i).query()).toBeNull();
+    expect(page.getByText(/^cmdk_photos_heading$|^Photos$/i).query()).toBeNull();
   });
 
-  it('scope nav: NavigationSections render; nothing else', () => {
+  it('scope nav: NavigationSections render; nothing else', async () => {
     const manager = makeWithScope('>fav');
     manager.sections.navigation = {
       status: 'ok',
@@ -1833,11 +1846,11 @@ describe('prefix scoping — scoped rendering', () => {
       ],
       total: 1,
     };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     // Modal portals its content to document.body; the nav section wrapper has
     // data-cmdk-nav-section on each GroupWrapper rendered by GlobalSearchNavigationSections.
     expect(document.querySelector('[data-cmdk-nav-section]')).not.toBeNull();
-    expect(screen.queryByText(/^cmdk_photos_heading$|^Photos$/i)).toBeNull();
+    expect(page.getByText(/^cmdk_photos_heading$|^Photos$/i).query()).toBeNull();
   });
 
   // The plan spec originally required the placeholder text to be exactly "Search..."
@@ -1847,45 +1860,45 @@ describe('prefix scoping — scoped rendering', () => {
   // Adapt the assertion to accept either the literal key or the English label.
   // The regression guard (single-term placeholder with no hint suffix) still holds:
   // if someone appended hints, the placeholder text would no longer match.
-  it('placeholder text is a single term (no hint bloat)', () => {
+  it('placeholder text is a single term (no hint bloat)', async () => {
     const manager = new GlobalSearchManager();
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     const input = document.querySelector('input[role="combobox"], input[type="text"]') as HTMLInputElement | null;
     expect(input).not.toBeNull();
     expect(input?.placeholder).toMatch(/^(cmdk_placeholder|Search Gallery|Search\.\.\.)$/);
   });
 
-  it('scope all with mlHealthy=false shows ML banner', () => {
+  it('scope all with mlHealthy=false shows ML banner', async () => {
     const manager = new GlobalSearchManager();
     manager.query = 'alice';
     manager.mlHealthy = false;
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     // Banner renders literal i18n key in dev fallback.
-    expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).not.toBeNull();
+    expect(page.getByText(/cmdk_smart_unavailable|smart search is unavailable/i).query()).not.toBeNull();
   });
 
-  it('scope people with mlHealthy=false hides ML banner', () => {
+  it('scope people with mlHealthy=false hides ML banner', async () => {
     const manager = makeWithScope('@alice');
     manager.mlHealthy = false;
-    render(GlobalSearch, { props: { manager } });
-    expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).toBeNull();
+    await render(GlobalSearch, { props: { manager } });
+    expect(page.getByText(/cmdk_smart_unavailable|smart search is unavailable/i).query()).toBeNull();
   });
 
-  it('scope people hides TopNavigationMatch promotion', () => {
+  it('scope people hides TopNavigationMatch promotion', async () => {
     const manager = makeWithScope('@classification');
     // Under scope=people the top-result promotion branch is not rendered regardless
     // of whether topNavigationMatch derives non-null — the whole `all` branch is skipped.
-    render(GlobalSearch, { props: { manager } });
-    expect(screen.queryByText(/cmdk_top_result|top result/i)).toBeNull();
+    await render(GlobalSearch, { props: { manager } });
+    expect(page.getByText(/cmdk_top_result|top result/i).query()).toBeNull();
   });
 
-  it('mode pills under scope: opacity-50, no aria-disabled, still focusable', () => {
+  it('mode pills under scope: opacity-50, no aria-disabled, still focusable', async () => {
     const manager = makeWithScope('@alice');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     // Modal portals its content to document.body, not the render container.
     const radioGroup = document.querySelector('[data-testid="search-mode-rail"]');
     expect(radioGroup).not.toBeNull();
-    expect(radioGroup).toHaveAttribute('data-scoped', 'true');
+    await expect.element(page.elementLocator(radioGroup!)).toHaveAttribute('data-scoped', 'true');
     // The radiogroup + every radio input inside it must not carry aria-disabled —
     // they stay focusable so users can still preset a mode for when they clear
     // the prefix. Scoping to the radiogroup subtree avoids coincidental
@@ -1906,7 +1919,7 @@ describe('prefix scoping — scoped rendering', () => {
     const searchAssetsSpy = vi.mocked(searchAssets);
     searchSmartSpy.mockClear();
     searchAssetsSpy.mockClear();
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     const metadataRadio = document.querySelector('input[value="metadata"]') as HTMLInputElement;
     expect(metadataRadio).not.toBeNull();
     metadataRadio.click();
@@ -1917,14 +1930,14 @@ describe('prefix scoping — scoped rendering', () => {
     expect(manager.mode).toBe('metadata');
   });
 
-  it('? keydown (no modifiers) opens ShortcutsModal', () => {
+  it('? keydown (no modifiers) opens ShortcutsModal', async () => {
     // modalManager.show returns Promise<never>; stub with Promise.resolve cast through any
     // so the assertion chain compiles under CI's strict tsc.
     const showSpy = vi.spyOn(modalManager, 'show').mockImplementation(() => Promise.resolve(void 0 as never));
     const manager = new GlobalSearchManager();
     manager.open();
-    render(GlobalSearch, { props: { manager } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await render(GlobalSearch, { props: { manager } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.focus();
     const ev = new KeyboardEvent('keydown', { key: '?', bubbles: true, cancelable: true });
     input.dispatchEvent(ev);
@@ -1933,42 +1946,42 @@ describe('prefix scoping — scoped rendering', () => {
     showSpy.mockRestore();
   });
 
-  it('Ctrl+? does NOT open modal', () => {
+  it('Ctrl+? does NOT open modal', async () => {
     // modalManager.show returns Promise<never>; stub with Promise.resolve cast through any
     // so the assertion chain compiles under CI's strict tsc.
     const showSpy = vi.spyOn(modalManager, 'show').mockImplementation(() => Promise.resolve(void 0 as never));
     const manager = new GlobalSearchManager();
     manager.open();
-    render(GlobalSearch, { props: { manager } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await render(GlobalSearch, { props: { manager } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: '?', ctrlKey: true, bubbles: true }));
     expect(showSpy).not.toHaveBeenCalled();
     showSpy.mockRestore();
   });
 
-  it('Alt+? does NOT open modal', () => {
+  it('Alt+? does NOT open modal', async () => {
     // modalManager.show returns Promise<never>; stub with Promise.resolve cast through any
     // so the assertion chain compiles under CI's strict tsc.
     const showSpy = vi.spyOn(modalManager, 'show').mockImplementation(() => Promise.resolve(void 0 as never));
     const manager = new GlobalSearchManager();
     manager.open();
-    render(GlobalSearch, { props: { manager } });
-    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await render(GlobalSearch, { props: { manager } });
+    const input = page.getByRole('combobox').element() as HTMLInputElement;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: '?', altKey: true, bubbles: true }));
     expect(showSpy).not.toHaveBeenCalled();
     showSpy.mockRestore();
   });
 
-  it('preview pane under @alice with Alice highlighted renders PersonPreview', () => {
+  it('preview pane under @alice with Alice highlighted renders PersonPreview', async () => {
     mediaState.minLg = true;
     const manager = makeWithScope('@alice');
     manager.sections.people = { status: 'ok', items: [{ id: 'p1', name: 'Alice' } as never], total: 1 };
     manager.setActiveItem('person:p1');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(document.querySelector('[data-cmdk-preview-person]')).not.toBeNull();
   });
 
-  it('preview pane under person: with a live person filter choice highlighted renders PersonPreview', () => {
+  it('preview pane under person: with a live person filter choice highlighted renders PersonPreview', async () => {
     mediaState.minLg = true;
     const manager = new GlobalSearchManager();
     manager.open();
@@ -2001,23 +2014,23 @@ describe('prefix scoping — scoped rendering', () => {
     };
     manager.setActiveItem('filter:person:0:7:person:p1:Alice');
 
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
 
     const preview = document.querySelector('[data-cmdk-preview-person]') as HTMLElement | null;
     expect(preview).not.toBeNull();
-    expect(within(preview!).getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.elementLocator(preview!).getByText('Alice')).toBeInTheDocument();
   });
 
-  it('preview pane under #xmas with tag highlighted renders TagPreview', () => {
+  it('preview pane under #xmas with tag highlighted renders TagPreview', async () => {
     mediaState.minLg = true;
     const manager = makeWithScope('#xmas');
     manager.sections.tags = { status: 'ok', items: [{ id: 't1', name: 'xmas' } as never], total: 1 };
     manager.setActiveItem('tag:t1');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(document.querySelector('[data-cmdk-preview-tag]')).not.toBeNull();
   });
 
-  it('preview pane under /trip with album highlighted renders AlbumPreview', () => {
+  it('preview pane under /trip with album highlighted renders AlbumPreview', async () => {
     mediaState.minLg = true;
     const manager = makeWithScope('/trip');
     manager.sections.albums = {
@@ -2026,11 +2039,11 @@ describe('prefix scoping — scoped rendering', () => {
       total: 1,
     };
     manager.setActiveItem('album:a1');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(document.querySelector('[data-cmdk-preview-album]')).not.toBeNull();
   });
 
-  it('preview pane under /trip with space highlighted renders SpacePreview', () => {
+  it('preview pane under /trip with space highlighted renders SpacePreview', async () => {
     mediaState.minLg = true;
     const manager = makeWithScope('/trip');
     manager.sections.spaces = {
@@ -2049,11 +2062,11 @@ describe('prefix scoping — scoped rendering', () => {
       total: 1,
     };
     manager.setActiveItem('space:s1');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(document.querySelector('[data-cmdk-preview-space]')).not.toBeNull();
   });
 
-  it('preview pane under >theme with nav highlighted renders empty-state fallback', () => {
+  it('preview pane under >theme with nav highlighted renders empty-state fallback', async () => {
     mediaState.minLg = true;
     const manager = makeWithScope('>theme');
     manager.sections.navigation = {
@@ -2070,12 +2083,12 @@ describe('prefix scoping — scoped rendering', () => {
       total: 1,
     };
     manager.setActiveItem('nav:userPages:photos');
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     // Nav preview branch renders the empty-state placeholder (literal key under dev fallback).
-    expect(screen.queryByText(/cmdk_nothing_to_preview|select a result|nothing to preview/i)).not.toBeNull();
+    expect(page.getByText(/cmdk_nothing_to_preview|select a result|nothing to preview/i).query()).not.toBeNull();
   });
 
-  it('> bare scroll: nav items render in DOM across buckets', () => {
+  it('> bare scroll: nav items render in DOM across buckets', async () => {
     const manager = makeWithScope('>');
     // GlobalSearchNavigationSections caps each bucket at TOP_N=5. Distribute 36
     // items across all 3 categories (systemSettings/admin/userPages) so
@@ -2091,7 +2104,7 @@ describe('prefix scoping — scoped rendering', () => {
       route: `/r${i}`,
     }));
     manager.sections.navigation = { status: 'ok', items: items as never, total: 36 };
-    render(GlobalSearch, { props: { manager } });
+    await render(GlobalSearch, { props: { manager } });
     expect(document.querySelector('[data-cmdk-nav-section]')).not.toBeNull();
     const rows = document.querySelectorAll('[data-command-item]');
     expect(rows.length).toBeGreaterThan(0);
@@ -2103,29 +2116,28 @@ describe('search mode control placement', () => {
     localStorage.clear();
   });
 
-  it('puts the rail in the modal palette', () => {
+  it('puts the rail in the modal palette', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
     expect(document.querySelector('[data-testid="search-mode-rail"]')).not.toBeNull();
   });
 
   it('changes the manager mode from the modal rail', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
     const radios = [...document.querySelectorAll('[data-testid="search-mode-rail"] input')] as HTMLInputElement[];
-    await user.click(radios.find((radio) => radio.value === 'ocr')!);
+    await userEvent.click(radios.find((radio) => radio.value === 'ocr')!);
 
     expect(m.mode).toBe('ocr');
   });
 
-  it('puts the chip inside the inline search field, where the Cmd-K hint lives', () => {
+  it('puts the chip inside the inline search field, where the Cmd-K hint lives', async () => {
     const m = new GlobalSearchManager();
-    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    const { container } = await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
     expect(
       container.querySelector(':scope [data-testid="cmdk-input-trigger"] [data-testid="search-mode-chip"]'),
@@ -2133,12 +2145,13 @@ describe('search mode control placement', () => {
   });
 
   it('changes the manager mode from the inline chip', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const m = new GlobalSearchManager();
-    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    const { container } = await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
-    await user.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
-    await user.click(container.querySelector('[data-testid="search-mode-option-description"]') as HTMLButtonElement);
+    await userEvent.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
+    await userEvent.click(
+      container.querySelector('[data-testid="search-mode-option-description"]') as HTMLButtonElement,
+    );
 
     expect(m.mode).toBe('description');
   });
@@ -2148,12 +2161,11 @@ describe('search mode control placement', () => {
   // field's clickOutside wrapper). The panel is the later sibling, so at equal z-index it
   // wins the paint and swallows the menu. Assert the menu outranks it.
   it('paints the chip menu above the open results panel', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const m = new GlobalSearchManager();
     m.open('dropdown');
-    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    const { container } = await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
-    await user.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
+    await userEvent.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
 
     const zIndexOf = (element: Element | null) => Number(/z-(\d+)/.exec(element?.className ?? '')?.[1] ?? 0);
     const panel = container.querySelector('[data-cmdk-dropdown-panel]');
@@ -2163,17 +2175,17 @@ describe('search mode control placement', () => {
     expect(zIndexOf(menu)).toBeGreaterThan(zIndexOf(panel));
   });
 
-  it('keeps the chip out of the modal, where the rail already carries the mode', () => {
+  it('keeps the chip out of the modal, where the rail already carries the mode', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
+    await render(GlobalSearch, { props: { manager: m } });
 
     expect(document.querySelector('[data-testid="search-mode-chip"]')).toBeNull();
   });
 
-  it('keeps the rail out of the inline dropdown, where the chip already carries the mode', () => {
+  it('keeps the rail out of the inline dropdown, where the chip already carries the mode', async () => {
     const m = new GlobalSearchManager();
-    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+    const { container } = await render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
 
     expect(container.querySelector('[data-testid="search-mode-rail"]')).toBeNull();
   });

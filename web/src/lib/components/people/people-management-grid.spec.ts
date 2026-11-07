@@ -1,49 +1,82 @@
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { flushSync } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PeopleManagementGridWrapper from './people-management-grid.test-wrapper.svelte';
 
+/**
+Thumbnails never load in the unit tier: every request 404s within milliseconds, and that real `error`
+event would free a deferred-thumbnail slot (and swap the image for the broken-asset fallback) before
+a test could look at the queue. Swallow the browser's own image load/error events in the capture
+phase, before they reach the image, so a slot is released only by the events a test dispatches.
+*/
+const swallowBrowserImageEvents = (event: Event) => {
+  if (event.isTrusted && event.target instanceof HTMLImageElement) {
+    event.stopImmediatePropagation();
+  }
+};
+
+const mouseEnter = () => {
+  page.getByRole('group').element().dispatchEvent(new MouseEvent('mouseenter'));
+  flushSync();
+};
+
+const fire = (title: string, type: 'load' | 'error') => {
+  page.getByTitle(title, { exact: true }).element().dispatchEvent(new Event(type));
+  flushSync();
+};
+
 describe('PeopleManagementGrid', () => {
+  beforeEach(() => {
+    addEventListener('load', swallowBrowserImageEvents, { capture: true });
+    addEventListener('error', swallowBrowserImageEvents, { capture: true });
+  });
+
+  afterEach(() => {
+    removeEventListener('load', swallowBrowserImageEvents, { capture: true });
+    removeEventListener('error', swallowBrowserImageEvents, { capture: true });
+  });
+
   it('renders shared person tiles with an editable canonical name footer', async () => {
     const onNameSubmit = vi.fn();
-    render(PeopleManagementGridWrapper, { props: { onNameSubmit } });
+    await render(PeopleManagementGridWrapper, { props: { onNameSubmit } });
 
-    expect(screen.getByRole('link', { name: 'Ada Lovelace' })).toHaveAttribute('href', '/people/person-1');
+    await expect.element(page.getByRole('link', { name: 'Ada Lovelace' })).toHaveAttribute('href', '/people/person-1');
 
-    const input = screen.getByDisplayValue('Ada Lovelace');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Ada Byron');
-    await fireEvent.focusOut(input);
+    const input = page.getByRole('textbox');
+    await expect.element(input).toHaveValue('Ada Lovelace');
+    await userEvent.fill(input, 'Ada Byron');
+    (input.element() as HTMLInputElement).blur();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(onNameSubmit).toHaveBeenCalledWith('Ada Byron', expect.objectContaining({ id: 'person-1' }));
     });
   });
 
-  it('renders readonly names when editing is disabled', () => {
-    render(PeopleManagementGridWrapper, { props: { canEditNames: false } });
+  it('renders readonly names when editing is disabled', async () => {
+    await render(PeopleManagementGridWrapper, { props: { canEditNames: false } });
 
-    expect(screen.queryByDisplayValue('Ada Lovelace')).not.toBeInTheDocument();
-    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(page.getByRole('textbox').query()).toBeNull();
   });
 
   it('uses the shared tile action slot and can disable actions per page', async () => {
     const onAction = vi.fn();
-    const { rerender } = render(PeopleManagementGridWrapper, {
+    const { rerender } = await render(PeopleManagementGridWrapper, {
       props: { canShowActions: false, onAction },
     });
 
-    await fireEvent.mouseEnter(screen.getByRole('group'));
-    expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument();
+    mouseEnter();
+    expect(page.getByRole('button', { name: 'Actions' }).query()).toBeNull();
 
     await rerender({ canShowActions: true, onAction });
-    await fireEvent.mouseEnter(screen.getByRole('group'));
-    await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    mouseEnter();
+    await page.getByRole('button', { name: 'Actions' }).click();
 
     expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'person-1' }));
   });
 
-  it('does not assign thumbnail src for deferred offscreen tiles', () => {
+  it('does not assign thumbnail src for deferred offscreen tiles', async () => {
     class NeverIntersectingObserver {
       observe = vi.fn();
       disconnect = vi.fn();
@@ -51,16 +84,16 @@ describe('PeopleManagementGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', NeverIntersectingObserver);
 
-    render(PeopleManagementGridWrapper, {
+    await render(PeopleManagementGridWrapper, {
       props: {
         deferThumbnails: true,
         people: Array.from({ length: 3 }, (_, index) => ({ id: `person-${index}`, name: `Person ${index}` })),
       },
     });
 
-    expect(screen.getByTitle('Person 0')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Person 1')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Person 2')).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Person 0', { exact: true })).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Person 1', { exact: true })).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Person 2', { exact: true })).not.toHaveAttribute('src');
 
     vi.unstubAllGlobals();
   });
@@ -82,7 +115,7 @@ describe('PeopleManagementGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', VisibleObserver);
 
-    render(PeopleManagementGridWrapper, {
+    await render(PeopleManagementGridWrapper, {
       props: {
         deferThumbnails: true,
         thumbnailConcurrency: 2,
@@ -90,17 +123,19 @@ describe('PeopleManagementGrid', () => {
       },
     });
 
-    await waitFor(() => {
-      expect(screen.getByTitle('Person 0')).toHaveAttribute('src', '/api/people/person-0/thumbnail');
-      expect(screen.getByTitle('Person 1')).toHaveAttribute('src', '/api/people/person-1/thumbnail');
-    });
-    expect(screen.getByTitle('Person 2')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Person 3')).not.toHaveAttribute('src');
+    await expect
+      .element(page.getByTitle('Person 0', { exact: true }))
+      .toHaveAttribute('src', '/api/people/person-0/thumbnail');
+    await expect
+      .element(page.getByTitle('Person 1', { exact: true }))
+      .toHaveAttribute('src', '/api/people/person-1/thumbnail');
+    await expect.element(page.getByTitle('Person 2', { exact: true })).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Person 3', { exact: true })).not.toHaveAttribute('src');
 
-    await fireEvent.load(screen.getByTitle('Person 0'));
-    await waitFor(() => {
-      expect(screen.getByTitle('Person 2')).toHaveAttribute('src', '/api/people/person-2/thumbnail');
-    });
+    fire('Person 0', 'load');
+    await expect
+      .element(page.getByTitle('Person 2', { exact: true }))
+      .toHaveAttribute('src', '/api/people/person-2/thumbnail');
 
     vi.unstubAllGlobals();
   });
@@ -122,7 +157,7 @@ describe('PeopleManagementGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', VisibleObserver);
 
-    render(PeopleManagementGridWrapper, {
+    await render(PeopleManagementGridWrapper, {
       props: {
         deferThumbnails: true,
         thumbnailConcurrency: 1,
@@ -133,10 +168,10 @@ describe('PeopleManagementGrid', () => {
       },
     });
 
-    await waitFor(() => expect(screen.getByTitle('Ada Lovelace')).toHaveAttribute('src'));
-    expect(screen.getByTitle('Grace Hopper')).not.toHaveAttribute('src');
-    await fireEvent.error(screen.getByTitle('Ada Lovelace'));
-    await waitFor(() => expect(screen.getByTitle('Grace Hopper')).toHaveAttribute('src'));
+    await expect.element(page.getByTitle('Ada Lovelace', { exact: true })).toHaveAttribute('src');
+    await expect.element(page.getByTitle('Grace Hopper', { exact: true })).not.toHaveAttribute('src');
+    fire('Ada Lovelace', 'error');
+    await expect.element(page.getByTitle('Grace Hopper', { exact: true })).toHaveAttribute('src');
 
     vi.unstubAllGlobals();
   });
@@ -158,7 +193,7 @@ describe('PeopleManagementGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', VisibleObserver);
 
-    const { rerender } = render(PeopleManagementGridWrapper, {
+    const { rerender } = await render(PeopleManagementGridWrapper, {
       props: {
         deferThumbnails: true,
         thumbnailConcurrency: 2,
@@ -168,8 +203,8 @@ describe('PeopleManagementGrid', () => {
         ],
       },
     });
-    await waitFor(() => expect(screen.getByTitle('Ada Lovelace')).toHaveAttribute('src'));
-    await waitFor(() => expect(screen.getByTitle('Grace Hopper')).toHaveAttribute('src'));
+    await expect.element(page.getByTitle('Ada Lovelace', { exact: true })).toHaveAttribute('src');
+    await expect.element(page.getByTitle('Grace Hopper', { exact: true })).toHaveAttribute('src');
 
     await rerender({
       deferThumbnails: true,
@@ -183,13 +218,13 @@ describe('PeopleManagementGrid', () => {
       ],
     });
 
-    expect(screen.getByTitle('Katherine Johnson')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Dorothy Vaughan')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Mary Jackson')).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Katherine Johnson', { exact: true })).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Dorothy Vaughan', { exact: true })).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Mary Jackson', { exact: true })).not.toHaveAttribute('src');
 
-    await fireEvent.load(screen.getByTitle('Ada Lovelace'));
-    await waitFor(() => expect(screen.getByTitle('Katherine Johnson')).toHaveAttribute('src'));
-    expect(screen.getByTitle('Mary Jackson')).not.toHaveAttribute('src');
+    fire('Ada Lovelace', 'load');
+    await expect.element(page.getByTitle('Katherine Johnson', { exact: true })).toHaveAttribute('src');
+    await expect.element(page.getByTitle('Mary Jackson', { exact: true })).not.toHaveAttribute('src');
 
     vi.unstubAllGlobals();
   });

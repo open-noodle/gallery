@@ -1,4 +1,4 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import {
   SharedSpaceRole,
   type AlbumResponseDto,

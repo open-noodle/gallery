@@ -36,6 +36,9 @@ hooks, next to the flat endpoints on `searchAssetBuilderLegacy`. Only this UI st
    In particular, upstream's `#30279` added `searchManager.setQuery(terms)` calls to
    `web/src/routes/(user)/search/…/+page.svelte`. Those were removed during the batch-124 rebase: that
    page is a **live fork surface** and must not depend on the dormant manager.
+   The one expected hit is upstream's own `web/src/routes/(user)/search/…/page.spec.ts` (since
+   v3.4.0-rc.3), which drives this search bar. It is kept as upstream wrote it with its cases
+   `test.skip`ped, so it still merges; do not mount the dormant bar to make it pass.
 3. **`i18n/en.json` keys for this UI are also dormant.** They are upstream's; they do not need the
    nine-locale fork translation pass, because no fork surface renders them.
 

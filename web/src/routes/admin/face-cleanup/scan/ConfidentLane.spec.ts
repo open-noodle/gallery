@@ -1,7 +1,7 @@
 import { Route } from '#lib/route.ts';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import ConfidentLane from './ConfidentLane.svelte';
 import { createScanTriageModel, type FaceCleanupPerson } from './scan-triage.svelte';
 
@@ -9,18 +9,6 @@ vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
   const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { ...mod, Icon: noop.default };
-});
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    t: {
-      subscribe: (run: (fn: (k: string, o?: unknown) => string) => void) => {
-        run((k) => k);
-        return () => {};
-      },
-    },
-  };
 });
 vi.mock('#lib/utils/people-utils.js', () => ({ getAdminFaceThumbnailUrl: (id: string) => `/thumb/${id}` }));
 
@@ -41,75 +29,81 @@ const conf = (id: string): FaceCleanupPerson => ({
 });
 
 describe('ConfidentLane', () => {
-  it('renders nothing when there are no confident clusters', () => {
+  it('renders nothing when there are no confident clusters', async () => {
     const model = createScanTriageModel([{ ...conf('r'), recommendation: 'review-first' }]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    expect(screen.queryByTestId('confident-lane')).not.toBeInTheDocument();
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    expect(page.getByTestId('confident-lane').query()).not.toBeInTheDocument();
   });
 
-  it('offers to approve every confident cluster by default', () => {
+  it('offers to approve every confident cluster by default', async () => {
     const model = createScanTriageModel([conf('c1'), conf('c2'), conf('c3')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('3');
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('3');
   });
 
   it('approve button invokes onApprove', async () => {
     const model = createScanTriageModel([conf('c1')]);
     const onApprove = vi.fn();
-    render(ConfidentLane, { props: { model, applying: false, onApprove } });
-    await fireEvent.click(screen.getByTestId('confident-approve'));
+    await render(ConfidentLane, { props: { model, applying: false, onApprove } });
+    await userEvent.click(page.getByTestId('confident-approve').element());
     expect(onApprove).toHaveBeenCalledTimes(1);
   });
 
-  it('approve button is disabled while applying', () => {
+  it('approve button is disabled while applying', async () => {
     const model = createScanTriageModel([conf('c1')]);
-    render(ConfidentLane, { props: { model, applying: true, onApprove: vi.fn() } });
-    expect(screen.getByTestId('confident-approve')).toBeDisabled();
+    await render(ConfidentLane, { props: { model, applying: true, onApprove: vi.fn() } });
+    expect(page.getByTestId('confident-approve').element()).toBeDisabled();
   });
 
   it('expanding reveals a spot-check card per confident cluster', async () => {
     const model = createScanTriageModel([conf('c1'), conf('c2')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    expect(screen.queryByTestId('confident-spotcheck')).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    const grid = screen.getByTestId('confident-spotcheck');
-    expect(within(grid).getByTestId('confident-exclude-c1')).toBeInTheDocument();
-    expect(within(grid).getByTestId('confident-exclude-c2')).toBeInTheDocument();
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    expect(page.getByTestId('confident-spotcheck').query()).not.toBeInTheDocument();
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    const grid = page.getByTestId('confident-spotcheck').element();
+    expect(page.elementLocator(grid).getByTestId('confident-exclude-c1').element()).toBeInTheDocument();
+    expect(page.elementLocator(grid).getByTestId('confident-exclude-c2').element()).toBeInTheDocument();
   });
 
   it('excluding a cluster drops the approve count and re-including restores it', async () => {
     const model = createScanTriageModel([conf('c1'), conf('c2')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
     expect(model.approvedIds).toEqual(['c2']);
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('1');
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('1');
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
     expect(model.approvedIds).toEqual(['c1', 'c2']);
-    expect(screen.getByTestId('confident-approve')).toHaveTextContent('2');
+    expect(page.getByTestId('confident-approve').element()).toMatchTextContent('2');
   });
 
   it('disables approve when every cluster is excluded', async () => {
     const model = createScanTriageModel([conf('c1')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
-    expect(screen.getByTestId('confident-approve')).toBeDisabled();
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
+    expect(page.getByTestId('confident-approve').element()).toBeDisabled();
   });
 
   it('each spot-check card is a link to the per-cluster review page', async () => {
     const model = createScanTriageModel([conf('c1')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    expect(screen.getByTestId('confident-open-c1')).toHaveAttribute('href', Route.viewFaceCleanupPerson({ id: 'c1' }));
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    expect(page.getByTestId('confident-open-c1').element()).toHaveAttribute(
+      'href',
+      Route.viewFaceCleanupPerson({ id: 'c1' }),
+    );
   });
 
   it('excluding a cluster keeps its card clickable', async () => {
     const model = createScanTriageModel([conf('c1')]);
-    render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
-    await fireEvent.click(screen.getByTestId('confident-toggle'));
-    await fireEvent.click(screen.getByTestId('confident-exclude-c1'));
+    await render(ConfidentLane, { props: { model, applying: false, onApprove: vi.fn() } });
+    await userEvent.click(page.getByTestId('confident-toggle').element());
+    await userEvent.click(page.getByTestId('confident-exclude-c1').element());
     expect(model.isExcluded('c1')).toBe(true);
-    expect(screen.getByTestId('confident-open-c1')).toHaveAttribute('href', Route.viewFaceCleanupPerson({ id: 'c1' }));
+    expect(page.getByTestId('confident-open-c1').element()).toHaveAttribute(
+      'href',
+      Route.viewFaceCleanupPerson({ id: 'c1' }),
+    );
   });
 });

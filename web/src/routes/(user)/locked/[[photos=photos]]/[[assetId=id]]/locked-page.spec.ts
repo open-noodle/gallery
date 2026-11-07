@@ -1,7 +1,8 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import LockedPage from './+page.svelte';
 
 type TimelineStubGlobals = typeof globalThis & {
@@ -19,7 +20,10 @@ const { gotoMock, mockAssetMultiSelectManager } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 vi.mock('#lib/components/OnEvents.svelte', async () => {
   const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
@@ -110,107 +114,98 @@ describe('Locked page timeline grouping', () => {
     timelineStubGlobals.__timelineStubAssetCount = undefined;
   });
 
-  it('renders desktop grouping controls and mobile grouping props for locked assets', async () => {
-    renderPage();
+  const options = () => page.getByTestId('timeline-options');
+  const anchor = () => page.getByTestId('timeline-anchor');
 
-    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: true }),
-    );
-    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"visibility":"locked"');
-    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
+  it('renders desktop grouping controls and mobile grouping props for locked assets', async () => {
+    await renderPage();
+
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
+    await expect.element(options()).toMatchTextContent('"visibility":"locked"');
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
   });
 
   it('year and month buckets keep locked options without temporal chips', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await page.getByTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"visibility":"locked"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
-    });
+    await expect.element(options()).toMatchTextContent('"visibility":"locked"');
+    await expect.element(options()).toMatchTextContent('"grouping":"month"');
+    await expect.element(options()).not.toMatchTextContent('"takenAfter"');
+    await expect.element(options()).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(anchor()).toMatchTextContent('{"year":2015}');
 
-    await fireEvent.click(screen.getByTestId('activate-month-bucket'));
+    await page.getByTestId('activate-month-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"visibility":"locked"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015,"month":8}');
-    });
+    await expect.element(options()).toMatchTextContent('"visibility":"locked"');
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
+    await expect.element(options()).not.toMatchTextContent('"takenAfter"');
+    await expect.element(options()).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(anchor()).toMatchTextContent('{"year":2015,"month":8}');
   });
 
   it('bucket activation does not render a temporal result count chip', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await page.getByTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
-    });
-    expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"month"');
+    await expect.element(anchor()).toMatchTextContent('{"year":2015}');
+    expect(page.getByTestId('result-count').query()).toBeNull();
+    expect(page.getByTestId('active-filters-bar').query()).toBeNull();
   });
 
   it('manual grouping changes do not create temporal chips', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('timeline-grouping-year'));
+    await page.getByTestId('timeline-grouping-year').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-    });
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"year"');
+    expect(page.getByTestId('active-filters-bar').query()).toBeNull();
     // The grouping change preserves position via a scroll anchor, not a filter chip.
-    expect(screen.getByTestId('timeline-anchor')).not.toHaveTextContent('null');
+    await expect.element(anchor()).not.toMatchTextContent('null');
   });
 
-  it('selection mode hides desktop grouping controls', () => {
+  it('selection mode hides desktop grouping controls', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).toBeNull();
   });
 
   it('ignores bucket activation while selection mode is active', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await renderPage();
+    await page.getByTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
+    await expect.element(anchor()).toMatchTextContent('null');
+    expect(page.getByTestId('active-filters-bar').query()).toBeNull();
   });
 
   it('unfiltered empty placeholder does not render orphaned grouping controls', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 0;
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    });
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
   it('never shows the add-all-to-collection button (excluded surface)', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 3;
 
-    renderPage();
+    await renderPage();
 
-    await screen.findByTestId('timeline-desktop-grouping-control');
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(page.getByTestId('add-all-to-collection').query()).toBeNull();
   });
 });

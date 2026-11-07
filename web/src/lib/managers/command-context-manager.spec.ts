@@ -8,8 +8,8 @@ import {
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import RegisterAlbumContextHarness from './__tests__/register-album-context-harness.svelte';
 import RegisterSelectionContextHarness from './__tests__/register-selection-context-harness.svelte';
 import RegisterSpaceContextHarness from './__tests__/register-space-context-harness.svelte';
@@ -131,58 +131,58 @@ describe('registerAlbumContext', () => {
     mockPage.route.id = ALBUM_ROUTE;
   });
 
-  it('sets album on mount, clears on unmount', () => {
+  it('sets album on mount, clears on unmount', async () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const album = makeAlbum();
-    const { unmount } = render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
+    const { unmount } = await render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
     expect(commandContextManager.getContext().album?.id).toBe('a1');
-    unmount();
+    await unmount();
     expect(commandContextManager.getContext().album).toBeNull();
   });
 
-  it('computes isOwner=true when current user matches the owner album user', () => {
+  it('computes isOwner=true when current user matches the owner album user', async () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
-    const { unmount } = render(RegisterAlbumContextHarness, {
+    const { unmount } = await render(RegisterAlbumContextHarness, {
       props: { thunk: () => makeAlbum({ albumUsers: [makeAlbumUser('u-owner')] }) },
     });
     expect(commandContextManager.getContext().album?.isOwner).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('computes isOwner=false when user differs from the owner album user', () => {
+  it('computes isOwner=false when user differs from the owner album user', async () => {
     mockUser.current = { id: 'u-other', isAdmin: false };
-    const { unmount } = render(RegisterAlbumContextHarness, {
+    const { unmount } = await render(RegisterAlbumContextHarness, {
       props: { thunk: () => makeAlbum({ albumUsers: [makeAlbumUser('u-owner')] }) },
     });
     expect(commandContextManager.getContext().album?.isOwner).toBe(false);
-    unmount();
+    await unmount();
   });
 
-  it('treats undefined albumUsers as isMember=false', () => {
+  it('treats undefined albumUsers as isMember=false', async () => {
     mockUser.current = { id: 'u-other', isAdmin: false };
     const album = makeAlbum({ albumUsers: undefined });
-    const { unmount } = render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
+    const { unmount } = await render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
     expect(commandContextManager.getContext().album?.isMember).toBe(false);
-    unmount();
+    await unmount();
   });
 
-  it('sets isMember=true when current user is in albumUsers', () => {
+  it('sets isMember=true when current user is in albumUsers', async () => {
     mockUser.current = { id: 'u-current', isAdmin: false };
     const album = makeAlbum({
       albumUsers: [makeAlbumUser('u-owner'), makeAlbumUser('u-current', AlbumUserRole.Editor)],
     });
-    const { unmount } = render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
+    const { unmount } = await render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
     expect(commandContextManager.getContext().album?.isMember).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('exposes raw DTO on context', () => {
+  it('exposes raw DTO on context', async () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const album = makeAlbum({ albumName: 'Original' });
-    const { unmount } = render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
+    const { unmount } = await render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
     // $state wraps the stored object in a reactive proxy; assert field equality, not identity.
     expect(commandContextManager.getContext().album?.raw.albumName).toBe('Original');
-    unmount();
+    await unmount();
   });
 });
 
@@ -237,8 +237,8 @@ describe('registerSelectionContext', () => {
     expect(commandContextManager.getContext().selection).toBeNull();
   });
 
-  it('returns selection:null when getAssets returns an empty array', () => {
-    const { unmount } = render(RegisterSelectionContextHarness, {
+  it('returns selection:null when getAssets returns an empty array', async () => {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: {
         options: {
           getAssets: () => [],
@@ -248,17 +248,17 @@ describe('registerSelectionContext', () => {
     });
 
     expect(commandContextManager.getContext().selection).toBeNull();
-    unmount();
+    await unmount();
   });
 
-  it('builds a live, deduped selection snapshot in selected order', () => {
+  it('builds a live, deduped selection snapshot in selected order', async () => {
     let assets = [
       makeAsset({ id: 'asset-1', ownerId: 'u-me' }),
       makeAsset({ id: 'asset-2', ownerId: 'u-other' }),
       makeAsset({ id: 'asset-1', ownerId: 'u-me' }),
     ];
     const clearSelection = vi.fn();
-    const { unmount } = render(RegisterSelectionContextHarness, {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => assets, clearSelection } },
     });
 
@@ -277,12 +277,12 @@ describe('registerSelectionContext', () => {
     expect(second?.ownedSelectedAssetIds).toEqual(['asset-3']);
     expect(second?.isAllUserOwned).toBe(true);
     expect(second?.isAllFavorite).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('treats all selected assets as unowned without an authenticated user', () => {
+  it('treats all selected assets as unowned without an authenticated user', async () => {
     mockUser.current = null;
-    const { unmount } = render(RegisterSelectionContextHarness, {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: {
         options: {
           getAssets: () => [makeAsset({ id: 'asset-1', ownerId: 'u-other' })],
@@ -295,15 +295,15 @@ describe('registerSelectionContext', () => {
     expect(selection?.ownedAssets).toEqual([]);
     expect(selection?.ownedSelectedAssetIds).toEqual([]);
     expect(selection?.isAllUserOwned).toBe(false);
-    unmount();
+    await unmount();
   });
 
-  it('computes archive/trash/favorite flags from the live assets', () => {
+  it('computes archive/trash/favorite flags from the live assets', async () => {
     let assets = [
       makeAsset({ id: 'asset-1', visibility: AssetVisibility.Archive, isFavorite: true, isTrashed: true }),
       makeAsset({ id: 'asset-2', visibility: AssetVisibility.Archive, isFavorite: true, isTrashed: true }),
     ];
-    const { unmount } = render(RegisterSelectionContextHarness, {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => assets, clearSelection: vi.fn() } },
     });
 
@@ -319,10 +319,10 @@ describe('registerSelectionContext', () => {
       isAllArchived: false,
       isAllTrashed: false,
     });
-    unmount();
+    await unmount();
   });
 
-  it('resolves canAddToAlbum and callbacks through live getters', () => {
+  it('resolves canAddToAlbum and callbacks through live getters', async () => {
     let canAddToAlbum = false;
     let canAddToSpace = false;
     let favorite = vi.fn();
@@ -331,7 +331,7 @@ describe('registerSelectionContext', () => {
     const onUndoDelete = vi.fn();
     const addSelectedToCurrentSpace = vi.fn().mockResolvedValue(true);
 
-    const { unmount } = render(RegisterSelectionContextHarness, {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: {
         options: {
           getAssets: () => [makeAsset()],
@@ -360,11 +360,11 @@ describe('registerSelectionContext', () => {
     expect(commandContextManager.getContext().selection?.onDelete).toBe(onDelete);
     expect(commandContextManager.getContext().selection?.onUndoDelete).toBe(onUndoDelete);
     expect(commandContextManager.getContext().selection?.addSelectedToCurrentSpace).toBe(addSelectedToCurrentSpace);
-    unmount();
+    await unmount();
   });
 
-  it('hides a stored selection context after route navigation and restores it on the original route', () => {
-    const { unmount } = render(RegisterSelectionContextHarness, {
+  it('hides a stored selection context after route navigation and restores it on the original route', async () => {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => [makeAsset()], clearSelection: vi.fn() } },
     });
 
@@ -373,30 +373,30 @@ describe('registerSelectionContext', () => {
     expect(commandContextManager.getContext().selection).toBeNull();
     mockPage.route.id = PHOTOS_ROUTE;
     expect(commandContextManager.getContext().selection?.selectedAssetIds).toEqual(['asset-1']);
-    unmount();
+    await unmount();
   });
 
-  it('clears selection registration on unmount', () => {
-    const { unmount } = render(RegisterSelectionContextHarness, {
+  it('clears selection registration on unmount', async () => {
+    const { unmount } = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => [makeAsset()], clearSelection: vi.fn() } },
     });
     expect(commandContextManager.getContext().selection).not.toBeNull();
-    unmount();
+    await unmount();
     expect(commandContextManager.getContext().selection).toBeNull();
   });
 
-  it('does not let an older registration cleanup clear a newer active registration', () => {
-    const first = render(RegisterSelectionContextHarness, {
+  it('does not let an older registration cleanup clear a newer active registration', async () => {
+    const first = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => [makeAsset({ id: 'asset-1' })], clearSelection: vi.fn() } },
     });
-    const second = render(RegisterSelectionContextHarness, {
+    const second = await render(RegisterSelectionContextHarness, {
       props: { options: { getAssets: () => [makeAsset({ id: 'asset-2' })], clearSelection: vi.fn() } },
     });
 
     expect(commandContextManager.getContext().selection?.selectedAssetIds).toEqual(['asset-2']);
-    first.unmount();
+    await first.unmount();
     expect(commandContextManager.getContext().selection?.selectedAssetIds).toEqual(['asset-2']);
-    second.unmount();
+    await second.unmount();
     expect(commandContextManager.getContext().selection).toBeNull();
   });
 });
@@ -406,61 +406,61 @@ describe('registerSpaceContext', () => {
     mockPage.route.id = SPACE_ROUTE;
   });
 
-  it('sets isOwner=true when user is createdById', () => {
+  it('sets isOwner=true when user is createdById', async () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const space = makeSpace();
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => space, membersThunk: () => [] },
     });
     expect(commandContextManager.getContext().space?.isOwner).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('canWrite=true for owner role in members list', () => {
+  it('canWrite=true for owner role in members list', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Owner })];
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
     expect(commandContextManager.getContext().space?.canWrite).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('canWrite=true for editor', () => {
+  it('canWrite=true for editor', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Editor })];
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
     expect(commandContextManager.getContext().space?.canWrite).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('canWrite=false for viewer', () => {
+  it('canWrite=false for viewer', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Viewer })];
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
     expect(commandContextManager.getContext().space?.canWrite).toBe(false);
-    unmount();
+    await unmount();
   });
 
-  it('treats undefined members thunk as isMember=false + canWrite=false', () => {
+  it('treats undefined members thunk as isMember=false + canWrite=false', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => undefined },
     });
     const space = commandContextManager.getContext().space;
     expect(space?.isMember).toBe(false);
     expect(space?.canWrite).toBe(false);
-    unmount();
+    await unmount();
   });
 
-  it('passes through the live add-photos callback when provided', () => {
+  it('passes through the live add-photos callback when provided', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const addPhotosToCurrentSpace = vi.fn();
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: {
         spaceThunk: () => makeSpace(),
         membersThunk: () => [makeMember({ userId: 'u-me', role: SharedSpaceRole.Editor })],
@@ -471,41 +471,41 @@ describe('registerSpaceContext', () => {
     expect(commandContextManager.getContext().space?.addPhotosToCurrentSpace).toBe(addPhotosToCurrentSpace);
     commandContextManager.getContext().space?.addPhotosToCurrentSpace?.();
     expect(addPhotosToCurrentSpace).toHaveBeenCalledOnce();
-    unmount();
+    await unmount();
   });
 
-  it('isMember=true when current user appears in members', () => {
+  it('isMember=true when current user appears in members', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const members = [makeMember({ userId: 'u-me' })];
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
     expect(commandContextManager.getContext().space?.isMember).toBe(true);
-    unmount();
+    await unmount();
   });
 
-  it('cleanup clears space on unmount', () => {
+  it('cleanup clears space on unmount', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => [] },
     });
     expect(commandContextManager.getContext().space).not.toBeNull();
-    unmount();
+    await unmount();
     expect(commandContextManager.getContext().space).toBeNull();
   });
 
-  it('stores raw DTO and separately-fetched members on context', () => {
+  it('stores raw DTO and separately-fetched members on context', async () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const space = makeSpace({ name: 'Original' });
     const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Owner })];
-    const { unmount } = render(RegisterSpaceContextHarness, {
+    const { unmount } = await render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => space, membersThunk: () => members },
     });
     const ctx = commandContextManager.getContext();
     // $state wraps stored objects in reactive proxies; assert field equality, not identity.
     expect(ctx.space?.raw.name).toBe('Original');
     expect(ctx.space?.members.map((m) => m.userId)).toEqual(['u-me']);
-    unmount();
+    await unmount();
   });
 
   it('SharedSpaceRole enum values are lowercase strings', () => {

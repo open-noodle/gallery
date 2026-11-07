@@ -7,12 +7,13 @@ import { Route } from '#lib/route.ts';
 import * as albumService from '#lib/services/album.service.ts';
 import * as albumUtils from '#lib/utils/album-utils.ts';
 import * as fileUploader from '#lib/utils/file-uploader.ts';
-import * as handleErrorModule from '#lib/utils/handle-error.ts';
+import { handleError } from '#lib/utils/handle-error.ts';
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
 import { QueueCommand, QueueName, SharedSpaceRole } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { commands } from 'vitest/browser';
 import { goto } from '$app/navigation';
 import AlbumEditModal from '../modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '../modals/AlbumOptionsModal.svelte';
@@ -41,29 +42,23 @@ vi.mock('@immich/sdk', async (orig) => ({
   removeSpace: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
+// Browser mode rejects an import of a name a mock does not export, so keep the global fake's other exports.
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('#lib/gallery/spaces/add-space-members.js', () => ({ showAddSpaceMembersModal: vi.fn() }));
 
-vi.mock('#lib/services/album.service.js', () => ({
-  handleDeleteAlbum: vi.fn().mockResolvedValue(undefined),
-  handleDownloadAlbum: vi.fn().mockResolvedValue(undefined),
-}));
+// ES module namespaces cannot be spied on in the browser; spy on these modules' exports instead.
+vi.mock(import('#lib/utils/file-uploader.ts'), { spy: true });
+vi.mock(import('#lib/utils/album-utils.ts'), { spy: true });
+vi.mock(import('#lib/utils/handle-error.ts'), { spy: true });
 
-vi.mock('#lib/managers/selection-command-handlers.js', async () => {
-  const actual = await vi.importActual<typeof import('#lib/managers/selection-command-handlers.ts')>(
-    '#lib/managers/selection-command-handlers.ts',
-  );
-  return {
-    ...actual,
-    handleAddSelectedToAlbum: vi.fn(),
-    handleAddSelectedToCurrentSpace: vi.fn(),
-    handleAddSelectedToSpace: vi.fn(),
-    handleFavoriteSelected: vi.fn(),
-    handleArchiveSelected: vi.fn(),
-    handleDeleteSelected: vi.fn(),
-  };
-});
+// Spy on these modules' exports (the real module stays loaded, so every export exists); the tests stub the
+// handlers they call in their own beforeEach.
+vi.mock(import('#lib/services/album.service.ts'), { spy: true });
+vi.mock(import('#lib/managers/selection-command-handlers.ts'), { spy: true });
 
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user' } as { id: string } | null },
@@ -212,12 +207,18 @@ describe('selection-context commands', () => {
   const cmd = (id: string) => COMMAND_ITEMS.find((item) => item.id === id)!;
 
   beforeEach(() => {
-    vi.mocked(selectionHandlers.handleAddSelectedToAlbum).mockClear();
-    vi.mocked(selectionHandlers.handleAddSelectedToCurrentSpace).mockClear();
-    vi.mocked(selectionHandlers.handleAddSelectedToSpace).mockClear();
-    vi.mocked(selectionHandlers.handleFavoriteSelected).mockClear();
-    vi.mocked(selectionHandlers.handleArchiveSelected).mockClear();
-    vi.mocked(selectionHandlers.handleDeleteSelected).mockClear();
+    for (const handler of [
+      selectionHandlers.handleAddSelectedToAlbum,
+      selectionHandlers.handleAddSelectedToCurrentSpace,
+      selectionHandlers.handleAddSelectedToSpace,
+      selectionHandlers.handleFavoriteSelected,
+      selectionHandlers.handleArchiveSelected,
+      selectionHandlers.handleDeleteSelected,
+    ]) {
+      vi.mocked(handler)
+        .mockReset()
+        .mockResolvedValue(undefined as never);
+    }
   });
 
   it('registers all selection command ids', () => {
@@ -331,21 +332,21 @@ describe('selection-context commands', () => {
 
 describe('cmd:upload', () => {
   it('invokes openFileUploadDialog', async () => {
-    const spy = vi.spyOn(fileUploader, 'openFileUploadDialog').mockResolvedValue(undefined as never);
+    const spy = vi.mocked(fileUploader.openFileUploadDialog).mockResolvedValue(undefined as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:upload')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledOnce();
-    spy.mockRestore();
+    spy.mockReset();
   });
 });
 
 describe('cmd:new_album', () => {
   it('invokes createAlbumAndRedirect', async () => {
-    const spy = vi.spyOn(albumUtils, 'createAlbumAndRedirect').mockResolvedValue(undefined as never);
+    const spy = vi.mocked(albumUtils.createAlbumAndRedirect).mockResolvedValue(undefined as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:new_album')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledOnce();
-    spy.mockRestore();
+    spy.mockReset();
   });
 });
 
@@ -435,7 +436,7 @@ describe.each([
   ['cmd:run_face_recognition', QueueName.FacialRecognition],
 ])('%s', (id, expectedQueue) => {
   it('dispatches Start + force:false against the expected queue, shows success toast', async () => {
-    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockResolvedValue({} as never);
+    const spy = vi.mocked(sdk.runQueueCommandLegacy).mockResolvedValue({} as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledWith({
@@ -452,7 +453,7 @@ describe.each([
 // Shared helper — one rejection test covers the error branch for all 5 Run-X
 // commands since they dispatch through `runQueue`.
 it('cmd:run_thumbnail_gen: SDK rejection fires handleError (danger toast), no success toast', async () => {
-  vi.spyOn(sdk, 'runQueueCommandLegacy').mockRejectedValue(new Error('boom') as never);
+  vi.mocked(sdk.runQueueCommandLegacy).mockRejectedValue(new Error('boom') as never);
   const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:run_thumbnail_gen')!;
   await cmd.handler();
   expect(toastManager.primary).not.toHaveBeenCalled();
@@ -465,7 +466,7 @@ describe.each([
   ['cmd:resume_all_queues', QueueCommand.Resume, 'cmdk_cmd_all_resumed'],
 ])('%s', (id, expectedCommand, successKey) => {
   it('dispatches to every admin-visible queue (not all QueueName values)', async () => {
-    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockResolvedValue({} as never);
+    const spy = vi.mocked(sdk.runQueueCommandLegacy).mockResolvedValue({} as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
@@ -479,7 +480,7 @@ describe.each([
 
   it('partial failure: some reject → warning toast fires, no success toast', async () => {
     const spy = vi
-      .spyOn(sdk, 'runQueueCommandLegacy')
+      .mocked(sdk.runQueueCommandLegacy)
       .mockImplementation(({ name }) =>
         name === QueueName.ThumbnailGeneration
           ? (Promise.reject(new Error('boom')) as never)
@@ -496,7 +497,7 @@ describe.each([
   });
 
   it('total failure: all reject → warning toast fires, no success toast', async () => {
-    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockRejectedValue(new Error('boom') as never);
+    const spy = vi.mocked(sdk.runQueueCommandLegacy).mockRejectedValue(new Error('boom') as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
@@ -507,7 +508,7 @@ describe.each([
 
 describe('cmd:clear_failed_jobs', () => {
   it('calls emptyQueue with failed:true for every admin-visible queue', async () => {
-    const spy = vi.spyOn(sdk, 'emptyQueue').mockResolvedValue({} as never);
+    const spy = vi.mocked(sdk.emptyQueue).mockResolvedValue({} as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
@@ -519,7 +520,7 @@ describe('cmd:clear_failed_jobs', () => {
 
   it('partial failure: warning toast fires, no success toast', async () => {
     const spy = vi
-      .spyOn(sdk, 'emptyQueue')
+      .mocked(sdk.emptyQueue)
       .mockImplementation(({ name }) =>
         name === QueueName.FaceDetection
           ? (Promise.reject(new Error('boom')) as never)
@@ -533,7 +534,7 @@ describe('cmd:clear_failed_jobs', () => {
   });
 
   it('total failure: warning toast fires', async () => {
-    const spy = vi.spyOn(sdk, 'emptyQueue').mockRejectedValue(new Error('boom') as never);
+    const spy = vi.mocked(sdk.emptyQueue).mockRejectedValue(new Error('boom') as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
@@ -585,7 +586,7 @@ describe('album-context commands', () => {
     userId: 'u-editor',
   });
 
-  let handleErrorSpy: ReturnType<typeof vi.spyOn>;
+  const handleErrorSpy = vi.mocked(handleError);
   beforeEach(() => {
     vi.mocked(modalManager.show).mockClear();
     vi.mocked(albumService.handleDeleteAlbum).mockReset().mockResolvedValue(undefined);
@@ -594,10 +595,10 @@ describe('album-context commands', () => {
       .mockReset()
       .mockResolvedValue(undefined as never);
     vi.mocked(goto).mockReset().mockResolvedValue(undefined);
-    handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
+    handleErrorSpy.mockImplementation(() => {});
   });
   afterEach(() => {
-    handleErrorSpy.mockRestore();
+    handleErrorSpy.mockReset();
   });
 
   describe('cmd:album_rename', () => {
@@ -779,7 +780,7 @@ describe('space-context commands', () => {
     userId: 'u-stranger',
   });
 
-  let handleErrorSpy: ReturnType<typeof vi.spyOn>;
+  const handleErrorSpy = vi.mocked(handleError);
   beforeEach(() => {
     vi.mocked(modalManager.show).mockClear();
     vi.mocked(sdk.bulkAddAssets)
@@ -793,10 +794,10 @@ describe('space-context commands', () => {
       .mockResolvedValue(undefined as never);
     vi.mocked(goto).mockReset().mockResolvedValue(undefined);
     vi.mocked(toastManager.primary).mockClear();
-    handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
+    handleErrorSpy.mockImplementation(() => {});
   });
   afterEach(() => {
-    handleErrorSpy.mockRestore();
+    handleErrorSpy.mockReset();
   });
 
   describe('cmd:space_add_photos', () => {
@@ -981,8 +982,7 @@ describe('space-context commands', () => {
 
   describe('route-helper drift guard', () => {
     it('command-items.ts uses Route.albums() + Route.spaces() helpers (no raw literals)', async () => {
-      const { readFile } = await import('node:fs/promises');
-      const src = await readFile('src/lib/managers/command-items.ts', 'utf8');
+      const src = await commands.readFile('src/lib/managers/command-items.ts');
       expect(src).not.toMatch(/goto\(['"]\/(albums|spaces)['"]\)/);
       expect(src).toMatch(/Route\.albums\(\)/);
       expect(src).toMatch(/Route\.spaces\(\)/);

@@ -1,5 +1,5 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import SpaceLinkAlbumModal from '#lib/modals/SpaceLinkAlbumModal.svelte';
@@ -14,11 +14,13 @@ import {
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { goto, invalidateAll } from '$app/navigation';
+import { fireEvent } from '../../fire-event.test-helpers';
 import SpaceAlbumsPage from './+page.svelte';
 
 // A mutable holder so individual tests can point `page.url` at a `?folder=` query string before
@@ -30,8 +32,15 @@ const { pageMock } = vi.hoisted(() => ({
   pageMock: { url: new URL('http://localhost/spaces/space-1/albums') },
 }));
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
-vi.mock('$app/state', () => ({ page: pageMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+  invalidateAll: vi.fn(),
+}));
+vi.mock('$app/state', async () => ({
+  ...(await import('#test/unit/mocks/app-state.svelte.ts')),
+  page: pageMock,
+}));
 
 const { modalManagerMock } = vi.hoisted(() => ({
   modalManagerMock: { show: vi.fn(), showDialog: vi.fn() },
@@ -191,8 +200,8 @@ rendered card, so the target is matched via its data-folder-id attribute instead
 
 `setActiveDragPayload` is called first, matching what a real `dragstart` does — without it,
 the card's `canAccept()` reads a permanently-empty active-drag slot, `ondragover` always
-early-returns, and `drop` becomes the only handler doing anything (jsdom's fireEvent.drop
-doesn't require a prior preventDefault()'d dragover the way a real browser does), meaning the
+early-returns, and `drop` becomes the only handler doing anything (a synthetic `drop` event
+does not require a prior preventDefault()'d dragover the way a real drag does), meaning the
 dragover gate — and the `folders`/`albums` props it depends on — go completely untested.
 
 `drop` only fires if dragover accepted (preventDefault() ran), exactly matching a real
@@ -205,15 +214,20 @@ async function dropOnFolder(payload: DragPayload, targetFolderId: string): Promi
   const dataTransfer = makeFakeDataTransfer();
   writeDragPayload(dataTransfer, payload);
 
-  const cards = await screen.findAllByTestId('space-album-folder-card');
-  const card = cards.find((element) => element.dataset.folderId === targetFolderId);
+  const findCard = () =>
+    page
+      .getByTestId('space-album-folder-card')
+      .elements()
+      .find((element) => (element as HTMLElement).dataset.folderId === targetFolderId);
+  await expect.poll(findCard).toBeDefined();
+  const card = findCard();
   if (!card) {
     throw new Error(`dropOnFolder: no rendered folder card for target "${targetFolderId}"`);
   }
 
-  const dragOverAccepted = !(await fireEvent.dragOver(card, { dataTransfer }));
+  const dragOverAccepted = !fireEvent('dragover', card, { dataTransfer });
   if (dragOverAccepted) {
-    await fireEvent.drop(card, { dataTransfer });
+    fireEvent('drop', card, { dataTransfer });
   }
   setActiveDragPayload(null);
   return dragOverAccepted;
@@ -228,11 +242,17 @@ async function dropOnCrumb(payload: DragPayload, targetFolderId: string | null):
   const dataTransfer = makeFakeDataTransfer();
   writeDragPayload(dataTransfer, payload);
 
-  const crumb = await screen.findByTestId(targetFolderId === null ? 'breadcrumb-root' : `breadcrumb-${targetFolderId}`);
+  await expect
+    .element(page.getByTestId(targetFolderId === null ? 'breadcrumb-root' : `breadcrumb-${targetFolderId}`))
+    .toBeInTheDocument();
 
-  const dragOverAccepted = !(await fireEvent.dragOver(crumb, { dataTransfer }));
+  const crumb = page
+    .getByTestId(targetFolderId === null ? 'breadcrumb-root' : `breadcrumb-${targetFolderId}`)
+    .element() as HTMLElement;
+
+  const dragOverAccepted = !fireEvent('dragover', crumb, { dataTransfer });
   if (dragOverAccepted) {
-    await fireEvent.drop(crumb, { dataTransfer });
+    fireEvent('drop', crumb, { dataTransfer });
   }
   setActiveDragPayload(null);
   return dragOverAccepted;
@@ -254,17 +274,25 @@ describe('Space albums page', () => {
     sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
     sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue([]);
     // pageMock is a plain object, not a vi.fn — vi.resetAllMocks() above doesn't touch it, and web
-    // vitest has no clearMocks, so a `?folder=` set by one test would otherwise leak into the next.
+    // vitest's clearMocks does not reset it either, so a `?folder=` set by one test would otherwise leak into the next.
     pageMock.url = new URL('http://localhost/spaces/space-1/albums');
     // getActiveDragPayload is bare module state too — reset so a payload left active by one
     // test (e.g. a dropOnFolder/dropOnCrumb call that never reached its own cleanup because of
     // an assertion throwing first) can't leak into the next test's dragover check.
     setActiveDragPayload(null);
+    // The album grid mounts its cards in viewport-sized chunks (lazy-chunks.svelte) and unmounts a
+    // chunk the IntersectionObserver reports off screen. The test iframe is small and unstyled, so
+    // cards below the fold would disappear mid-test; without an observer every chunk renders.
+    vi.stubGlobal('IntersectionObserver', undefined);
   });
 
-  it('renders one card per album', () => {
-    renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' }), makeAlbum({ id: 'a-2', albumName: 'Home' })]);
-    expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders one card per album', async () => {
+    await renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' }), makeAlbum({ id: 'a-2', albumName: 'Home' })]);
+    expect(page.getByTestId('space-album-card').elements()).toHaveLength(2);
   });
 
   describe('first paint is already folder-scoped', () => {
@@ -274,8 +302,8 @@ describe('Space albums page', () => {
     // space unscoped — on every deep link, refresh, and back-navigation — and the albums shown were
     // clickable. Shipping the tree with the page load removes the window rather than masking it
     // with a spinner. These assert synchronously, BEFORE any refetch: that is the whole point.
-    it('scopes to the deep-linked folder on the very first paint', () => {
-      renderPage(
+    it('scopes to the deep-linked folder on the very first paint', async () => {
+      await renderPage(
         [
           makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
           makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
@@ -284,13 +312,13 @@ describe('Space albums page', () => {
         { foldersPending: true, folderParam: 'f-1', folders: [makeFolder('f-1', 'Trips')] },
       );
 
-      expect(screen.getAllByTestId('space-album-card')).toHaveLength(1);
-      expect(screen.getByText('Trip')).toBeInTheDocument();
-      expect(screen.queryByText('Home')).not.toBeInTheDocument();
+      expect(page.getByTestId('space-album-card').elements()).toHaveLength(1);
+      await expect.element(page.getByText('Trip')).toBeInTheDocument();
+      await expect.element(page.getByText('Home')).not.toBeInTheDocument();
     });
 
-    it('keeps a foldered album out of the root level on the very first paint', () => {
-      renderPage(
+    it('keeps a foldered album out of the root level on the very first paint', async () => {
+      await renderPage(
         [
           makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
           makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
@@ -299,25 +327,25 @@ describe('Space albums page', () => {
         { foldersPending: true, folders: [makeFolder('f-1', 'Trips')] },
       );
 
-      expect(screen.getAllByTestId('space-album-card')).toHaveLength(1);
-      expect(screen.getByText('Home')).toBeInTheDocument();
+      expect(page.getByTestId('space-album-card').elements()).toHaveLength(1);
+      await expect.element(page.getByText('Home')).toBeInTheDocument();
     });
 
-    it('renders the breadcrumb on the very first paint, not one round-trip later', () => {
-      renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' })], SharedSpaceRole.Owner, {
+    it('renders the breadcrumb on the very first paint, not one round-trip later', async () => {
+      await renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' })], SharedSpaceRole.Owner, {
         foldersPending: true,
         folderParam: 'f-1',
         folders: [makeFolder('f-1', 'Trips')],
       });
 
-      expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
     });
 
     // A load failure has no tree to scope by, so it must still degrade to the flat list rather
     // than hiding every foldered album. Without this the three tests above could be satisfied by
     // a page that simply refuses to render whenever folders are missing.
-    it('falls back to the flat list when the page load could not fetch folders', () => {
-      renderPage(
+    it('falls back to the flat list when the page load could not fetch folders', async () => {
+      await renderPage(
         [
           makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
           makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
@@ -326,77 +354,77 @@ describe('Space albums page', () => {
         { foldersRejects: true },
       );
 
-      expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+      expect(page.getByTestId('space-album-card').elements()).toHaveLength(2);
     });
   });
 
-  it('renders the view toggle control', () => {
-    renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' })]);
-    expect(screen.getByTestId('space-albums-view-toggle')).toBeInTheDocument();
+  it('renders the view toggle control', async () => {
+    await renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' })]);
+    await expect.element(page.getByTestId('space-albums-view-toggle')).toBeInTheDocument();
   });
 
-  it('renders the search input when albums are present', () => {
-    renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' })]);
-    expect(screen.getByTestId('space-albums-search')).toBeInTheDocument();
+  it('renders the search input when albums are present', async () => {
+    await renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' })]);
+    await expect.element(page.getByTestId('space-albums-search')).toBeInTheDocument();
   });
 
-  it('editor sees the "Link album" button', () => {
-    renderPage([makeAlbum()], SharedSpaceRole.Editor);
-    expect(screen.getByTestId('link-album-button')).toBeInTheDocument();
+  it('editor sees the "Link album" button', async () => {
+    await renderPage([makeAlbum()], SharedSpaceRole.Editor);
+    await expect.element(page.getByTestId('link-album-button')).toBeInTheDocument();
   });
 
-  it('owner sees the "Link album" button', () => {
-    renderPage([makeAlbum()], SharedSpaceRole.Owner);
-    expect(screen.getByTestId('link-album-button')).toBeInTheDocument();
+  it('owner sees the "Link album" button', async () => {
+    await renderPage([makeAlbum()], SharedSpaceRole.Owner);
+    await expect.element(page.getByTestId('link-album-button')).toBeInTheDocument();
   });
 
-  it('viewer does NOT see the "Link album" button', () => {
-    renderPage([makeAlbum()], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('link-album-button')).not.toBeInTheDocument();
+  it('viewer does NOT see the "Link album" button', async () => {
+    await renderPage([makeAlbum()], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('link-album-button')).not.toBeInTheDocument();
   });
 
-  it('shows empty-state text when albums list is empty', () => {
-    renderPage([], SharedSpaceRole.Viewer);
-    expect(screen.getByTestId('empty-state-message')).toBeInTheDocument();
+  it('shows empty-state text when albums list is empty', async () => {
+    await renderPage([], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('empty-state-message')).toBeInTheDocument();
   });
 
-  it('shows editor CTA when albums list is empty and user is editor', () => {
-    renderPage([], SharedSpaceRole.Editor);
-    expect(screen.getByTestId('empty-link-album-button')).toBeInTheDocument();
+  it('shows editor CTA when albums list is empty and user is editor', async () => {
+    await renderPage([], SharedSpaceRole.Editor);
+    await expect.element(page.getByTestId('empty-link-album-button')).toBeInTheDocument();
   });
 
-  it('offers Create album alongside Link album on the empty state — a space with no albums yet is exactly where creating one is most useful', () => {
-    renderPage([], SharedSpaceRole.Editor);
-    expect(screen.getByTestId('empty-create-album-button')).toBeInTheDocument();
-    expect(screen.getByTestId('empty-link-album-button')).toBeInTheDocument();
+  it('offers Create album alongside Link album on the empty state — a space with no albums yet is exactly where creating one is most useful', async () => {
+    await renderPage([], SharedSpaceRole.Editor);
+    await expect.element(page.getByTestId('empty-create-album-button')).toBeInTheDocument();
+    await expect.element(page.getByTestId('empty-link-album-button')).toBeInTheDocument();
   });
 
-  it('viewer with empty albums list sees no Create album button either', () => {
-    renderPage([], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('empty-create-album-button')).not.toBeInTheDocument();
+  it('viewer with empty albums list sees no Create album button either', async () => {
+    await renderPage([], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('empty-create-album-button')).not.toBeInTheDocument();
   });
 
   // Finding: without this, a brand-new space had no way to create a folder until an album
   // existed to put in one — SpaceAlbumsControls (with its New folder button) only renders in the
   // populated arm of the page.
-  it('offers New folder on the empty state for editors', () => {
-    renderPage([], SharedSpaceRole.Editor);
-    expect(screen.getByTestId('empty-create-folder-button')).toBeInTheDocument();
+  it('offers New folder on the empty state for editors', async () => {
+    await renderPage([], SharedSpaceRole.Editor);
+    await expect.element(page.getByTestId('empty-create-folder-button')).toBeInTheDocument();
   });
 
-  it('viewer with empty albums list sees no New folder button either', () => {
-    renderPage([], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('empty-create-folder-button')).not.toBeInTheDocument();
+  it('viewer with empty albums list sees no New folder button either', async () => {
+    await renderPage([], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('empty-create-folder-button')).not.toBeInTheDocument();
   });
 
   describe('interactions', () => {
     it('clicking "Link album" opens the SpaceLinkAlbumModal with the linked album ids', async () => {
       modalManagerMock.show.mockResolvedValue(undefined);
-      renderPage([makeAlbum({ id: 'album-1' })], SharedSpaceRole.Editor);
+      await renderPage([makeAlbum({ id: 'album-1' })], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('link-album-button'));
+      await userEvent.click(page.getByTestId('link-album-button'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(modalManagerMock.show).toHaveBeenCalledWith(SpaceLinkAlbumModal, {
           spaceId: 'space-1',
           linkedAlbumIds: ['album-1'],
@@ -407,21 +435,21 @@ describe('Space albums page', () => {
     it('reloads and invalidates layout data when the modal reports linked albums', async () => {
       modalManagerMock.show.mockResolvedValue(2);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue([makeAlbum({ id: 'av-1', albumName: 'Road Trip' })]);
-      renderPage([], SharedSpaceRole.Editor);
+      await renderPage([], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('empty-link-album-button'));
+      await userEvent.click(page.getByTestId('empty-link-album-button'));
 
-      await waitFor(() => expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' }));
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' }));
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     it('does not reload or invalidate when the modal links nothing', async () => {
       modalManagerMock.show.mockResolvedValue(0);
-      renderPage([], SharedSpaceRole.Editor);
+      await renderPage([], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('empty-link-album-button'));
+      await userEvent.click(page.getByTestId('empty-link-album-button'));
 
-      await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+      await vi.waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
       // getSharedSpaceAlbums is called once on mount (reload); the no-op link must not trigger another.
       expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(1);
       expect(invalidateAll).not.toHaveBeenCalled();
@@ -432,19 +460,20 @@ describe('Space albums page', () => {
       sdkMock.unlinkAlbum.mockResolvedValue(undefined as never);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation' });
-      renderPage([album], SharedSpaceRole.Editor);
+      await renderPage([album], SharedSpaceRole.Editor);
 
       // Find the card's ⋯ menu button and open it
-      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuContainer = page.getByTestId('space-album-card-menu').element() as HTMLElement;
       const menuButton = menuContainer.querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
+      await userEvent.click(menuButton!);
 
       // Wait for menu items to appear, then click "Unlink album"
-      const unlinkOption = await screen.findByText('Unlink album');
-      await fireEvent.click(unlinkOption);
+      await expect.element(page.getByText('Unlink album')).toBeInTheDocument();
+      const unlinkOption = page.getByText('Unlink album').element() as HTMLElement;
+      await userEvent.click(unlinkOption);
 
-      await waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }));
+      await vi.waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }));
     });
 
     // Regression: after unlink/link the [spaceId] layout's cached linkedAlbums must be invalidated,
@@ -454,14 +483,14 @@ describe('Space albums page', () => {
       modalManagerMock.showDialog.mockResolvedValue(true);
       sdkMock.unlinkAlbum.mockResolvedValue(undefined as never);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
-      renderPage([makeAlbum({ id: 'album-1', albumName: 'Vacation' })], SharedSpaceRole.Editor);
+      await renderPage([makeAlbum({ id: 'album-1', albumName: 'Vacation' })], SharedSpaceRole.Editor);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText('Unlink album'));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText('Unlink album'));
 
-      await waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalled());
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalled());
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     // Same regression class as the unlink case above, reached a different way: deleting a folder
@@ -471,36 +500,38 @@ describe('Space albums page', () => {
     it('deleting a folder invalidates layout data so album placements stay current', async () => {
       modalManagerMock.showDialog.mockResolvedValue(true);
       sdkMock.deleteSharedSpaceAlbumFolder.mockResolvedValue(undefined as never);
-      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+      await renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
 
-      // findBy, not getBy: `folders` starts empty and is only populated by the on-mount fetch,
+      // Waits for the card: `folders` starts empty and is only populated by the on-mount fetch,
       // so the card does not exist on the first paint.
-      const menu = await screen.findByTestId('space-album-folder-card-menu');
-      await fireEvent.click(menu.querySelector('button')!);
-      await fireEvent.click(await screen.findByText('Delete folder'));
+      await expect.element(page.getByTestId('space-album-folder-card-menu')).toBeInTheDocument();
+      const menu = page.getByTestId('space-album-folder-card-menu').element() as HTMLElement;
+      await userEvent.click(menu.querySelector('button')!);
+      await userEvent.click(page.getByText('Delete folder'));
 
-      await waitFor(() => expect(sdkMock.deleteSharedSpaceAlbumFolder).toHaveBeenCalled());
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.deleteSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     it('toggle show-in-timeline calls updateSharedSpaceAlbum and flips optimistic state', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Editor);
+      await renderPage([album], SharedSpaceRole.Editor);
 
       // Open the card's ⋯ context menu
-      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuContainer = page.getByTestId('space-album-card-menu').element() as HTMLElement;
       const menuButton = menuContainer.querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
+      await userEvent.click(menuButton!);
 
       // Click "Hide this album from the space's photos" (showInTimeline=true → shows hide option;
       // this is the editor-gated shared flag, distinct from the "my timeline" item above it).
-      const toggleOption = await screen.findByText("Hide this album from the space's photos");
-      await fireEvent.click(toggleOption);
+      await expect.element(page.getByText("Hide this album from the space's photos")).toBeInTheDocument();
+      const toggleOption = page.getByText("Hide this album from the space's photos").element() as HTMLElement;
+      await userEvent.click(toggleOption);
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalledWith({
           id: 'space-1',
           albumId: 'album-1',
@@ -509,8 +540,8 @@ describe('Space albums page', () => {
       );
 
       // Optimistic flip: "hidden from the space's photos" label should now appear
-      await waitFor(() => expect(screen.getByText(/Hidden from the space's photos/)).toBeInTheDocument());
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await expect.element(page.getByText(/Hidden from the space's photos/)).toBeInTheDocument();
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     // ── Owner equivalents for unlink and toggle ──────────────────────────────
@@ -520,34 +551,38 @@ describe('Space albums page', () => {
       sdkMock.unlinkAlbum.mockResolvedValue(undefined as never);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation' });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuContainer = page.getByTestId('space-album-card-menu').element() as HTMLElement;
       const menuButton = menuContainer.querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
+      await userEvent.click(menuButton!);
 
-      const unlinkOption = await screen.findByText('Unlink album');
-      await fireEvent.click(unlinkOption);
+      await expect.element(page.getByText('Unlink album')).toBeInTheDocument();
 
-      await waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }));
+      const unlinkOption = page.getByText('Unlink album').element() as HTMLElement;
+      await userEvent.click(unlinkOption);
+
+      await vi.waitFor(() => expect(sdkMock.unlinkAlbum).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }));
     });
 
     it('owner can toggle show-in-timeline: calls updateSharedSpaceAlbum', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuContainer = page.getByTestId('space-album-card-menu').element() as HTMLElement;
       const menuButton = menuContainer.querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
+      await userEvent.click(menuButton!);
 
-      const toggleOption = await screen.findByText("Hide this album from the space's photos");
-      await fireEvent.click(toggleOption);
+      await expect.element(page.getByText("Hide this album from the space's photos")).toBeInTheDocument();
 
-      await waitFor(() =>
+      const toggleOption = page.getByText("Hide this album from the space's photos").element() as HTMLElement;
+      await userEvent.click(toggleOption);
+
+      await vi.waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalledWith({
           id: 'space-1',
           albumId: 'album-1',
@@ -563,20 +598,20 @@ describe('Space albums page', () => {
       sdkMock.updateAlbumTimelineForMember.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: true });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText("Hide this album from the space's photos"));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalledWith({
           id: 'space-1',
           albumId: 'album-1',
           sharedSpaceAlbumLinkUpdateDto: { showInTimeline: false },
         }),
       );
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalledWith({
           id: 'space-1',
           albumId: 'album-1',
@@ -594,40 +629,40 @@ describe('Space albums page', () => {
       sdkMock.updateAlbumTimelineForMember.mockRejectedValue(new Error('boom') as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: true });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText("Hide this album from the space's photos"));
 
-      await waitFor(() => expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalled());
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalled());
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     it('leaving the "also hide from my timeline" checkbox unticked writes only the shared flag', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText("Hide this album from the space's photos"));
 
-      await waitFor(() => expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalled());
       expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
     });
 
     it('the editor dialog: does nothing when dismissed', async () => {
       modalManagerMock.show.mockResolvedValue(undefined);
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
-      renderPage([album], SharedSpaceRole.Owner);
+      await renderPage([album], SharedSpaceRole.Owner);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText("Hide this album from the space's photos"));
 
-      await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+      await vi.waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
       expect(sdkMock.updateSharedSpaceAlbum).not.toHaveBeenCalled();
       expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
     });
@@ -635,31 +670,31 @@ describe('Space albums page', () => {
     it('create: creates an album, links it, and navigates to the space album route', async () => {
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockResolvedValue(undefined as never);
-      renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
-      await fireEvent.click(screen.getByTestId('create-album-button'));
-      await waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
+      await renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
+      await userEvent.click(page.getByTestId('create-album-button'));
+      await vi.waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
       expect(goto).toHaveBeenCalledWith(`/spaces/${BASE_SPACE.id}/albums/new-1`);
     });
 
     it('empty-state create: creates an album, links it, and navigates to the space album route', async () => {
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockResolvedValue(undefined as never);
-      renderPage([], SharedSpaceRole.Editor);
+      await renderPage([], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('empty-create-album-button'));
+      await userEvent.click(page.getByTestId('empty-create-album-button'));
 
-      await waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
+      await vi.waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
       expect(goto).toHaveBeenCalledWith(`/spaces/${BASE_SPACE.id}/albums/new-1`);
     });
 
     it('empty-state New folder opens the folder-name modal and creates the folder at the root', async () => {
       modalManagerMock.show.mockResolvedValue('Trips');
       sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue(makeFolder('trips', 'Trips'));
-      renderPage([], SharedSpaceRole.Editor);
+      await renderPage([], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('empty-create-folder-button'));
+      await userEvent.click(page.getByTestId('empty-create-folder-button'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalledWith({
           id: 'space-1',
           sharedSpaceAlbumFolderCreateDto: { name: 'Trips', parentId: null },
@@ -670,17 +705,17 @@ describe('Space albums page', () => {
     it('create succeeds but link fails → toast, no navigation, reload', async () => {
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockRejectedValue(new Error('nope'));
-      renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
-      await fireEvent.click(screen.getByTestId('create-album-button'));
-      await waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalled());
+      await renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
+      await userEvent.click(page.getByTestId('create-album-button'));
+      await vi.waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalled());
       expect(goto).not.toHaveBeenCalled();
       expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalled(); // reload
     });
 
-    it('viewer sees no Create/Link buttons', () => {
-      renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Viewer);
-      expect(screen.queryByTestId('create-album-button')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('link-album-button')).not.toBeInTheDocument();
+    it('viewer sees no Create/Link buttons', async () => {
+      await renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Viewer);
+      await expect.element(page.getByTestId('create-album-button')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('link-album-button')).not.toBeInTheDocument();
     });
   });
 
@@ -691,17 +726,19 @@ describe('Space albums page', () => {
       sdkMock.unlinkAlbum.mockResolvedValue(undefined as never);
       sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation' });
-      renderPage([album], SharedSpaceRole.Editor);
+      await renderPage([album], SharedSpaceRole.Editor);
 
-      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuContainer = page.getByTestId('space-album-card-menu').element() as HTMLElement;
       const menuButton = menuContainer.querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
+      await userEvent.click(menuButton!);
 
-      const unlinkOption = await screen.findByText('Unlink album');
-      await fireEvent.click(unlinkOption);
+      await expect.element(page.getByText('Unlink album')).toBeInTheDocument();
 
-      await waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceUnlinkAlbum', { spaceId: 'space-1' }));
+      const unlinkOption = page.getByText('Unlink album').element() as HTMLElement;
+      await userEvent.click(unlinkOption);
+
+      await vi.waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceUnlinkAlbum', { spaceId: 'space-1' }));
       emitSpy.mockRestore();
     });
 
@@ -709,11 +746,11 @@ describe('Space albums page', () => {
       const emitSpy = vi.spyOn(eventManager, 'emit');
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockResolvedValue(undefined as never);
-      renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
+      await renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
 
-      await fireEvent.click(screen.getByTestId('create-album-button'));
+      await userEvent.click(page.getByTestId('create-album-button'));
 
-      await waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceLinkAlbum', { spaceId: BASE_SPACE.id }));
+      await vi.waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceLinkAlbum', { spaceId: BASE_SPACE.id }));
       emitSpy.mockRestore();
     });
   });
@@ -721,23 +758,27 @@ describe('Space albums page', () => {
   describe('folders', () => {
     // W-02
     it('W-02: opening a folder pushes ?folder= onto the URL', async () => {
-      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+      await renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
 
-      const openButton = await screen.findByTestId('space-album-folder-card-open');
-      await fireEvent.click(openButton);
+      await expect.element(page.getByTestId('space-album-folder-card-open')).toBeInTheDocument();
+
+      const openButton = page.getByTestId('space-album-folder-card-open').element() as HTMLElement;
+      await userEvent.click(openButton);
 
       expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'));
     });
 
     // W-03
     it('W-03: a breadcrumb crumb navigates up one level', async () => {
-      renderPage([], SharedSpaceRole.Editor, {
+      await renderPage([], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips'), makeFolder('y2026', '2026', 'trips')],
         folderParam: 'y2026',
       });
 
-      const crumb = await screen.findByTestId('breadcrumb-trips');
-      await fireEvent.click(crumb);
+      await expect.element(page.getByTestId('breadcrumb-trips')).toBeInTheDocument();
+
+      const crumb = page.getByTestId('breadcrumb-trips').element() as HTMLElement;
+      await userEvent.click(crumb);
 
       expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'));
     });
@@ -750,10 +791,12 @@ describe('Space albums page', () => {
     // `options: undefined` if it never fired, and `expect(undefined).not.toEqual(objectContaining
     // (...))` passes — a click that does nothing would pass this test without that assertion.
     it('W-04: drill-in uses history navigation so browser back works', async () => {
-      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+      await renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
 
-      const openButton = await screen.findByTestId('space-album-folder-card-open');
-      await fireEvent.click(openButton);
+      await expect.element(page.getByTestId('space-album-folder-card-open')).toBeInTheDocument();
+
+      const openButton = page.getByTestId('space-album-folder-card-open').element() as HTMLElement;
+      await userEvent.click(openButton);
 
       expect(goto).toHaveBeenCalled();
       const [, options] = vi.mocked(goto).mock.calls.at(-1) ?? [];
@@ -762,21 +805,21 @@ describe('Space albums page', () => {
 
     // W-05: a space with no folders must be pixel-identical to today.
     it('W-05: renders no breadcrumb when the space has no folders', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, { folders: [] });
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, { folders: [] });
 
-      await screen.findByText('Rome');
-      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
     });
 
     // W-06: another editor deleting the folder you have open must not break your page.
     it('W-06: falls back to the root and strips an unknown ?folder=', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'deleted',
       });
 
-      await waitFor(() => expect(screen.getByText('Rome')).toBeInTheDocument());
-      await waitFor(() =>
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await vi.waitFor(() =>
         expect(goto).toHaveBeenCalledWith(expect.not.stringContaining('folder='), { replaceState: true }),
       );
     });
@@ -784,34 +827,34 @@ describe('Space albums page', () => {
     // Finding: `folders.length > 0` can't distinguish "haven't loaded yet" from "genuinely zero
     // folders" — a space whose last folder was just deleted left a dangling ?folder= forever.
     it('strips ?folder= when the space has been emptied down to zero folders', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [],
         folderParam: 'trips',
       });
 
-      await waitFor(() => expect(screen.getByText('Rome')).toBeInTheDocument());
-      await waitFor(() =>
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await vi.waitFor(() =>
         expect(goto).toHaveBeenCalledWith(expect.not.stringContaining('folder='), { replaceState: true }),
       );
     });
 
     // W-10: search is not folder state — clearing it must restore where you were.
     it('W-10: clearing the search returns to the folder you were in', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
 
-      await screen.findByTestId('space-album-folder-breadcrumb');
-      const search = screen.getByTestId('space-albums-search');
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      const search = page.getByTestId('space-albums-search').element() as HTMLElement;
 
-      await fireEvent.input(search, { target: { value: 'zzz' } });
-      expect(screen.queryByText('Rome')).not.toBeInTheDocument();
+      fireEvent('input', search, { target: { value: 'zzz' } });
+      await expect.element(page.getByText('Rome')).not.toBeInTheDocument();
 
-      await fireEvent.input(search, { target: { value: '' } });
+      fireEvent('input', search, { target: { value: '' } });
 
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
     });
 
     // A search hides the breadcrumb AND every folder row, but leaves "New folder" and "Link album"
@@ -823,38 +866,38 @@ describe('Space albums page', () => {
     it('clears an active search after creating a folder, so the new folder is visible', async () => {
       modalManagerMock.show.mockResolvedValue('Rome 2026');
       sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue({} as SharedSpaceAlbumFolderDto);
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
 
-      await screen.findByTestId('space-album-folder-breadcrumb');
-      const search = screen.getByTestId('space-albums-search');
-      await fireEvent.input(search, { target: { value: 'zzz' } });
-      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      const search = page.getByTestId('space-albums-search').element() as HTMLElement;
+      fireEvent('input', search, { target: { value: 'zzz' } });
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
 
-      await fireEvent.click(screen.getByTestId('create-folder-button'));
+      await userEvent.click(page.getByTestId('create-folder-button'));
 
       // Back out of search: the breadcrumb returns, so the user can see the level the folder
       // was created in.
-      await waitFor(() => expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument());
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
       expect((search as HTMLInputElement).value).toBe('');
     });
 
     it('clears an active search after linking an album', async () => {
       modalManagerMock.show.mockResolvedValue(1);
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
 
-      await screen.findByTestId('space-album-folder-breadcrumb');
-      const search = screen.getByTestId('space-albums-search');
-      await fireEvent.input(search, { target: { value: 'zzz' } });
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      const search = page.getByTestId('space-albums-search').element() as HTMLElement;
+      fireEvent('input', search, { target: { value: 'zzz' } });
 
-      await fireEvent.click(screen.getByTestId('link-album-button'));
+      await userEvent.click(page.getByTestId('link-album-button'));
 
-      await waitFor(() => expect((search as HTMLInputElement).value).toBe(''));
+      await vi.waitFor(() => expect((search as HTMLInputElement).value).toBe(''));
     });
 
     // The control: a create with no search active must not disturb anything, and in particular
@@ -862,27 +905,29 @@ describe('Space albums page', () => {
     it('leaves the search box alone when creating a folder with no search active', async () => {
       modalManagerMock.show.mockResolvedValue('Rome 2026');
       sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue({} as SharedSpaceAlbumFolderDto);
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
 
-      await fireEvent.click(screen.getByTestId('create-folder-button'));
+      await userEvent.click(page.getByTestId('create-folder-button'));
 
-      await waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
-      expect((screen.getByTestId('space-albums-search') as HTMLInputElement).value).toBe('');
+      await vi.waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
+      expect((page.getByTestId('space-albums-search').element() as HTMLInputElement).value).toBe('');
     });
 
     // W-16: one request, not link-then-move.
     it('W-16: creating an album inside a folder links it straight into that folder', async () => {
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockResolvedValue(undefined as never);
-      renderPage([], SharedSpaceRole.Editor, {
+      await renderPage([], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
 
-      const createButton = await screen.findByTestId('create-album-button');
-      await fireEvent.click(createButton);
+      await expect.element(page.getByTestId('create-album-button')).toBeInTheDocument();
 
-      await waitFor(() =>
+      const createButton = page.getByTestId('create-album-button').element() as HTMLElement;
+      await userEvent.click(createButton);
+
+      await vi.waitFor(() =>
         expect(sdkMock.linkAlbum).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'trips' })),
       );
     });
@@ -891,16 +936,16 @@ describe('Space albums page', () => {
     // search — showing e.g. "Albums › Trips" while the results underneath are actually
     // space-wide, misrepresenting where they come from.
     it('W-09: hides the breadcrumb while searching', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
 
-      await screen.findByTestId('space-album-folder-breadcrumb');
-      const search = screen.getByTestId('space-albums-search');
-      await fireEvent.input(search, { target: { value: 'rom' } });
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      const search = page.getByTestId('space-albums-search').element() as HTMLElement;
+      fireEvent('input', search, { target: { value: 'rom' } });
 
-      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
     });
 
     // Finding: reload() used an atomic Promise.all, so a folders-fetch failure also prevented the
@@ -910,14 +955,14 @@ describe('Space albums page', () => {
     it('a folders-fetch failure still refreshes albums and degrades to a flat, unscoped list', async () => {
       // linkedAlbums: [] at mount — only the reload's resolved albums (below) contain Rome/
       // Venice, so a passing assertion proves the reload actually landed despite the rejection.
-      renderPage(
+      await renderPage(
         [makeAlbum({ id: 'a1', albumName: 'Rome' }), makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })],
         SharedSpaceRole.Editor,
         { foldersRejects: true, linkedAlbums: [] },
       );
 
-      await screen.findByText('Rome');
-      expect(screen.getByText('Venice')).toBeInTheDocument();
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByText('Venice')).toBeInTheDocument();
     });
 
     // Finding: `foldersUnavailable` was driven off "most recent fetch failed" alone. Once a
@@ -936,33 +981,33 @@ describe('Space albums page', () => {
       modalManagerMock.show.mockResolvedValue('Souvenirs');
       sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue(makeFolder('souvenirs', 'Souvenirs', 'trips'));
 
-      renderPage(albums, SharedSpaceRole.Editor, { folders, folderParam: 'trips' });
+      await renderPage(albums, SharedSpaceRole.Editor, { folders, folderParam: 'trips' });
 
-      await screen.findByTestId('space-album-folder-breadcrumb');
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByText('Venice')).not.toBeInTheDocument();
 
       // The NEXT folders fetch (triggered by creating a folder, which reload()s afterward) fails;
       // the albums half of that same reload still succeeds.
       sdkMock.getSharedSpaceAlbumFolders.mockRejectedValueOnce(new Error('network error'));
 
-      await fireEvent.click(screen.getByTestId('create-folder-button'));
+      await userEvent.click(page.getByTestId('create-folder-button'));
 
-      await waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
-      await waitFor(() => expect(sdkMock.getSharedSpaceAlbumFolders).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.getSharedSpaceAlbumFolders).toHaveBeenCalledTimes(2));
 
       // Still "inside Trips" per the breadcrumb, and the content underneath must still agree —
       // Rome (scoped to Trips) visible, Venice (root-level) still hidden, not flattened.
-      expect(screen.getByTestId('space-album-folder-breadcrumb')).toHaveTextContent('Trips');
-      expect(screen.getByText('Rome')).toBeInTheDocument();
-      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toMatchTextContent('Trips');
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByText('Venice')).not.toBeInTheDocument();
     });
   });
 
   describe('drag and drop', () => {
     // W-12
     it('W-12: dropping an album on a folder calls the move endpoint', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
       });
 
@@ -972,7 +1017,7 @@ describe('Space albums page', () => {
       // at all when this is true, so this is what actually gates the request, not merely
       // handleDropItem's own after-the-fact canDrop re-check.
       expect(accepted).toBe(true);
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
@@ -983,26 +1028,26 @@ describe('Space albums page', () => {
     // page's back button navigates to. Refreshing only this page's state leaves that cache stale,
     // so a just-moved album sends you back to the folder it used to live in.
     it('invalidates the layout cache after moving an album, so back lands in the new folder', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
       });
 
       await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
 
-      await waitFor(() => expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalled());
-      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+      await vi.waitFor(() => expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     // W-12, folder variant: dropping a folder onto another folder calls the folder-move endpoint.
     it('W-12: dropping a folder on another folder calls the folder move endpoint', async () => {
-      renderPage([], SharedSpaceRole.Editor, {
+      await renderPage([], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')],
       });
 
       const accepted = await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
 
       expect(accepted).toBe(true);
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbumFolder).toHaveBeenCalledWith({
           id: 'space-1',
           folderId: 'trips',
@@ -1015,7 +1060,7 @@ describe('Space albums page', () => {
     // children actually render as folder cards to drop onto — at the space root, "2026" and
     // "Italy" are nested under "Trips" and never appear in the grid at all.
     it('W-13: fires no request for a folder dropped onto its own descendant, and proves the handler ran via a legal drop in the same view', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'italy' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'italy' })], SharedSpaceRole.Editor, {
         folders: [
           makeFolder('trips', 'Trips'),
           makeFolder('y2026', '2026', 'trips'),
@@ -1036,7 +1081,7 @@ describe('Space albums page', () => {
       // legal drop in the very same view — moving Rome from Italy into 2026 — does fire a request.
       const validAccepted = await dropOnFolder({ kind: 'album', id: 'a1' }, 'y2026');
       expect(validAccepted).toBe(true);
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'y2026' } }),
         ),
@@ -1045,7 +1090,7 @@ describe('Space albums page', () => {
 
     // W-14: dropping onto the parent it already has is a no-op, so no request should fire.
     it('W-14: fires no request for an album dropped onto the folder it already sits in, and proves the handler ran via a legal drop in the same view', async () => {
-      renderPage(
+      await renderPage(
         [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' }), makeAlbum({ id: 'a2', albumName: 'Venice' })],
         SharedSpaceRole.Editor,
         { folders: [makeFolder('trips', 'Trips')] },
@@ -1059,7 +1104,7 @@ describe('Space albums page', () => {
       // Prove the handler ran: a2, which does NOT already sit in "trips", legally drops there.
       const validAccepted = await dropOnFolder({ kind: 'album', id: 'a2' }, 'trips');
       expect(validAccepted).toBe(true);
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a2', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
@@ -1071,7 +1116,7 @@ describe('Space albums page', () => {
     // renders as a folder card; "y2026" being dragged is a synthesized payload, not something
     // read off the DOM, so it need not be visible itself.
     it('W-14: fires no request for a folder dropped onto the parent it already has', async () => {
-      renderPage([], SharedSpaceRole.Editor, {
+      await renderPage([], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips'), makeFolder('y2026', '2026', 'trips')],
       });
 
@@ -1089,11 +1134,11 @@ describe('Space albums page', () => {
     // (space-album-folder-card.svelte) has no canDrop check of its own — it forwards straight to
     // onDropItem — so handleDropItem's guard is the only thing standing between an illegal drop
     // and the SDK once dragover is bypassed. Dispatching `drop` directly, with no dragover at
-    // all, exercises exactly that: jsdom's fireEvent.drop doesn't require a prior
-    // preventDefault()'d dragover the way a real browser does, so this reaches the guard even
+    // all, exercises exactly that: a synthetic `drop` event does not require a prior
+    // preventDefault()'d dragover the way a real drag does, so this reaches the guard even
     // though a real browser never would have let the drop fire in the first place.
     it("handleDropItem's own canDrop guard rejects an invalid drop even without a preceding dragover", async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
       });
 
@@ -1101,8 +1146,10 @@ describe('Space albums page', () => {
       // a1 already sits in "trips" — an illegal, no-op drop per canDrop.
       writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
 
-      const card = await screen.findByTestId('space-album-folder-card');
-      await fireEvent.drop(card, { dataTransfer }); // no preceding dragover
+      await expect.element(page.getByTestId('space-album-folder-card')).toBeInTheDocument();
+
+      const card = page.getByTestId('space-album-folder-card').element() as HTMLElement;
+      fireEvent('drop', card, { dataTransfer }); // no preceding dragover
 
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
       expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
@@ -1111,10 +1158,10 @@ describe('Space albums page', () => {
     // W-15
     it('W-15: rolls the optimistic move back and toasts when the request fails', async () => {
       sdkMock.setSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('boom'));
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
       });
-      await screen.findByTestId('space-album-folder-card');
+      await expect.element(page.getByTestId('space-album-folder-card')).toBeInTheDocument();
 
       // The reload triggered by the failed move ALSO fails on its albums half. Without this, the
       // reload's own (successful) re-fetch of the never-actually-changed server state would make
@@ -1125,7 +1172,7 @@ describe('Space albums page', () => {
       await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
 
       // The request was actually attempted (proves the optimistic-apply branch ran)...
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
@@ -1134,19 +1181,19 @@ describe('Space albums page', () => {
       // (also-rejected, for the isolation reason above) albums refetch fires its OWN handleError
       // call with a different message ("Failed to load albums"), so a bare toHaveBeenCalled()
       // would stay green even with the move's own handleError call deleted entirely.
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
+      await vi.waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
       // ...but rolled back: still visible at the root, where it started, not stranded in "trips".
-      expect(screen.getByText('Rome')).toBeInTheDocument();
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
     });
 
     // W-15, folder variant: the same optimistic-apply-then-rollback behaviour applies to a
     // failed folder move, not just an album move.
     it('W-15: rolls back a failed folder move and toasts', async () => {
       sdkMock.updateSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('boom'));
-      renderPage([], SharedSpaceRole.Editor, {
+      await renderPage([], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')],
       });
-      await screen.findAllByTestId('space-album-folder-card');
+      page.getByTestId('space-album-folder-card').elements();
 
       // Isolates the manual rollback from reload()'s own re-fetch, exactly as the album variant
       // above does — without this, reload's successful (unrelated) refetch of the
@@ -1156,7 +1203,7 @@ describe('Space albums page', () => {
 
       await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbumFolder).toHaveBeenCalledWith({
           id: 'space-1',
           folderId: 'trips',
@@ -1166,19 +1213,19 @@ describe('Space albums page', () => {
       // Same reasoning as the album variant above: the specific move message, not a bare
       // "something called handleError" that reload()'s own rejected folders refetch would
       // also satisfy on its own.
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
+      await vi.waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
       // Rolled back: "Trips" is still a root-level folder card, not moved under "Family".
-      expect(screen.getByText('Trips')).toBeInTheDocument();
+      await expect.element(page.getByText('Trips')).toBeInTheDocument();
     });
 
     // W-19: the folder was deleted by another editor between our render and this drop. Same
     // failure path as any other rejection — rollback plus toast, then it vanishes on reload.
     it('W-19: handles a drop onto a folder deleted server-side', async () => {
       sdkMock.setSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('Folder not found'));
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
       });
-      await screen.findByTestId('space-album-folder-card');
+      await expect.element(page.getByTestId('space-album-folder-card')).toBeInTheDocument();
 
       // The reload triggered by the failed move: the folders half discovers the target is gone
       // (W-19's actual scenario) — queued AFTER the initial render so it doesn't also swallow the
@@ -1192,26 +1239,26 @@ describe('Space albums page', () => {
       // The move-specific message — see the W-15 comment above for why a bare toHaveBeenCalled()
       // can't tell "the move's own handleError call ran" apart from "only reload's unrelated,
       // deliberately-rejected albums refetch called handleError".
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
-      expect(screen.getByText('Rome')).toBeInTheDocument();
+      await vi.waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
+      await expect.element(page.getByText('Rome')).toBeInTheDocument();
       // The stale folder disappears from the grid once the reload lands.
-      await waitFor(() => expect(screen.queryByTestId('space-album-folder-card')).not.toBeInTheDocument());
+      await expect.element(page.getByTestId('space-album-folder-card')).not.toBeInTheDocument();
     });
 
     // Page-level proof that `folders`/`albums`/`canManage`/`onDropItem` are actually threaded
     // through to SpaceAlbumFolderBreadcrumb (not just to the folder-card grid) — before this
     // suite had no page-level drop assertion against the breadcrumb at all.
     it('W-12: dropping an album on the root breadcrumb crumb calls the move endpoint', async () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'trips',
       });
-      await screen.findByTestId('space-album-folder-breadcrumb');
+      await expect.element(page.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
 
       const accepted = await dropOnCrumb({ kind: 'album', id: 'a1' }, null);
 
       expect(accepted).toBe(true);
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: null } }),
         ),
@@ -1224,24 +1271,24 @@ describe('Space albums page', () => {
     // all three SpaceAlbumCard render sites could be deleted with the suite green.
     // No `folders` fixture here: SpaceAlbumFolderPickerModal is mocked out via modalManagerMock,
     // so no real folder list needs to render — and a real rendered folder card would ALSO offer
-    // a "Move to folder..." option in its own kebab (same i18n key), making `findByText` ambiguous.
+    // a "Move to folder..." option in its own kebab (same i18n key), making a text query ambiguous.
     it('kebab "Move to folder..." opens the picker and calls the move endpoint', async () => {
       modalManagerMock.show.mockResolvedValue({ folderId: 'trips' });
       const album = makeAlbum({ id: 'a1', albumName: 'Rome', folderId: null });
-      renderPage([album], SharedSpaceRole.Editor);
+      await renderPage([album], SharedSpaceRole.Editor);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
       expect(menuButton).not.toBeNull();
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText('Move to folder...'));
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText('Move to folder...'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(modalManagerMock.show).toHaveBeenCalledWith(
           expect.anything(),
           expect.objectContaining({ excludeFolderId: null, currentFolderId: null }),
         ),
       );
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
@@ -1250,26 +1297,26 @@ describe('Space albums page', () => {
 
     it('kebab "Move to folder...": dismissing the picker fires no request', async () => {
       modalManagerMock.show.mockResolvedValue(undefined);
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
 
-      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-      await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText('Move to folder...'));
+      const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+      await userEvent.click(menuButton!);
+      await userEvent.click(page.getByText('Move to folder...'));
 
-      await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+      await vi.waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
     });
 
-    it('viewer cannot drag: the album card is not draggable', () => {
-      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Viewer);
+    it('viewer cannot drag: the album card is not draggable', async () => {
+      await renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Viewer);
 
-      expect(screen.getByTestId('space-album-card')).toHaveAttribute('draggable', 'false');
+      await expect.element(page.getByTestId('space-album-card')).toHaveAttribute('draggable', 'false');
     });
 
     it('viewer cannot drag: the folder card is not draggable', async () => {
-      renderPage([], SharedSpaceRole.Viewer, { folders: [makeFolder('trips', 'Trips')] });
+      await renderPage([], SharedSpaceRole.Viewer, { folders: [makeFolder('trips', 'Trips')] });
 
-      expect(await screen.findByTestId('space-album-folder-card')).toHaveAttribute('draggable', 'false');
+      await expect.element(page.getByTestId('space-album-folder-card')).toHaveAttribute('draggable', 'false');
     });
   });
 
@@ -1279,15 +1326,15 @@ describe('Space albums page', () => {
   // from their OWN timeline (#1041 §2, a personal preference, not an editor action). Only the
   // editor-only items inside it (space-photos toggle, unlink) are gated.
   it('viewer with a linked album sees the card menu, with only the my-timeline item', async () => {
-    renderPage([makeAlbum()], SharedSpaceRole.Viewer);
-    expect(screen.getByTestId('space-album-card-menu')).toBeInTheDocument();
+    await renderPage([makeAlbum()], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('space-album-card-menu')).toBeInTheDocument();
 
-    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-    await fireEvent.click(menuButton!);
+    const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+    await userEvent.click(menuButton!);
 
-    expect(await screen.findByText('Hide this album from my timeline')).toBeInTheDocument();
-    expect(screen.queryByText("Hide this album from the space's photos")).not.toBeInTheDocument();
-    expect(screen.queryByText('Unlink album')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Hide this album from my timeline')).toBeInTheDocument();
+    await expect.element(page.getByText("Hide this album from the space's photos")).not.toBeInTheDocument();
+    await expect.element(page.getByText('Unlink album')).not.toBeInTheDocument();
   });
 
   it('viewer clicking "Hide this album from my timeline" surfaces the preview count and calls the member-only endpoint', async () => {
@@ -1295,20 +1342,20 @@ describe('Space albums page', () => {
     sdkMock.updateAlbumTimelineForMember.mockResolvedValue(undefined as never);
     modalManagerMock.show.mockResolvedValue(true);
     const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', hiddenFromMyTimeline: false });
-    renderPage([album], SharedSpaceRole.Viewer);
+    await renderPage([album], SharedSpaceRole.Viewer);
 
-    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-    await fireEvent.click(menuButton!);
-    await fireEvent.click(await screen.findByText('Hide this album from my timeline'));
+    const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+    await userEvent.click(menuButton!);
+    await userEvent.click(page.getByText('Hide this album from my timeline'));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.getAlbumTimelineHidePreview).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }),
     );
     expect(modalManagerMock.show).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ albumName: 'Vacation', count: 4 }),
     );
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalledWith({
         id: 'space-1',
         albumId: 'album-1',
@@ -1319,25 +1366,25 @@ describe('Space albums page', () => {
     expect(sdkMock.updateSharedSpaceAlbum).not.toHaveBeenCalled();
     // The member-toggle handler was never audited for this before #1041 slice 12 — it must
     // invalidate the [spaceId] layout's cached linkedAlbums, same as the editor toggle does.
-    await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+    await vi.waitFor(() => expect(invalidateAll).toHaveBeenCalled());
   });
 
   it('cancelling the "my timeline" confirm dialog changes nothing', async () => {
     sdkMock.getAlbumTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 4 });
     modalManagerMock.show.mockResolvedValue(false);
     const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', hiddenFromMyTimeline: false });
-    renderPage([album], SharedSpaceRole.Viewer);
+    await renderPage([album], SharedSpaceRole.Viewer);
 
-    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
-    await fireEvent.click(menuButton!);
-    await fireEvent.click(await screen.findByText('Hide this album from my timeline'));
+    const menuButton = page.getByTestId('space-album-card-menu').element().querySelector('button');
+    await userEvent.click(menuButton!);
+    await userEvent.click(page.getByText('Hide this album from my timeline'));
 
-    await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+    await vi.waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
     expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
   });
 
-  it('viewer with empty albums list sees no empty-link-album-button', () => {
-    renderPage([], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('empty-link-album-button')).not.toBeInTheDocument();
+  it('viewer with empty albums list sees no empty-link-album-button', async () => {
+    await renderPage([], SharedSpaceRole.Viewer);
+    await expect.element(page.getByTestId('empty-link-album-button')).not.toBeInTheDocument();
   });
 });

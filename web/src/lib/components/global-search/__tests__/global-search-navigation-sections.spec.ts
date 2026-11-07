@@ -1,7 +1,7 @@
 import type { NavigationItem } from '#lib/managers/navigation-items.ts';
-import { render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import CommandRootWrapper from './test-harness/command-root-wrapper.svelte';
 
 beforeAll(async () => {
@@ -25,41 +25,41 @@ function makeItem(category: NavigationItem['category'], id: string): NavigationI
 }
 
 describe('global-search-navigation-sections', () => {
-  it('renders nothing when status is idle', () => {
-    const { container } = render(CommandRootWrapper, {
+  it('renders nothing when status is idle', async () => {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'idle' } },
     });
     expect(container.querySelector('[data-command-group]')).toBeNull();
   });
 
-  it('renders nothing when status is empty', () => {
-    const { container } = render(CommandRootWrapper, {
+  it('renders nothing when status is empty', async () => {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'empty' } },
     });
     expect(container.querySelector('[data-command-group]')).toBeNull();
   });
 
-  it('renders nothing when status is loading', () => {
-    const { container } = render(CommandRootWrapper, {
+  it('renders nothing when status is loading', async () => {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'loading' } },
     });
     expect(container.querySelector('[data-command-group]')).toBeNull();
   });
 
-  it('renders nothing when status is error', () => {
-    const { container } = render(CommandRootWrapper, {
+  it('renders nothing when status is error', async () => {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'error', message: 'boom' } },
     });
     expect(container.querySelector('[data-command-group]')).toBeNull();
   });
 
-  it('renders three sub-sections in fixed order when all categories have items', () => {
+  it('renders three sub-sections in fixed order when all categories have items', async () => {
     const items = [
       makeItem('admin', 'nav:admin:users'),
       makeItem('userPages', 'nav:userPages:photos'),
       makeItem('systemSettings', 'nav:systemSettings:authentication'),
     ];
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: items.length } },
     });
     const headings = [...container.querySelectorAll('[data-command-group-heading]')];
@@ -68,9 +68,9 @@ describe('global-search-navigation-sections', () => {
     expect(order).toEqual(['System Settings', 'Admin', 'Navigation']);
   });
 
-  it('omits empty categories entirely (no heading, no group)', () => {
+  it('omits empty categories entirely (no heading, no group)', async () => {
     const items = [makeItem('admin', 'nav:admin:users')];
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: 1 } },
     });
     const headings = [...container.querySelectorAll('[data-command-group-heading]')];
@@ -78,19 +78,19 @@ describe('global-search-navigation-sections', () => {
     expect(headings[0].textContent?.trim()).toBe('Admin');
   });
 
-  it('slices each category to topN=5', () => {
+  it('slices each category to topN=5', async () => {
     const items: NavigationItem[] = [];
     for (let i = 0; i < 8; i++) {
       items.push(makeItem('systemSettings', `nav:systemSettings:k${i}`));
     }
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: items.length } },
     });
     const rows = container.querySelectorAll('[data-command-item]');
     expect(rows.length).toBe(5);
   });
 
-  it('× N more affordance is currently absent', () => {
+  it('× N more affordance is currently absent', async () => {
     // Regression pin: the "× N more" chip + "(M of N)" heading count were removed
     // from navigation sub-sections. Seed 6 items in one sub-section (one more than
     // TOP_N=5) and assert that neither affordance renders.
@@ -98,7 +98,7 @@ describe('global-search-navigation-sections', () => {
     for (let i = 0; i < 6; i++) {
       items.push(makeItem('userPages', `nav:userPages:k${i}`));
     }
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: items.length } },
     });
 
@@ -112,12 +112,12 @@ describe('global-search-navigation-sections', () => {
     }
   });
 
-  it('only groups categories that are present — mixed 2-of-4 render', () => {
+  it('only groups categories that are present — mixed 2-of-4 render', async () => {
     const items = [
       makeItem('systemSettings', 'nav:systemSettings:authentication'),
       makeItem('userPages', 'nav:userPages:photos'),
     ];
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: items.length } },
     });
     const headings = [...container.querySelectorAll('[data-command-group-heading]')];
@@ -126,9 +126,9 @@ describe('global-search-navigation-sections', () => {
     expect(headings[1].textContent?.trim()).toBe('Navigation');
   });
 
-  it('renders Command.Item with data-value equal to the NavigationItem.id', () => {
+  it('renders Command.Item with data-value equal to the NavigationItem.id', async () => {
     const items = [makeItem('userPages', 'nav:userPages:photos')];
-    const { container } = render(CommandRootWrapper, {
+    const { container } = await render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: 1 } },
     });
     const item = container.querySelector('[data-command-item]') as HTMLElement | null;

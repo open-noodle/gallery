@@ -3,9 +3,8 @@ import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanelStarRating from '../DetailPanelStarRating.svelte';
 
 // Task 5 of Slice 7. R6 — the stars ARE the editing control (a star click means "set rating to N"),
@@ -16,11 +15,14 @@ const { gotoMock, updateAssetMock } = vi.hoisted(() => ({
   updateAssetMock: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock };
+  return { ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: reactivePageMock };
 });
 
 vi.mock('@immich/sdk', async (importOriginal) => {
@@ -60,9 +62,9 @@ describe('DetailPanelStarRating filter (R6)', () => {
   it.each(surfaces)('the ⚗️ icon emits { rating } and filters $label', async ({ url, basePath }) => {
     mockPage.reset(url);
 
-    renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(4), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(4), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText(/^filter_by_rating/));
+    await page.getByLabelText(/^filter_by_rating/).click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { rating: 4 });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -74,26 +76,25 @@ describe('DetailPanelStarRating filter (R6)', () => {
   // R9 — parseRating rejects anything outside 1..5, so an unrated asset's ⚗️ would close the viewer
   // and apply NOTHING. It must not be rendered at all.
   it.each([0, null])('R9: renders no ⚗️ for an unrated asset (rating %s)', async (rating) => {
-    renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(rating), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(rating), isOwner: true, canFilter: true });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-rating')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_rating/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-rating')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_rating/)).not.toBeInTheDocument();
   });
 
   it('keeps the stars as the EDITING control (clicking a star rates, it does not filter)', async () => {
-    renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(2), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(2), isOwner: true, canFilter: true });
 
-    const stars = await screen.findAllByTestId('star');
-    await fireEvent.click(stars[4]);
+    await page.getByTestId('star').nth(4).click();
 
     expect(gotoMock).not.toHaveBeenCalled();
   });
 
   it('E2: with canFilter false no ⚗️ renders', async () => {
-    renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(4), isOwner: true, canFilter: false });
+    await renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(4), isOwner: true, canFilter: false });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-rating')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_rating/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-rating')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_rating/)).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
   });
 
@@ -101,9 +102,9 @@ describe('DetailPanelStarRating filter (R6)', () => {
   it('E8: a non-owner still gets the ⚗️', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(5), isOwner: false, canFilter: true });
+    await renderWithTooltips(DetailPanelStarRating, { asset: buildAsset(5), isOwner: false, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText(/^filter_by_rating/));
+    await page.getByLabelText(/^filter_by_rating/).click();
 
     expect(gotoMock).toHaveBeenCalledWith(buildContextualFilterUrl(mockPage.url, { rating: 5 }));
   });

@@ -2,14 +2,13 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { queryClient } from '#lib/queries/client.ts';
 import { getUniqueOriginalPathsQuery } from '#lib/queries/view.query.ts';
 import { TreeNode } from '#lib/utils/tree-utils.ts';
-import { factory } from '#test/unit/factories.ts';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { factory } from '#test/common/factories.ts';
 import type { Component } from 'svelte';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import FoldersPage from './+page.svelte';
 
-const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager } = vi.hoisted(() => ({
-  mockAfterNavigate: vi.fn(),
+const { mockAssetMultiSelectManager, mockAuthManager } = vi.hoisted(() => ({
   mockAssetMultiSelectManager: {
     selectionActive: false,
     assets: [],
@@ -22,14 +21,6 @@ const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager } = vi.h
   mockAuthManager: {
     preferences: { tags: { enabled: true } },
   },
-}));
-
-vi.mock('$app/navigation', () => ({
-  afterNavigate: mockAfterNavigate,
-  beforeNavigate: vi.fn(),
-  goto: vi.fn(),
-  invalidateAll: vi.fn(),
-  refreshAll: vi.fn(),
 }));
 
 vi.mock('#lib/components/ActionMenuItem.svelte', async () => {
@@ -142,10 +133,6 @@ vi.mock('#lib/services/asset.service.js', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 
-vi.mock('#lib/utils/timeline-util.js', () => ({
-  toTimelineAsset: vi.fn((asset) => asset),
-}));
-
 function renderPage() {
   // The folder tree is a preloaded query since immich-32667 (getFolderTreeQuery).
   queryClient.setQueryData(getUniqueOriginalPathsQuery().queryKey, ['Trips']);
@@ -172,9 +159,9 @@ describe('Folders page GalleryViewer grouping', () => {
     mockAssetMultiSelectManager.assets = [];
   });
 
-  it('enables GalleryViewer grouping for folder asset grids', () => {
-    renderPage();
+  it('enables GalleryViewer grouping for folder asset grids', async () => {
+    await renderPage();
 
-    expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
+    await expect.element(page.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
   });
 });

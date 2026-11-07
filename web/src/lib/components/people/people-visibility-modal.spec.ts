@@ -1,7 +1,9 @@
 import { handleError } from '#lib/utils/handle-error.ts';
 import { toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { addMessages } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import type { VisibilityPerson } from './people-types';
 import PeopleVisibilityModalWrapper from './people-visibility-modal.test-wrapper.svelte';
 
@@ -13,21 +15,19 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-vi.mock('#lib/utils/handle-error.js', () => ({
+vi.mock('#lib/utils/handle-error.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/handle-error.ts')>()),
   handleError: vi.fn(),
 }));
 
-vi.mock('svelte-i18n', async () => {
-  const { readable } = await import('svelte/store');
-  const formatMessage = (key: string, options?: { values?: Record<string, unknown> }) => {
-    const count = options?.values?.count;
-    return count === undefined ? key : `${key} ${count}`;
-  };
-
-  return {
-    locale: readable('en-US'),
-    t: readable(formatMessage),
-  };
+// The test setup's `dev` locale renders a key without its values, so give the two toasts' keys a
+// message that shows the count they were formatted with. (A vi.mock of svelte-i18n would not take:
+// the setup file has already loaded the real module in this page.)
+beforeAll(() => {
+  addMessages('dev', {
+    visibility_changed: 'visibility_changed {count}',
+    'errors.unable_to_change_visibility': 'errors.unable_to_change_visibility {count}',
+  });
 });
 
 const makePerson = (overrides: Partial<VisibilityPerson> = {}): VisibilityPerson => ({
@@ -63,10 +63,10 @@ describe('PeopleVisibilityModal', () => {
       makePerson({ id: 'p1', displayName: 'Alice', isHidden: false }),
       makePerson({ id: 'p2', displayName: 'Bob', isHidden: false }),
     ];
-    const { rerender } = renderComponent(people);
+    const { rerender } = await renderComponent(people);
 
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('visibility-person-p1').click();
+    await expect.element(page.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
 
     await rerender({
       people: [...people, makePerson({ id: 'p3', displayName: 'Charlie', isHidden: false })],
@@ -75,9 +75,9 @@ describe('PeopleVisibilityModal', () => {
       saveVisibilityChanges,
     });
 
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('visibility-person-p2')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('visibility-person-p3')).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(page.getByTestId('visibility-person-p2')).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('visibility-person-p3')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('saves only changed people and returns updated local people via onUpdate', async () => {
@@ -87,13 +87,13 @@ describe('PeopleVisibilityModal', () => {
       makePerson({ id: 'p3', displayName: 'Charlie', isHidden: false }),
     ];
     saveVisibilityChanges.mockResolvedValueOnce({ successCount: 2, failCount: 0 });
-    renderComponent(people);
+    await renderComponent(people);
 
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    await fireEvent.click(screen.getByTestId('visibility-person-p2'));
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await page.getByTestId('visibility-person-p1').click();
+    await page.getByTestId('visibility-person-p2').click();
+    await page.getByTestId('save-visibility').click();
 
-    await waitFor(() => expect(saveVisibilityChanges).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(saveVisibilityChanges).toHaveBeenCalledTimes(1));
     expect(saveVisibilityChanges).toHaveBeenCalledWith([
       { id: 'p1', isHidden: true },
       { id: 'p2', isHidden: false },
@@ -115,13 +115,13 @@ describe('PeopleVisibilityModal', () => {
       makePerson({ id: 'p3', displayName: 'Charlie', isHidden: false }),
     ];
     saveVisibilityChanges.mockResolvedValueOnce({ successCount: 1, failCount: 1 });
-    renderComponent(people);
+    await renderComponent(people);
 
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    await fireEvent.click(screen.getByTestId('visibility-person-p2'));
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await page.getByTestId('visibility-person-p1').click();
+    await page.getByTestId('visibility-person-p2').click();
+    await page.getByTestId('save-visibility').click();
 
-    await waitFor(() => expect(saveVisibilityChanges).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(saveVisibilityChanges).toHaveBeenCalledTimes(1));
     expect(saveVisibilityChanges).toHaveBeenCalledWith([
       { id: 'p1', isHidden: true },
       { id: 'p2', isHidden: false },
@@ -141,24 +141,24 @@ describe('PeopleVisibilityModal', () => {
       makePerson({ id: 'named', displayName: 'Space Alias', isHidden: false }),
       makePerson({ id: 'unnamed', displayName: '', isHidden: false }),
     ];
-    renderComponent(people);
+    await renderComponent(people);
 
-    await fireEvent.click(screen.getByLabelText('hide_unnamed_people'));
+    await page.getByLabelText('hide_unnamed_people').click();
 
-    expect(screen.getByTestId('visibility-person-named')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('visibility-person-unnamed')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(page.getByTestId('visibility-person-named')).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('visibility-person-unnamed')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('resets local overrides without saving changes', async () => {
-    renderComponent([makePerson({ id: 'p1', displayName: 'Alice', isHidden: false })]);
+    await renderComponent([makePerson({ id: 'p1', displayName: 'Alice', isHidden: false })]);
 
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('visibility-person-p1').click();
+    await expect.element(page.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
 
-    await fireEvent.click(screen.getByLabelText('reset_people_visibility'));
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'false');
+    await page.getByLabelText('reset_people_visibility').click();
+    await expect.element(page.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'false');
 
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await page.getByTestId('save-visibility').click();
 
     expect(saveVisibilityChanges).not.toHaveBeenCalled();
     expect(onUpdate).toHaveBeenCalledWith([makePerson({ id: 'p1', displayName: 'Alice', isHidden: false })]);
@@ -168,20 +168,20 @@ describe('PeopleVisibilityModal', () => {
   it('calls onClose from the close button and handles save errors', async () => {
     const error = new Error('save failed');
     saveVisibilityChanges.mockRejectedValue(error);
-    renderComponent([makePerson({ id: 'p1', displayName: 'Alice', isHidden: false })]);
+    await renderComponent([makePerson({ id: 'p1', displayName: 'Alice', isHidden: false })]);
 
-    await fireEvent.click(screen.getByTestId('close-visibility'));
+    await page.getByTestId('close-visibility').click();
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await page.getByTestId('visibility-person-p1').click();
+    await page.getByTestId('save-visibility').click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(handleError).toHaveBeenCalledWith(error, expect.stringContaining('errors.unable_to_change_visibility')),
     );
   });
 
-  it('does not assign thumbnail src for deferred offscreen visibility modal people', () => {
+  it('does not assign thumbnail src for deferred offscreen visibility modal people', async () => {
     class NeverIntersectingObserver {
       observe = vi.fn();
       disconnect = vi.fn();
@@ -189,7 +189,7 @@ describe('PeopleVisibilityModal', () => {
     }
     vi.stubGlobal('IntersectionObserver', NeverIntersectingObserver);
 
-    render(PeopleVisibilityModalWrapper, {
+    await render(PeopleVisibilityModalWrapper, {
       props: {
         people: [
           makePerson({ id: 'p1', displayName: 'Alice', thumbnailUrl: '/api/people/p1/thumbnail' }),
@@ -202,8 +202,8 @@ describe('PeopleVisibilityModal', () => {
       },
     });
 
-    expect(screen.getByTitle('Alice')).not.toHaveAttribute('src');
-    expect(screen.getByTitle('Bob')).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Alice')).not.toHaveAttribute('src');
+    await expect.element(page.getByTitle('Bob')).not.toHaveAttribute('src');
 
     vi.unstubAllGlobals();
   });

@@ -1,7 +1,7 @@
 import SidebarNavGroup from '#lib/components/sidebar/sidebar-nav-group.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -24,35 +24,35 @@ describe('sidebar-nav-group', () => {
     mocks.sidebarModeStore.railExpanded = false;
   });
 
-  it('renders the text header when expanded', () => {
-    render(SidebarNavGroup, { title: 'Library' });
+  it('renders the text header when expanded', async () => {
+    await render(SidebarNavGroup, { title: 'Library' });
 
-    expect(screen.getByText('Library')).toBeInTheDocument();
-    expect(screen.queryByTestId('sidebar-group-divider')).not.toBeInTheDocument();
+    expect(page.getByText('Library', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('sidebar-group-divider').query()).not.toBeInTheDocument();
   });
 
   // A bare rule is 47px shorter than the header it replaced, so every row below a group jumped
   // that far the moment the rail collapsed - and back again on hover. The header stays mounted
   // to hold the group's height; only its ink is swapped for a rule.
-  it('renders a divider instead of the header in rail mode', () => {
+  it('renders a divider instead of the header in rail mode', async () => {
     mocks.sidebarModeStore.layout = 'rail';
 
-    render(SidebarNavGroup, { title: 'Library' });
+    await render(SidebarNavGroup, { title: 'Library' });
 
-    expect(screen.getByTestId('sidebar-group-divider')).toBeInTheDocument();
-    const reserved = screen.getByText('Library').closest('[aria-hidden="true"]');
+    expect(page.getByTestId('sidebar-group-divider').element()).toBeInTheDocument();
+    const reserved = page.getByText('Library', { exact: true }).element().closest('[aria-hidden="true"]');
     // Hidden from sight and from assistive tech, but still occupying its box.
     expect(reserved).toHaveClass('invisible');
   });
 
-  it('restores the header while hover-expanded', () => {
+  it('restores the header while hover-expanded', async () => {
     mocks.sidebarModeStore.layout = 'rail';
     mocks.sidebarModeStore.hoverExpanded = true;
     mocks.sidebarModeStore.railExpanded = true;
 
-    render(SidebarNavGroup, { title: 'Library' });
+    await render(SidebarNavGroup, { title: 'Library' });
 
-    expect(screen.getByText('Library')).toBeInTheDocument();
-    expect(screen.queryByTestId('sidebar-group-divider')).not.toBeInTheDocument();
+    expect(page.getByText('Library', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('sidebar-group-divider').query()).not.toBeInTheDocument();
   });
 });

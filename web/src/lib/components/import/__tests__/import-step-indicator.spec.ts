@@ -1,6 +1,6 @@
 import { ImportStep } from '#lib/managers/import-manager.svelte.ts';
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import ImportStepIndicator from '../import-step-indicator.svelte';
 
 describe('ImportStepIndicator', () => {
@@ -8,36 +8,35 @@ describe('ImportStepIndicator', () => {
     vi.resetAllMocks();
   });
 
-  it('renders all step labels', () => {
-    const { getByText } = render(ImportStepIndicator, { props: { currentStep: ImportStep.Source } });
+  it('renders all step labels', async () => {
+    const { getByText } = await render(ImportStepIndicator, { currentStep: ImportStep.Source });
 
-    expect(getByText('import_step_source')).toBeInTheDocument();
-    expect(getByText('import_step_files')).toBeInTheDocument();
-    expect(getByText('import_step_scan')).toBeInTheDocument();
-    expect(getByText('import_step_review')).toBeInTheDocument();
-    expect(getByText('import_step_import')).toBeInTheDocument();
+    await expect.element(getByText('import_step_source')).toBeInTheDocument();
+    await expect.element(getByText('import_step_files')).toBeInTheDocument();
+    await expect.element(getByText('import_step_scan')).toBeInTheDocument();
+    await expect.element(getByText('import_step_review')).toBeInTheDocument();
+    await expect.element(getByText('import_step_import')).toBeInTheDocument();
   });
 
-  it('marks current step as active', () => {
-    const { getByTestId } = render(ImportStepIndicator, { props: { currentStep: ImportStep.Scan } });
+  it('marks current step as active', async () => {
+    const { getByTestId } = await render(ImportStepIndicator, { currentStep: ImportStep.Scan });
 
-    const activeStep = getByTestId('step-2');
-    expect(activeStep.querySelector('.bg-primary')).toBeInTheDocument();
+    expect(getByTestId('step-2').element().querySelector('.bg-primary')).not.toBeNull();
   });
 
-  it('marks previous steps as completed', () => {
-    const { getByTestId } = render(ImportStepIndicator, { props: { currentStep: ImportStep.Review } });
+  it('marks previous steps as completed', async () => {
+    const { getByTestId } = await render(ImportStepIndicator, { currentStep: ImportStep.Review });
 
-    expect(getByTestId('step-0')).toHaveAttribute('data-completed', 'true');
-    expect(getByTestId('step-1')).toHaveAttribute('data-completed', 'true');
-    expect(getByTestId('step-2')).toHaveAttribute('data-completed', 'true');
+    await expect.element(getByTestId('step-0')).toHaveAttribute('data-completed', 'true');
+    await expect.element(getByTestId('step-1')).toHaveAttribute('data-completed', 'true');
+    await expect.element(getByTestId('step-2')).toHaveAttribute('data-completed', 'true');
   });
 
-  it('marks future steps as inactive', () => {
-    const { getByTestId } = render(ImportStepIndicator, { props: { currentStep: ImportStep.Files } });
+  it('marks future steps as inactive', async () => {
+    const { getByTestId } = await render(ImportStepIndicator, { currentStep: ImportStep.Files });
 
-    expect(getByTestId('step-2')).toHaveAttribute('data-completed', 'false');
-    expect(getByTestId('step-3')).toHaveAttribute('data-completed', 'false');
-    expect(getByTestId('step-4')).toHaveAttribute('data-completed', 'false');
+    await expect.element(getByTestId('step-2')).toHaveAttribute('data-completed', 'false');
+    await expect.element(getByTestId('step-3')).toHaveAttribute('data-completed', 'false');
+    await expect.element(getByTestId('step-4')).toHaveAttribute('data-completed', 'false');
   });
 });

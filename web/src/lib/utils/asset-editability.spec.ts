@@ -1,6 +1,16 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { canEditAsset, canEditSpacePeople, resolveEditableAssetIds } from './asset-editability';
+
+// In browser mode a spec's static imports are linked before an imported module's vi.mock runs, unless the spec
+// hoists a vi.mock of its own. This one defers them, so './asset-editability' gets sdk.mock.ts's spied SDK.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocked = Object.fromEntries(
+    Object.entries(module).map(([key, value]) => [key, typeof value === 'function' ? vi.fn() : value]),
+  );
+  return { ...mocked, default: mocked };
+});
 
 const space = (canWrite: boolean, memberIds: string[]) => ({
   canWrite,

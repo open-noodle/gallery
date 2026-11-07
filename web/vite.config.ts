@@ -106,6 +106,8 @@ export default defineConfig({
   server: {
     // connect to a remote backend during web-only development
     proxy: process.env.VITEST ? {} : proxy,
+    // Gallery: no HMR socket per test iframe; hundreds of them in one browser session drop Vitest's own connection.
+    hmr: process.env.VITEST ? false : undefined,
     allowedHosts: true,
   },
   preview: {
@@ -165,6 +167,9 @@ export default defineConfig({
       },
     },
     clearMocks: true,
+    // Gallery: at most three test iframes at once. With one per core (17 on a large machine) the browser drops
+    // Vitest's own connection partway through the suite. CI's 4-core runners get three anyway.
+    maxWorkers: 3,
     name: 'web:unit',
     include: ['src/**/*.{test,spec}.{js,ts}'],
     setupFiles: ['./test/unit/setup.ts', './test/unit/gallery-setup.ts'],

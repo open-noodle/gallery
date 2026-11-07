@@ -1,5 +1,6 @@
 import { AssetTypeEnum } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import type { FilterContext, FilterPanelConfig, FilterSection, FilterSuggestionsResponse } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -65,9 +66,7 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should re-fetch providers with temporal context when a year is selected', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -76,7 +75,7 @@ describe('Contextual re-fetch on temporal change', () => {
     expect(config.providers!.cameras).toHaveBeenCalledTimes(1);
 
     // Click year to select 2023
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
 
     // Advance past debounce
     await vi.advanceTimersByTimeAsync(250);
@@ -86,7 +85,7 @@ describe('Contextual re-fetch on temporal change', () => {
       takenBefore: '2024-01-01T00:00:00.000Z',
     };
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.providers!.people).toHaveBeenCalledTimes(2);
       expect(config.providers!.people).toHaveBeenLastCalledWith(expectedContext);
       expect(config.providers!.locations).toHaveBeenLastCalledWith(expectedContext);
@@ -98,16 +97,14 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should re-fetch tags with temporal context when a year is selected', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
     expect(config.providers!.tags).toHaveBeenCalledTimes(1);
 
     // Click year to select 2023
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
 
     // Advance past debounce
     await vi.advanceTimersByTimeAsync(250);
@@ -117,7 +114,7 @@ describe('Contextual re-fetch on temporal change', () => {
       takenBefore: '2024-01-01T00:00:00.000Z',
     };
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.providers!.tags).toHaveBeenCalledTimes(2);
       expect(config.providers!.tags).toHaveBeenLastCalledWith(expectedContext);
     });
@@ -125,16 +122,14 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should re-fetch with full-year bounds when only year is selected', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await fireEvent.click(screen.getByTestId('year-btn-2024'));
+    await userEvent.click(page.getByTestId('year-btn-2024'));
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2024-01-01T00:00:00.000Z',
         takenBefore: '2025-01-01T00:00:00.000Z',
@@ -144,27 +139,25 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should debounce rapid temporal changes — year then quickly month yields limited calls', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
     const initialCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
 
     // Click year — this triggers a 200ms debounce for the year context
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
 
     // Wait for the year debounce to fire
     await vi.advanceTimersByTimeAsync(250);
 
     // Now click month (month grid is visible after year selection)
-    await fireEvent.click(screen.getByTestId('month-btn-6'));
+    await userEvent.click(page.getByTestId('month-btn-6'));
 
     // Wait for month debounce
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const finalCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
       // Year triggers 1 re-fetch, month triggers another → exactly 2 extra
       expect(finalCalls - initialCalls).toBe(2);
@@ -173,11 +166,9 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should NOT trigger re-fetch when non-temporal filters change', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: {
-        config: { ...config, sections: ['people', 'rating', 'media'] },
-        timeBuckets: [],
-      },
+    await render(FilterPanel, {
+      config: { ...config, sections: ['people', 'rating', 'media'] },
+      timeBuckets: [],
     });
 
     await vi.advanceTimersByTimeAsync(0);
@@ -192,25 +183,23 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should bypass debounce on clear (immediate re-fetch with no context)', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
     // Select year first
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
 
     const callsAfterYear = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
 
     // Click "All" breadcrumb to clear temporal filter
-    await fireEvent.click(screen.getByTestId('temporal-breadcrumb-all'));
+    await userEvent.click(page.getByTestId('temporal-breadcrumb-all'));
 
     // Advance just 1ms — clear should fire immediately (delay=0)
     await vi.advanceTimersByTimeAsync(1);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const finalCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
       expect(finalCalls).toBeGreaterThan(callsAfterYear);
       expect(config.providers!.people).toHaveBeenLastCalledWith(undefined);
@@ -224,44 +213,40 @@ describe('Contextual re-fetch on temporal change', () => {
       .mockRejectedValueOnce(new Error('Network error'));
 
     const config = createConfig({ people: peopleFn });
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
     });
 
     // Select year to trigger re-fetch (which will fail)
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
 
     // Allow promise rejection to settle
     await vi.advanceTimersByTimeAsync(0);
 
     // Stale data should still be visible
-    expect(screen.getByTestId('people-item-p1')).toBeTruthy();
+    expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
   });
 
   it('should produce correct UTC ISO strings for month temporal ranges', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
     // Select year first
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
 
     // Now select month (August — month 8)
-    await fireEvent.click(screen.getByTestId('month-btn-8'));
+    await userEvent.click(page.getByTestId('month-btn-8'));
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2023-08-01T00:00:00.000Z',
         takenBefore: '2023-09-01T00:00:00.000Z',
@@ -284,20 +269,18 @@ describe('Contextual re-fetch on temporal change', () => {
       suggestionsProvider,
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p2')).toBeTruthy();
-      expect(screen.getByTestId('tags-item-t2')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p2').element()).toBeTruthy();
+      expect(page.getByTestId('tags-item-t2').element()).toBeTruthy();
     });
 
-    await fireEvent.input(screen.getByTestId('custom-date-from-input'), { target: { value: '2024-01-01' } });
+    await userEvent.fill(page.getByTestId('custom-date-from-input'), '2024-01-01');
     await vi.advanceTimersByTimeAsync(200);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(suggestionsProvider).toHaveBeenCalledTimes(2);
       expect(suggestionsProvider).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -307,30 +290,28 @@ describe('Contextual re-fetch on temporal change', () => {
           selectedMonth: undefined,
         }),
       );
-      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
-      expect(screen.queryByTestId('people-item-p2')).toBeNull();
-      expect(screen.getByTestId('tags-item-t1')).toBeTruthy();
-      expect(screen.queryByTestId('tags-item-t2')).toBeNull();
+      expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
+      expect(page.getByTestId('people-item-p2').query()).toBeNull();
+      expect(page.getByTestId('tags-item-t1').element()).toBeTruthy();
+      expect(page.getByTestId('tags-item-t2').query()).toBeNull();
     });
   });
 
   it('should clear selected year when custom from date changes', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
-    expect(screen.getByTestId('month-grid')).toBeTruthy();
+    expect(page.getByTestId('month-grid').element()).toBeTruthy();
 
-    await fireEvent.input(screen.getByTestId('custom-date-from-input'), { target: { value: '2024-01-01' } });
+    await userEvent.fill(page.getByTestId('custom-date-from-input'), '2024-01-01');
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('month-grid')).toBeNull();
-      expect(screen.getByTestId('year-grid')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('month-grid').query()).toBeNull();
+      expect(page.getByTestId('year-grid').element()).toBeTruthy();
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2024-01-01T00:00:00.000Z',
       });
@@ -339,23 +320,21 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should clear selected year and month when custom to date changes', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
-    await fireEvent.click(screen.getByTestId('month-btn-8'));
+    await userEvent.click(page.getByTestId('month-btn-8'));
     await vi.advanceTimersByTimeAsync(250);
-    expect(screen.getByTestId('month-grid')).toBeTruthy();
+    expect(page.getByTestId('month-grid').element()).toBeTruthy();
 
-    await fireEvent.input(screen.getByTestId('custom-date-to-input'), { target: { value: '2024-12-31' } });
+    await userEvent.fill(page.getByTestId('custom-date-to-input'), '2024-12-31');
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('month-grid')).toBeNull();
-      expect(screen.getByTestId('year-grid')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('month-grid').query()).toBeNull();
+      expect(page.getByTestId('year-grid').element()).toBeTruthy();
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenBefore: '2025-01-01T00:00:00.000Z',
       });
@@ -364,21 +343,19 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should clear custom dates when selecting a year', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await fireEvent.input(screen.getByTestId('custom-date-from-input'), { target: { value: '2024-01-01' } });
-    await fireEvent.input(screen.getByTestId('custom-date-to-input'), { target: { value: '2024-12-31' } });
+    await userEvent.fill(page.getByTestId('custom-date-from-input'), '2024-01-01');
+    await userEvent.fill(page.getByTestId('custom-date-to-input'), '2024-12-31');
     await vi.advanceTimersByTimeAsync(250);
 
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await userEvent.click(page.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('custom-date-from-input')).toHaveValue('');
-      expect(screen.getByTestId('custom-date-to-input')).toHaveValue('');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('custom-date-from-input').element()).toHaveValue('');
+      expect(page.getByTestId('custom-date-to-input').element()).toHaveValue('');
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2023-01-01T00:00:00.000Z',
         takenBefore: '2024-01-01T00:00:00.000Z',
@@ -388,29 +365,27 @@ describe('Contextual re-fetch on temporal change', () => {
 
   it('should clear custom dates when selecting a month', async () => {
     const config = createConfig();
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets,
-        filters: {
-          personIds: [],
-          tagIds: [],
-          mediaType: 'all',
-          sortOrder: 'desc',
-          dateAfter: '2024-01-01',
-          dateBefore: '2024-12-31',
-          selectedYear: 2023,
-        },
+    await render(FilterPanel, {
+      config,
+      timeBuckets,
+      filters: {
+        personIds: [],
+        tagIds: [],
+        mediaType: 'all',
+        sortOrder: 'desc',
+        dateAfter: '2024-01-01',
+        dateBefore: '2024-12-31',
+        selectedYear: 2023,
       },
     });
 
     await vi.advanceTimersByTimeAsync(0);
-    await fireEvent.click(screen.getByTestId('month-btn-8'));
+    await userEvent.click(page.getByTestId('month-btn-8'));
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('custom-date-from-input')).toHaveValue('');
-      expect(screen.getByTestId('custom-date-to-input')).toHaveValue('');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('custom-date-from-input').element()).toHaveValue('');
+      expect(page.getByTestId('custom-date-to-input').element()).toHaveValue('');
       expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2023-08-01T00:00:00.000Z',
         takenBefore: '2023-09-01T00:00:00.000Z',
@@ -422,18 +397,16 @@ describe('Contextual re-fetch on temporal change', () => {
     const cities = vi.fn().mockResolvedValue(['Berlin']);
     const cameraModels = vi.fn().mockResolvedValue(['EOS R5']);
     const config = createConfig({ cities, cameraModels });
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await fireEvent.input(screen.getByTestId('custom-date-from-input'), { target: { value: '2024-01-01' } });
+    await userEvent.fill(page.getByTestId('custom-date-from-input'), '2024-01-01');
     await vi.advanceTimersByTimeAsync(250);
 
-    await fireEvent.click(screen.getByTestId('location-country-Germany'));
-    await fireEvent.click(screen.getByTestId('camera-make-Canon'));
+    await userEvent.click(page.getByTestId('location-country-Germany'));
+    await userEvent.click(page.getByTestId('camera-make-Canon'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(cities).toHaveBeenLastCalledWith('Germany', {
         takenAfter: '2024-01-01T00:00:00.000Z',
         make: 'Canon',
@@ -452,15 +425,15 @@ describe('Contextual re-fetch on temporal change', () => {
       ...createConfig({ cities, cameraModels }),
       sections: ['location', 'camera', 'media'] as FilterSection[],
     };
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await fireEvent.click(screen.getByTestId('location-country-Germany'));
-    await fireEvent.click(screen.getByTestId('camera-make-Canon'));
-    await fireEvent.click(screen.getByTestId('media-type-video'));
+    await userEvent.click(page.getByTestId('location-country-Germany'));
+    await userEvent.click(page.getByTestId('camera-make-Canon'));
+    await userEvent.click(page.getByTestId('media-type-video'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(cities).toHaveBeenLastCalledWith('Germany', {
         make: 'Canon',
         mediaType: AssetTypeEnum.Video,
@@ -481,28 +454,26 @@ describe('Contextual re-fetch on temporal change', () => {
     // viewer, typed search or a link — so the scenario is "the panel opens with them already set",
     // not "the user clicks them". (Clicking a country would replace the whole location group and
     // clear the state, which is why the city list must not be narrowed by it.)
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets,
-        filters: {
-          personIds: [],
-          tagIds: [],
-          mediaType: 'all',
-          sortOrder: 'desc',
-          country: 'Germany',
-          state: 'Bavaria',
-          make: 'Canon',
-          model: 'Canon EOS R6',
-          lensModel: 'RF24-105mm F4 L IS USM',
-          ownerId: 'owner-1',
-        },
+    await render(FilterPanel, {
+      config,
+      timeBuckets,
+      filters: {
+        personIds: [],
+        tagIds: [],
+        mediaType: 'all',
+        sortOrder: 'desc',
+        country: 'Germany',
+        state: 'Bavaria',
+        make: 'Canon',
+        model: 'Canon EOS R6',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
       },
     });
 
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       // The location group is self-excluded, so the pinned state is NOT sent to the city list …
       expect(cities).toHaveBeenLastCalledWith('Germany', {
         make: 'Canon',
@@ -532,25 +503,23 @@ describe('Contextual re-fetch on temporal change', () => {
       suggestionsProvider,
     };
 
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets,
-        filters: {
-          personIds: [],
-          tagIds: [],
-          mediaType: 'all',
-          sortOrder: 'desc',
-          state: 'Bavaria',
-          lensModel: 'RF24-105mm F4 L IS USM',
-          ownerId: 'owner-1',
-        },
+    await render(FilterPanel, {
+      config,
+      timeBuckets,
+      filters: {
+        personIds: [],
+        tagIds: [],
+        mediaType: 'all',
+        sortOrder: 'desc',
+        state: 'Bavaria',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
       },
     });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       // The provider reads the state this effect reconstructs, so an untracked field is an unsent
       // one — these three have to survive the round trip for the lists to narrow at all.
       expect(suggestionsProvider).toHaveBeenLastCalledWith(
@@ -561,10 +530,10 @@ describe('Contextual re-fetch on temporal change', () => {
         }),
       );
       // …and the narrowed lists it returns are what the panel renders.
-      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
-      expect(screen.queryByTestId('people-item-p2')).toBeNull();
-      expect(screen.getByTestId('tags-item-t1')).toBeTruthy();
-      expect(screen.queryByTestId('tags-item-t2')).toBeNull();
+      expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
+      expect(page.getByTestId('people-item-p2').query()).toBeNull();
+      expect(page.getByTestId('tags-item-t1').element()).toBeTruthy();
+      expect(page.getByTestId('tags-item-t2').query()).toBeNull();
     });
   });
 
@@ -580,27 +549,25 @@ describe('Contextual re-fetch on temporal change', () => {
     });
     const config: FilterPanelConfig = { sections: ['people', 'tags'], suggestionsProvider };
 
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets,
-        filters: {
-          personIds: [],
-          tagIds: [],
-          mediaType: 'all',
-          sortOrder: 'desc',
-          state: 'Bavaria',
-          lensModel: 'RF24-105mm F4 L IS USM',
-          ownerId: 'owner-1',
-        },
+    await render(FilterPanel, {
+      config,
+      timeBuckets,
+      filters: {
+        personIds: [],
+        tagIds: [],
+        mediaType: 'all',
+        sortOrder: 'desc',
+        state: 'Bavaria',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
       },
     });
 
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalled());
+    await vi.waitFor(() => expect(suggestionsProvider).toHaveBeenCalled());
 
     for (const section of ['people', 'tags']) {
-      const button = screen.getByTestId(`filter-section-${section}`).querySelector('button')!;
+      const button = page.getByTestId(`filter-section-${section}`).element().querySelector('button')!;
       expect(button.textContent).not.toContain('(0)');
       expect(button.hasAttribute('disabled')).toBe(false);
     }
@@ -621,26 +588,24 @@ describe('Contextual re-fetch on temporal change', () => {
       suggestionsProvider,
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets },
-    });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => {
-      expect(screen.getByTestId('rating-star-1')).toBeTruthy();
-      expect(screen.getByTestId('media-type-video')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('rating-star-1').element()).toBeTruthy();
+      expect(page.getByTestId('media-type-video').element()).toBeTruthy();
     });
 
-    await fireEvent.input(screen.getByTestId('custom-date-from-input'), { target: { value: '2024-01-01' } });
+    await userEvent.fill(page.getByTestId('custom-date-from-input'), '2024-01-01');
     await vi.advanceTimersByTimeAsync(200);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(suggestionsProvider).toHaveBeenCalledTimes(2);
       for (const star of [1, 2, 3, 4, 5]) {
-        expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
+        expect(page.getByTestId(`rating-star-${star}`).element()).toBeTruthy();
       }
-      expect(screen.getByTestId('media-type-image')).toBeTruthy();
-      expect(screen.getByTestId('media-type-video')).toBeTruthy();
+      expect(page.getByTestId('media-type-image').element()).toBeTruthy();
+      expect(page.getByTestId('media-type-video').element()).toBeTruthy();
     });
   });
 });

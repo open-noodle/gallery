@@ -1,9 +1,10 @@
 import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { Settings } from 'luxon';
+import { init, register, waitLocale } from 'svelte-i18n';
 import { SvelteSet } from 'svelte/reactivity';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
@@ -14,15 +15,13 @@ vi.mock('@immich/ui', async (original) => {
   };
 });
 
-vi.mock('svelte-i18n', async () => {
-  const { readable } = await import('svelte/store');
-  // Interpolating, NOT the key-echoing mock the page specs use: the date-formatting tests below assert on
-  // what actually RENDERS, so a mock that drops `values` would make them unfalsifiable.
-  const formatMessage = (key: string, options?: { values?: Record<string, unknown> }) => {
-    const date = options?.values?.date;
-    return date === undefined ? key : `${key} ${date}`;
-  };
-  return { locale: readable('en-US'), t: readable(formatMessage) };
+// Real English strings, NOT the key-echoing `dev` locale: the date-formatting tests below assert on what
+// actually RENDERS, so a translation that drops `values` would make them unfalsifiable. (A `vi.mock` of
+// svelte-i18n cannot work in browser mode: the test setup has already loaded the real module.)
+beforeAll(async () => {
+  register('en-US', () => import('#i18n/en.json'));
+  await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
+  await waitLocale('en-US');
 });
 
 const face = (overrides: Record<string, unknown> = {}) => ({
@@ -37,8 +36,8 @@ const face = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-// happy-dom reports naturalWidth/width as 0 for every <img>, so getContentMetrics would divide by zero.
-// Stubbing them is what makes the overlay geometry observable at all in this runner.
+// The preview URL never loads in the unit tier (it 404s), so naturalWidth is 0 and getContentMetrics would
+// divide by zero. Stubbing the four metrics pins the overlay geometry to known numbers.
 const sizeImage = (img: HTMLImageElement) => {
   for (const [property, value] of [
     ['naturalWidth', 400],
@@ -48,29 +47,32 @@ const sizeImage = (img: HTMLImageElement) => {
   ] as const) {
     Object.defineProperty(img, property, { configurable: true, value });
   }
-  void fireEvent.load(img);
+  img.dispatchEvent(new Event('load'));
 };
 
 describe('FacePhotoModal', () => {
-  it('T6.1: shows the admin preview for the face at `index`', () => {
-    render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 1, onClose: vi.fn() });
+  it('T6.1: shows the admin preview for the face at `index`', async () => {
+    await render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 1, onClose: vi.fn() });
 
-    expect(screen.getByTestId('face-photo')).toHaveAttribute('src', '/api/admin/face-repair/faces/face-2/preview');
+    await expect
+      .element(page.getByTestId('face-photo'))
+      .toHaveAttribute('src', '/api/admin/face-repair/faces/face-2/preview');
   });
 
   it('T6.2/T6.23: draws exactly one box, positioned from the rendered image metrics', async () => {
-    render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
-    sizeImage(screen.getByTestId('face-photo') as HTMLImageElement);
+    await render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
+    sizeImage((await page.getByTestId('face-photo').findElement()) as HTMLImageElement);
 
-    const boxes = await screen.findAllByTestId('face-photo-box');
+    await expect.element(page.getByTestId('face-photo-box').first()).toBeInTheDocument();
+    const boxes = page.getByTestId('face-photo-box').elements();
     expect(boxes).toHaveLength(1);
     // 400x300 natural inside 800x600 client => contentWidth 800, offset 0; x1 100/400 * 800 = 200.
     expect(boxes[0].style.left).toBe('200px');
     expect(boxes[0].style.width).toBe('200px');
   });
 
-  // I1 regression: happy-dom has no layout, so it cannot reproduce the actual portrait misalignment (the box
-  // would land at the same computed offset either way in this runner). What CAN be pinned structurally is the
+  // I1 regression: the image metrics are stubbed (the preview never loads here), so this runner cannot
+  // reproduce the actual portrait misalignment (the box would land at the same computed offset either way). What CAN be pinned structurally is the
   // coordinate origin the box and the img must share: `left`/`top` are measured from getContentMetrics(img),
   // which is relative to the IMG's own box. If the img's positioning ancestor (the nearest `position:relative`
   // element) is a wider element than the img itself — e.g. a `justify-center` flex row that centers the img
@@ -80,18 +82,18 @@ describe('FacePhotoModal', () => {
   // the structural invariant that catches a reintroduction of that bug even though this runner can't measure
   // the pixel gap directly.
   it('I1: the box and the img share the same offset parent, not the outer centring container', async () => {
-    render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
-    const img = screen.getByTestId('face-photo');
-    sizeImage(img as HTMLImageElement);
+    await render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
+    const img = (await page.getByTestId('face-photo').findElement()) as HTMLImageElement;
+    sizeImage(img);
 
-    const box = await screen.findByTestId('face-photo-box');
+    const box = await page.getByTestId('face-photo-box').findElement();
 
     // The box's positioning parent must be the SAME element that directly wraps the img — not some ancestor
     // further out. `position:absolute` resolves against the nearest positioned ancestor, so this is exactly
     // "do they share a coordinate origin".
     const boxParent = box.parentElement;
     expect(boxParent).not.toBeNull();
-    expect(boxParent).toContainElement(img);
+    await expect.element(page.elementLocator(boxParent!)).toContainElement(img);
 
     // The regression this guards against: wrapping the img directly in the `justify-center` flex row (no
     // shrink-wrapping element in between) would make the box's parent equal the img's parent AND that parent
@@ -103,53 +105,61 @@ describe('FacePhotoModal', () => {
     expect(imgParent?.className).not.toMatch(/justify-center/);
   });
 
-  it('T6.3: renders the photo but no box when imageWidth is 0', () => {
-    render(FacePhotoModal, { faces: [face({ imageWidth: 0 })], index: 0, onClose: vi.fn() });
-    sizeImage(screen.getByTestId('face-photo') as HTMLImageElement);
+  it('T6.3: renders the photo but no box when imageWidth is 0', async () => {
+    await render(FacePhotoModal, { faces: [face({ imageWidth: 0 })], index: 0, onClose: vi.fn() });
+    sizeImage((await page.getByTestId('face-photo').findElement()) as HTMLImageElement);
 
-    expect(screen.getByTestId('face-photo')).toBeInTheDocument(); // positive control
-    expect(screen.queryByTestId('face-photo-box')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('face-photo')).toBeInTheDocument(); // positive control
+    await expect.element(page.getByTestId('face-photo-box')).not.toBeInTheDocument();
   });
 
-  it('T6.4: renders no box for a degenerate box', () => {
-    render(FacePhotoModal, { faces: [face({ boundingBoxX2: 100 })], index: 0, onClose: vi.fn() });
-    sizeImage(screen.getByTestId('face-photo') as HTMLImageElement);
+  it('T6.4: renders no box for a degenerate box', async () => {
+    await render(FacePhotoModal, { faces: [face({ boundingBoxX2: 100 })], index: 0, onClose: vi.fn() });
+    sizeImage((await page.getByTestId('face-photo').findElement()) as HTMLImageElement);
 
-    expect(screen.getByTestId('face-photo')).toBeInTheDocument();
-    expect(screen.queryByTestId('face-photo-box')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('face-photo')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-photo-box')).not.toBeInTheDocument();
   });
 
   it('T6.5: clamps a box that runs past the image edge', async () => {
-    render(FacePhotoModal, { faces: [face({ boundingBoxX1: -100, boundingBoxX2: 900 })], index: 0, onClose: vi.fn() });
-    sizeImage(screen.getByTestId('face-photo') as HTMLImageElement);
+    await render(FacePhotoModal, {
+      faces: [face({ boundingBoxX1: -100, boundingBoxX2: 900 })],
+      index: 0,
+      onClose: vi.fn(),
+    });
+    sizeImage((await page.getByTestId('face-photo').findElement()) as HTMLImageElement);
 
-    const box = await screen.findByTestId('face-photo-box');
+    const box = await page.getByTestId('face-photo-box').findElement();
     expect(box.style.left).toBe('0px');
     expect(box.style.width).toBe('800px');
   });
 
   it('T6.6: the arrows page forward and back, and the photo follows', async () => {
-    render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 0, onClose: vi.fn() });
+    await render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 0, onClose: vi.fn() });
 
-    await fireEvent.click(screen.getByTestId('face-photo-next'));
-    expect(screen.getByTestId('face-photo')).toHaveAttribute('src', '/api/admin/face-repair/faces/face-2/preview');
+    await userEvent.click(page.getByTestId('face-photo-next'));
+    await expect
+      .element(page.getByTestId('face-photo'))
+      .toHaveAttribute('src', '/api/admin/face-repair/faces/face-2/preview');
 
-    await fireEvent.click(screen.getByTestId('face-photo-prev'));
-    expect(screen.getByTestId('face-photo')).toHaveAttribute('src', '/api/admin/face-repair/faces/face-1/preview');
+    await userEvent.click(page.getByTestId('face-photo-prev'));
+    await expect
+      .element(page.getByTestId('face-photo'))
+      .toHaveAttribute('src', '/api/admin/face-repair/faces/face-1/preview');
   });
 
-  it('T6.7: clamps at both ends rather than wrapping', () => {
-    const { unmount } = render(FacePhotoModal, {
+  it('T6.7: clamps at both ends rather than wrapping', async () => {
+    const { unmount } = await render(FacePhotoModal, {
       faces: [face(), face({ assetFaceId: 'face-2' })],
       index: 0,
       onClose: vi.fn(),
     });
-    expect(screen.getByTestId('face-photo-prev')).toBeDisabled();
-    expect(screen.getByTestId('face-photo-next')).toBeEnabled(); // positive control
-    unmount();
+    await expect.element(page.getByTestId('face-photo-prev')).toBeDisabled();
+    await expect.element(page.getByTestId('face-photo-next')).toBeEnabled(); // positive control
+    await unmount();
 
-    render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 1, onClose: vi.fn() });
-    expect(screen.getByTestId('face-photo-next')).toBeDisabled();
+    await render(FacePhotoModal, { faces: [face(), face({ assetFaceId: 'face-2' })], index: 1, onClose: vi.fn() });
+    await expect.element(page.getByTestId('face-photo-next')).toBeDisabled();
   });
 
   // E13 — localDateTime stores local wall-clock time as a UTC timestamp, so it must be parsed with
@@ -163,47 +173,47 @@ describe('FacePhotoModal', () => {
   // Each case pins a fixed zone (not the runner's own) so it is unconditionally discriminating on any
   // machine: T6.9a pins a zone BEHIND UTC, where a naive local parse of a 00:30Z photo would render 3 July;
   // T6.9b pins a zone AHEAD of UTC, where a naive local parse of a 23:30Z photo would render 5 July.
-  it('T6.9a: a 00:30Z photo keeps its own day in a zone behind UTC', () => {
+  it('T6.9a: a 00:30Z photo keeps its own day in a zone behind UTC', async () => {
     const previousZone = Settings.defaultZone;
     Settings.defaultZone = 'America/Los_Angeles';
 
     try {
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face({ localDateTime: '2019-07-04T00:30:00.000Z' })],
         index: 0,
         onClose: vi.fn(),
       });
 
-      expect(screen.getByTestId('face-photo-taken')).toHaveTextContent('Jul 4, 2019');
-      expect(screen.getByTestId('face-photo-taken')).not.toHaveTextContent('Jul 3');
+      await expect.element(page.getByTestId('face-photo-taken')).toMatchTextContent('Jul 4, 2019');
+      await expect.element(page.getByTestId('face-photo-taken')).not.toMatchTextContent('Jul 3');
     } finally {
       Settings.defaultZone = previousZone;
     }
   });
 
-  it('T6.9b: a 23:30Z photo keeps its own day in a zone ahead of UTC', () => {
+  it('T6.9b: a 23:30Z photo keeps its own day in a zone ahead of UTC', async () => {
     const previousZone = Settings.defaultZone;
     Settings.defaultZone = 'Asia/Tokyo';
 
     try {
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face({ localDateTime: '2019-07-04T23:30:00.000Z' })],
         index: 0,
         onClose: vi.fn(),
       });
 
-      expect(screen.getByTestId('face-photo-taken')).toHaveTextContent('Jul 4, 2019');
-      expect(screen.getByTestId('face-photo-taken')).not.toHaveTextContent('Jul 5');
+      await expect.element(page.getByTestId('face-photo-taken')).toMatchTextContent('Jul 4, 2019');
+      await expect.element(page.getByTestId('face-photo-taken')).not.toMatchTextContent('Jul 5');
     } finally {
       Settings.defaultZone = previousZone;
     }
   });
 
-  it('T6.10: omits the caption rather than rendering "Invalid DateTime"', () => {
-    render(FacePhotoModal, { faces: [face({ localDateTime: 'not-a-date' })], index: 0, onClose: vi.fn() });
+  it('T6.10: omits the caption rather than rendering "Invalid DateTime"', async () => {
+    await render(FacePhotoModal, { faces: [face({ localDateTime: 'not-a-date' })], index: 0, onClose: vi.fn() });
 
-    expect(screen.queryByTestId('face-photo-taken')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Invalid DateTime/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('face-photo-taken')).not.toBeInTheDocument();
+    await expect.element(page.getByText(/Invalid DateTime/)).not.toBeInTheDocument();
   });
 
   // Selecting from inside the lightbox. The point is triage without closing: page through 48 faces, marking
@@ -211,16 +221,16 @@ describe('FacePhotoModal', () => {
   // stages a decision" — that invariant is about the MAGNIFIER click (pinned by the page specs' T7.3/T7.6/
   // T8.2); the control below is a deliberate, explicit act taken inside the modal.
   describe('selection', () => {
-    it('renders no selection control when the caller does not supply one', () => {
-      render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
+    it('renders no selection control when the caller does not supply one', async () => {
+      await render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
 
-      expect(screen.getByTestId('face-photo')).toBeInTheDocument(); // positive control: the modal did render
-      expect(screen.queryByTestId('face-photo-select')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('face-photo')).toBeInTheDocument(); // positive control: the modal did render
+      await expect.element(page.getByTestId('face-photo-select')).not.toBeInTheDocument();
     });
 
     it('toggles the CURRENT face, and keeps targeting the right face after paging', async () => {
       const onToggleSelect = vi.fn();
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face(), face({ assetFaceId: 'face-2' })],
         index: 0,
         onClose: vi.fn(),
@@ -228,38 +238,38 @@ describe('FacePhotoModal', () => {
         onToggleSelect,
       });
 
-      await fireEvent.click(screen.getByTestId('face-photo-select'));
+      await userEvent.click(page.getByTestId('face-photo-select'));
       expect(onToggleSelect).toHaveBeenCalledWith('face-1');
 
-      await fireEvent.click(screen.getByTestId('face-photo-next'));
-      await fireEvent.click(screen.getByTestId('face-photo-select'));
+      await userEvent.click(page.getByTestId('face-photo-next'));
+      await userEvent.click(page.getByTestId('face-photo-select'));
       expect(onToggleSelect).toHaveBeenLastCalledWith('face-2');
     });
 
-    it("reflects the current face's selection state", () => {
-      const { unmount } = render(FacePhotoModal, {
+    it("reflects the current face's selection state", async () => {
+      const { unmount } = await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
         isSelected: () => false,
         onToggleSelect: vi.fn(),
       });
-      expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false');
-      unmount();
+      await expect.element(page.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false');
+      await unmount();
 
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
         isSelected: () => true,
         onToggleSelect: vi.fn(),
       });
-      expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true');
+      await expect.element(page.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('Space toggles the current face', async () => {
       const onToggleSelect = vi.fn();
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
@@ -267,7 +277,7 @@ describe('FacePhotoModal', () => {
         onToggleSelect,
       });
 
-      await fireEvent.keyDown(document.body, { key: ' ' });
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
 
       expect(onToggleSelect).toHaveBeenCalledWith('face-1');
     });
@@ -275,8 +285,8 @@ describe('FacePhotoModal', () => {
     // The rest-of-cluster grid's gate is ASYMMETRIC: a staged face can always be removed, but a new one can
     // only be added once a valid destination is chosen — otherwise the tile ribbon would name a destination
     // Apply refuses to use. The modal must mirror that exactly, or the control lies about what it will do.
-    it('disables ADDING when the caller says the face cannot be selected', () => {
-      render(FacePhotoModal, {
+    it('disables ADDING when the caller says the face cannot be selected', async () => {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
@@ -285,12 +295,12 @@ describe('FacePhotoModal', () => {
         onToggleSelect: vi.fn(),
       });
 
-      expect(screen.getByTestId('face-photo-select')).toBeDisabled();
+      await expect.element(page.getByTestId('face-photo-select')).toBeDisabled();
     });
 
     it('still allows REMOVING an already-selected face when adding is gated', async () => {
       const onToggleSelect = vi.fn();
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
@@ -299,9 +309,9 @@ describe('FacePhotoModal', () => {
         onToggleSelect,
       });
 
-      const control = screen.getByTestId('face-photo-select');
-      expect(control).toBeEnabled(); // the asymmetry: deselecting is never blocked
-      await fireEvent.click(control);
+      const control = page.getByTestId('face-photo-select');
+      await expect.element(control).toBeEnabled(); // the asymmetry: deselecting is never blocked
+      await userEvent.click(control);
       expect(onToggleSelect).toHaveBeenCalledWith('face-1');
     });
 
@@ -311,7 +321,7 @@ describe('FacePhotoModal', () => {
     // selection the moment the admin used it, which is exactly the workflow this control exists for.
     it('updates its pressed state when the caller’s selection changes underneath it', async () => {
       const staged = new SvelteSet<string>();
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
@@ -319,19 +329,19 @@ describe('FacePhotoModal', () => {
         onToggleSelect: (id: string) => (staged.has(id) ? staged.delete(id) : staged.add(id)),
       });
 
-      const control = screen.getByTestId('face-photo-select');
-      expect(control).toHaveAttribute('aria-pressed', 'false');
+      const control = page.getByTestId('face-photo-select');
+      await expect.element(control).toHaveAttribute('aria-pressed', 'false');
 
-      await fireEvent.click(control);
-      await waitFor(() => expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true'));
+      await userEvent.click(control);
+      await expect.element(page.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true');
 
-      await fireEvent.click(screen.getByTestId('face-photo-select'));
-      await waitFor(() => expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false'));
+      await userEvent.click(page.getByTestId('face-photo-select'));
+      await expect.element(page.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false');
     });
 
     it('does not fire on Space when adding is gated', async () => {
       const onToggleSelect = vi.fn();
-      render(FacePhotoModal, {
+      await render(FacePhotoModal, {
         faces: [face()],
         index: 0,
         onClose: vi.fn(),
@@ -340,7 +350,7 @@ describe('FacePhotoModal', () => {
         onToggleSelect,
       });
 
-      await fireEvent.keyDown(document.body, { key: ' ' });
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
 
       expect(onToggleSelect).not.toHaveBeenCalled();
     });

@@ -1,6 +1,9 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { QueryParameter } from '#lib/constants.ts';
-import { load } from './+page';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
+
+// Loaded after the sdk mock: a static import of either would link the real @immich/sdk before
+// sdk.mock.ts registers its vi.mock.
+const { QueryParameter } = await import('#lib/constants.ts');
+const { load } = await import('./+page');
 
 const { authenticate } = vi.hoisted(() => ({ authenticate: vi.fn() }));
 

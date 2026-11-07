@@ -1,21 +1,21 @@
 import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
 import StopPropagationHost from '#lib/gallery/__mocks__/face-tile-overlay-stop-propagation.host.stub.svelte';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 describe('FaceTileOverlay', () => {
-  it('renders a month-and-year pill — the cheapest signal that separates two similar children', () => {
-    render(FaceTileOverlay, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen: vi.fn() });
+  it('renders a month-and-year pill — the cheapest signal that separates two similar children', async () => {
+    await render(FaceTileOverlay, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen: vi.fn() });
 
-    expect(screen.getByTestId('face-tile-date')).toHaveTextContent('2019');
+    await expect.element(page.getByTestId('face-tile-date')).toMatchTextContent('2019');
   });
 
-  it('omits the pill for an unparseable date rather than rendering "Invalid DateTime"', () => {
-    render(FaceTileOverlay, { localDateTime: 'not-a-date', onOpen: vi.fn() });
+  it('omits the pill for an unparseable date rather than rendering "Invalid DateTime"', async () => {
+    await render(FaceTileOverlay, { localDateTime: 'not-a-date', onOpen: vi.fn() });
 
-    expect(screen.queryByTestId('face-tile-date')).not.toBeInTheDocument();
-    expect(screen.getByTestId('face-tile-view-photo')).toBeInTheDocument(); // positive control
+    await expect.element(page.getByTestId('face-tile-date')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('face-tile-view-photo')).toBeInTheDocument(); // positive control
   });
 
   it('calls onOpen and stops the click from reaching the tile beneath', async () => {
@@ -26,22 +26,24 @@ describe('FaceTileOverlay', () => {
     // test actually exercises the propagation-stopping the component relies on.
     const onOpen = vi.fn();
     const onAncestorClick = vi.fn();
-    render(StopPropagationHost, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen, onAncestorClick });
+    await render(StopPropagationHost, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen, onAncestorClick });
 
-    await fireEvent.click(screen.getByTestId('face-tile-view-photo'));
+    await userEvent.click(page.getByTestId('face-tile-view-photo'));
 
     expect(onOpen).toHaveBeenCalledOnce();
     expect(onAncestorClick).not.toHaveBeenCalled();
 
     // Positive control: the ancestor probe must actually respond to a real, unstopped click, or its absence
     // above would be meaningless.
-    await fireEvent.click(screen.getByTestId('ancestor'));
+    await userEvent.click(page.getByTestId('ancestor'));
     expect(onAncestorClick).toHaveBeenCalledOnce();
   });
 
-  it('labels the magnifier for screen readers', () => {
-    render(FaceTileOverlay, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen: vi.fn() });
+  it('labels the magnifier for screen readers', async () => {
+    await render(FaceTileOverlay, { localDateTime: '2019-07-04T10:30:00.000Z', onOpen: vi.fn() });
 
-    expect(screen.getByTestId('face-tile-view-photo')).toHaveAccessibleName('admin.face_cleanup_view_photo');
+    await expect
+      .element(page.getByTestId('face-tile-view-photo'))
+      .toHaveAccessibleName('admin.face_cleanup_view_photo');
   });
 });

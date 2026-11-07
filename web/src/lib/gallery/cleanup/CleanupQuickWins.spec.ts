@@ -1,6 +1,8 @@
 import CleanupQuickWins from '#lib/gallery/cleanup/CleanupQuickWins.svelte';
 import { CleanupCountQueue } from '@immich/sdk';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const loaded = {
   [CleanupCountQueue.SpaceHogs]: { count: 12, bytes: 5_000_000_000 },
@@ -18,10 +20,10 @@ describe('CleanupQuickWins', () => {
   beforeEach(() => stubReducedMotion(true));
   afterEach(() => vi.unstubAllGlobals());
 
-  it('renders the five queues in the mockup order', () => {
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+  it('renders the five queues in the mockup order', async () => {
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    const rows = screen.getAllByTestId(/^cleanup-queue-(?!skeleton)/);
+    const rows = page.getByTestId(/^cleanup-queue-(?!skeleton)/).elements();
     expect(rows.map((row) => row.dataset.testid)).toEqual([
       'cleanup-queue-space_hogs',
       'cleanup-queue-bursts',
@@ -31,92 +33,97 @@ describe('CleanupQuickWins', () => {
     ]);
   });
 
-  it('shows analysis progress only while a pixel queue is still being analysed', () => {
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+  it('shows analysis progress only while a pixel queue is still being analysed', async () => {
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    expect(within(screen.getByTestId('cleanup-queue-blurry')).getByText('cleanup_analysing_percent')).toBeVisible();
-    expect(
-      within(screen.getByTestId('cleanup-queue-screenshots')).queryByText('cleanup_analysing_percent'),
-    ).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-queue-blurry').getByText('cleanup_analysing_percent')).toBeVisible();
+    await expect
+      .element(page.getByTestId('cleanup-queue-screenshots').getByText('cleanup_analysing_percent'))
+      .not.toBeInTheDocument();
   });
 
-  it('gives each count the unit the mockup shows', () => {
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+  it('gives each count the unit the mockup shows', async () => {
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    const row = (queue: string) => within(screen.getByTestId(`cleanup-queue-${queue}`));
-    expect(row('space_hogs').getByText('cleanup_queue_count_files')).toBeVisible();
-    expect(row('bursts').getByText('cleanup_up_to_count')).toBeVisible();
-    expect(row('screenshots').getByText('7')).toBeVisible();
-    expect(row('duplicates').getByText('cleanup_queue_count_groups')).toBeVisible();
+    const row = (queue: string) => page.getByTestId(`cleanup-queue-${queue}`);
+    await expect.element(row('space_hogs').getByText('cleanup_queue_count_files')).toBeVisible();
+    await expect.element(row('bursts').getByText('cleanup_up_to_count')).toBeVisible();
+    await expect.element(row('screenshots').getByText('7')).toBeVisible();
+    await expect.element(row('duplicates').getByText('cleanup_queue_count_groups')).toBeVisible();
     // blurry is still being analysed, so its count is partial
-    expect(row('blurry').getByText('cleanup_queue_count_so_far')).toBeVisible();
-    expect(row('space_hogs').queryByText('cleanup_up_to_count')).toBeNull();
+    await expect.element(row('blurry').getByText('cleanup_queue_count_so_far')).toBeVisible();
+    expect(row('space_hogs').getByText('cleanup_up_to_count').query()).toBeNull();
   });
 
-  it('shows a plain count for blurry once analysis has covered the library', () => {
-    render(CleanupQuickWins, {
+  it('shows a plain count for blurry once analysis has covered the library', async () => {
+    await render(CleanupQuickWins, {
       counts: { ...loaded, [CleanupCountQueue.Blurry]: { count: 9, bytes: 1, analysedPercent: 100 } },
       onEmptyTrash: vi.fn(),
     });
 
-    expect(within(screen.getByTestId('cleanup-queue-blurry')).getByText('9')).toBeVisible();
+    await expect.element(page.getByTestId('cleanup-queue-blurry').getByText('9')).toBeVisible();
   });
 
-  it('links each queue to its page, and duplicates to the duplicates utility', () => {
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+  it('links each queue to its page, and duplicates to the duplicates utility', async () => {
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    expect(screen.getByTestId('cleanup-queue-duplicates')).toHaveAttribute('href', '/utilities/duplicates');
-    expect(screen.getByTestId('cleanup-queue-space_hogs')).toHaveAttribute('href', '/utilities/cleanup/space-hogs');
-    expect(screen.getByTestId('cleanup-queue-blurry')).toHaveAttribute('href', '/utilities/cleanup/blurry');
+    await expect.element(page.getByTestId('cleanup-queue-duplicates')).toHaveAttribute('href', '/utilities/duplicates');
+    await expect
+      .element(page.getByTestId('cleanup-queue-space_hogs'))
+      .toHaveAttribute('href', '/utilities/cleanup/space-hogs');
+    await expect.element(page.getByTestId('cleanup-queue-blurry')).toHaveAttribute('href', '/utilities/cleanup/blurry');
   });
 
-  it('shows a skeleton for a queue whose count is still loading', () => {
-    render(CleanupQuickWins, {
+  it('shows a skeleton for a queue whose count is still loading', async () => {
+    await render(CleanupQuickWins, {
       counts: { ...loaded, [CleanupCountQueue.Bursts]: undefined },
       onEmptyTrash: vi.fn(),
     });
 
-    const skeletons = screen.getAllByTestId('cleanup-queue-skeleton');
+    const skeletons = page.getByTestId('cleanup-queue-skeleton').elements();
     expect(skeletons).toHaveLength(1);
-    expect(within(screen.getByTestId('cleanup-queue-bursts')).getByTestId('cleanup-queue-skeleton')).toBeVisible();
+    // The skeleton is an empty, CSS-sized bar; unit tests load no Tailwind, so it has no box to be visible in.
+    await expect
+      .element(page.getByTestId('cleanup-queue-bursts').getByTestId('cleanup-queue-skeleton'))
+      .toBeInTheDocument();
   });
 
   it('empties the trash from the footer', async () => {
     const onEmptyTrash = vi.fn();
-    render(CleanupQuickWins, { counts: loaded, trash: { count: 4, bytes: 1_000_000 }, onEmptyTrash });
+    await render(CleanupQuickWins, { counts: loaded, trash: { count: 4, bytes: 1_000_000 }, onEmptyTrash });
 
-    expect(screen.getByText('cleanup_trash_holds')).toBeVisible();
-    await fireEvent.click(screen.getByRole('button', { name: 'cleanup_trash_empty' }));
+    await expect.element(page.getByText('cleanup_trash_holds')).toBeVisible();
+    await userEvent.click(page.getByRole('button', { name: 'cleanup_trash_empty' }));
     expect(onEmptyTrash).toHaveBeenCalledOnce();
   });
 
-  it('hides the trash footer when the trash is turned off', () => {
-    render(CleanupQuickWins, {
+  it('hides the trash footer when the trash is turned off', async () => {
+    await render(CleanupQuickWins, {
       counts: loaded,
       trash: { count: 0, bytes: 0 },
       showTrash: false,
       onEmptyTrash: vi.fn(),
     });
 
-    expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
-    expect(screen.getByTestId('cleanup-queue-space_hogs')).toBeVisible();
+    expect(page.getByTestId('cleanup-trash-footer').query()).toBeNull();
+    await expect.element(page.getByTestId('cleanup-queue-space_hogs')).toBeVisible();
   });
 
-  it('shows "All clear" on a queue with nothing in it, still linking to its page', () => {
-    render(CleanupQuickWins, {
+  it('shows "All clear" on a queue with nothing in it, still linking to its page', async () => {
+    await render(CleanupQuickWins, {
       counts: { ...loaded, [CleanupCountQueue.Screenshots]: { count: 0, bytes: 0, analysedPercent: 100 } },
       onEmptyTrash: vi.fn(),
     });
 
-    const card = screen.getByTestId('cleanup-queue-screenshots');
-    expect(card).toHaveAttribute('data-state', 'clear');
-    expect(within(card).getByText('cleanup_all_clear')).toBeVisible();
-    expect(card).toHaveAttribute('href', '/utilities/cleanup/screenshots');
-    expect(screen.getByTestId('cleanup-queue-blurry')).not.toHaveAttribute('data-state', 'clear');
+    const card = page.getByTestId('cleanup-queue-screenshots');
+    await expect.element(card).toHaveAttribute('data-state', 'clear');
+    await expect.element(card.getByText('cleanup_all_clear')).toBeVisible();
+    await expect.element(card).toHaveAttribute('href', '/utilities/cleanup/screenshots');
+    await expect.element(page.getByTestId('cleanup-queue-blurry')).not.toHaveAttribute('data-state', 'clear');
   });
 
-  it('uses the cover photo where one is loaded and the queue icon otherwise', () => {
-    render(CleanupQuickWins, {
+  it('uses the cover photo where one is loaded and the queue icon otherwise', async () => {
+    await render(CleanupQuickWins, {
       counts: loaded,
       covers: {
         [CleanupCountQueue.SpaceHogs]: { id: 'cover-1', thumbhash: null, originalFileName: 'a.mp4' } as never,
@@ -124,25 +131,24 @@ describe('CleanupQuickWins', () => {
       onEmptyTrash: vi.fn(),
     });
 
-    expect(screen.getByTestId('cleanup-queue-space_hogs').querySelector('img')).toHaveAttribute(
-      'src',
-      expect.stringContaining('cover-1'),
-    );
-    expect(within(screen.getByTestId('cleanup-queue-bursts')).getByTestId('cleanup-card-icon')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('cleanup-queue-space_hogs').element().querySelector('img'))
+      .toHaveAttribute('src', expect.stringContaining('cover-1'));
+    await expect.element(page.getByTestId('cleanup-queue-bursts').getByTestId('cleanup-card-icon')).toBeInTheDocument();
   });
 
-  it('lifts as a card on hover', () => {
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+  it('lifts as a card on hover', async () => {
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    expect(screen.getByTestId('cleanup-queue-bursts')).toHaveAttribute('data-motion-lift-group');
+    await expect.element(page.getByTestId('cleanup-queue-bursts')).toHaveAttribute('data-motion-lift-group');
   });
 
-  it('counts the bytes up from zero when motion is allowed', () => {
+  it('counts the bytes up from zero when motion is allowed', async () => {
     stubReducedMotion(false);
-    render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
+    await render(CleanupQuickWins, { counts: loaded, onEmptyTrash: vi.fn() });
 
-    expect(within(screen.getByTestId('cleanup-queue-space_hogs')).getByTestId('cleanup-card-bytes')).toHaveTextContent(
-      /^−0 B$/,
-    );
+    await expect
+      .element(page.getByTestId('cleanup-queue-space_hogs').getByTestId('cleanup-card-bytes'))
+      .toMatchTextContent(/^−0 B$/);
   });
 });

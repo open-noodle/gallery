@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import ShortcutsModal from './ShortcutsModal.svelte';
 
 vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
@@ -9,18 +10,11 @@ vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   },
 }));
 
-// Drain bits-ui Modal's deferred body-scroll-lock cleanup before happy-dom tears
-// down `document`. Otherwise CI can report an unhandled `document is not defined`
-// after all assertions in this file have passed.
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-});
-
 describe('ShortcutsModal', () => {
-  it('uses the Gallery logo in the modal header', () => {
-    render(ShortcutsModal, { props: { onClose: vi.fn() } });
+  it('uses the Gallery logo in the modal header', async () => {
+    await render(ShortcutsModal, { onClose: vi.fn() });
 
-    expect(screen.getByRole('img', { name: 'Gallery logo' })).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: 'Immich logo' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('img', { name: 'Gallery logo' })).toBeInTheDocument();
+    expect(page.getByRole('img', { name: 'Immich logo' }).query()).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import AlbumRow from './album-row.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -19,44 +20,44 @@ describe('album-row', () => {
     isPending: false,
   };
 
-  it('renders album name', () => {
-    render(AlbumRow, { props: baseProps as never });
-    expect(screen.getByText('Hawaii 2024')).toBeInTheDocument();
+  it('renders album name', async () => {
+    await render(AlbumRow, { props: baseProps as never });
+    await expect.element(page.getByText('Hawaii 2024')).toBeInTheDocument();
   });
 
-  it('renders shared badge when shared=true', () => {
-    render(AlbumRow, {
+  it('renders shared badge when shared=true', async () => {
+    await render(AlbumRow, {
       props: { ...baseProps, item: { ...baseProps.item, shared: true } } as never,
     });
-    expect(screen.getByText(/shared/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/shared/i)).toBeInTheDocument();
   });
 
-  it('omits shared badge when shared=false', () => {
-    render(AlbumRow, { props: baseProps as never });
-    expect(screen.queryByText(/shared/i)).toBeNull();
+  it('omits shared badge when shared=false', async () => {
+    await render(AlbumRow, { props: baseProps as never });
+    expect(page.getByText(/shared/i).query()).toBeNull();
   });
 
-  it('cover uses createUrl() (src prefixed with /api/)', () => {
-    const { container } = render(AlbumRow, { props: baseProps as never });
+  it('cover uses createUrl() (src prefixed with /api/)', async () => {
+    const { container } = await render(AlbumRow, { props: baseProps as never });
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
     expect(img?.getAttribute('src')).toMatch(/^\/api\//);
   });
 
-  it('renders pending style when isPending=true', () => {
-    const { container } = render(AlbumRow, {
+  it('renders pending style when isPending=true', async () => {
+    const { container } = await render(AlbumRow, {
       props: { ...baseProps, isPending: true } as never,
     });
-    expect(container.querySelector('.opacity-50')).toBeInTheDocument();
-    expect(container.querySelector('[data-testid="pending-spinner"]')).toBeInTheDocument();
+    expect(container.querySelector('.opacity-50')).not.toBeNull();
+    await expect.element(page.getByTestId('pending-spinner')).toBeInTheDocument();
   });
 
-  it('long name truncates with ellipsis class', () => {
+  it('long name truncates with ellipsis class', async () => {
     const longName = 'A'.repeat(200);
-    render(AlbumRow, {
+    await render(AlbumRow, {
       props: { ...baseProps, item: { ...baseProps.item, albumName: longName } } as never,
     });
-    const nameEl = screen.getByText(longName);
+    const nameEl = page.getByText(longName).element();
     expect(nameEl.className).toMatch(/truncate|line-clamp/);
   });
 });

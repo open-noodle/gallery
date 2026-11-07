@@ -1,7 +1,7 @@
 import type { ScanProgress } from '#lib/utils/google-takeout-scanner.ts';
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import ImportScanStep from '../import-scan-step.svelte';
 
 function makeScanProgress(overrides?: Partial<ScanProgress>): ScanProgress {
@@ -27,39 +27,30 @@ describe('ImportScanStep', () => {
     vi.resetAllMocks();
   });
 
-  it('renders scanning title', () => {
-    const { getByText } = render(ImportScanStep, {
-      props: { progress: makeScanProgress(), onCancel },
-    });
+  it('renders scanning title', async () => {
+    const { getByText } = await render(ImportScanStep, { progress: makeScanProgress(), onCancel });
 
-    expect(getByText('import_scanning')).toBeInTheDocument();
+    await expect.element(getByText('import_scanning')).toBeInTheDocument();
   });
 
-  it('shows current file being scanned', () => {
+  it('shows current file being scanned', async () => {
     const progress = makeScanProgress({ currentFile: 'Photos/beach.jpg' });
-    const { getByText } = render(ImportScanStep, {
-      props: { progress, onCancel },
-    });
+    const { getByText } = await render(ImportScanStep, { progress, onCancel });
 
-    expect(getByText('Photos/beach.jpg')).toBeInTheDocument();
+    await expect.element(getByText('Photos/beach.jpg')).toBeInTheDocument();
   });
 
-  it('shows media count', () => {
+  it('shows media count', async () => {
     const progress = makeScanProgress({ mediaCount: 42 });
-    const { getByText } = render(ImportScanStep, {
-      props: { progress, onCancel },
-    });
+    const { getByText } = await render(ImportScanStep, { progress, onCancel });
 
-    expect(getByText('42')).toBeInTheDocument();
+    await expect.element(getByText('42')).toBeInTheDocument();
   });
 
   it('cancel button calls onCancel', async () => {
-    const user = userEvent.setup();
-    const { getByText } = render(ImportScanStep, {
-      props: { progress: makeScanProgress(), onCancel },
-    });
+    const { getByText } = await render(ImportScanStep, { progress: makeScanProgress(), onCancel });
 
-    await user.click(getByText('cancel'));
+    await userEvent.click(getByText('cancel'));
     expect(onCancel).toHaveBeenCalledOnce();
   });
 });

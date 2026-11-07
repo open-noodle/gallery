@@ -3,14 +3,13 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { fromTimelinePlainDateTime } from '#lib/utils/timeline-util.ts';
 import { factory } from '#test/unit/factories.ts';
 import { modalManager } from '@immich/ui';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import ChangeDateAction from './ChangeDateAction.svelte';
 
 const clickChangeDate = async () => {
-  const user = userEvent.setup();
-  await user.click(screen.getByRole('menuitem', { name: 'change_date' }));
+  await page.getByRole('menuitem', { name: 'change_date' }).click();
 };
 
 describe('ChangeDateAction — #734 absent-prop fallback stays behaviour-identical', () => {
@@ -30,7 +29,7 @@ describe('ChangeDateAction — #734 absent-prop fallback stays behaviour-identic
     assetMultiSelectManager.selectAssets([mine, theirs]);
     const show = vi.spyOn(modalManager, 'show').mockResolvedValue(true as never);
 
-    render(ChangeDateAction, { menuItem: true });
+    await render(ChangeDateAction, { menuItem: true });
     await clickChangeDate();
 
     expect(show).toHaveBeenCalledTimes(1);
@@ -47,7 +46,7 @@ describe('ChangeDateAction — #734 absent-prop fallback stays behaviour-identic
     assetMultiSelectManager.selectAssets([theirs]);
     const show = vi.spyOn(modalManager, 'show').mockResolvedValue(true as never);
 
-    render(ChangeDateAction, { menuItem: true });
+    await render(ChangeDateAction, { menuItem: true });
     await clickChangeDate();
 
     const props = show.mock.calls[0][1] as unknown as {

@@ -1,27 +1,28 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import PersonRow from '../rows/person-row.svelte';
 
 describe('person-row', () => {
-  it('renders the person name and asset count', () => {
-    render(PersonRow, {
+  it('renders the person name and asset count', async () => {
+    await render(PersonRow, {
       props: {
         item: { id: 'p1', name: 'Alice', numberOfAssets: 42 } as never,
       },
     });
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
   });
 
-  it('falls back to "Unnamed person" label when name is empty', () => {
-    render(PersonRow, {
+  it('falls back to "Unnamed person" label when name is empty', async () => {
+    await render(PersonRow, {
       props: { item: { id: 'p1', name: '' } as never },
     });
-    expect(screen.getByText(/cmdk_unnamed_person|Unnamed/)).toBeInTheDocument();
+    await expect.element(page.getByText(/cmdk_unnamed_person|Unnamed/)).toBeInTheDocument();
   });
 
-  it('renders the people thumbnail endpoint url', () => {
-    const { container } = render(PersonRow, {
+  it('renders the people thumbnail endpoint url', async () => {
+    const { container } = await render(PersonRow, {
       props: { item: { id: 'p1', name: 'Alice' } as never },
     });
     const img = container.querySelector('img');
@@ -29,8 +30,8 @@ describe('person-row', () => {
     expect(img?.getAttribute('src')).toMatch(/\/api\/people\/p1\/thumbnail/);
   });
 
-  it('renders the shared-space person thumbnail for space-primary rows', () => {
-    const { container } = render(PersonRow, {
+  it('renders the shared-space person thumbnail for space-primary rows', async () => {
+    const { container } = await render(PersonRow, {
       props: {
         item: {
           id: 'space-person-1',
@@ -44,18 +45,20 @@ describe('person-row', () => {
   });
 
   it('swaps to placeholder div when the thumbnail image fails to load', async () => {
-    const { container } = render(PersonRow, {
+    const { container } = await render(PersonRow, {
       props: { item: { id: 'p1', name: 'Alice' } as never },
     });
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    await fireEvent.error(img!);
-    expect(container.querySelector('img')).toBeNull();
-    expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    img!.dispatchEvent(new Event('error'));
+    await vi.waitFor(() => {
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    });
   });
 
-  it('does NOT set role="option"', () => {
-    const { container } = render(PersonRow, {
+  it('does NOT set role="option"', async () => {
+    const { container } = await render(PersonRow, {
       props: { item: { id: 'p1', name: 'X' } as never },
     });
     expect(container.querySelector('[role="option"]')).toBeNull();

@@ -6,6 +6,9 @@ import { expect } from 'vitest';
 import Page from './+page.svelte';
 import { load } from './+page.ts';
 
+// Gallery: these cases drive upstream's search bar, which Gallery carries dormant and does not mount on this
+// page (lib/components/shared-components/search-bar/DORMANT.md). Kept, skipped, so the file still merges.
+
 const holiday = factory.tag({ name: 'holiday' });
 const family = factory.tag({ name: 'family' });
 
@@ -17,7 +20,7 @@ test.afterEach(() => {
   searchManager.reset();
 });
 
-test('removing a chip drops the tag and keeps focus in the panel', async ({ router, render, settle, app }) => {
+test.skip('removing a chip drops the tag and keeps focus in the panel', async ({ router, render, settle, app }) => {
   await router.goto(Route.search({ tagIds: [holiday.id, family.id] }));
   await render(Page, load);
   await settle();
@@ -31,7 +34,7 @@ test('removing a chip drops the tag and keeps focus in the panel', async ({ rout
   expect(app.search.tags.section().element().contains(document.activeElement)).toBe(true);
 });
 
-test('untagged replaces the tags and toggling it off restores none', async ({ router, render, settle, app }) => {
+test.skip('untagged replaces the tags and toggling it off restores none', async ({ router, render, settle, app }) => {
   await router.goto(Route.search({ tagIds: [holiday.id] }));
   await render(Page, load);
   await settle();

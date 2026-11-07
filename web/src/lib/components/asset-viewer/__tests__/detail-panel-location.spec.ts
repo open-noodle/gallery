@@ -4,9 +4,8 @@ import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanelLocation from '../DetailPanelLocation.svelte';
 
 // Task 3 of Slice 7 (asset-viewer-contextual-filters). DetailPanelLocation had NO spec file at all
@@ -20,7 +19,7 @@ const { gotoMock, mockFeatureFlags } = vi.hoisted(() => ({
   mockFeatureFlags: { map: true },
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: gotoMock }));
 
 // #1046 — the map pin is gated on the server's `map` feature flag (read by buildContextualMapUrl).
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
@@ -66,46 +65,46 @@ beforeEach(() => {
 // R3 — the three branches of this component, pinned so nobody deletes the second one by accident.
 describe('DetailPanelLocation branches', () => {
   it('renders the value row when country is set', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
-    expect(screen.getByText('Berlin')).toBeInTheDocument();
-    expect(screen.getByText('State of Berlin')).toBeInTheDocument();
-    expect(screen.getByText('Germany')).toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+    await expect.element(page.getByText('Berlin', { exact: true })).toBeInTheDocument();
+    await expect.element(page.getByText('State of Berlin')).toBeInTheDocument();
+    await expect.element(page.getByText('Germany')).toBeInTheDocument();
   });
 
   // The LIVE, previously untested second branch: an owner looking at an asset with no location at
   // all still gets the "Add a location" button — the ONLY way into the geo picker for such an asset.
   it('still renders the add-a-location button for an owner with no city and no country', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: true, canFilter: true });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
-    expect(screen.getByText('add_a_location')).toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+    await expect.element(page.getByText('add_a_location')).toBeInTheDocument();
   });
 
   it('add-a-location still opens the geo picker', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByText('add_a_location'));
+    await page.getByText('add_a_location').click();
 
     expect(modalManager.show).toHaveBeenCalled();
   });
 
   it('renders nothing for a non-owner with no location', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: false, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset({}), isOwner: false, canFilter: true });
 
-    await waitFor(() => expect(screen.queryByTestId('detail-panel-location')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('detail-panel-location')).not.toBeInTheDocument();
   });
 
   // The genuinely dead case: a city but no country renders neither branch.
   it('renders nothing when there is a city but no country', async () => {
-    renderWithTooltips(DetailPanelLocation, {
+    await renderWithTooltips(DetailPanelLocation, {
       asset: buildAsset({ city: 'Berlin' }),
       isOwner: true,
       canFilter: true,
     });
 
-    await waitFor(() => expect(screen.queryByTestId('detail-panel-location')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('detail-panel-location')).not.toBeInTheDocument();
   });
 });
 
@@ -120,9 +119,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it.each(surfaces)('clicking the city filters $label and closes the viewer', async ({ url, basePath }) => {
     mockPage.reset(url);
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: Berlin'));
+    await page.getByLabelText('filter_by_location: Berlin').click();
 
     // §5.5 — the city patch carries the COUNTRY too, to disambiguate same-named cities.
     const expected = buildContextualFilterUrl(mockPage.url, { city: 'Berlin', country: 'Germany' });
@@ -136,9 +135,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it('clicking the state emits { state, country }', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: State of Berlin'));
+    await page.getByLabelText('filter_by_location: State of Berlin').click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { state: 'State of Berlin', country: 'Germany' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -150,9 +149,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it('clicking the country emits { country } only', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: Germany'));
+    await page.getByLabelText('filter_by_location: Germany').click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { country: 'Germany' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -169,9 +168,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it('clicking the city clears a stale state/country from a prior location filter', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1?state=Bavaria&country=Austria');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: Berlin'));
+    await page.getByLabelText('filter_by_location: Berlin').click();
 
     const url = gotoMock.mock.calls[0][0] as string;
     expect(url).toContain('city=Berlin');
@@ -183,9 +182,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it('clicking the state clears a stale city from a prior location filter', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1?city=Munich&country=Germany');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: State of Berlin'));
+    await page.getByLabelText('filter_by_location: State of Berlin').click();
 
     const url = gotoMock.mock.calls[0][0] as string;
     expect(url).toContain('state=');
@@ -197,9 +196,9 @@ describe('DetailPanelLocation filter grammar', () => {
   it('clicking the country clears a stale city and state from a prior location filter', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1?city=Munich&state=Bavaria&country=Germany');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_location: Germany'));
+    await page.getByLabelText('filter_by_location: Germany').click();
 
     const url = gotoMock.mock.calls[0][0] as string;
     expect(url).toContain('country=Germany');
@@ -212,15 +211,15 @@ describe('DetailPanelLocation filter grammar', () => {
   // R9/E7 — a whitespace-only value trims to nothing, so a click would close the viewer and apply
   // NO filter. It must not be clickable at all (the country line still is).
   it('R9: a whitespace-only city line is not clickable', async () => {
-    renderWithTooltips(DetailPanelLocation, {
+    await renderWithTooltips(DetailPanelLocation, {
       asset: buildAsset({ city: ' '.repeat(3), country: 'Germany' }),
       isOwner: true,
       canFilter: true,
     });
 
-    await waitFor(() => expect(screen.getByLabelText('filter_by_location: Germany')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/filter_by_location: \s+$/)).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText(/^filter_by_location/)).toHaveLength(1);
+    await expect.element(page.getByLabelText('filter_by_location: Germany')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_location: \s+$/)).not.toBeInTheDocument();
+    expect(page.getByLabelText(/^filter_by_location/).elements()).toHaveLength(1);
   });
 });
 
@@ -228,9 +227,11 @@ describe('DetailPanelLocation map pin (E10)', () => {
   it('carries the Space scope AND the active filters, centered on the asset', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1?make=Apple');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    const pin = await screen.findByLabelText('view_in_map');
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
+
+    const pin = page.getByLabelText('view_in_map').element();
     const href = pin.getAttribute('href') ?? '';
 
     expect(href.startsWith('/map?')).toBe(true);
@@ -242,9 +243,11 @@ describe('DetailPanelLocation map pin (E10)', () => {
   it('lands on the global map with the active filters from /photos', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1?make=Apple');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    const pin = await screen.findByLabelText('view_in_map');
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
+
+    const pin = page.getByLabelText('view_in_map').element();
     const href = pin.getAttribute('href') ?? '';
 
     expect(href.startsWith('/map?')).toBe(true);
@@ -255,9 +258,11 @@ describe('DetailPanelLocation map pin (E10)', () => {
   it('keeps the space scope when the viewer was opened from the space map', async () => {
     mockPage.reset('https://gallery.test/map/photos/asset-1?spaceId=space-1&country=Germany');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    const pin = await screen.findByLabelText('view_in_map');
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
+
+    const pin = page.getByLabelText('view_in_map').element();
     const href = pin.getAttribute('href') ?? '';
 
     expect(href).toContain('spaceId=space-1');
@@ -270,22 +275,24 @@ describe('DetailPanelLocation map pin (E10)', () => {
   it('is NOT offered on an album surface (no album-map URL exists — would silently widen scope)', async () => {
     mockPage.reset('https://gallery.test/albums/album-1/photos/asset-1?make=Apple');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
-    expect(screen.queryByLabelText('view_in_map')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('view_in_map')).not.toBeInTheDocument();
   });
 
   it('still links to the map for an asset without coordinates (no center)', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
 
-    renderWithTooltips(DetailPanelLocation, {
+    await renderWithTooltips(DetailPanelLocation, {
       asset: buildAsset({ city: 'Berlin', country: 'Germany' }),
       isOwner: true,
       canFilter: true,
     });
 
-    const pin = await screen.findByLabelText('view_in_map');
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
+
+    const pin = page.getByLabelText('view_in_map').element();
     const href = pin.getAttribute('href') ?? '';
 
     expect(href.startsWith('/map')).toBe(true);
@@ -295,9 +302,9 @@ describe('DetailPanelLocation map pin (E10)', () => {
 
 describe('DetailPanelLocation edit + gating', () => {
   it('the owner-gated ✏️ still opens the geo picker', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText('edit_location'));
+    await page.getByLabelText('edit_location').click();
 
     expect(modalManager.show).toHaveBeenCalled();
   });
@@ -307,25 +314,27 @@ describe('DetailPanelLocation edit + gating', () => {
   it('E8: a non-owner sees the values and the pin, but no pencil, and the row is not a button', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: false, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: false, canFilter: true });
 
-    const row = await screen.findByTestId('detail-panel-location');
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+
+    const row = page.getByTestId('detail-panel-location').element();
     expect(row.tagName).not.toBe('BUTTON');
-    expect(screen.getByLabelText('filter_by_location: Berlin')).toBeInTheDocument();
-    expect(screen.getByLabelText('view_in_map')).toBeInTheDocument();
-    expect(screen.queryByLabelText('edit_location')).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_location: Berlin')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('edit_location')).not.toBeInTheDocument();
   });
 
   // E2 — a shared link gets NO filter affordance at all (values render as plain text).
   it('E2: a shared link renders no filter affordance and no map pin', async () => {
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: false, canFilter: false });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: false, canFilter: false });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
-    expect(screen.getByText('Berlin')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^filter_by_location/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('view_in_map')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+    await expect.element(page.getByText('Berlin', { exact: true })).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_location/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText('view_in_map')).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
   });
 });
@@ -336,17 +345,17 @@ describe('DetailPanelLocation map feature flag', () => {
   it('hides the map pin when the map feature is disabled', async () => {
     mockFeatureFlags.map = false;
 
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
-    expect(screen.getByLabelText('filter_by_location: Berlin')).toBeInTheDocument();
-    expect(screen.getByLabelText('edit_location')).toBeInTheDocument();
-    expect(screen.queryByLabelText('view_in_map')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-location')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_location: Berlin')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('edit_location')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('view_in_map')).not.toBeInTheDocument();
   });
 
   it('shows the map pin when the map feature is enabled', async () => {
-    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
 
-    expect(await screen.findByLabelText('view_in_map')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('view_in_map')).toBeInTheDocument();
   });
 });
