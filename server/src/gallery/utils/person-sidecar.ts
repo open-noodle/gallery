@@ -17,10 +17,10 @@ export const personIsPet = (alias = 'person') =>
   sql<boolean>`EXISTS (SELECT FROM "person_pet" WHERE "person_pet"."personGroupId" = ${groupRef(alias)})`;
 
 /**
- * A person is listed unless it is a per-species pet bucket, which the detector alone produces and whose
- * faces never carry an embedding. A pet that pet recognition identified has pet_search rows; a human
- * cluster its owner reclassified as a pet keeps its face_search rows.
- */
+A person is listed unless it is a per-species pet bucket, which the detector alone produces and whose
+faces never carry an embedding. A pet that pet recognition identified has pet_search rows; a human
+cluster its owner reclassified as a pet keeps its face_search rows.
+*/
 export const personIsListed = (alias = 'person') =>
   sql<boolean>`(NOT ${personIsPet(alias)} OR EXISTS (
     SELECT FROM "asset_face" "pet_face"

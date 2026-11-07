@@ -1,10 +1,14 @@
+import {
+  keepSpacesLoaded,
+  libraryViewOptions,
+  libraryViewShown,
+} from '#lib/gallery/library-view/library-view.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
 import { buildMapFilterConfig } from '#lib/utils/map-filter-config.ts';
 import { buildPhotosTimelineOptions } from '#lib/utils/photos-filter-options.ts';
 import { AssetVisibility } from '@immich/sdk';
-import { keepSpacesLoaded, libraryViewOptions, libraryViewShown } from '#lib/gallery/library-view/library-view.svelte.ts';
 import { FilteredTimelineController, type FilteredTimelineConfig } from './filtered-timeline-controller.svelte';
 
 const scope = { withSharedSpaces: true };

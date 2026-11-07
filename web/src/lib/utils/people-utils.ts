@@ -1,9 +1,9 @@
+import { fetchVideoFaceCrop } from '#lib/gallery/people/video-face-crop.ts';
 import { PeopleSortBy } from '#lib/gallery/stores/preferences.store.ts';
 import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { createUrl, getAssetMediaUrl } from '#lib/utils.ts';
 import { mapNormalizedRectToContent, type ContentMetrics, type Rect, type Size } from '#lib/utils/container-utils.ts';
 import { AssetTypeEnum } from '@immich/sdk';
-import { fetchVideoFaceCrop } from '#lib/gallery/people/video-face-crop.ts';
 
 export type BoundingBox = Rect & { id: string; labelWidth: number };
 export type SortablePerson = {

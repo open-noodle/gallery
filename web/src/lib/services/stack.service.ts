@@ -1,3 +1,4 @@
+import { keepThisDeleteOthersPrompt } from '#lib/gallery/stack/keep-this-delete-others.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
@@ -26,7 +27,6 @@ import {
   mdiUploadMultiple,
 } from '@mdi/js';
 import { type MessageFormatter } from 'svelte-i18n';
-import { keepThisDeleteOthersPrompt } from '#lib/gallery/stack/keep-this-delete-others.ts';
 
 export const getStackBulkActions = ($t: MessageFormatter) => {
   const Stack: ActionItem = {
