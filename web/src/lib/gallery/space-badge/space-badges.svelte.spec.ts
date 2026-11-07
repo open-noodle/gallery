@@ -1,8 +1,8 @@
-import { getAllSpaces, getAssetSpaces } from '@immich/sdk';
-import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { factory } from '#test/unit/factories.ts';
+import { getAllSpaces, getAssetSpaces } from '@immich/sdk';
 import { spaceBadges } from './space-badges.svelte';
 
 vi.mock('@immich/sdk', async (orig) => ({

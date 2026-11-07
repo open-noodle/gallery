@@ -5,6 +5,7 @@ import {
   type GalleryAssetActionOptions,
   type GalleryAssetBulkActionOptions,
 } from '#lib/gallery/asset-actions.ts';
+import { resetLibraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 import { animateRemoval, celebrate } from '#lib/gallery/motion/index.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
@@ -75,7 +76,6 @@ import type { MessageFormatter } from 'svelte-i18n';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
-import { resetLibraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 
 export const getAssetBulkActions = (
   $t: MessageFormatter,

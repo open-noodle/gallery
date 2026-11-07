@@ -65,10 +65,10 @@ export const videoFaceFrameFolder = (asset: { id: string; ownerId: string }, bac
 };
 
 /**
- * A video sampled from at least this many frames logs its progress every 10%, as transcoding does: one this long can
- * hold a face detection slot for many minutes, and without it a busy job looks like a stuck one. Shorter videos log
- * only their start and finish, so a library of phone clips does not flood the log.
- */
+A video sampled from at least this many frames logs its progress every 10%, as transcoding does: one this long can
+hold a face detection slot for many minutes, and without it a busy job looks like a stuck one. Shorter videos log
+only their start and finish, so a library of phone clips does not flood the log.
+*/
 const PROGRESS_MIN_FRAMES = 100;
 const PROGRESS_STEP_PERCENT = 10;
 
@@ -97,10 +97,10 @@ export class VideoFaceDetector {
   }
 
   /**
-   * Face detection's Missing job also queues the videos detected before this sampler was on, or by an older Gallery:
-   * a library is rescanned only when an admin asks for it, never just because the setting was turned on. Reset and
-   * Refresh already queue every asset.
-   */
+  Face detection's Missing job also queues the videos detected before this sampler was on, or by an older Gallery:
+  a library is rescanned only when an admin asks for it, never just because the setting was turned on. Reset and
+  Refresh already queue every asset.
+  */
   async queueMissing(machineLearning: SystemConfig['machineLearning'], force?: boolean): Promise<void> {
     if (force !== false || !machineLearning.facialRecognition.video?.enabled) {
       return;
@@ -304,10 +304,10 @@ export class VideoFaceDetector {
   }
 
   /**
-   * The faces in one frame. With tiled detection, a frame larger than the detector's input is also searched as four
-   * overlapping quarters, which show small faces at about twice the size, and the finds are merged; the whole frame is
-   * still searched too, for faces larger than the overlap between quarters.
-   */
+  The faces in one frame. With tiled detection, a frame larger than the detector's input is also searched as four
+  overlapping quarters, which show small faces at about twice the size, and the finds are merged; the whole frame is
+  still searched too, for faces larger than the overlap between quarters.
+  */
   private async detectInFrame(
     path: string,
     frameSize: { width: number; height: number },

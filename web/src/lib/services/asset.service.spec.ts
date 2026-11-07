@@ -1,3 +1,4 @@
+import { libraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
@@ -20,7 +21,6 @@ import {
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
-import { libraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 
 const { downloadUrlMock } = vitest.hoisted(() => ({
   downloadUrlMock: vitest.fn(),
