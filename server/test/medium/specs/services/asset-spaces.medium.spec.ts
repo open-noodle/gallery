@@ -12,9 +12,9 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
-const setup = (db?: Kysely<DB>) =>
+const setup = () =>
   newMediumService(GalleryAssetService, {
-    database: db || defaultDatabase,
+    database: defaultDatabase,
     real: [AccessRepository, PartnerRepository, SharedSpaceRepository],
     mock: [LoggingRepository],
   });

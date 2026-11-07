@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
+import 'package:immich_mobile/gallery/passkeys.dart';
 import 'package:immich_mobile/platform/background_worker_api.g.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
 import 'package:immich_mobile/platform/connectivity_api.g.dart';
@@ -22,7 +23,7 @@ final permissionApiProvider = Provider<PermissionApi>((_) => PermissionApi());
 
 final connectivityApiProvider = Provider<ConnectivityApi>((_) => ConnectivityApi());
 
-final passkeyHostApiProvider = Provider<PasskeyHostApi>((_) => PasskeyHostApi());
+final passkeyHostApiProvider = Provider<PasskeyHostApi>((_) => galleryPasskeyHostApi());
 
 final localImageApi = LocalImageApi();
 
