@@ -834,26 +834,8 @@ where
   )
 limit
   $9
-select distinct
-  (
-    CASE
-      WHEN "asset"."width" IS NULL
-      OR "asset"."height" IS NULL THEN NULL
-      WHEN "asset"."width" <= 0
-      OR "asset"."height" <= 0 THEN NULL
-      WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
-      WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
-        WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
-        ELSE 'panorama-tall'
-      END
-      WHEN "asset"."width" > "asset"."height" THEN 'landscape'
-      ELSE 'portrait'
-    END
-  ) as "aspectClass"
-from
-  "asset"
-where
-  "id" in (
+select
+  exists (
     select
       "asset"."id"
     from
@@ -893,7 +875,246 @@ where
           )
       )
       and "asset"."type" = $8
-  )
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('landscape')
+  ) as "landscape",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($9::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $10
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $11
+      and "asset"."localDateTime" < $12
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $13
+            and "asset_exif"."make" = $14
+            and "asset_exif"."rating" >= $15
+          )
+      )
+      and "asset"."type" = $16
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('square')
+  ) as "square",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($17::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $18
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $19
+      and "asset"."localDateTime" < $20
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $21
+            and "asset_exif"."make" = $22
+            and "asset_exif"."rating" >= $23
+          )
+      )
+      and "asset"."type" = $24
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('portrait')
+  ) as "portrait",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($25::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $26
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $27
+      and "asset"."localDateTime" < $28
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $29
+            and "asset_exif"."make" = $30
+            and "asset_exif"."rating" >= $31
+          )
+      )
+      and "asset"."type" = $32
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('panorama-wide')
+  ) as "panorama-wide",
+  exists (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($33::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $34
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $35
+      and "asset"."localDateTime" < $36
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $37
+            and "asset_exif"."make" = $38
+            and "asset_exif"."rating" >= $39
+          )
+      )
+      and "asset"."type" = $40
+      and (
+        CASE
+          WHEN "asset"."width" IS NULL
+          OR "asset"."height" IS NULL THEN NULL
+          WHEN "asset"."width" <= 0
+          OR "asset"."height" <= 0 THEN NULL
+          WHEN 50 * GREATEST("asset"."width"::bigint, "asset"."height"::bigint) <= 51 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN 'square'
+          WHEN GREATEST("asset"."width"::bigint, "asset"."height"::bigint) >= 2 * LEAST("asset"."width"::bigint, "asset"."height"::bigint) THEN CASE
+            WHEN "asset"."width" > "asset"."height" THEN 'panorama-wide'
+            ELSE 'panorama-tall'
+          END
+          WHEN "asset"."width" > "asset"."height" THEN 'landscape'
+          ELSE 'portrait'
+        END
+      ) in ('panorama-tall')
+  ) as "panorama-tall"
 commit
 
 -- SmartFacetRepository.getSearchOptions
