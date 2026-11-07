@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/gallery/utils/person_thumbnail_url.dart';
+import 'package:immich_mobile/gallery/video_faces/video_moments.widgets.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/people/person_edit_name_modal.widget.dart';
@@ -67,7 +68,7 @@ class PeopleDetails extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.only(left: 16.0),
                   scrollDirection: Axis.horizontal,
-                  children: [
+                  children: withVideoMomentsBadges(asset, people, [
                     for (final person in people)
                       _Avatar(
                         person: person,
@@ -87,9 +88,10 @@ class PeopleDetails extends ConsumerWidget {
                         },
                         onNameTap: ownedByCurrentUser ? () => showNameEditModal(person) : null,
                       ),
-                  ],
+                  ]),
                 ),
               ),
+              VideoPersonMoments(asset: asset),
             ],
           ),
           crossFadeState: people.isEmpty ? CrossFadeState.showFirst : CrossFadeState.showSecond,
