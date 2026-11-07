@@ -22,14 +22,23 @@ beforeEach(async () => {
   } catch {
     // No page fixture: the spec renders components directly and gets the defaults.
   }
+  const imports = [
+    import('#lib/queries/client.ts'),
+    import('#lib/queries/config-public.query.ts'),
+    import('#lib/queries/config-user.query.ts'),
+    import('#lib/queries/notification.query.ts'),
+  ] as const;
+  // Let every import settle before going on. When one rejects (a spec's `@immich/sdk` mock without
+  // `getPublicConfig` fails to link in milliseconds), Promise.all returns while the others are still
+  // fetching their module graphs. The spec can then finish and its iframe be removed with those
+  // fetches in flight. Vitest holds a request for a factory-mocked module (`$app/navigation`,
+  // `$app/state`) until the iframe returns the factory's keys. Once the iframe is gone, that request
+  // rejects in the Vitest process ("Browser connection was closed ... rpc is closed, cannot call
+  // resolveManualMock") and the whole run aborts.
+  await Promise.allSettled(imports);
   let modules;
   try {
-    modules = await Promise.all([
-      import('#lib/queries/client.ts'),
-      import('#lib/queries/config-public.query.ts'),
-      import('#lib/queries/config-user.query.ts'),
-      import('#lib/queries/notification.query.ts'),
-    ]);
+    modules = await Promise.all(imports);
   } catch {
     // The spec mocks one of these modules' dependencies (e.g. the event manager) out of shape: it
     // owns its query setup, so the shared defaults do not apply.

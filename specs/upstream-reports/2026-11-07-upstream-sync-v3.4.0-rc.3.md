@@ -94,8 +94,14 @@ suite: 461 files, 7055 tests.
   one iframe per core (17 here) Vitest's browser connection dropped partway through most runs; `vite.config.ts`
   now turns HMR off in tests and caps `maxWorkers` at 3 (what CI's 4-core runners get anyway). Specs share the
   real pointer across parallel files, so pointer-sensitive specs drop trusted input or click through the DOM.
-  Locally a connection drop still happens in about one run in five; root cause not found (inside Vitest's
-  browser runner). Watch CI.
+  The remaining drops had one cause: `gallery-setup.ts` started four imports with `Promise.all`; when one
+  failed to link (a spec's `@immich/sdk` mock lacking `getPublicConfig`), the spec went on while the other
+  imports still fetched factory-mocked modules (`$app/navigation`, `$app/state`). A short spec then ended, Vitest
+  removed its iframe, and the pending mock request rejected unhandled in the Vitest process, which aborted the
+  run. The setup now lets every import settle first. Verified: 11 of 11 full runs clean (8 at 17 workers),
+  the triggering spec 24 of 24. Vitest 5.0.5 does not catch that rejection in its Playwright route handler;
+  worth reporting upstream to Vitest. `maxWorkers: 3` stays for now: at 17 workers two pointer-sensitive specs
+  (`detail-panel-star-rating`, `cleanup-hub-page`) still fail now and then.
 - Findings not changed: upstream's `SettingInputField` points `aria-labelledby` at an id nothing carries;
   `space-albums-table`'s flex header row does not expose column headers.
 
