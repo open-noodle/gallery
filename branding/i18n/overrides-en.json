@@ -51,6 +51,8 @@
   "open_in_app_banner_title": "Open in Noodle Gallery",
   "open_in_immich_body": "Set Noodle Gallery as your gallery on Android to open photos straight from other apps.",
   "open_in_immich_title": "Open photos in Noodle Gallery",
+  "passkeys_on_server": "Passkeys registered with the Noodle Gallery server",
+  "passkeys_on_server_description": "Note: Removing a passkey from the Noodle Gallery server does not remove it from your device",
   "permission_onboarding_permission_denied": "Permission denied. To use Noodle Gallery, grant photo and video permissions in Settings.",
   "permission_onboarding_permission_limited": "Permission limited. To let Noodle Gallery backup and manage your entire gallery collection, grant photo and video permissions in Settings.",
   "permission_onboarding_request": "Noodle Gallery requires permission to view your photos and videos.",

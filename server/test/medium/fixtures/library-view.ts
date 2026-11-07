@@ -3,10 +3,10 @@ import { MediumTestContext } from 'test/medium.factory.js';
 import { SPACE_DATE } from 'test/medium/fixtures/two-owner-space.js';
 
 /**
- * #1038: the viewer's own photos (outside any space, added to a space, in a linked album, in a linked library, in a
- * space hidden from their timeline), a member's photo in the space and a partner's photo. Shared by the timeline and
- * search suites, which apply the same library view through different query builders.
- */
+#1038: the viewer's own photos (outside any space, added to a space, in a linked album, in a linked library, in a
+space hidden from their timeline), a member's photo in the space and a partner's photo. Shared by the timeline and
+search suites, which apply the same library view through different query builders.
+*/
 export const seedLibraryView = async (ctx: MediumTestContext) => {
   const { user: me } = await ctx.newUser();
   const { user: peer } = await ctx.newUser();

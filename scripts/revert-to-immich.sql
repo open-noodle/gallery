@@ -1079,9 +1079,10 @@ BEGIN
   END IF;
 END $$;
 
--- Post-tag upstream migrations this branch carries: none. `upstream.version` is 3.4.0-rc.2, which
+-- Post-tag upstream migrations this branch carries: none. `upstream.version` is 3.4.0-rc.3, which
 -- ships every upstream migration in this tree.
 --
+-- The 3.4.0-rc.2 -> 3.4.0-rc.3 bump removed nothing: rc.3 adds no migrations.
 -- The 3.4.0-rc.1 -> 3.4.0-rc.2 bump removed nothing: rc.2 adds no migrations.
 -- The 3.4.0-rc.0 -> 3.4.0-rc.1 bump removed nothing: rc.1 adds no migrations.
 -- The 3.3.5 -> 3.4.0-rc.0 bump removed three entries, now shipped by the tag:
@@ -1263,7 +1264,7 @@ DELETE FROM "kysely_migrations"
    '1776735180298-ChangeDurationToInteger'
 
    -- Post-tag upstream migrations pulled in by rebase go here, paired with schema rollbacks in
-   -- step 7 and kept timestamp-sorted. None at `upstream.version` 3.4.0-rc.2.
+   -- step 7 and kept timestamp-sorted. None at `upstream.version` 3.4.0-rc.3.
  );
 
 -- Gallery builds since the ledger split record fork migrations in their own table instead. The

@@ -45,7 +45,7 @@ class AuthApiRepository extends ApiRepository {
 
     final loginResponseDto = await checkNull(Future.value(LoginResponseDto.fromJson(jsonDecode(response.body))));
 
-    return _mapLoginReponse(loginResponseDto);
+    return LoginResponse.fromDto(loginResponseDto);
   }
 
   Future<void> logout() async {
