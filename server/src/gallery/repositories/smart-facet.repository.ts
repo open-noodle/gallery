@@ -11,7 +11,7 @@ import {
   getFilteredIdentityPeople,
   getFilteredIdentityPeopleWithCounts,
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
-import { ASPECT_CLASSES, ASPECT_CLASS_QUALIFIED_SQL } from 'src/gallery/utils/aspect-class-sql.js';
+import { ASPECT_CLASSES } from 'src/gallery/utils/aspect-class-sql.js';
 import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { SEARCH_OPTIONS_PROBE, isSearchOptionsProbeTimeout } from 'src/gallery/utils/search-options-probe.js';
 import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
@@ -20,7 +20,12 @@ import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { AssetSearchBuilderOptions, SmartSearchOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
-import { AssetFilter, searchAssetBuilderWithLocalTaken, withAssetFilter } from 'src/utils/asset-filter.js';
+import {
+  AssetFilter,
+  aspectClassCondition,
+  searchAssetBuilderWithLocalTaken,
+  withAssetFilter,
+} from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, hasPeople, hasTags, searchAssetBuilderLegacy, truncatedDate } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { without } from 'src/utils/filter-suggestions.js';
@@ -1231,18 +1236,18 @@ export class SmartFacetRepository {
     return rows.map((row) => row.rating!);
   }
 
+  /** One probe per class, as in filter suggestions: each stops at its first match, where a DISTINCT reads the whole set. */
   private async getSmartFacetAspectClasses(
     trx: Kysely<DB>,
     options: SmartSearchFacetsOptions,
   ): Promise<AssetAspectClass[]> {
-    const rows = await trx
-      .selectFrom('asset')
-      .select(sql.raw<AssetAspectClass | null>(ASPECT_CLASS_QUALIFIED_SQL).as('aspectClass'))
-      .distinct()
-      .where('id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'aspect'))
-      .execute();
-    const present = new Set(rows.map((row) => row.aspectClass));
-    return ASPECT_CLASSES.filter((value) => present.has(value));
+    const filteredIds = this.buildSmartFacetFilteredAssetIds(trx, options, 'aspect');
+    const present = await trx
+      .selectNoFrom((eb) =>
+        ASPECT_CLASSES.map((value) => eb.exists(filteredIds.where(aspectClassCondition([value]))).as(value)),
+      )
+      .executeTakeFirst();
+    return ASPECT_CLASSES.filter((value) => present?.[value]);
   }
 
   private async getSmartFacetMediaTypes(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<AssetType[]> {
