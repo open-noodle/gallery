@@ -533,6 +533,9 @@ const SIGHTING_TIME_TOLERANCE = 0.001;
 
 const toPlayerTime = (t: number, trimStart: number) => Math.round((t - trimStart) * 1000) / 1000;
 
+const isInTrim = (t: number, start: number, end: number) =>
+  t >= start - SIGHTING_TIME_TOLERANCE && t <= end + SIGHTING_TIME_TOLERANCE;
+
 const toFrameFraction = (value: number, size: number) =>
   Math.min(1, Math.max(0, Math.round((value / size) * 1e4) / 1e4));
 
@@ -558,7 +561,7 @@ export const sightingsForPlayer = ({
   const start = trimStart ?? 0;
   const end = trimEnd ?? Infinity;
   return sightings
-    .filter(({ t }) => t >= start - SIGHTING_TIME_TOLERANCE && t <= end + SIGHTING_TIME_TOLERANCE)
+    .filter(({ t, removed }) => !removed && isInTrim(t, start, end))
     .sort((a, b) => a.t - b.t)
     .map(({ t, score, x1, y1, x2, y2 }) => ({
       time: Math.max(0, toPlayerTime(t, start)),
@@ -586,4 +589,75 @@ export const findSightingAt = (stored: StoredSightings, time: number): VideoFace
     const playerTime = Math.max(0, toPlayerTime(sighting.t, start));
     return playable.has(playerTime) && Math.abs(playerTime - time) < SIGHTING_TIME_TOLERANCE;
   });
+};
+
+/** What removing or restoring a sighting writes: every stored sighting, and the new best view when it moves. */
+export type SightingChange = { sightings: VideoFaceSighting[]; best?: VideoFaceSighting };
+
+/** The stored sighting, removed or not, at `time` on the player's timeline and inside the current trim. */
+const storedAt = (stored: StoredSightings, time: number) => {
+  const start = stored.trimStart ?? 0;
+  const end = stored.trimEnd ?? Infinity;
+  return stored.sightings.find(
+    ({ t }) =>
+      isInTrim(t, start, end) && Math.abs(Math.max(0, toPlayerTime(t, start)) - time) < SIGHTING_TIME_TOLERANCE,
+  );
+};
+
+const isBestView = (stored: StoredSightings, sighting: VideoFaceSighting) =>
+  Math.abs(sighting.t - stored.timeSeconds) < SIGHTING_TIME_TOLERANCE;
+
+/**
+ * Takes the sighting at `time` out of the face (Phase 2), keeping it with `removed` so `restoreSightingAt` can bring
+ * it back. Removing the best view moves it to the remaining sighting with the highest score, preferring one inside the
+ * trim, and marks the removed one `wasBest`. Undefined when no sighting is shown at `time`; `last` when it is the
+ * face's only one left, which stays: a face needs a frame to be cut from.
+ */
+export const removeSightingAt = (stored: StoredSightings, time: number): SightingChange | 'last' | undefined => {
+  const target = storedAt(stored, time);
+  if (!target || target.removed) {
+    return;
+  }
+
+  const remaining = stored.sightings.filter((sighting) => sighting !== target && !sighting.removed);
+  if (remaining.length === 0) {
+    return 'last';
+  }
+
+  const wasBest = isBestView(stored, target);
+  const sightings = stored.sightings.map((sighting) =>
+    sighting === target ? { ...sighting, removed: true, ...(wasBest && { wasBest: true }) } : sighting,
+  );
+  if (!wasBest) {
+    return { sightings };
+  }
+
+  const start = stored.trimStart ?? 0;
+  const end = stored.trimEnd ?? Infinity;
+  const [best] = remaining.toSorted(
+    (a, b) => Number(isInTrim(b.t, start, end)) - Number(isInTrim(a.t, start, end)) || b.score - a.score,
+  );
+  return { sightings, best };
+};
+
+/**
+ * Brings back the removed sighting at `time`, as the best view again when it was the best when removed. Undefined when
+ * no removed sighting is at `time`.
+ */
+export const restoreSightingAt = (stored: StoredSightings, time: number): SightingChange | undefined => {
+  const target = storedAt(stored, time);
+  if (!target?.removed) {
+    return;
+  }
+
+  const restored: VideoFaceSighting = {
+    t: target.t,
+    x1: target.x1,
+    y1: target.y1,
+    x2: target.x2,
+    y2: target.y2,
+    score: target.score,
+  };
+  const sightings = stored.sightings.map((sighting) => (sighting === target ? restored : sighting));
+  return target.wasBest ? { sightings, best: restored } : { sightings };
 };

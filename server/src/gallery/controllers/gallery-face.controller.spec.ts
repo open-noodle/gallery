@@ -90,4 +90,47 @@ describe(GalleryFaceController.name, () => {
       expect(service.getSightingThumbnail).not.toHaveBeenCalled();
     });
   });
+
+  describe.each([
+    { method: 'delete', path: '', call: 'removeSighting' },
+    { method: 'post', path: '/restore', call: 'restoreSighting' },
+  ] as const)('$method /faces/:id/sightings$path', ({ method, path, call }) => {
+    const url = `/faces/6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60/sightings${path}`;
+
+    it('should be an authenticated route with the face delete permission', async () => {
+      await request(ctx.getHttpServer())[method](`${url}?time=1.5`);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: expect.objectContaining({ permission: Permission.FaceDelete }) }),
+      );
+    });
+
+    it('should pass the face and the time to the service', async () => {
+      service[call].mockResolvedValue({ sightings: [] });
+      const { status, body } = await request(ctx.getHttpServer())
+        [method](`${url}?time=1.5`)
+        .set('Authorization', 'Bearer token');
+
+      expect(body).toEqual({ sightings: [] });
+      expect(status).toBe(200);
+      expect(service[call]).toHaveBeenCalledWith(undefined, '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60', 1.5);
+    });
+
+    it('should require a UUID', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        [method](`/faces/not-a-uuid/sightings${path}?time=1.5`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(400);
+      expect(service[call]).not.toHaveBeenCalled();
+    });
+
+    it.each(['', '?time=-1', '?time=abc'])('should reject a missing or invalid time (%s)', async (query) => {
+      const { status } = await request(ctx.getHttpServer())
+        [method](`${url}${query}`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(400);
+      expect(service[call]).not.toHaveBeenCalled();
+    });
+  });
 });

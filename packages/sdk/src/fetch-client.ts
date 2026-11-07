@@ -7871,6 +7871,23 @@ export function reassignFacesById({ id, faceDto }: {
     })));
 }
 /**
+ * Remove a face sighting
+ */
+export function removeAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
  * Get face sightings
  */
 export function getAssetFaceSightings({ id }: {
@@ -7881,6 +7898,23 @@ export function getAssetFaceSightings({ id }: {
         data: VideoFaceSightingsResponseDto;
     }>(`/faces/${encodeURIComponent(id)}/sightings`, {
         ...opts
+    }));
+}
+/**
+ * Restore a face sighting
+ */
+export function restoreAssetFaceSighting({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/restore${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts,
+        method: "POST"
     }));
 }
 /**

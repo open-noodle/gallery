@@ -2,8 +2,21 @@ import { Column, CreateDateColumn, ForeignKeyColumn, Table } from '@immich/sql-t
 import type { Generated, Timestamp } from '@immich/sql-tools';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 
-/** One sampled sighting of a video face: `t` in the original's timeline, box in the best frame's pixel space. */
-export type VideoFaceSighting = { t: number; x1: number; y1: number; x2: number; y2: number; score: number };
+/**
+ * One sampled sighting of a video face: `t` in the original's timeline, box in the best frame's pixel space. `removed`
+ * marks one the user took out of the face (kept so Undo can bring it back), and `wasBest` one that was the best view
+ * when it was removed.
+ */
+export type VideoFaceSighting = {
+  t: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  score: number;
+  removed?: boolean;
+  wasBest?: boolean;
+};
 
 // The best frame of a video face found by sampling the whole video (specs/2026-10-31-video-face-frames-design.md).
 // Beside asset_face rather than on it, so asset_face keeps Immich's meaning: the face's box and imageWidth/imageHeight

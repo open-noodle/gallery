@@ -46,5 +46,16 @@ const VideoFaceSightingThumbnailSchema = z
   })
   .meta({ id: 'VideoFaceSightingThumbnailDto' });
 
+const VideoFaceSightingTimeSchema = z
+  .object({
+    time: z.coerce
+      .number()
+      .min(0)
+      .meta({ format: 'double' })
+      .describe("The sighting's time, as GET /faces/{id}/sightings returned it, or as it was when removed"),
+  })
+  .meta({ id: 'VideoFaceSightingTimeDto' });
+
 export class VideoFaceSightingsResponseDto extends createZodDto(VideoFaceSightingsResponseSchema) {}
+export class VideoFaceSightingTimeDto extends createZodDto(VideoFaceSightingTimeSchema) {}
 export class VideoFaceSightingThumbnailDto extends createZodDto(VideoFaceSightingThumbnailSchema) {}

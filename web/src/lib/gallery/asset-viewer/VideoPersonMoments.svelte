@@ -12,9 +12,11 @@
    */
   interface Props {
     asset: AssetResponseDto;
+    /** The asset's owner, who holds face delete: each moment gets a button to take it out of the person's face. */
+    canRemove?: boolean;
   }
 
-  let { asset }: Props = $props();
+  let { asset, canRemove = false }: Props = $props();
 
   const selection = $derived(
     videoPersonSightings.current?.assetId === asset.id ? videoPersonSightings.current : undefined,
@@ -35,7 +37,7 @@
         onclick={() => videoPersonSightings.clear()}
       />
     </div>
-    <VideoFaceSightings faceIds={selection.faceIds}>
+    <VideoFaceSightings faceIds={selection.faceIds} {canRemove}>
       {#snippet empty()}
         <Text size="small" color="muted" class="mb-4">{$t('video_person_sightings_none')}</Text>
       {/snippet}

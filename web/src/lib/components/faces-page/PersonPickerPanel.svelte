@@ -48,9 +48,10 @@
     searchActions?: Snippet;
     /**
      * The face being named, when it is on a video: the panel then shows every moment that person was seen, each one
-     * seeking the player there, to tell people apart who look alike in a single crop.
+     * seeking the player there, to tell people apart who look alike in a single crop. `canRemove` (the asset's owner,
+     * who holds face delete) adds a button to take a moment out of the face.
      */
-    videoFaceId?: string;
+    videoFace?: { id: string; canRemove: boolean };
   };
 
   let {
@@ -63,7 +64,7 @@
     onQueryChange,
     headerActions,
     searchActions,
-    videoFaceId,
+    videoFace,
   }: Props = $props();
 </script>
 
@@ -92,8 +93,8 @@
   </div>
 
   <div class="p-4 text-sm">
-    {#if videoFaceId}
-      <VideoFaceSightings faceIds={[videoFaceId]} />
+    {#if videoFace}
+      <VideoFaceSightings faceIds={[videoFace.id]} canRemove={videoFace.canRemove} />
     {/if}
     <div class="mb-4 flex gap-2">
       <Input placeholder={$t('search_people')} bind:value={query} oninput={() => onQueryChange?.(query)} size="tiny" />

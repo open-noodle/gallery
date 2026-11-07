@@ -61,7 +61,7 @@ const person = (name: string): PersonResponseDto =>
     updatedAt: '2026-01-01T00:00:00.000Z',
   }) as unknown as PersonResponseDto;
 
-const renderPanel = (type: AssetTypeEnum, faces: Record<string, string[]>) => {
+const renderPanel = (type: AssetTypeEnum, faces: Record<string, string[]>, isOwner = true) => {
   faceManagerMock.people = Object.keys(faces).map((name) => person(name));
   faceManagerMock.facesByPersonId = new Map(
     Object.entries(faces).map(([name, ids]) => [`person-${name}`, ids.map((id) => ({ id }))]),
@@ -71,7 +71,7 @@ const renderPanel = (type: AssetTypeEnum, faces: Record<string, string[]>) => {
     .map((id) => ({ id }));
   return renderWithTooltips(DetailPanelPeople, {
     asset: assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', type }),
-    isOwner: true,
+    isOwner,
     previousRoute: '/photos',
   });
 };
@@ -144,5 +144,25 @@ describe('DetailPanelPeople, a person’s moments in a video', () => {
 
     expect(screen.queryByTestId('video-person-moments')).not.toBeInTheDocument();
     expect(momentsButton('Alice')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('lets only the owner remove a moment', async () => {
+    const sightings = [
+      { time: 4, score: 0.9, isBest: true, box },
+      { time: 9, score: 0.8, isBest: false, box },
+    ];
+    getAssetFaceSightings.mockResolvedValue({ sightings });
+    const owner = renderPanel(AssetTypeEnum.Video, { Alice: ['face-1'] });
+    await userEvent.click(momentsButton('Alice'));
+    await waitFor(() => expect(screen.getAllByTestId('remove-sighting')).toHaveLength(2));
+    owner.unmount();
+    videoPersonSightings.clear();
+
+    renderPanel(AssetTypeEnum.Video, { Alice: ['face-1'] }, false);
+    await userEvent.click(momentsButton('Alice'));
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /^video_face_sightings_show_at/ })).toHaveLength(2),
+    );
+    expect(screen.queryByTestId('remove-sighting')).not.toBeInTheDocument();
   });
 });

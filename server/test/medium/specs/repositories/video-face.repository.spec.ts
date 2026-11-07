@@ -258,6 +258,7 @@ describe(VideoFaceRepository.name, () => {
       await expect(sut.getSightings(faceId)).resolves.toEqual({
         sightings,
         timeSeconds: 3.25,
+        framePath: `thumbs/owner/aa/bb/asset_faces/${faceId}.jpeg`,
         imageWidth: 1920,
         imageHeight: 1080,
         originalPath: asset.originalPath,
@@ -288,6 +289,46 @@ describe(VideoFaceRepository.name, () => {
       await expect(sut.getSightings(assetFace.id)).resolves.toBeUndefined();
       await expect(sut.getSightings(newUuid())).resolves.toBeUndefined();
       await expect(sut.getSightings(trashedFaceId)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('setSightings', () => {
+    it("writes the sightings, and with a new best view moves the face's box and best time in one go", async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const kept = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const next = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings: [kept, next] })],
+      });
+
+      await sut.setSightings(faceId, [{ ...kept, removed: true }, next]);
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({
+        sightings: [{ ...kept, removed: true }, next],
+        timeSeconds: 3.25,
+      });
+
+      await sut.setSightings(faceId, [{ ...kept, removed: true, wasBest: true }, next], {
+        timeSeconds: 7.5,
+        box: { boundingBoxX1: 300, boundingBoxY1: 220, boundingBoxX2: 360, boundingBoxY2: 290 },
+      });
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ timeSeconds: 7.5 });
+      const face = await defaultDatabase
+        .selectFrom('asset_face')
+        .select(['boundingBoxX1', 'boundingBoxY1', 'boundingBoxX2', 'boundingBoxY2', 'imageWidth'])
+        .where('id', '=', faceId)
+        .executeTakeFirstOrThrow();
+      expect(face).toEqual({
+        boundingBoxX1: 300,
+        boundingBoxY1: 220,
+        boundingBoxX2: 360,
+        boundingBoxY2: 290,
+        imageWidth: 1920,
+      });
     });
   });
 

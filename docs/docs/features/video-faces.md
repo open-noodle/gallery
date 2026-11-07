@@ -62,7 +62,9 @@ people found to 24. It takes about five times as long per frame, so leave it off
   of that face at each moment Gallery saw it, with the clearest view starred. Click one to jump the video to that
   moment, with a box around the face, which helps when a single crop is not enough to tell who it is. To find where
   someone appears without editing faces, open the info panel and click the film button on their picture under
-  People.
+  People. If a moment shows someone else, the video's owner can remove it with the trash button on its corner (with
+  a few seconds to undo); removing the starred one makes the next clearest moment the face's picture. Running face
+  detection on the video again brings removed moments back.
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no
 frame will show them clearly.

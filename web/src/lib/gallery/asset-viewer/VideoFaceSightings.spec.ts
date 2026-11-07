@@ -16,11 +16,25 @@ vi.mock('svelte-i18n', () => ({
   },
 }));
 
-const getAssetFaceSightings = vi.hoisted(() => vi.fn());
+const { getAssetFaceSightings, removeAssetFaceSighting, restoreAssetFaceSighting, toastPrimary, handleError } =
+  vi.hoisted(() => ({
+    getAssetFaceSightings: vi.fn(),
+    removeAssetFaceSighting: vi.fn(),
+    restoreAssetFaceSighting: vi.fn(),
+    toastPrimary: vi.fn(),
+    handleError: vi.fn(),
+  }));
 vi.mock('@immich/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@immich/sdk')>()),
   getAssetFaceSightings,
+  removeAssetFaceSighting,
+  restoreAssetFaceSighting,
 }));
+vi.mock('@immich/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/ui')>()),
+  toastManager: { primary: toastPrimary },
+}));
+vi.mock('$lib/utils/handle-error', () => ({ handleError }));
 
 const seekViewerVideo = vi.hoisted(() => vi.fn());
 vi.mock('$lib/gallery/asset-viewer/video-seek', async (importOriginal) => ({
@@ -144,5 +158,83 @@ describe('VideoFaceSightings', () => {
     expect(screen.queryByText('nothing here')).not.toBeInTheDocument();
     answer({ sightings: [] });
     expect(await screen.findByText('nothing here')).toBeInTheDocument();
+  });
+
+  describe('removing a moment', () => {
+    const early = { time: 8.5, score: 0.9, isBest: true, box };
+    const late = { time: 31.5, score: 0.8, isBest: false, box };
+
+    const tilesShown = () =>
+      screen.getAllByRole('button', { name: /^video_face_sightings_show_at/ }).map((b) => b.textContent?.trim());
+
+    it('offers no remove button without permission', async () => {
+      getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
+      render(VideoFaceSightings, { faceIds: ['face-1'] });
+
+      await screen.findAllByRole('button');
+      expect(screen.queryByTestId('remove-sighting')).not.toBeInTheDocument();
+    });
+
+    it("offers it on each moment of a face with more than one, and keeps a face's last moment", async () => {
+      getAssetFaceSightings.mockImplementation(({ id }: { id: string }) =>
+        Promise.resolve({ sightings: id === 'face-1' ? [early, late] : [{ ...late, time: 40 }] }),
+      );
+      render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'], canRemove: true });
+
+      await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31', '0:40']));
+      expect(screen.getAllByTestId('remove-sighting')).toHaveLength(2);
+    });
+
+    it('takes the moment out, moves the star to what the server says, and offers to undo it', async () => {
+      getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
+      removeAssetFaceSighting.mockResolvedValue({ sightings: [{ ...late, isBest: true }] });
+      restoreAssetFaceSighting.mockResolvedValue({ sightings: [early, late] });
+      render(VideoFaceSightings, { faceIds: ['face-1'], canRemove: true });
+
+      const [removeEarly] = await screen.findAllByTestId('remove-sighting');
+      await userEvent.click(removeEarly);
+
+      expect(removeAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 8.5 });
+      await waitFor(() => expect(tilesShown()).toEqual(['0:31']));
+      expect(screen.getByTestId('best').closest('button')).toHaveTextContent('0:31');
+      expect(screen.queryByTestId('remove-sighting')).not.toBeInTheDocument();
+
+      const [[toast, options]] = toastPrimary.mock.calls;
+      expect(toast.description).toBe('video_face_sighting_removed');
+      expect(options).toEqual({ timeout: 5000 });
+      await toast.button.onclick();
+
+      expect(restoreAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 8.5 });
+      await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
+    });
+
+    it('takes the face box away with the moment it was drawn for', async () => {
+      getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
+      removeAssetFaceSighting.mockResolvedValue({ sightings: [{ ...late, isBest: true }] });
+      seekViewerVideo.mockReturnValue(true);
+      render(VideoFaceSightings, { faceIds: ['face-1'], canRemove: true });
+
+      const [shownTile] = await screen.findAllByRole('button', { name: /^video_face_sightings_show_at/ });
+      await userEvent.click(shownTile);
+      videoFaceBox.show(box, 8.5);
+      await userEvent.click(screen.getAllByTestId('remove-sighting')[0]);
+
+      await waitFor(() => expect(videoFaceBox.current).toBeUndefined());
+    });
+
+    it('reports a failure and keeps the moment, with nothing to undo', async () => {
+      getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
+      removeAssetFaceSighting.mockRejectedValue(new Error('500'));
+      render(VideoFaceSightings, { faceIds: ['face-1'], canRemove: true });
+
+      const [removeEarly] = await screen.findAllByTestId('remove-sighting');
+      await userEvent.click(removeEarly);
+
+      await waitFor(() =>
+        expect(handleError).toHaveBeenCalledWith(expect.any(Error), 'video_face_sighting_remove_failed'),
+      );
+      expect(tilesShown()).toEqual(['0:08', '0:31']);
+      expect(toastPrimary).not.toHaveBeenCalled();
+    });
   });
 });

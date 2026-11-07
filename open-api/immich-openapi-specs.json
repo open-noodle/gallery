@@ -9360,6 +9360,72 @@
       }
     },
     "/faces/{id}/sightings": {
+      "delete": {
+        "description": "Take one moment out of a video face, at a time GET /faces/{id}/sightings returned. Removing the best view makes the next best one it, which moves the face crop. A face keeps at least one sighting. Returns the sightings left.",
+        "operationId": "removeAssetFaceSighting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "time",
+            "required": true,
+            "in": "query",
+            "description": "The sighting's time, as GET /faces/{id}/sightings returned it, or as it was when removed",
+            "schema": {
+              "minimum": 0,
+              "format": "double",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoFaceSightingsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Remove a face sighting",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.delete",
+        "x-immich-state": "Stable"
+      },
       "get": {
         "description": "Every moment a video face was seen while the video was sampled, on the player timeline. Empty for a photo face or a video face detected on the poster only.",
         "operationId": "getAssetFaceSightings",
@@ -9413,6 +9479,74 @@
           }
         ],
         "x-immich-permission": "face.read",
+        "x-immich-state": "Stable"
+      }
+    },
+    "/faces/{id}/sightings/restore": {
+      "post": {
+        "description": "Bring back a moment DELETE /faces/{id}/sightings removed, as the best view again if it was that. Returns the sightings.",
+        "operationId": "restoreAssetFaceSighting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "time",
+            "required": true,
+            "in": "query",
+            "description": "The sighting's time, as GET /faces/{id}/sightings returned it, or as it was when removed",
+            "schema": {
+              "minimum": 0,
+              "format": "double",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoFaceSightingsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Restore a face sighting",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.delete",
         "x-immich-state": "Stable"
       }
     },

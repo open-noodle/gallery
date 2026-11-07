@@ -1,17 +1,22 @@
-import { Controller, Get, Next, Param, Query, Res } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { NextFunction, Response } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { ApiTag, Permission } from 'src/enum.js';
-import { VideoFaceSightingThumbnailDto, VideoFaceSightingsResponseDto } from 'src/gallery/dtos/video-face.dto.js';
+import {
+  VideoFaceSightingThumbnailDto,
+  VideoFaceSightingTimeDto,
+  VideoFaceSightingsResponseDto,
+} from 'src/gallery/dtos/video-face.dto.js';
 import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { sendFile } from 'src/utils/file.js';
 import { UUIDParamDto } from 'src/validation.js';
 
-// Mounted before FaceController (see src/gallery/index.ts); upstream has no GET route under `/faces/:id`.
+// Mounted before FaceController (see src/gallery/index.ts); upstream has no route under `/faces/:id/` and no GET under
+// `/faces/:id`.
 @ApiTags(ApiTag.Faces)
 @Controller('faces')
 export class GalleryFaceController {
@@ -49,6 +54,39 @@ export class GalleryFaceController {
   })
   getAssetFaceSightings(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<VideoFaceSightingsResponseDto> {
     return this.service.getSightings(auth, id);
+  }
+
+  @Delete(':id/sightings')
+  @Authenticated({ permission: Permission.FaceDelete })
+  @Endpoint({
+    summary: 'Remove a face sighting',
+    description:
+      'Take one moment out of a video face, at a time GET /faces/{id}/sightings returned. Removing the best view makes the next best one it, which moves the face crop. A face keeps at least one sighting. Returns the sightings left.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  removeAssetFaceSighting(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() { time }: VideoFaceSightingTimeDto,
+  ): Promise<VideoFaceSightingsResponseDto> {
+    return this.service.removeSighting(auth, id, time);
+  }
+
+  @Post(':id/sightings/restore')
+  @HttpCode(HttpStatus.OK)
+  @Authenticated({ permission: Permission.FaceDelete })
+  @Endpoint({
+    summary: 'Restore a face sighting',
+    description:
+      'Bring back a moment DELETE /faces/{id}/sightings removed, as the best view again if it was that. Returns the sightings.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  restoreAssetFaceSighting(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() { time }: VideoFaceSightingTimeDto,
+  ): Promise<VideoFaceSightingsResponseDto> {
+    return this.service.restoreSighting(auth, id, time);
   }
 
   @Get(':id/sightings/thumbnail')

@@ -4,7 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetType, AssetVisibility } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
-import { AssetFaceVideoFrameTable } from 'src/schema/tables/asset-face-video-frame.table.js';
+import { AssetFaceVideoFrameTable, type VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { asUuid, petFacePredicate } from 'src/utils/database.js';
 
@@ -142,6 +142,7 @@ export class VideoFaceRepository {
       .select([
         'asset_face_video_frame.sightings',
         'asset_face_video_frame.timeSeconds',
+        'asset_face_video_frame.path as framePath',
         'asset_face.imageWidth',
         'asset_face.imageHeight',
         'asset.originalPath',
@@ -151,6 +152,30 @@ export class VideoFaceRepository {
       .where('asset_face_video_frame.faceId', '=', asUuid(faceId))
       .where('asset.deletedAt', 'is', null)
       .executeTakeFirst();
+  }
+
+  /**
+   * Writes a face's sightings after one was removed or restored, and with `best`, moves the face's box and best time
+   * to that sighting (its frame already written to the face's frame path), in one transaction.
+   */
+  async setSightings(
+    faceId: string,
+    sightings: VideoFaceSighting[],
+    best?: {
+      timeSeconds: number;
+      box: Pick<VideoFaceBox, 'boundingBoxX1' | 'boundingBoxY1' | 'boundingBoxX2' | 'boundingBoxY2'>;
+    },
+  ): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .updateTable('asset_face_video_frame')
+        .set({ sightings, ...(best && { timeSeconds: best.timeSeconds }) })
+        .where('faceId', '=', asUuid(faceId))
+        .execute();
+      if (best) {
+        await trx.updateTable('asset_face').set(best.box).where('asset_face.id', '=', asUuid(faceId)).execute();
+      }
+    });
   }
 
   /** The best frame of a person's representative face, for the person thumbnail. */
