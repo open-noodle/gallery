@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,7 +7,7 @@
     <!--
       Static mockup for specs/2026-11-06-aspect-ratio-filter-design.md. Styles copy the real components:
       filter-section.svelte, albums-filter.svelte, active-filters-bar.svelte. Colours come from web/src/app.css.
-      Labels are German on request, with the planned i18n key and the English text next to each state.
+      The i18n table at the end lists the planned keys with their en and de strings.
       Placeholder tiles only, no real photos.
     -->
     <style>
@@ -381,7 +381,7 @@
     <div class="wrap">
       <header class="page">
         <h1>Aspect ratio filter</h1>
-        <button class="toggle" type="button" id="theme">Hell / Dunkel</button>
+        <button class="toggle" type="button" id="theme">Light / Dark</button>
       </header>
       <p class="lead">
         Static mockup for specs/2026-11-06-aspect-ratio-filter-design.md. Section between Albums and Text, with one
@@ -390,23 +390,23 @@
 
       <h2>Panel with the new section and the chip</h2>
       <p class="lead">
-        Hoch is selected. Panorama hoch is absent from the current set. Panorama is selected but absent (orphan style).
+        Portrait is selected. Tall panorama is absent from the current set. Panorama is selected but absent (orphan style).
       </p>
       <div class="app">
-        <aside class="panel" aria-label="Filter">
-          <div class="section"><button class="section-head closed" type="button">Medientyp<svg><use href="#i-chevron" /></svg></button></div>
-          <div class="section"><button class="section-head closed" type="button">Favoriten<svg><use href="#i-chevron" /></svg></button></div>
-          <div class="section"><button class="section-head closed" type="button">Alben<svg><use href="#i-chevron" /></svg></button></div>
+        <aside class="panel" aria-label="Filters">
+          <div class="section"><button class="section-head closed" type="button">Media type<svg><use href="#i-chevron" /></svg></button></div>
+          <div class="section"><button class="section-head closed" type="button">Favorites<svg><use href="#i-chevron" /></svg></button></div>
+          <div class="section"><button class="section-head closed" type="button">Albums<svg><use href="#i-chevron" /></svg></button></div>
           <div class="section" data-testid="filter-section-aspect">
-            <button class="section-head" type="button">Seitenverhältnis<svg><use href="#i-chevron" /></svg></button>
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
             <div class="section-body">
-              <div class="rows" role="group" aria-label="Seitenverhältnis">
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>Alle</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Quer</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Quadratisch</button>
-                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Hoch</button>
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
                 <button class="row orphan" type="button" aria-pressed="true"><svg><use href="#i-pano" /></svg>Panorama</button>
-                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Panorama hoch</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
               </div>
             </div>
           </div>
@@ -414,15 +414,15 @@
         </aside>
         <main class="main">
           <div class="bar" data-testid="active-filters-bar">
-            <span class="count">128 Ergebnisse</span>
+            <span class="count">128 results</span>
             <span class="dot" aria-hidden="true"></span>
             <span class="chip" data-testid="active-chip">
-              <svg><use href="#i-portrait" /></svg><span>Seitenverhältnis: Hoch</span>
-              <button type="button" aria-label="Seitenverhältnis: Hoch entfernen"><svg><use href="#i-close" /></svg></button>
+              <svg><use href="#i-portrait" /></svg><span>Aspect ratio: Portrait</span>
+              <button type="button" aria-label="Remove Aspect ratio: Portrait"><svg><use href="#i-close" /></svg></button>
             </span>
             <span class="chip" data-testid="active-chip">
-              <svg><use href="#i-pano" /></svg><span>Seitenverhältnis: Panorama</span>
-              <button type="button" aria-label="Seitenverhältnis: Panorama entfernen"><svg><use href="#i-close" /></svg></button>
+              <svg><use href="#i-pano" /></svg><span>Aspect ratio: Panorama</span>
+              <button type="button" aria-label="Remove Aspect ratio: Panorama"><svg><use href="#i-close" /></svg></button>
             </span>
           </div>
           <div class="tiles">
@@ -437,17 +437,17 @@
       <div class="states">
         <section class="card">
           <h3>Nothing selected</h3>
-          <p class="note">Alle is outlined and is never greyed.</p>
+          <p class="note">All is outlined and is never greyed.</p>
           <div class="section">
-            <button class="section-head" type="button">Seitenverhältnis<svg><use href="#i-chevron" /></svg></button>
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
             <div class="section-body">
-              <div class="rows" role="group" aria-label="Seitenverhältnis">
-                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-all" /></svg>Alle</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Quer</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Quadratisch</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-portrait" /></svg>Hoch</button>
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-portrait" /></svg>Portrait</button>
                 <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano" /></svg>Panorama</button>
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano-tall" /></svg>Panorama hoch</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
               </div>
             </div>
           </div>
@@ -460,7 +460,7 @@
             when the baseline is not known.
           </p>
           <div class="section">
-            <button class="section-head" type="button" disabled>Seitenverhältnis (0)</button>
+            <button class="section-head" type="button" disabled>Aspect ratio (0)</button>
           </div>
         </section>
 
@@ -474,15 +474,15 @@
           <h3>Selection stays reachable</h3>
           <p class="note">A section with a selection is never greyed or hidden, even if the classes are all absent.</p>
           <div class="section">
-            <button class="section-head" type="button">Seitenverhältnis<svg><use href="#i-chevron" /></svg></button>
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
             <div class="section-body">
-              <div class="rows" role="group" aria-label="Seitenverhältnis">
-                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>Alle</button>
-                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-landscape" /></svg>Quer</button>
-                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-square" /></svg>Quadratisch</button>
-                <button class="row orphan" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Hoch</button>
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row orphan" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
                 <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano" /></svg>Panorama</button>
-                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Panorama hoch</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
               </div>
             </div>
           </div>
@@ -493,23 +493,23 @@
       <div class="phone">
         <div class="app">
           <div class="bar">
-            <span class="count">128 Ergebnisse</span>
+            <span class="count">128 results</span>
             <span class="chip">
-              <svg><use href="#i-portrait" /></svg><span>Seitenverhältnis: Hoch</span>
-              <button type="button" aria-label="Seitenverhältnis: Hoch entfernen"><svg><use href="#i-close" /></svg></button>
+              <svg><use href="#i-portrait" /></svg><span>Aspect ratio: Portrait</span>
+              <button type="button" aria-label="Remove Aspect ratio: Portrait"><svg><use href="#i-close" /></svg></button>
             </span>
           </div>
           <div class="panel">
             <div class="section">
-              <button class="section-head" type="button">Seitenverhältnis<svg><use href="#i-chevron" /></svg></button>
+              <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
               <div class="section-body">
-                <div class="rows" role="group" aria-label="Seitenverhältnis">
-                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>Alle</button>
-                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Quer</button>
-                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Quadratisch</button>
-                  <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Hoch</button>
+                <div class="rows" role="group" aria-label="Aspect ratio">
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                  <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
                   <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano" /></svg>Panorama</button>
-                  <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Panorama hoch</button>
+                  <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
                 </div>
               </div>
             </div>
