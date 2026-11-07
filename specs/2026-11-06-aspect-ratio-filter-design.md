@@ -1,6 +1,6 @@
 # Aspect ratio filter
 
-Status: spec and mockup approved by the requester on 2026-11-06. Written against `upstream/main` at `ae178054c` (Immich base 3.3.5). `3983e4381`
+Status: spec and mockup approved by the requester on 2026-11-06. Written against `main` of open-noodle/gallery at `ae178054c` (Immich base 3.3.5). `3983e4381`
 changes none of the filter, DTO, schema, revert or web filter panel files cited here.
 Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html`, approved.
 
@@ -512,7 +512,7 @@ measured cost. So this rules out a large write cost but cannot resolve a small o
 No update in C or D was a HOT update, with or without the index: the trigger `asset_updatedAt` rewrites `updateId`, which has
 its own index, so updates of `asset` are never HOT today. The new index therefore costs no HOT updates.
 
-S8.10b in `face-person-verdict.repository.spec.ts` timed out at 5,000 ms in two full CI runs and took 1,681 and 1,979 ms when
+The test S8.10b in `face-person-verdict.repository.spec.ts`, which collects 5,000 orphaned rows, timed out at 5,000 ms in two full CI runs and took 1,681 and 1,979 ms when
 run alone, on a side without and a side with the index. The empty table cases above show no measurable index cost, so it is
 treated as a test that is sensitive to load in CI, not as a cost of the index.
 
