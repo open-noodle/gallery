@@ -1,11 +1,11 @@
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import {
+  QUERY_MODE_FILTER_HANDLING,
+  SEARCH_FILTER_DEBOUNCE_MS,
   buildSmartSearchFacetKey,
   buildSmartSearchFacetsParams,
   buildSmartSearchParams,
   mapSmartSearchFacetsToFilterSuggestions,
-  QUERY_MODE_FILTER_HANDLING,
-  SEARCH_FILTER_DEBOUNCE_MS,
 } from '#lib/utils/space-search.ts';
 import { AssetOrder, AssetTypeEnum, Type } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';

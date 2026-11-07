@@ -1,14 +1,11 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import type { Request } from 'express';
 import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import type { Request } from 'express';
-import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
-import type { BoundingBox } from 'src/repositories/machine-learning.repository.js';
-import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
 import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE, THUMBNAIL_DECODING_TIER } from 'src/constants.js';
 import { ThumbnailPathEntity } from 'src/cores/storage.core.js';
@@ -16,6 +13,7 @@ import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, CacheControl, ImageFormat, ImmichHeader, JobName, StorageFolder } from 'src/enum.js';
+import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import {
   getRelativeImagePath,
   getRelativeNestedPath,
@@ -26,8 +24,10 @@ import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/int
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import type { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
 import {
   ContentDisposition,
   ImmichFileResponse,

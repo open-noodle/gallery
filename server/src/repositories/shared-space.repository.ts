@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, NotNull, Transaction, type Updateable, sql } from 'kysely';
+import { Insertable, Kysely, NotNull, Transaction, sql, type Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
-import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
   AlbumUserRole,
@@ -13,8 +11,10 @@ import {
   SourceType,
   VectorIndex,
 } from 'src/enum.js';
+import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
 import { personIdentityId, personIsPet, personSpecies, personType } from 'src/gallery/utils/person-sidecar.js';
 import { probes } from 'src/repositories/database.repository.js';
+import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';

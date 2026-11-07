@@ -38,8 +38,8 @@ import { DB } from 'src/schema/index.js';
 import { SearchService } from 'src/services/search.service.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
-import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
+import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 

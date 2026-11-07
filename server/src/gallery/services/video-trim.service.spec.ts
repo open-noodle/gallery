@@ -1,6 +1,5 @@
 import { Reflector } from '@nestjs/core';
 import { OutputInfo } from 'sharp';
-import type { RawImageInfo } from 'src/types.js';
 import { AssetFileType, AssetType, JobName, JobStatus, MetadataKey, QueueName } from 'src/enum.js';
 import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import {
@@ -8,6 +7,7 @@ import {
   getRelativeEditedEncodedVideoPath,
   getRelativeEncodedVideoPath,
 } from 'src/gallery/utils/storage-keys.js';
+import type { RawImageInfo } from 'src/types.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { videoInfoStub } from 'test/fixtures/media.stub.js';
 import { getForGenerateThumbnail } from 'test/mappers.js';

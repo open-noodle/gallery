@@ -1,5 +1,5 @@
+import { isNeutralImageAdjust, type ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import type { Bitmap } from 'src/types.js';
-import { type ImageAdjust, isNeutralImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 
 const clamp01 = (value: number) => (value < 0 ? 0 : Math.min(value, 1));
 

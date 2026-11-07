@@ -1,9 +1,9 @@
 import type { AlbumResponseDto } from 'src/dtos/album.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import type { AccessRepository } from 'src/repositories/access.repository.js';
-import type { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { AlbumUserRole } from 'src/enum.js';
 import { hasDirectAlbumReadAccess } from 'src/gallery/utils/access-grants.js';
+import type { AccessRepository } from 'src/repositories/access.repository.js';
+import type { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 
 type AlbumResponseOverlayDependencies = {
   access: AccessRepository;

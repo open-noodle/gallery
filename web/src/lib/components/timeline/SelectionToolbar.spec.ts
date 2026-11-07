@@ -3,12 +3,14 @@ import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-m
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
 import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import type { TimelineDateTime } from '#lib/utils/timeline-util.ts';
-import type {
-  AlbumResponseDto,
-  AssetVisibility as AssetVisibilityType,
-  SharedSpaceMemberResponseDto,
+import {
+  AlbumUserRole,
+  AssetVisibility,
+  getEditableAssets,
+  type AlbumResponseDto,
+  type AssetVisibility as AssetVisibilityType,
+  type SharedSpaceMemberResponseDto,
 } from '@immich/sdk';
-import { AlbumUserRole, AssetVisibility, getEditableAssets } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

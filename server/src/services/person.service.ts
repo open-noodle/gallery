@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
-import type { JobItem, JobOf } from 'src/types.js';
 import { Chunked, OnJob } from 'src/decorators.js';
 import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
@@ -52,6 +50,8 @@ import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
+import type { JobItem, JobOf } from 'src/types.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';

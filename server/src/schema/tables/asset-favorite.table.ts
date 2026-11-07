@@ -5,8 +5,8 @@ import {
   ForeignKeyColumn,
   Table,
   Timestamp,
+  type Generated,
 } from '@immich/sql-tools';
-import type { Generated } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn } from 'src/decorators.js';
 import {
   asset_favorite_after_delete,

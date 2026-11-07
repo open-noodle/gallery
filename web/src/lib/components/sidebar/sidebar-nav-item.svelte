@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   // @immich/ui re-exports its types (dist/index.d.ts: `export * from './types.js'`),
   // so IconLike / IconProps come from the package rather than being redeclared here.
@@ -7,6 +6,7 @@
   import { mdiChevronDown, mdiChevronRight } from '@mdi/js';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   interface Props {
     title: string;

@@ -17,13 +17,13 @@ import { decodeFilterParams } from '#lib/utils/filter-url.ts';
 import { buildMapFilterConfig } from '#lib/utils/map-filter-config.ts';
 import { buildMapMarkerOptions, buildMapTimeBucketOptions } from '#lib/utils/map-filter-options.ts';
 import { handlePhotosRemoveFilter } from '#lib/utils/photos-filter-options.ts';
-import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '#lib/utils/space-search.ts';
+import { SEARCH_FILTER_DEBOUNCE_MS, buildSmartSearchParams } from '#lib/utils/space-search.ts';
 import {
   AssetVisibility,
   getFilteredMapMarkers,
   getTimeBuckets,
-  type MapMarkerResponseDto,
   searchSmart,
+  type MapMarkerResponseDto,
 } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { untrack } from 'svelte';

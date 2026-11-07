@@ -1,10 +1,10 @@
 import {
   CreateDateColumn,
   ForeignKeyColumn,
-  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
+  type Generated,
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';

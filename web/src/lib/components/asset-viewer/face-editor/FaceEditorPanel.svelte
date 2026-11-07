@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { getFaceEditorSpace } from '#lib/gallery/asset-viewer/space-face-editor.ts';
   import { useAssetSpace } from '#lib/gallery/asset-viewer/asset-space.ts';
+  import { getFaceEditorSpace } from '#lib/gallery/asset-viewer/space-face-editor.ts';
   import type { AssetResponseDto } from '@immich/sdk';
   import FaceEditor from './FaceEditor.svelte';
 

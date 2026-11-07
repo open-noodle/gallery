@@ -1,24 +1,26 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
   import { clickOutside } from '#lib/actions/click-outside.ts';
   import { listNavigation } from '#lib/actions/list-navigation.ts';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import PersonSuggestionBanner from '#lib/components/faces-page/person-suggestion-banner.svelte';
   import PeopleMergeSelector from '#lib/components/people/people-merge-selector.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import SelectionToolbar from '#lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import { timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
+  import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '#lib/gallery/people/space-person-name-merge.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
-  import { timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
   import PersonEditBirthDateModal from '#lib/modals/PersonEditBirthDateModal.svelte';
-  import PersonSuggestionBanner from '#lib/components/faces-page/person-suggestion-banner.svelte';
-  import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '#lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '#lib/route.ts';
+  import { locale } from '#lib/stores/preferences.store.ts';
   import {
     createCrossOwnerMergeHandlers,
     runMergeWithCrossOwnerConfirmation,
@@ -26,26 +28,23 @@
   } from '#lib/utils/cross-owner-merge.ts';
   import { getGlobalPersonThumbnailUrl, getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { locale } from '#lib/stores/preferences.store.ts';
   import { getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '#lib/gallery/people/space-person-name-merge.ts';
   import { toScopedPersonRef as toPersonScopedRef } from '#lib/utils/scoped-person-ref.ts';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import {
+    RepresentativeFaceSource,
+    ScopedPersonProfileType,
+    SharedSpaceRole,
     confirmSpacePersonFaceSuggestion,
     detachScopedPerson,
     dismissSpacePersonFaceSuggestion,
-    getSpacePersonFaces,
-    getSpacePersonFaceSuggestions,
-    ignoreSpacePersonFaceSuggestion,
     getSpacePeople,
+    getSpacePersonFaceSuggestions,
+    getSpacePersonFaces,
+    ignoreSpacePersonFaceSuggestion,
     mergeSpacePeople,
-    RepresentativeFaceSource,
     searchPerson,
-    SharedSpaceRole,
-    ScopedPersonProfileType,
-    updateSpacePersonRepresentativeFace,
     updateSpacePerson,
+    updateSpacePersonRepresentativeFace,
     type PersonFaceResponseDto,
     type PersonFaceSuggestionResponseDto,
     type PersonResponseDto,
@@ -65,6 +64,7 @@
   import { DateTime } from 'luxon';
   import { tick } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { goto, invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

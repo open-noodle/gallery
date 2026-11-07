@@ -1,5 +1,6 @@
 import type { MockData } from '#test/common/data.ts';
 import { Spy } from '#test/common/expectations.ts';
+import { galleryHandlers } from '#test/common/gallery/handlers.ts';
 import { createHandlers } from '#test/common/handlers.ts';
 import { getOperation, hasOperation, matchOperation, toCall } from '#test/common/spec.ts';
 import type { Call, Handler, Handlers, OperationId } from '#test/common/types.ts';
@@ -50,6 +51,8 @@ export class Dispatcher {
 
   constructor(data: MockData) {
     this.on(createHandlers(data));
+    // Gallery: defaults for the fork endpoints the app calls on most pages; a spec can override them.
+    this.on(galleryHandlers(data));
   }
 
   on(handlers: Handlers) {

@@ -1,15 +1,15 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { ShallowDehydrateObject } from 'kysely';
 import type { AssetFace } from 'src/database.js';
+import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
 import type { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.repository.js';
-import type { LinkedSpacePerson, SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { isSpatialSceneEnabled, isSpatialSceneOffered } from 'src/gallery/utils/spatial-scene.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import type { LinkedSpacePerson, SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 

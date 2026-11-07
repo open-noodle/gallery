@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BROWSER_MAX_SCROLL_DEVICE_PX,
-  maxScrollHeightForDevicePixelRatio,
   SCROLL_CEILING_FIREFOX_PX,
   VirtualScrollManager,
+  maxScrollHeightForDevicePixelRatio,
 } from './VirtualScrollManager.svelte';
 
 class TestScroller extends VirtualScrollManager {

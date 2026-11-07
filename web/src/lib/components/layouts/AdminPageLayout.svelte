@@ -11,8 +11,8 @@
   import {
     mdiAccountMultipleOutline,
     mdiBookshelf,
-    mdiCog,
     mdiCloudSyncOutline,
+    mdiCog,
     mdiFaceRecognition,
     mdiServer,
     mdiTrayFull,

@@ -1,10 +1,10 @@
 <script lang="ts">
   import { shouldIgnoreEvent } from '#lib/actions/shortcut.ts';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { dragAndDropFilesStore } from '#lib/stores/drag-and-drop-files.store.ts';
   import { fileUploadHandler } from '#lib/utils/file-uploader.ts';
   import { isAlbumsRoute, isLockedFolderRoute } from '#lib/utils/navigation.ts';
-  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import { page } from '$app/state';

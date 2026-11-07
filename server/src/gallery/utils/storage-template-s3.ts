@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import type { StorageAsset } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder, SystemMetadataKey } from 'src/enum.js';
@@ -8,6 +7,7 @@ import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import type { StorageAsset } from 'src/types.js';
 
 /**
 The library folder a storage template renders into, in the namespace that holds the original: a disk file gets

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getSearchablePageFilterState, getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   interface Props {
     spaceId: string;

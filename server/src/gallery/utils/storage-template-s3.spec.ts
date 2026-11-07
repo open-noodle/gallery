@@ -1,5 +1,4 @@
 import { Mock } from 'vitest';
-import type { StorageAsset, SystemMetadata } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, SystemMetadataKey } from 'src/enum.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
@@ -8,6 +7,7 @@ import {
   isManualOnlyTemplateMove,
   isTemplateDestinationTaken,
 } from 'src/gallery/utils/storage-template-s3.js';
+import type { StorageAsset, SystemMetadata } from 'src/types.js';
 import { getMocks } from 'test/utils.js';
 
 describe('getTemplateLibraryRoot', () => {

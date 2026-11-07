@@ -1,4 +1,4 @@
-import { installTilt, MAX_TILT, pointerPercent, tiltFor } from '#lib/gallery/motion/tilt.ts';
+import { MAX_TILT, installTilt, pointerPercent, tiltFor } from '#lib/gallery/motion/tilt.ts';
 
 describe('tiltFor', () => {
   const rect = { left: 0, top: 0, width: 200, height: 100 };

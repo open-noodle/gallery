@@ -2,8 +2,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import type { FilterPanelConfig, FilterSection } from '../filter-panel';
-import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
+import { ALL_FILTER_SECTIONS, createFilterState, type FilterPanelConfig, type FilterSection } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 beforeAll(async () => {

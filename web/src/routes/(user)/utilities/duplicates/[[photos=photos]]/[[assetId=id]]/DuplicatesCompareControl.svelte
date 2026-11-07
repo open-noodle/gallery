@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import Portal from '#lib/elements/Portal.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
@@ -11,6 +10,7 @@
     countDifferingMetadataItems,
     type DifferingMetadataFields,
   } from '#lib/utils/duplicate-utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { getAssetInfo, type AssetResponseDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';

@@ -2,7 +2,7 @@
   import { initInput } from '#lib/actions/focus.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { getAllSpaces, SharedSpaceRole, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
+  import { SharedSpaceRole, UserAvatarColor, getAllSpaces, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon, Modal, ModalBody } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';
   import { onMount } from 'svelte';

@@ -1,19 +1,18 @@
 <script lang="ts">
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
   import RotateAction from '#lib/components/timeline/actions/RotateAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
-  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
-  import { AssetAction } from '#lib/constants.ts';
-
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
+  import { AssetAction } from '#lib/constants.ts';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { registerSelectionContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';

@@ -1,10 +1,10 @@
-import { galleryTimeBucketHandlers } from '#test/medium/gallery/time-buckets.ts';
-import type { MockData } from '#test/medium/mock/data.ts';
-import type { Handlers } from '#test/medium/mock/types.ts';
+import type { MockData } from '#test/common/data.ts';
+import { galleryTimeBucketHandlers } from '#test/common/gallery/time-buckets.ts';
+import type { Handlers } from '#test/common/types.ts';
 
-// Default answers for the Gallery endpoints the web app calls on most pages, so upstream's medium specs run
-// against Gallery's web unchanged. Registered after upstream's handlers in mock.ts; a spec can override any of
-// them with `api.on(...)`.
+// Default answers for the Gallery endpoints the web app calls on most pages, so upstream's unit and medium specs
+// run against Gallery's web unchanged. Registered after upstream's handlers in the shared dispatcher
+// (test/common/dispatcher.ts); a spec can override any of them with `api.on(...)`.
 export const galleryHandlers = (data: MockData): Handlers => ({
   ...galleryTimeBucketHandlers(data),
   getAllSpaces: () => ({ json: [] }),

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Kysely, type SelectQueryBuilder, type SqlBool, sql } from 'kysely';
+import { sql, type Kysely, type SelectQueryBuilder, type SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { isDeepStrictEqual } from 'node:util';
 import { DummyValue, GenerateSql } from 'src/decorators.js';

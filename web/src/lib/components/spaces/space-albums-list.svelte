@@ -1,23 +1,23 @@
 <script lang="ts">
-  import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
-  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
-  import { buildSpaceAlbumGroups, getSelectedSpaceAlbumGroupOption } from '#lib/utils/space-album-grouping.ts';
-  import { isAlbumGroupCollapsed, toggleAlbumGroupCollapsing } from '#lib/utils/album-utils.ts';
-  import { sortSpaceAlbums } from '#lib/utils/space-album-sort.ts';
-  import {
-    buildFolderSummaries,
-    EMPTY_FOLDER_SUMMARY,
-    flattenForSearch,
-    getFolderContents,
-  } from '#lib/utils/space-album-folders.ts';
-  import type { DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
-  import LazyAlbumGrid from '#lib/gallery/components/lazy-album-grid.svelte';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import SpaceAlbumCard from '#lib/components/spaces/space-album-card.svelte';
   import SpaceAlbumFolderCard from '#lib/components/spaces/space-album-folder-card.svelte';
   import SpaceAlbumsTable from '#lib/components/spaces/space-albums-table.svelte';
+  import LazyAlbumGrid from '#lib/gallery/components/lazy-album-grid.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+  import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
+  import { isAlbumGroupCollapsed, toggleAlbumGroupCollapsing } from '#lib/utils/album-utils.ts';
+  import type { DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
+  import {
+    EMPTY_FOLDER_SUMMARY,
+    buildFolderSummaries,
+    flattenForSearch,
+    getFolderContents,
+  } from '#lib/utils/space-album-folders.ts';
+  import { buildSpaceAlbumGroups, getSelectedSpaceAlbumGroupOption } from '#lib/utils/space-album-grouping.ts';
+  import { sortSpaceAlbums } from '#lib/utils/space-album-sort.ts';
+  import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
   import { t } from 'svelte-i18n';

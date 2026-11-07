@@ -1,33 +1,19 @@
 <script lang="ts">
-  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
-  import { beforeNavigate, goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import { cleanupShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
-  import RewindOneAtATime from '#lib/gallery/cleanup/RewindOneAtATime.svelte';
-  import RewindYearSection from '#lib/gallery/cleanup/RewindYearSection.svelte';
-  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { RewindSession, type RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
-  import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import { slideMotion } from '#lib/components/filter-panel/motion.ts';
+  import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import RewindDayDone from '#lib/gallery/cleanup/RewindDayDone.svelte';
   import RewindExplainer from '#lib/gallery/cleanup/RewindExplainer.svelte';
-  import { explainerSeen, tapHintDone } from '#lib/gallery/cleanup/explainer-seen.ts';
-  import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
-  import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
-  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
-  import { getAssetMediaUrl } from '#lib/utils.ts';
-  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '#lib/gallery/motion/index.ts';
-  import CleanupFinishButton from '#lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
-  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
-  import { Route } from '#lib/route.ts';
-  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import RewindOneAtATime from '#lib/gallery/cleanup/RewindOneAtATime.svelte';
+  import RewindYearSection from '#lib/gallery/cleanup/RewindYearSection.svelte';
   import {
     animateCleanupRemoval,
     confirmCleanupTrash,
     showRemovedToast,
   } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import { cleanupShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
   import {
     browserTimeZone,
     burstMemberIds,
@@ -37,6 +23,18 @@
     nextUnreviewedDay,
     shiftMonthDay,
   } from '#lib/gallery/cleanup/cleanup.ts';
+  import { explainerSeen, tapHintDone } from '#lib/gallery/cleanup/explainer-seen.ts';
+  import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
+  import CleanupFinishButton from '#lib/gallery/cleanup/pages/rewind/CleanupFinishButton.svelte';
+  import { rewindDirection } from '#lib/gallery/cleanup/rewind-direction.ts';
+  import { RewindSession, type RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
+  import { celebrate, countMotion, duration, ease, pulse, slideFrom } from '#lib/gallery/motion/index.ts';
+  import { prefersReducedMotion } from '#lib/gallery/motion/tokens.ts';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
+  import { Route } from '#lib/route.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import {
@@ -54,6 +52,8 @@
   import { locale, t } from 'svelte-i18n';
   import { Tween } from 'svelte/motion';
   import { fade, slide } from 'svelte/transition';
+  import { beforeNavigate, goto } from '$app/navigation';
+  import { page } from '$app/state';
 
   type Props = {
     monthDay: number;

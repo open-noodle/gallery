@@ -1,11 +1,11 @@
 <script lang="ts">
   import { cleanClass } from '#lib';
-  import { Route } from '#lib/route.ts';
   import {
     formatSampledJobTypeCount,
     getQueueJobTypeLabel,
     type QueueJobTypeCounts,
   } from '#lib/gallery/utils/queue-jobs.ts';
+  import { Route } from '#lib/route.ts';
   import { asQueueItem } from '#lib/services/queue.service.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { transformToTitleCase } from '#lib/utils.ts';
@@ -23,8 +23,8 @@
     mdiSelectionSearch,
   } from '@mdi/js';
   import { type Component } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
+  import { SvelteMap } from 'svelte/reactivity';
   import QueueCardBadge from './QueueCardBadge.svelte';
   import QueueCardButton from './QueueCardButton.svelte';
 

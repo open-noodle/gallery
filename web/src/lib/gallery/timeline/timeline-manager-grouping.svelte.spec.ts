@@ -8,12 +8,12 @@ import { tick } from 'svelte';
 import { mergeTimeBuckets } from './album-picker-support';
 import { toTimeBucketRequest, toTimeBucketsRequest } from './request-options';
 import {
-  aggregateDayBucketsByMonth,
-  getTimeBucketSizeForGrouping,
-  layoutTimelineBuckets,
   REPRESENTATIVE_TIMELINE_BUCKET_GAP,
   REPRESENTATIVE_TIMELINE_BUCKET_HEIGHT,
   TimelineBucket,
+  aggregateDayBucketsByMonth,
+  getTimeBucketSizeForGrouping,
+  layoutTimelineBuckets,
 } from './timeline-bucket.svelte';
 
 function buildTimelineAssetAt(id: string, isoDate: string) {

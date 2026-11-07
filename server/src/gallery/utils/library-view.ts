@@ -1,10 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import type { SelectQueryBuilder } from 'kysely';
-import type { ViewerSurface } from 'src/utils/viewer-scope.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { LibraryView } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { sharedWithViewer, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
+import type { ViewerSurface } from 'src/utils/viewer-scope.js';
 
 export type LibraryViewOptions = { libraryView?: LibraryView };
 

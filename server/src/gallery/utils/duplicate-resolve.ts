@@ -1,10 +1,10 @@
+import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { JobName, Permission } from 'src/enum.js';
 import type { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import type { AccessRepository } from 'src/repositories/access.repository.js';
 import type { JobRepository } from 'src/repositories/job.repository.js';
 import type { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
-import { JobName, Permission } from 'src/enum.js';
 import { checkAccess } from 'src/utils/access.js';
 
 // Fork hooks in DuplicateService.resolveGroup: one call before upstream's writes, one after them.

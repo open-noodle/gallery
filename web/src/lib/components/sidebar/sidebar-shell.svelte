@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { beforeNavigate } from '$app/navigation';
   import { clickOutside } from '#lib/actions/click-outside.ts';
   import { focusTrap } from '#lib/actions/focus-trap.ts';
   import { menuButtonId } from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
   import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   import { sidebarStore } from '#lib/stores/sidebar.svelte.ts';
   import type { Snippet } from 'svelte';
+  import { beforeNavigate } from '$app/navigation';
 
   interface Props {
     ariaLabel?: string;

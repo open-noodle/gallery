@@ -1,9 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
-import type { AssetFile } from 'src/database.js';
-import type { JobItem, JobOf } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
+import type { AssetFile } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetResponseDto, SanitizedAssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import {
@@ -21,12 +20,12 @@ import {
   UpdateAssetDto,
   mapStats,
 } from 'src/dtos/asset.dto.js';
-import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
+import { isMetadataHidden, type AuthDto } from 'src/dtos/auth.dto.js';
 import {
   AssetEditAction,
-  type AssetEditActionItem,
   AssetEditsCreateDto,
   AssetEditsResponseDto,
+  type AssetEditActionItem,
 } from 'src/dtos/editing.dto.js';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto.js';
 import {
@@ -44,6 +43,7 @@ import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-over
 import { afterAssetUpdate, beforeAssetUpdate, beforeAssetUpdateAll } from 'src/gallery/utils/asset-update-hooks.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobItem, JobOf } from 'src/types.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
 import {
   getAssetFiles,

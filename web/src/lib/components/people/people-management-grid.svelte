@@ -1,8 +1,8 @@
 <script lang="ts" generics="T extends { id: string }">
   import { shortcut } from '#lib/actions/shortcut.ts';
   import PeopleGrid from '#lib/components/people/people-grid.svelte';
-  import PersonTile from '#lib/components/people/person-tile.svelte';
   import type { ManagedPerson } from '#lib/components/people/people-types.ts';
+  import PersonTile from '#lib/components/people/person-tile.svelte';
   import { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';

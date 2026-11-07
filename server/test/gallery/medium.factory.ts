@@ -1,5 +1,4 @@
 import { Kysely } from 'kysely';
-import type { ClassConstructor } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -29,6 +28,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BASE_SERVICE_DEPENDENCIES } from 'src/services/base.service.js';
+import type { ClassConstructor } from 'src/types.js';
 import { automock } from 'test/utils.js';
 
 // The fork half of test/medium.factory.ts: specs list fork repositories in `mock`/`real` like upstream ones, and

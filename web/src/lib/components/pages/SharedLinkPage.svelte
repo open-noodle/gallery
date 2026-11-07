@@ -2,15 +2,15 @@
   import AlbumViewer from '#lib/components/album-page/AlbumViewer.svelte';
   import IndividualSharedViewer from '#lib/components/share-page/IndividualSharedViewer.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import ThemeButton from '#lib/components/shared-components/ThemeButton.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { setSharedLink } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
-  import { sharedLinkLogin, SharedLinkType, type AssetResponseDto, type SharedLinkResponseDto } from '@immich/sdk';
+  import { SharedLinkType, sharedLinkLogin, type AssetResponseDto, type SharedLinkResponseDto } from '@immich/sdk';
   import { Button, PasswordInput } from '@immich/ui';
-  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { onDestroy, tick } from 'svelte';
   import { t } from 'svelte-i18n';
 

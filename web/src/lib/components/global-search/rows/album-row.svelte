@@ -1,8 +1,8 @@
 <script lang="ts">
   import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { AssetMediaSize, type AlbumNameDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';
-  import { AssetMediaSize, type AlbumNameDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
   interface Props {

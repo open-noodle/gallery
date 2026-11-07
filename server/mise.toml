@@ -47,14 +47,14 @@ run = "node ./dist/bin/sync-open-api.js"
 env._.path = "./node_modules/.bin"
 run = """sh -c 'export DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/immich}"; \
 case "$1" in run|revert) exec node ./dist/bin/gallery-migrations.js "$1" ;; esac; \
-exec sql-tools -u "$DB_URL" migrations "$@"' migrations"""
+exec sql-tools -u "$DB_URL" --ignore-prefix futo_backups_ migrations "$@"' migrations"""
 description = "Run database migration commands (create, generate, run, revert, sync-order, verify-order, ...)"
 
 [tasks."migrations-gallery"]
 env._.path = "./node_modules/.bin"
 run = """sh -c 'export DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/immich}"; \
 case "$1" in run|revert) exec node ./dist/bin/gallery-migrations.js "$1" ;; esac; \
-exec sql-tools --source-folder src/schema/migrations-gallery -u "$DB_URL" migrations "$@"' migrations"""
+exec sql-tools --source-folder src/schema/migrations-gallery -u "$DB_URL" --ignore-prefix futo_backups_ migrations "$@"' migrations"""
 description = "Migration ORDER commands scoped to the fork-only migrations-gallery folder (run and revert cover both folders)"
 
 [tasks."schema-drop"]
