@@ -1,4 +1,4 @@
-import { Insertable, Kysely } from 'kysely';
+import { Kysely } from 'kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AlbumUserRole, TimeBucketSize } from 'src/enum.js';
@@ -11,7 +11,6 @@ import { PartnerRepository } from 'src/repositories/partner.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { DB } from 'src/schema/index.js';
-import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
@@ -22,9 +21,9 @@ import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
-const setup = (db?: Kysely<DB>) => {
+const setup = () => {
   return newMediumService(TimelineService, {
-    database: db || defaultDatabase,
+    database: defaultDatabase,
     real: [AssetRepository, AccessRepository, PartnerRepository, SharedSpaceRepository],
     mock: [LoggingRepository],
   });
@@ -41,14 +40,9 @@ const albumStackSetup = () =>
 
 const BUCKET = '2026-03-01';
 
-const createAsset = async (
-  ctx: Pick<Context, 'newAsset' | 'newExif'>,
-  ownerId: string,
-  day: number,
-  options: Partial<Insertable<AssetTable>> = {},
-) => {
+const createAsset = async (ctx: Pick<Context, 'newAsset' | 'newExif'>, ownerId: string, day: number) => {
   const date = new Date(`2026-03-${String(day).padStart(2, '0')}T12:00:00.000Z`);
-  const { asset } = await ctx.newAsset({ ownerId, fileCreatedAt: date, localDateTime: date, ...options });
+  const { asset } = await ctx.newAsset({ ownerId, fileCreatedAt: date, localDateTime: date });
   await ctx.newExif({ assetId: asset.id, make: 'Canon', timeZone: 'UTC' });
   return asset;
 };

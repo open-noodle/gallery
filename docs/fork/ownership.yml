@@ -694,6 +694,8 @@ features:
         - server/src/schema/migrations-gallery/1799600000000-AddAssetQualityScreenshotVersion.ts
         - server/src/schema/migrations-gallery/1799700000000-AddAssetSpatialSceneTable.ts
         - server/src/schema/migrations-gallery/1799800000000-ScopeJitOffToDatabase.ts
+        - server/src/schema/migrations-gallery/1799900000000-AddAssetDataSaverVideoTable.ts
+        - server/src/schema/migrations-gallery/1800000000000-AddAssetFaceVideoFrameTable.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
