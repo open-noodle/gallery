@@ -1,16 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import {
+  sql,
   type ExpressionBuilder,
   type Insertable,
   type Kysely,
   type OrderByDirection,
   type Updateable,
-  sql,
 } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { DateTime } from 'luxon';
 import { InjectKysely } from 'nestjs-kysely';
-import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
 import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
@@ -19,13 +18,14 @@ import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
+import type { IBulkAsset } from 'src/types.js';
 import { asUuid } from 'src/utils/database.js';
 import { asLocalTime } from 'src/utils/date.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
-  type TimelineHiddenScope,
   hiddenFromOwnTimeline,
   timelineHiddenScopeIsEmpty,
+  type TimelineHiddenScope,
 } from 'src/utils/shared-space-album-scope.js';
 
 const asMakeDate = (eb: ExpressionBuilder<DB, 'asset'>, { year, month, day }: YearMonthDay) =>

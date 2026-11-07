@@ -4,13 +4,13 @@
   import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import {
-    removeMember,
     SharedSpaceRole,
-    updateMember,
     UserAvatarColor,
+    removeMember,
+    updateMember,
     type SharedSpaceMemberResponseDto,
   } from '@immich/sdk';
-  import { BasicModal, Button, Field, modalManager, Select, Text, type SelectOption } from '@immich/ui';
+  import { BasicModal, Button, Field, Select, Text, modalManager, type SelectOption } from '@immich/ui';
   import { mdiAccountPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
 

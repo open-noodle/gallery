@@ -1,9 +1,9 @@
-import type { SpatialSceneConfig } from 'src/gallery/dtos/config.dto.js';
-import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder } from 'src/enum.js';
+import type { SpatialSceneConfig } from 'src/gallery/dtos/config.dto.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
+import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md).
 

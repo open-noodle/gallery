@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { Readable } from 'node:stream';
-import type { UserMetadataItem } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { SALT_ROUNDS } from 'src/constants.js';
 import { UserAdmin } from 'src/database.js';
@@ -11,6 +10,7 @@ import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AuthService } from 'src/services/auth.service.js';
+import type { UserMetadataItem } from 'src/types.js';
 import { ApiKeyFactory } from 'test/factories/api-key.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { OAuthProfileFactory } from 'test/factories/oauth-profile.factory.js';

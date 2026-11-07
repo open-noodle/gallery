@@ -1,6 +1,13 @@
 <script lang="ts">
+  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
+  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
+  import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     getFaceRepairClusterFaces,
@@ -13,27 +20,20 @@
   } from '@immich/sdk';
   import { Button, ConfirmModal, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiArrowRight, mdiCheckBold, mdiClose, mdiInformationOutline } from '@mdi/js';
-  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import { t, type Translations } from 'svelte-i18n';
-  import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
-  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
-  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
-  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
-  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
-  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
-  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { goto } from '$app/navigation';
   import { faceCleanupBreadcrumbs, guidedCrumb } from '../breadcrumbs';
   import type { PageData } from './$types';
-  import { selectableDestinations, sortDestinations, type SuspectedOwner } from './destination';
   import DestinationCards from './DestinationCards.svelte';
   import DestinationSelect from './DestinationSelect.svelte';
   import PersonPicker from './PersonPicker.svelte';
+  import { selectableDestinations, sortDestinations, type SuspectedOwner } from './destination';
   import {
-    createReviewModel,
     STATE_COLOR,
     STATE_ICON,
+    createReviewModel,
     type FaceEntry,
     type FaceState,
     type FlaggedFace,

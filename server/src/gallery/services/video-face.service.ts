@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { ImmichMediaResponse } from 'src/utils/file.js';
 import { OnEvent } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Permission } from 'src/enum.js';
 import { videoFaceFrameFolder } from 'src/gallery/utils/video-face-detector.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import type { ImmichMediaResponse } from 'src/utils/file.js';
 
 /**
 Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,

@@ -1,8 +1,8 @@
 <script lang="ts">
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
+  import { monthDayLabel } from '#lib/gallery/cleanup/cleanup.ts';
   import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
   import { getAssetMediaUrl } from '#lib/utils.ts';
-  import { monthDayLabel } from '#lib/gallery/cleanup/cleanup.ts';
   import { AssetMediaSize, type CleanupAssetDto } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
   import { mdiCheck, mdiClose, mdiHeart } from '@mdi/js';

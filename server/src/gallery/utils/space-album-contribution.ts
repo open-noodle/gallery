@@ -1,10 +1,10 @@
+import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { JobName } from 'src/enum.js';
 import type { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import type { EventRepository } from 'src/repositories/event.repository.js';
 import type { JobRepository } from 'src/repositories/job.repository.js';
 import type { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
-import { JobName } from 'src/enum.js';
 
 // Fork side of AlbumService's asset add/remove: the AlbumAssetsAdd/AlbumAssetsRemove events that drive space people
 // sync, and #764 cross-owner contributions (`album_space_asset` rows, never `album_asset`).

@@ -1,5 +1,4 @@
 import { Mocked } from 'vitest';
-import type { RepositoryInterface } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -30,6 +29,7 @@ import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
+import type { RepositoryInterface } from 'src/types.js';
 import { automock } from 'test/utils.js';
 
 // The fork half of test/utils.ts: mocks for every repository in GalleryRepositories, and the aggregate

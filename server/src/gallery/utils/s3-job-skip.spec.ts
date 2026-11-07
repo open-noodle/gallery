@@ -1,8 +1,8 @@
-import type { JobItem } from 'src/types.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { JobName, JobStatus, QueueName } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import type { JobItem } from 'src/types.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe('integrity jobs on S3 (open-noodle/gallery#685)', () => {

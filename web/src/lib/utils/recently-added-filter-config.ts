@@ -1,13 +1,16 @@
-import { ALL_FILTER_SECTIONS } from '#lib/components/filter-panel/filter-panel.ts';
-import type { FilterPanelConfig, FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import {
+  ALL_FILTER_SECTIONS,
+  type FilterPanelConfig,
+  type FilterState,
+} from '#lib/components/filter-panel/filter-panel.ts';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
 import { buildRecentlyAddedSuggestionRequest } from '#lib/utils/recently-added-filter-options.ts';
 import { buildSmartSearchFacetsParams, mapSmartSearchFacetsToFilterSuggestions } from '#lib/utils/space-search.ts';
 import {
+  SearchSuggestionType,
   getFilterSuggestions,
   getSearchSuggestions,
   searchSmartFacets,
-  SearchSuggestionType,
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
 

@@ -1,5 +1,4 @@
-import type { AdminConfigDto } from '@immich/sdk';
-import { ReleaseChannel } from '@immich/sdk';
+import { ReleaseChannel, type AdminConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';

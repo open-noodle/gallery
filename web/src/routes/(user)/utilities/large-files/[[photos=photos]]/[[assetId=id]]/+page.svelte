@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-  import OnEvents from '#lib/components/OnEvents.svelte';
-  import LargeAssetData from './LargeAssetData.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { handlePromiseError } from '#lib/utils.ts';
   import { getNextAsset, getPreviousAsset, navigateToAsset } from '#lib/utils/asset-utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import type { AssetResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
+  import LargeAssetData from './LargeAssetData.svelte';
 
   interface Props {
     data: PageData;

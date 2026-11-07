@@ -1,10 +1,10 @@
 <script lang="ts">
+  import type { RecentEntry } from '#lib/stores/cmdk-recent.ts';
   import { Icon } from '@immich/ui';
   import { t, type Translations } from 'svelte-i18n';
-  import type { RecentEntry } from '#lib/stores/cmdk-recent.ts';
   import AlbumRow from './album-row.svelte';
-  import PhotoRow from './photo-row.svelte';
   import PersonRow from './person-row.svelte';
+  import PhotoRow from './photo-row.svelte';
   import PlaceRow from './place-row.svelte';
   import QueryRow from './query-row.svelte';
   import SpaceRow from './space-row.svelte';

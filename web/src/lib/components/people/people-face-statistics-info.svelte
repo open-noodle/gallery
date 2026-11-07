@@ -5,8 +5,8 @@
     setCachedPeopleFaceStatistics,
   } from '#lib/components/people/people-face-statistics-info-cache.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
-  import { IconButton } from '@immich/ui';
   import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
+  import { IconButton } from '@immich/ui';
   import { mdiInformationOutline } from '@mdi/js';
   import { tick } from 'svelte';
   import { t } from 'svelte-i18n';

@@ -2,11 +2,11 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { JobsOptions, Queue, WorkerOptions } from 'bullmq';
-import { setTimeout } from 'node:timers/promises';
 import type { Redis } from 'ioredis';
-import type { JobCounts, JobItem, JobOf, JobTypeCounts } from 'src/types.js';
+import { setTimeout } from 'node:timers/promises';
 import { ImmichWorker, JobName, QueueName } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import type { JobCounts, JobItem, JobOf, JobTypeCounts } from 'src/types.js';
 
 export type QueueTelemetryStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting' | 'paused';
 export type QueueTelemetryStalenessStatus = 'waiting' | 'delayed' | 'failed';

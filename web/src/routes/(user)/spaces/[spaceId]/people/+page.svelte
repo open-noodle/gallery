@@ -1,20 +1,19 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
-  import { QueryParameter, timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
-  import Dropdown from '#lib/elements/Dropdown.svelte';
-  import SearchBar from '#lib/elements/SearchBar.svelte';
   import PeopleFaceStatisticsInfo from '#lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
   import PeopleMergeSelector from '#lib/components/people/people-merge-selector.svelte';
   import type { ManagedPerson } from '#lib/components/people/people-types.ts';
-  import ManageSpacePeopleVisibility from '#lib/components/spaces/manage-space-people-visibility.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import ManageSpacePeopleVisibility from '#lib/components/spaces/manage-space-people-visibility.svelte';
+  import { QueryParameter, timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
+  import Dropdown from '#lib/elements/Dropdown.svelte';
+  import SearchBar from '#lib/elements/SearchBar.svelte';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '#lib/gallery/people/space-person-name-merge.ts';
+  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import PersonEditBirthDateModal from '#lib/modals/PersonEditBirthDateModal.svelte';
-  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { handlePromiseError } from '#lib/utils.ts';
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '#lib/utils/cross-owner-merge.ts';
@@ -22,15 +21,14 @@
   import { handleError } from '#lib/utils/handle-error.ts';
   import { clearQueryParam } from '#lib/utils/navigation.ts';
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '#lib/utils/people-filter.ts';
-  import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
-  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '#lib/gallery/people/space-person-name-merge.ts';
   import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
+  import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
   import {
+    SharedSpaceRole,
     getSpacePeople,
     getSpacePeopleFaceStatistics,
     getSpacePeopleStatistics,
     mergeSpacePeople,
-    SharedSpaceRole,
     updateSpacePerson,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePeopleStatisticsResponseDto,
@@ -51,9 +49,11 @@
     mdiSortNumericDescending,
   } from '@mdi/js';
   import { onMount } from 'svelte';
-  import { fly } from 'svelte/transition';
-  import { quintOut } from 'svelte/easing';
   import { t } from 'svelte-i18n';
+  import { quintOut } from 'svelte/easing';
+  import { fly } from 'svelte/transition';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import type { PageData } from './$types';
 
   interface Props {

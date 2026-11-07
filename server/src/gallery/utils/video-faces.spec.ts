@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Detection,
   FaceTracker,
   acceptTrack,
   findAgain,
@@ -16,6 +15,7 @@ import {
   trackEmbedding,
   widenSmallFace,
   withSighting,
+  type Detection,
 } from 'src/gallery/utils/video-faces.js';
 
 // Two people far apart in embedding space, and a slightly different view of each.

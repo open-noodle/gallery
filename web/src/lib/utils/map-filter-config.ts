@@ -7,9 +7,9 @@ import {
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
 import {
   AssetTypeEnum,
+  SearchSuggestionType,
   getFilterSuggestions,
   getSearchSuggestions,
-  SearchSuggestionType,
   type FilterSuggestionsPersonDto,
 } from '@immich/sdk';
 

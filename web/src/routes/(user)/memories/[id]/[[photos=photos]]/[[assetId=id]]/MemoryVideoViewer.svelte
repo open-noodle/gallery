@@ -1,7 +1,7 @@
 <script lang="ts">
   import { assetViewerFadeDuration } from '#lib/constants.ts';
-  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
   import { videoViewerMuted, videoViewerVolume } from '#lib/gallery/stores/preferences.store.ts';
+  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
   import { autoPlayVideo } from '#lib/stores/preferences.store.ts';
   import { getAssetMediaUrl, getAssetPlaybackUrl } from '#lib/utils.ts';
   import { AssetMediaSize } from '@immich/sdk';

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { pop } from '#lib/gallery/motion/index.ts';
   import { monthDayLabel, shadeLevel, shadeScale } from '#lib/gallery/cleanup/cleanup.ts';
+  import { pop } from '#lib/gallery/motion/index.ts';
   import type { CleanupCalendarDayDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
   import { mdiArrowLeft, mdiChevronLeft, mdiChevronRight } from '@mdi/js';

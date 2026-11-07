@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
-  import { page } from '$app/state';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
   import SpaceHero from '#lib/components/spaces/space-hero.svelte';
   import SpaceTabs from '#lib/components/spaces/space-tabs.svelte';
+  import { invalidateSpaces } from '#lib/gallery/spaces/space.query.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
   import SpaceEditModal from '#lib/modals/SpaceEditModal.svelte';
@@ -13,17 +12,16 @@
   import { Route } from '#lib/route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
-  import { invalidateSpaces } from '#lib/gallery/spaces/space.query.ts';
   import {
+    SharedSpaceRole,
+    UserAvatarColor,
     bulkAddAssets,
     getTimelineHidePreview,
     removeMember,
     removeSpace,
-    SharedSpaceRole,
     updateMemberPreferences,
     updateMemberTimeline,
     updateSpace,
-    UserAvatarColor,
   } from '@immich/sdk';
   import { Button, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
@@ -41,6 +39,8 @@
   } from '@mdi/js';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/state';
   import type { LayoutData } from './$types';
 
   interface Props {

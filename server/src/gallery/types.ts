@@ -1,6 +1,6 @@
-import type { IBaseJob, IDeferrableJob, IDelayedJob, IEntityJob, INightlyJob } from 'src/types.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { JobName, SystemMetadataKey } from 'src/enum.js';
+import type { IBaseJob, IDeferrableJob, IDelayedJob, IEntityJob, INightlyJob } from 'src/types.js';
 
 // Fork job payloads, memory data and system-metadata keys, merged into upstream's src/types.ts with one re-export,
 // `GalleryJobItem |` on JobItem and `extends GallerySystemMetadata` on SystemMetadata (GallerySystemMetadata carries

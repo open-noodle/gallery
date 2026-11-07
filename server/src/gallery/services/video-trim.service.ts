@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
-import type { JobOf } from 'src/types.js';
 import { OnJob } from 'src/decorators.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
 import { getEditedEncodedVideoPath, getRelativeEditedEncodedVideoPath } from 'src/gallery/utils/storage-keys.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { MediaService } from 'src/services/media.service.js';
+import type { JobOf } from 'src/types.js';
 
 type ThumbnailAsset = NonNullable<Awaited<ReturnType<AssetJobRepository['getForGenerateThumbnailJob']>>>;
 

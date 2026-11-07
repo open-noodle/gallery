@@ -5,12 +5,12 @@ import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
 import {
+  PersonType,
+  ScopedPersonProfileType,
+  SharedSpaceRole,
   detachScopedPerson,
   getPersonFaces,
   getSpacePersonFaces,
-  ScopedPersonProfileType,
-  PersonType,
-  SharedSpaceRole,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,

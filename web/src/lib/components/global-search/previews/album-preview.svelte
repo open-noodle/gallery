@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, type AlbumNameDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
 
   interface Props {
     item: AlbumNameDto;

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import type { ArgOf } from 'src/repositories/event.repository.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { DetectedPet } from 'src/repositories/machine-learning.repository.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { BaseService } from 'src/services/base.service.js';

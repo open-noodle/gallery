@@ -7,7 +7,6 @@ import {
   PostgresIntrospector,
   PostgresQueryCompiler,
 } from 'kysely';
-import type { DB } from 'src/schema/index.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
@@ -20,6 +19,7 @@ import {
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
+import type { DB } from 'src/schema/index.js';
 
 /** a Kysely that records each query and answers it with `rows`, to check the SQL a repository method sends */
 const recordingKysely = (rows: unknown[]) => {

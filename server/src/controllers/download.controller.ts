@@ -1,8 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';

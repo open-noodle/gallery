@@ -1,5 +1,5 @@
-import type { MockData } from '#test/medium/mock/data.ts';
-import type { Handlers } from '#test/medium/mock/types.ts';
+import type { MockData } from '#test/common/data.ts';
+import type { Handlers } from '#test/common/types.ts';
 import { TimeBucketSize, type TimeBucketAssetResponseDto } from '@immich/sdk';
 
 // Gallery's timeline groups by year, month or day (`bucketSize`); upstream's mock always groups by month. Month

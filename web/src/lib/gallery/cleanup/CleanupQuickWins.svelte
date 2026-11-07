@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
   import CleanupQuickWinCard from '#lib/gallery/cleanup/CleanupQuickWinCard.svelte';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import { queueToSlug } from '#lib/gallery/cleanup/cleanup.ts';
   import { staggerDelay } from '#lib/gallery/motion/index.ts';
   import { Route } from '#lib/route.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
-  import { queueToSlug } from '#lib/gallery/cleanup/cleanup.ts';
   import {
     CleanupCountQueue,
     type CleanupAssetDto,

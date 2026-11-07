@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
-  import { flipMotion } from '#lib/gallery/motion/index.ts';
-  import { flip } from 'svelte/animate';
-  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
   import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
   import { TILE_MIN_WIDTH, type TileSize } from '#lib/gallery/cleanup/tile-size.ts';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
   import { CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { flip } from 'svelte/animate';
 
   type Props = {
     items: CleanupAssetDto[];

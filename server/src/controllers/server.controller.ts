@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Header, Headers, HttpCode, HttpStatus, Put } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiTags } from '@nestjs/swagger';
 import type { IncomingHttpHeaders } from 'node:http';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { LicenseKeyDto, LicenseResponseDto } from 'src/dtos/license.dto.js';
 import {
   ServerAboutResponseDto,

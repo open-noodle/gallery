@@ -1,4 +1,4 @@
-import { type MockInstance, vi } from 'vitest';
+import { vi, type MockInstance } from 'vitest';
 import {
   HLS_BACKPRESSURE_PAUSE_SEGMENTS,
   HLS_BACKPRESSURE_RESUME_SEGMENTS,

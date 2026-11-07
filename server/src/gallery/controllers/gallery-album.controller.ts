@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AlbumNameDto } from 'src/dtos/album-name.dto.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { StackResponseDto } from 'src/dtos/stack.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import { AlbumAddTargetsDto, AlbumAddTargetsResponseDto, AlbumStackParamDto } from 'src/gallery/dtos/album.dto.js';

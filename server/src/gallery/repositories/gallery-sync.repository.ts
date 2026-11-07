@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type Expression, type ExpressionBuilder, type Kysely, type SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { SyncAck } from 'src/types.js';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -11,6 +10,7 @@ import {
   type SyncQueryOptions,
 } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
+import type { SyncAck } from 'src/types.js';
 import { asUuid } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {

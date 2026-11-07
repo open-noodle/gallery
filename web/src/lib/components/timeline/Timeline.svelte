@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { afterNavigate, beforeNavigate } from '$app/navigation';
-  import { page } from '$app/state';
   import Thumbnail from '#lib/components/assets/thumbnail/Thumbnail.svelte';
   import Month from '#lib/components/timeline/Month.svelte';
   import Scrubber from '#lib/components/timeline/Scrubber.svelte';
@@ -13,13 +11,13 @@
   import HotModuleReload from '#lib/elements/HotModuleReload.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import Skeleton from '#lib/elements/Skeleton.svelte';
+  import { retryOnAnimationFrames, scrollTimelineToTemporalAnchor } from '#lib/gallery/timeline/timeline-anchor.ts';
   import type { AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { retryOnAnimationFrames, scrollTimelineToTemporalAnchor } from '#lib/gallery/timeline/timeline-anchor.ts';
-  import type { TimelineDay } from '#lib/managers/timeline-manager/timeline-day.svelte.ts';
   import { isIntersecting } from '#lib/managers/timeline-manager/internal/intersection-support.svelte.ts';
-  import type { TimelineMonth } from '#lib/managers/timeline-manager/timeline-month.svelte.ts';
+  import type { TimelineDay } from '#lib/managers/timeline-manager/timeline-day.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineMonth } from '#lib/managers/timeline-manager/timeline-month.svelte.ts';
   import type {
     TimelineAsset,
     TimelineGrouping,
@@ -32,12 +30,14 @@
   import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { lang } from '#lib/stores/preferences.store.ts';
   import { isAssetViewerRoute, navigate } from '#lib/utils/navigation.ts';
-  import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
   import { getTimes, type ScrubberListener } from '#lib/utils/timeline-util.ts';
+  import type { ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
   import { type AlbumResponseDto, type PersonResponseDto, type UserResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
   import { onDestroy, onMount, tick, type Snippet } from 'svelte';
   import type { UpdatePayload } from 'vite';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  import { page } from '$app/state';
 
   interface Props {
     isSelectionMode?: boolean;

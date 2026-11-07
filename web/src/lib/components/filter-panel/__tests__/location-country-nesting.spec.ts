@@ -1,8 +1,12 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import type { FilterPanelConfig, FilterState, FilterSuggestionsResponse } from '../filter-panel';
-import { createFilterState } from '../filter-panel';
+import {
+  createFilterState,
+  type FilterPanelConfig,
+  type FilterState,
+  type FilterSuggestionsResponse,
+} from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 /**

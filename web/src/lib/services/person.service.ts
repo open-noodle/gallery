@@ -6,8 +6,8 @@ import { getSpaceProfile } from '#lib/utils/global-person-route.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import {
-  getPerson,
   PersonUpdateStrategy,
+  getPerson,
   updatePerson,
   type AssetResponseDto,
   type PersonResponseDto,
@@ -44,6 +44,7 @@ export const getPersonActions = (
     icon: mdiHeartOutline,
     $if: () => !getSpaceProfile(person) && !person.isFavorite,
     onAction: () => handleFavoritePerson(person),
+    shortcuts: { key: 'f' },
   };
 
   const Unfavorite: ActionItem = {
@@ -51,6 +52,7 @@ export const getPersonActions = (
     icon: mdiHeartMinusOutline,
     $if: () => !getSpaceProfile(person) && !!person.isFavorite,
     onAction: () => handleUnfavoritePerson(person),
+    shortcuts: { key: 'f' },
   };
 
   const HidePerson: ActionItem = {
@@ -58,6 +60,7 @@ export const getPersonActions = (
     icon: mdiEyeOffOutline,
     $if: () => !person.isHidden && canWrite(),
     onAction: () => handleHidePerson(person),
+    shortcuts: { key: 'h' },
   };
 
   const ShowPerson: ActionItem = {
@@ -65,6 +68,7 @@ export const getPersonActions = (
     icon: mdiEyeOutline,
     $if: () => !!person.isHidden && canWrite(),
     onAction: () => handleShowPerson(person),
+    shortcuts: { key: 'h' },
   };
 
   return { SetDateOfBirth, Favorite, Unfavorite, HidePerson, ShowPerson };

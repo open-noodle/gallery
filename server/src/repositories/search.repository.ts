@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
+  expressionBuilder,
+  sql,
   type Expression,
   type ExpressionBuilder,
   type Kysely,
@@ -7,17 +9,15 @@ import {
   type Selectable,
   type ShallowDehydrateObject,
   type SqlBool,
-  expressionBuilder,
-  sql,
 } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import z from 'zod';
-import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchFilter, SearchOrder } from 'src/dtos/search.dto.js';
 import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
+import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { buildSearchSmartQueries } from 'src/gallery/utils/smart-search.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -34,7 +34,7 @@ import {
   withSearchOrder,
 } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
-import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
+import { paginationHelper, type PaginationOptions } from 'src/utils/pagination.js';
 import { ownedOrSharedWithViewer } from 'src/utils/shared-space-album-scope.js';
 
 export interface SearchAssetIdOptions {

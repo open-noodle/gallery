@@ -1,14 +1,6 @@
 import { WorkflowTrigger } from '@immich/plugin-sdk';
 import { ShallowDehydrateObject } from 'kysely';
 import { Mocked } from 'vitest';
-import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
-import type {
-  GalleryJobItem,
-  GallerySystemMetadata,
-  IAssetDetectFacesJob,
-  IFacialRecognitionJob,
-  RuleMemoryData,
-} from 'src/gallery/types.js';
 import { VECTOR_EXTENSIONS } from 'src/constants.js';
 import { AssetFile } from 'src/database.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
@@ -41,6 +33,14 @@ import {
   TranscodeTarget,
   UserMetadataKey,
 } from 'src/enum.js';
+import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
+import type {
+  GalleryJobItem,
+  GallerySystemMetadata,
+  IAssetDetectFacesJob,
+  IFacialRecognitionJob,
+  RuleMemoryData,
+} from 'src/gallery/types.js';
 
 export * from 'src/gallery/types.js';
 

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { AssetVisibility } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { spaceVisibilityGate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
+
 // Import the old names via the repositories that re-export them after consolidation.
 // These are module-level consts (not exported), so we verify via the shared reference test
 // by reading the same constant through the consolidated import.

@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { DB } from 'src/schema/index.js';

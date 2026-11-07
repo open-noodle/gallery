@@ -1,4 +1,4 @@
-import { factory as mockFactory } from '#test/medium/mock/factories.ts';
+import { factory as mockFactory } from '#test/common/factories.ts';
 import {
   AssetOrder,
   UserAvatarColor,

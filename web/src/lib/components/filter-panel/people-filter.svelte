@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
-  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { PersonOption } from './filter-panel';
 
   interface Props {

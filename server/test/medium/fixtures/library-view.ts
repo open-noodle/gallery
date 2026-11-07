@@ -1,6 +1,6 @@
 import { SharedSpaceRole } from 'src/enum.js';
-import { SPACE_DATE } from 'test/medium/fixtures/two-owner-space.js';
 import { MediumTestContext } from 'test/medium.factory.js';
+import { SPACE_DATE } from 'test/medium/fixtures/two-owner-space.js';
 
 /**
  * #1038: the viewer's own photos (outside any space, added to a space, in a linked album, in a linked library, in a

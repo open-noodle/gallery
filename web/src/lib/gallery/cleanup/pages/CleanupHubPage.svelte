@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
-  import CleanupCalendar from '#lib/gallery/cleanup/CleanupCalendar.svelte';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import CleanupCalendar from '#lib/gallery/cleanup/CleanupCalendar.svelte';
   import CleanupDayBanner from '#lib/gallery/cleanup/CleanupDayBanner.svelte';
   import CleanupQuickWins from '#lib/gallery/cleanup/CleanupQuickWins.svelte';
+  import { isTrashEnabled } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
+  import { browserTimeZone, busiestYear, dominantCity, todayMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
   import type { DayPeek } from '#lib/gallery/cleanup/day-peek.ts';
   import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
   import { countMotion, staggerDelay } from '#lib/gallery/motion/index.ts';
   import { Route } from '#lib/route.ts';
   import { handleEmptyTrash } from '#lib/services/trash.service.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
-  import { browserTimeZone, busiestYear, dominantCity, todayMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
-  import { isTrashEnabled } from '#lib/gallery/cleanup/cleanup-actions.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import {
     CleanupCountQueue,
@@ -29,11 +29,11 @@
   } from '@immich/sdk';
   import { Breadcrumbs, Card, Heading, Text } from '@immich/ui';
   import { mdiSlashForward } from '@mdi/js';
-  import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
   import { locale, t } from 'svelte-i18n';
   import { Tween } from 'svelte/motion';
   import { SvelteMap } from 'svelte/reactivity';
+  import { goto } from '$app/navigation';
 
   type Props = {
     /** The route's load data: only its page title is read here. */
