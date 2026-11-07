@@ -6,7 +6,8 @@ Mockup: `specs/mockups/2026-11-06-aspect-ratio-filter.html`, approved.
 
 Source labels used below: a file path with a line is read from the code at that commit. "M1" and "M2" are the measurement
 runs defined under Performance. Every M1 and M2 number in this spec is measured with integer codes, not with the final
-helper expression (see Performance). "Open" marks anything not verified.
+helper expression. "M3" is the run with the final helper on a restored copy, and it is the benchmark the maintainer asked
+for (see Performance). "Open" marks anything not verified.
 
 ## Summary
 
@@ -134,7 +135,7 @@ Thresholds are fixed before the first release, because changing them means rebui
 Known limitations, both inherited from the stored dimensions:
 
 - Assets without dimensions have no class. They disappear while a class is selected and are never counted as a class.
-  There is no fallback. The number of such assets on a real migrated library is open.
+  There is no fallback. M3 found 16 such assets in 634,052.
 - `getVideoTags` maps video rotations of -90, 0, 90 and 180 only (`metadata.service.ts`, from line 1223). A video whose
   stream reports 270 gets no orientation, so its width and height are not swapped and it lands in the wrong class. This
   is upstream behaviour and this feature does not change it.
@@ -253,13 +254,17 @@ below prove this.
   statement joins the `sortQueries` list of the `@GenerateSql` decorator, and `mise sql` regenerates the query file. The
   media type statement stays unchanged. **The probes never ship without the index**: without it they take 221 to 227 ms
   when a class is absent (measured with integer codes).
-- Smart facets: the class list comes from `buildSmartFacetFilteredAssetIds(trx, options, 'aspect')` inside the existing
-  transaction, either as one DISTINCT or as probes. The PR measures both and keeps the cheaper. It must not read the temp
-  table directly, because the other filters are applied outside it, and goal 4 needs them. The candidate query
-  (`smart-facet.repository.ts:918`) calls `searchAssetBuilderLegacy`, which ignores `aspectClasses`, so the selection never
-  bakes into the temp table and self-exclusion works with no change to its `without(...)` list.
-- Stop condition: if EXPLAIN on a real VectorChord database shows smart search leaving the vector index because of the
-  class predicate, implementation stops and reports.
+- Smart facets: the class list comes from probes over `buildSmartFacetFilteredAssetIds(trx, options, 'aspect')`, inside the
+  existing transaction, in the same form as the suggestions. M3 measured both forms: a DISTINCT takes about 2,200 ms, the
+  probes 1.1 to 3.5 ms. It must not read the temp table directly, because the other filters are applied outside it, and
+  goal 4 needs them. The candidate query (`smart-facet.repository.ts`, `buildSmartFacetCandidateQuery`) calls
+  `searchAssetBuilderLegacy`, which ignores `aspectClasses`, so the selection never bakes into the temp table and
+  self-exclusion works with no change to its `without(...)` list.
+- Smart search leaves `clip_index` for rare classes. This replaces the stop condition of the first draft, and the requester
+  accepted the measured result. With few matching rows the planner reads them through `asset_aspectClass_idx`, computes
+  every distance and sorts them, which it prices below scanning the vector index. That path returns the exact nearest
+  neighbours, where the vector index is an approximation. It costs more than the unfiltered search (see Smart search under
+  Performance). The switch point lies between 5,353 and 128,939 rows and is not known more closely.
 
 The filter never ships without the stored class, so all of this and the index are one server PR. That PR carries the A/B
 numbers the maintainer asked for.
@@ -366,8 +371,8 @@ Generated files (OpenAPI spec, SDK, `server/src/queries/*.sql`) are regenerated,
 All other server and web files in this spec are fork files. The upstream diff grows by the lines above and by nothing
 else.
 
-Open: `refs/upstream/v3.3.5` does not exist in this clone, so the baseline `git diff --stat` per file is not measured yet.
-The server PR reports it.
+Checked against the immich-app/immich tag v3.3.5: of the files the server PR touches by hand, only
+`server/src/dtos/search.dto.ts` and `server/src/schema/tables/asset.table.ts` exist upstream.
 
 Rebase risk: `asset.table.ts` is a recurring conflict point (`specs/upstream-reports/2026-10-22-upstream-sync-v3.3.5.md`
 line 39, MEDIUM), and one more decorator adds little to that. If upstream rebuilds `width` or `height`, the index must be
@@ -379,6 +384,11 @@ Nothing to move back: the class lives only in the index and derives from upstrea
 `revert-to-immich.sql` remove the index, its override row and the migration name. `revert-to-immich.spec.ts` guards the
 index drop (`:147`) and the step 8 name (`:130`), and the Revert-to-Immich validation workflow proves the round trip with
 stock Immich.
+
+Checked on the restored copy on 2026-11-07, in one transaction ending in ROLLBACK: the migration up, then the body of
+`revert-to-immich.sql` with only its own `BEGIN` and `COMMIT` removed. It took 15 seconds and its own closing checks passed.
+Afterwards the index, its override row, the migration names and the `gallery_migrations` ledger were gone, and the asset count
+was unchanged. The stock Immich boot is left to the validation workflow in the PR.
 
 ## Performance
 
@@ -407,24 +417,106 @@ Results (M2, all measured with integer codes):
 - Index: 4.2 MB (4,312 kB) at 634,000 assets, built in 386 ms.
 - Class counts: 1,894 tall panoramas, 1,319 panoramas, 2,141 squares.
 
-Still to measure, for the server PR, with the final helper expression:
+### M3: the benchmark with the final helper
 
-| Item | Status |
-| --- | --- |
-| Every M2 number above, again with the text values of the final helper | Required before the numbers count as the maintainer's benchmark condition |
-| Smart facets, DISTINCT over the temp set against probes | Open |
-| Map markers | Open |
-| Metadata search | Open |
-| Member with partners, hidden spaces or hidden albums (subtraction arm) | Open |
-| Smart search with the class predicate on a real VectorChord database | Open, stop condition above |
-| Write cost on upload and metadata extraction | Synthetic only, within noise |
-| Assets without dimensions on a real migrated library | Open |
-| Duration of `ANALYZE "asset"` at 634,000 assets | Open |
+Provenance: a copy of production restored in a separate PostgreSQL container from the nightly dump of 2026-11-07, image
+`ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0`, PostgreSQL 14.19, VectorChord 0.4.3, 4 CPUs and 6 GB, the
+PostgreSQL settings of production (shared_buffers 2 GB, work_mem 32 MB, jit off, random_page_cost 1.1), measured on
+2026-11-07. Scripts `aspect-bench-v3.sql` (branch `ca6547103`), `aspect-bench-v3b.sql` and `aspect-bench-v3c.sql` (branch
+`46206ecd5`), not committed.
 
-The harness (`aspect-sql-capture.spec.ts`, `aspect-bench-v2.sql`) is never committed. It is adapted to the final
-expression and extended to these paths, the requester runs it, and the output goes into the PR. The numbers must come
-from PostgreSQL 14, at least 600,000 assets, a space member who owns none of the assets, the exact server SQL, and every
-variant inside a transaction that ends in ROLLBACK.
+Data: 634,052 assets, 633,684 embeddings, one owner, 11 users, 5 spaces, 16 assets without dimensions. View: a space member
+who owns none of the assets, reaching them through 3 timeline spaces, and the same member with a partner and the
+subtraction arm. Exact server SQL with the final helper, the index as the migration creates it, then ANALYZE, everything in
+a transaction ending in ROLLBACK. The copy has no bloat and fresh statistics, so production can be somewhat slower.
+
+Index: 446 ms to build, 4,392 kB, ANALYZE of `asset` 894 ms. All fork migrations took 6 seconds, and `down()` removed the
+index and its override row.
+
+Median ms, three interleaved runs after a warm-up, plain member view; the partner variant shows the same picture:
+
+| Path | Unfiltered | Square and panoramas | Portrait | Landscape | Index used |
+| --- | --- | --- | --- | --- | --- |
+| Timeline, Photos | 837 to 911 | 4.8 to 6.4 | 174 | 576 | every class |
+| Timeline, Space | 627 to 816 | 4.1 to 5.2 | 108 | 364 | every class |
+| Map | 1,753 to 1,802 | 7.3 to 11.8 | 478 | 1,748 | all but landscape |
+| Metadata search | 2.6 to 5.6 | 9.4 to 12.2 | 5.0 | 3.1 | the rare classes |
+
+- Metadata search reads one page when unfiltered, so a rare class costs a few ms more there. The goal concerns the timeline.
+- Map, landscape with a partner: 1,777 ms (1,670 to 2,270) against 1,811 ms unfiltered (1,694 to 1,875), 7 alternating runs
+  each. Landscape costs nothing there.
+- With no class selected there is no measurable change on any path.
+- Availability probes: 4.9 to 5.6 ms without other filters, 8.1 to 11.7 ms with a video filter. Without the index the same
+  statement took up to 348 ms, so the probes depend on the index. The media type statement next to them takes about 1,000 ms.
+- Smart facets: probes 1.1 to 2.1 ms, 3.3 to 3.5 ms with a video filter, 5 alternating runs.
+
+Smart search, median and range in ms, 7 runs alternating with the unfiltered query, page fetch of 101 rows:
+
+| Selection | Rows in scope | `clip_index` | Unfiltered | With class | Rows returned |
+| --- | --- | --- | --- | --- | --- |
+| Landscape | 499,397 | yes | 4.5 | 4.9 (3.4 to 5.3) | 101 |
+| Portrait | 128,939 | yes | 4.3 | 5.4 (4.8 to 6.8) | 95 |
+| Square and portrait | 131,079 | yes | 4.4 | 6.6 (6.5 to 8.4) | 95 |
+| Panorama | 1,319 | no | 3.5 | 16.7 (14.2 to 17.7) | 101 |
+| Tall panorama | 1,894 | no | 3.4 | 19.4 (18.0 to 24.9) | 101 |
+| Square | 2,140 | no | 3.5 | 23.6 (23.0 to 31.0) | 101 |
+| Square and both panoramas | 5,353 | no | 3.9 | 60.1 (55.3 to 96.6) | 101 |
+
+These are database times with one reference vector, a warm cache and no distance limit. The text encoding comes on top and
+was not measured. EXPLAIN (ANALYZE, BUFFERS) of the slowest case: an index scan on `asset_aspectClass_idx`, a nested loop to
+`smart_search` and a top-N sort, 65 ms, 49,023 shared buffer hits.
+
+Derived, not measured: the exact path costs about 11 microseconds per row with a warm cache (60.1 ms for 5,353 rows), which
+lets a reader estimate larger libraries. A cold cache will cost more.
+
+### Known limitation: smart search can return less than a page
+
+This is pre-existing and independent of this feature, and this PR does not change it. It was measured in the fork, on the
+copy described above. Stock Immich was not checked. Smart search runs with
+`vchordrq.probes = 1` (`server/src/repositories/search.repository.ts:469`, value in `database.repository.ts:55-56`), and
+filters apply after the vector index, so a filter can leave fewer rows than a page although more matches exist (inferred).
+`paginationHelper` then reports no next page (`server/src/utils/pagination.ts:12`), so the user cannot page further.
+
+Rows returned for three reference vectors, page fetch of 101, without any aspect class:
+
+| Filter | Rows in the library | Rows returned |
+| --- | --- | --- |
+| None | all | 101, 101, 101 |
+| Type video | 7,653 | 0, 4, 0 |
+| City | 35,888 | 101, 78, 0 |
+| Camera make | 34,665 | 0, 101, 0 |
+
+An aspect class behaves the same when the planner keeps the vector index: portrait returned 101, 101, 31 and, in the run
+above, 95. The reference vectors come from images, not from text queries.
+
+### Write cost
+
+Same copy and environment as M3, plus an empty database in the same container. Script `aspect-bench-v3d.sql`, not committed,
+2026-11-07. Every round ends in ROLLBACK. 7 rounds per side after one warm-up, the order of the sides rotating every round.
+The side "again without" repeats "without" as a noise baseline. Copied rows get a new `id` and `checksum`, which covers all
+three unique indexes on `asset`. Median ms for 5,000 rows, in batches of 1,000:
+
+| Case | Without | With index | Again without |
+| --- | --- | --- | --- |
+| A, insert with dimensions, copy | 914.8 | 713.0 | 817.7 |
+| B, insert without dimensions, copy | 1,072.0 | 962.8 | 1,019.8 |
+| C, update `width` and `height`, copy | 972.2 | 980.6 | 933.2 |
+| D, update `thumbhash`, copy | 1,012.7 | 933.1 | 914.8 |
+| A, insert with dimensions, empty table | 252.2 | 248.4 | 257.9 |
+| B, insert without dimensions, empty table | 265.0 | 259.1 | 242.9 |
+
+The cost of the index does not show: the two sides without it differ from each other by up to 10.6 percent, more than any
+measured cost. So this rules out a large write cost but cannot resolve a small one, roughly below 20 microseconds per row
+(derived from that noise). The ranges are wide, up to 3,847 ms for a single round on the copy.
+
+No update in C or D was a HOT update, with or without the index: the trigger `asset_updatedAt` rewrites `updateId`, which has
+its own index, so updates of `asset` are never HOT today. The new index therefore costs no HOT updates.
+
+S8.10b in `face-person-verdict.repository.spec.ts` timed out at 5,000 ms in two full CI runs and took 1,681 and 1,979 ms when
+run alone, on a side without and a side with the index. The empty table cases above show no measurable index cost, so it is
+treated as a test that is sensitive to load in CI, not as a cost of the index.
+
+The harness is never committed.
 
 ## Security and privacy
 
