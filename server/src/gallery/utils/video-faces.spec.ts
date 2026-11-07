@@ -4,6 +4,7 @@ import {
   FaceTracker,
   acceptTrack,
   findAgain,
+  findSightingAt,
   isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
@@ -13,6 +14,7 @@ import {
   planTiles,
   sampleIntervalFor,
   sightingQuality,
+  sightingsForPlayer,
   trackEmbedding,
   widenSmallFace,
   withSighting,
@@ -419,5 +421,50 @@ describe('widenSmallFace', () => {
   it('stays inside the frame', () => {
     expect(widenSmallFace({ x1: 0, y1: 0, x2: 20, y2: 20 }, frame)).toMatchObject({ x1: 0, y1: 0 });
     expect(widenSmallFace({ x1: 1900, y1: 1060, x2: 1920, y2: 1080 }, frame)).toMatchObject({ x2: 1920, y2: 1080 });
+  });
+});
+
+describe('sightings on the player timeline', () => {
+  const box = { x1: 10, y1: 10, x2: 50, y2: 50 };
+  const stored = {
+    sightings: [
+      { t: 12.5, score: 0.9, ...box },
+      { t: 2.25, score: 0.8, ...box },
+      { t: 30, score: 0.7, ...box },
+    ],
+    timeSeconds: 12.5,
+    trimStart: null,
+    trimEnd: null,
+  };
+
+  it('lists every sighting in time order, with the best view marked', () => {
+    expect(sightingsForPlayer(stored)).toEqual([
+      { time: 2.25, score: 0.8, isBest: false },
+      { time: 12.5, score: 0.9, isBest: true },
+      { time: 30, score: 0.7, isBest: false },
+    ]);
+  });
+
+  it('shifts times by the trim start and leaves out sightings outside the trim', () => {
+    expect(sightingsForPlayer({ ...stored, trimStart: 2.5, trimEnd: 20 })).toEqual([
+      { time: 10, score: 0.9, isBest: true },
+    ]);
+  });
+
+  it('rounds times to the millisecond', () => {
+    const [sighting] = sightingsForPlayer({ ...stored, sightings: [{ t: 1.23456, score: 1, ...box }], trimStart: 0.1 });
+    expect(sighting.time).toBe(1.135);
+  });
+
+  it('finds a sighting by the time it was listed at', () => {
+    expect(findSightingAt(stored, 30)).toMatchObject({ t: 30 });
+    expect(findSightingAt({ ...stored, trimStart: 2.5, trimEnd: 20 }, 10)).toMatchObject({ t: 12.5 });
+  });
+
+  it('finds nothing at a time no sighting is listed at', () => {
+    expect(findSightingAt(stored, 13)).toBeUndefined();
+    // Under a trim from 5 s, the sighting at 2.25 s is not listed, so its old time finds nothing.
+    expect(findSightingAt({ ...stored, trimStart: 5 }, 2.25)).toBeUndefined();
+    expect(findSightingAt({ ...stored, trimStart: 5 }, 0)).toBeUndefined();
   });
 });

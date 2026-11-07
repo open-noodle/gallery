@@ -239,6 +239,56 @@ describe(VideoFaceRepository.name, () => {
     });
   });
 
+  describe('getSightings', () => {
+    it("returns a face's sightings with the video's current trim and original", async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const sightings = [
+        { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 },
+        { t: 7.5, x1: 300, y1: 200, x2: 360, y2: 270, score: 0.6 },
+      ];
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings })],
+      });
+
+      await expect(sut.getSightings(faceId)).resolves.toEqual({
+        sightings,
+        timeSeconds: 3.25,
+        originalPath: asset.originalPath,
+        trimStart: null,
+        trimEnd: null,
+      });
+
+      await defaultDatabase
+        .insertInto('asset_video_trim')
+        .values({ assetId: asset.id, startTime: 2, endTime: 9, duration: 7 })
+        .execute();
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ trimStart: 2, trimEnd: 9 });
+    });
+
+    it('returns nothing for a face without a frame, an unknown face, or one on a trashed video', async () => {
+      const { ctx, user, asset, sut } = await setup();
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const { asset: trashed } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video, deletedAt: new Date() });
+      const trashedFaceId = newUuid();
+      await sut.apply({
+        insert: [{ id: trashedFaceId, assetId: trashed.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(trashedFaceId)],
+      });
+
+      await expect(sut.getSightings(assetFace.id)).resolves.toBeUndefined();
+      await expect(sut.getSightings(newUuid())).resolves.toBeUndefined();
+      await expect(sut.getSightings(trashedFaceId)).resolves.toBeUndefined();
+    });
+  });
+
   describe('storage migration', () => {
     it('streams, counts and re-points best frames with the person thumbnails', async () => {
       const { asset, sut } = await setup();

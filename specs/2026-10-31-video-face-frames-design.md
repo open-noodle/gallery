@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-31
 **Status:** Phase 1 implemented (server sampling, tracking, best-frame crops, web crop source, admin settings); unit
-tested, not yet run on a real library or against a database. Phase 2 (sightings UI) not started.
+tested, not yet run on a real library or against a database. Merged as #1261. Phase 2 (sightings UI) designed below,
+in progress.
 
 ## Summary
 
@@ -427,9 +428,107 @@ Storage: one JPEG of about 200 to 400 KB per video face.
 
 ## Phase 2: sightings in the assign UI
 
-Assigning a video face shows a strip of that person's sightings (thumbnails cut on demand at `t`, a handful spread
-across the video, best first), each opening the video at that moment. It reads `asset_face_video_frame.sightings` and
-needs no change to the stored data.
+**Status:** designed 2026-11-06, in progress on `feat/video-face-sightings`.
+
+Picking a person for a video face means recognising someone from one crop. Phase 1 made that crop the person's best
+view, but the best view can still be a profile, or a face too small to tell apart from a sibling. The tracker has
+already found that person at every moment they were on screen. Phase 2 shows those moments.
+
+### What the user sees
+
+In the asset viewer, on a video, the "Select face" picker (owner's `AssignFaceSidePanel` and the space editor's
+`SpacePersonSidePanel`, both through the fork's `PersonPickerPanel`) shows a strip above the search field:
+
+- A heading, "Seen at N moments" (`video_face_sightings_count`).
+- **Every** sighting as a square crop, in time order, in one horizontally scrolling row. Each tile carries its time
+  (`0:42`, or `1:02:05` past an hour) and the best view is marked with a star, the same sighting the face crop shows.
+  Tiles load lazily (`loading="lazy"`), so a video with dozens of sightings only cuts the ones scrolled into view.
+- Clicking a tile seeks the player to that moment and pauses it, so the frame stays on screen beside the picker.
+  The tile stays highlighted until another one is clicked. Tiles are buttons labelled "Show at 0:42"
+  (`video_face_sightings_show_at`).
+- The strip is absent, with no placeholder, for a photo, for a video face that has no stored sightings (a face
+  detected on the poster by an older build, or with video sampling off), when the request fails, and against a server
+  without the route.
+
+The order was "a handful, best first" in the Phase 1 summary. Showing all of them changes that: in time order the
+strip reads as a timeline the user scrubs through, and the star finds the best one.
+
+### Server
+
+Two routes on `GalleryFaceController`, under `Permission.FaceRead`, with the same access check as
+`GET /faces/{id}/thumbnail`: the face must be on a live asset the caller can read (`requireAccess` with
+`Permission.AssetRead`, which already covers space members through `checkAccess`'s grants, so the access oracle is
+the enumerating test).
+
+**`GET /faces/{id}/sightings`** returns `{ sightings: [{ time, score, isBest }] }`:
+
+- `time` is seconds in the **player's** timeline, rounded to the millisecond. Sightings are stored in the original's
+  timeline; a trimmed video plays its trimmed encode, whose zero is the trim start, so `time = t − trimStart`. The
+  trim is read from `asset_video_trim` when the request is made, not when the video was sampled, so a trim changed
+  later still maps correctly. Sightings outside the current trim window are left out.
+- `isBest` marks the sighting at the frame row's `timeSeconds`.
+- A face with no `asset_face_video_frame` row (a photo face, a poster face, a manual face) returns an empty list,
+  not a 404: "no sightings" is an ordinary answer, and the client hides the strip either way.
+
+**`GET /faces/{id}/sightings/thumbnail?time=<seconds>`** returns the crop of one sighting as a JPEG:
+
+- The sighting is looked up by `time` (player timeline, matched within a millisecond after adding the trim start),
+  not by position in the list. A re-scan can renumber sightings but never moves one to another moment, so the time
+  is a stable key: the browser may cache the URL, and a URL for a moment that no longer exists returns 404 instead of
+  another moment's face. The route never seeks to an arbitrary time the client picks.
+- The frame is extracted from the original at the stored `t` with the same `VideoFrameReader.extractFrame` the
+  sampler used (1440 px short edge, rotated upright, tone-mapped), so the sighting's box, stored in frame pixels,
+  lands where it was found. The box is scaled to the extracted frame's size anyway, in case the original changed.
+- The original is read through `backendMedia.getProbeInput`: a disk path as is, or a presigned URL that ffmpeg reads
+  with range requests. Nothing is staged, which matters here, because a request handler must not download a whole
+  S3 video for one frame.
+- The crop goes through `generateFaceThumbnailResponse`, widened when small as the best-frame crop is
+  (`widenSmallFace`), 250 px, cacheable (`PrivateWithCache`).
+
+### Seeking the player
+
+The side panel and the player have no reference to each other. A small fork manager,
+`web/src/lib/gallery/asset-viewer/video-seek.svelte.ts`, holds the current `<video>` element: `VideoNativeViewer`
+registers it with one `$effect` call (registration returns the cleanup that clears it), and the strip calls
+`videoSeek.seekTo(time)`. A seek with no registered player does nothing. The time is already in the player's
+timeline, which holds for every source `VideoNativeViewer` plays: HLS is used only for unedited videos (whose
+timeline is the original's), and the playback and original URLs of a trimmed video both serve the trimmed encode
+(`edited=true` is the default).
+
+### Version pairings
+
+- **New web, old server:** `GET /faces/{id}/sightings` 404s and the strip is not shown.
+- **Old web, new server:** nothing changes; the routes are only called by the new strip.
+- **Mobile and stock Immich clients:** no assign UI calls these routes; nothing changes.
+- **Database:** no schema change. Phase 1's rows already carry the sightings.
+
+### Layering
+
+Server work is all fork code (`GalleryFaceController`, `VideoFaceService`, `VideoFaceRepository`, a fork DTO).
+Upstream files: `AssignFaceSidePanel.svelte` passes the face to the picker (one prop line), and
+`VideoNativeViewer.svelte` registers its player (an import and one call). `PersonPickerPanel.svelte` and
+`SpacePersonSidePanel.svelte` are fork files. The open-api spec and SDK are generated.
+
+### Cost
+
+One thumbnail is a probe and a single-frame seek of the original, then a crop: about the cost of a person thumbnail
+for a video, plus the seek (fast on a disk file, a few range requests on S3). Lazy loading bounds a visit to the
+tiles in view, about four in the panel's width plus the browser's look-ahead, and a revisit is served from the
+browser cache.
+
+### Testing
+
+- Unit (`video-face.service.spec.ts`): sightings mapped through a trim and filtered to its window, `isBest`, time
+  order, an empty list for a face without a frame row, not found and no access; the thumbnail looked up by time
+  (with and without a trim), a time with no sighting is 404, the frame extracted from the probe input at the stored
+  `t`, the crop cut at the sighting's box.
+- Unit (`gallery-face.controller.spec.ts`): both routes require `FaceRead` and a UUID; `time` must be a non-negative
+  number.
+- Medium (`video-face.repository.spec.ts`): `getSightings` with and without a trim, for a face without a frame row,
+  and on a trashed video.
+- Web (`VideoFaceSightings.spec.ts`): hidden when empty, on error and for a photo; tiles in time order with the best
+  starred and lazy images keyed by time; a click seeks and pauses through the manager. `video-seek.spec.ts`: seek with
+  and without a registered player, cleanup on unregister.
 
 ## Open questions
 
@@ -440,5 +539,16 @@ needs no change to the stored data.
   were 0.76 apart, as far as two different people usually are. Merging on position alone would also merge one person
   stepping out and another stepping into the same spot, which hides a person under another's name. The split costs
   the user one extra assignment, so it stays until real libraries show it is common.
+- The opposite, two people merged into one track, is possible: lookalikes or small faces within `maxDistance`, one
+  person stepping into the spot another left between two samples (the position relaxation to 0.6), or the final pass
+  joining two tracks that never share a frame. The name then goes on the face cut from the best view, and the other
+  person has no face in that video, so a search for them misses it. If a merged sighting is among the best three, it
+  also pulls the averaged embedding toward the wrong person. A rescan builds the same track again. The Phase 2 strip
+  shows such a mix but cannot correct it. A fix would be a "Not this person" action on a sighting that splits it, and
+  the sightings nearer to it than to the best view, into a new face. The new face's embedding would come from the frame
+  cut at that moment, since sightings store no embeddings, and the split would be stored as a constraint the tracker
+  honours on rescan so the next "Refresh faces" does not merge them again. The threshold is the one recognition already
+  uses to tie two photos to one person, so merges are expected to be rarer than head-turn splits. This waits until
+  real videos show mixed strips.
 - A dedicated queue would keep a long video from holding a face-detection slot for minutes. That costs upstream queue
   registrations, so it waits until it is needed.

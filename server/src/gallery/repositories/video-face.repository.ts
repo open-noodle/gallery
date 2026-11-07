@@ -128,6 +128,29 @@ export class VideoFaceRepository {
     return row?.path;
   }
 
+  /**
+   * Everything one face's sightings need: the stored sightings and best time, the video's current trim, and its
+   * original. Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSightings(faceId: string) {
+    return this.db
+      .selectFrom('asset_face_video_frame')
+      .innerJoin('asset_face', 'asset_face.id', 'asset_face_video_frame.faceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('asset_video_trim', 'asset_video_trim.assetId', 'asset.id')
+      .select([
+        'asset_face_video_frame.sightings',
+        'asset_face_video_frame.timeSeconds',
+        'asset.originalPath',
+        'asset_video_trim.startTime as trimStart',
+        'asset_video_trim.endTime as trimEnd',
+      ])
+      .where('asset_face_video_frame.faceId', '=', asUuid(faceId))
+      .where('asset.deletedAt', 'is', null)
+      .executeTakeFirst();
+  }
+
   /** The best frame of a person's representative face, for the person thumbnail. */
   @GenerateSql({ params: [{ ownerId: DummyValue.UUID, personGroupId: DummyValue.UUID }] })
   async getRepresentativeFramePath({ ownerId, personGroupId }: { ownerId: string; personGroupId: string }) {

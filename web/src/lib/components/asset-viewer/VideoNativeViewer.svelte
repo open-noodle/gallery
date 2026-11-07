@@ -2,7 +2,7 @@
   import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import VideoRemoteViewer from '$lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import { assetViewerFadeDuration } from '$lib/constants';
-  import { persistVideoVolume } from '$lib/gallery/asset-viewer/video-volume';
+  import { galleryViewerVideo } from '$lib/gallery/asset-viewer/viewer-video';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { castManager } from '$lib/managers/cast-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
@@ -408,7 +408,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            {@attach persistVideoVolume}
+            {@attach galleryViewerVideo}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></hls-video>
         {:else}
@@ -436,7 +436,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            {@attach persistVideoVolume}
+            {@attach galleryViewerVideo}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></video>
         {/if}

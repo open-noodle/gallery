@@ -1542,6 +1542,8 @@
   "use_inherited_thumbnail": "Использовать унаследованную миниатюру",
   "user_groups": "Группы пользователей",
   "version_announcement_closing": "Твой друг Pierre",
+  "video_face_sightings_count": "{count, plural, one {Виден в # моменте} few {Виден в # моментах} many {Виден в # моментах} other {Виден в # моментах}}",
+  "video_face_sightings_show_at": "Показать на {time}",
   "videos_only": "Только видео",
   "view_face_statistics_details": "Подробная статистика по лицам",
   "view_in_map": "Показать на карте",

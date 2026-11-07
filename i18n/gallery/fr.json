@@ -1543,6 +1543,8 @@
   "use_inherited_thumbnail": "Utiliser la vignette héritée",
   "user_groups": "Groupes d'utilisateurs",
   "version_announcement_closing": "Ton ami, Pierre",
+  "video_face_sightings_count": "{count, plural, one {Vu à # moment} other {Vu à # moments}}",
+  "video_face_sightings_show_at": "Afficher à {time}",
   "videos_only": "Vidéos uniquement",
   "view_face_statistics_details": "Voir les détails des statistiques des Visages",
   "view_in_map": "Voir sur la carte",

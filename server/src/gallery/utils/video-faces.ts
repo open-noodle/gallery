@@ -1,4 +1,5 @@
 import type { BoundingBox } from 'src/repositories/machine-learning.repository.js';
+import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 
 // Pure parts of video face sampling (specs/2026-10-31-video-face-frames-design.md): which frames to look at, which
 // detections are the same person, which view of them is best, and which existing face a new one replaces.
@@ -516,4 +517,48 @@ export const widenSmallFace = (box: BoundingBox, frame: { width: number; height:
     x2: Math.min(frame.width, Math.round(centreX + halfWidth)),
     y2: Math.min(frame.height, Math.round(centreY + halfHeight)),
   };
+};
+
+type StoredSightings = {
+  sightings: VideoFaceSighting[];
+  timeSeconds: number;
+  trimStart: number | null;
+  trimEnd: number | null;
+};
+
+/** Sightings this close (in seconds) are the same moment: the player's times are rounded to the millisecond. */
+const SIGHTING_TIME_TOLERANCE = 0.001;
+
+const toPlayerTime = (t: number, trimStart: number) => Math.round((t - trimStart) * 1000) / 1000;
+
+/**
+ * A face's sightings on the player's timeline, in time order (Phase 2). A trimmed video plays its trimmed encode, whose
+ * zero is the trim start, so each time is shifted by it, and sightings outside the trim are left out. The trim is the
+ * current one, not the one the video was sampled under.
+ */
+export const sightingsForPlayer = ({ sightings, timeSeconds, trimStart, trimEnd }: StoredSightings) => {
+  const start = trimStart ?? 0;
+  const end = trimEnd ?? Infinity;
+  return sightings
+    .filter(({ t }) => t >= start - SIGHTING_TIME_TOLERANCE && t <= end + SIGHTING_TIME_TOLERANCE)
+    .sort((a, b) => a.t - b.t)
+    .map(({ t, score }) => ({
+      time: Math.max(0, toPlayerTime(t, start)),
+      score,
+      isBest: Math.abs(t - timeSeconds) < SIGHTING_TIME_TOLERANCE,
+    }));
+};
+
+/**
+ * The stored sighting at `time` on the player's timeline, as sightingsForPlayer reported it, or undefined when no
+ * sighting is at that moment (a re-scan or a new trim moved them). Looked up by time rather than by position, so a
+ * cached URL can never show another moment's face.
+ */
+export const findSightingAt = (stored: StoredSightings, time: number): VideoFaceSighting | undefined => {
+  const start = stored.trimStart ?? 0;
+  const playable = new Set(sightingsForPlayer(stored).map((sighting) => sighting.time));
+  return stored.sightings.find((sighting) => {
+    const playerTime = Math.max(0, toPlayerTime(sighting.t, start));
+    return playable.has(playerTime) && Math.abs(playerTime - time) < SIGHTING_TIME_TOLERANCE;
+  });
 };

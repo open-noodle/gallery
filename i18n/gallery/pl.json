@@ -1545,6 +1545,8 @@
   "use_inherited_thumbnail": "Użyj odziedziczonej miniatury",
   "user_groups": "Grupy użytkowników",
   "version_announcement_closing": "Twój przyjaciel Pierre",
+  "video_face_sightings_count": "{count, plural, one {Widoczny w # momencie} few {Widoczny w # momentach} many {Widoczny w # momentach} other {Widoczny w # momentach}}",
+  "video_face_sightings_show_at": "Pokaż w {time}",
   "videos_only": "Tylko filmy",
   "view_face_statistics_details": "Zobacz szczegóły statystyk twarzy",
   "view_in_map": "Pokaż na mapie",

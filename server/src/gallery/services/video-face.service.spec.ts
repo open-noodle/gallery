@@ -113,4 +113,139 @@ describe(VideoFaceService.name, () => {
       await expect(sut.getFaceThumbnail(auth, 'face-1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('getSightings', () => {
+    const auth = AuthFactory.create();
+    const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1' });
+    const box = { x1: 10, y1: 10, x2: 50, y2: 50 };
+
+    beforeEach(() => {
+      mocks.galleryPerson.getFaceByIdOnLiveAsset.mockResolvedValue(face as any);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+    });
+
+    it("returns the face's sightings on the player timeline", async () => {
+      mocks.videoFace.getSightings.mockResolvedValue({
+        sightings: [
+          { t: 8, score: 0.9, ...box },
+          { t: 3, score: 0.6, ...box },
+        ],
+        timeSeconds: 8,
+        originalPath: '/data/library/video.mp4',
+        trimStart: 2,
+        trimEnd: null,
+      });
+
+      await expect(sut.getSightings(auth, 'face-1')).resolves.toEqual({
+        sightings: [
+          { time: 1, score: 0.6, isBest: false },
+          { time: 6, score: 0.9, isBest: true },
+        ],
+      });
+      expect(mocks.videoFace.getSightings).toHaveBeenCalledWith('face-1');
+    });
+
+    it('returns no sightings for a face not sampled from a video', async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(undefined);
+
+      await expect(sut.getSightings(auth, 'face-1')).resolves.toEqual({ sightings: [] });
+    });
+
+    it('requires read access to the asset', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getSightings(auth, 'face-1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.videoFace.getSightings).not.toHaveBeenCalled();
+    });
+
+    it('is not found for an unknown face, or one on a trashed asset', async () => {
+      mocks.galleryPerson.getFaceByIdOnLiveAsset.mockRejectedValue(new Error('no result'));
+
+      await expect(sut.getSightings(auth, 'face-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getSightingThumbnail', () => {
+    const auth = AuthFactory.create();
+    const face = AssetFaceFactory.create({
+      id: 'face-1',
+      assetId: 'asset-1',
+      imageWidth: 2560,
+      imageHeight: 1440,
+      boundingBoxX1: 1000,
+      boundingBoxY1: 500,
+      boundingBoxX2: 1200,
+      boundingBoxY2: 700,
+    });
+    const stored = {
+      sightings: [
+        { t: 4, score: 0.9, x1: 1000, y1: 500, x2: 1200, y2: 700 },
+        { t: 9.5, score: 0.7, x1: 200, y1: 100, x2: 400, y2: 300 },
+      ],
+      timeSeconds: 4,
+      originalPath: 'upload/owner/video.mp4',
+      trimStart: 1.5,
+      trimEnd: null,
+    };
+    let extractFrame: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mocks.galleryPerson.getFaceByIdOnLiveAsset.mockResolvedValue(face as any);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.videoFace.getSightings.mockResolvedValue(stored);
+      mocks.media.probe.mockResolvedValue({ videoStreams: [{ index: 0 }] } as any);
+      vi.spyOn((sut as any).backendMedia, 'getProbeInput').mockResolvedValue('https://s3.example/video.mp4?sig');
+      extractFrame = vi.fn(async (_input: string, output: string) => {
+        await writeFile(output, Buffer.from('frame'));
+      });
+      (sut as any).frames = { extractFrame };
+      mocks.media.decodeImage.mockResolvedValue({
+        data: Buffer.from('decoded'),
+        info: { width: 2560, height: 1440, channels: 3 },
+      } as any);
+      mocks.media.generateThumbnail.mockImplementation(async (_input, _options, output) => {
+        await writeFile(output, Buffer.from('crop'));
+      });
+    });
+
+    it('crops the sighting from a frame extracted from the original at its stored time, read in place', async () => {
+      const result = await sut.getSightingThumbnail(auth, 'face-1', 8);
+      if (result instanceof ImmichStreamResponse) {
+        result.stream.destroy();
+      }
+
+      expect(mocks.media.probe).toHaveBeenCalledWith('https://s3.example/video.mp4?sig');
+      // 8 s on the player is 9.5 s in the original, under a trim from 1.5 s.
+      expect(extractFrame).toHaveBeenCalledWith(
+        'https://s3.example/video.mp4?sig',
+        expect.stringMatching(/frame\.jpeg$/),
+        9.5,
+        expect.objectContaining({ videoStream: { index: 0 } }),
+      );
+      const [, options] = mocks.media.generateThumbnail.mock.calls[0];
+      const crop = (options.edits as { parameters: { x: number; y: number; width: number } }[])[0].parameters;
+      // The crop is around the sighting's box (200-400 x 100-300), not the face's best box.
+      expect(crop.x).toBeLessThanOrEqual(200);
+      expect(crop.x + crop.width).toBeGreaterThanOrEqual(400);
+      expect(crop.x).toBeLessThan(1000);
+    });
+
+    it('is not found at a time with no sighting', async () => {
+      await expect(sut.getSightingThumbnail(auth, 'face-1', 9.5)).rejects.toBeInstanceOf(NotFoundException);
+      expect(extractFrame).not.toHaveBeenCalled();
+    });
+
+    it('is not found for a face not sampled from a video', async () => {
+      mocks.videoFace.getSightings.mockResolvedValue(undefined);
+
+      await expect(sut.getSightingThumbnail(auth, 'face-1', 0)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('requires read access to the asset', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getSightingThumbnail(auth, 'face-1', 8)).rejects.toBeInstanceOf(BadRequestException);
+      expect(extractFrame).not.toHaveBeenCalled();
+    });
+  });
 });

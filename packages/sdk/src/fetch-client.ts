@@ -2387,6 +2387,18 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
+export type VideoFaceSightingDto = {
+    /** Whether this is the best view, the one the face crop is cut from */
+    isBest: boolean;
+    /** Detector confidence for this sighting */
+    score: number;
+    /** When the face was seen, in seconds on the player's timeline: from the trim start for a trimmed video */
+    time: number;
+};
+export type VideoFaceSightingsResponseDto = {
+    /** Every sighting inside the current trim, in time order; empty for a face not sampled from a video */
+    sightings: VideoFaceSightingDto[];
+};
 export type QueueStatisticsDto = {
     /** Number of active jobs */
     active: number;
@@ -7845,6 +7857,35 @@ export function reassignFacesById({ id, faceDto }: {
         method: "PUT",
         body: faceDto
     })));
+}
+/**
+ * Get face sightings
+ */
+export function getAssetFaceSightings({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingsResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings`, {
+        ...opts
+    }));
+}
+/**
+ * Get face sighting thumbnail
+ */
+export function getAssetFaceSightingThumbnail({ id, time }: {
+    id: string;
+    time: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/thumbnail${QS.query(QS.explode({
+        time
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Get face thumbnail

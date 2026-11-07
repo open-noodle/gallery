@@ -1544,6 +1544,8 @@
   "use_inherited_thumbnail": "Geerbtes Vorschaubild verwenden",
   "user_groups": "Benutzergruppen",
   "version_announcement_closing": "Dein Freund, Pierre",
+  "video_face_sightings_count": "{count, plural, one {An # Moment gesehen} other {An # Momenten gesehen}}",
+  "video_face_sightings_show_at": "Bei {time} anzeigen",
   "videos_only": "Nur Videos",
   "view_face_statistics_details": "Details zu Gesichtsstatistiken anzeigen",
   "view_in_map": "Auf Karte anzeigen",

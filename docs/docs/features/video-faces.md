@@ -58,6 +58,9 @@ people found to 24. It takes about five times as long per frame, so leave it off
   it is seen clearly enough across several frames.
 - **A head turn can split one person in two.** If someone turns from facing the camera to side-on between frames,
   Gallery may not be sure it is the same person and keep both views. Give both the same name.
+- **You can see every moment a person appears.** When you choose a name for a face in a video, the panel shows a row
+  of that face at each moment Gallery saw it, with the clearest view starred. Click one to jump the video to that
+  moment, which helps when a single crop is not enough to tell who it is.
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no
 frame will show them clearly.

@@ -1547,6 +1547,8 @@
   "use_inherited_thumbnail": "Use inherited thumbnail",
   "user_groups": "User groups",
   "version_announcement_closing": "Your friend, Pierre",
+  "video_face_sightings_count": "Seen at {count, plural, one {# moment} other {# moments}}",
+  "video_face_sightings_show_at": "Show at {time}",
   "videos_only": "Videos only",
   "view_face_statistics_details": "View face statistics details",
   "view_in_map": "View in map",

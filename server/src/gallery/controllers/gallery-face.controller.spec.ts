@@ -45,4 +45,49 @@ describe(GalleryFaceController.name, () => {
       expect(service.getFaceThumbnail).not.toHaveBeenCalled();
     });
   });
+
+  describe('GET /faces/:id/sightings', () => {
+    it('should be an authenticated route with the face read permission', async () => {
+      await request(ctx.getHttpServer()).get('/faces/123e4567-e89b-12d3-a456-426614174000/sightings');
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: expect.objectContaining({ permission: Permission.FaceRead }) }),
+      );
+    });
+
+    it('should require a UUID', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/faces/not-a-uuid/sightings')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(400);
+      expect(service.getSightings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /faces/:id/sightings/thumbnail', () => {
+    const url = '/faces/123e4567-e89b-12d3-a456-426614174000/sightings/thumbnail';
+
+    it('should be an authenticated route with the face read permission', async () => {
+      await request(ctx.getHttpServer()).get(`${url}?time=1.5`);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: expect.objectContaining({ permission: Permission.FaceRead }) }),
+      );
+    });
+
+    it('should require a UUID', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/faces/not-a-uuid/sightings/thumbnail?time=1.5')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(400);
+      expect(service.getSightingThumbnail).not.toHaveBeenCalled();
+    });
+
+    it.each(['', '?time=', '?time=-1', '?time=abc'])('should reject a missing or invalid time (%s)', async (query) => {
+      const { status } = await request(ctx.getHttpServer()).get(`${url}${query}`).set('Authorization', 'Bearer token');
+
+      expect(status).toBe(400);
+      expect(service.getSightingThumbnail).not.toHaveBeenCalled();
+    });
+  });
 });
