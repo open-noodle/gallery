@@ -1,6 +1,8 @@
 import SpaceAlbumFolderPickerModal from '#lib/modals/SpaceAlbumFolderPickerModal.svelte';
 import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const folder = (id: string, name: string, parentId: string | null = null) =>
   ({
@@ -20,12 +22,6 @@ const folders = [
   folder('family', 'Family'),
 ];
 
-// Same drain as SpaceAlbumFolderNameModal.spec: this file mounts the same bits-ui-backed
-// FormModal and provably leaves the identical uncleared 24ms cleanup timer behind on unmount.
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-});
-
 describe('SpaceAlbumFolderPickerModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,23 +29,23 @@ describe('SpaceAlbumFolderPickerModal', () => {
 
   // W-17: offering a folder's own subtree as a destination would guarantee a 400. Disabling
   // it client-side means the illegal option is never selectable in the first place.
-  it('W-17: disables the moved folder and all of its descendants', () => {
-    render(SpaceAlbumFolderPickerModal, {
+  it('W-17: disables the moved folder and all of its descendants', async () => {
+    await render(SpaceAlbumFolderPickerModal, {
       folders,
       excludeFolderId: 'trips',
       currentFolderId: null,
       onClose: vi.fn(),
     });
 
-    expect(screen.getByTestId('folder-option-trips')).toBeDisabled();
-    expect(screen.getByTestId('folder-option-y2026')).toBeDisabled();
-    expect(screen.getByTestId('folder-option-italy')).toBeDisabled();
-    expect(screen.getByTestId('folder-option-family')).toBeEnabled();
+    await expect.element(page.getByTestId('folder-option-trips')).toBeDisabled();
+    await expect.element(page.getByTestId('folder-option-y2026')).toBeDisabled();
+    await expect.element(page.getByTestId('folder-option-italy')).toBeDisabled();
+    await expect.element(page.getByTestId('folder-option-family')).toBeEnabled();
   });
 
   // Moving an ALBUM has no subtree to exclude, so every folder stays selectable.
-  it('W-17: leaves every folder selectable when no folder is excluded', () => {
-    render(SpaceAlbumFolderPickerModal, {
+  it('W-17: leaves every folder selectable when no folder is excluded', async () => {
+    await render(SpaceAlbumFolderPickerModal, {
       folders,
       excludeFolderId: null,
       currentFolderId: null,
@@ -57,18 +53,18 @@ describe('SpaceAlbumFolderPickerModal', () => {
     });
 
     for (const id of ['trips', 'y2026', 'italy', 'family']) {
-      expect(screen.getByTestId(`folder-option-${id}`)).toBeEnabled();
+      await expect.element(page.getByTestId(`folder-option-${id}`)).toBeEnabled();
     }
   });
 
-  it('offers the space root as a destination', () => {
-    render(SpaceAlbumFolderPickerModal, {
+  it('offers the space root as a destination', async () => {
+    await render(SpaceAlbumFolderPickerModal, {
       folders,
       excludeFolderId: null,
       currentFolderId: 'trips',
       onClose: vi.fn(),
     });
 
-    expect(screen.getByTestId('folder-option-root')).toBeInTheDocument();
+    await expect.element(page.getByTestId('folder-option-root')).toBeInTheDocument();
   });
 });

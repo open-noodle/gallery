@@ -34,7 +34,19 @@ describe('installPressFeedback', () => {
     element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 10, clientY: 20 }));
   };
 
+  // Specs share the browser's real pointer: one moved for another file can land here and start a hover
+  // animation. These tests drive only synthetic events, so real (trusted) pointer input is dropped.
+  const dropRealPointer = (event: Event) => {
+    if (event.isTrusted) {
+      event.stopImmediatePropagation();
+    }
+  };
+  const pointerEvents = ['pointerover', 'pointerout', 'pointerdown', 'pointerup', 'pointermove'];
+
   beforeEach(() => {
+    for (const type of pointerEvents) {
+      addEventListener(type, dropRealPointer, { capture: true });
+    }
     animate = vi.fn(() => ({ cancel: vi.fn() }));
     Element.prototype.animate = animate as unknown as Element['animate'];
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100, height: 36 } as DOMRect);
@@ -42,6 +54,9 @@ describe('installPressFeedback', () => {
   });
 
   afterEach(() => {
+    for (const type of pointerEvents) {
+      removeEventListener(type, dropRealPointer, { capture: true });
+    }
     uninstall();
     document.body.replaceChildren();
     vi.restoreAllMocks();

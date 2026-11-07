@@ -39,12 +39,18 @@ describe('installViewerZoom', () => {
   };
   const flyers = () => document.querySelectorAll('[data-motion-flyer]').length;
 
+  // A real browser follows the thumbnail's <a href>, which would navigate the test page away; the viewer is
+  // opened by the app's router, not by the link's default action.
+  const keepPage = (event: MouseEvent) => event.preventDefault();
+
   beforeEach(() => {
     Element.prototype.animate ??= vi.fn() as unknown as Element['animate'];
     uninstall = installViewerZoom();
+    addEventListener('click', keepPage);
   });
 
   afterEach(() => {
+    removeEventListener('click', keepPage);
     uninstall();
     document.body.replaceChildren();
   });

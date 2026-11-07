@@ -1,7 +1,7 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanel from './DetailPanel.svelte';
 
 // Regression probe for "file storage path no longer displayed below the filename in rc4".
@@ -34,7 +34,10 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
@@ -96,48 +99,48 @@ describe('DetailPanel file path display', () => {
   it('hides the file path when the persisted toggle is off (the rc4 default state)', async () => {
     assetViewerManagerMock.isShowAssetPath = false;
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
     // Filename is always shown; the path is not, until the user toggles it on.
-    await waitFor(() => expect(screen.getByText('20260416_173726.jpg')).toBeInTheDocument());
-    expect(screen.queryByText(ORIGINAL_PATH)).not.toBeInTheDocument();
+    await expect.element(page.getByText('20260416_173726.jpg')).toBeInTheDocument();
+    expect(page.getByText(ORIGINAL_PATH).query()).toBeNull();
   });
 
   it('shows the file path below the filename when the persisted toggle is on', async () => {
     assetViewerManagerMock.isShowAssetPath = true;
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByText(ORIGINAL_PATH)).toBeInTheDocument());
+    await expect.element(page.getByText(ORIGINAL_PATH)).toBeInTheDocument();
   });
 
   // Option 1: the "show file location" toggle is gated on the path being present, not on
   // ownership — so a non-owner who can see an external-library asset can still reveal its path.
   it('shows the file-location toggle to a non-owner when originalPath is present', async () => {
-    renderWithTooltips(DetailPanel, {
+    await renderWithTooltips(DetailPanel, {
       asset: buildAsset({ ownerId: 'owner-2' }),
       currentAlbum: null,
     });
 
-    await waitFor(() => expect(screen.getByLabelText('show_file_location')).toBeInTheDocument());
+    await expect.element(page.getByLabelText('show_file_location')).toBeInTheDocument();
   });
 
   it('shows the file-location toggle to the owner', async () => {
-    renderWithTooltips(DetailPanel, {
+    await renderWithTooltips(DetailPanel, {
       asset: buildAsset({ ownerId: 'owner-1' }),
       currentAlbum: null,
     });
 
-    await waitFor(() => expect(screen.getByLabelText('show_file_location')).toBeInTheDocument());
+    await expect.element(page.getByLabelText('show_file_location')).toBeInTheDocument();
   });
 
   it('hides the file-location toggle when there is no path (e.g. sanitized shared-link view)', async () => {
-    renderWithTooltips(DetailPanel, {
+    await renderWithTooltips(DetailPanel, {
       asset: buildAsset({ ownerId: 'owner-2', originalPath: '' }),
       currentAlbum: null,
     });
 
-    await waitFor(() => expect(screen.getByText('20260416_173726.jpg')).toBeInTheDocument());
-    expect(screen.queryByLabelText('show_file_location')).not.toBeInTheDocument();
+    await expect.element(page.getByText('20260416_173726.jpg')).toBeInTheDocument();
+    expect(page.getByLabelText('show_file_location').query()).toBeNull();
   });
 });

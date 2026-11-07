@@ -1,4 +1,3 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
@@ -16,10 +15,11 @@ import {
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { goto } from '$app/navigation';
 import SpaceAlbumDetailPage from './+page.svelte';
 import { mockTimelineState, resetMockTimelineState, setMockTimelineEmpty } from './mock-timeline-state';
@@ -60,7 +60,12 @@ vi.mock('#lib/components/filter-panel/active-filters-bar.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNavigate: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+  invalidateAll: vi.fn(),
+  onNavigate: vi.fn(),
+}));
 
 // Reactive, not a plain hoisted object: this page's filters and committed query are URL-backed, so
 // its re-hydrate $effect only re-runs when `page.url` is a real signal. A plain object would let a
@@ -82,6 +87,9 @@ vi.mock('#lib/components/timeline/TimelineGroupingControl.svelte', async () => {
 
 vi.mock('#lib/gallery/timeline/timeline-anchor.js', () => ({
   getTimelineTopVisibleAnchor: vi.fn().mockReturnValue(undefined),
+  getTimelineTemporalAnchorTarget: vi.fn(),
+  scrollTimelineToTemporalAnchor: vi.fn(),
+  retryOnAnimationFrames: vi.fn(),
 }));
 
 vi.mock('#lib/utils/timeline-zoom-navigation.js', () => ({
@@ -156,28 +164,14 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-vi.mock('#lib/services/album.service.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#lib/services/album.service.ts')>();
-  return {
-    ...actual,
-    getAlbumAssetsActions: vi.fn().mockReturnValue({
-      AddAssets: {
-        title: 'Add assets',
-        icon: '',
-        onAction: vi.fn().mockResolvedValue(undefined),
-        $if: () => true,
-      },
-      Upload: {
-        title: 'Upload',
-        icon: '',
-        onAction: vi.fn(),
-      },
-    }),
-  };
-});
+// Spied, not replaced by a factory: spreading importOriginal() here deadlocks the browser-mode module
+// graph. beforeEach gives getAlbumAssetsActions its fixture return.
+vi.mock('#lib/services/album.service.js', { spy: true });
 
 vi.mock('#lib/gallery/album/album-add.js', () => ({
   addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
+  addAssetsToAlbums: vi.fn(),
+  createAlbum: vi.fn(),
 }));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
@@ -275,7 +269,7 @@ function renderPage({
 // before asserting on any menu item, mirroring the Slice 4/5 Playwright specs
 // (spaces-selection-toolbar-timeline.e2e-spec.ts's `openOverflowMenu`).
 async function openOverflowMenu() {
-  await fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  await userEvent.click(page.getByRole('button', { name: 'Menu' }));
 }
 
 describe('Space album detail page', () => {
@@ -288,10 +282,6 @@ describe('Space album detail page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1');
-    // The add→browse transition calls element.animate(); without a mock it returns undefined and
-    // setting .onfinish on it throws an async unhandled error that fails the run (seen only in CI's
-    // test ordering). Mirror the global-album route spec.
-    Element.prototype.animate = getAnimateMock();
     resetMockTimelineState();
     // The picker selection is a shared array (see the AssetMultiSelectManager mock) - reset it
     // so a test that seeds a selection cannot leak into the next one.
@@ -320,58 +310,58 @@ describe('Space album detail page', () => {
     } as never);
   });
 
-  it('renders the album timeline', () => {
-    renderPage();
-    expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
+  it('renders the album timeline', async () => {
+    await renderPage();
+    await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
   });
 
-  it('shows the space name in the page title (the album name lives in the editable AlbumTitle below)', () => {
-    renderPage({
+  it('shows the space name in the page title (the album name lives in the editable AlbumTitle below)', async () => {
+    await renderPage({
       album: makeAlbum({ albumName: 'Summer Trips' }),
       space: { ...BASE_SPACE, name: 'Family Memories' },
     });
-    const layout = screen.getByTestId('user-page-layout');
+    const layout = page.getByTestId('user-page-layout').element() as HTMLElement;
     expect(layout).toHaveAttribute('data-title', 'Family Memories');
     // The album name is no longer duplicated in the page header (it moved to the editable AlbumTitle).
     expect(layout.dataset.title).not.toBe('Summer Trips');
   });
 
-  it('renders the back button in leading slot', () => {
-    renderPage();
-    const leading = screen.getByTestId('layout-leading');
+  it('renders the back button in leading slot', async () => {
+    await renderPage();
+    const leading = page.getByTestId('layout-leading').element() as HTMLElement;
     expect(leading.querySelector('button')).not.toBeNull();
   });
 
   // Back must return the user to the folder the album lives in, not dump them at the space
   // root — otherwise every trip into an album costs them their place in the tree.
   it('back returns to the album folder when the album lives in one', async () => {
-    renderPage({ folderId: 'folder-trips' });
+    await renderPage({ folderId: 'folder-trips' });
 
-    await fireEvent.click(screen.getByTestId('layout-leading').querySelector('button')!);
+    await userEvent.click(page.getByTestId('layout-leading').element().querySelector('button')!);
 
     expect(goto).toHaveBeenCalledWith('/spaces/space-1/albums?folder=folder-trips');
   });
 
   it('back returns to the space root when the album is not in a folder', async () => {
-    renderPage({ folderId: null });
+    await renderPage({ folderId: null });
 
-    await fireEvent.click(screen.getByTestId('layout-leading').querySelector('button')!);
+    await userEvent.click(page.getByTestId('layout-leading').element().querySelector('button')!);
 
     expect(goto).toHaveBeenCalledWith('/spaces/space-1/albums');
   });
 
-  it('editor sees the "Add photos" button', () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
-    expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+  it('editor sees the "Add photos" button', async () => {
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
-  it('owner sees the "Add photos" button', () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
-    expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+  it('owner sees the "Add photos" button', async () => {
+    await renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
-  it('viewer does NOT see the "Add photos" button when not an album editor', () => {
-    renderPage({
+  it('viewer does NOT see the "Add photos" button when not an album editor', async () => {
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -382,11 +372,11 @@ describe('Space album detail page', () => {
         ],
       }),
     });
-    expect(screen.queryByTestId('add-photos-button')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-button')).not.toBeInTheDocument();
   });
 
-  it('album editor/owner can manage even as a space viewer', () => {
-    renderPage({
+  it('album editor/owner can manage even as a space viewer', async () => {
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -397,91 +387,89 @@ describe('Space album detail page', () => {
         ],
       }),
     });
-    expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
-  it('showInTimeline=false album still renders the timeline fully', () => {
-    renderPage({
+  it('showInTimeline=false album still renders the timeline fully', async () => {
+    await renderPage({
       album: makeAlbum(),
     });
-    expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
+    await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
   });
 
-  it('browse timeline has enableRouting=true so the in-place asset viewer opens/closes via the URL', () => {
-    renderPage();
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-enable-routing', 'true');
+  it('browse timeline has enableRouting=true so the in-place asset viewer opens/closes via the URL', async () => {
+    await renderPage();
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-enable-routing', 'true');
   });
 
   // #889 — the in-place asset viewer gates add-to-album on the space capability, so the browse
   // timeline has to carry it (an album linked to this space is the only target the server can
   // accept another member's photo into).
-  it('browse timeline carries the space capability for an editor', () => {
-    renderPage();
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute(
-      'data-space',
-      JSON.stringify({ id: 'space-1', canWrite: true }),
-    );
+  it('browse timeline carries the space capability for an editor', async () => {
+    await renderPage();
+    await expect
+      .element(page.getByTestId('space-album-timeline'))
+      .toHaveAttribute('data-space', JSON.stringify({ id: 'space-1', canWrite: true }));
   });
 
-  it('browse timeline carries the space capability as read-only for a viewer', () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Viewer)] });
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute(
-      'data-space',
-      JSON.stringify({ id: 'space-1', canWrite: false }),
-    );
+  it('browse timeline carries the space capability as read-only for a viewer', async () => {
+    await renderPage({ members: [makeMember(SharedSpaceRole.Viewer)] });
+    await expect
+      .element(page.getByTestId('space-album-timeline'))
+      .toHaveAttribute('data-space', JSON.stringify({ id: 'space-1', canWrite: false }));
   });
 
-  it('in browse mode, the timeline-desktop-grouping-control renders', () => {
-    renderPage();
-    expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+  it('in browse mode, the timeline-desktop-grouping-control renders', async () => {
+    await renderPage();
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
   });
 
   // #1051. This page hand-rolls the toolbar row rather than using FilterToolbar, so the button is
   // wired separately here and needs its own coverage — a FilterToolbar test proves nothing for it.
   describe('scoped search button', () => {
-    it('sits beside the grouping control in browse mode', () => {
-      renderPage();
-      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
+    it('sits beside the grouping control in browse mode', async () => {
+      await renderPage();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
     it('opens the album-scoped search palette when clicked', async () => {
-      renderPage();
-      await fireEvent.click(screen.getByTestId('scoped-search-button'));
+      await renderPage();
+      await userEvent.click(page.getByTestId('scoped-search-button'));
 
       expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
     });
 
-    it('is hidden when selection is active, alongside the grouping control', () => {
+    it('is hidden when selection is active, alongside the grouping control', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
-      renderPage();
-      expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument();
+      await renderPage();
+      await expect.element(page.getByTestId('scoped-search-button')).not.toBeInTheDocument();
     });
 
-    it('stays available while album search results are showing', () => {
+    it('stays available while album search results are showing', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
     // This toolbar row is hand-rolled rather than FilterToolbar, so its responsive contract
     // has to be asserted here too — a FilterToolbar test proves nothing for it.
-    it('is desktop-only, matching the grouping control beside it', () => {
-      renderPage();
+    it('is desktop-only, matching the grouping control beside it', async () => {
+      await renderPage();
 
-      const wrapper = screen.getByTestId('space-album-toolbar-search');
+      const wrapper = page.getByTestId('space-album-toolbar-search').element() as HTMLElement;
       expect(wrapper.className).toContain('hidden');
       expect(wrapper.className).toContain('md:flex');
     });
   });
 
-  it('the grouping-control bar is transparent (no navy/border bar) to match the space page', () => {
-    renderPage();
+  it('the grouping-control bar is transparent (no navy/border bar) to match the space page', async () => {
+    await renderPage();
     // data-testid="timeline-desktop-grouping-control" now sits on the grouping wrapper (kept
     // desktop-only, #752 launch review F3); the surrounding bar carrying the background utilities
     // is its parent.
-    const bar = screen.getByTestId('timeline-desktop-grouping-control').parentElement!;
+    const bar = page.getByTestId('timeline-desktop-grouping-control').element().parentElement!;
     // The rolling/main fix dropped the bordered grey/navy bar in favour of a transparent container.
     expect(bar.className).toContain('bg-transparent');
     expect(bar.className).toContain('dark:bg-transparent');
@@ -490,90 +478,86 @@ describe('Space album detail page', () => {
     expect(bar.className).not.toContain('border-b');
   });
 
-  it('timeline receives grouping="day" by default (not "month")', () => {
-    renderPage();
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-grouping', 'day');
+  it('timeline receives grouping="day" by default (not "month")', async () => {
+    await renderPage();
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-grouping', 'day');
   });
 
-  it('browse timeline OPTIONS carry the current grouping (default day) so the manager actually groups', () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+  it('browse timeline OPTIONS carry the current grouping (default day) so the manager actually groups', async () => {
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
     expect(options.grouping).toBe('day');
   });
 
   it('changing the grouping control updates the timeline OPTIONS grouping (not just the prop)', async () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('set-grouping-month'));
-    await waitFor(() => {
-      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('set-grouping-month'));
+    await vi.waitFor(() => {
+      const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
       expect(options.grouping).toBe('month');
     });
     // and the prop stays in sync
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-grouping', 'month');
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-grouping', 'month');
   });
 
-  it('timeline-desktop-grouping-control is hidden when selection is active in browse mode', () => {
+  it('timeline-desktop-grouping-control is hidden when selection is active in browse mode', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage();
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await renderPage();
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
   it('timeline-desktop-grouping-control is hidden in add mode', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => {
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
-    });
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
-  it('timeline options include albumId in browse mode', () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+  it('timeline options include albumId in browse mode', async () => {
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
     expect(options).toMatchObject({ albumId: 'album-1' });
   });
 
-  it('timeline starts in browse mode (options have albumId, not timelineAlbumId)', () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
+  it('timeline starts in browse mode (options have albumId, not timelineAlbumId)', async () => {
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
   });
 
   it('clicking "Add photos" switches timeline to add mode (picker options)', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    const addButton = screen.getByTestId('add-photos-button');
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    const addButton = page.getByTestId('add-photos-button').element() as HTMLElement;
 
-    await fireEvent.click(addButton);
+    await userEvent.click(addButton);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
-    });
-    const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
+    const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
     expect(options).toMatchObject({ timelineAlbumId: 'album-1' });
     expect(options).not.toHaveProperty('albumId');
   });
 
-  it('in browse mode with selection active, AssetSelectControlBar is rendered', () => {
+  it('in browse mode with selection active, AssetSelectControlBar is rendered', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
-    expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+    await expect.element(page.getByTestId('asset-select-control-bar')).toBeInTheDocument();
   });
 
   it('in browse mode with selection active and canManage=true, RemoveFromAlbum and Download actions are wired', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
     // AssetSelectControlBar renders its children
-    expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
+    await expect.element(page.getByTestId('asset-select-control-bar')).toBeInTheDocument();
 
     // Remove-from-album and DownloadAction are menu items inside the "⋮" overflow menu.
     await openOverflowMenu();
-    expect(screen.getByText('Remove from album')).toBeInTheDocument();
+    await expect.element(page.getByText('Remove from album')).toBeInTheDocument();
     // DownloadAction is rendered for all members
-    expect(screen.getByTestId('download-action')).toBeInTheDocument();
+    await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
   });
 
   it('in browse mode with selection active and canManage=false, control bar shown with Download but no Remove action', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage({
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -585,13 +569,13 @@ describe('Space album detail page', () => {
       }),
     });
     // Control bar shows
-    expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
+    await expect.element(page.getByTestId('asset-select-control-bar')).toBeInTheDocument();
 
     await openOverflowMenu();
     // DownloadAction is available to all members (bar is not empty for viewers)
-    expect(screen.getByTestId('download-action')).toBeInTheDocument();
+    await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
     // But remove-from-album is NOT rendered
-    expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Remove from album')).not.toBeInTheDocument();
   });
 
   // ── Picker source toggle ────────────────────────────────────────────────────
@@ -601,13 +585,13 @@ describe('Space album detail page', () => {
   // closes that asymmetry by sourcing the picker from the space pool.
   describe('picker source toggle', () => {
     const openPicker = async () => {
-      await fireEvent.click(screen.getByTestId('add-photos-button'));
-      await waitFor(() => expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add'));
+      await userEvent.click(page.getByTestId('add-photos-button'));
+      await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
     };
-    const pickerOptions = () => JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+    const pickerOptions = () => JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
 
     it('defaults to the caller’s own photos — unchanged from today', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
 
       expect(pickerOptions()).toMatchObject({ timelineAlbumId: 'album-1' });
@@ -615,46 +599,46 @@ describe('Space album detail page', () => {
     });
 
     it('switching to Space sources the picker from the space pool while keeping the already-in-album marker', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
 
-      await fireEvent.click(screen.getByTestId('picker-source-space'));
+      await userEvent.click(page.getByTestId('picker-source-space'));
 
-      await waitFor(() => expect(pickerOptions().spaceId).toBe(BASE_SPACE.id));
+      await vi.waitFor(() => expect(pickerOptions().spaceId).toBe(BASE_SPACE.id));
       // timelineAlbumId must survive: it is what greys out assets already in the album.
       expect(pickerOptions()).toMatchObject({ timelineAlbumId: 'album-1' });
     });
 
     it('switching back to My photos drops the space scope again', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
 
-      await fireEvent.click(screen.getByTestId('picker-source-space'));
-      await waitFor(() => expect(pickerOptions().spaceId).toBe(BASE_SPACE.id));
-      await fireEvent.click(screen.getByTestId('picker-source-mine'));
+      await userEvent.click(page.getByTestId('picker-source-space'));
+      await vi.waitFor(() => expect(pickerOptions().spaceId).toBe(BASE_SPACE.id));
+      await userEvent.click(page.getByTestId('picker-source-mine'));
 
-      await waitFor(() => expect(pickerOptions().spaceId).toBeUndefined());
+      await vi.waitFor(() => expect(pickerOptions().spaceId).toBeUndefined());
     });
 
     it('clears the pending selection when the source changes, so a selection never spans both pools', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
       // Opening the picker already calls clear() via resetPicker, and the mock class shares one
       // spy across instances — so asserting "has been called" would pass even with the clear in
       // setPickerSource deleted. Baseline here and assert the toggle adds a call of its own.
       const callsBeforeToggle = pickerMultiSelectClear.mock.calls.length;
 
-      await fireEvent.click(screen.getByTestId('picker-source-space'));
+      await userEvent.click(page.getByTestId('picker-source-space'));
 
-      await waitFor(() => expect(pickerMultiSelectClear.mock.calls.length).toBeGreaterThan(callsBeforeToggle));
+      await vi.waitFor(() => expect(pickerMultiSelectClear.mock.calls.length).toBeGreaterThan(callsBeforeToggle));
     });
 
     it('does not clear when the already-active source is re-clicked', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
       const callsBeforeToggle = pickerMultiSelectClear.mock.calls.length;
 
-      await fireEvent.click(screen.getByTestId('picker-source-mine'));
+      await userEvent.click(page.getByTestId('picker-source-mine'));
 
       expect(pickerMultiSelectClear.mock.calls.length).toBe(callsBeforeToggle);
     });
@@ -662,54 +646,48 @@ describe('Space album detail page', () => {
     // The default album fixture makes the current user its OWNER, so the picker still opens
     // for a space Viewer — but contributing another member's photo is Owner/Editor-only.
     it('is hidden from a space viewer — only an Owner/Editor may contribute another member’s photo', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Viewer)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Viewer)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
 
-      expect(screen.queryByTestId('picker-source-toggle')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('picker-source-toggle')).not.toBeInTheDocument();
     });
 
     it('is shown to a space editor', async () => {
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
       await openPicker();
 
-      expect(screen.getByTestId('picker-source-toggle')).toBeInTheDocument();
+      await expect.element(page.getByTestId('picker-source-toggle')).toBeInTheDocument();
     });
   });
 
   it('add mode shows picker control bar (no add-photos button visible while in add mode)', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
-    });
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
     // In add mode, the add-photos button should be hidden / not visible as a standalone button
     // (the ControlAppBar for picker mode replaces the regular app bar)
-    expect(screen.queryByTestId('add-photos-button')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-button')).not.toBeInTheDocument();
   });
 
   it('in add mode, the full-screen overlay renders with the picker timeline inside', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('add-photos-overlay')).toBeInTheDocument();
-    });
-    const overlay = screen.getByTestId('add-photos-overlay');
-    const main = screen.getByTestId('add-photos-timeline-main');
+    await expect.element(page.getByTestId('add-photos-overlay')).toBeInTheDocument();
+    const overlay = page.getByTestId('add-photos-overlay').element() as HTMLElement;
+    const main = page.getByTestId('add-photos-timeline-main').element() as HTMLElement;
     expect(overlay).toContainElement(main);
     expect(main.className).toContain('pt-(--control-bar-height)');
   });
 
   it('the picker control bar comes AFTER the timeline-main in DOM so it paints on top and its buttons are clickable', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => {
-      expect(screen.getByTestId('add-photos-overlay')).toBeInTheDocument();
-    });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('add-photos-overlay')).toBeInTheDocument();
 
-    const overlay = screen.getByTestId('add-photos-overlay');
-    const main = screen.getByTestId('add-photos-timeline-main');
+    const overlay = page.getByTestId('add-photos-overlay').element() as HTMLElement;
+    const main = page.getByTestId('add-photos-timeline-main').element() as HTMLElement;
     // The ControlAppBar is `position: absolute` with auto z-index. The full-height <main> would
     // paint over it (swallowing clicks on the trailing Upload/Add buttons) unless the bar comes
     // LATER in DOM order. querySelectorAll returns document order — bar must be last.
@@ -717,18 +695,18 @@ describe('Space album detail page', () => {
       ...overlay.querySelectorAll('[data-testid="add-photos-timeline-main"], [data-testid="control-app-bar"]'),
     ];
     expect(ordered[0]).toBe(main);
-    expect(ordered[1]).toBe(screen.getByTestId('control-app-bar'));
+    expect(ordered[1]).toBe(page.getByTestId('control-app-bar').element());
   });
 
-  it('in browse mode, the add-photos overlay is NOT rendered', () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    expect(screen.queryByTestId('add-photos-overlay')).not.toBeInTheDocument();
+  it('in browse mode, the add-photos overlay is NOT rendered', async () => {
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await expect.element(page.getByTestId('add-photos-overlay')).not.toBeInTheDocument();
   });
 
-  it('in browse mode, the browse timeline renders (not in the overlay)', () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
-    expect(screen.queryByTestId('add-photos-overlay')).not.toBeInTheDocument();
+  it('in browse mode, the browse timeline renders (not in the overlay)', async () => {
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
+    await expect.element(page.getByTestId('add-photos-overlay')).not.toBeInTheDocument();
   });
 
   it('firing AddAssets action in add mode returns to browse and refreshes album', async () => {
@@ -753,43 +731,39 @@ describe('Space album detail page', () => {
       },
     } as never);
 
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
     // Enter add mode
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => {
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
-    });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
 
     // The ControlAppBar mock renders its trailing slot, so the HeaderActionButton for AddAssets
     // is in the DOM. Click it to fire the page's wrapped onAction → handleAddAssetsSuccess.
-    const addAssetsButton = screen.getByRole('button', { name: /add assets/i });
-    await fireEvent.click(addAssetsButton);
+    const addAssetsButton = page.getByRole('button', { name: /add assets/i }).element() as HTMLElement;
+    await userEvent.click(addAssetsButton);
 
     // handleAddAssetsSuccess: calls AddAssets.onAction (which resolves), then refreshAlbum
     // (getAlbumInfo), then sets mode='browse'
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getAlbumInfo).toHaveBeenCalledWith(expect.objectContaining({ id: 'album-1' }), expect.anything());
     });
     // After refresh, mode returns to browse (add-photos button reappears)
-    await waitFor(() => {
-      expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
-    });
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
   it('does not insert photos into the album grid when the add call fails', async () => {
     // The service never rejects - on 5xx/network it toasts and resolves ok:false.
     pickerSelectedAssets.splice(0, pickerSelectedAssets.length, { id: 'a-1' });
     vi.mocked(addAssetsToAlbumWithOutcome).mockResolvedValue({ ok: false, addedIds: [], deniedIds: [] });
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
     // Enter add mode and fire the header Add action, exactly as the success test does.
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add'));
-    await fireEvent.click(screen.getByRole('button', { name: /add assets/i }));
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
+    await userEvent.click(page.getByRole('button', { name: /add assets/i }));
 
     // The picker stays open (retry) and nothing was optimistically upserted into the browse timeline.
-    expect(screen.getByTestId('add-photos-overlay')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-overlay')).toBeInTheDocument();
     expect(mockTimelineState.upsertAssets).not.toHaveBeenCalled();
   });
 
@@ -798,9 +772,9 @@ describe('Space album detail page', () => {
   // an asset visible through the space is not necessarily one the contribution path will accept.
   describe('partial add outcomes', () => {
     const fireAdd = async () => {
-      await fireEvent.click(screen.getByTestId('add-photos-button'));
-      await waitFor(() => expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add'));
-      await fireEvent.click(screen.getByRole('button', { name: /add assets/i }));
+      await userEvent.click(page.getByTestId('add-photos-button'));
+      await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
+      await userEvent.click(page.getByRole('button', { name: /add assets/i }));
     };
 
     beforeEach(() => {
@@ -816,11 +790,11 @@ describe('Space album detail page', () => {
 
     it('inserts only the assets the server actually accepted, not the whole selection', async () => {
       vi.mocked(addAssetsToAlbumWithOutcome).mockResolvedValue({ ok: true, addedIds: ['mine'], deniedIds: [] });
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
       await fireAdd();
 
-      await waitFor(() => expect(mockTimelineState.upsertAssets).toHaveBeenCalled());
+      await vi.waitFor(() => expect(mockTimelineState.upsertAssets).toHaveBeenCalled());
       // 'theirs' was denied per-asset; painting it in would show a photo that vanishes on reload.
       expect(mockTimelineState.upsertAssets).toHaveBeenCalledWith([{ id: 'mine' }]);
     });
@@ -831,12 +805,12 @@ describe('Space album detail page', () => {
         addedIds: [],
         deniedIds: ['mine', 'theirs'],
       });
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
       await fireAdd();
 
       expect(mockTimelineState.upsertAssets).not.toHaveBeenCalled();
-      expect(screen.getByTestId('add-photos-overlay')).toBeInTheDocument();
+      await expect.element(page.getByTestId('add-photos-overlay')).toBeInTheDocument();
     });
 
     // A duplicate is not a refusal: the photo is already where the user wanted it, so there is
@@ -844,125 +818,118 @@ describe('Space album detail page', () => {
     // behaviour, which returned to browse on any non-throwing call.
     it('closes the picker when every asset was already in the album', async () => {
       vi.mocked(addAssetsToAlbumWithOutcome).mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] });
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
       await fireAdd();
 
-      await waitFor(() => expect(screen.queryByTestId('add-photos-overlay')).not.toBeInTheDocument());
+      await expect.element(page.getByTestId('add-photos-overlay')).not.toBeInTheDocument();
       expect(mockTimelineState.upsertAssets).toHaveBeenCalledWith([]);
     });
   });
 
-  it('browse mode renders the FilterPanel', () => {
-    renderPage();
-    expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
+  it('browse mode renders the FilterPanel', async () => {
+    await renderPage();
+    await expect.element(page.getByTestId('filter-panel')).toBeInTheDocument();
   });
 
-  it('does not render the FilterPanel while a browse selection is active', () => {
+  it('does not render the FilterPanel while a browse selection is active', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage();
-    expect(screen.queryByTestId('filter-panel')).not.toBeInTheDocument();
+    await renderPage();
+    await expect.element(page.getByTestId('filter-panel')).not.toBeInTheDocument();
   });
 
   it('browseOptions carry filter fields once a browse filter is set', async () => {
-    renderPage({ album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => {
-      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+    await renderPage({ album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await vi.waitFor(() => {
+      const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
       expect(options.personIds).toEqual(['person-1']);
     });
   });
 
   it('shows ActiveFiltersBar only when a browse filter is active', async () => {
-    renderPage();
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument());
+    await renderPage();
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
   });
 
   it('wires the add-all-to-collection handler into the browse ActiveFiltersBar', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    const bar = await screen.findByTestId('active-filters-bar');
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
+    const bar = page.getByTestId('active-filters-bar').element() as HTMLElement;
     expect(bar).toHaveAttribute('data-has-add-all', 'true');
   });
 
   it('browse: when filtered to empty, the filtered-empty block replaces the timeline; clear restores it', async () => {
     setMockTimelineEmpty();
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => {
-      expect(screen.getByTestId('browse-filtered-empty')).toBeInTheDocument();
-      expect(screen.queryByTestId('space-album-timeline')).not.toBeInTheDocument();
-    });
-    await fireEvent.click(screen.getByTestId('browse-clear-filters'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('browse-filtered-empty')).not.toBeInTheDocument();
-      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
-    });
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('browse-filtered-empty')).toBeInTheDocument();
+    await expect.element(page.getByTestId('space-album-timeline')).not.toBeInTheDocument();
+    await userEvent.click(page.getByTestId('browse-clear-filters'));
+    await expect.element(page.getByTestId('browse-filtered-empty')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
   });
 
   it('browse: the FilterPanel is hidden when the album is genuinely empty (no assets, no filters)', async () => {
     setMockTimelineEmpty();
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('filter-panel').dataset.hidden).toBe('true'));
+    await renderPage();
+    await vi.waitFor(() => expect(page.getByTestId('filter-panel').element().dataset.hidden).toBe('true'));
   });
 
   it('browse: the FilterPanel stays visible when filtered to empty (so it can be cleared)', async () => {
     setMockTimelineEmpty();
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('filter-panel').dataset.hidden).toBe('false'));
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await vi.waitFor(() => expect(page.getByTestId('filter-panel').element().dataset.hidden).toBe('false'));
   });
 
   it('browse: removing the temporal chip clears the temporal filter (ActiveFiltersBar disappears)', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-year'));
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('active-filters-remove-timeline'));
-    await waitFor(() => expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument());
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-add-year'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('active-filters-remove-timeline'));
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('browse: clear-all in ActiveFiltersBar removes all filters', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('active-filters-clear-all'));
-    await waitFor(() => expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument());
+    await renderPage();
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('active-filters-clear-all'));
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('add mode renders the picker FilterPanel', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => expect(screen.getByTestId('filter-panel')).toBeInTheDocument());
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('filter-panel')).toBeInTheDocument();
   });
 
   it('pickerOptions carry filter fields once a picker filter is set, and show ActiveFiltersBar', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => {
-      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await vi.waitFor(() => {
+      const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
       expect(options.personIds).toEqual(['person-1']);
       expect(options.timelineAlbumId).toBe('album-1');
     });
-    expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
   });
 
   it('add mode: filtered-empty replaces the picker timeline; clear restores it', async () => {
     setMockTimelineEmpty();
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => {
-      expect(screen.getByTestId('picker-filtered-empty')).toBeInTheDocument();
-      expect(screen.queryByTestId('space-album-timeline')).not.toBeInTheDocument();
-    });
-    await fireEvent.click(screen.getByTestId('picker-clear-filters'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('picker-filtered-empty')).not.toBeInTheDocument();
-      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
-    });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('picker-filtered-empty')).toBeInTheDocument();
+    await expect.element(page.getByTestId('space-album-timeline')).not.toBeInTheDocument();
+    await userEvent.click(page.getByTestId('picker-clear-filters'));
+    await expect.element(page.getByTestId('picker-filtered-empty')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
   });
 
   it('picker filters are reset after a successful add (returns to browse with no active filters)', async () => {
@@ -976,63 +943,61 @@ describe('Space album detail page', () => {
       Upload: { title: 'Upload', icon: '', onAction: vi.fn() },
     } as never);
 
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
 
     // Enter add mode and set a picker filter.
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => {
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
-    });
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument());
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
 
     // Fire the AddAssets action — same mechanism as the existing test.
-    const addAssetsButton = screen.getByRole('button', { name: /add assets/i });
-    await fireEvent.click(addAssetsButton);
+    const addAssetsButton = page.getByRole('button', { name: /add assets/i }).element() as HTMLElement;
+    await userEvent.click(addAssetsButton);
 
     // handleAddAssetsSuccess runs: calls onAction, refreshes album, resets picker filters, returns to browse.
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getAlbumInfo).toHaveBeenCalledWith(expect.objectContaining({ id: 'album-1' }), expect.anything());
     });
     // After returning to browse, the picker filters must be cleared → no active-filters-bar.
-    await waitFor(() => expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('entering add mode starts with no active picker filters even if browse was filtered', async () => {
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument());
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => expect(screen.getByTestId('add-photos-overlay')).toBeInTheDocument());
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await expect.element(page.getByTestId('add-photos-overlay')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('add mode: the picker FilterPanel is hidden when there are no photos to add and no filters', async () => {
     setMockTimelineEmpty();
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await waitFor(() => expect(screen.getByTestId('filter-panel').dataset.hidden).toBe('true'));
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await vi.waitFor(() => expect(page.getByTestId('filter-panel').element().dataset.hidden).toBe('true'));
   });
 
   it('add mode: the picker FilterPanel stays visible when filtered to empty', async () => {
     setMockTimelineEmpty();
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
-    await fireEvent.click(screen.getByTestId('add-photos-button'));
-    await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-    await waitFor(() => expect(screen.getByTestId('filter-panel').dataset.hidden).toBe('false'));
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)], album: makeAlbum({ id: 'album-1' }) });
+    await userEvent.click(page.getByTestId('add-photos-button'));
+    await userEvent.click(page.getByTestId('filter-panel-add-person'));
+    await vi.waitFor(() => expect(page.getByTestId('filter-panel').element().dataset.hidden).toBe('false'));
   });
 
   // ── empty-add-photos-button gating ──────────────────────────────────────────
 
-  it('empty-add-photos-button is present for a space editor (empty album)', () => {
+  it('empty-add-photos-button is present for a space editor (empty album)', async () => {
     setMockTimelineEmpty();
-    renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
-    expect(screen.getByTestId('empty-add-photos-button')).toBeInTheDocument();
+    await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+    await expect.element(page.getByTestId('empty-add-photos-button')).toBeInTheDocument();
   });
 
-  it('empty-add-photos-button is absent for a space viewer with album-viewer role', () => {
+  it('empty-add-photos-button is absent for a space viewer with album-viewer role', async () => {
     setMockTimelineEmpty();
-    renderPage({
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -1043,13 +1008,13 @@ describe('Space album detail page', () => {
         ],
       }),
     });
-    expect(screen.queryByTestId('empty-add-photos-button')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('empty-add-photos-button')).not.toBeInTheDocument();
   });
 
   // ── header add-photos-button role-combo coverage ─────────────────────────────
 
-  it('space=Editor + album role=Viewer: add-photos-button present (canManage via isSpaceEditor)', () => {
-    renderPage({
+  it('space=Editor + album role=Viewer: add-photos-button present (canManage via isSpaceEditor)', async () => {
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Editor)],
       album: makeAlbum({
         albumUsers: [
@@ -1060,11 +1025,11 @@ describe('Space album detail page', () => {
         ],
       }),
     });
-    expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
-  it('space=Viewer + album role=Owner: add-photos-button present (canManage via isAlbumEditor)', () => {
-    renderPage({
+  it('space=Viewer + album role=Owner: add-photos-button present (canManage via isAlbumEditor)', async () => {
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -1075,14 +1040,14 @@ describe('Space album detail page', () => {
         ],
       }),
     });
-    expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
   });
 
   // ── RemoveFromAlbum gating — additional role combos ──────────────────────────
 
   it('space=Viewer + album=Editor + selection active: RemoveFromAlbum is present', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage({
+    await renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
       album: makeAlbum({
         albumUsers: [
@@ -1094,14 +1059,14 @@ describe('Space album detail page', () => {
       }),
     });
     await openOverflowMenu();
-    expect(screen.getByText('Remove from album')).toBeInTheDocument();
+    await expect.element(page.getByText('Remove from album')).toBeInTheDocument();
   });
 
   it('space=Owner + default album + selection active: RemoveFromAlbum is present', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
+    await renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
     await openOverflowMenu();
-    expect(screen.getByText('Remove from album')).toBeInTheDocument();
+    await expect.element(page.getByText('Remove from album')).toBeInTheDocument();
   });
 
   // Slice 6 — rbac-5/albums-8 REVERSED: the browse control bar now renders the full
@@ -1119,55 +1084,55 @@ describe('Space album detail page', () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = true;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
 
-      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
-      expect(screen.getByTestId('download-action')).toBeInTheDocument();
-      expect(screen.getByText('Remove from album')).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Change location' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
+      await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
+      await expect.element(page.getByText('Remove from album')).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Change location' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
     });
 
     it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album + Share (canManage/space-role-gated) + Favorite (per-user) present, metadata-edit + Delete absent (ownership-gated)', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
-      renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+      await renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
 
       // A space Editor may also publish non-owned assets through the space (#1018), so Share
       // stays — the link is created against the space and warns before it is made.
-      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Share' })).toBeInTheDocument();
       // A space Editor may contribute non-owned assets into an album linked to this space
       // (#764), so the "+" stays — it opens the picker restricted to that space's albums.
-      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
       // #763: favoriting writes a per-user `asset_favorite` row, so it is not ownership-gated —
       // the heart stays for a non-owned selection.
-      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
-      expect(screen.getByTestId('download-action')).toBeInTheDocument();
+      await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
       // canRemoveFromAlbum / canSetCover key off canManage (space.canWrite || album.isEditor),
       // NOT ownership — both stay visible even though the selection isn't owned.
-      expect(screen.getByText('Remove from album')).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
+      await expect.element(page.getByText('Remove from album')).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
       // Ownership-gated actions are hidden regardless of manager status.
-      expect(screen.queryByRole('menuitem', { name: 'Change date' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Archive' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Change date' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Archive' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
     });
 
     it('non-manager (viewer) + all-owned selection: metadata-edit affordances present, RemoveFromAlbum + Set-cover absent', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = true;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
-      renderPage({
+      await renderPage({
         members: [makeMember(SharedSpaceRole.Viewer)],
         album: makeAlbum({
           albumUsers: [
@@ -1179,27 +1144,27 @@ describe('Space album detail page', () => {
         }),
       });
 
-      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
-      expect(screen.getByTestId('download-action')).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+      await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
 
       // canManage is false for a plain album/space Viewer — Remove and Set-cover stay hidden
       // even though the selection is entirely their own.
-      expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
+      await expect.element(page.getByText('Remove from album')).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });
 
     it('non-manager (viewer) + NOT-owned selection: only Select-all, Favorite and Download are shown', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
-      renderPage({
+      await renderPage({
         members: [makeMember(SharedSpaceRole.Viewer)],
         album: makeAlbum({
           albumUsers: [
@@ -1211,18 +1176,18 @@ describe('Space album detail page', () => {
         }),
       });
 
-      expect(screen.getByRole('button', { name: 'Select all' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Select all' })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
       // #763: favoriting is a per-user overlay write available to anyone who can see the asset,
       // so even a read-only space viewer gets the heart on a non-owned selection.
-      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+      await expect.element(page.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
-      expect(screen.getByTestId('download-action')).toBeInTheDocument();
-      expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('download-action')).toBeInTheDocument();
+      await expect.element(page.getByText('Remove from album')).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });
   });
 
@@ -1250,56 +1215,56 @@ describe('Space album detail page', () => {
       });
 
     it('rebuilds the timeline for the newly navigated album', async () => {
-      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1', albumName: 'Vacation 2025' }) });
+      const { rerender } = await renderPage({ album: makeAlbum({ id: 'album-1', albumName: 'Vacation 2025' }) });
 
-      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').albumId).toBe('album-1');
+      expect(JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}').albumId).toBe('album-1');
 
       await rerender(rerenderWith(makeAlbum({ id: 'album-2', albumName: 'Birthday Party' })));
 
-      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').albumId).toBe('album-2');
+      expect(JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}').albumId).toBe('album-2');
     });
 
     it('re-evaluates album-derived permissions for the newly navigated album', async () => {
       // Space viewer, so the manage gate falls through to the per-album role: owned album-1 keeps
       // "Add photos", viewer-only album-2 must not. A stale album leaves the button wrongly shown.
       const viewerOnly = [makeMember(SharedSpaceRole.Viewer)];
-      const { rerender } = renderPage({
+      const { rerender } = await renderPage({
         album: albumWithRole('album-1', AlbumUserRole.Owner),
         members: viewerOnly,
       });
 
-      expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('add-photos-button')).toBeInTheDocument();
 
       await rerender(rerenderWith(albumWithRole('album-2', AlbumUserRole.Viewer), viewerOnly));
 
-      expect(screen.queryByTestId('add-photos-button')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('add-photos-button')).not.toBeInTheDocument();
     });
 
     it('drops the previous album filters instead of carrying them onto the new album', async () => {
-      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+      const { rerender } = await renderPage({ album: makeAlbum({ id: 'album-1' }) });
 
-      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
-      await waitFor(() => {
-        const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+      await userEvent.click(page.getByTestId('filter-panel-add-person'));
+      await vi.waitFor(() => {
+        const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
         expect(options.personIds).toEqual(['person-1']);
       });
 
       await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
 
-      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+      const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
       expect(options.albumId).toBe('album-2');
       expect(options.personIds).toBeUndefined();
     });
 
     it('returns to browse mode when navigating away from the add-photos picker', async () => {
-      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+      const { rerender } = await renderPage({ album: makeAlbum({ id: 'album-1' }) });
 
-      await fireEvent.click(screen.getByTestId('add-photos-button'));
-      await waitFor(() => expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add'));
+      await userEvent.click(page.getByTestId('add-photos-button'));
+      await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add');
 
       await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
 
-      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
+      await expect.element(page.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
     });
   });
 
@@ -1312,88 +1277,88 @@ describe('Space album detail page', () => {
       componentProps: { data: makePageData(album) },
     });
 
-    it('runs the search in place instead of showing the browse timeline', () => {
+    it('runs the search in place instead of showing the browse timeline', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
-      expect(screen.queryByTestId('space-album-timeline')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+      await expect.element(page.getByTestId('space-album-timeline')).not.toBeInTheDocument();
     });
 
-    it('scopes the search to the album it was launched from', () => {
+    it('scopes the search to the album it was launched from', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      renderPage({ album: makeAlbum({ id: 'album-1' }) });
+      await renderPage({ album: makeAlbum({ id: 'album-1' }) });
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
     });
 
     // A space album is scoped by its album, not by its space: sending spaceId as well would make the
     // server drop the space gate in favour of the caller's full timeline-space set (database.ts).
-    it('does not send a space scope alongside the album scope', () => {
+    it('does not send a space scope alongside the album scope', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', '');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', '');
     });
 
-    it('shows the browse timeline when there is no query', () => {
-      renderPage();
+    it('shows the browse timeline when there is no query', async () => {
+      await renderPage();
 
-      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
-      expect(screen.queryByTestId('smart-search-results')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
+      await expect.element(page.getByTestId('smart-search-results')).not.toBeInTheDocument();
     });
 
-    it('hydrates filters from the URL into the search', () => {
+    it('hydrates filters from the URL into the search', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach&city=Berlin&type=video');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
     });
 
-    it('hydrates filters from the URL into the browse timeline', () => {
+    it('hydrates filters from the URL into the browse timeline', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?city=Berlin');
 
-      renderPage();
+      await renderPage();
 
-      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+      const options = JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}');
       expect(options.city).toBe('Berlin');
     });
 
-    it('carries an explicit sort into the search', () => {
+    it('carries an explicit sort into the search', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach&sort=asc');
 
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
     });
 
     // The navbar sort dropdown appears on every searchable page, browse mode included. Ignoring the
     // param there would leave a control that visibly does nothing.
-    it('lets an explicit sort override the album order in browse mode', () => {
+    it('lets an explicit sort override the album order in browse mode', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?sort=asc');
 
-      renderPage({ album: makeAlbum({ order: AssetOrder.Desc }) });
+      await renderPage({ album: makeAlbum({ order: AssetOrder.Desc }) });
 
-      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').order).toBe(AssetOrder.Asc);
+      expect(JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}').order).toBe(AssetOrder.Asc);
     });
 
-    it("keeps the album's own order in browse mode when the URL carries no sort", () => {
-      renderPage({ album: makeAlbum({ order: AssetOrder.Asc }) });
+    it("keeps the album's own order in browse mode when the URL carries no sort", async () => {
+      await renderPage({ album: makeAlbum({ order: AssetOrder.Asc }) });
 
-      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').order).toBe(AssetOrder.Asc);
+      expect(JSON.parse(page.getByTestId('timeline-options').element().textContent ?? '{}').order).toBe(AssetOrder.Asc);
     });
 
     it('writes a filter change back to the URL', async () => {
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
+      await userEvent.click(page.getByTestId('filter-panel-add-person'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(goto).toHaveBeenCalledWith(
           '/spaces/space-1/albums/album-1?people=person-1',
           expect.objectContaining({ replace: true }),
@@ -1404,11 +1369,11 @@ describe('Space album detail page', () => {
     it('keeps the query in the URL when a filter changes during a search', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
+      await userEvent.click(page.getByTestId('filter-panel-add-person'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(goto).toHaveBeenCalledWith(
           expect.stringContaining('q=beach'),
           expect.objectContaining({ replace: true }),
@@ -1417,15 +1382,13 @@ describe('Space album detail page', () => {
     });
 
     it('re-hydrates when the URL changes under it (back/forward, shared link)', async () => {
-      renderPage();
+      await renderPage();
 
-      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
+      await expect.element(page.getByTestId('space-album-timeline')).toBeInTheDocument();
 
       mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1?q=sunset');
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset'),
-      );
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset');
     });
 
     const facetsWith = (people: Array<{ id: string; name: string }> = []) =>
@@ -1449,9 +1412,9 @@ describe('Space album detail page', () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
       vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith([{ id: 'facet-person', name: 'Facet Person' }]));
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() => expect(screen.getByTestId('filter-panel-suggested-person-facet-person')).toBeInTheDocument());
+      await expect.element(page.getByTestId('filter-panel-suggested-person-facet-person')).toBeInTheDocument();
       expect(vi.mocked(getFilterSuggestions)).not.toHaveBeenCalled();
     });
 
@@ -1459,31 +1422,29 @@ describe('Space album detail page', () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
       vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() =>
-        expect(screen.getByTestId('filter-panel')).toHaveAttribute('data-time-buckets', '2025-06-01'),
-      );
+      await expect.element(page.getByTestId('filter-panel')).toHaveAttribute('data-time-buckets', '2025-06-01');
     });
 
     it('shows the search total rather than the browse count', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
       vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
 
-      renderPage();
+      await renderPage();
 
-      await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveAttribute('data-result-count', '7'));
+      await expect.element(page.getByTestId('active-filters-bar')).toHaveAttribute('data-result-count', '7');
     });
 
     it('clears the query from the URL when the search chip is dismissed', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
       vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
 
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(await screen.findByTestId('active-filters-clear-search'));
+      await userEvent.click(page.getByTestId('active-filters-clear-search'));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
         expect(target).not.toContain('q=beach');
       });
@@ -1494,11 +1455,11 @@ describe('Space album detail page', () => {
     it('writes temporal chip removal back to the URL', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?year=2025');
 
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(await screen.findByTestId('active-filters-remove-timeline'));
+      await userEvent.click(page.getByTestId('active-filters-remove-timeline'));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
         expect(target).not.toContain('year=2025');
       });
@@ -1508,11 +1469,11 @@ describe('Space album detail page', () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?city=Berlin');
       setMockTimelineEmpty();
 
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(await screen.findByTestId('browse-clear-filters'));
+      await userEvent.click(page.getByTestId('browse-clear-filters'));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
         expect(target).not.toContain('city=Berlin');
       });
@@ -1521,14 +1482,14 @@ describe('Space album detail page', () => {
     it('re-scopes the search when navigating straight to a sibling album', async () => {
       mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
 
-      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+      const { rerender } = await renderPage({ album: makeAlbum({ id: 'album-1' }) });
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
 
       mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-2?q=beach');
       await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
 
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-2');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-2');
     });
   });
 });

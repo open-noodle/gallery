@@ -1,6 +1,4 @@
 import { compileUtilities, hasRuleFor } from '#test/unit/tailwind.ts';
-import { readFile, readdir } from 'node:fs/promises';
-import path from 'node:path';
 
 /**
 Guards whole utility families against names that compile to nothing.
@@ -18,8 +16,8 @@ styles nothing. Two families have shipped that way already:
   (#1082).
 
 Nothing else catches this. eslint's `better-tailwindcss/enforce-consistent-class-order` only
-orders classes it recognises and leaves unknown ones alone; the unit suite runs on happy-dom,
-which resolves no stylesheets; and the class name is still right there in the markup, so reading
+orders classes it recognises and leaves unknown ones alone; the unit suite never asserts on
+computed styles for these classes; and the class name is still right there in the markup, so reading
 the diff does not help either.
 
 Scoped to specific prefixes deliberately. Every token matched below is a Tailwind utility in this
@@ -27,8 +25,12 @@ codebase, so compiling them all is safe; widening the scan to arbitrary prefixes
 picking up `@immich/ui` theme classes and dynamic fragments that legitimately produce no CSS on
 their own.
 */
-const SOURCE_ROOT = path.resolve(process.cwd(), 'src');
-const SOURCE_EXTENSIONS = new Set(['.svelte', '.ts', '.js']);
+// The specs run in the browser, so the sources come in through Vite as raw text rather than off
+// disk. Keys are root-relative paths such as `/src/lib/foo.svelte`. Vite leaves the importing file
+// out of its own glob, which keeps this guard from scanning itself: it names the dead spellings in
+// prose above, which would otherwise register as usages and fail the very check it exists to
+// perform.
+const SOURCES = import.meta.glob<string>('/src/**/*.{svelte,ts,js}', { query: '?raw', import: 'default' });
 
 const FAMILIES = [
   { name: 'wrap-*', pattern: /\bwrap-[a-z][\w-]*\b/g },
@@ -37,23 +39,13 @@ const FAMILIES = [
 ];
 
 async function collectUtilities(pattern: RegExp): Promise<Map<string, string[]>> {
-  const entries = await readdir(SOURCE_ROOT, { recursive: true, withFileTypes: true });
   const sites = new Map<string, string[]>();
 
   await Promise.all(
-    entries.map(async (entry) => {
-      if (!entry.isFile() || !SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
-        return;
-      }
-      const file = path.join(entry.parentPath, entry.name);
-      // Skip this guard itself: it names the dead spellings in prose above, which would otherwise
-      // register as usages and fail the very check it exists to perform.
-      if (file === import.meta.filename) {
-        return;
-      }
-      const contents = await readFile(file, 'utf8');
+    Object.entries(SOURCES).map(async ([file, load]) => {
+      const contents = await load();
       for (const [token] of contents.matchAll(pattern)) {
-        sites.set(token, [...(sites.get(token) ?? []), path.relative(SOURCE_ROOT, file)]);
+        sites.set(token, [...(sites.get(token) ?? []), file.slice('/src/'.length)]);
       }
     }),
   );

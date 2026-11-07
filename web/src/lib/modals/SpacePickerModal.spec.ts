@@ -1,10 +1,8 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import '#lib/__mocks__/sdk.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { SharedSpaceRole, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import SpacePickerModal from './SpacePickerModal.svelte';
 
 const { mockUser } = vi.hoisted(() => ({
@@ -62,17 +60,8 @@ describe('SpacePickerModal', () => {
   const onClose = vi.fn();
 
   beforeEach(() => {
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    vi.stubGlobal('visualViewport', getVisualViewportMock());
     vi.resetAllMocks();
-    Element.prototype.animate = getAnimateMock();
     mockUser.current = { id: 'u-me', isAdmin: false };
-  });
-
-  afterAll(async () => {
-    await waitFor(() => {
-      expect(document.body.style.pointerEvents).not.toBe('none');
-    });
   });
 
   it('shows owner and editor spaces and hides viewer spaces', async () => {
@@ -82,11 +71,11 @@ describe('SpacePickerModal', () => {
       makeSpace({ id: 'viewer-space', name: 'Viewer Space', role: SharedSpaceRole.Viewer }),
     ]);
 
-    render(SpacePickerModal, { onClose });
+    await render(SpacePickerModal, { onClose });
 
-    expect(await screen.findByRole('button', { name: /Owner Space/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Editor Space/ })).toBeInTheDocument();
-    expect(screen.queryByText('Viewer Space')).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Owner Space/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Editor Space/ })).toBeInTheDocument();
+    expect(page.getByText('Viewer Space').query()).toBeNull();
   });
 
   it('treats createdById as an owner fallback when member rows are missing', async () => {
@@ -94,13 +83,13 @@ describe('SpacePickerModal', () => {
       makeSpace({ id: 'created-space', name: 'Created Space', createdById: 'u-me', members: [] }),
     ]);
 
-    render(SpacePickerModal, { onClose });
+    await render(SpacePickerModal, { onClose });
 
-    expect(await screen.findByRole('button', { name: /Created Space/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Created Space/ })).toBeInTheDocument();
   });
 
   it('lists the spaces it is given with their counts and title, without asking the server', async () => {
-    render(SpacePickerModal, {
+    await render(SpacePickerModal, {
       onClose,
       title: 'Remove from space',
       spaces: [
@@ -111,18 +100,18 @@ describe('SpacePickerModal', () => {
       counts: { family: 2, trips: 1 },
     });
 
-    expect(await screen.findByRole('button', { name: /Family/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Trips/ })).toBeInTheDocument();
-    expect(screen.queryByText('Viewed')).not.toBeInTheDocument();
-    expect(screen.getByText('Remove from space')).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Family/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Trips/ })).toBeInTheDocument();
+    expect(page.getByText('Viewed').query()).toBeNull();
+    await expect.element(page.getByText('Remove from space')).toBeInTheDocument();
     // The test locale shows keys: a count per row, in place of the role.
-    expect(screen.getAllByText('items_count')).toHaveLength(2);
-    expect(screen.queryByText('role_editor')).not.toBeInTheDocument();
+    expect(page.getByText('items_count').elements()).toHaveLength(2);
+    expect(page.getByText('role_editor').query()).toBeNull();
     expect(sdkMock.getAllSpaces).not.toHaveBeenCalled();
   });
 
   it("shows each space's colour next to its count", async () => {
-    render(SpacePickerModal, {
+    await render(SpacePickerModal, {
       onClose,
       spaces: [
         makeSpace({ id: 'family', name: 'Family', color: UserAvatarColor.Pink }),
@@ -131,9 +120,10 @@ describe('SpacePickerModal', () => {
       counts: { family: 2, trips: 1 },
     });
 
-    const family = await screen.findByRole('button', { name: /Family/ });
+    await expect.element(page.getByRole('button', { name: /Family/ })).toBeInTheDocument();
+    const family = page.getByRole('button', { name: /Family/ }).element();
     expect(family.querySelector(':scope [data-space-color] svg')?.getAttribute('class')).toContain('text-pink-500');
-    const trips = screen.getByRole('button', { name: /Trips/ });
+    const trips = page.getByRole('button', { name: /Trips/ }).element();
     expect(trips.querySelector(':scope [data-space-color] svg')?.getAttribute('class')).toContain('text-blue-600');
   });
 
@@ -143,37 +133,37 @@ describe('SpacePickerModal', () => {
       makeSpace({ id: 'work-space', name: 'Work Space' }),
     ]);
 
-    render(SpacePickerModal, { onClose });
-    await screen.findByText('Family Space');
+    await render(SpacePickerModal, { onClose });
+    await expect.element(page.getByText('Family Space')).toBeInTheDocument();
 
-    await fireEvent.input(screen.getByRole('textbox'), { target: { value: 'work' } });
+    await userEvent.fill(page.getByRole('textbox'), 'work');
 
-    expect(screen.queryByText('Family Space')).not.toBeInTheDocument();
-    expect(screen.getByText('Work Space')).toBeInTheDocument();
+    expect(page.getByText('Family Space').query()).toBeNull();
+    await expect.element(page.getByText('Work Space')).toBeInTheDocument();
   });
 
   it('shows an empty state when no writable spaces match', async () => {
     sdkMock.getAllSpaces.mockResolvedValue([makeSpace({ id: 'viewer-space', role: SharedSpaceRole.Viewer })]);
 
-    render(SpacePickerModal, { onClose });
+    await render(SpacePickerModal, { onClose });
 
-    expect(await screen.findByText('spaces_no_writable_spaces')).toBeInTheDocument();
+    await expect.element(page.getByText('spaces_no_writable_spaces')).toBeInTheDocument();
   });
 
   it('shows the empty state when spaces fail to load', async () => {
     sdkMock.getAllSpaces.mockRejectedValue(new Error('network'));
 
-    render(SpacePickerModal, { onClose });
+    await render(SpacePickerModal, { onClose });
 
-    expect(await screen.findByText('spaces_no_writable_spaces')).toBeInTheDocument();
+    await expect.element(page.getByText('spaces_no_writable_spaces')).toBeInTheDocument();
   });
 
   it('returns the selected writable space', async () => {
     const target = makeSpace({ id: 'target-space', name: 'Target Space', role: SharedSpaceRole.Editor });
     sdkMock.getAllSpaces.mockResolvedValue([target]);
 
-    render(SpacePickerModal, { onClose });
-    await fireEvent.click(await screen.findByRole('button', { name: /Target Space/ }));
+    await render(SpacePickerModal, { onClose });
+    await userEvent.click(page.getByRole('button', { name: /Target Space/ }));
 
     expect(onClose).toHaveBeenCalledWith(target);
   });

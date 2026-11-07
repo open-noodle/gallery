@@ -1,8 +1,8 @@
 import { duration, ease, spring } from '#lib/gallery/motion/tokens.ts';
-import { readFileSync } from 'node:fs';
+import { commands } from 'vitest/browser';
 
-// Vitest runs from web/; a `?raw` import comes back empty because CSS is stubbed in unit tests.
-const css = readFileSync('src/lib/gallery/motion/motion.css', 'utf8');
+// Read off disk (path relative to web/); a `?raw` import comes back empty because CSS is stubbed in unit tests.
+const css = await commands.readFile('src/lib/gallery/motion/motion.css');
 
 const cssVariable = (name: string) => {
   const match = new RegExp(String.raw`--${name}:\s*([^;]+);`).exec(css);

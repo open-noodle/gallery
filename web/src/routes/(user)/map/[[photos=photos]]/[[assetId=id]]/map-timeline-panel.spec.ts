@@ -1,8 +1,9 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import MapTimelinePanel from './MapTimelinePanel.svelte';
 
 const { mockAssetMultiSelectManager } = vi.hoisted(() => ({
@@ -110,8 +111,8 @@ vi.mock('#lib/services/asset.service.js', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 
-function renderPanel(filters = createFilterState(), onFiltersChange?: (filters: FilterState) => void) {
-  return render(
+async function renderPanel(filters = createFilterState(), onFiltersChange?: (filters: FilterState) => void) {
+  return await render(
     TestWrapper as Component<{ component: typeof MapTimelinePanel; componentProps: Record<string, unknown> }>,
     {
       component: MapTimelinePanel,
@@ -148,89 +149,85 @@ describe('MapTimelinePanel grouping', () => {
   it('counts the assets its own timeline holds, not the size of the cluster selection', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 7;
 
-    renderPanel(); // the cluster selection carries 2 ids
+    await renderPanel(); // the cluster selection carries 2 ids
 
-    await waitFor(() => expect(screen.getByTestId('map-panel-asset-count')).toHaveAttribute('data-asset-count', '7'));
+    await expect.element(page.getByTestId('map-panel-asset-count')).toHaveAttribute('data-asset-count', '7');
   });
 
   it('reports an empty panel when its timeline holds nothing (a filter excluded every pin)', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 0;
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(screen.getByTestId('map-panel-asset-count')).toHaveAttribute('data-asset-count', '0'));
+    await expect.element(page.getByTestId('map-panel-asset-count')).toHaveAttribute('data-asset-count', '0');
   });
 
-  it('renders compact grouping controls and passes mobile grouping props', () => {
-    renderPanel();
+  it('renders compact grouping controls and passes mobile grouping props', async () => {
+    await renderPanel();
 
-    expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: true }),
-    );
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
   });
 
   it('manual grouping changes keep map bbox and selected cluster filters without temporal chips', async () => {
-    renderPanel();
+    await renderPanel();
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    await userEvent.click(page.getByTestId('timeline-grouping-year'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"assetFilter":{}');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"year"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"assetFilter":{}');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('year bucket activation keeps map filters and anchors without temporal filters', async () => {
-    renderPanel(createFilterState());
+    await renderPanel(createFilterState());
 
-    await fireEvent.click(screen.getByTestId('activate-year-bucket'));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"assetFilter":{}');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015 }));
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"assetFilter":{}');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent(JSON.stringify({ year: 2015 }));
   });
 
   it('month bucket activation keeps map filters and anchors without temporal filters', async () => {
-    renderPanel(createFilterState());
+    await renderPanel(createFilterState());
 
-    await fireEvent.click(screen.getByTestId('activate-month-bucket'));
+    await userEvent.click(page.getByTestId('activate-month-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"assetFilter":{}');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015, month: 8 }));
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"assetFilter":{}');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-anchor'))
+      .toMatchTextContent(JSON.stringify({ year: 2015, month: 8 }));
   });
 
   it('explicit map temporal filters still show chips and clear without changing grouping', async () => {
-    renderPanel({ ...createFilterState(), selectedYear: 2015 });
+    await renderPanel({ ...createFilterState(), selectedYear: 2015 });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2015');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"takenAfter":"2015-01-01T00:00:00.000Z"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"takenBefore":"2016-01-01T00:00:00.000Z"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-    });
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2015');
+    await expect
+      .element(page.getByTestId('timeline-options'))
+      .toMatchTextContent('"takenAfter":"2015-01-01T00:00:00.000Z"');
+    await expect
+      .element(page.getByTestId('timeline-options'))
+      .toMatchTextContent('"takenBefore":"2016-01-01T00:00:00.000Z"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
 
-    await fireEvent.click(screen.getByRole('button', { name: 'filter_remove_chip' }));
+    await userEvent.click(page.getByRole('button', { name: 'filter_remove_chip' }));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent('null');
   });
 
   // Finding 1 (#767 fresh instance): clearing the temporal chip INSIDE the panel used to only
@@ -239,15 +236,13 @@ describe('MapTimelinePanel grouping', () => {
   // page (onFiltersChange), exactly like FilterPanel does, so the caller can sync the URL.
   it('notifies onFiltersChange with the temporal fields cleared when the chip is removed inside the panel', async () => {
     const onFiltersChange = vi.fn();
-    renderPanel({ ...createFilterState(), dateAfter: '2024-01-01', dateBefore: '2024-06-30' }, onFiltersChange);
+    await renderPanel({ ...createFilterState(), dateAfter: '2024-01-01', dateBefore: '2024-06-30' }, onFiltersChange);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
-    });
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole('button', { name: 'filter_remove_chip' }));
+    await userEvent.click(page.getByRole('button', { name: 'filter_remove_chip' }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(onFiltersChange).toHaveBeenCalledWith(
         expect.objectContaining({
           dateAfter: undefined,
@@ -261,24 +256,22 @@ describe('MapTimelinePanel grouping', () => {
 
   it('ignores map bucket activation while selection mode is active', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    renderPanel(createFilterState());
+    await renderPanel(createFilterState());
 
-    await fireEvent.click(screen.getByTestId('activate-year-bucket'));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent('null');
   });
 
-  it('hides panel grouping controls while selection mode is active', () => {
+  it('hides panel grouping controls while selection mode is active', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
 
-    renderPanel();
+    await renderPanel();
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: false }),
-    );
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: false }));
   });
 });

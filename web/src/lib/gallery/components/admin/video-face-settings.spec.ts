@@ -1,7 +1,7 @@
 import type { AdminConfigDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import VideoFaceSettings from './video-face-settings.svelte';
 
 const makeConfig = (
@@ -27,33 +27,52 @@ const makeConfig = (
     },
   }) as unknown as AdminConfigDto;
 
+/**
+The number field whose `<label for>` reads `label`. SettingInputField also sets `aria-labelledby` to an
+id nothing carries, which Chromium's accessible-name computation honours, so the field has no
+accessible name and `getByRole('spinbutton', { name })` cannot find it. Reach it through the label's
+`for` target instead, and check it is the number input the role query used to match.
+*/
+const numberField = (label: string) => {
+  const input = document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(label)}"]`)?.control;
+  expect(input).toBeInstanceOf(HTMLInputElement);
+  expect((input as HTMLInputElement).type).toBe('number');
+  return page.elementLocator(input!);
+};
+
 describe('VideoFaceSettings', () => {
-  it('shows the switch and keeps the tuning fields disabled until the feature is on', () => {
+  it('shows the switch and keeps the tuning fields disabled until the feature is on', async () => {
     const config = makeConfig({});
-    render(VideoFaceSettings, { configToEdit: makeConfig({}), config, disabled: false });
+    await render(VideoFaceSettings, { configToEdit: makeConfig({}), config, disabled: false });
 
-    expect(screen.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' })).toBeEnabled();
-    expect(screen.getByRole('spinbutton', { name: 'admin.machine_learning_video_faces_interval' })).toBeDisabled();
-    expect(screen.getByRole('spinbutton', { name: 'admin.machine_learning_video_faces_max_frames' })).toBeDisabled();
+    await expect
+      .element(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' }))
+      .toBeEnabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_interval')).toBeDisabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_max_frames')).toBeDisabled();
   });
 
-  it('enables the tuning fields when the feature is on', () => {
-    render(VideoFaceSettings, { configToEdit: makeConfig({ enabled: true }), config: makeConfig({}), disabled: false });
+  it('enables the tuning fields when the feature is on', async () => {
+    await render(VideoFaceSettings, {
+      configToEdit: makeConfig({ enabled: true }),
+      config: makeConfig({}),
+      disabled: false,
+    });
 
-    expect(screen.getByRole('spinbutton', { name: 'admin.machine_learning_video_faces_interval' })).toBeEnabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_interval')).toBeEnabled();
   });
 
-  it('cannot be turned on while facial recognition is off', () => {
-    render(VideoFaceSettings, { configToEdit: makeConfig({}, false), config: makeConfig({}), disabled: false });
+  it('cannot be turned on while facial recognition is off', async () => {
+    await render(VideoFaceSettings, { configToEdit: makeConfig({}, false), config: makeConfig({}), disabled: false });
 
-    expect(screen.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' })).toBeDisabled();
+    await expect
+      .element(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' }))
+      .toBeDisabled();
   });
 
-  it('renders nothing against an older server that sends no video block', () => {
-    render(VideoFaceSettings, { configToEdit: makeConfig(), config: makeConfig(), disabled: false });
+  it('renders nothing against an older server that sends no video block', async () => {
+    await render(VideoFaceSettings, { configToEdit: makeConfig(), config: makeConfig(), disabled: false });
 
-    expect(
-      screen.queryByRole('switch', { name: 'admin.machine_learning_video_faces_setting' }),
-    ).not.toBeInTheDocument();
+    expect(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' }).query()).toBeNull();
   });
 });

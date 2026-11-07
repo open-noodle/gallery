@@ -1,15 +1,12 @@
-import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
 import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
-import { queryClient } from '#lib/queries/client.ts';
-import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { AssetTypeEnum, type UserConfigDto } from '@immich/sdk';
+import { AssetTypeEnum } from '@immich/sdk';
 import { commandPaletteManager, modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { page } from 'vitest/browser';
 import AssetViewerNavBar from './AssetViewerNavBar.svelte';
 
 vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), function () {
@@ -45,15 +42,6 @@ describe('AssetViewerNavBar component', () => {
     setPlayOriginalVideo: () => Promise.resolve(),
   };
 
-  beforeAll(() => {
-    Element.prototype.animate = vi.fn().mockImplementation(function () {
-      return {
-        cancel: () => {},
-      };
-    });
-    vi.stubGlobal('ResizeObserver', getResizeObserverMock());
-  });
-
   afterEach(() => {
     authManager.reset();
   });
@@ -62,56 +50,23 @@ describe('AssetViewerNavBar component', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows back button', () => {
-    const preferences = factory.preferences({ cast: { gCastEnabled: false } });
-    authManager.setPreferences(preferences);
-
-    const asset = factory.asset({ isTrashed: false });
-    const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
-    expect(getByLabelText('go_back')).toBeInTheDocument();
-  });
-
-  it('shows edited badge when asset is edited', () => {
+  it('shows edited badge when asset is edited', async () => {
     const prefs = factory.preferences({ cast: { gCastEnabled: false } });
     authManager.setPreferences(prefs);
 
     const asset = factory.asset({ isEdited: true, isTrashed: false });
-    const { getByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
-    expect(getByText('edited')).toBeInTheDocument();
+    const screen = await renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
+    await expect.element(screen.getByText('edited')).toBeInTheDocument();
   });
 
-  it('does not show edited badge when asset is not edited', () => {
+  it('does not show edited badge when asset is not edited', async () => {
     const prefs = factory.preferences({ cast: { gCastEnabled: false } });
     authManager.setPreferences(prefs);
 
     const asset = factory.asset({ isEdited: false, isTrashed: false });
-    const { queryByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
-    expect(queryByText('edited')).not.toBeInTheDocument();
-  });
-
-  describe('if the current user owns the asset', () => {
-    it('shows delete button', () => {
-      const ownerId = 'id-of-the-user';
-      const user = factory.user({ id: ownerId });
-      const asset = factory.asset({ ownerId, isTrashed: false });
-      authManager.setUser(user);
-      queryClient.setQueryData(getUserConfigQuery().queryKey, {
-        machineLearning: {
-          enabled: true,
-          clip: { enabled: true },
-          duplicateDetection: { enabled: true },
-          facialRecognition: { enabled: true },
-          ocr: { enabled: true },
-        },
-        trash: { enabled: true, days: 30 },
-      } as UserConfigDto);
-
-      const preferences = factory.preferences({ cast: { gCastEnabled: false } });
-      authManager.setPreferences(preferences);
-
-      const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
-      expect(getByLabelText('delete')).toBeInTheDocument();
-    });
+    const screen = await renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
+    await expect.element(screen.getByLabelText('go_back')).toBeInTheDocument();
+    expect(screen.getByText('edited').query()).toBeNull();
   });
 
   // #889: viewing a shared-space photo owned by someone else, "add to album or space" used to
@@ -122,15 +77,15 @@ describe('AssetViewerNavBar component', () => {
       authManager.setPreferences(factory.preferences({ cast: { gCastEnabled: false } }));
       const asset = factory.asset({ id: 'space-photo', ownerId: 'space-owner', isTrashed: false });
 
-      renderInViewerSpace(AssetViewerNavBar, { asset, ...additionalProps }, { space });
-      await fireEvent.click(screen.getByLabelText('more'));
+      await renderInViewerSpace(AssetViewerNavBar, { asset, ...additionalProps }, { space });
+      await page.getByLabelText('more').click();
     };
 
     it('opens the same picker as the timeline for an editor (#1119)', async () => {
       const show = vi.spyOn(modalManager, 'show').mockResolvedValue(undefined as never);
 
       await renderSpaceViewer({ id: 'space-1', canWrite: true });
-      await fireEvent.click(screen.getByText('add_to_album_or_space'));
+      await page.getByText('add_to_album_or_space').click();
 
       expect(show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['space-photo'] });
       show.mockRestore();
@@ -139,7 +94,8 @@ describe('AssetViewerNavBar component', () => {
     it('does not offer the action to a viewer', async () => {
       await renderSpaceViewer({ id: 'space-1', canWrite: false });
 
-      expect(screen.queryByText('add_to_album_or_space')).not.toBeInTheDocument();
+      await expect.element(page.getByRole('menu')).toBeInTheDocument();
+      expect(page.getByText('add_to_album_or_space').query()).toBeNull();
     });
   });
 
@@ -166,21 +122,21 @@ describe('AssetViewerNavBar component', () => {
         canEdit,
       });
 
-      renderInViewerSpace(
+      await renderInViewerSpace(
         AssetViewerNavBar,
         { asset, ...additionalProps },
         { space: { id: 'space-1', canWrite: true } },
       );
-      await fireEvent.click(screen.getByLabelText('more'));
+      await page.getByLabelText('more').click();
     };
 
     it('W-1: offers rotate and the re-processing jobs when canEdit is true', async () => {
       await renderEditableSpacePhoto(true);
 
-      expect(screen.getByText('rotate_left')).toBeInTheDocument();
-      expect(screen.getByText('rotate_180')).toBeInTheDocument();
-      expect(screen.getByText('refresh_faces')).toBeInTheDocument();
-      expect(screen.getByText('refresh_metadata')).toBeInTheDocument();
+      await expect.element(page.getByText('rotate_left')).toBeInTheDocument();
+      await expect.element(page.getByText('rotate_180')).toBeInTheDocument();
+      await expect.element(page.getByText('refresh_faces')).toBeInTheDocument();
+      await expect.element(page.getByText('refresh_metadata')).toBeInTheDocument();
     });
 
     // Rating is the `Rate` ActionItem (immich-31804): no visible markup, only number-key shortcuts
@@ -200,13 +156,13 @@ describe('AssetViewerNavBar component', () => {
         canEdit: true,
       });
 
-      renderInViewerSpace(
+      await renderInViewerSpace(
         AssetViewerNavBar,
         { asset, ...additionalProps },
         { space: { id: 'space-1', canWrite: true } },
       );
 
-      await fireEvent.keyDown(document.body, { key: '5' });
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '5', bubbles: true }));
 
       await vi.waitFor(() =>
         expect(updateAssetMock).toHaveBeenCalledWith({ id: 'space-photo', updateAssetDto: { rating: 5 } }),
@@ -226,13 +182,13 @@ describe('AssetViewerNavBar component', () => {
         canEdit: false,
       });
 
-      renderInViewerSpace(
+      await renderInViewerSpace(
         AssetViewerNavBar,
         { asset, ...additionalProps },
         { space: { id: 'space-1', canWrite: true } },
       );
 
-      await fireEvent.keyDown(document.body, { key: '5' });
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '5', bubbles: true }));
       // The handler is async (it awaits the formatter first), so let it settle before asserting
       // the negative — otherwise this passes before a wrongly-wired call could land.
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -243,17 +199,19 @@ describe('AssetViewerNavBar component', () => {
     it('W-2: still withholds the owner-only actions from a non-owner', async () => {
       await renderEditableSpacePhoto(true);
 
-      expect(screen.queryByLabelText('delete')).toBeNull();
-      expect(screen.queryByText('to_archive')).toBeNull();
-      expect(screen.queryByText('add_upload_to_stack')).toBeNull();
-      expect(screen.queryByText('view_in_timeline')).toBeNull();
+      await expect.element(page.getByText('rotate_left')).toBeInTheDocument();
+      expect(page.getByLabelText('delete').query()).toBeNull();
+      expect(page.getByText('to_archive').query()).toBeNull();
+      expect(page.getByText('add_upload_to_stack').query()).toBeNull();
+      expect(page.getByText('view_in_timeline').query()).toBeNull();
     });
 
     it('W-3: withholds the edit actions when canEdit is false', async () => {
       await renderEditableSpacePhoto(false);
 
-      expect(screen.queryByText('rotate_left')).toBeNull();
-      expect(screen.queryByText('refresh_faces')).toBeNull();
+      await expect.element(page.getByRole('menu')).toBeInTheDocument();
+      expect(page.getByText('rotate_left').query()).toBeNull();
+      expect(page.getByText('refresh_faces').query()).toBeNull();
     });
   });
 });

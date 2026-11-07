@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import type { FilterPanelConfig, FilterSection, FilterSuggestionsResponse } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -26,6 +28,13 @@ const timeBuckets = [
   { timeBucket: '2024-03-01', count: 50 },
 ];
 
+// These tests run under fake timers, so clicks are dispatched synchronously in the page rather than
+// through the Playwright user path, whose round trip would wait on the faked clock.
+const click = async (element: Element) => {
+  (element as HTMLElement).click();
+  await tick();
+};
+
 function createUnifiedConfig(overrides: Partial<FilterPanelConfig> = {}): FilterPanelConfig {
   return {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
@@ -46,11 +55,11 @@ describe('Unified suggestionsProvider', () => {
 
   it('should fire suggestionsProvider on initial mount with default state', async () => {
     const config = createUnifiedConfig();
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
       expect(config.suggestionsProvider).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -65,49 +74,49 @@ describe('Unified suggestionsProvider', () => {
 
   it('should update suggestions in DOM after response', async () => {
     const config = createUnifiedConfig();
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeTruthy();
-      expect(screen.getByText('Germany')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByText('Alice').element()).toBeTruthy();
+      expect(page.getByText('Germany').element()).toBeTruthy();
     });
   });
 
   it('should debounce discrete filter changes at 50ms', async () => {
     const config = createUnifiedConfig();
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
     expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
-    await fireEvent.click(screen.getByText('Alice'));
+    await vi.waitFor(() => expect(page.getByText('Alice').element()).toBeTruthy());
+    await click(page.getByText('Alice').element());
 
     expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(50);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.suggestionsProvider).toHaveBeenCalledTimes(2);
     });
   });
 
   it('should debounce temporal changes at 200ms', async () => {
     const config = createUnifiedConfig();
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await click(page.getByTestId('year-btn-2023').element());
 
     await vi.advanceTimersByTimeAsync(50);
     expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(150);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(config.suggestionsProvider).toHaveBeenCalledTimes(2);
     });
   });
@@ -119,13 +128,13 @@ describe('Unified suggestionsProvider', () => {
         ratings: [4, 5],
       }),
     });
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       for (const star of [1, 2, 3, 4, 5]) {
-        expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
+        expect(page.getByTestId(`rating-star-${star}`).element()).toBeTruthy();
       }
     });
   });
@@ -135,12 +144,12 @@ describe('Unified suggestionsProvider', () => {
       sections: ['rating'],
       providers: {},
     };
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
     for (const star of [1, 2, 3, 4, 5]) {
-      expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
+      expect(page.getByTestId(`rating-star-${star}`).element()).toBeTruthy();
     }
   });
 
@@ -152,13 +161,13 @@ describe('Unified suggestionsProvider', () => {
         people: peopleProvider,
       },
     };
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(peopleProvider).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('Alice')).toBeTruthy();
+      expect(page.getByText('Alice').element()).toBeTruthy();
     });
   });
 
@@ -167,12 +176,12 @@ describe('Unified suggestionsProvider', () => {
       sections: ['people', 'location'],
       suggestionsProvider: vi.fn().mockResolvedValue(defaultResponse),
     };
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByText('Germany')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByText('Germany').element()).toBeTruthy();
     });
   });
 
@@ -184,24 +193,23 @@ describe('Unified suggestionsProvider', () => {
     });
     const config = { sections: ['rating', 'media'] as FilterSection[], suggestionsProvider };
 
-    render(FilterPanel, { props: { config, timeBuckets: [] } });
+    await render(FilterPanel, { config, timeBuckets: [] });
 
-    // Every other test in this file advances fake timers before waitFor for the same reason:
-    // @testing-library's waitFor only self-advances Jest fake timers (it probes a global `jest`),
-    // not Vitest's, so the initial-mount debounce (0ms) needs a manual nudge or these hang for
-    // real until the test's own 5s timeout.
+    // Every other test in this file advances fake timers before waiting for the same reason:
+    // vi.waitFor polls on real timers and never advances the faked clock, so the initial-mount
+    // debounce (0ms) needs a manual nudge or these hang for real until the test's own timeout.
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByTestId('rating-star-5')).toBeInTheDocument());
+    await vi.waitFor(() => expect(suggestionsProvider).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(page.getByTestId('rating-star-5').element()).toBeTruthy());
 
     // Re-introducing `availableRatings` would dim stars 1, 3, 4 and 5 here. Re-introducing
     // `availableMediaTypes` would drop a media button. Neither may happen.
     for (const star of [1, 2, 3, 4, 5]) {
-      expect(screen.getByTestId(`rating-star-${star}`).className).not.toContain('opacity-50');
+      expect(page.getByTestId(`rating-star-${star}`).element().className).not.toContain('opacity-50');
     }
     for (const type of ['all', 'image', 'video']) {
-      expect(screen.getByTestId(`media-type-${type}`)).toBeInTheDocument();
+      expect(page.getByTestId(`media-type-${type}`).element()).toBeTruthy();
     }
   });
 
@@ -212,18 +220,18 @@ describe('Unified suggestionsProvider', () => {
         cities: citiesProvider,
       },
     });
-    render(FilterPanel, { props: { config, timeBuckets } });
+    await render(FilterPanel, { config, timeBuckets });
 
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
+    await vi.waitFor(() => expect(page.getByText('Alice').element()).toBeTruthy());
 
-    await fireEvent.click(screen.getByTestId('people-item-p1'));
+    await click(page.getByTestId('people-item-p1').element());
     await vi.advanceTimersByTimeAsync(50);
-    await waitFor(() => expect(config.suggestionsProvider).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(config.suggestionsProvider).toHaveBeenCalledTimes(2));
 
-    await fireEvent.click(screen.getByTestId('location-country-Germany'));
+    await click(page.getByTestId('location-country-Germany').element());
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(citiesProvider).toHaveBeenCalledWith(
         'Germany',
         expect.objectContaining({

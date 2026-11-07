@@ -1,7 +1,7 @@
 import FaceCrop from '#lib/components/faces-page/face-crop.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const face = {
   assetId: 'asset-1',
@@ -14,9 +14,9 @@ const face = {
 };
 
 describe('FaceCrop', () => {
-  it('renders a labelled image element backed by the asset media URL and crop transform', () => {
-    render(FaceCrop, { props: { face, label: 'Suggested face' } });
-    const el = screen.getByRole('img', { name: 'Suggested face' });
+  it('renders a labelled image element backed by the asset media URL and crop transform', async () => {
+    await render(FaceCrop, { props: { face, label: 'Suggested face' } });
+    const el = await page.getByRole('img', { name: 'Suggested face' }).findElement();
     const style = el.getAttribute('style') ?? '';
     // getFaceCropTransform with bw=bh=0.25 → 400% / 0% 0%
     expect(style).toContain('background-size: 400% 400%');

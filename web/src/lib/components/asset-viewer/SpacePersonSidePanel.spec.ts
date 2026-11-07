@@ -1,8 +1,7 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, type SharedSpacePersonResponseDto, type SpaceAssetFaceResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 import SpacePersonSidePanel from './SpacePersonSidePanel.svelte';
 
 const {
@@ -111,11 +110,11 @@ describe('SpacePersonSidePanel', () => {
       face({ id: 'face-2' }),
     ]);
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalledWith({ id: 'space-1', assetId: 'asset-1' }));
-    expect(await screen.findByText('Bob')).toBeInTheDocument();
-    expect(screen.getByText('face_unassigned')).toBeInTheDocument();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalledWith({ id: 'space-1', assetId: 'asset-1' }));
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByText('face_unassigned')).toBeInTheDocument();
   });
 
   // Field report on #992: an editor opening this panel got a spinner that never resolved. The
@@ -130,21 +129,21 @@ describe('SpacePersonSidePanel', () => {
       face({ id: 'face-2' }),
     ]);
 
-    renderPanel();
+    await renderPanel();
 
-    expect(await screen.findByText('Bob')).toBeInTheDocument();
-    expect(screen.getAllByText('Bob')).toHaveLength(1);
-    expect(screen.getByText('face_unassigned')).toBeInTheDocument();
-    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    expect(page.getByText('Bob').elements()).toHaveLength(1);
+    await expect.element(page.getByText('face_unassigned')).toBeInTheDocument();
+    expect(page.getByTestId('loading-spinner').query()).toBeNull();
   });
 
   it('F-31: shows an error state and no affordances when the faces request rejects', async () => {
     getSpaceAssetFacesMock.mockRejectedValue(new Error('boom'));
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(screen.getByTestId('space-person-panel-error')).toBeInTheDocument());
-    expect(screen.queryAllByRole('button', { name: /select_new_face|unassign_face/ })).toHaveLength(0);
+    await expect.element(page.getByTestId('space-person-panel-error')).toBeInTheDocument();
+    expect(page.getByRole('button', { name: /select_new_face|unassign_face/ }).elements()).toHaveLength(0);
   });
 
   it('attaches an existing space person to an unassigned face', async () => {
@@ -153,15 +152,15 @@ describe('SpacePersonSidePanel', () => {
     attachSpacePersonFaceMock.mockResolvedValue({ acted: true });
     const onRefresh = vi.fn();
 
-    renderPanel({ onRefresh });
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await renderPanel({ onRefresh });
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalledWith({ id: 'space-1', withHidden: false }));
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalledWith({ id: 'space-1', withHidden: false }));
 
-    await userEvent.click(await screen.findByRole('button', { name: /Bob/ }));
+    await page.getByRole('button', { name: /Bob/ }).click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(attachSpacePersonFaceMock).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'sp-1',
@@ -170,7 +169,7 @@ describe('SpacePersonSidePanel', () => {
     );
     expect(onRefresh).toHaveBeenCalled();
     // The row updates in place to reflect the new attachment.
-    expect(await screen.findByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
   });
 
   // Field report on #992 (pr-992-rc.3): the picker's only text field was the CREATE-person name
@@ -187,16 +186,16 @@ describe('SpacePersonSidePanel', () => {
       spacePerson({ id: 'sp-3', name: 'Bob' }),
     ]);
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole('textbox'), 'alej');
+    await userEvent.fill(page.getByRole('textbox'), 'alej');
 
-    expect(screen.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Alexandra/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    expect(page.getByRole('button', { name: /Alexandra/ }).query()).toBeNull();
+    expect(page.getByRole('button', { name: /Bob/ }).query()).toBeNull();
   });
 
   it('matches candidate names regardless of case and accents', async () => {
@@ -206,15 +205,15 @@ describe('SpacePersonSidePanel', () => {
       spacePerson({ id: 'sp-2', name: 'Bob' }),
     ]);
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    expect(await screen.findByRole('button', { name: /Ángela/ })).toBeInTheDocument();
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('button', { name: /Ángela/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole('textbox'), 'angela');
+    await userEvent.fill(page.getByRole('textbox'), 'angela');
 
-    expect(screen.getByRole('button', { name: /Ángela/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Ángela/ })).toBeInTheDocument();
+    expect(page.getByRole('button', { name: /Bob/ }).query()).toBeNull();
   });
 
   it('restores the full candidate list when the search is cleared', async () => {
@@ -224,18 +223,18 @@ describe('SpacePersonSidePanel', () => {
       spacePerson({ id: 'sp-3', name: 'Bob' }),
     ]);
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    expect(await screen.findByRole('button', { name: /Bob/ })).toBeInTheDocument();
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('button', { name: /Bob/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole('textbox'), 'alej');
-    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+    await userEvent.fill(page.getByRole('textbox'), 'alej');
+    expect(page.getByRole('button', { name: /Bob/ }).query()).toBeNull();
 
-    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.clear(page.getByRole('textbox'));
 
-    expect(screen.getByRole('button', { name: /Bob/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Bob/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
   });
 
   it('attaches the person picked out of a filtered list', async () => {
@@ -246,15 +245,15 @@ describe('SpacePersonSidePanel', () => {
     ]);
     attachSpacePersonFaceMock.mockResolvedValue({ acted: true });
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole('textbox'), 'alej');
-    await userEvent.click(screen.getByRole('button', { name: /Alejandra/ }));
+    await userEvent.fill(page.getByRole('textbox'), 'alej');
+    await page.getByRole('button', { name: /Alejandra/ }).click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(attachSpacePersonFaceMock).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'sp-1',
@@ -272,32 +271,32 @@ describe('SpacePersonSidePanel', () => {
     let settleAttach: (value: unknown) => void = () => {};
     attachSpacePersonFaceMock.mockReturnValue(new Promise((resolve) => (settleAttach = resolve)));
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    await userEvent.click(await screen.findByRole('button', { name: /Bob/ }));
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await page.getByRole('button', { name: /Bob/ }).click();
 
-    expect(await screen.findByTestId('loading-spinner')).toBeInTheDocument();
+    await expect.element(page.getByTestId('loading-spinner')).toBeInTheDocument();
     // And the card is gone with it, so a second impatient tap cannot fire a second attach.
-    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+    expect(page.getByRole('button', { name: /Bob/ }).query()).toBeNull();
 
     settleAttach({ acted: true });
 
-    await waitFor(() => expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByTestId('loading-spinner').query()).toBeNull());
   });
 
   it('says so when the typed name matches nobody, rather than showing an empty grid', async () => {
     getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
     getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Alejandra' })]);
 
-    renderPanel();
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    await renderPanel();
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole('textbox'), 'zzz');
+    await userEvent.fill(page.getByRole('textbox'), 'zzz');
 
-    expect(screen.getByText('no_people_found')).toBeInTheDocument();
+    await expect.element(page.getByText('no_people_found')).toBeInTheDocument();
   });
 
   it('creates a new space person from a face and attaches it in one call', async () => {
@@ -306,23 +305,23 @@ describe('SpacePersonSidePanel', () => {
     createSpacePersonMock.mockResolvedValue(spacePerson({ id: 'sp-new', name: 'Carol' }));
     const onRefresh = vi.fn();
 
-    renderPanel({ onRefresh });
-    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await renderPanel({ onRefresh });
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
 
-    await userEvent.type(screen.getByRole('textbox'), 'Carol');
-    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+    await userEvent.fill(page.getByRole('textbox'), 'Carol');
+    await page.getByRole('button', { name: 'create_person' }).click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(createSpacePersonMock).toHaveBeenCalledWith({
         id: 'space-1',
         sharedSpacePersonCreateDto: { name: 'Carol', assetFaceId: 'face-1' },
       }),
     );
     expect(onRefresh).toHaveBeenCalled();
-    expect(await screen.findByText('Carol')).toBeInTheDocument();
+    await expect.element(page.getByText('Carol')).toBeInTheDocument();
   });
 
   it('detaches a face from its space person', async () => {
@@ -330,12 +329,12 @@ describe('SpacePersonSidePanel', () => {
     detachSpacePersonFaceMock.mockResolvedValue(undefined);
     const onRefresh = vi.fn();
 
-    renderPanel({ onRefresh });
-    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
+    await renderPanel({ onRefresh });
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'unassign_face' }));
+    await page.getByRole('button', { name: 'unassign_face' }).click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(detachSpacePersonFaceMock).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'sp-1',
@@ -343,16 +342,16 @@ describe('SpacePersonSidePanel', () => {
       }),
     );
     expect(onRefresh).toHaveBeenCalled();
-    expect(await screen.findByText('face_unassigned')).toBeInTheDocument();
+    await expect.element(page.getByText('face_unassigned')).toBeInTheDocument();
   });
 
   it('never offers the unassign control on a face with no space person', async () => {
     getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(screen.getByText('face_unassigned')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'unassign_face' })).toBeNull();
+    await expect.element(page.getByText('face_unassigned')).toBeInTheDocument();
+    expect(page.getByRole('button', { name: 'unassign_face' }).query()).toBeNull();
   });
 
   // Slice 9, Task 1 (spec §6.6): the delete-box control is the client's only use of
@@ -366,17 +365,17 @@ describe('SpacePersonSidePanel', () => {
     deleteSpaceAssetFaceMock.mockResolvedValue(undefined);
     const onRefresh = vi.fn();
 
-    renderPanel({ onRefresh });
-    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
+    await renderPanel({ onRefresh });
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'delete_face' }));
+    await page.getByRole('button', { name: 'delete_face' }).click();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(deleteSpaceAssetFaceMock).toHaveBeenCalledWith({ id: 'space-1', assetFaceId: 'face-1' }),
     );
     expect(onRefresh).toHaveBeenCalled();
     // The box is destroyed outright, unlike unassign -- the whole row disappears.
-    expect(screen.queryByText('Bob')).toBeNull();
+    await expect.element(page.getByText('Bob')).not.toBeInTheDocument();
   });
 
   it('never offers the delete control on a face the editor did not draw', async () => {
@@ -384,9 +383,9 @@ describe('SpacePersonSidePanel', () => {
       face({ id: 'face-1', spacePersonId: 'sp-1', spacePersonName: 'Bob', isEditorDrawn: false }),
     ]);
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'delete_face' })).toBeNull();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    expect(page.getByRole('button', { name: 'delete_face' }).query()).toBeNull();
   });
 });

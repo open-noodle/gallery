@@ -1,7 +1,10 @@
-import '#lib/__mocks__/sdk.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectSearchResultAssetIds } from './search.service';
+
+// The browser links every static import before any module body runs, so a static import of the
+// service would load the real @immich/sdk before sdk.mock.ts registers its vi.mock. Loading it
+// after that registration gives it the mocked module.
+const { collectSearchResultAssetIds } = await import('./search.service');
 
 const page = (ids: string[], nextPage: string | null) =>
   ({

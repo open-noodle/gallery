@@ -1,16 +1,23 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { type AlbumResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
+import type { AlbumResponseDto } from '@immich/sdk';
 import { Settings } from 'luxon';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import AlbumEditModal from './AlbumEditModal.svelte';
+import { tick } from 'svelte';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 // The modal saves through upstream's updateAlbumInfoMutation (immich-32668): assert on the SDK call.
 const updateAlbumInfoMock = sdkMock.updateAlbumInfo;
 
 const originalZone = Settings.defaultZone;
+
+// Loaded after the sdk mock above: in browser mode a static import would link the modal's
+// query module to the real SDK before the mock is registered.
+let AlbumEditModal: typeof import('./AlbumEditModal.svelte').default;
+beforeAll(async () => {
+  const module = await import('./AlbumEditModal.svelte');
+  AlbumEditModal = module.default;
+});
 
 // eslint-disable-next-line unicorn/no-unnecessary-parameters
 const album = (o: Partial<AlbumResponseDto> = {}): AlbumResponseDto =>
@@ -24,15 +31,18 @@ const album = (o: Partial<AlbumResponseDto> = {}): AlbumResponseDto =>
     ...o,
   }) as never;
 
-const createdAtInput = () => screen.getByTestId('album-edit-created-at') as HTMLInputElement;
-const saveButton = () => screen.getByRole('button', { name: 'Save' });
+const createdAtInput = () => page.getByTestId('album-edit-created-at').element() as HTMLInputElement;
+const saveButton = () => page.getByRole('button', { name: 'Save' });
 
-// `userEvent.type` is unreliable against `datetime-local`, which browsers and happy-dom
-// treat as segmented rather than free text. Set the whole value at once — the same
-// input+change pair AssetChangeDateModal.spec.ts:57-62 uses on this element.
+// `userEvent.type` is unreliable against `datetime-local`, which browsers treat as
+// segmented rather than free text. Set the whole value at once and fire the
+// input+change pair a user edit produces.
 const setDate = async (value: string) => {
-  await fireEvent.input(createdAtInput(), { target: { value } });
-  await fireEvent.change(createdAtInput(), { target: { value } });
+  const input = createdAtInput();
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await tick();
 };
 
 beforeEach(() => {
@@ -42,19 +52,6 @@ beforeEach(() => {
   Settings.defaultZone = 'Europe/Berlin';
   updateAlbumInfoMock.mockReset();
   updateAlbumInfoMock.mockResolvedValue({ id: 'a1' } as never);
-});
-
-// `FormModal` mounts a bits-ui dialog, which takes a body scroll lock and releases it on a
-// 24ms timer rather than synchronously, so that a same-tick destroy/create keeps the lock
-// (bits-ui/dist/internal/body-scroll-lock.svelte.js:75). If the file finishes inside that
-// window, happy-dom has already torn the environment down when the timer fires and
-// `resetBodyStyle` throws `document is not defined`. Vitest reports that as an *unhandled
-// error*, not a test failure — so the run exits 1 while every test still passes, which is
-// exactly how it surfaced in CI. Unmount and drain the timer before the file ends.
-// `cleanup` is idempotent, so testing-library's own afterEach stays a no-op.
-afterEach(async () => {
-  cleanup();
-  await new Promise((resolve) => setTimeout(resolve, 30));
 });
 
 afterAll(() => {
@@ -67,55 +64,54 @@ describe('AlbumEditModal', () => {
   // context, so the input shipped with no visible label and no accessible name — nothing in
   // this file caught it, because every other assertion reaches the input by test id.
   // getByLabelText resolves through the `for`/`id` association, so it fails if either goes.
-  it('labels the created date input', () => {
-    render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
+  it('labels the created date input', async () => {
+    await render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
 
-    expect(screen.getByLabelText('date_created')).toBe(createdAtInput());
+    expect(page.getByLabelText('date_created').element()).toBe(createdAtInput());
   });
 
-  it('pre-fills the created date in local time', () => {
-    render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
+  it('pre-fills the created date in local time', async () => {
+    await render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
 
     // `datetime-local` inputs normalize their value string per the WHATWG "valid normalized
     // local date and time string" algorithm: the seconds component is dropped when it (and any
     // fractional part) is zero. 1996-06-15T12:30:00.000Z is exactly 14:30:00.000 in Berlin summer
-    // time, so seconds/ms are both zero here and the browser (and happy-dom, spec-compliantly)
-    // renders "14:30" rather than "14:30:00.000". This is a display-string quirk, not a timezone
+    // time, so seconds/ms are both zero here and the browser renders "14:30" rather than "14:30:00.000". This is a display-string quirk, not a timezone
     // bug — the historical-offset assertion below is the real proof of correct zone handling.
     expect(createdAtInput().value).toBe('1996-06-15T14:30');
   });
 
   it('submits the edited date as an ISO string with the historical offset', async () => {
     const onClose = vi.fn();
-    render(AlbumEditModal, { props: { album: album(), onClose } });
+    await render(AlbumEditModal, { props: { album: album(), onClose } });
 
     await setDate('1996-06-15T09:00:00.000');
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
     const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto.createdAt).toBe('1996-06-15T09:00:00.000+02:00');
     expect(onClose).toHaveBeenCalled();
   });
 
   it('omits the created date when it was not touched', async () => {
-    render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
+    await render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
 
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
     const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto).not.toHaveProperty('createdAt');
     expect(dto.albumName).toBe('Summer');
   });
 
   it('omits the created date when the input is cleared, and still saves the name', async () => {
-    render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
+    await render(AlbumEditModal, { props: { album: album(), onClose: vi.fn() } });
 
     await setDate('');
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
     const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto).not.toHaveProperty('createdAt');
     expect(dto.albumName).toBe('Summer');

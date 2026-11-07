@@ -1,5 +1,5 @@
-import { fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
 import SortToggle from '../sort-toggle.svelte';
 
 beforeAll(async () => {
@@ -9,17 +9,15 @@ beforeAll(async () => {
 });
 
 describe('SortToggle', () => {
-  it('should show descending by default', () => {
-    const { getByTestId } = render(SortToggle, {
-      props: {
-        sortOrder: 'desc',
-        onToggle: () => {},
-      },
+  it('should show descending by default', async () => {
+    const { getByTestId } = await render(SortToggle, {
+      sortOrder: 'desc',
+      onToggle: () => {},
     });
 
     const button = getByTestId('sort-toggle');
-    expect(button).toBeTruthy();
-    expect(button.getAttribute('title')).toBe('Sort: newest first');
+    await expect.element(button).toBeInTheDocument();
+    expect(button.element().getAttribute('title')).toBe('Sort: newest first');
   });
 
   it('should toggle direction on click', async () => {
@@ -28,14 +26,12 @@ describe('SortToggle', () => {
       toggled = order;
     };
 
-    const { getByTestId } = render(SortToggle, {
-      props: {
-        sortOrder: 'desc',
-        onToggle,
-      },
+    const { getByTestId } = await render(SortToggle, {
+      sortOrder: 'desc',
+      onToggle,
     });
 
-    await fireEvent.click(getByTestId('sort-toggle'));
+    await getByTestId('sort-toggle').click();
     expect(toggled).toBe('asc');
   });
 
@@ -45,17 +41,15 @@ describe('SortToggle', () => {
       toggled = order;
     };
 
-    const { getByTestId } = render(SortToggle, {
-      props: {
-        sortOrder: 'asc',
-        onToggle,
-      },
+    const { getByTestId } = await render(SortToggle, {
+      sortOrder: 'asc',
+      onToggle,
     });
 
     const button = getByTestId('sort-toggle');
-    expect(button.getAttribute('title')).toBe('Sort: oldest first');
+    expect(button.element().getAttribute('title')).toBe('Sort: oldest first');
 
-    await fireEvent.click(button);
+    await button.click();
     expect(toggled).toBe('desc');
   });
 });

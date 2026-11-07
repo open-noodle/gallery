@@ -1,5 +1,6 @@
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import PeopleGridWrapper from './people-grid.test-wrapper.svelte';
 
 type ObserverEntry = Pick<IntersectionObserverEntry, 'target' | 'isIntersecting'>;
@@ -60,8 +61,8 @@ describe('PeopleGrid', () => {
     }
   };
 
-  it('renders items through the child snippet', () => {
-    render(PeopleGridWrapper, {
+  it('renders items through the child snippet', async () => {
+    await render(PeopleGridWrapper, {
       props: {
         items: [
           { id: 'p1', label: 'Alice' },
@@ -71,12 +72,12 @@ describe('PeopleGrid', () => {
       },
     });
 
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
   });
 
-  it('shows loading text when loading the next page', () => {
-    render(PeopleGridWrapper, {
+  it('shows loading text when loading the next page', async () => {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -85,13 +86,13 @@ describe('PeopleGrid', () => {
       },
     });
 
-    expect(screen.getByText('loading')).toBeInTheDocument();
-    expect(screen.getByText('loading')).toHaveAttribute('aria-live', 'polite');
+    await expect.element(page.getByText('loading', { exact: true })).toBeInTheDocument();
+    await expect.element(page.getByText('loading', { exact: true })).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('calls loadNextPage when the sentinel intersects while more pages are available', () => {
+  it('calls loadNextPage when the sentinel intersects while more pages are available', async () => {
     const loadNextPage = vi.fn();
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -107,9 +108,9 @@ describe('PeopleGrid', () => {
     expect(loadNextPage).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call loadNextPage when the sentinel is not intersecting', () => {
+  it('does not call loadNextPage when the sentinel is not intersecting', async () => {
     const loadNextPage = vi.fn();
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -125,9 +126,9 @@ describe('PeopleGrid', () => {
     expect(loadNextPage).not.toHaveBeenCalled();
   });
 
-  it('does not call loadNextPage while loading', () => {
+  it('does not call loadNextPage while loading', async () => {
     const loadNextPage = vi.fn();
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -150,7 +151,7 @@ describe('PeopleGrid', () => {
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -160,7 +161,7 @@ describe('PeopleGrid', () => {
 
     flushAnimationFrames();
 
-    await waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
   });
 
   it('calls loadNextPage after items grow when the sentinel remains visible', async () => {
@@ -169,7 +170,7 @@ describe('PeopleGrid', () => {
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    const { rerender } = render(PeopleGridWrapper, {
+    const { rerender } = await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -192,16 +193,16 @@ describe('PeopleGrid', () => {
 
     flushAnimationFrames();
 
-    await waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
   });
 
-  it('does not call loadNextPage from the visibility re-check while loading', () => {
+  it('does not call loadNextPage from the visibility re-check while loading', async () => {
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
       top: window.innerHeight - 1,
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -221,7 +222,7 @@ describe('PeopleGrid', () => {
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    const { rerender } = render(PeopleGridWrapper, {
+    const { rerender } = await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -251,7 +252,7 @@ describe('PeopleGrid', () => {
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    const { rerender } = render(PeopleGridWrapper, {
+    const { rerender } = await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -272,16 +273,16 @@ describe('PeopleGrid', () => {
 
     flushAnimationFrames();
 
-    await waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
   });
 
-  it('does not call loadNextPage twice when intersection fires before a pending visibility re-check', () => {
+  it('does not call loadNextPage twice when intersection fires before a pending visibility re-check', async () => {
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
       top: window.innerHeight - 1,
     } as DOMRect);
     const loadNextPage = vi.fn();
 
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -298,9 +299,9 @@ describe('PeopleGrid', () => {
     expect(loadNextPage).toHaveBeenCalledTimes(1);
   });
 
-  it('does not observe or call loadNextPage when there are no more pages', () => {
+  it('does not observe or call loadNextPage when there are no more pages', async () => {
     const loadNextPage = vi.fn();
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: false,
@@ -313,7 +314,7 @@ describe('PeopleGrid', () => {
   });
 
   it('disconnects the observer when pagination is no longer available', async () => {
-    const { rerender } = render(PeopleGridWrapper, {
+    const { rerender } = await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -331,10 +332,10 @@ describe('PeopleGrid', () => {
     expect(observer.disconnect).toHaveBeenCalled();
   });
 
-  it('renders without IntersectionObserver support', () => {
+  it('renders without IntersectionObserver support', async () => {
     vi.stubGlobal('IntersectionObserver', undefined);
 
-    render(PeopleGridWrapper, {
+    await render(PeopleGridWrapper, {
       props: {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
@@ -342,6 +343,6 @@ describe('PeopleGrid', () => {
       },
     });
 
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
   });
 });

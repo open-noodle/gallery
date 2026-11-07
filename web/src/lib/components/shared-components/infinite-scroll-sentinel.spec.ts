@@ -1,6 +1,5 @@
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import InfiniteScrollSentinel from './infinite-scroll-sentinel.svelte';
 
 // The sentinel-only infinite-scroll primitive. Mirrors the controllable-observer + rAF-fallback test harness
@@ -65,44 +64,46 @@ describe('InfiniteScrollSentinel', () => {
     }
   };
 
-  it('renders the sentinel only while there are more pages', () => {
-    const { rerender } = render(InfiniteScrollSentinel, {
+  it('renders the sentinel only while there are more pages', async () => {
+    const { rerender } = await render(InfiniteScrollSentinel, {
       props: { hasMore: false, onLoadMore: vi.fn() },
     });
     expect(observerInstances).toHaveLength(0);
 
-    void rerender({ hasMore: true, onLoadMore: vi.fn() });
+    await rerender({ hasMore: true, onLoadMore: vi.fn() });
   });
 
-  it('shows the loading label with aria-live while a page is in flight', () => {
-    render(InfiniteScrollSentinel, { props: { hasMore: true, loading: true, onLoadMore: vi.fn() } });
+  it('shows the loading label with aria-live while a page is in flight', async () => {
+    const screen = await render(InfiniteScrollSentinel, {
+      props: { hasMore: true, loading: true, onLoadMore: vi.fn() },
+    });
 
     const label = screen.getByText('loading');
-    expect(label).toBeInTheDocument();
-    expect(label).toHaveAttribute('aria-live', 'polite');
+    await expect.element(label).toBeInTheDocument();
+    await expect.element(label).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('calls onLoadMore when the sentinel intersects while more pages are available', () => {
+  it('calls onLoadMore when the sentinel intersects while more pages are available', async () => {
     const onLoadMore = vi.fn();
-    render(InfiniteScrollSentinel, { props: { hasMore: true, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, onLoadMore } });
 
     observerInstances[0].trigger({ target: observerInstances[0].observedTarget!, isIntersecting: true });
 
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onLoadMore when the sentinel is not intersecting', () => {
+  it('does not call onLoadMore when the sentinel is not intersecting', async () => {
     const onLoadMore = vi.fn();
-    render(InfiniteScrollSentinel, { props: { hasMore: true, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, onLoadMore } });
 
     observerInstances[0].trigger({ target: observerInstances[0].observedTarget!, isIntersecting: false });
 
     expect(onLoadMore).not.toHaveBeenCalled();
   });
 
-  it('does not call onLoadMore while loading', () => {
+  it('does not call onLoadMore while loading', async () => {
     const onLoadMore = vi.fn();
-    render(InfiniteScrollSentinel, { props: { hasMore: true, loading: true, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, loading: true, onLoadMore } });
 
     observerInstances[0].trigger({ target: observerInstances[0].observedTarget!, isIntersecting: true });
 
@@ -115,10 +116,10 @@ describe('InfiniteScrollSentinel', () => {
     } as DOMRect);
     const onLoadMore = vi.fn();
 
-    render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
     flushAnimationFrames();
 
-    await waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1));
   });
 
   it('re-checks visibility after the loaded count grows', async () => {
@@ -127,7 +128,7 @@ describe('InfiniteScrollSentinel', () => {
     } as DOMRect);
     const onLoadMore = vi.fn();
 
-    const { rerender } = render(InfiniteScrollSentinel, {
+    const { rerender } = await render(InfiniteScrollSentinel, {
       props: { hasMore: true, loading: true, itemCount: 1, onLoadMore },
     });
     expect(onLoadMore).not.toHaveBeenCalled();
@@ -135,16 +136,16 @@ describe('InfiniteScrollSentinel', () => {
     await rerender({ hasMore: true, loading: false, itemCount: 2, onLoadMore });
     flushAnimationFrames();
 
-    await waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1));
   });
 
-  it('does not call onLoadMore twice when intersection fires before a pending visibility re-check', () => {
+  it('does not call onLoadMore twice when intersection fires before a pending visibility re-check', async () => {
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
       top: window.innerHeight - 1,
     } as DOMRect);
     const onLoadMore = vi.fn();
 
-    render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
 
     observerInstances[0].trigger({ target: observerInstances[0].observedTarget!, isIntersecting: true });
     flushAnimationFrames();
@@ -152,16 +153,16 @@ describe('InfiniteScrollSentinel', () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it('does not observe or call onLoadMore when there are no more pages', () => {
+  it('does not observe or call onLoadMore when there are no more pages', async () => {
     const onLoadMore = vi.fn();
-    render(InfiniteScrollSentinel, { props: { hasMore: false, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: false, onLoadMore } });
 
     expect(observerInstances).toHaveLength(0);
     expect(onLoadMore).not.toHaveBeenCalled();
   });
 
   it('disconnects the observer when pagination is no longer available', async () => {
-    const { rerender } = render(InfiniteScrollSentinel, {
+    const { rerender } = await render(InfiniteScrollSentinel, {
       props: { hasMore: true, onLoadMore: vi.fn() },
     });
     const observer = observerInstances[0];
@@ -171,14 +172,14 @@ describe('InfiniteScrollSentinel', () => {
     expect(observer.disconnect).toHaveBeenCalled();
   });
 
-  it('falls back gracefully when IntersectionObserver is unavailable', () => {
+  it('falls back gracefully when IntersectionObserver is unavailable', async () => {
     vi.stubGlobal('IntersectionObserver', undefined);
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
       top: window.innerHeight - 1,
     } as DOMRect);
     const onLoadMore = vi.fn();
 
-    render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
+    await render(InfiniteScrollSentinel, { props: { hasMore: true, itemCount: 1, onLoadMore } });
     flushAnimationFrames();
 
     expect(onLoadMore).toHaveBeenCalledTimes(1);

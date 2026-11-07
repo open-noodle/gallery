@@ -2,7 +2,16 @@ import { getAssetTrim, isHttpError, removeAssetTrim, updateAssetTrim, type Asset
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TrimManager } from './trim-manager.svelte';
 
-vi.mock('@immich/sdk');
+// Browser mode cannot automock `@immich/sdk` (its build uses `export *`): replace each function with a mock.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocks = Object.fromEntries(
+    Object.entries(module)
+      .filter(([, value]) => typeof value === 'function')
+      .map(([key]) => [key, vi.fn()]),
+  );
+  return { ...module, ...mocks };
+});
 
 const notFound = { status: 404 };
 

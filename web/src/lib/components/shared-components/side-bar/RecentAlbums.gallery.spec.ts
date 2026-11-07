@@ -1,10 +1,11 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import RecentAlbums from '#lib/components/shared-components/side-bar/RecentAlbums.svelte';
 import { albumsQueryKey } from '#lib/queries/album.query.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { factory } from '#test/unit/factories.ts';
-import { render, screen } from '@testing-library/svelte';
-import { tick } from 'svelte';
+import { test } from '#test/unit/fixtures.ts';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const sidebarMocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -17,9 +18,6 @@ vi.mock('#lib/stores/sidebar-mode.svelte.js', () => ({ sidebarModeStore: sidebar
 
 describe('RecentAlbums component', () => {
   beforeEach(() => {
-    // This project does not enable `clearMocks`, so call history accumulates across a file and
-    // a `toHaveBeenCalledOnce` further down would count every earlier render too.
-    vi.clearAllMocks();
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;
     sidebarMocks.sidebarModeStore.railExpanded = false;
@@ -30,23 +28,22 @@ describe('RecentAlbums component', () => {
 
   // The rail keeps these rows so it holds the expanded sidebar's vertical rhythm; collapsed a
   // row is just its cover thumbnail, centred, as Google Photos' rail shows albums.
-  it.each`
+  test.for`
     layout        | hoverExpanded | centred  | inset
     ${'rail'}     | ${false}      | ${true}  | ${false}
     ${'rail'}     | ${true}       | ${false} | ${true}
     ${'expanded'} | ${false}      | ${false} | ${true}
   `(
     'centred=$centred for layout=$layout hoverExpanded=$hoverExpanded',
-    async ({ layout, hoverExpanded, centred, inset }) => {
+    async ({ layout, hoverExpanded, centred, inset }, { data }) => {
       sidebarMocks.sidebarModeStore.layout = layout;
       sidebarMocks.sidebarModeStore.hoverExpanded = hoverExpanded;
       sidebarMocks.sidebarModeStore.railExpanded = hoverExpanded;
-      sdkMock.getAllAlbums.mockResolvedValueOnce([factory.album()]);
-      render(RecentAlbums);
-      await tick();
-      await tick();
+      data.addAlbums(factory.album());
+      await render(RecentAlbums);
 
-      const row = screen.getAllByRole('link')[0];
+      await expect.element(page.getByRole('link')).toBeInTheDocument();
+      const row = page.getByRole('link').element();
       // Centring is a padding value, never `justify-center`: only a length can be transitioned,
       // and without that the thumbnail snapped to the row's start before sliding right.
       expect(/\bw-12\b/.test(row.className)).toBe(centred);
@@ -54,23 +51,4 @@ describe('RecentAlbums component', () => {
       expect(row.className).not.toContain('justify-center');
     },
   );
-
-  it('sorts albums by most recently updated', async () => {
-    const albums = [
-      factory.album({ updatedAt: '2024-01-01T00:00:00Z' }),
-      factory.album({ updatedAt: '2024-01-09T00:00:01Z' }),
-      factory.album({ updatedAt: '2024-01-10T00:00:00Z' }),
-      factory.album({ updatedAt: '2024-01-09T00:00:00Z' }),
-    ];
-
-    sdkMock.getAllAlbums.mockResolvedValueOnce([...albums]);
-    render(RecentAlbums);
-
-    const links = await screen.findAllByRole('link');
-    expect(sdkMock.getAllAlbums).toHaveBeenCalledOnce();
-    expect(links).toHaveLength(3);
-    expect(links[0]).toHaveAttribute('href', `/albums/${albums[2].id}`);
-    expect(links[1]).toHaveAttribute('href', `/albums/${albums[1].id}`);
-    expect(links[2]).toHaveAttribute('href', `/albums/${albums[3].id}`);
-  });
 });

@@ -1,7 +1,9 @@
 import { reactiveProps } from '#lib/gallery/__mocks__/reactive-props.svelte.ts';
 import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
+import { expect } from 'vitest';
+import { cleanup, render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Timeline from './Timeline.svelte';
 
 const testState = vi.hoisted(() => ({
@@ -50,12 +52,14 @@ const testState = vi.hoisted(() => ({
   renderOffset: 0,
 }));
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   afterNavigate: vi.fn(),
   beforeNavigate: vi.fn(),
 }));
 
-vi.mock('$app/state', () => ({
+vi.mock('$app/state', async () => ({
+  ...(await import('#test/unit/mocks/app-state.svelte.ts')),
   page: {
     url: new URL('https://gallery.test/photos'),
     route: { id: '/(user)/photos' },
@@ -104,15 +108,6 @@ vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
     },
   },
 }));
-
-vi.mock('#lib/stores/preferences.store.js', async () => {
-  const { readable } = await import('svelte/store');
-  return {
-    lang: readable('en-US'),
-    // `utils.ts` derives `memoryLaneTitle` from this at module load, so the mock must carry it.
-    locale: readable('en-US'),
-  };
-});
 
 vi.mock('#lib/managers/timeline-manager/timeline-manager.svelte.js', () => ({
   TimelineManager: class TimelineManagerMock {
@@ -262,51 +257,51 @@ describe('Timeline representative grouping integration', () => {
   it('renders representative buckets instead of month groups in year mode', async () => {
     testState.grouping = 'year';
 
-    renderTimeline({ onGroupingChange: () => {} });
+    await renderTimeline({ onGroupingChange: () => {} });
 
-    expect(await screen.findByTestId('timeline-representative-buckets')).toHaveAttribute('data-grouping', 'year');
-    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-representative-buckets')).toHaveAttribute('data-grouping', 'year');
+    await expect.element(page.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
   });
 
   it('shows the mobile grouping control only when a handler exists and overlays are inactive', async () => {
     testState.grouping = 'month';
     testState.maxMd = true;
 
-    renderTimeline({ onGroupingChange: () => {} });
+    await renderTimeline({ onGroupingChange: () => {} });
 
-    expect(await screen.findByTestId('timeline-mobile-grouping-control-shell')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-mobile-grouping-control-shell')).toBeInTheDocument();
 
     cleanup();
-    renderTimeline({ assetInteraction: assetInteraction({ selectionActive: true }), onGroupingChange: () => {} });
-    expect(screen.queryByTestId('timeline-mobile-grouping-control-shell')).not.toBeInTheDocument();
+    await renderTimeline({ assetInteraction: assetInteraction({ selectionActive: true }), onGroupingChange: () => {} });
+    expect(page.getByTestId('timeline-mobile-grouping-control-shell').query()).toBeNull();
 
     cleanup();
     testState.isViewing = true;
-    renderTimeline({ onGroupingChange: () => {} });
-    expect(screen.queryByTestId('timeline-mobile-grouping-control-shell')).not.toBeInTheDocument();
+    await renderTimeline({ onGroupingChange: () => {} });
+    expect(page.getByTestId('timeline-mobile-grouping-control-shell').query()).toBeNull();
 
     cleanup();
     testState.isViewing = false;
-    renderTimeline();
-    expect(screen.queryByTestId('timeline-mobile-grouping-control-shell')).not.toBeInTheDocument();
+    await renderTimeline();
+    expect(page.getByTestId('timeline-mobile-grouping-control-shell').query()).toBeNull();
   });
 
   it('keeps the mobile grouping control in sync with the timeline manager grouping', async () => {
     testState.grouping = 'day';
     testState.maxMd = true;
 
-    renderTimeline({
+    await renderTimeline({
       options: { grouping: 'month' },
       grouping: 'day',
       onGroupingChange: () => {},
     });
 
-    expect(await screen.findByTestId('timeline-representative-buckets')).toHaveAttribute('data-grouping', 'month');
-    expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('timeline-representative-buckets')).toHaveAttribute('data-grouping', 'month');
+    await expect.element(page.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('waits for the manager grouping to match options before resolving a temporal anchor', () => {
+  it('waits for the manager grouping to match options before resolving a temporal anchor', async () => {
     const onTemporalAnchorResolved = vi.fn();
     testState.grouping = 'month';
     testState.keepStaleGroupingOnUpdate = true;
@@ -324,7 +319,7 @@ describe('Timeline representative grouping integration', () => {
       representativeRatio: null,
     };
 
-    renderTimeline({
+    await renderTimeline({
       options: { grouping: 'day' },
       grouping: 'day',
       temporalAnchor: { year: 2015, month: 8 },
@@ -334,14 +329,14 @@ describe('Timeline representative grouping integration', () => {
     expect(onTemporalAnchorResolved).not.toHaveBeenCalled();
   });
 
-  it('waits for viewport geometry before resolving a day-mode temporal anchor', () => {
+  it('waits for viewport geometry before resolving a day-mode temporal anchor', async () => {
     const onTemporalAnchorResolved = vi.fn();
     testState.grouping = 'day';
     testState.viewportHeight = 0;
     testState.viewportWidth = 0;
     testState.months = [{ yearMonth: { year: 2015, month: 8 }, top: 0 }] as unknown[];
 
-    renderTimeline({
+    await renderTimeline({
       options: { grouping: 'day' },
       grouping: 'day',
       temporalAnchor: { year: 2015, month: 8 },
@@ -351,13 +346,13 @@ describe('Timeline representative grouping integration', () => {
     expect(onTemporalAnchorResolved).not.toHaveBeenCalled();
   });
 
-  it('waits for the scroll container before resolving a day-mode temporal anchor', () => {
+  it('waits for the scroll container before resolving a day-mode temporal anchor', async () => {
     const onTemporalAnchorResolved = vi.fn();
     testState.grouping = 'day';
     testState.hasScrollableElement = false;
     testState.months = [{ yearMonth: { year: 2015, month: 8 }, top: 480 }] as unknown[];
 
-    renderTimeline({
+    await renderTimeline({
       options: { grouping: 'day' },
       grouping: 'day',
       temporalAnchor: { year: 2015, month: 8 },
@@ -386,14 +381,14 @@ describe('Timeline representative grouping integration', () => {
       testState.scrollToUpdatesAfterCalls = 2;
       testState.months = [{ yearMonth: { year: 2015, month: 8 }, top: 1200, height: 240 }] as unknown[];
 
-      renderTimeline({
+      await renderTimeline({
         options: { grouping: 'day' },
         grouping: 'day',
         temporalAnchor: { year: 2015, month: 8 },
         onTemporalAnchorResolved,
       });
 
-      await waitFor(() => expect(onTemporalAnchorResolved).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(onTemporalAnchorResolved).toHaveBeenCalledOnce());
       expect(testState.scrollCalls).toEqual([1200, 1200]);
     } finally {
       vi.unstubAllGlobals();
@@ -404,7 +399,7 @@ describe('Timeline representative grouping integration', () => {
     testState.grouping = 'day';
     testState.months = [];
 
-    renderTimeline({
+    await renderTimeline({
       enableRouting: true,
       options: { grouping: 'day' },
       grouping: 'day',
@@ -422,25 +417,25 @@ describe('Timeline representative grouping integration', () => {
     testState.maxMd = false;
     testState.pointerCoarse = true;
 
-    renderTimeline({
+    await renderTimeline({
       onGroupingChange: (grouping: TimelineGrouping) => {
         changes.push(grouping);
       },
     });
 
-    const shell = await screen.findByTestId('timeline-mobile-grouping-control-shell');
-    expect(within(shell).getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(within(shell).getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
+    const shell = page.getByTestId('timeline-mobile-grouping-control-shell');
+    await expect.element(shell).toBeInTheDocument();
+    await expect
+      .element(shell.getByRole('button', { name: 'timeline_grouping_all' }))
+      .toHaveAttribute('aria-pressed', 'true');
+    await expect.element(shell.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
 
-    await fireEvent.click(within(shell).getByRole('button', { name: 'timeline_grouping_years' }));
+    await shell.getByRole('button', { name: 'timeline_grouping_years' }).click();
 
     expect(changes).toEqual(['year']);
   });
 
-  it('renders the empty snippet when the initialized timeline has zero assets', () => {
+  it('renders the empty snippet when the initialized timeline has zero assets', async () => {
     testState.assetCount = 0;
     testState.months = [
       {
@@ -453,11 +448,11 @@ describe('Timeline representative grouping integration', () => {
       },
     ];
 
-    renderTimeline({
+    await renderTimeline({
       empty: createRawSnippet(() => ({ render: () => '<div>No assets found</div>' })),
     });
 
-    expect(screen.getByText('No assets found')).toBeInTheDocument();
+    await expect.element(page.getByText('No assets found')).toBeInTheDocument();
   });
 });
 
@@ -472,14 +467,14 @@ describe('Timeline scroll-space scaling', () => {
     testState.months = [];
   });
 
-  it('sizes the virtual timeline to domHeight, not totalViewerHeight', () => {
+  it('sizes the virtual timeline to domHeight, not totalViewerHeight', async () => {
     testState.domHeight = 200; // < totalViewerHeight (296)
-    const { container } = renderTimeline();
+    const { container } = await renderTimeline();
     const virtual = container.querySelector('#virtual-timeline') as HTMLElement;
-    expect(virtual).toHaveStyle({ height: '200px' });
+    await expect.element(page.elementLocator(virtual)).toHaveStyle({ height: '200px' });
   });
 
-  it('offsets the month skeleton transform by renderOffset', () => {
+  it('offsets the month skeleton transform by renderOffset', async () => {
     testState.renderOffset = 50;
     testState.months = [
       {
@@ -491,29 +486,29 @@ describe('Timeline scroll-space scaling', () => {
         title: 'Jan 2015',
       },
     ];
-    renderTimeline();
+    await renderTimeline();
     // assert on the raw inline style so CSS normalization (e.g. `0`→`0px`) can't cause a false negative;
     // the template emits exactly `translate3d(0,${top + renderOffset}px,0)`
-    const skeleton = screen.getByTestId('timeline-month-skeleton');
+    const skeleton = page.getByTestId('timeline-month-skeleton').element();
     expect(skeleton.getAttribute('style')).toMatch(/translate3d\(\s*0(?:px)?\s*,\s*1250px\s*,\s*0(?:px)?\s*\)/);
   });
 
-  it('offsets the lead-out spacer transform by renderOffset', () => {
+  it('offsets the lead-out spacer transform by renderOffset', async () => {
     // topSectionHeight 0 + bodySectionHeight 296 + renderOffset 50 = 346
     testState.renderOffset = 50;
-    const { getByTestId } = renderTimeline();
-    expect(getByTestId('timeline-leadout').getAttribute('style')).toMatch(
+    const { getByTestId } = await renderTimeline();
+    expect(getByTestId('timeline-leadout').element().getAttribute('style')).toMatch(
       /translate3d\(\s*0(?:px)?\s*,\s*346px\s*,\s*0(?:px)?\s*\)/,
     );
   });
 
-  it('offsets the lead-in/top section transform by renderOffset so it stays flush with the first month', () => {
+  it('offsets the lead-in/top section transform by renderOffset so it stays flush with the first month', async () => {
     // The top section renders at logical position 0, so its DOM position must be `0 + renderOffset`.
     // Without this, an above-cap library (renderOffset != 0) draws the first month over the still-visible
     // lead-in as it scrolls, because months use `top + renderOffset` and the top section did not.
     testState.renderOffset = 50;
-    const { getByTestId } = renderTimeline();
-    expect(getByTestId('timeline-top-section').getAttribute('style')).toMatch(
+    const { getByTestId } = await renderTimeline();
+    expect(getByTestId('timeline-top-section').element().getAttribute('style')).toMatch(
       /translate3d\(\s*0(?:px)?\s*,\s*50px\s*,\s*0(?:px)?\s*\)/,
     );
   });
@@ -536,7 +531,7 @@ describe('Timeline top section stacking', () => {
   // section (the person page's name-suggestion dropdown, #878) were painted under the day-title row
   // and swallowed its clicks. A `z-index` on the top section is the only lift that works: an overlay's
   // own z-index is trapped inside this section's stacking context.
-  it('paints the top section above the month layers so overflowing header overlays stay clickable', () => {
+  it('paints the top section above the month layers so overflowing header overlays stay clickable', async () => {
     testState.months = [
       {
         viewId: 'month:2015-01',
@@ -548,12 +543,12 @@ describe('Timeline top section stacking', () => {
       },
     ];
 
-    const { getByTestId } = renderTimeline();
+    const { getByTestId } = await renderTimeline();
 
-    expect(Number(getByTestId('timeline-top-section').style.zIndex)).toBeGreaterThan(0);
+    expect(Number((getByTestId('timeline-top-section').element() as HTMLElement).style.zIndex)).toBeGreaterThan(0);
   });
 
-  it('leaves the month layers at the default stacking level', () => {
+  it('leaves the month layers at the default stacking level', async () => {
     // The lift above only holds while months stay at `z-index: auto`. If a month layer ever gains its
     // own z-index, the top section's has to be re-derived against it rather than silently losing.
     testState.months = [
@@ -567,9 +562,9 @@ describe('Timeline top section stacking', () => {
       },
     ];
 
-    const { getByTestId } = renderTimeline();
+    const { getByTestId } = await renderTimeline();
 
-    expect(getByTestId('timeline-month-skeleton').style.zIndex).toBe('');
+    expect((getByTestId('timeline-month-skeleton').element() as HTMLElement).style.zIndex).toBe('');
   });
 });
 
@@ -603,13 +598,13 @@ describe('Timeline month reload', () => {
   it('remounts the month DOM when a reload rebuilds the months under the same keys', async () => {
     const live = reactiveProps({ months: [skeletonMonth()] });
     testState.liveMonths = live;
-    renderTimeline();
-    const before = screen.getByTestId('timeline-month-skeleton');
+    await renderTimeline();
+    const before = page.getByTestId('timeline-month-skeleton').element();
 
     live.months = [skeletonMonth()];
     await tick();
 
-    const after = screen.getByTestId('timeline-month-skeleton');
+    const after = page.getByTestId('timeline-month-skeleton').element();
     expect(after).not.toBe(before);
     expect(before.isConnected).toBe(false);
   });
@@ -617,15 +612,15 @@ describe('Timeline month reload', () => {
   it('keeps the month DOM while the same month object updates within a load', async () => {
     const live = reactiveProps({ months: [skeletonMonth()] });
     testState.liveMonths = live;
-    renderTimeline();
-    const before = screen.getByTestId('timeline-month-skeleton');
+    await renderTimeline();
+    const before = page.getByTestId('timeline-month-skeleton').element();
 
     live.months[0].height = 300;
     await tick();
 
-    const after = screen.getByTestId('timeline-month-skeleton');
+    const after = page.getByTestId('timeline-month-skeleton').element();
     expect(after).toBe(before);
-    expect(after).toHaveStyle({ height: '300px' });
+    await expect.element(page.elementLocator(after)).toHaveStyle({ height: '300px' });
   });
 });
 
@@ -658,7 +653,7 @@ describe('Timeline remount under a bound manager', () => {
         }
       },
     });
-    render(Host, props);
+    await render(Host, props);
     await tick();
 
     props.showNew = true;

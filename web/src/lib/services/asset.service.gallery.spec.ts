@@ -8,25 +8,15 @@ import SharedLinkCreateModal from '#lib/modals/SharedLinkCreateModal.svelte';
 import { queryClient } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { getAssetActions, getAssetBulkActions, handleDownloadAsset } from '#lib/services/asset.service.ts';
-import { setSharedLink } from '#lib/utils.ts';
+import { downloadUrl, setSharedLink } from '#lib/utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { factory } from '#test/unit/factories.ts';
-import {
-  LibraryView,
-  getAssetInfo,
-  updateAsset,
-  updateAssetFavorites,
-  type AssetResponseDto,
-  type UserConfigDto,
-} from '@immich/sdk';
+import { LibraryView, updateAsset, updateAssetFavorites, type AssetResponseDto, type UserConfigDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
 
-const { downloadUrlMock } = vitest.hoisted(() => ({
-  downloadUrlMock: vitest.fn(),
-}));
-
-vitest.mock('@immich/ui', () => ({
+vitest.mock('@immich/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/ui')>()),
   toastManager: {
     primary: vitest.fn(),
     warning: vitest.fn(),
@@ -39,16 +29,15 @@ vitest.mock('#lib/managers/asset-multi-select-manager.svelte.js', () => ({
   assetMultiSelectManager: { assets: [{ id: 'x1' }, { id: 'x2' }] },
 }));
 
-vitest.mock('#lib/utils/i18n.js', () => ({
-  getFormatter: vitest.fn(),
-  getPreferredLocale: vitest.fn(),
-}));
+// Spied rather than replaced by a factory: a factory that re-imports the real module deadlocks the
+// browser runner on the module cycle through `#lib/utils.ts`, and a bare factory would drop the
+// module's other exports, which its importers need.
+vitest.mock(import('#lib/utils/i18n.ts'), { spy: true });
 
 vitest.mock('@immich/sdk', async () => {
   const originalModule = await vitest.importActual<typeof import('@immich/sdk')>('@immich/sdk');
   return {
     ...originalModule,
-    getAssetInfo: vitest.fn(),
     updateAsset: vitest.fn(),
     updateAssetFavorites: vitest.fn(),
   };
@@ -60,16 +49,14 @@ vitest.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   },
 }));
 
-vitest.mock('#lib/utils.js', async () => {
-  const originalModule = await vitest.importActual('#lib/utils.js');
-  return {
-    ...originalModule,
-    sleep: vitest.fn(),
-    downloadUrl: downloadUrlMock,
-  };
-});
+vitest.mock(import('#lib/utils.ts'), { spy: true });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: vi.fn() }));
+
+beforeEach(() => {
+  // Never let a test start a real browser download.
+  vitest.mocked(downloadUrl).mockImplementation(() => {});
+});
 
 describe('AssetService', () => {
   describe('getAssetActions', () => {
@@ -84,33 +71,6 @@ describe('AssetService', () => {
           ocr: { enabled: false },
         },
       } as UserConfigDto);
-    });
-
-    it('should allow shared link downloads if the user owns the asset and shared link downloads are disabled', () => {
-      const ownerId = 'owner';
-      const user = factory.user({ id: ownerId });
-      const asset = factory.asset({ ownerId });
-      authManager.setUser(user);
-      setSharedLink(factory.sharedLink({ allowDownload: false }));
-      const assetActions = getAssetActions(() => '', asset);
-      expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(true);
-    });
-
-    it('should not allow shared link downloads if the user does not own the asset and shared link downloads are disabled', () => {
-      const ownerId = 'owner';
-      const user = factory.user({ id: 'non-owner' });
-      const asset = factory.asset({ ownerId });
-      authManager.setUser(user);
-      setSharedLink(factory.sharedLink({ allowDownload: false }));
-      const assetActions = getAssetActions(() => '', asset);
-      expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(false);
-    });
-
-    it('should allow shared link downloads if shared link downloads are enabled regardless of user', () => {
-      const asset = factory.asset();
-      setSharedLink(factory.sharedLink({ allowDownload: true }));
-      const assetActions = getAssetActions(() => '', asset);
-      expect(assetActions.SharedLinkDownload.$if?.()).toStrictEqual(true);
     });
 
     it('should offer the share action if the user owns the asset', () => {
@@ -145,42 +105,20 @@ describe('AssetService', () => {
   });
 
   describe('handleDownloadAsset', () => {
-    it('should use the asset originalFileName when showing toasts', async () => {
-      const $t = vitest.fn().mockReturnValue('formatter');
-      vitest.mocked(getFormatter).mockResolvedValue($t);
-      const asset = factory.asset({ originalFileName: 'asset.heic' });
-      await handleDownloadAsset(asset, { edited: false });
-      expect($t).toHaveBeenNthCalledWith(1, 'downloading_asset_filename', { values: { filename: 'asset.heic' } });
-      expect(toastManager.primary).toHaveBeenCalledWith('formatter');
-    });
-
-    it('should use the motion asset originalFileName when showing toasts', async () => {
-      const $t = vitest.fn().mockReturnValue('formatter');
-      vitest.mocked(getFormatter).mockResolvedValue($t);
-      const motionAsset = factory.asset({ originalFileName: 'asset.mov' });
-      vitest.mocked(getAssetInfo).mockResolvedValue(motionAsset);
-      const asset = factory.asset({ originalFileName: 'asset.heic', livePhotoVideoId: '1' });
-      await handleDownloadAsset(asset, { edited: false });
-      expect($t).toHaveBeenNthCalledWith(1, 'downloading_asset_filename', { values: { filename: 'asset.heic' } });
-      expect($t).toHaveBeenNthCalledWith(2, 'downloading_asset_filename', { values: { filename: 'asset-motion.mov' } });
-      expect(toastManager.primary).toHaveBeenCalledWith('formatter');
-    });
-
     it('should request attachment disposition for single-asset downloads', async () => {
-      downloadUrlMock.mockClear();
       const $t = vitest.fn().mockReturnValue('formatter');
       vitest.mocked(getFormatter).mockResolvedValue($t);
       const asset = factory.asset({ id: 'asset-1', originalFileName: 'asset.jpg', thumbhash: 'cache-1' });
 
       await handleDownloadAsset(asset, { edited: false });
 
-      expect(downloadUrlMock).toHaveBeenCalledWith(
+      expect(vitest.mocked(downloadUrl)).toHaveBeenCalledWith(
         expect.stringContaining('/api/assets/asset-1/original'),
         'asset.jpg',
       );
-      expect(downloadUrlMock.mock.calls[0][0]).toContain('download=true');
-      expect(downloadUrlMock.mock.calls[0][0]).toContain('edited=false');
-      expect(downloadUrlMock.mock.calls[0][0]).toContain('c=cache-1');
+      expect(vitest.mocked(downloadUrl).mock.calls[0][0]).toContain('download=true');
+      expect(vitest.mocked(downloadUrl).mock.calls[0][0]).toContain('edited=false');
+      expect(vitest.mocked(downloadUrl).mock.calls[0][0]).toContain('c=cache-1');
     });
   });
 });

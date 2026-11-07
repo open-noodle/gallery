@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import ImportSourceStep from '../import-source-step.svelte';
 
 describe('ImportSourceStep', () => {
@@ -10,26 +10,25 @@ describe('ImportSourceStep', () => {
     vi.resetAllMocks();
   });
 
-  it('renders Google Photos source card', () => {
-    const { getByTestId } = render(ImportSourceStep, { props: { onNext } });
-    expect(getByTestId('source-google')).toBeInTheDocument();
+  it('renders Google Photos source card', async () => {
+    const { getByTestId } = await render(ImportSourceStep, { onNext });
+    await expect.element(getByTestId('source-google')).toBeInTheDocument();
   });
 
-  it('renders Apple Photos as disabled', () => {
-    const { getByTestId } = render(ImportSourceStep, { props: { onNext } });
-    expect(getByTestId('source-apple')).toHaveAttribute('aria-disabled', 'true');
+  it('renders Apple Photos as disabled', async () => {
+    const { getByTestId } = await render(ImportSourceStep, { onNext });
+    await expect.element(getByTestId('source-apple')).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('has Google Photos selected by default', () => {
-    const { getByTestId } = render(ImportSourceStep, { props: { onNext } });
-    expect(getByTestId('source-google').className).toContain('border-primary');
+  it('has Google Photos selected by default', async () => {
+    const { getByTestId } = await render(ImportSourceStep, { onNext });
+    await expect.element(getByTestId('source-google')).toHaveClass('border-primary');
   });
 
   it('calls onNext when Next clicked', async () => {
-    const user = userEvent.setup();
-    const { getByText } = render(ImportSourceStep, { props: { onNext } });
+    const { getByText } = await render(ImportSourceStep, { onNext });
 
-    await user.click(getByText('next'));
+    await userEvent.click(getByText('next'));
     expect(onNext).toHaveBeenCalledOnce();
   });
 });

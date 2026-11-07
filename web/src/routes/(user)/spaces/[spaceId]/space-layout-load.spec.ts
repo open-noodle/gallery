@@ -1,4 +1,4 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { authenticate } from '#lib/utils/auth.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { load } from './+layout';

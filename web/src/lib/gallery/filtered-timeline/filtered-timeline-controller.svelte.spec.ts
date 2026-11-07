@@ -1,10 +1,6 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import {
-  createFilterState,
-  type FilterPanelConfig,
-  type FilterState,
-} from '#lib/components/filter-panel/filter-panel.ts';
+import type { FilterPanelConfig, FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { albumStackPreferences } from '#lib/gallery/stack/album-stack-preferences.svelte.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -21,13 +17,20 @@ import { createPhotosTimeline } from './photos-timeline';
 import { createRecentlyAddedTimeline } from './recently-added-timeline.svelte';
 import { createSpaceTimeline } from './space-timeline';
 
+// Loaded after sdk.mock.ts: browser mode links static imports in order, and filter-panel.ts imports
+// @immich/sdk, so importing it statically ahead of sdk.mock.ts would bind the real SDK for the whole file.
+const { createFilterState } = await import('#lib/components/filter-panel/filter-panel.ts');
+
 const { gotoMock, registerSelectionContextMock, topVisibleAnchorMock } = vi.hoisted(() => ({
   gotoMock: vi.fn(),
   registerSelectionContextMock: vi.fn(),
   topVisibleAnchorMock: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
   return { page: reactivePageMock };

@@ -1,11 +1,13 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import '#lib/__mocks__/sdk.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import '#lib/gallery/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import type { AlbumResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import SearchAddAllToCollectionModal from './SearchAddAllToCollectionModal.svelte';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+
+// The browser links every static import before any module body runs, so a static import of the
+// component would load the real @immich/sdk before sdk.mock.ts registers its vi.mock. Loading it
+// after that registration gives it the mocked module.
+const { default: SearchAddAllToCollectionModal } = await import('./SearchAddAllToCollectionModal.svelte');
 
 const { mockUser, mockAdd, mockCollect, mockHandleError } = vi.hoisted(() => ({
   mockUser: { current: { id: 'me', isAdmin: false } },
@@ -46,9 +48,6 @@ const baseProps = (overrides = {}) => ({
 });
 
 beforeEach(() => {
-  vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-  vi.stubGlobal('visualViewport', getVisualViewportMock());
-  Element.prototype.animate = getAnimateMock();
   vi.resetAllMocks();
   mockUser.current = { id: 'me', isAdmin: false };
   mockAdd.mockResolvedValue(true);
@@ -59,43 +58,51 @@ beforeEach(() => {
   sdkMock.getAllSpaces.mockResolvedValue([]);
 });
 
-afterAll(async () => {
-  await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
-});
-
 describe('SearchAddAllToCollectionModal', () => {
   it('collects all matching ids then dispatches to the chosen collection and closes', async () => {
     const onClose = vi.fn();
-    render(SearchAddAllToCollectionModal, { ...baseProps({ terms: { isFavorite: true } }), onClose });
+    await render(SearchAddAllToCollectionModal, { ...baseProps({ terms: { isFavorite: true } }), onClose });
 
-    const trip = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(trip[0]);
+    const trip = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: /Trip/ }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(trip[0]);
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(mockCollect).toHaveBeenCalledWith({ isFavorite: true }, { smartSearchEnabled: false, language: 'en' }),
     );
     expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2', '3']);
-    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
   it('shows the preparing indicator while collecting', async () => {
     let resolveCollect!: (ids: string[]) => void;
     mockCollect.mockReturnValue(new Promise<string[]>((resolve) => (resolveCollect = resolve)));
-    render(SearchAddAllToCollectionModal, { ...baseProps(), onClose: vi.fn() });
+    await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose: vi.fn() });
 
-    const trip = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(trip[0]);
+    const trip = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: /Trip/ }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(trip[0]);
 
-    await screen.findByTestId('preparing-indicator');
+    await vi.waitFor(() => page.getByTestId('preparing-indicator').element());
     resolveCollect(['1']);
   });
 
   it('closes without collecting or adding when dismissed', async () => {
     const onClose = vi.fn();
-    render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
+    await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
 
-    const close = await screen.findAllByRole('button', { name: 'Close' });
-    await fireEvent.click(close[0]);
+    const close = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: 'Close', exact: true }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(close[0]);
 
     expect(mockCollect).not.toHaveBeenCalled();
     expect(mockAdd).not.toHaveBeenCalled();
@@ -105,32 +112,40 @@ describe('SearchAddAllToCollectionModal', () => {
   it('stays open when the add reports failure', async () => {
     mockAdd.mockResolvedValue(false);
     const onClose = vi.fn();
-    render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
+    await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
 
-    const trip = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(trip[0]);
+    const trip = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: /Trip/ }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(trip[0]);
 
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mockAdd).toHaveBeenCalledOnce());
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it('surfaces an error via handleError and stays open when collection fails', async () => {
     mockCollect.mockRejectedValue(new Error('boom'));
     const onClose = vi.fn();
-    render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
+    await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
 
-    const trip = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(trip[0]);
+    const trip = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: /Trip/ }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(trip[0]);
 
-    await waitFor(() => expect(mockHandleError).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mockHandleError).toHaveBeenCalled());
     expect(mockAdd).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it('hides spaces and shows the over-cap notice when total exceeds the cap', async () => {
     sdkMock.getAllSpaces.mockResolvedValue([{ id: 's1', name: 'Family' } as unknown as SharedSpaceResponseDto]);
-    render(SearchAddAllToCollectionModal, { ...baseProps({ total: 50_001 }), onClose: vi.fn() });
+    await render(SearchAddAllToCollectionModal, { ...baseProps({ total: 50_001 }), onClose: vi.fn() });
 
-    await screen.findByTestId('spaces-hidden-notice');
+    await vi.waitFor(() => page.getByTestId('spaces-hidden-notice').element());
   });
 });

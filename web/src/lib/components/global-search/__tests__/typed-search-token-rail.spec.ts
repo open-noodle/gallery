@@ -1,10 +1,11 @@
 import TypedSearchTokenRail from '#lib/components/global-search/typed-search-token-rail.svelte';
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 describe('TypedSearchTokenRail', () => {
-  it('renders recognized and pending tokens quietly', () => {
-    render(TypedSearchTokenRail, {
+  it('renders recognized and pending tokens quietly', async () => {
+    await render(TypedSearchTokenRail, {
       props: {
         tokens: [
           { raw: 'from:2025', key: 'from', value: '2025', status: 'recognized' },
@@ -13,42 +14,43 @@ describe('TypedSearchTokenRail', () => {
       },
     });
 
-    expect(screen.getByText('from')).toBeVisible();
-    expect(screen.getByText('2025')).toBeVisible();
-    expect(screen.getByText('person')).toBeVisible();
-    expect(screen.getByText('anna')).toBeVisible();
-    expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
+    await expect.element(page.getByText('from')).toBeVisible();
+    await expect.element(page.getByText('2025')).toBeVisible();
+    await expect.element(page.getByText('person')).toBeVisible();
+    await expect.element(page.getByText('anna')).toBeVisible();
+    await expect
+      .element(page.getByTestId('typed-search-token-person'))
+      .toHaveAttribute('data-status', 'pending-entity');
   });
 
-  it('gives filter chips breathing room below the input row', () => {
-    render(TypedSearchTokenRail, {
+  it('gives filter chips breathing room below the input row', async () => {
+    await render(TypedSearchTokenRail, {
       props: {
         tokens: [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'pending-entity' }],
       },
     });
 
-    expect(screen.getByTestId('typed-search-token-rail')).toHaveClass('px-4', 'pt-2', 'pb-1');
+    await expect.element(page.getByTestId('typed-search-token-rail')).toHaveClass('px-4', 'pt-2', 'pb-1');
   });
 
-  it('renders typed filters as substantial key-value capsules', () => {
-    render(TypedSearchTokenRail, {
+  it('renders typed filters as substantial key-value capsules', async () => {
+    await render(TypedSearchTokenRail, {
       props: {
         tokens: [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'pending-entity' }],
       },
     });
 
-    expect(screen.getByTestId('typed-search-token-person')).toHaveClass(
-      'min-h-7',
-      'overflow-hidden',
-      'rounded-full',
-      'text-xs',
-    );
-    expect(screen.getByTestId('typed-search-token-person-key')).toHaveClass('uppercase', 'tracking-[0.08em]');
-    expect(screen.getByTestId('typed-search-token-person-value')).toHaveClass('px-2.5', 'py-1.5');
+    await expect
+      .element(page.getByTestId('typed-search-token-person'))
+      .toHaveClass('min-h-7', 'overflow-hidden', 'rounded-full', 'text-xs');
+    await expect
+      .element(page.getByTestId('typed-search-token-person-key'))
+      .toHaveClass('uppercase', 'tracking-[0.08em]');
+    await expect.element(page.getByTestId('typed-search-token-person-value')).toHaveClass('px-2.5', 'py-1.5');
   });
 
-  it('renders error tokens with issue text', () => {
-    render(TypedSearchTokenRail, {
+  it('renders error tokens with issue text', async () => {
+    await render(TypedSearchTokenRail, {
       props: {
         tokens: [
           {
@@ -68,12 +70,12 @@ describe('TypedSearchTokenRail', () => {
       },
     });
 
-    expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'error');
-    expect(screen.getByLabelText('No person found for "anna"')).toBeInTheDocument();
+    await expect.element(page.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'error');
+    await expect.element(page.getByLabelText('No person found for "anna"')).toBeInTheDocument();
   });
 
-  it('renders draft scalar errors with the error status color', () => {
-    render(TypedSearchTokenRail, {
+  it('renders draft scalar errors with the error status color', async () => {
+    await render(TypedSearchTokenRail, {
       props: {
         tokens: [
           {
@@ -93,6 +95,6 @@ describe('TypedSearchTokenRail', () => {
       },
     });
 
-    expect(screen.getByTestId('typed-search-token-rating')).toHaveAttribute('data-status', 'error');
+    await expect.element(page.getByTestId('typed-search-token-rating')).toHaveAttribute('data-status', 'error');
   });
 });

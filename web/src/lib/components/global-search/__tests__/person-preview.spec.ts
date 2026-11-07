@@ -1,6 +1,7 @@
 import { searchAssets } from '@immich/sdk';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { goto } from '$app/navigation';
 import PersonPreview from '../previews/person-preview.svelte';
 
@@ -9,7 +10,10 @@ vi.mock('@immich/sdk', async () => {
   return { ...actual, searchAssets: vi.fn() };
 });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+}));
 
 describe('person-preview', () => {
   beforeEach(() => {
@@ -21,18 +25,18 @@ describe('person-preview', () => {
     vi.useRealTimers();
   });
 
-  it('renders the person name and count', () => {
-    render(PersonPreview, {
+  it('renders the person name and count', async () => {
+    await render(PersonPreview, {
       props: {
         person: { id: 'p1', name: 'Alice', numberOfAssets: 42 } as never,
       },
     });
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
   });
 
   it('defers searchAssets by 300ms after mount', async () => {
-    render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
+    await render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
     await vi.advanceTimersByTimeAsync(200);
     expect(searchAssets).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
@@ -43,8 +47,8 @@ describe('person-preview', () => {
     );
   });
 
-  it('renders the people thumbnail endpoint url', () => {
-    const { container } = render(PersonPreview, {
+  it('renders the people thumbnail endpoint url', async () => {
+    const { container } = await render(PersonPreview, {
       props: { person: { id: 'p1', name: 'Alice' } as never },
     });
     const img = container.querySelector(':scope [data-cmdk-preview-person] > img');
@@ -53,7 +57,7 @@ describe('person-preview', () => {
   });
 
   it('uses scoped filter tokens and shared thumbnails for space-primary people', async () => {
-    const { container } = render(PersonPreview, {
+    const { container } = await render(PersonPreview, {
       props: {
         person: {
           id: 'space-person-1',
@@ -80,35 +84,40 @@ describe('person-preview', () => {
   });
 
   it('swaps to placeholder when the thumbnail image fails to load', async () => {
-    const { container } = render(PersonPreview, {
+    const { container } = await render(PersonPreview, {
       props: { person: { id: 'p1', name: 'Alice' } as never },
     });
     const img = container.querySelector(':scope [data-cmdk-preview-person] > img');
     expect(img).not.toBeNull();
-    await fireEvent.error(img!);
-    expect(container.querySelector(':scope [data-cmdk-preview-person] > img')).toBeNull();
-    expect(container.querySelector(':scope [data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
+    img!.dispatchEvent(new Event('error'));
+    await vi.waitFor(() => {
+      expect(container.querySelector(':scope [data-cmdk-preview-person] > img')).toBeNull();
+      expect(container.querySelector(':scope [data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
+    });
   });
 
-  it('offers a button to the person management page', () => {
-    render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
+  it('offers a button to the person management page', async () => {
+    await render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
 
     // This spec does not init svelte-i18n, so $t() returns the raw key.
-    expect(screen.getByText('cmdk_open_person_page')).toBeInTheDocument();
+    await expect.element(page.getByText('cmdk_open_person_page')).toBeInTheDocument();
   });
 
   it('navigates to the person page for a personal person', async () => {
-    render(PersonPreview, {
+    // Playwright's actionability checks need real timers.
+    vi.useRealTimers();
+    await render(PersonPreview, {
       props: { person: { id: 'p1', name: 'Alice', primaryProfile: { id: 'p1', type: 'user-person' } } as never },
     });
 
-    await fireEvent.click(screen.getByText('cmdk_open_person_page'));
+    await userEvent.click(page.getByText('cmdk_open_person_page'));
 
     expect(goto).toHaveBeenCalledWith('/people/p1');
   });
 
   it('navigates to the profile id for a space person', async () => {
-    render(PersonPreview, {
+    vi.useRealTimers();
+    await render(PersonPreview, {
       props: {
         person: {
           id: 'sp1',
@@ -118,7 +127,7 @@ describe('person-preview', () => {
       },
     });
 
-    await fireEvent.click(screen.getByText('cmdk_open_person_page'));
+    await userEvent.click(page.getByText('cmdk_open_person_page'));
 
     expect(goto).toHaveBeenCalledWith('/people/profile-1');
   });

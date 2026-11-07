@@ -12,8 +12,8 @@
   let { id, name, initialChecked, onToggle }: Props = $props();
 
   // Only R17 uses this. `checked` must be a genuine local $state flipped by a click handled inside
-  // THIS component, not a prop pushed in from the test via rerender(): @testing-library/svelte's
-  // rerender() replaces the whole props object as one shallow `$state.raw` box (see
+  // THIS component, not a prop pushed in from the test via rerender(): vitest-browser-svelte's
+  // rerender() replaces the whole props object as one shallow `$state.raw` box (it delegates to
   // @testing-library/svelte-core's createProps), so any partial update invalidates every prop
   // reader together — which would mask exactly the fine-grained per-prop dependency bug R17 exists
   // to catch (TagFilterRow's clampOverflow key depending on `name` but not `checked`). Toggling here

@@ -1,10 +1,10 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import type { SharedSpaceActivityResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import ActivityPage from './+page.svelte';
 
 const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
@@ -46,31 +46,33 @@ function renderPage(
 describe('Activity page', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders the activity feed wrapper', () => {
-    renderPage({ activities: [activity()] });
-    expect(screen.getByTestId('space-activity')).toBeInTheDocument();
+  it('renders the activity feed wrapper', async () => {
+    await renderPage({ activities: [activity()] });
+    await expect.element(page.getByTestId('space-activity')).toBeInTheDocument();
   });
 
-  it('renders an activity item from data.activities', () => {
-    renderPage({ activities: [activity({ id: 'a1', type: 'asset_add', data: { count: 3 } })] });
-    expect(screen.getByTestId('activity-item-a1')).toBeInTheDocument();
+  it('renders an activity item from data.activities', async () => {
+    await renderPage({ activities: [activity({ id: 'a1', type: 'asset_add', data: { count: 3 } })] });
+    await expect.element(page.getByTestId('activity-item-a1')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there are no activities', () => {
-    renderPage({ activities: [] });
-    expect(screen.getByTestId('activity-empty-state')).toBeInTheDocument();
+  it('shows the empty state when there are no activities', async () => {
+    await renderPage({ activities: [] });
+    await expect.element(page.getByTestId('activity-empty-state')).toBeInTheDocument();
   });
 
   describe('load more activities', () => {
     it('fetches the next page at the current offset and appends the results', async () => {
       const initial = Array.from({ length: 20 }, (_, i) => activity({ id: `a${i}`, data: { count: i } }));
       sdkMock.getSpaceActivities.mockResolvedValue([activity({ id: 'a-next', type: 'space_color_change', data: {} })]);
-      renderPage({ activities: initial, hasMoreActivities: true });
+      await renderPage({ activities: initial, hasMoreActivities: true });
 
-      await fireEvent.click(within(screen.getByTestId('load-more-button')).getByRole('button'));
+      await userEvent.click(page.getByTestId('load-more-button').getByRole('button'));
 
-      await waitFor(() => expect(sdkMock.getSpaceActivities).toHaveBeenCalledWith({ id: 's1', limit: 20, offset: 20 }));
-      await waitFor(() => expect(screen.getByTestId('activity-item-a-next')).toBeInTheDocument());
+      await vi.waitFor(() =>
+        expect(sdkMock.getSpaceActivities).toHaveBeenCalledWith({ id: 's1', limit: 20, offset: 20 }),
+      );
+      await expect.element(page.getByTestId('activity-item-a-next')).toBeInTheDocument();
     });
 
     // This feed grows at the head by design and pages by OFFSET over `createdAt desc`, so anything
@@ -83,25 +85,25 @@ describe('Activity page', () => {
         initial.at(-1)!,
         activity({ id: 'a-next', type: 'space_color_change', data: {} }),
       ]);
-      renderPage({ activities: initial, hasMoreActivities: true });
+      await renderPage({ activities: initial, hasMoreActivities: true });
 
-      await fireEvent.click(within(screen.getByTestId('load-more-button')).getByRole('button'));
+      await userEvent.click(page.getByTestId('load-more-button').getByRole('button'));
 
-      await waitFor(() => expect(screen.getByTestId('activity-item-a-next')).toBeInTheDocument());
-      expect(screen.getAllByTestId(/^activity-item-/)).toHaveLength(21);
+      await expect.element(page.getByTestId('activity-item-a-next')).toBeInTheDocument();
+      expect(page.getByTestId(/^activity-item-/).elements()).toHaveLength(21);
     });
 
     it('keeps the feed and the load-more button when loading more fails', async () => {
       const initial = Array.from({ length: 20 }, (_, i) => activity({ id: `a${i}`, data: { count: i } }));
       sdkMock.getSpaceActivities.mockRejectedValueOnce(new Error('network'));
-      renderPage({ activities: initial, hasMoreActivities: true });
+      await renderPage({ activities: initial, hasMoreActivities: true });
 
-      await fireEvent.click(within(screen.getByTestId('load-more-button')).getByRole('button'));
+      await userEvent.click(page.getByTestId('load-more-button').getByRole('button'));
 
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
-      expect(screen.getAllByTestId(/^activity-item-/)).toHaveLength(20);
-      expect(screen.getByTestId('load-more-button')).toBeInTheDocument();
-      expect(within(screen.getByTestId('load-more-button')).getByRole('button')).toBeInTheDocument();
+      await vi.waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      expect(page.getByTestId(/^activity-item-/).elements()).toHaveLength(20);
+      await expect.element(page.getByTestId('load-more-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('load-more-button').getByRole('button')).toBeInTheDocument();
     });
   });
 });

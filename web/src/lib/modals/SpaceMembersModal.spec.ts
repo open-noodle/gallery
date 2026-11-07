@@ -1,9 +1,8 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import '#lib/__mocks__/sdk.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import '#lib/gallery/__mocks__/sdk.mock.ts';
 import { SharedSpaceRole, type SharedSpaceMemberResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import SpaceMembersModal from './SpaceMembersModal.svelte';
 
 // Mock svelte-persisted-store to avoid localStorage issues in test environment
@@ -57,56 +56,47 @@ describe('SpaceMembersModal', () => {
   };
 
   beforeEach(() => {
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    vi.stubGlobal('visualViewport', getVisualViewportMock());
     vi.resetAllMocks();
-    Element.prototype.animate = getAnimateMock();
   });
 
-  afterAll(async () => {
-    await waitFor(() => {
-      expect(document.body.style.pointerEvents).not.toBe('none');
-    });
-  });
-
-  it('should render all members with names and emails', () => {
-    render(SpaceMembersModal, {
+  it('should render all members with names and emails', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: false,
       onClose,
     });
 
-    expect(screen.getByText('Owner User')).toBeInTheDocument();
-    expect(screen.getByText('owner@test.com')).toBeInTheDocument();
-    expect(screen.getByText('Editor User')).toBeInTheDocument();
-    expect(screen.getByText('editor@test.com')).toBeInTheDocument();
+    await expect.element(page.getByText('Owner User')).toBeInTheDocument();
+    await expect.element(page.getByText('owner@test.com')).toBeInTheDocument();
+    await expect.element(page.getByText('Editor User')).toBeInTheDocument();
+    await expect.element(page.getByText('editor@test.com')).toBeInTheDocument();
   });
 
-  it('should show add member button for owners', () => {
-    render(SpaceMembersModal, {
+  it('should show add member button for owners', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember],
       isOwner: true,
       onClose,
     });
 
-    expect(screen.getByText('spaces_add_member')).toBeInTheDocument();
+    await expect.element(page.getByText('spaces_add_member')).toBeInTheDocument();
   });
 
-  it('should not show add member button for non-owners', () => {
-    render(SpaceMembersModal, {
+  it('should not show add member button for non-owners', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: false,
       onClose,
     });
 
-    expect(screen.queryByText('spaces_add_member')).not.toBeInTheDocument();
+    await expect.element(page.getByText('spaces_add_member')).not.toBeInTheDocument();
   });
 
-  it('should show role selects to a non-owner when canChangeRoles is set', () => {
-    render(SpaceMembersModal, {
+  it('should show role selects to a non-owner when canChangeRoles is set', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, viewerMember],
       isOwner: false,
@@ -114,11 +104,11 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    expect(screen.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
   });
 
-  it('should show a badge, never a role select, on owner rows for a non-owner with canChangeRoles', () => {
-    render(SpaceMembersModal, {
+  it('should show a badge, never a role select, on owner rows for a non-owner with canChangeRoles', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, viewerMember],
       isOwner: false,
@@ -126,12 +116,12 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    expect(screen.getByTestId('role-badge-owner')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /^role_/ })).toHaveLength(1);
+    await expect.element(page.getByTestId('role-badge-owner')).toBeInTheDocument();
+    expect(page.getByRole('button', { name: /^role_/ }).elements()).toHaveLength(1);
   });
 
-  it("should not show a role select on the viewer's own row", () => {
-    render(SpaceMembersModal, {
+  it("should not show a role select on the viewer's own row", async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember, viewerMember],
       isOwner: false,
@@ -140,18 +130,18 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    expect(screen.queryByRole('button', { name: 'role_editor' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_editor' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
   });
 
-  it('should keep static roles for a non-owner when canChangeRoles is not set', () => {
-    render(SpaceMembersModal, { spaceId, members: [ownerMember, viewerMember], isOwner: false, onClose });
+  it('should keep static roles for a non-owner when canChangeRoles is not set', async () => {
+    await render(SpaceMembersModal, { spaceId, members: [ownerMember, viewerMember], isOwner: false, onClose });
 
-    expect(screen.queryByRole('button', { name: 'role_viewer' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_viewer' })).not.toBeInTheDocument();
   });
 
-  it('should show role badge for owner and select triggers for other members', () => {
-    render(SpaceMembersModal, {
+  it('should show role badge for owner and select triggers for other members', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember, viewerMember],
       isOwner: true,
@@ -159,20 +149,17 @@ describe('SpaceMembersModal', () => {
     });
 
     // Owner shows a static role badge (not a dropdown)
-    const ownerBadge = screen.getByTestId('role-badge-owner');
-    expect(ownerBadge).toBeInTheDocument();
-    expect(ownerBadge.tagName).toBe('SPAN');
+    const ownerBadge = page.getByTestId('role-badge-owner');
+    await expect.element(ownerBadge).toBeInTheDocument();
+    expect(ownerBadge.element().tagName).toBe('SPAN');
 
     // Editor/viewer still show select dropdowns
-    const editorTrigger = screen.getByRole('button', { name: 'role_editor' });
-    expect(editorTrigger).toBeInTheDocument();
-
-    const viewerTrigger = screen.getByRole('button', { name: 'role_viewer' });
-    expect(viewerTrigger).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_editor' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
   });
 
-  it('should show owner role badge instead of dropdown', () => {
-    render(SpaceMembersModal, {
+  it('should show owner role badge instead of dropdown', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: true,
@@ -180,13 +167,12 @@ describe('SpaceMembersModal', () => {
     });
 
     // Owner row has a role badge, not a button/dropdown
-    const ownerBadge = screen.getByTestId('role-badge-owner');
-    expect(ownerBadge).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'owner' })).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('role-badge-owner')).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'owner' })).not.toBeInTheDocument();
   });
 
-  it('should show static role text for non-owners viewing members', () => {
-    render(SpaceMembersModal, {
+  it('should show static role text for non-owners viewing members', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: false,
@@ -194,27 +180,27 @@ describe('SpaceMembersModal', () => {
     });
 
     // Non-owners should see role badges, not dropdown triggers
-    expect(screen.getByTestId('role-badge-owner')).toBeInTheDocument();
-    expect(screen.getByTestId('role-badge-editor')).toBeInTheDocument();
+    await expect.element(page.getByTestId('role-badge-owner')).toBeInTheDocument();
+    await expect.element(page.getByTestId('role-badge-editor')).toBeInTheDocument();
     // Should not have select triggers (no aria-haspopup=listbox buttons)
-    expect(screen.queryByRole('button', { name: 'owner' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'owner' })).not.toBeInTheDocument();
   });
 
-  it('should have aria-haspopup=listbox on role select triggers', () => {
-    render(SpaceMembersModal, {
+  it('should have aria-haspopup=listbox on role select triggers', async () => {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: true,
       onClose,
     });
 
-    const editorTrigger = screen.getByRole('button', { name: 'role_editor' });
-    expect(editorTrigger).toHaveAttribute('aria-haspopup', 'listbox');
-    expect(editorTrigger).toHaveAttribute('aria-expanded', 'false');
+    const editorTrigger = page.getByRole('button', { name: 'role_editor' });
+    await expect.element(editorTrigger).toHaveAttribute('aria-haspopup', 'listbox');
+    await expect.element(editorTrigger).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('should pass updated members on close', async () => {
-    render(SpaceMembersModal, {
+    await render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
       isOwner: true,
@@ -222,8 +208,7 @@ describe('SpaceMembersModal', () => {
     });
 
     // BasicModal renders multiple close buttons; use the first one
-    const closeButtons = screen.getAllByRole('button', { name: 'Close' });
-    await fireEvent.click(closeButtons[0]);
+    await page.getByRole('button', { name: 'Close' }).first().click();
 
     expect(onClose).toHaveBeenCalledWith([ownerMember, editorMember]);
   });

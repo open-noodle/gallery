@@ -1,6 +1,5 @@
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { fireEvent, screen } from '@testing-library/svelte';
+import { page } from 'vitest/browser';
 import Combobox from './Combobox.svelte';
 
 // Geometry measured on an iPad Pro 13" simulator, on the "Sidebar" setting from Account
@@ -65,11 +64,11 @@ const openDropdown = async ({
     removeEventListener: vi.fn(),
   });
 
-  renderWithTooltips(Combobox, { label: 'Sidebar', options, selectedOption: options[0] });
+  await renderWithTooltips(Combobox, { label: 'Sidebar', options, selectedOption: options[0] });
 
-  // happy-dom reports every rect as zero, so the geometry under test is stubbed onto the
+  // The geometry under test (an iPad with its on-screen keyboard up) is stubbed onto the
   // individual elements the component measures.
-  const inputElement = screen.getByRole('combobox');
+  const inputElement = page.getByRole('combobox').element() as HTMLInputElement;
   inputElement.getBoundingClientRect = () => input;
   const stubFrame = (side: string, top: number) => {
     const probe = document.querySelector<HTMLElement>(`[data-fixed-frame="${CSS.escape(side)}"]`)!;
@@ -78,8 +77,9 @@ const openDropdown = async ({
   stubFrame('start', frameTop);
   stubFrame('end', frameBottom);
 
-  await fireEvent.focus(inputElement);
-  return screen.getByRole('listbox');
+  inputElement.dispatchEvent(new FocusEvent('focus'));
+  await expect.element(page.getByRole('listbox')).toBeInTheDocument();
+  return page.getByRole('listbox').element() as HTMLElement;
 };
 
 /** The px budget the dropdown gets, parsed out of `min(<n>px, 18rem)`. */
@@ -89,10 +89,6 @@ const maxHeightPx = (listbox: HTMLElement) => Number(/min\((?<px>[\d.]+)px/.exec
 const ONE_OPTION = 36;
 
 describe('Combobox', () => {
-  beforeEach(() => {
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

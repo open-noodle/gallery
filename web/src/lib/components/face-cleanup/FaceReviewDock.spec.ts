@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import { FACE_ACTIONS } from './face-actions';
 import Harness from './face-review-dock.test-wrapper.svelte';
 
@@ -37,299 +37,328 @@ const renderDock = (over: Record<string, unknown> = {}) =>
     },
   });
 
+// The dock listens for mouseenter/mouseleave and focusin/focusout on each action. Dispatching them directly
+// keeps each case to exactly the events it names (a real pointer move would also fire a leave on whatever
+// element the cursor was over before).
+const dispatch = (testId: string, event: Event) => page.getByTestId(testId).element().dispatchEvent(event);
+const mouseEnter = (testId: string) => dispatch(testId, new MouseEvent('mouseenter'));
+const mouseLeave = (testId: string) => dispatch(testId, new MouseEvent('mouseleave'));
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
+const focusIn = (testId: string) => dispatch(testId, new FocusEvent('focusin', { bubbles: true }));
+const focusOut = (testId: string) => dispatch(testId, new FocusEvent('focusout', { bubbles: true }));
+// The unit tier loads no stylesheet, so the hover popover renders in normal flow and shifts the buttons
+// under a real pointer. These cases are about click routing, so click the element directly.
+const click = (testId: string) => (page.getByTestId(testId).element() as HTMLElement).click();
+
 describe('FaceReviewDock — summary and actions', () => {
   // D1
-  it('shows the page-supplied summary and apply content while nothing is selected', () => {
-    renderDock({ selectedCount: 0 });
+  it('shows the page-supplied summary and apply content while nothing is selected', async () => {
+    await renderDock({ selectedCount: 0 });
 
-    expect(screen.getByTestId('harness-summary')).toBeInTheDocument();
-    expect(screen.getByTestId('harness-apply')).toBeInTheDocument();
-    expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('harness-summary')).toBeInTheDocument();
+    await expect.element(page.getByTestId('harness-apply')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-bar')).not.toBeInTheDocument();
   });
 
   // D2
-  it('swaps to the action bar once a face is selected', () => {
-    renderDock({ selectedCount: 1 });
+  it('swaps to the action bar once a face is selected', async () => {
+    await renderDock({ selectedCount: 1 });
 
-    expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument();
-    expect(screen.queryByTestId('harness-summary')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('harness-apply')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-bar')).toBeInTheDocument();
+    await expect.element(page.getByTestId('harness-summary')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('harness-apply')).not.toBeInTheDocument();
   });
 
   // D3
-  it('reports how many faces the actions will apply to', () => {
-    renderDock({ selectedCount: 7 });
+  it('reports how many faces the actions will apply to', async () => {
+    await renderDock({ selectedCount: 7 });
 
-    expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('7 selected');
+    await expect.element(page.getByTestId('face-bulk-bar')).toMatchTextContent('7 selected');
   });
 
   // D4
-  it('renders one button per action, in the order given, under its own testid', () => {
-    renderDock();
+  it('renders one button per action, in the order given, under its own testid', async () => {
+    await renderDock();
 
     for (const action of GUIDED_ACTIONS) {
-      expect(screen.getByTestId(action.testId)).toBeInTheDocument();
+      await expect.element(page.getByTestId(action.testId)).toBeInTheDocument();
     }
-    const rendered = screen.getAllByRole('button').map((button) => button.dataset.testid);
+    const rendered = page
+      .getByRole('button')
+      .elements()
+      .map((button) => button.dataset.testid);
     expect(rendered.filter((id) => id?.startsWith('bulk-'))).toEqual(GUIDED_ACTIONS.map((action) => action.testId));
   });
 
   // D5
-  it('labels each button with the harmonised action name', () => {
-    renderDock();
+  it('labels each button with the harmonised action name', async () => {
+    await renderDock();
 
-    expect(screen.getByTestId('bulk-owner')).toHaveTextContent('Move to owner');
-    expect(screen.getByTestId('bulk-stay')).toHaveTextContent('Keep here');
-    expect(screen.getByTestId('bulk-lock')).toHaveTextContent('Confirm & lock');
-    expect(screen.getByTestId('bulk-other')).toHaveTextContent('Move to person...');
-    expect(screen.getByTestId('bulk-unknown')).toHaveTextContent('Unknown person');
-    expect(screen.getByTestId('bulk-detach')).toHaveTextContent('Not a face');
+    await expect.element(page.getByTestId('bulk-owner')).toMatchTextContent('Move to owner');
+    await expect.element(page.getByTestId('bulk-stay')).toMatchTextContent('Keep here');
+    await expect.element(page.getByTestId('bulk-lock')).toMatchTextContent('Confirm & lock');
+    await expect.element(page.getByTestId('bulk-other')).toMatchTextContent('Move to person...');
+    await expect.element(page.getByTestId('bulk-unknown')).toMatchTextContent('Unknown person');
+    await expect.element(page.getByTestId('bulk-detach')).toMatchTextContent('Not a face');
   });
 
   // D6
   it('routes a click to exactly one action', async () => {
     const onAction = vi.fn();
-    renderDock({ onAction });
+    await renderDock({ onAction });
 
-    await fireEvent.click(screen.getByTestId('bulk-lock'));
+    click('bulk-lock');
 
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onAction).toHaveBeenCalledWith('lock');
   });
 
   // D7 — the destructive button's distinctness as an assertable attribute, not a class-list match.
-  it('marks only the irreversible action as dangerous', () => {
-    renderDock();
+  it('marks only the irreversible action as dangerous', async () => {
+    await renderDock();
 
-    expect(screen.getByTestId('bulk-detach')).toHaveAttribute('data-tone', 'danger');
-    expect(screen.getByTestId('bulk-lock')).toHaveAttribute('data-tone', 'default');
+    await expect.element(page.getByTestId('bulk-detach')).toHaveAttribute('data-tone', 'danger');
+    await expect.element(page.getByTestId('bulk-lock')).toHaveAttribute('data-tone', 'default');
   });
 
   // D8
   it('routes clear and help to their own handlers', async () => {
     const onClear = vi.fn();
     const onHelp = vi.fn();
-    renderDock({ onClear, onHelp });
+    await renderDock({ onClear, onHelp });
 
-    await fireEvent.click(screen.getByTestId('face-bulk-clear'));
-    await fireEvent.click(screen.getByTestId('face-bulk-help'));
+    click('face-bulk-clear');
+    click('face-bulk-help');
 
     expect(onClear).toHaveBeenCalledTimes(1);
     expect(onHelp).toHaveBeenCalledTimes(1);
   });
 
   // D9 — the manual-mode gap being closed: help is never conditional on which subset was passed.
-  it('offers clear and help whatever subset of actions it was given', () => {
-    renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
+  it('offers clear and help whatever subset of actions it was given', async () => {
+    await renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
 
-    expect(screen.getByTestId('face-bulk-clear')).toBeInTheDocument();
-    expect(screen.getByTestId('face-bulk-help')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-clear')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-help')).toBeInTheDocument();
   });
 
   // D10 — F2's regression guard. Icon identity is observable here because this spec does not stub Icon.
-  it('gives every action button its glyph, including unmark, which has no tile colour', () => {
-    renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
+  it('gives every action button its glyph, including unmark, which has no tile colour', async () => {
+    await renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
 
-    const path = screen.getByTestId('manual-review-bulk-unmark').querySelector('path');
-    expect(path).toHaveAttribute('d', FACE_ACTIONS.unmark.buttonIcon);
+    const path = page.getByTestId('manual-review-bulk-unmark').element().querySelector('path');
+    await expect.element(path).toHaveAttribute('d', FACE_ACTIONS.unmark.buttonIcon);
   });
 });
 
 describe('FaceReviewDock — hover, focus and the swap', () => {
   // D11
-  it('given nothing hovered, shows the neutral hint and no popover', () => {
-    renderDock();
+  it('given nothing hovered, shows the neutral hint and no popover', async () => {
+    await renderDock();
 
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
-    expect(screen.queryByTestId('face-bulk-popover')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
+    await expect.element(page.getByTestId('face-bulk-popover')).not.toBeInTheDocument();
   });
 
   // D12 + D13
   it('given the pointer enters an action, shows its tip in a popover and its effect in the hint row', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
 
-    expect(screen.getByTestId('face-bulk-popover')).toHaveTextContent(
-      'Pin these here permanently, so no future scan can flag them.',
-    );
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Confirm & lock');
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('the face is pinned to this person');
+    await expect
+      .element(page.getByTestId('face-bulk-popover'))
+      .toMatchTextContent('Pin these here permanently, so no future scan can flag them.');
+    await expect.element(page.getByTestId('face-bulk-hint')).toMatchTextContent('Confirm & lock');
+    await expect.element(page.getByTestId('face-bulk-hint')).toMatchTextContent('the face is pinned to this person');
   });
 
   // D13 (mode arm) — guided resolves the scan-referencing effect copy.
   it('given guided mode, the hint row for a chosen-person move warns about the next scan', async () => {
-    renderDock({ mode: 'guided' });
+    await renderDock({ mode: 'guided' });
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-other'));
+    mouseEnter('bulk-other');
 
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('the next scan can flag the face again');
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('the next scan can flag the face again');
   });
 
   // D13 (mode arm) — manual resolves the scan-free copy for the SAME action id.
   it('given manual mode, the same action’s hint row never mentions a scan', async () => {
-    renderDock({ mode: 'manual', actions: [{ id: 'other', testId: 'manual-review-bulk-move' }] });
+    await renderDock({ mode: 'manual', actions: [{ id: 'other', testId: 'manual-review-bulk-move' }] });
 
-    await fireEvent.mouseEnter(screen.getByTestId('manual-review-bulk-move'));
+    mouseEnter('manual-review-bulk-move');
 
-    const hint = screen.getByTestId('face-bulk-hint');
-    expect(hint).toHaveTextContent('so recognition never routes the face back here later');
-    expect(hint).not.toHaveTextContent('the next scan can flag the face again');
+    const hint = page.getByTestId('face-bulk-hint');
+    await expect.element(hint).toMatchTextContent('so recognition never routes the face back here later');
+    await expect.element(hint).not.toMatchTextContent('the next scan can flag the face again');
   });
 
   // D14
   it('given the pointer leaves, restores the neutral hint and removes the popover', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
-    await fireEvent.mouseLeave(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
+    mouseLeave('bulk-lock');
 
-    expect(screen.queryByTestId('face-bulk-popover')).not.toBeInTheDocument();
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
+    await expect.element(page.getByTestId('face-bulk-popover')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
   });
 
   // D15 — keyboard parity.
   it('given a keyboard user focuses an action, shows the same popover and hint as hovering', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.focusIn(screen.getByTestId('bulk-detach'));
+    focusIn('bulk-detach');
 
-    expect(screen.getByTestId('face-bulk-popover')).toHaveTextContent('Irreversible');
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Not a face');
+    await expect.element(page.getByTestId('face-bulk-popover')).toMatchTextContent('Irreversible');
+    await expect.element(page.getByTestId('face-bulk-hint')).toMatchTextContent('Not a face');
   });
 
   // D16
   it('given focus leaves the action, restores the neutral hint', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.focusIn(screen.getByTestId('bulk-detach'));
-    await fireEvent.focusOut(screen.getByTestId('bulk-detach'));
+    focusIn('bulk-detach');
+    focusOut('bulk-detach');
 
-    expect(screen.queryByTestId('face-bulk-popover')).not.toBeInTheDocument();
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
+    await expect.element(page.getByTestId('face-bulk-popover')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
   });
 
   // D17 — sliding along the bar with no intervening leave.
   it('given the pointer moves straight from one action to another, describes the second', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-unknown'));
+    mouseEnter('bulk-lock');
+    mouseEnter('bulk-unknown');
 
-    expect(screen.getByTestId('face-bulk-popover')).toHaveTextContent('Real faces, but not this person');
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Unknown person');
-    expect(screen.getByTestId('face-bulk-hint')).not.toHaveTextContent('pinned to this person');
+    await expect.element(page.getByTestId('face-bulk-popover')).toMatchTextContent('Real faces, but not this person');
+    await expect.element(page.getByTestId('face-bulk-hint')).toMatchTextContent('Unknown person');
+    await expect.element(page.getByTestId('face-bulk-hint')).not.toMatchTextContent('pinned to this person');
   });
 
   // D18
   it('given an action is hovered, exactly one popover exists', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
 
-    expect(screen.getAllByTestId('face-bulk-popover')).toHaveLength(1);
+    await expect.poll(() => page.getByTestId('face-bulk-popover').elements()).toHaveLength(1);
   });
 
   // D19 — one announcement, and focus reaches the effect text.
   it('given an action is hovered, the popover is hidden from screen readers and the button describes itself', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
 
-    expect(screen.getByTestId('face-bulk-popover')).toHaveAttribute('aria-hidden', 'true');
-    const describedBy = screen.getByTestId('bulk-lock').getAttribute('aria-describedby');
+    await expect.element(page.getByTestId('face-bulk-popover')).toHaveAttribute('aria-hidden', 'true');
+    const describedBy = page.getByTestId('bulk-lock').element().getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
-    expect(document.querySelector(`#${describedBy}`)).toBe(screen.getByTestId('face-bulk-hint'));
+    expect(document.querySelector(`#${describedBy}`)).toBe(page.getByTestId('face-bulk-hint').element());
   });
 
   // D20
   it('given the pointer enters clear or help, leaves the hint row alone', async () => {
-    renderDock();
+    await renderDock();
 
-    await fireEvent.mouseEnter(screen.getByTestId('face-bulk-clear'));
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
+    mouseEnter('face-bulk-clear');
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
 
-    await fireEvent.mouseEnter(screen.getByTestId('face-bulk-help'));
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
+    mouseEnter('face-bulk-help');
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
   });
 
   // D21 + D22 — applying an action clears the selection, so the bar unmounts while still hovered.
   it('given the selection is emptied while an action is hovered, the next selection opens with no stale effect', async () => {
-    const { rerender } = renderDock({ selectedCount: 2 });
+    const { rerender } = await renderDock({ selectedCount: 2 });
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
     await rerender({ selectedCount: 0 });
 
-    expect(screen.getByTestId('harness-summary')).toBeInTheDocument();
+    await expect.element(page.getByTestId('harness-summary')).toBeInTheDocument();
 
     await rerender({ selectedCount: 3 });
 
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Nothing is written until you press Apply.');
-    expect(screen.queryByTestId('face-bulk-popover')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('face-bulk-hint'))
+      .toMatchTextContent('Nothing is written until you press Apply.');
+    await expect.element(page.getByTestId('face-bulk-popover')).not.toBeInTheDocument();
   });
 
   // D23 — growing the selection must not clear a live hover.
   it('given the selection grows while an action is hovered, keeps describing that action', async () => {
-    const { rerender } = renderDock({ selectedCount: 2 });
+    const { rerender } = await renderDock({ selectedCount: 2 });
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
     await rerender({ selectedCount: 5 });
 
-    expect(screen.getByTestId('face-bulk-hint')).toHaveTextContent('Confirm & lock');
+    await expect.element(page.getByTestId('face-bulk-hint')).toMatchTextContent('Confirm & lock');
   });
 });
 
 describe('FaceReviewDock — edge cases', () => {
   // D24
-  it('renders the bar shell with no actions at all', () => {
-    renderDock({ actions: [] });
+  it('renders the bar shell with no actions at all', async () => {
+    await renderDock({ actions: [] });
 
-    expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('2 selected');
-    expect(screen.getByTestId('face-bulk-clear')).toBeInTheDocument();
-    expect(screen.getByTestId('face-bulk-help')).toBeInTheDocument();
-    expect(screen.getByTestId('face-bulk-hint')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-bar')).toMatchTextContent('2 selected');
+    await expect.element(page.getByTestId('face-bulk-clear')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-help')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-bulk-hint')).toBeInTheDocument();
   });
 
   // D25
-  it('renders a single action', () => {
-    renderDock({ actions: [{ id: 'detach', testId: 'bulk-detach' }] });
+  it('renders a single action', async () => {
+    await renderDock({ actions: [{ id: 'detach', testId: 'bulk-detach' }] });
 
-    expect(screen.getByTestId('bulk-detach')).toBeInTheDocument();
+    await expect.element(page.getByTestId('bulk-detach')).toBeInTheDocument();
   });
 
   // D26
-  it('renders a selection of one as readily as many', () => {
-    renderDock({ selectedCount: 1 });
+  it('renders a selection of one as readily as many', async () => {
+    await renderDock({ selectedCount: 1 });
 
-    expect(screen.getByTestId('face-bulk-bar')).toHaveTextContent('1 selected');
+    await expect.element(page.getByTestId('face-bulk-bar')).toMatchTextContent('1 selected');
   });
 
   // D27 — the other half of the F2 split: no swatch must not suppress the glyph.
-  it('renders the glyph of an action that has no tile colour', () => {
-    renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
+  it('renders the glyph of an action that has no tile colour', async () => {
+    await renderDock({ actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
 
     expect(FACE_ACTIONS.unmark.swatchColor).toBeUndefined();
-    expect(screen.getByTestId('manual-review-bulk-unmark').querySelector('path')).toHaveAttribute(
-      'd',
-      FACE_ACTIONS.unmark.buttonIcon,
-    );
+    const button = await page.getByTestId('manual-review-bulk-unmark').findElement();
+    const path = button.querySelector('path');
+    await expect.element(page.elementLocator(path!)).toHaveAttribute('d', FACE_ACTIONS.unmark.buttonIcon);
   });
 
   // D28 — no module-level state leaks between instances (the suite sets no clearMocks). Every testid in the
   // second dock is distinct, INCLUDING `dock`: two elements sharing one testid would make a later
   // `getByTestId('face-dock')` throw "found multiple elements" from an unrelated test.
   it('keeps two docks independent', async () => {
-    renderDock({ actions: [{ id: 'lock', testId: 'bulk-lock' }] });
-    renderDock({ mode: 'manual', actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
+    await renderDock({ actions: [{ id: 'lock', testId: 'bulk-lock' }] });
+    await renderDock({ mode: 'manual', actions: [{ id: 'unmark', testId: 'manual-review-bulk-unmark' }] });
 
     // Both docks render the same normalised chrome testids, so index the pair rather than aliasing them.
-    const hints = screen.getAllByTestId('face-bulk-hint');
-    expect(hints).toHaveLength(2);
+    const hints = page.getByTestId('face-bulk-hint');
+    await expect.poll(() => hints.elements()).toHaveLength(2);
 
-    await fireEvent.mouseEnter(screen.getByTestId('bulk-lock'));
+    mouseEnter('bulk-lock');
 
     // The first dock describes what was hovered; the second is untouched by it — no module-level state leak.
-    expect(hints[0]).toHaveTextContent('Confirm & lock');
-    expect(hints[1]).toHaveTextContent('Nothing is written until you press Apply.');
+    await expect.element(hints.nth(0)).toMatchTextContent('Confirm & lock');
+    await expect.element(hints.nth(1)).toMatchTextContent('Nothing is written until you press Apply.');
   });
 });

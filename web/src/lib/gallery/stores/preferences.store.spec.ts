@@ -25,23 +25,8 @@ describe('cropFacesFromAsset', () => {
     expect(localStorage.getItem(CROP_KEY)).toBe('false');
   });
 
-  it('reads a previously stored choice on load', async () => {
-    localStorage.setItem(CROP_KEY, 'false');
-    vi.resetModules();
-
-    const reloaded = await import('#lib/gallery/stores/preferences.store.ts');
-
-    expect(get(reloaded.cropFacesFromAsset)).toBe(false);
-  });
-
-  it('degrades a corrupt localStorage value to the default instead of throwing', async () => {
-    localStorage.setItem(CROP_KEY, 'not-valid-json');
-    vi.resetModules();
-
-    const reloaded = await import('#lib/gallery/stores/preferences.store.ts');
-
-    expect(get(reloaded.cropFacesFromAsset)).toBe(true);
-  });
+  // Reading a stored choice on load is in preferences.store.load*.spec.ts: `persisted()` caches each store by key
+  // for the page's lifetime, and browser mode cannot reset modules, so each load needs a fresh test file.
 });
 
 describe('recentSpaceAlbumsExpanded', () => {

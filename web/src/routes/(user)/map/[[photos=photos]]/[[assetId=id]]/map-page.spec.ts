@@ -1,13 +1,27 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { timeToLoadTheMap } from '#lib/constants.ts';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
+import { navigate } from '#lib/utils/navigation.ts';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '#lib/utils/space-search.ts';
 import { mdiTune } from '@mdi/js';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, type Locator } from 'vitest/browser';
 import MapPage from './+page.svelte';
+
+// sdk.mock.ts registers its `@immich/sdk` mock only when it is evaluated, after the imports sorted above it
+// (TestWrapper, constants, ...) have loaded the real SDK. Hoist the same mock here.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const module = await importOriginal<typeof import('@immich/sdk')>();
+  const mocks = Object.fromEntries(
+    Object.entries(module)
+      .filter(([, value]) => typeof value === 'function')
+      .map(([key]) => [key, vi.fn()]),
+  );
+  return { ...module, ...mocks };
+});
 
 const { featureFlagsMock, gotoMock, mockAssetViewerManager } = vi.hoisted(() => ({
   featureFlagsMock: { value: { map: true } as Record<string, unknown> },
@@ -20,7 +34,8 @@ const { featureFlagsMock, gotoMock, mockAssetViewerManager } = vi.hoisted(() => 
   },
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+// Browser mode rejects an import of a name a mock does not export, so keep the global fake's other exports.
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: gotoMock }));
 // The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
 // what the page's $effect sees. A plain vi.hoisted object registers no signal for a Svelte 5
 // `$effect` reading `page.url.search` (I5) — this reactive mock is the faithful stand-in for the
@@ -68,19 +83,32 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: featureFlagsMock,
 }));
 
-vi.mock('#lib/utils/navigation.js', () => ({ navigate: () => Promise.resolve() }));
+// Only `navigate` is stubbed (each beforeEach below); the module's other exports stay real, because
+// browser mode rejects an import of a name a factory mock leaves out.
+vi.mock('#lib/utils/navigation.ts', { spy: true });
 
-function renderPage() {
+async function renderPage() {
   const props = {
     data: {
       meta: { title: 'Map' },
     },
   };
 
-  return render(TestWrapper as Component<{ component: typeof MapPage; componentProps: typeof props }>, {
+  return await render(TestWrapper as Component<{ component: typeof MapPage; componentProps: typeof props }>, {
     component: MapPage,
     componentProps: props,
   });
+}
+
+/**
+Dispatches a DOM click, then flushes Svelte. Every describe here runs
+under `vi.useFakeTimers()`, which fakes requestAnimationFrame, and Playwright's actionability
+checks wait on animation frames, so a real userEvent.click would never settle.
+*/
+async function click(target: Locator | Element) {
+  const element = 'element' in target ? target.element() : target;
+  (element as HTMLElement).click();
+  await tick();
 }
 
 async function flushQueryDebounce() {
@@ -97,6 +125,7 @@ describe('Map page query intersection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetAllMocks();
+    vi.mocked(navigate).mockResolvedValue();
     // A goto() actually moves page.url, which re-runs the page's URL $effect. If the effect's
     // lastHandled token guard is ever broken, this turns goto -> $effect -> goto into a real loop
     // and the test times out — the correct, loud failure.
@@ -128,35 +157,34 @@ describe('Map page query intersection', () => {
   it('keeps the existing marker flow when q is absent', async () => {
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1);
       expect(sdkMock.searchSmart).not.toHaveBeenCalled();
-      expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-1');
     });
+    await expect.element(page.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-1');
   });
 
-  it('exposes the full canonical section set in the map filter panel', () => {
+  it('exposes the full canonical section set in the map filter panel', async () => {
     // #802 — the Map panel used to stop at 'albums', one section short of every other view.
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites,albums,text',
-    );
+    await expect
+      .element(page.getByTestId('filter-panel-stub'))
+      .toHaveAttribute('data-sections', 'timeline,people,location,camera,tags,rating,media,favorites,albums,text');
   });
 
   // #802 — the Text section is only a real fix if the value actually reaches the marker query.
   // Before this change FilteredMapMarkerDto had no text fields at all, so the pins would have
   // kept showing assets the timeline had already filtered out.
   it('passes text filters to filtered map markers when set', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-text'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-text'));
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
         expect.objectContaining({
           description: 'birthday cake',
@@ -168,21 +196,21 @@ describe('Map page query intersection', () => {
   });
 
   it('passes has-no-album to filtered map markers when selected', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-has-no-album-filter'));
+    await renderPage();
+    await click(page.getByTestId('select-has-no-album-filter'));
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ isNotInAlbum: true }));
     });
   });
 
   it('passes has-album to filtered map markers when selected', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-has-album-filter'));
+    await renderPage();
+    await click(page.getByTestId('select-has-album-filter'));
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
     });
   });
@@ -198,19 +226,19 @@ describe('Map page query intersection', () => {
       albums: { items: [], nextPage: null },
     } as never);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('search-chip')).toHaveTextContent('beach');
+    await expect.element(page.getByTestId('search-chip')).toMatchTextContent('beach');
+    await vi.waitFor(() => {
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1);
       expect(sdkMock.searchSmart).toHaveBeenCalledWith(
         expect.objectContaining({
           smartSearchDto: expect.objectContaining({ query: 'beach', page: 1, size: 100 }),
         }),
       );
-      expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
     });
+    await expect.element(page.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
   });
 
   it('stops paging once every currently fetched marker id has been matched', async () => {
@@ -221,21 +249,21 @@ describe('Map page query intersection', () => {
       albums: { items: [], nextPage: null },
     } as never);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.searchSmart).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
     });
+    await expect.element(page.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
   });
 
   it('clears q through the URL while preserving the map hash', async () => {
     mockPage.url = new URL('https://gallery.test/map?q=beach#12/48.8566/2.3522');
 
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(screen.getByTestId('search-chip-close'));
+    await click(page.getByTestId('search-chip-close'));
 
     expect(gotoMock).toHaveBeenCalledWith('/map#12/48.8566/2.3522', {
       replace: true,
@@ -243,13 +271,13 @@ describe('Map page query intersection', () => {
     });
   });
 
-  it('anchors the active filters bar to the map content column instead of a hard-coded desktop offset', () => {
+  it('anchors the active filters bar to the map content column instead of a hard-coded desktop offset', async () => {
     mockPage.url = new URL('https://gallery.test/map?q=beach');
 
-    renderPage();
+    await renderPage();
 
-    const activeFiltersBar = screen.getByTestId('active-filters-bar');
-    const overlay = activeFiltersBar.parentElement as HTMLElement | null;
+    const activeFiltersBar = page.getByTestId('active-filters-bar');
+    const overlay = activeFiltersBar.element().parentElement as HTMLElement | null;
     const contentColumn = overlay?.parentElement as HTMLElement | null;
 
     expect(overlay).not.toBeNull();
@@ -262,63 +290,57 @@ describe('Map page query intersection', () => {
   it('keeps map FilterPanel temporal state untouched when the timeline panel activates a bucket', async () => {
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
     await flushMapLoad();
-    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
-    await fireEvent.click(screen.getByTestId('map-panel-activate-year'));
+    await click(page.getByTestId('map-cluster-asset-1'));
+    await click(page.getByTestId('map-panel-activate-year'));
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-bucket-activations', '1');
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-bucket-activations', '1');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('keeps explicit map temporal filters synchronized with the FilterPanel and chips', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2015');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2015');
   });
 
   it('clears explicit map temporal filter state from map chips and the FilterPanel', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
-    await fireEvent.click(screen.getByTestId('clear-all-btn'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
+    await click(page.getByTestId('clear-all-btn'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('does not leave explicit temporal state in the mobile filter overlay after clearing map chips', async () => {
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
-    await fireEvent.click(screen.getByLabelText('Close filters'));
-    await fireEvent.click(screen.getByTestId('clear-all-btn'));
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await renderPage();
+    await click(page.getByTestId('map-mobile-filter-toggle'));
+    await click(page.getByTestId('filter-panel-set-year'));
+    await click(page.getByLabelText('Close filters'));
+    await click(page.getByTestId('clear-all-btn'));
+    await click(page.getByTestId('map-mobile-filter-toggle'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
-    });
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
   });
 
-  it('uses the shared filter icon on the mobile toggle (#964)', () => {
+  it('uses the shared filter icon on the mobile toggle (#964)', async () => {
     // Every other filter affordance — the desktop header toggle and the panel's own collapsed
     // button — is mdiTune. The map's hand-rolled mobile button was the only mdiFilterVariant.
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
+    await renderPage();
 
-    const toggle = screen.getByTestId('map-mobile-filter-toggle');
-    expect(toggle.querySelector(':scope svg path')).toHaveAttribute('d', mdiTune);
-    expect(toggle).toHaveAccessibleName();
+    const toggle = page.getByTestId('map-mobile-filter-toggle');
+    expect(toggle.element().querySelector(':scope svg path')).toHaveAttribute('d', mdiTune);
+    await expect.element(toggle).toHaveAccessibleName();
   });
 
   it('keeps the mobile filter overlay clear of the app chrome (#964)', async () => {
@@ -326,10 +348,10 @@ describe('Map page query intersection', () => {
     // panel's own header — the close button and the section menu — under the navigation bar.
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await renderPage();
+    await click(page.getByTestId('map-mobile-filter-toggle'));
 
-    const overlay = screen.getByTestId('map-mobile-filter-overlay');
+    const overlay = page.getByTestId('map-mobile-filter-overlay').element();
     expect(overlay.className.split(/\s+/)).not.toContain('inset-0');
     expect(overlay.className).toContain('top-(--navbar-height)');
   });
@@ -340,12 +362,12 @@ describe('Map page query intersection', () => {
     // title. It has to be portalled to the body instead.
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await renderPage();
+    await click(page.getByTestId('map-mobile-filter-toggle'));
 
-    const overlay = screen.getByTestId('map-mobile-filter-overlay');
-    expect(overlay.closest('[data-testid="portal"]')).toHaveAttribute('data-portal-target', 'body');
-    expect(overlay.closest('.isolate')).toBeNull();
+    const overlay = page.getByTestId('map-mobile-filter-overlay');
+    expect(overlay.element().closest('[data-testid="portal"]')).toHaveAttribute('data-portal-target', 'body');
+    expect(overlay.element().closest('.isolate')).toBeNull();
   });
 
   it('dismisses the mobile filter overlay when the panel is closed (#964)', async () => {
@@ -353,12 +375,12 @@ describe('Map page query intersection', () => {
     // strip in it — the "stuck open" half of the report. On mobile, closing means closing.
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
-    await fireEvent.click(screen.getByTestId('filter-panel-collapse'));
+    await renderPage();
+    await click(page.getByTestId('map-mobile-filter-toggle'));
+    await click(page.getByTestId('filter-panel-collapse'));
 
-    expect(screen.queryByTestId('map-mobile-filter-overlay')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('filter-panel-stub')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('map-mobile-filter-overlay')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('filter-panel-stub')).not.toBeInTheDocument();
   });
 
   it('reopens the mobile filter overlay expanded after it was closed from the panel (#964)', async () => {
@@ -366,12 +388,12 @@ describe('Map page query intersection', () => {
     // next open — that would reopen the drawer showing the bare icon strip.
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
-    await fireEvent.click(screen.getByTestId('filter-panel-collapse'));
-    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await renderPage();
+    await click(page.getByTestId('map-mobile-filter-toggle'));
+    await click(page.getByTestId('filter-panel-collapse'));
+    await click(page.getByTestId('map-mobile-filter-toggle'));
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-collapsed', 'false');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('shows the add-all-to-collection button when the map is filtered with markers', async () => {
@@ -382,11 +404,11 @@ describe('Map page query intersection', () => {
       albums: { items: [], nextPage: null },
     } as never);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
     await flushMapLoad();
 
-    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-all-to-collection')).toBeInTheDocument();
   });
 });
 
@@ -394,6 +416,7 @@ describe('Map page filters are URL-backed', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetAllMocks();
+    vi.mocked(navigate).mockResolvedValue();
     // Stand in for SvelteKit: a goto() actually changes page.url, which re-runs the page's URL
     // $effect. If the effect's lastHandled token guard is ever broken, this turns goto -> $effect ->
     // goto into a real loop and the test times out — which is the correct, loud failure.
@@ -418,15 +441,15 @@ describe('Map page filters are URL-backed', () => {
   it('hydrates the filters from the URL into the marker query', async () => {
     mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&make=Apple&rating=4&lens=RF24-70mm');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
         expect.objectContaining({ spaceId: 'space-1', make: 'Apple', rating: 4, lensModel: 'RF24-70mm' }),
       ),
     );
-    expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
   });
 
   // NB: the panel stub's `filter-panel-set-year` is deliberately NOT used here. It sets only the
@@ -437,10 +460,10 @@ describe('Map page filters are URL-backed', () => {
   it('writes a filter change back to the URL, preserving spaceId, q and the viewport hash', async () => {
     mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&q=ski#12/48.85/2.35');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-country'));
 
-    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target).toContain('/map?');
     expect(target).toContain('spaceId=space-1');
@@ -455,11 +478,11 @@ describe('Map page filters are URL-backed', () => {
   it('writes a year-only filter change to the URL, keeping the space scope', async () => {
     mockPage.url = new URL('https://gallery.test/map?spaceId=space-1');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
-    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target).toContain('year=2015');
     expect(target).toContain('spaceId=space-1');
@@ -471,10 +494,10 @@ describe('Map page filters are URL-backed', () => {
   it('drops a stray albumId when the map is scoped to a space', async () => {
     mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&albumId=album-9&make=Apple');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
+    await vi.waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
     const [options] = sdkMock.getFilteredMapMarkers.mock.calls.at(-1) as [Record<string, unknown>];
     expect(options).toMatchObject({ spaceId: 'space-1', make: 'Apple' });
     expect(options.albumId).toBeUndefined();
@@ -485,10 +508,10 @@ describe('Map page filters are URL-backed', () => {
   it('keeps an albumId scope on the global map', async () => {
     mockPage.url = new URL('https://gallery.test/map?albumId=album-9');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-9' })),
     );
   });
@@ -501,14 +524,14 @@ describe('Map page filters are URL-backed', () => {
     sdkMock.getAlbumInfo.mockResolvedValue({ id: 'album-9', albumName: 'Iceland 2026' } as never);
     mockPage.url = new URL('https://gallery.test/map?albumId=album-9');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getAlbumInfo).toHaveBeenCalledWith({ id: 'album-9' });
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Iceland 2026');
     });
-    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent('album-9');
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('Iceland 2026');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toMatchTextContent('album-9');
   });
 
   // The real ✕, clicked on the real chip, inside a space scope (the spec's BDD: "and likewise when I
@@ -516,15 +539,16 @@ describe('Map page filters are URL-backed', () => {
   it('clears a lens chip from the URL when its ✕ is clicked in a space-scoped map', async () => {
     mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&lens=RF24-70mm');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    const chips = await screen.findAllByTestId('active-chip');
+    await expect.element(page.getByTestId('active-chip').first()).toBeInTheDocument();
+    const chips = page.getByTestId('active-chip').elements();
     const lensChip = chips.find((chip) => chip.textContent?.includes('RF24-70mm'));
     expect(lensChip).toBeDefined();
-    await fireEvent.click(lensChip!.querySelector('[data-testid="chip-close"]')!);
+    await click(lensChip!.querySelector('[data-testid="chip-close"]')!);
 
-    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target).not.toContain('lens=');
     expect(target).toContain('spaceId=space-1');
@@ -538,13 +562,13 @@ describe('Map page filters are URL-backed', () => {
     mockPage.url = new URL('https://gallery.test/map?from=2024-01-01&to=2024-06-30');
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
     await flushMapLoad();
-    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
-    await fireEvent.click(screen.getByTestId('map-panel-clear-temporal-filter'));
+    await click(page.getByTestId('map-cluster-asset-1'));
+    await click(page.getByTestId('map-panel-clear-temporal-filter'));
 
-    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target).not.toContain('from=');
     expect(target).not.toContain('to=');
@@ -563,24 +587,23 @@ describe('Map page filters are URL-backed', () => {
       { id: 'asset-3', lat: 5, lon: 5 },
     ] as never);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
     await flushMapLoad();
-    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+    await click(page.getByTestId('map-cluster-asset-1'));
 
-    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute(
-      'data-selected-cluster-ids',
-      'asset-1,asset-2,asset-3',
-    );
+    await expect
+      .element(page.getByTestId('map-timeline-panel-stub'))
+      .toHaveAttribute('data-selected-cluster-ids', 'asset-1,asset-2,asset-3');
 
     // A rating/country/… chip drops two of the three pins.
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 1 }] as never);
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await click(page.getByTestId('filter-panel-set-country'));
     await flushQueryDebounce();
 
-    await waitFor(() =>
-      expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-selected-cluster-ids', 'asset-1'),
-    );
+    await expect
+      .element(page.getByTestId('map-timeline-panel-stub'))
+      .toHaveAttribute('data-selected-cluster-ids', 'asset-1');
   });
 
   // The direction that was outright impossible before: WIDENING.
@@ -588,12 +611,14 @@ describe('Map page filters are URL-backed', () => {
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 1 }] as never);
     mockPage.url = new URL('https://gallery.test/map?country=Germany');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
     await flushMapLoad();
-    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+    await click(page.getByTestId('map-cluster-asset-1'));
 
-    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-selected-cluster-ids', 'asset-1');
+    await expect
+      .element(page.getByTestId('map-timeline-panel-stub'))
+      .toHaveAttribute('data-selected-cluster-ids', 'asset-1');
 
     // Clearing the country brings two more assets — inside the same cluster's bbox — back into the
     // markers. They must reach the panel; the click-time snapshot could never let them in.
@@ -602,15 +627,12 @@ describe('Map page filters are URL-backed', () => {
       { id: 'asset-2', lat: 1, lon: 1 },
       { id: 'asset-3', lat: 1, lon: 1 },
     ] as never);
-    await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
+    await click(page.getByTestId('filter-panel-clear-location'));
     await flushQueryDebounce();
 
-    await waitFor(() =>
-      expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute(
-        'data-selected-cluster-ids',
-        'asset-1,asset-2,asset-3',
-      ),
-    );
+    await expect
+      .element(page.getByTestId('map-timeline-panel-stub'))
+      .toHaveAttribute('data-selected-cluster-ids', 'asset-1,asset-2,asset-3');
   });
 
   // Back/forward: SvelteKit swaps page.url without remounting the page component. The $effect must
@@ -620,10 +642,10 @@ describe('Map page filters are URL-backed', () => {
   // no-op the effect never saw.
   it('re-hydrates when the URL changes underneath the page (back/forward)', async () => {
     mockPage.url = new URL('https://gallery.test/map?make=Apple&rating=4');
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ make: 'Apple', rating: 4 })),
     );
 
@@ -631,7 +653,7 @@ describe('Map page filters are URL-backed', () => {
     mockPage.url = new URL('https://gallery.test/map?make=Apple');
     await flushQueryDebounce();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const [options] = sdkMock.getFilteredMapMarkers.mock.calls.at(-1) as [Record<string, unknown>];
       expect(options).toMatchObject({ make: 'Apple' });
       expect(options.rating).toBeUndefined();
@@ -643,14 +665,14 @@ describe('Map page filters are URL-backed', () => {
   // its own — and `?at=` must still not read as a filter change, or the map re-runs its marker fetch
   // for an identical FilterState on every viewer close.
   it('keeps the year when the asset viewer closes (?at= is not a filter change)', async () => {
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
 
     // Simulate the asset viewer closing: replaceScrollTarget appends `at` to the CURRENT url, which
-    // now carries year=2015 (the page wrote it). This is a raw property set (not a fireEvent), so
-    // nothing implicitly flushes the pending $effect the way fireEvent does — tick() forces that
+    // now carries year=2015 (the page wrote it). This is a raw property set (not a click()), so
+    // nothing implicitly flushes the pending $effect the way click() does — tick() forces that
     // flush. A plain waitFor here would be vacuous under fake timers: its own first synchronous
     // check runs BEFORE the effect flushes and sees the still-2015 value, so it would pass whether
     // or not the bug is present (compare I3).
@@ -659,7 +681,7 @@ describe('Map page filters are URL-backed', () => {
     mockPage.url = withAt;
     await tick();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
   });
 
   // I4's regression test. Clicking the search chip's X calls clearCommittedQuery, which goto()s a
@@ -668,16 +690,16 @@ describe('Map page filters are URL-backed', () => {
   // repro: year 2015 -> "" after clicking the chip's X.
   it('keeps a transient year when the committed q chip is cleared', async () => {
     mockPage.url = new URL('https://gallery.test/map?q=beach');
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
 
-    // fireEvent flushes pending effects itself (unlike a raw page.url mutation — see the tick() note
+    // click() flushes pending effects itself (unlike a raw page.url mutation — see the tick() note
     // above), so the state right after this settles is the real post-effect state, not a stale one.
-    await fireEvent.click(screen.getByTestId('search-chip-close'));
+    await click(page.getByTestId('search-chip-close'));
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
   });
 
   // D2 (was the transient-year carry-over test). A picked year is IN the URL codec now: it writes,
@@ -685,39 +707,39 @@ describe('Map page filters are URL-backed', () => {
   // outside the FilterState codec entirely) survives the same write.
   it('writes a picked year to the URL and keeps it across a second filter change, preserving the viewport hash', async () => {
     mockPage.url = new URL('https://gallery.test/map#12/48.85/2.35');
-    renderPage();
-    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await renderPage();
+    await click(page.getByTestId('filter-panel-set-year'));
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
     // A year IS in the URL codec, so picking one writes.
-    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
     const [yearTarget] = gotoMock.mock.calls.at(-1) as [string];
     expect(yearTarget).toContain('year=2015');
     expect(yearTarget).toContain('#12/48.85/2.35');
 
-    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await click(page.getByTestId('filter-panel-set-country'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const [target] = gotoMock.mock.calls.at(-1) as [string];
       expect(target).toContain('country=Germany');
       expect(target).toContain('year=2015');
       expect(target).toContain('#12/48.85/2.35');
     });
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
   });
 
   // D2 — a shared map link carries the year.
   it('hydrates a shared ?year= link into the picker, the chip and the marker query', async () => {
     mockPage.url = new URL('https://gallery.test/map?year=2023&month=6');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
-    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2023');
-    await waitFor(() =>
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+    await expect.element(page.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2023');
+    await vi.waitFor(() =>
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
         expect.objectContaining({
           takenAfter: '2023-06-01T00:00:00.000Z',
@@ -732,6 +754,7 @@ describe('Map page smart-search honesty (#767c)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetAllMocks();
+    vi.mocked(navigate).mockResolvedValue();
     gotoMock.mockResolvedValue(undefined);
     mockPage.url = new URL('https://gallery.test/map');
     sdkMock.getTimeBuckets.mockResolvedValue([]);
@@ -748,21 +771,21 @@ describe('Map page smart-search honesty (#767c)', () => {
     mockPage.url = new URL('https://gallery.test/map?q=ski&make=Apple&rating=4');
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => {
-      // the structured half of the filter IS honoured…
-      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ make: 'Apple', rating: 4 }));
-      // …the smart-search half is not, and the map says so instead of pretending
-      expect(screen.getByTestId('map-smart-search-notice')).toBeInTheDocument();
-    });
+    // the structured half of the filter IS honoured…
+    await vi.waitFor(() =>
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ make: 'Apple', rating: 4 })),
+    );
+    // …the smart-search half is not, and the map says so instead of pretending
+    await expect.element(page.getByTestId('map-smart-search-notice')).toBeInTheDocument();
 
     // The loop that pages the entire library and narrows nothing never runs here (R2).
     expect(sdkMock.searchSmart).not.toHaveBeenCalled();
     // The markers matching the structured filters are still shown — not a silent full library, and
     // not a silently empty map either.
-    expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-1');
+    await expect.element(page.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-1');
   });
 
   it('intersects and shows NO notice when the instance has a smart-search cutoff', async () => {
@@ -778,33 +801,33 @@ describe('Map page smart-search honesty (#767c)', () => {
       assets: { items: [{ id: 'asset-2' }], nextPage: null },
     } as never);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => expect(sdkMock.searchSmart).toHaveBeenCalled());
+    await vi.waitFor(() => expect(sdkMock.searchSmart).toHaveBeenCalled());
     // Narrowed to the semantic match…
-    await waitFor(() => expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2'));
+    await expect.element(page.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
     // …and no notice, because the term genuinely WAS applied.
-    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('map-smart-search-notice')).not.toBeInTheDocument();
   });
 
   it('shows no notice when there is no smart-search term', async () => {
     mockPage.url = new URL('https://gallery.test/map?make=Apple');
     sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    await waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
-    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
+    await expect.element(page.getByTestId('map-smart-search-notice')).not.toBeInTheDocument();
   });
 
   it('shows no notice for a whitespace-only q', async () => {
     mockPage.url = new URL('https://gallery.test/map?q=%20%20');
 
-    renderPage();
+    await renderPage();
     await flushQueryDebounce();
 
-    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('map-smart-search-notice')).not.toBeInTheDocument();
   });
 });

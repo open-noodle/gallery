@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import FilterToolbar from '../filter-toolbar.svelte';
 
 beforeAll(async () => {
@@ -15,81 +15,79 @@ const filtersSnippet = createRawSnippet(() => ({
 }));
 
 describe('FilterToolbar', () => {
-  it('renders the grouping control (desktop wrapper) and no filters by default', () => {
-    const { getByTestId, queryByTestId } = render(FilterToolbar, {
-      props: { grouping: 'day', onGroupingChange: () => {} },
-    });
-    expect(getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(getByTestId('timeline-grouping-control')).toBeInTheDocument();
-    expect(queryByTestId('filter-toolbar-separator')).toBeNull();
+  it('renders the grouping control (desktop wrapper) and no filters by default', async () => {
+    await render(FilterToolbar, { grouping: 'day', onGroupingChange: () => {} });
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-grouping-control')).toBeInTheDocument();
+    expect(page.getByTestId('filter-toolbar-separator').query()).toBeNull();
   });
 
-  it('renders the filters snippet and separator when showFilters is set', () => {
-    const { getByTestId } = render(FilterToolbar, {
-      props: {
-        grouping: 'day',
-        onGroupingChange: () => {},
-        showGrouping: true,
-        showFilters: true,
-        filters: filtersSnippet,
-      },
+  it('renders the filters snippet and separator when showFilters is set', async () => {
+    await render(FilterToolbar, {
+      grouping: 'day',
+      onGroupingChange: () => {},
+      showGrouping: true,
+      showFilters: true,
+      filters: filtersSnippet,
     });
-    expect(getByTestId('bar-content')).toBeInTheDocument();
-    expect(getByTestId('filter-toolbar-separator')).toBeInTheDocument();
+    await expect.element(page.getByTestId('bar-content')).toBeInTheDocument();
+    await expect.element(page.getByTestId('filter-toolbar-separator')).toBeInTheDocument();
   });
 
-  it('omits the grouping wrapper (and separator) when showGrouping is false', () => {
-    const { queryByTestId, getByTestId } = render(FilterToolbar, {
-      props: {
-        grouping: 'day',
-        onGroupingChange: () => {},
-        showGrouping: false,
-        showFilters: true,
-        filters: filtersSnippet,
-      },
+  it('omits the grouping wrapper (and separator) when showGrouping is false', async () => {
+    await render(FilterToolbar, {
+      grouping: 'day',
+      onGroupingChange: () => {},
+      showGrouping: false,
+      showFilters: true,
+      filters: filtersSnippet,
     });
-    expect(queryByTestId('timeline-desktop-grouping-control')).toBeNull();
-    expect(queryByTestId('filter-toolbar-separator')).toBeNull();
-    expect(getByTestId('bar-content')).toBeInTheDocument();
+    expect(page.getByTestId('timeline-desktop-grouping-control').query()).toBeNull();
+    expect(page.getByTestId('filter-toolbar-separator').query()).toBeNull();
+    await expect.element(page.getByTestId('bar-content')).toBeInTheDocument();
   });
 
-  it('renders nothing when neither grouping nor filters are shown', () => {
-    const { container } = render(FilterToolbar, {
-      props: { grouping: 'day', onGroupingChange: () => {}, showGrouping: false, showFilters: false },
+  it('renders nothing when neither grouping nor filters are shown', async () => {
+    const { container } = await render(FilterToolbar, {
+      grouping: 'day',
+      onGroupingChange: () => {},
+      showGrouping: false,
+      showFilters: false,
     });
     expect(container.querySelector('[data-testid="timeline-grouping-control"]')).toBeNull();
   });
 
   // --- responsive contract (the riskiest part of the merge) ---
 
-  it('is visible on mobile (flex, never hidden) when filters are shown', () => {
-    const { getByTestId } = render(FilterToolbar, {
-      props: {
-        grouping: 'day',
-        onGroupingChange: () => {},
-        showGrouping: true,
-        showFilters: true,
-        filters: filtersSnippet,
-      },
+  it('is visible on mobile (flex, never hidden) when filters are shown', async () => {
+    await render(FilterToolbar, {
+      grouping: 'day',
+      onGroupingChange: () => {},
+      showGrouping: true,
+      showFilters: true,
+      filters: filtersSnippet,
     });
     // the grouping wrapper's parent IS the toolbar root
-    const root = getByTestId('timeline-desktop-grouping-control').parentElement!;
+    const root = page.getByTestId('timeline-desktop-grouping-control').element().parentElement!;
     expect(root.className).toContain('flex');
     expect(root.className).not.toMatch(/(^|\s)hidden(\s|$)/);
   });
 
-  it('is desktop-only (hidden md:flex) when only grouping is shown', () => {
-    const { getByTestId } = render(FilterToolbar, {
-      props: { grouping: 'day', onGroupingChange: () => {}, showGrouping: true, showFilters: false },
+  it('is desktop-only (hidden md:flex) when only grouping is shown', async () => {
+    await render(FilterToolbar, {
+      grouping: 'day',
+      onGroupingChange: () => {},
+      showGrouping: true,
+      showFilters: false,
     });
-    const root = getByTestId('timeline-desktop-grouping-control').parentElement!;
+    const root = page.getByTestId('timeline-desktop-grouping-control').element().parentElement!;
     expect(root.className).toContain('hidden');
     expect(root.className).toContain('md:flex');
   });
 
   describe('collapsed-panel reopen button', () => {
-    it('renders the reopen button without responsive hiding so phones can reopen the panel', () => {
-      render(FilterToolbar, {
+    it('renders the reopen button without responsive hiding so phones can reopen the panel', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showFilterButton: true,
@@ -97,16 +95,16 @@ describe('FilterToolbar', () => {
         onExpandFilters: vi.fn(),
       });
 
-      const root = screen.getByTestId('filter-toolbar-root');
+      const root = page.getByTestId('filter-toolbar-root').element();
       expect(root.className).toContain('flex');
       expect(root.className).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
 
-      const wrapper = screen.getByTestId('filter-toolbar-reopen');
+      const wrapper = page.getByTestId('filter-toolbar-reopen').element();
       expect(wrapper.className).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
     });
 
-    it('keeps the grouping control desktop-only', () => {
-      render(FilterToolbar, {
+    it('keeps the grouping control desktop-only', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showFilterButton: true,
@@ -114,7 +112,7 @@ describe('FilterToolbar', () => {
         onExpandFilters: vi.fn(),
       });
 
-      expect(screen.getByTestId('timeline-desktop-grouping-control').className).toContain('hidden');
+      expect(page.getByTestId('timeline-desktop-grouping-control').element().className).toContain('hidden');
     });
   });
 
@@ -123,15 +121,15 @@ describe('FilterToolbar', () => {
   // The scoped search already worked from the nav bar; what it lacked was an affordance ON the
   // surface being searched. The button sits with the grouping pill, YouTube-channel style.
   describe('scoped search button', () => {
-    it('is absent unless the host opts in', () => {
-      render(FilterToolbar, { grouping: 'day', onGroupingChange: vi.fn(), showGrouping: true });
+    it('is absent unless the host opts in', async () => {
+      await render(FilterToolbar, { grouping: 'day', onGroupingChange: vi.fn(), showGrouping: true });
 
-      expect(screen.queryByTestId('scoped-search-button')).toBeNull();
+      expect(page.getByTestId('scoped-search-button').query()).toBeNull();
     });
 
     it('renders and calls onSearch when the host opts in', async () => {
       const onSearch = vi.fn();
-      render(FilterToolbar, {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: true,
@@ -139,24 +137,24 @@ describe('FilterToolbar', () => {
         onSearch,
       });
 
-      await fireEvent.click(screen.getByTestId('scoped-search-button'));
+      await page.getByTestId('scoped-search-button').click();
 
       expect(onSearch).toHaveBeenCalledOnce();
     });
 
-    it('stays hidden when showSearchButton is set but no handler is wired', () => {
-      render(FilterToolbar, {
+    it('stays hidden when showSearchButton is set but no handler is wired', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: true,
         showSearchButton: true,
       });
 
-      expect(screen.queryByTestId('scoped-search-button')).toBeNull();
+      expect(page.getByTestId('scoped-search-button').query()).toBeNull();
     });
 
-    it('sits after the grouping pill, matching the requested layout', () => {
-      render(FilterToolbar, {
+    it('sits after the grouping pill, matching the requested layout', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: true,
@@ -164,13 +162,13 @@ describe('FilterToolbar', () => {
         onSearch: vi.fn(),
       });
 
-      const grouping = screen.getByTestId('timeline-desktop-grouping-control');
-      const search = screen.getByTestId('filter-toolbar-search');
+      const grouping = page.getByTestId('timeline-desktop-grouping-control').element();
+      const search = page.getByTestId('filter-toolbar-search').element();
       expect(grouping.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('is desktop-only, matching the grouping control it sits beside', () => {
-      render(FilterToolbar, {
+    it('is desktop-only, matching the grouping control it sits beside', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: true,
@@ -178,13 +176,13 @@ describe('FilterToolbar', () => {
         onSearch: vi.fn(),
       });
 
-      const wrapper = screen.getByTestId('filter-toolbar-search');
+      const wrapper = page.getByTestId('filter-toolbar-search').element();
       expect(wrapper.className).toContain('hidden');
       expect(wrapper.className).toContain('md:flex');
     });
 
-    it('renders the toolbar for the search button alone — browsing an unfiltered album is the main case', () => {
-      render(FilterToolbar, {
+    it('renders the toolbar for the search button alone — browsing an unfiltered album is the main case', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: false,
@@ -193,12 +191,12 @@ describe('FilterToolbar', () => {
         onSearch: vi.fn(),
       });
 
-      expect(screen.getByTestId('filter-toolbar-root')).toBeInTheDocument();
-      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('filter-toolbar-root')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
-    it('survives search mode, where the grouping pill is swapped out for the chip bar', () => {
-      render(FilterToolbar, {
+    it('survives search mode, where the grouping pill is swapped out for the chip bar', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: false,
@@ -208,12 +206,12 @@ describe('FilterToolbar', () => {
         onSearch: vi.fn(),
       });
 
-      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
-      expect(screen.getByTestId('bar-content')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('bar-content')).toBeInTheDocument();
     });
 
-    it('keeps a separator before the chip bar in search mode, where the grouping pill is gone', () => {
-      render(FilterToolbar, {
+    it('keeps a separator before the chip bar in search mode, where the grouping pill is gone', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: false,
@@ -223,11 +221,11 @@ describe('FilterToolbar', () => {
         onSearch: vi.fn(),
       });
 
-      expect(screen.getByTestId('filter-toolbar-separator')).toBeInTheDocument();
+      await expect.element(page.getByTestId('filter-toolbar-separator')).toBeInTheDocument();
     });
 
-    it('still omits the separator when neither the pill nor the button is there', () => {
-      render(FilterToolbar, {
+    it('still omits the separator when neither the pill nor the button is there', async () => {
+      await render(FilterToolbar, {
         grouping: 'day',
         onGroupingChange: vi.fn(),
         showGrouping: false,
@@ -235,7 +233,7 @@ describe('FilterToolbar', () => {
         filters: filtersSnippet,
       });
 
-      expect(screen.queryByTestId('filter-toolbar-separator')).toBeNull();
+      expect(page.getByTestId('filter-toolbar-separator').query()).toBeNull();
     });
   });
 });

@@ -1,8 +1,9 @@
+import { fireDragEvent } from '#lib/components/spaces/dom-events.test-helpers.ts';
 import SpaceAlbumFolderBreadcrumb from '#lib/components/spaces/space-album-folder-breadcrumb.svelte';
 import { getActiveDragPayload, setActiveDragPayload, writeDragPayload } from '#lib/utils/space-album-folder-dnd.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { fireEvent, render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const crumb = (id: string, name: string, parentId: string | null = null) =>
   ({
@@ -36,57 +37,57 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
     setActiveDragPayload(null);
   });
 
-  it('renders a root crumb plus one crumb per path entry', () => {
-    render(SpaceAlbumFolderBreadcrumb, {
+  it('renders a root crumb plus one crumb per path entry', async () => {
+    await render(SpaceAlbumFolderBreadcrumb, {
       path: [crumb('trips', 'Trips'), crumb('y2026', '2026', 'trips')],
       onNavigate: vi.fn(),
     });
 
-    expect(screen.getByText('space_album_folder_root')).toBeInTheDocument();
-    expect(screen.getByText('Trips')).toBeInTheDocument();
-    expect(screen.getByText('2026')).toBeInTheDocument();
+    expect(page.getByText('space_album_folder_root', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Trips', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('2026', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('navigates to the space root when the root crumb is clicked', async () => {
     const onNavigate = vi.fn();
-    render(SpaceAlbumFolderBreadcrumb, { path: [crumb('trips', 'Trips')], onNavigate });
+    await render(SpaceAlbumFolderBreadcrumb, { path: [crumb('trips', 'Trips')], onNavigate });
 
-    await userEvent.click(screen.getByText('space_album_folder_root'));
+    await userEvent.click(page.getByText('space_album_folder_root', { exact: true }));
 
     expect(onNavigate).toHaveBeenCalledWith(null);
   });
 
   it('navigates to an ancestor when its crumb is clicked', async () => {
     const onNavigate = vi.fn();
-    render(SpaceAlbumFolderBreadcrumb, {
+    await render(SpaceAlbumFolderBreadcrumb, {
       path: [crumb('trips', 'Trips'), crumb('y2026', '2026', 'trips')],
       onNavigate,
     });
 
-    await userEvent.click(screen.getByText('Trips'));
+    await userEvent.click(page.getByText('Trips', { exact: true }));
 
     expect(onNavigate).toHaveBeenCalledWith('trips');
   });
 
   // A deep tree must not push the toolbar off-screen on a narrow viewport.
-  it('collapses middle crumbs past four levels', () => {
-    render(SpaceAlbumFolderBreadcrumb, {
+  it('collapses middle crumbs past four levels', async () => {
+    await render(SpaceAlbumFolderBreadcrumb, {
       path: [crumb('a', 'A'), crumb('b', 'B', 'a'), crumb('c', 'C', 'b'), crumb('d', 'D', 'c'), crumb('e', 'E', 'd')],
       onNavigate: vi.fn(),
     });
 
-    expect(screen.getByText('…')).toBeInTheDocument();
-    expect(screen.queryByText('C')).not.toBeInTheDocument();
+    expect(page.getByText('…', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('C', { exact: true }).query()).not.toBeInTheDocument();
     // First and last are always kept so the trail stays meaningful.
-    expect(screen.getByText('A')).toBeInTheDocument();
-    expect(screen.getByText('E')).toBeInTheDocument();
+    expect(page.getByText('A', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('E', { exact: true }).element()).toBeInTheDocument();
   });
 
   describe('as a drop target', () => {
     const folders = [crumb('trips', 'Trips')];
 
     it('does not preventDefault or highlight when no drag is active', async () => {
-      render(SpaceAlbumFolderBreadcrumb, {
+      await render(SpaceAlbumFolderBreadcrumb, {
         path: [crumb('trips', 'Trips')],
         folders,
         albums: [album('a1')],
@@ -94,14 +95,14 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
         onNavigate: vi.fn(),
       });
 
-      const notPrevented = await fireEvent.dragOver(screen.getByTestId('breadcrumb-root'));
+      const notPrevented = await fireDragEvent(page.getByTestId('breadcrumb-root').element(), 'dragover');
 
       expect(notPrevented).toBe(true); // preventDefault was NOT called
-      expect(screen.getByTestId('breadcrumb-root')).not.toHaveClass('ring-2');
+      expect(page.getByTestId('breadcrumb-root').element()).not.toHaveClass('ring-2');
     });
 
     it('a viewer (canManage=false) never accepts a drop, even for an otherwise legal target', async () => {
-      render(SpaceAlbumFolderBreadcrumb, {
+      await render(SpaceAlbumFolderBreadcrumb, {
         path: [crumb('trips', 'Trips')],
         folders,
         // a1 sits in "trips" — dropping it on the root crumb WOULD be a legal move if canManage
@@ -113,15 +114,15 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
       });
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
-      const notPrevented = await fireEvent.dragOver(screen.getByTestId('breadcrumb-root'));
+      const notPrevented = await fireDragEvent(page.getByTestId('breadcrumb-root').element(), 'dragover');
 
       expect(notPrevented).toBe(true);
-      expect(screen.getByTestId('breadcrumb-root')).not.toHaveClass('ring-2');
+      expect(page.getByTestId('breadcrumb-root').element()).not.toHaveClass('ring-2');
     });
 
     it('preventDefaults and highlights the root crumb for a legal target, and calls onDropItem(payload, null) on drop', async () => {
       const onDropItem = vi.fn();
-      render(SpaceAlbumFolderBreadcrumb, {
+      await render(SpaceAlbumFolderBreadcrumb, {
         path: [crumb('trips', 'Trips')],
         folders,
         albums: [album('a1', 'trips')],
@@ -129,11 +130,11 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
         onNavigate: vi.fn(),
         onDropItem,
       });
-      const rootCrumb = screen.getByTestId('breadcrumb-root');
-      const tripsCrumb = screen.getByTestId('breadcrumb-trips');
+      const rootCrumb = page.getByTestId('breadcrumb-root').element();
+      const tripsCrumb = page.getByTestId('breadcrumb-trips').element();
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
-      const notPrevented = await fireEvent.dragOver(rootCrumb);
+      const notPrevented = await fireDragEvent(rootCrumb, 'dragover');
 
       expect(notPrevented).toBe(false); // preventDefault WAS called
       expect(rootCrumb).toHaveClass('ring-2');
@@ -142,14 +143,14 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
 
       const dataTransfer = makeDataTransfer();
       writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
-      await fireEvent.drop(rootCrumb, { dataTransfer });
+      await fireDragEvent(rootCrumb, 'drop', { dataTransfer });
 
       expect(onDropItem).toHaveBeenCalledWith({ kind: 'album', id: 'a1' }, null);
     });
 
     it('preventDefaults and highlights a folder crumb, and calls onDropItem(payload, folderId) on drop', async () => {
       const onDropItem = vi.fn();
-      render(SpaceAlbumFolderBreadcrumb, {
+      await render(SpaceAlbumFolderBreadcrumb, {
         path: [crumb('trips', 'Trips')],
         folders,
         albums: [album('a1')],
@@ -157,11 +158,11 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
         onNavigate: vi.fn(),
         onDropItem,
       });
-      const tripsCrumb = screen.getByTestId('breadcrumb-trips');
-      const rootCrumb = screen.getByTestId('breadcrumb-root');
+      const tripsCrumb = page.getByTestId('breadcrumb-trips').element();
+      const rootCrumb = page.getByTestId('breadcrumb-root').element();
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
-      const notPrevented = await fireEvent.dragOver(tripsCrumb);
+      const notPrevented = await fireDragEvent(tripsCrumb, 'dragover');
 
       expect(notPrevented).toBe(false);
       expect(tripsCrumb).toHaveClass('ring-2');
@@ -170,7 +171,7 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
 
       const dataTransfer = makeDataTransfer();
       writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
-      await fireEvent.drop(tripsCrumb, { dataTransfer });
+      await fireDragEvent(tripsCrumb, 'drop', { dataTransfer });
 
       expect(onDropItem).toHaveBeenCalledWith({ kind: 'album', id: 'a1' }, 'trips');
     });
@@ -181,7 +182,7 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
     // element. A crumb drop must clear it directly rather than leave a stale payload for a later,
     // unrelated drag to inherit.
     it('clears the active drag payload on drop', async () => {
-      render(SpaceAlbumFolderBreadcrumb, {
+      await render(SpaceAlbumFolderBreadcrumb, {
         path: [crumb('trips', 'Trips')],
         folders,
         albums: [album('a1')],
@@ -189,12 +190,12 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
         onNavigate: vi.fn(),
         onDropItem: vi.fn(),
       });
-      const tripsCrumb = screen.getByTestId('breadcrumb-trips');
+      const tripsCrumb = page.getByTestId('breadcrumb-trips').element();
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
       const dataTransfer = makeDataTransfer();
       writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
-      await fireEvent.drop(tripsCrumb, { dataTransfer });
+      await fireDragEvent(tripsCrumb, 'drop', { dataTransfer });
 
       expect(getActiveDragPayload()).toBeNull();
     });

@@ -1,3 +1,4 @@
+import { fireDragEvent } from '#lib/components/spaces/dom-events.test-helpers.ts';
 import SpaceAlbumFolderCard from '#lib/components/spaces/space-album-folder-card.svelte';
 import {
   getActiveDragPayload,
@@ -7,7 +8,7 @@ import {
 } from '#lib/utils/space-album-folder-dnd.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { fireEvent, screen } from '@testing-library/svelte';
+import { page } from 'vitest/browser';
 
 const folder = {
   id: 'trips',
@@ -63,37 +64,41 @@ describe('SpaceAlbumFolderCard', () => {
     }
   });
 
-  it('renders the folder name', () => {
-    renderWithTooltips(SpaceAlbumFolderCard, defaults);
+  it('renders the folder name', async () => {
+    await renderWithTooltips(SpaceAlbumFolderCard, defaults);
 
-    expect(screen.getByText('Trips')).toBeInTheDocument();
+    expect(page.getByText('Trips', { exact: true }).element()).toBeInTheDocument();
   });
 
   // SpaceCollage renders alt="" images, so queryByRole('img') against it can never fail.
   // Count the elements directly, exactly as space-collage.spec.ts does.
-  it('renders one collage image per preview asset', () => {
-    const { container } = renderWithTooltips(SpaceAlbumFolderCard, defaults);
+  it('renders one collage image per preview asset', async () => {
+    const { container } = await renderWithTooltips(SpaceAlbumFolderCard, defaults);
 
     expect(container.querySelectorAll('img')).toHaveLength(4);
   });
 
-  it('renders the collage empty state for a folder with no previews', () => {
-    const { container } = renderWithTooltips(SpaceAlbumFolderCard, { ...defaults, previewAssetIds: [], albumCount: 0 });
+  it('renders the collage empty state for a folder with no previews', async () => {
+    const { container } = await renderWithTooltips(SpaceAlbumFolderCard, {
+      ...defaults,
+      previewAssetIds: [],
+      albumCount: 0,
+    });
 
     expect(container.querySelectorAll('img')).toHaveLength(0);
     expect(container.querySelector('[data-testid="collage-empty"]')).toBeInTheDocument();
   });
 
   // W-11: viewers get no management affordances at all.
-  it('W-11: renders no kebab menu and is not draggable for a viewer', () => {
-    const { container } = renderWithTooltips(SpaceAlbumFolderCard, { ...defaults, canManage: false });
+  it('W-11: renders no kebab menu and is not draggable for a viewer', async () => {
+    const { container } = await renderWithTooltips(SpaceAlbumFolderCard, { ...defaults, canManage: false });
 
     expect(container.querySelector('[data-testid="space-album-folder-card-menu"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-testid="space-album-folder-card"]')).toHaveAttribute('draggable', 'false');
   });
 
-  it('W-11: renders the kebab menu and is draggable for an editor', () => {
-    const { container } = renderWithTooltips(SpaceAlbumFolderCard, defaults);
+  it('W-11: renders the kebab menu and is draggable for an editor', async () => {
+    const { container } = await renderWithTooltips(SpaceAlbumFolderCard, defaults);
 
     expect(container.querySelector('[data-testid="space-album-folder-card-menu"]')).toBeInTheDocument();
     expect(container.querySelector('[data-testid="space-album-folder-card"]')).toHaveAttribute('draggable', 'true');
@@ -101,35 +106,37 @@ describe('SpaceAlbumFolderCard', () => {
 
   // W-20: no hardcoded English anywhere. $t() returns the raw key, so the key IS the
   // rendered text — if a literal string were used instead, this assertion would fail.
-  it('W-20: renders the album count through i18n rather than a hardcoded string', () => {
-    renderWithTooltips(SpaceAlbumFolderCard, defaults);
+  it('W-20: renders the album count through i18n rather than a hardcoded string', async () => {
+    await renderWithTooltips(SpaceAlbumFolderCard, defaults);
 
-    expect(screen.getByTestId('space-album-folder-card-count')).toHaveTextContent('space_album_folder_albums_count');
+    expect(page.getByTestId('space-album-folder-card-count').element()).toMatchTextContent(
+      'space_album_folder_albums_count',
+    );
   });
 
   it('dragstart writes the folder payload onto the DataTransfer and the active-drag slot', async () => {
-    const { container } = renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const { container } = await renderWithTooltips(SpaceAlbumFolderCard, defaults);
     const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
     const dataTransfer = makeDataTransfer();
 
     expect(getActiveDragPayload()).toBeNull();
 
-    await fireEvent.dragStart(card, { dataTransfer });
+    await fireDragEvent(card, 'dragstart', { dataTransfer });
 
     expect(readDragPayload(dataTransfer)).toEqual({ kind: 'folder', id: folder.id });
     expect(getActiveDragPayload()).toEqual({ kind: 'folder', id: folder.id });
 
-    await fireEvent.dragEnd(card);
+    await fireDragEvent(card, 'dragend');
 
     expect(getActiveDragPayload()).toBeNull();
   });
 
   it('dragstart replaces the default drag image with a small label chip', async () => {
-    renderWithTooltips(SpaceAlbumFolderCard, defaults);
-    const card = screen.getByTestId('space-album-folder-card');
+    await renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const card = page.getByTestId('space-album-folder-card').element();
     const dataTransfer = makeDataTransfer();
 
-    await fireEvent.dragStart(card, { dataTransfer });
+    await fireDragEvent(card, 'dragstart', { dataTransfer });
 
     expect(dataTransfer.setDragImage).toHaveBeenCalledTimes(1);
     const [chip] = vi.mocked(dataTransfer.setDragImage).mock.calls[0];
@@ -139,10 +146,10 @@ describe('SpaceAlbumFolderCard', () => {
   it('adds the chip to the document for the snapshot and removes it afterwards', async () => {
     vi.useFakeTimers();
     try {
-      renderWithTooltips(SpaceAlbumFolderCard, defaults);
-      const card = screen.getByTestId('space-album-folder-card');
+      await renderWithTooltips(SpaceAlbumFolderCard, defaults);
+      const card = page.getByTestId('space-album-folder-card').element();
 
-      await fireEvent.dragStart(card, { dataTransfer: makeDataTransfer() });
+      await fireDragEvent(card, 'dragstart', { dataTransfer: makeDataTransfer() });
       // Present at snapshot time — asserting only the absence below would pass
       // just as happily against an implementation that never builds a chip.
       expect(document.querySelectorAll('[data-space-drag-chip]')).toHaveLength(1);
@@ -155,23 +162,19 @@ describe('SpaceAlbumFolderCard', () => {
   });
 
   it('still writes the payload when the DataTransfer has no setDragImage', async () => {
-    renderWithTooltips(SpaceAlbumFolderCard, defaults);
-    const card = screen.getByTestId('space-album-folder-card');
+    await renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const card = page.getByTestId('space-album-folder-card').element();
     const store = new Map<string, string>();
     const dataTransfer = {
       setData: (type: string, value: string) => store.set(type, value),
       getData: (type: string) => store.get(type) ?? '',
       types: [...store.keys()],
-      // Explicitly undefined, not merely omitted: @testing-library/dom's fireEvent merges a
-      // DataTransfer init object onto `new window.DataTransfer()` by copying only the init
-      // object's OWN property names. happy-dom's real DataTransfer class has a `setDragImage`
-      // *prototype* method (a stub that throws `Not implemented.`), which is inherited and
-      // still `typeof … === 'function'` unless an own property shadows it — an object that
-      // simply omits the key does not reproduce "no setDragImage" through fireEvent here.
+      // Explicitly undefined: the stand-in is the event's whole DataTransfer, so this is the
+      // "no setDragImage" case the component has to tolerate.
       setDragImage: undefined,
     } as unknown as DataTransfer;
 
-    await fireEvent.dragStart(card, { dataTransfer });
+    await fireDragEvent(card, 'dragstart', { dataTransfer });
 
     expect(readDragPayload(dataTransfer)).toEqual({ kind: 'folder', id: folder.id });
     expect(getActiveDragPayload()).toEqual({ kind: 'folder', id: folder.id });
@@ -183,21 +186,21 @@ describe('SpaceAlbumFolderCard', () => {
     // check off the module-level active-drag slot instead of the DataTransfer — this is what
     // setActiveDragPayload simulates here.
     it('does not preventDefault or highlight when no drag is active', async () => {
-      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+      const { container } = await renderWithTooltips(SpaceAlbumFolderCard, {
         ...defaults,
         folders: [folder, otherFolder],
         albums: [album('a1')],
       });
       const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
 
-      const notPrevented = await fireEvent.dragOver(card);
+      const notPrevented = await fireDragEvent(card, 'dragover');
 
       expect(notPrevented).toBe(true); // preventDefault was NOT called
       expect(card).not.toHaveClass('ring-2');
     });
 
     it('does not preventDefault or highlight for an illegal target (dropping a folder on itself)', async () => {
-      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+      const { container } = await renderWithTooltips(SpaceAlbumFolderCard, {
         ...defaults,
         folders: [folder, otherFolder],
         albums: [],
@@ -205,14 +208,14 @@ describe('SpaceAlbumFolderCard', () => {
       const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
 
       setActiveDragPayload({ kind: 'folder', id: folder.id });
-      const notPrevented = await fireEvent.dragOver(card);
+      const notPrevented = await fireDragEvent(card, 'dragover');
 
       expect(notPrevented).toBe(true);
       expect(card).not.toHaveClass('ring-2');
     });
 
     it('a viewer never accepts a drop, even for an otherwise legal target', async () => {
-      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+      const { container } = await renderWithTooltips(SpaceAlbumFolderCard, {
         ...defaults,
         canManage: false,
         folders: [folder, otherFolder],
@@ -221,7 +224,7 @@ describe('SpaceAlbumFolderCard', () => {
       const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
-      const notPrevented = await fireEvent.dragOver(card);
+      const notPrevented = await fireDragEvent(card, 'dragover');
 
       expect(notPrevented).toBe(true);
       expect(card).not.toHaveClass('ring-2');
@@ -229,7 +232,7 @@ describe('SpaceAlbumFolderCard', () => {
 
     it('preventDefaults and highlights for a legal target, and calls onDropItem on drop', async () => {
       const onDropItem = vi.fn();
-      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+      const { container } = await renderWithTooltips(SpaceAlbumFolderCard, {
         ...defaults,
         folders: [folder, otherFolder],
         albums: [album('a1')],
@@ -238,14 +241,14 @@ describe('SpaceAlbumFolderCard', () => {
       const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
 
       setActiveDragPayload({ kind: 'album', id: 'a1' });
-      const notPrevented = await fireEvent.dragOver(card);
+      const notPrevented = await fireDragEvent(card, 'dragover');
 
       expect(notPrevented).toBe(false); // preventDefault WAS called
       expect(card).toHaveClass('ring-2');
 
       const dataTransfer = makeDataTransfer();
       writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
-      await fireEvent.drop(card, { dataTransfer });
+      await fireDragEvent(card, 'drop', { dataTransfer });
 
       expect(onDropItem).toHaveBeenCalledWith({ kind: 'album', id: 'a1' }, folder.id);
     });

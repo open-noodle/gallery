@@ -1,10 +1,10 @@
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { ImageCarousel } from '@immich/ui';
-import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
 
 describe('ImageCarousel', () => {
-  it('constrains long card titles inside the card', () => {
-    render(ImageCarousel, {
+  it('constrains long card titles inside the card', async () => {
+    const screen = await renderWithTooltips(ImageCarousel, {
       items: [
         {
           id: 'memory-id',
@@ -16,9 +16,8 @@ describe('ImageCarousel', () => {
       ],
     });
 
-    expect(screen.getByText('Your recent trip to South Africa')).toHaveClass(
-      'w-[calc(100%-2rem)]',
-      'whitespace-normal',
-    );
+    await expect
+      .element(screen.getByText('Your recent trip to South Africa'))
+      .toHaveClass('w-[calc(100%-2rem)]', 'whitespace-normal');
   });
 });

@@ -1,8 +1,7 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, type AssetFaceResponseDto, type PersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen, waitFor, within } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 import AssignFaceSidePanel from './AssignFaceSidePanel.svelte';
 
 const { getAllPeopleMock, searchPersonMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
@@ -67,9 +66,11 @@ const renderPanel = (props: { onReassign?: (person: PersonResponseDto) => void }
   });
 
 const gridCaptions = async () => {
-  const grid = await screen.findByTestId('person-picker-grid');
-  return within(grid)
-    .getAllByRole('button')
+  const grid = page.getByTestId('person-picker-grid');
+  await expect.element(grid).toBeInTheDocument();
+  return grid
+    .getByRole('button')
+    .elements()
     .map((button) => button.textContent?.trim() ?? '');
 };
 
@@ -91,9 +92,9 @@ describe('AssignFaceSidePanel', () => {
   // Asking without it takes `getAllForUser`'s alphabetical branch, the same order every other
   // people list in the fork serves.
   it('asks for the alphabetical list, not the one ordered by resemblance', async () => {
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(() => expect(getAllPeopleMock).toHaveBeenCalledWith({ withHidden: true }));
+    await vi.waitFor(() => expect(getAllPeopleMock).toHaveBeenCalledWith({ withHidden: true }));
   });
 
   // Field report against pr-992-rc.5: the admin -- who owns the photos, so lands here rather than
@@ -110,9 +111,9 @@ describe('AssignFaceSidePanel', () => {
       ],
     });
 
-    renderPanel();
+    await renderPanel();
 
-    await waitFor(async () => {
+    await vi.waitFor(async () => {
       const captions = await gridCaptions();
       expect(captions.slice(0, 2)).toEqual(['Bob', 'Carol']);
     });
@@ -122,9 +123,9 @@ describe('AssignFaceSidePanel', () => {
   // library was the wall of unnamed clusters with no visible way to narrow it. Its space-flavoured
   // sibling has always shown the field outright.
   it('shows the search field without needing a magnifier first', async () => {
-    renderPanel();
+    await renderPanel();
 
-    expect(await screen.findByPlaceholderText('search_people')).toBeInTheDocument();
+    await expect.element(page.getByPlaceholder('search_people')).toBeInTheDocument();
   });
 
   // `getAllPeople` serves one page, so filtering the loaded list client-side would silently stop
@@ -133,13 +134,13 @@ describe('AssignFaceSidePanel', () => {
     getAllPeopleMock.mockResolvedValue({ people: [person({ id: 'p-2', name: 'Bob' })] });
     searchPersonMock.mockResolvedValue([person({ id: 'p-9', name: 'Alice' })]);
 
-    renderPanel();
+    await renderPanel();
 
-    await userEvent.type(await screen.findByPlaceholderText('search_people'), 'a');
+    await userEvent.type(page.getByPlaceholder('search_people'), 'a');
 
-    await waitFor(() => expect(searchPersonMock).toHaveBeenCalledWith({ name: 'a' }, expect.anything()));
-    expect(await screen.findByText('Alice')).toBeInTheDocument();
-    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(searchPersonMock).toHaveBeenCalledWith({ name: 'a' }, expect.anything()));
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).not.toBeInTheDocument();
   });
 
   // `PeopleSearch` short-circuited a growing query against an unsaturated result set, so typing a
@@ -148,16 +149,16 @@ describe('AssignFaceSidePanel', () => {
   it('narrows an unsaturated result set without a second request', async () => {
     searchPersonMock.mockResolvedValue([person({ id: 'p-9', name: 'Alice' }), person({ id: 'p-8', name: 'Albert' })]);
 
-    renderPanel();
-    const field = await screen.findByPlaceholderText('search_people');
+    await renderPanel();
+    const field = page.getByPlaceholder('search_people');
 
     await userEvent.type(field, 'a');
-    await waitFor(() => expect(searchPersonMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(searchPersonMock).toHaveBeenCalledTimes(1));
 
     await userEvent.type(field, 'lb');
 
-    await waitFor(() => expect(screen.queryByText('Alice')).not.toBeInTheDocument());
-    expect(screen.getByText('Albert')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Albert')).toBeInTheDocument();
     expect(searchPersonMock).toHaveBeenCalledTimes(1);
   });
 
@@ -165,9 +166,9 @@ describe('AssignFaceSidePanel', () => {
     const onReassign = vi.fn();
     getAllPeopleMock.mockResolvedValue({ people: [person({ id: 'p-2', name: 'Bob' })] });
 
-    renderPanel({ onReassign });
+    await renderPanel({ onReassign });
 
-    await userEvent.click(await screen.findByRole('button', { name: /Bob/ }));
+    await userEvent.click(page.getByRole('button', { name: /Bob/ }));
 
     expect(onReassign).toHaveBeenCalledWith(expect.objectContaining({ id: 'p-2', name: 'Bob' }));
   });

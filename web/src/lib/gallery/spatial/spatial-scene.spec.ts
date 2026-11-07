@@ -11,7 +11,8 @@ const photo = (overrides: Partial<AssetResponseDto> = {}) =>
 describe('Spatial Scene actions', () => {
   beforeEach(() => {
     spatialSceneState.hide();
-    // happy-dom has no WebGL; the actions only need to know whether a context exists
+    // Headless Chromium's WebGL support depends on the host GPU; the actions only need to know whether a
+    // context exists, so pin that
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as RenderingContext);
   });
 

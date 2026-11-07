@@ -1,5 +1,7 @@
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import type { ManagedPerson } from './people-types';
 import PersonTileWrapper from './person-tile.test-wrapper.svelte';
 
@@ -12,117 +14,97 @@ const basePerson = (overrides: Partial<ManagedPerson> = {}): ManagedPerson => ({
   ...overrides,
 });
 
+const actions = () => page.getByRole('button', { name: 'Actions' });
+
+// mouseenter / mouseleave do not bubble and are what the tile listens for, so they are dispatched on
+// the tile itself rather than synthesised through pointer moves.
+const mouse = (type: 'mouseenter' | 'mouseleave') => {
+  page.getByRole('group').element().dispatchEvent(new MouseEvent(type));
+  flushSync();
+};
+
 describe('PersonTile', () => {
-  it('renders link, thumbnail title, favorite badge, pet badge, and footer slot', () => {
-    render(PersonTileWrapper, {
-      props: {
-        person: basePerson({
-          displayName: 'Mochi',
-          isFavorite: true,
-          type: 'pet',
-          species: 'cat',
-        }),
-        showFooter: true,
-      },
+  it('renders link, thumbnail title, favorite badge, pet badge, and footer slot', async () => {
+    await render(PersonTileWrapper, {
+      person: basePerson({
+        displayName: 'Mochi',
+        isFavorite: true,
+        type: 'pet',
+        species: 'cat',
+      }),
+      showFooter: true,
     });
 
-    expect(screen.getByRole('link', { name: 'Mochi' })).toHaveAttribute('href', '/people/person-1');
-    expect(screen.getByTitle('Mochi')).toHaveAttribute('src', '/api/people/person-1/thumbnail');
-    expect(screen.getByLabelText('favorite')).toBeInTheDocument();
+    await expect.element(page.getByRole('link', { name: 'Mochi' })).toHaveAttribute('href', '/people/person-1');
+    await expect.element(page.getByTitle('Mochi')).toHaveAttribute('src', '/api/people/person-1/thumbnail');
+    await expect.element(page.getByLabelText('favorite')).toBeInTheDocument();
     // R8.2 (review-fixes F13): the badge gets role="img" + aria-label, and the tooltip goes
     // through pet-species.ts's i18n map. svelte-i18n's `dev` fallback locale (test setup) renders
     // an unmatched key literally, so the resolved key ('species_cat') proves the species went
     // through the map rather than being used raw.
-    const petBadge = screen.getByTitle('species_cat');
-    expect(petBadge).toHaveAttribute('role', 'img');
-    expect(petBadge).toHaveAttribute('aria-label', 'species_cat');
-    expect(screen.getByText('Footer content')).toBeInTheDocument();
+    const petBadge = page.getByTitle('species_cat');
+    await expect.element(petBadge).toHaveAttribute('role', 'img');
+    await expect.element(petBadge).toHaveAttribute('aria-label', 'species_cat');
+    await expect.element(page.getByText('Footer content')).toBeInTheDocument();
   });
 
   // A space People grid maps SharedSpacePersonResponseDto, which carries `type` but no `species`, so
   // the badge would otherwise be a `role="img"` with no accessible name (WCAG 1.1.1).
-  it('names the pet badge generically when the person carries no species', () => {
-    render(PersonTileWrapper, {
-      props: {
-        person: basePerson({ displayName: 'Rex', type: 'pet' }),
-      },
-    });
+  it('names the pet badge generically when the person carries no species', async () => {
+    await render(PersonTileWrapper, { person: basePerson({ displayName: 'Rex', type: 'pet' }) });
 
-    const petBadge = screen.getByTitle('pet');
-    expect(petBadge).toHaveAttribute('role', 'img');
-    expect(petBadge).toHaveAttribute('aria-label', 'pet');
+    const petBadge = page.getByTitle('pet', { exact: true });
+    await expect.element(petBadge).toHaveAttribute('role', 'img');
+    await expect.element(petBadge).toHaveAttribute('aria-label', 'pet');
   });
 
   it('renders action menu slot only on hover when provided', async () => {
-    render(PersonTileWrapper, {
-      props: {
-        person: basePerson(),
-        showActionMenu: true,
-      },
-    });
+    await render(PersonTileWrapper, { person: basePerson(), showActionMenu: true });
 
-    expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(actions().query()).toBeNull();
 
-    await fireEvent.mouseEnter(screen.getByRole('group'));
+    mouse('mouseenter');
+    await expect.element(actions()).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument();
-
-    await fireEvent.mouseLeave(screen.getByRole('group'));
-
-    expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument();
+    mouse('mouseleave');
+    expect(actions().query()).toBeNull();
   });
 
   it('keeps actions visible on mouse leave while focus remains inside and hides them after focus leaves', async () => {
-    const { container } = render(PersonTileWrapper, {
-      props: {
-        person: basePerson(),
-        showActionMenu: true,
-      },
-    });
+    const screen = await render(PersonTileWrapper, { person: basePerson(), showActionMenu: true });
 
-    const link = screen.getByRole('link', { name: 'Ada Lovelace' });
-    link.focus();
-    await fireEvent.focus(link);
+    page.getByRole('link', { name: 'Ada Lovelace' }).element().focus();
+    flushSync();
+    await expect.element(actions()).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument();
+    // Moving focus to the action button fires a focusout on the link whose relatedTarget is inside the tile.
+    (actions().element() as HTMLElement).focus();
+    flushSync();
 
-    const actionButton = screen.getByRole('button', { name: 'Actions' });
-    actionButton.focus();
-    await fireEvent.focusOut(link, { relatedTarget: actionButton });
-    await fireEvent.focus(actionButton);
+    mouse('mouseleave');
+    await expect.element(actions()).toBeInTheDocument();
 
-    await fireEvent.mouseLeave(screen.getByRole('group'));
+    // Focus leaves the tile: focusout with no relatedTarget.
+    (actions().element() as HTMLElement).blur();
+    flushSync();
 
-    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument();
-
-    await fireEvent.focusOut(actionButton, { relatedTarget: document.body });
-
-    expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument();
-    expect(container).not.toHaveTextContent('Actions');
+    expect(actions().query()).toBeNull();
+    expect(screen.container.textContent).not.toContain('Actions');
   });
 
   it('does not render action menu slot when actions are disabled', async () => {
-    render(PersonTileWrapper, {
-      props: {
-        person: basePerson(),
-        showActionMenu: false,
-      },
-    });
+    await render(PersonTileWrapper, { person: basePerson(), showActionMenu: false });
 
-    await fireEvent.mouseEnter(screen.getByRole('group'));
+    mouse('mouseenter');
 
-    expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(actions().query()).toBeNull();
   });
 
-  it('does not render favorite or pet badges when person does not qualify', () => {
-    render(PersonTileWrapper, {
-      props: {
-        person: basePerson(),
-        showFooter: true,
-      },
-    });
+  it('does not render favorite or pet badges when person does not qualify', async () => {
+    await render(PersonTileWrapper, { person: basePerson(), showFooter: true });
 
-    expect(screen.queryByLabelText('favorite')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('species_cat')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Footer content')).toBeInTheDocument();
+    expect(page.getByLabelText('favorite').query()).toBeNull();
+    expect(page.getByTitle('species_cat').query()).toBeNull();
   });
 });

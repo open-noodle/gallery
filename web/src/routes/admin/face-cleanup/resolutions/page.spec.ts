@@ -1,10 +1,11 @@
 import { Route } from '#lib/route.ts';
 import { getFaceRepairResolutions, removeFaceRepairResolutions } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { init, locale, register, waitLocale } from 'svelte-i18n';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+import { getAll } from '../dom-queries.test-helpers';
 import Page from './+page.svelte';
 
 // Unified resolutions manage page: NEGATIVE verdicts only ("this face is not that person"), from BOTH
@@ -166,11 +167,11 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
   });
 
   it('lists verdicts from both engines with their source, target and actor', async () => {
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const rows = screen.getAllByTestId('resolution-row');
+    const rows = getAll(page.getByTestId('resolution-row'));
     // eslint-disable-next-line unicorn/prefer-default-parameters
     expect(rows.map((r) => r.dataset.source).sort((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual([
       'cleanup',
@@ -183,15 +184,25 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
     // Target name resolves to the ACTUAL person on each row (Berta / Armin), not a shared constant —
     // discriminating per row. With the old key-passthrough i18n mock both rows rendered the identical
     // literal key string regardless of which person the row was actually about.
-    expect(within(cleanupRow).getByText('not Berta')).toBeInTheDocument();
-    expect(within(suggestionRow).getByText('not Armin')).toBeInTheDocument();
+    expect(page.elementLocator(cleanupRow).getByText('not Berta', { exact: true }).element()).toBeInTheDocument();
+    expect(page.elementLocator(suggestionRow).getByText('not Armin', { exact: true }).element()).toBeInTheDocument();
 
     // Source label + actor, per row — both previously unqueried by any test. The actor span renders as
     // "· by <name>" (a leading bullet separator), hence the substring match.
-    expect(within(cleanupRow).getByTestId('source-label')).toHaveTextContent('Admin cleanup');
-    expect(within(cleanupRow).getByText(/by Admin/)).toBeInTheDocument();
-    expect(within(suggestionRow).getByTestId('source-label')).toHaveTextContent('User review');
-    expect(within(suggestionRow).getByText(/by Jula/)).toBeInTheDocument();
+    expect(page.elementLocator(cleanupRow).getByTestId('source-label').element()).toMatchTextContent('Admin cleanup');
+    expect(
+      page
+        .elementLocator(cleanupRow)
+        .getByText(/by Admin/)
+        .element(),
+    ).toBeInTheDocument();
+    expect(page.elementLocator(suggestionRow).getByTestId('source-label').element()).toMatchTextContent('User review');
+    expect(
+      page
+        .elementLocator(suggestionRow)
+        .getByText(/by Jula/)
+        .element(),
+    ).toBeInTheDocument();
   });
 
   // The page lists NEGATIVE verdicts only, and that scope used to live solely in a source comment. An admin
@@ -200,13 +211,13 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
   // looks like it lost their work. The subtitle is the only thing on the page that explains that, so it must
   // render whether or not there are rows — the empty states are exactly when it is needed most.
   it('states the page scope in a subtitle, alongside rows', async () => {
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const subtitle = screen.getByTestId('resolutions-subtitle');
-    expect(subtitle).toHaveTextContent('Only "not this person" decisions appear here');
-    expect(subtitle).toHaveTextContent("undone on that person's review page");
+    const subtitle = page.getByTestId('resolutions-subtitle').element();
+    expect(subtitle).toMatchTextContent('Only "not this person" decisions appear here');
+    expect(subtitle).toMatchTextContent("undone on that person's review page");
   });
 
   it('keeps the scope subtitle in the empty state, where it explains the emptiness', async () => {
@@ -214,10 +225,12 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       ReturnType<typeof getFaceRepairResolutions>
     >);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getByText('No decisions recorded yet')).toBeInTheDocument());
-    expect(screen.getByTestId('resolutions-subtitle')).toHaveTextContent(
+    await vi.waitFor(() =>
+      expect(page.getByText('No decisions recorded yet', { exact: true }).element()).toBeInTheDocument(),
+    );
+    expect(page.getByTestId('resolutions-subtitle').element()).toMatchTextContent(
       'Only "not this person" decisions appear here',
     );
   });
@@ -228,25 +241,29 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       resolutions: [SPACE_PERSON_ROW, ORPHANED_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const rows = screen.getAllByTestId('resolution-row');
+    const rows = getAll(page.getByTestId('resolution-row'));
     const spacePersonRow = rows.find((r) => r.dataset.source === 'cleanup')!;
     const orphanedRow = rows.find((r) => r.dataset.source === 'suggestion')!;
 
     // (a) space-person row: target name resolves to the SPACE PERSON (Casper), not the personal fallback,
     // and the space is named alongside it.
-    expect(within(spacePersonRow).getByText('not Casper')).toBeInTheDocument();
-    expect(within(spacePersonRow).getByText('in Family Trip')).toBeInTheDocument();
+    expect(page.elementLocator(spacePersonRow).getByText('not Casper', { exact: true }).element()).toBeInTheDocument();
+    expect(
+      page.elementLocator(spacePersonRow).getByText('in Family Trip', { exact: true }).element(),
+    ).toBeInTheDocument();
 
     // (b) fully-orphaned row: no crash, and reads as a deleted target — a positive control that the
     // no-target branch itself renders correctly, not just that SOME text is present.
-    expect(within(orphanedRow).getByText('not Deleted target')).toBeInTheDocument();
+    expect(
+      page.elementLocator(orphanedRow).getByText('not Deleted target', { exact: true }).element(),
+    ).toBeInTheDocument();
     // No actor for the orphaned row (actorId/actorName both null) — the positive control for "by <actor>"
     // rendering at all is the cleanup row's "by Admin" assertion in the previous test.
-    expect(within(orphanedRow).queryByText(/^by /)).not.toBeInTheDocument();
+    expect(page.elementLocator(orphanedRow).getByText(/^by /).query()).not.toBeInTheDocument();
   });
 
   // S12.7/F30: "the target row still exists but was never named" and "the target row is gone" must read
@@ -272,49 +289,59 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       resolutions: [liveUnnamedRow, ORPHANED_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const rows = screen.getAllByTestId('resolution-row');
+    const rows = getAll(page.getByTestId('resolution-row'));
     const liveRow = rows.find((r) => r.dataset.source === 'cleanup')!;
     const orphanedRow = rows.find((r) => r.dataset.source === 'suggestion')!;
 
     // The person still exists — it just has no name. Calling that "deleted" tells the admin the opposite
     // of the truth.
-    expect(within(liveRow).getByText('not Unnamed cluster')).toBeInTheDocument();
-    expect(within(liveRow).queryByText('not Deleted target')).not.toBeInTheDocument();
+    expect(
+      page.elementLocator(liveRow).getByText('not Unnamed cluster', { exact: true }).element(),
+    ).toBeInTheDocument();
+    expect(
+      page.elementLocator(liveRow).getByText('not Deleted target', { exact: true }).query(),
+    ).not.toBeInTheDocument();
 
     // Positive control, same code path, opposite input: nothing survived here, so this is the row that
     // earns the "deleted" label. The two states use different i18n keys, not just different data.
-    expect(within(orphanedRow).getByText('not Deleted target')).toBeInTheDocument();
-    expect(within(orphanedRow).queryByText('not Unnamed cluster')).not.toBeInTheDocument();
+    expect(
+      page.elementLocator(orphanedRow).getByText('not Deleted target', { exact: true }).element(),
+    ).toBeInTheDocument();
+    expect(
+      page.elementLocator(orphanedRow).getByText('not Unnamed cluster', { exact: true }).query(),
+    ).not.toBeInTheDocument();
   });
 
   it('filters by source', async () => {
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const cleanupFilter = screen.getAllByTestId('source-filter-option').find((el) => el.dataset.value === 'cleanup')!;
-    await fireEvent.click(cleanupFilter);
+    const cleanupFilter = getAll(page.getByTestId('source-filter-option')).find(
+      (el) => el.dataset.value === 'cleanup',
+    )!;
+    await userEvent.click(cleanupFilter);
 
-    await waitFor(() => {
-      const rows = screen.getAllByTestId('resolution-row');
+    await vi.waitFor(() => {
+      const rows = getAll(page.getByTestId('resolution-row'));
       expect(rows).toHaveLength(1);
       expect(rows[0]).toHaveAttribute('data-source', 'cleanup');
     });
   });
 
   it('undoing a row posts removeFaceRepairResolutions with verdictIds and refreshes', async () => {
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
-    const firstRow = screen.getAllByTestId('resolution-row')[0];
-    await fireEvent.click(within(firstRow).getByTestId('undo-button'));
+    const firstRow = getAll(page.getByTestId('resolution-row'))[0];
+    await userEvent.click(page.elementLocator(firstRow).getByTestId('undo-button').element());
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(removeFaceRepairResolutions).toHaveBeenCalledWith({
         faceRepairResolutionsRemoveRequestDto: {
           verdictIds: [firstRow.dataset.source === 'cleanup' ? 'verdict-1' : 'verdict-2'],
@@ -341,11 +368,11 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
         resolutions: [page2Row],
       } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
     // Total matches the server total (3), not just what's loaded so far (2).
-    expect(screen.getByTestId('resolutions-load-more')).toHaveTextContent('1');
+    expect(page.getByTestId('resolutions-load-more').element()).toMatchTextContent('1');
     // S11b: the FIRST load asks for page 1 explicitly. Until the SDK carried page/size, this page
     // re-requested the server's default page every time and de-duplicated by id, so "Load more" was a
     // silent no-op that this test could not tell apart from working pagination.
@@ -354,28 +381,28 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
     // The space-person row (Casper) renders a thumbnail — the KNOWN GAP the comment in this file used to
     // describe. Positive control in the same test: the personal row (Berta) already renders one too, via the
     // SAME face-keyed helper, proving the assertion actually distinguishes "has an img" from "doesn't".
-    const rows = screen.getAllByTestId('resolution-row');
-    const spaceRow = rows.find((r) => within(r).queryByText('not Casper'))!;
-    const personalRow = rows.find((r) => within(r).queryByText('not Berta'))!;
-    expect(within(spaceRow).getByTestId('target-thumbnail')).toHaveAttribute(
+    const rows = getAll(page.getByTestId('resolution-row'));
+    const spaceRow = rows.find((r) => page.elementLocator(r).getByText('not Casper', { exact: true }).query())!;
+    const personalRow = rows.find((r) => page.elementLocator(r).getByText('not Berta', { exact: true }).query())!;
+    expect(page.elementLocator(spaceRow).getByTestId('target-thumbnail').element()).toHaveAttribute(
       'src',
       expect.stringContaining('repr-face-1'),
     );
-    expect(within(personalRow).getByTestId('target-thumbnail')).toBeInTheDocument();
+    expect(page.elementLocator(personalRow).getByTestId('target-thumbnail').element()).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByTestId('resolutions-load-more'));
+    await userEvent.click(page.getByTestId('resolutions-load-more').element());
 
-    await waitFor(() => expect(getFaceRepairResolutions).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(getFaceRepairResolutions).toHaveBeenCalledTimes(2));
     // S11b: and "Load more" asks for page 2 — the assertion that actually distinguishes real paging from
     // re-fetching page 1 and filtering duplicates out client-side.
     expect(getFaceRepairResolutions).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 2 }));
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(3));
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(3));
     // Page 1's rows are still there — load-more APPENDS, it does not replace.
-    expect(screen.getByText('not Casper')).toBeInTheDocument();
-    expect(screen.getByText('not Berta')).toBeInTheDocument();
-    expect(screen.getByText('not Zed')).toBeInTheDocument();
+    expect(page.getByText('not Casper', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('not Berta', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('not Zed', { exact: true }).element()).toBeInTheDocument();
     // Every row now loaded — the "Load more" affordance is gone.
-    expect(screen.queryByTestId('resolutions-load-more')).not.toBeInTheDocument();
+    expect(page.getByTestId('resolutions-load-more').query()).not.toBeInTheDocument();
   });
 
   it('shows the empty state when there are no verdicts', async () => {
@@ -383,12 +410,12 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       ReturnType<typeof getFaceRepairResolutions>
     >);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => {
-      expect(screen.getByText('No decisions recorded yet')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('No decisions recorded yet', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('resolution-row')).not.toBeInTheDocument();
+    expect(page.getByTestId('resolution-row').query()).not.toBeInTheDocument();
   });
 
   it('sends the empty-state button to the console landing page', async () => {
@@ -396,19 +423,19 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       ReturnType<typeof getFaceRepairResolutions>
     >);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
     // Real en.json is loaded in this file — 'No decisions recorded yet' is the actual value of
     // admin.face_cleanup_resolutions_empty, matching the sibling empty-state test above.
-    await waitFor(() => {
-      expect(screen.getByText('No decisions recorded yet')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('No decisions recorded yet', { exact: true }).element()).toBeInTheDocument();
     });
 
     // The button used to point at /scan while being labelled "Face cleanup". Exclude the trail so this is
     // about the button, not the crumb that now shares its name and href.
-    const buttons = screen
-      .getAllByRole('link', { name: 'Face cleanup' })
-      .filter((link) => !screen.getByTestId('breadcrumbs').contains(link));
+    const buttons = getAll(page.getByRole('link', { name: 'Face cleanup', exact: true })).filter(
+      (link) => !page.getByTestId('breadcrumbs').element().contains(link),
+    );
 
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveAttribute('href', Route.faceCleanup());
@@ -424,20 +451,20 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       resolutions: [CLEANUP_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(1));
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(1));
 
-    const suggestionFilter = screen
-      .getAllByTestId('source-filter-option')
-      .find((el) => el.dataset.value === 'suggestion')!;
-    await fireEvent.click(suggestionFilter);
+    const suggestionFilter = getAll(page.getByTestId('source-filter-option')).find(
+      (el) => el.dataset.value === 'suggestion',
+    )!;
+    await userEvent.click(suggestionFilter);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('resolution-row')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('resolution-row').query()).not.toBeInTheDocument();
       // The never-recorded message must NOT appear here — the row IS there, just filtered out. The whole list
       // is loaded (total === 1), so the state names the empty source rather than the neutral wording.
-      expect(screen.queryByText('No decisions recorded yet')).not.toBeInTheDocument();
-      expect(screen.getByText('No user review decisions yet')).toBeInTheDocument();
+      expect(page.getByText('No decisions recorded yet', { exact: true }).query()).not.toBeInTheDocument();
+      expect(page.getByText('No user review decisions yet', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -451,21 +478,25 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       resolutions: [SUGGESTION_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(1));
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(1));
 
-    const cleanupFilter = screen.getAllByTestId('source-filter-option').find((el) => el.dataset.value === 'cleanup')!;
-    await fireEvent.click(cleanupFilter);
+    const cleanupFilter = getAll(page.getByTestId('source-filter-option')).find(
+      (el) => el.dataset.value === 'cleanup',
+    )!;
+    await userEvent.click(cleanupFilter);
 
-    await waitFor(() => expect(screen.queryByTestId('resolution-row')).not.toBeInTheDocument());
-    expect(screen.getByText('No admin cleanup decisions yet')).toBeInTheDocument();
-    expect(screen.getByText('1 decision from the other source is hidden by this filter')).toBeInTheDocument();
+    await vi.waitFor(() => expect(page.getByTestId('resolution-row').query()).not.toBeInTheDocument());
+    expect(page.getByText('No admin cleanup decisions yet', { exact: true }).element()).toBeInTheDocument();
+    expect(
+      page.getByText('1 decision from the other source is hidden by this filter', { exact: true }).element(),
+    ).toBeInTheDocument();
     // Never the never-recorded message: the rows ARE there.
-    expect(screen.queryByText('No decisions recorded yet')).not.toBeInTheDocument();
+    expect(page.getByText('No decisions recorded yet', { exact: true }).query()).not.toBeInTheDocument();
 
     // One click back to the full list.
-    await fireEvent.click(screen.getByTestId('empty-filtered-show-all'));
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(1));
+    await userEvent.click(page.getByTestId('empty-filtered-show-all').element());
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(1));
   });
 
   // The inverse, and the reason the precise copy is conditional: with pages still unfetched, a source with no
@@ -478,16 +509,18 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       resolutions: [SUGGESTION_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(1));
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(1));
 
-    const cleanupFilter = screen.getAllByTestId('source-filter-option').find((el) => el.dataset.value === 'cleanup')!;
-    await fireEvent.click(cleanupFilter);
+    const cleanupFilter = getAll(page.getByTestId('source-filter-option')).find(
+      (el) => el.dataset.value === 'cleanup',
+    )!;
+    await userEvent.click(cleanupFilter);
 
-    await waitFor(() => expect(screen.queryByTestId('resolution-row')).not.toBeInTheDocument());
-    expect(screen.queryByText('No admin cleanup decisions yet')).not.toBeInTheDocument();
-    expect(screen.getByText('No decisions match this filter')).toBeInTheDocument();
-    expect(screen.getByTestId('resolutions-load-more')).toBeInTheDocument();
+    await vi.waitFor(() => expect(page.getByTestId('resolution-row').query()).not.toBeInTheDocument());
+    expect(page.getByText('No admin cleanup decisions yet', { exact: true }).query()).not.toBeInTheDocument();
+    expect(page.getByText('No decisions match this filter', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('resolutions-load-more').element()).toBeInTheDocument();
   });
 
   // ---- D17: a failed INITIAL load must not render as the reassuring "no verdicts" empty state ----
@@ -495,38 +528,41 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
   it('shows a load-error state (not the empty state) when the initial fetch fails, and Retry re-fetches', async () => {
     vi.mocked(getFaceRepairResolutions).mockRejectedValueOnce(new Error('network down'));
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('load-error-banner')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('load-error-banner').element()).toBeInTheDocument();
     });
-    expect(screen.queryByText('No decisions recorded yet')).not.toBeInTheDocument();
+    expect(page.getByText('No decisions recorded yet', { exact: true }).query()).not.toBeInTheDocument();
 
     vi.mocked(getFaceRepairResolutions).mockResolvedValueOnce({
       total: 2,
       resolutions: [CLEANUP_ROW, SUGGESTION_ROW],
     } as unknown as Awaited<ReturnType<typeof getFaceRepairResolutions>>);
-    await fireEvent.click(screen.getByTestId('load-error-retry'));
+    await userEvent.click(page.getByTestId('load-error-retry').element());
 
-    await waitFor(() => {
-      expect(screen.getAllByTestId('resolution-row')).toHaveLength(2);
-      expect(screen.queryByTestId('load-error-banner')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2);
+      expect(page.getByTestId('load-error-banner').query()).not.toBeInTheDocument();
     });
   });
 
   it('renders a breadcrumb trail back to the face cleanup landing page', async () => {
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
 
-    const trail = within(screen.getByTestId('breadcrumbs'));
+    const trail = page.getByTestId('breadcrumbs');
 
     // Real en.json is loaded in this file, so these are English strings, not raw keys.
     // The root used to point at /scan; Resolutions is a peer of the two modes, not a child of guided.
-    await waitFor(() => {
-      expect(trail.getByRole('link', { name: 'Face cleanup' })).toHaveAttribute('href', Route.faceCleanup());
+    await vi.waitFor(() => {
+      expect(trail.getByRole('link', { name: 'Face cleanup', exact: true }).element()).toHaveAttribute(
+        'href',
+        Route.faceCleanup(),
+      );
     });
 
-    expect(trail.getByText('Resolutions')).toBeInTheDocument();
-    expect(trail.getAllByRole('link')).toHaveLength(1);
+    expect(trail.getByText('Resolutions', { exact: true }).element()).toBeInTheDocument();
+    expect(getAll(trail.getByRole('link'))).toHaveLength(1);
   });
 
   // S12.8/F30: the three filter-chip labels were built once, at component init, into a plain (non-reactive)
@@ -549,28 +585,28 @@ describe('+page.svelte (face-cleanup resolutions)', () => {
       }),
     );
 
-    render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
-    await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(2));
+    await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+    await vi.waitFor(() => expect(getAll(page.getByTestId('resolution-row'))).toHaveLength(2));
 
     // Scoped to the filter-chip strip: `source-label` spans in the rows below also say "Admin cleanup" /
     // "User review(s)", which would otherwise make these queries ambiguous.
-    const filterStrip = () => within(screen.getByTestId('source-filter'));
+    const filterStrip = () => page.elementLocator(page.getByTestId('source-filter').element());
 
     // Positive control: the English labels render first, under the locale active at mount.
-    expect(filterStrip().getByText('All sources')).toBeInTheDocument();
-    expect(filterStrip().getByText('Admin cleanup')).toBeInTheDocument();
-    expect(filterStrip().getByText('User reviews')).toBeInTheDocument();
+    expect(filterStrip().getByText('All sources', { exact: true }).element()).toBeInTheDocument();
+    expect(filterStrip().getByText('Admin cleanup', { exact: true }).element()).toBeInTheDocument();
+    expect(filterStrip().getByText('User reviews', { exact: true }).element()).toBeInTheDocument();
 
     await locale.set('resolutions-test-locale');
     await waitLocale('resolutions-test-locale');
 
-    await waitFor(() => {
-      expect(filterStrip().getByText('Toutes les sources')).toBeInTheDocument();
-      expect(filterStrip().getByText('Nettoyage admin')).toBeInTheDocument();
-      expect(filterStrip().getByText('Avis utilisateur')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(filterStrip().getByText('Toutes les sources', { exact: true }).element()).toBeInTheDocument();
+      expect(filterStrip().getByText('Nettoyage admin', { exact: true }).element()).toBeInTheDocument();
+      expect(filterStrip().getByText('Avis utilisateur', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(filterStrip().queryByText('All sources')).not.toBeInTheDocument();
-    expect(filterStrip().queryByText('Admin cleanup')).not.toBeInTheDocument();
-    expect(filterStrip().queryByText('User reviews')).not.toBeInTheDocument();
+    expect(filterStrip().getByText('All sources', { exact: true }).query()).not.toBeInTheDocument();
+    expect(filterStrip().getByText('Admin cleanup', { exact: true }).query()).not.toBeInTheDocument();
+    expect(filterStrip().getByText('User reviews', { exact: true }).query()).not.toBeInTheDocument();
   });
 });

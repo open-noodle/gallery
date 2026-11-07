@@ -1,9 +1,6 @@
 import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { OpenQueryParam } from '#lib/constants.ts';
 import { Route } from '#lib/route.ts';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 describe('Route', () => {
   describe(Route.login.name, () => {
@@ -216,8 +213,10 @@ describe('Route', () => {
 });
 
 describe('Route.search call sites', () => {
-  // web/src/lib/ -> up 1 -> web/src
-  const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  // The specs run in the browser, so the sources come in through Vite as raw text. Keys are
+  // root-relative (`/src/lib/route.ts`); SRC_ROOT is stripped to match the paths below.
+  const SRC_ROOT = '/src/';
+  const SOURCES = import.meta.glob<string>('/src/**/*.{ts,svelte}', { query: '?raw', import: 'default' });
 
   // Every in-app link to the deprecated /search page. The page itself is kept as a landing page
   // for old bookmarks, but nothing new may point at it: a palette/search-bar result belongs on
@@ -238,23 +237,16 @@ describe('Route.search call sites', () => {
     'routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   ]);
 
-  function walk(dir: string, found: string[] = []): string[] {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) {
-        walk(full, found);
-        continue;
-      }
-      if (!/\.(ts|svelte)$/.test(name) || /\.spec\.ts$/.test(name)) {
-        continue;
-      }
-      // Anchored so a local like `previousRoute.search` cannot masquerade as `Route.search`
-      // — a plain substring match reads the tail of any identifier ending in `Route`.
-      if (/(?<![A-Za-z0-9_$])Route\.search\b/.test(readFileSync(full, 'utf8'))) {
-        found.push(relative(SRC_ROOT, full));
-      }
-    }
-    return found;
+  // Loads the sources in parallel: each one is a request to Vite, and one at a time takes longer than the test
+  // timeout when the whole suite runs.
+  async function walk(): Promise<string[]> {
+    const entries = Object.entries(SOURCES).filter(([file]) => !/\.spec\.ts$/.test(file));
+    const sources = await Promise.all(entries.map(([file, load]) => load().then((source) => [file, source] as const)));
+    // Anchored so a local like `previousRoute.search` cannot masquerade as `Route.search`
+    // — a plain substring match reads the tail of any identifier ending in `Route`.
+    return sources
+      .filter(([, source]) => /(?<![A-Za-z0-9_$])Route\.search\b/.test(source))
+      .map(([file]) => file.slice(SRC_ROOT.length));
   }
 
   // Upstream's own search UI is carried dormant — present, byte-identical to upstream, and never
@@ -264,11 +256,14 @@ describe('Route.search call sites', () => {
   // allowlisted, so that a real new call site in live code still fails this guard.
   const DORMANT = ['lib/components/shared-components/search-bar/', 'lib/managers/search-manager.svelte.ts'];
 
-  it('are a subset of the allowlist', () => {
-    const unexpected = walk(SRC_ROOT)
+  it('are a subset of the allowlist', async () => {
+    const found = await walk();
+    // Control on the scan itself: the allowlisted call sites are found.
+    expect(found).toContain('lib/services/asset.service.ts');
+    const unexpected = found
       .filter((file) => DORMANT.every((prefix) => !file.startsWith(prefix)))
       .filter((file) => !ALLOWED.has(file));
 
     expect(unexpected).toEqual([]);
-  });
+  }, 60_000);
 });

@@ -1,29 +1,37 @@
 import type { TimelineGrouping } from '#lib/managers/timeline-manager/types.ts';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import TimelineGroupingControl from './TimelineGroupingControl.svelte';
 
+const keyDown = (element: Element, key: string) => {
+  element.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+};
+
 describe('TimelineGroupingControl', () => {
-  it('renders Years, Months, and All with the active mode pressed', () => {
-    render(TimelineGroupingControl, {
+  it('renders Years, Months, and All with the active mode pressed', async () => {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'month',
         onGroupingChange: () => {},
       },
     });
 
-    expect(screen.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'inline');
-    expect(screen.getByTestId('timeline-grouping-year')).toHaveTextContent('timeline_grouping_years');
-    expect(screen.getByTestId('timeline-grouping-month')).toHaveTextContent('timeline_grouping_months');
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
-    expect(screen.getByRole('group', { name: 'timeline_grouping_selector' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-grouping-year')).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'inline');
+    await expect.element(page.getByTestId('timeline-grouping-year')).toHaveTextContent('timeline_grouping_years');
+    await expect.element(page.getByTestId('timeline-grouping-month')).toHaveTextContent('timeline_grouping_months');
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
+    await expect.element(page.getByRole('group', { name: 'timeline_grouping_selector' })).toBeInTheDocument();
+    await expect
+      .element(page.getByRole('button', { name: 'timeline_grouping_all' }))
+      .toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(page.getByTestId('timeline-grouping-year')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('emits a grouping change when a different mode is clicked', async () => {
     const changes: TimelineGrouping[] = [];
-    render(TimelineGroupingControl, {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'day',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -32,14 +40,14 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    await page.getByTestId('timeline-grouping-year').click();
 
     expect(changes).toEqual(['year']);
   });
 
   it('keeps the internal day grouping value when the All button is selected', async () => {
     const changes: TimelineGrouping[] = [];
-    render(TimelineGroupingControl, {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'month',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -48,15 +56,15 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'timeline_grouping_all' }));
+    await page.getByRole('button', { name: 'timeline_grouping_all' }).click();
 
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
     expect(changes).toEqual(['day']);
   });
 
   it('does not emit when clicking the already active mode', async () => {
     const changes: TimelineGrouping[] = [];
-    render(TimelineGroupingControl, {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'day',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -65,14 +73,14 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-day'));
+    await page.getByTestId('timeline-grouping-day').click();
 
     expect(changes).toEqual([]);
   });
 
   it('supports arrow-key navigation between modes', async () => {
     const changes: TimelineGrouping[] = [];
-    const { rerender } = render(TimelineGroupingControl, {
+    const { rerender } = await render(TimelineGroupingControl, {
       props: {
         grouping: 'month',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -81,9 +89,9 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    const focusedButton = screen.getByTestId('timeline-grouping-month');
+    const focusedButton = page.getByTestId('timeline-grouping-month').element() as HTMLElement;
     focusedButton.focus();
-    await fireEvent.keyDown(focusedButton, { key: 'ArrowRight' });
+    keyDown(focusedButton, 'ArrowRight');
 
     await rerender({
       grouping: 'day',
@@ -91,14 +99,14 @@ describe('TimelineGroupingControl', () => {
         changes.push(grouping);
       },
     });
-    await fireEvent.keyDown(focusedButton, { key: 'ArrowRight' });
+    keyDown(focusedButton, 'ArrowRight');
 
     expect(changes).toEqual(['day', 'year']);
   });
 
   it('supports reverse arrow-key navigation after controlled grouping changes', async () => {
     const changes: TimelineGrouping[] = [];
-    const { rerender } = render(TimelineGroupingControl, {
+    const { rerender } = await render(TimelineGroupingControl, {
       props: {
         grouping: 'month',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -107,9 +115,9 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    const focusedButton = screen.getByTestId('timeline-grouping-month');
+    const focusedButton = page.getByTestId('timeline-grouping-month').element() as HTMLElement;
     focusedButton.focus();
-    await fireEvent.keyDown(focusedButton, { key: 'ArrowLeft' });
+    keyDown(focusedButton, 'ArrowLeft');
 
     await rerender({
       grouping: 'year',
@@ -117,14 +125,14 @@ describe('TimelineGroupingControl', () => {
         changes.push(grouping);
       },
     });
-    await fireEvent.keyDown(focusedButton, { key: 'ArrowLeft' });
+    keyDown(focusedButton, 'ArrowLeft');
 
     expect(changes).toEqual(['year', 'day']);
   });
 
   it('wraps arrow-key navigation at the start and end of the modes', async () => {
     const changes: TimelineGrouping[] = [];
-    const { rerender } = render(TimelineGroupingControl, {
+    const { rerender } = await render(TimelineGroupingControl, {
       props: {
         grouping: 'day',
         onGroupingChange: (grouping: TimelineGrouping) => {
@@ -133,7 +141,7 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.keyDown(screen.getByTestId('timeline-grouping-day'), { key: 'ArrowRight' });
+    keyDown(page.getByTestId('timeline-grouping-day').element(), 'ArrowRight');
 
     await rerender({
       grouping: 'year',
@@ -141,14 +149,14 @@ describe('TimelineGroupingControl', () => {
         changes.push(grouping);
       },
     });
-    await fireEvent.keyDown(screen.getByTestId('timeline-grouping-year'), { key: 'ArrowLeft' });
+    keyDown(page.getByTestId('timeline-grouping-year').element(), 'ArrowLeft');
 
     expect(changes).toEqual(['year', 'day']);
   });
 
   it('disables all mode buttons without emitting changes', async () => {
     const changes: TimelineGrouping[] = [];
-    render(TimelineGroupingControl, {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'day',
         disabled: true,
@@ -158,16 +166,20 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.click(screen.getByTestId('timeline-grouping-year'));
+    // A disabled button is not actionable for a real user click, so dispatch the click directly.
+    page
+      .getByTestId('timeline-grouping-year')
+      .element()
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(screen.getByTestId('timeline-grouping-year')).toBeDisabled();
-    expect(screen.getByTestId('timeline-grouping-month')).toBeDisabled();
-    expect(screen.getByTestId('timeline-grouping-day')).toBeDisabled();
+    await expect.element(page.getByTestId('timeline-grouping-year')).toBeDisabled();
+    await expect.element(page.getByTestId('timeline-grouping-month')).toBeDisabled();
+    await expect.element(page.getByTestId('timeline-grouping-day')).toBeDisabled();
     expect(changes).toEqual([]);
   });
 
-  it('marks the floating variant for mobile placement styling', () => {
-    render(TimelineGroupingControl, {
+  it('marks the floating variant for mobile placement styling', async () => {
+    await render(TimelineGroupingControl, {
       props: {
         grouping: 'year',
         variant: 'floating',
@@ -175,6 +187,6 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    expect(screen.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'floating');
+    await expect.element(page.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'floating');
   });
 });

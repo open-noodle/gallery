@@ -1,9 +1,9 @@
 import { renderInViewerSpace } from '#lib/gallery/viewer-space.test-helpers.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import FaceEditorPanel from './FaceEditorPanel.svelte';
 
 // The single swap point PhotoViewer.svelte and VideoNativeViewer.svelte both render instead of
@@ -31,41 +31,43 @@ describe('FaceEditorPanel', () => {
     authManager.setPreferences(factory.preferences());
   });
 
-  it('renders FaceEditor in its space mode for a non-owner editor in a viewer space', () => {
+  it('renders FaceEditor in its space mode for a non-owner editor in a viewer space', async () => {
     const asset = factory.asset({ id: 'asset-1', ownerId: 'space-owner', canEdit: true });
-    renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
+    await renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
 
-    const stub = screen.getByTestId('face-editor-stub');
-    expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(stub).toHaveAttribute('data-space-id', 'space-1');
+    const stub = page.getByTestId('face-editor-stub');
+    await expect.element(stub).toHaveAttribute('data-asset-id', 'asset-1');
+    await expect.element(stub).toHaveAttribute('data-space-id', 'space-1');
   });
 
-  it('falls back to the space the asset resolved to when the viewer has no space', () => {
+  it('falls back to the space the asset resolved to when the viewer has no space', async () => {
     const asset = factory.asset({ ownerId: 'space-owner', canEdit: true, resolvedSpaceId: 'space-9' });
-    render(FaceEditorPanel, { ...base, asset });
+    await render(FaceEditorPanel, { ...base, asset });
 
-    expect(screen.getByTestId('face-editor-stub')).toHaveAttribute('data-space-id', 'space-9');
+    await expect.element(page.getByTestId('face-editor-stub')).toHaveAttribute('data-space-id', 'space-9');
   });
 
-  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', () => {
+  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', async () => {
     const asset = factory.asset({ ownerId: 'space-member', canEdit: true });
-    renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
+    await renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
 
-    expect(screen.getByTestId('face-editor-stub')).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
+    await expect.element(page.getByTestId('face-editor-stub')).toHaveAttribute('data-asset-id', 'asset-1');
+    await expect.element(page.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 
-  it('renders FaceEditor in its owner mode for a non-owner who may not edit the asset', () => {
+  it('renders FaceEditor in its owner mode for a non-owner who may not edit the asset', async () => {
     const asset = factory.asset({ ownerId: 'space-owner', canEdit: false });
-    renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
+    await renderInViewerSpace(FaceEditorPanel, { ...base, asset }, { spaceId: 'space-1' });
 
-    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
+    await expect.element(page.getByTestId('face-editor-stub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 
-  it('renders FaceEditor in its owner mode for an editor when no space id is available', () => {
+  it('renders FaceEditor in its owner mode for an editor when no space id is available', async () => {
     const asset = factory.asset({ ownerId: 'space-owner', canEdit: true, resolvedSpaceId: undefined });
-    render(FaceEditorPanel, { ...base, asset });
+    await render(FaceEditorPanel, { ...base, asset });
 
-    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
+    await expect.element(page.getByTestId('face-editor-stub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 });

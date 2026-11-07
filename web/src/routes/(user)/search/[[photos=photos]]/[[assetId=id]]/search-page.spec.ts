@@ -1,9 +1,10 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { QueryParameter } from '#lib/constants.ts';
 import { AssetVisibility, type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import SearchPage from './+page.svelte';
 
 const {
@@ -50,12 +51,17 @@ const {
   mockSearchSmart: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+
   afterNavigate: mockAfterNavigate,
   goto: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$app/state', () => ({ page: mockPage }));
+vi.mock('$app/state', async () => ({
+  ...(await import('#test/unit/mocks/app-state.svelte.ts')),
+  page: mockPage,
+}));
 
 vi.mock('#lib/components/ActionMenuItem.svelte', async () => {
   const { default: MockComponent } = await import('#lib/gallery/__mocks__/noop-component.svelte');
@@ -164,16 +170,9 @@ vi.mock('#lib/services/asset.service.js', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 
-vi.mock('#lib/utils/navigation.js', () => ({
-  isAlbumsRoute: vi.fn(() => false),
-  isPeopleRoute: vi.fn(() => false),
-}));
+vi.mock('#lib/utils/navigation.js', { spy: true });
 
-vi.mock('#lib/utils/timeline-util.js', () => ({
-  isTimelineAsset: vi.fn(Boolean),
-  isTimelineAssets: vi.fn((assets) => Array.isArray(assets)),
-  toTimelineAsset: vi.fn((asset) => asset),
-}));
+vi.mock('#lib/utils/timeline-util.js', { spy: true });
 
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
@@ -227,8 +226,8 @@ describe('Search page cmdk selection context', () => {
     });
   });
 
-  it('registers add-to-album and visible toolbar callbacks', () => {
-    renderPage();
+  it('registers add-to-album and visible toolbar callbacks', async () => {
+    await renderPage();
 
     expect(mockRegisterSelectionContext).toHaveBeenCalledOnce();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
@@ -245,20 +244,20 @@ describe('Search page cmdk selection context', () => {
     const query = encodeURIComponent(JSON.stringify({ visibility: AssetVisibility.Timeline }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('asset-row-asset-1')).toBeInTheDocument());
+    await expect.element(page.getByTestId('asset-row-asset-1')).toBeInTheDocument();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
 
     options.getOnArchive()(['asset-1'], AssetVisibility.Archive);
 
-    await waitFor(() => expect(screen.queryByTestId('asset-row-asset-1')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('asset-row-asset-1')).not.toBeInTheDocument();
   });
 
   it('enables GalleryViewer grouping for legacy search result grids', async () => {
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true'));
+    await expect.element(page.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
   });
 
   // #830: "Show similar photos" on a photo shared through a Space returned nothing for a member
@@ -270,9 +269,9 @@ describe('Search page cmdk selection context', () => {
     const query = encodeURIComponent(JSON.stringify({ queryAssetId: 'asset-1' }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchSmart).toHaveBeenCalledWith({
         smartSearchDto: expect.objectContaining({ queryAssetId: 'asset-1', withSharedSpaces: true }),
       });
@@ -285,9 +284,9 @@ describe('Search page cmdk selection context', () => {
     mockFeatureFlagsManager.value.smartSearch = true;
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=beach`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchSmart).toHaveBeenCalledWith({
         smartSearchDto: expect.objectContaining({ query: 'beach' }),
       });
@@ -298,9 +297,9 @@ describe('Search page cmdk selection context', () => {
     mockFeatureFlagsManager.value.smartSearch = true;
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=42`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchSmart).toHaveBeenCalledWith({
         smartSearchDto: expect.objectContaining({ query: '42' }),
       });
@@ -311,9 +310,9 @@ describe('Search page cmdk selection context', () => {
     const query = encodeURIComponent(JSON.stringify({ city: 'Berlin' }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchAssets).toHaveBeenCalledWith({
         metadataSearchDto: expect.objectContaining({ city: 'Berlin', withSharedSpaces: true }),
       });
@@ -327,9 +326,9 @@ describe('Search page cmdk selection context', () => {
     const query = encodeURIComponent(JSON.stringify({ query: 'beach', spaceId: 'space-1' }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(mockSearchSmart).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mockSearchSmart).toHaveBeenCalled());
     expect(mockSearchSmart.mock.calls[0][0].smartSearchDto).not.toHaveProperty('withSharedSpaces');
   });
 
@@ -337,9 +336,9 @@ describe('Search page cmdk selection context', () => {
     const query = encodeURIComponent(JSON.stringify({ city: 'Berlin', withSharedSpaces: false }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchAssets).toHaveBeenCalledWith({
         metadataSearchDto: expect.objectContaining({ withSharedSpaces: false }),
       });
@@ -360,9 +359,9 @@ describe('Search page cmdk selection context', () => {
       },
     ]);
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockSearchAssets).toHaveBeenCalledWith({
         metadataSearchDto: expect.objectContaining({
           personIds: ['space-person:space-person-1'],
@@ -370,8 +369,8 @@ describe('Search page cmdk selection context', () => {
         }),
       });
     });
-    await waitFor(() => expect(screen.getByText('Pierre')).toBeInTheDocument());
-    expect(screen.queryByText('withSharedSpaces')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Pierre')).toBeInTheDocument();
+    await expect.element(page.getByText('withSharedSpaces')).not.toBeInTheDocument();
     expect(mockGetPerson).not.toHaveBeenCalledWith({ id: 'space-person:space-person-1' });
   });
 });

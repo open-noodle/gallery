@@ -4,9 +4,8 @@ import { consumeTypedSearchNames } from '#lib/utils/typed-search/typed-search-na
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { AssetFaceResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanelPeople from '../DetailPanelPeople.svelte';
 
 // Task 5 of Slice 7 (asset-viewer-contextual-filters).
@@ -30,7 +29,7 @@ const { gotoMock, faceManagerMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
   zoomImageToBase64Mock: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: gotoMock }));
 
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
@@ -96,11 +95,18 @@ beforeEach(() => {
   mockPage.reset('https://gallery.test/photos/asset-1');
 });
 
+// The chip is a real link: in the browser a click would navigate the test frame away. Cancel the
+// default action (the component's own click handler still runs) so only the banking is observed.
+const clickWithoutNavigating = (link: HTMLElement | SVGElement) => {
+  link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+  link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+};
+
 describe('DetailPanelPeople filter grammar (R8)', () => {
   it('in a SPACE: the chip filters by the BARE spacePersonId (a scoped token would 400)', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson()]),
       isOwner: false,
       previousRoute: '/photos',
@@ -108,7 +114,9 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Alice');
+    await expect.element(page.getByLabelText('filter_by_person: Alice')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Alice').element();
     const href = chip.getAttribute('href') ?? '';
 
     expect(href).toBe(buildContextualFilterUrl(mockPage.url, { personIds: [SPACE_PERSON_UUID] }));
@@ -123,7 +131,7 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
   it('on the SPACE MAP: the chip likewise filters by the bare spacePersonId', async () => {
     mockPage.reset('https://gallery.test/map/photos/asset-1?spaceId=space-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson()]),
       isOwner: false,
       previousRoute: '/photos',
@@ -131,7 +139,9 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Alice');
+    await expect.element(page.getByLabelText('filter_by_person: Alice')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Alice').element();
     const href = chip.getAttribute('href') ?? '';
     const people = new URLSearchParams(href.split('?', 2)[1]).get('people') ?? '';
 
@@ -142,7 +152,7 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
   it('on /photos: a shared-space person filters by the SCOPED token (P1 — the owner uuid is invisible there)', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson()]),
       isOwner: false,
       previousRoute: '/photos',
@@ -150,7 +160,9 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Alice');
+    await expect.element(page.getByLabelText('filter_by_person: Alice')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Alice').element();
     const href = chip.getAttribute('href') ?? '';
     const people = new URLSearchParams(href.split('?', 2)[1]).get('people') ?? '';
 
@@ -163,14 +175,16 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Bob');
+    await expect.element(page.getByLabelText('filter_by_person: Bob')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Bob').element();
     const href = chip.getAttribute('href') ?? '';
     const people = new URLSearchParams(href.split('?', 2)[1]).get('people') ?? '';
 
@@ -185,7 +199,7 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
   it('R8: renders NO filter affordance for a Space person with no spacePersonId', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson({ spacePersonId: undefined })]),
       isOwner: false,
       previousRoute: '/photos',
@@ -193,12 +207,12 @@ describe('DetailPanelPeople filter grammar (R8)', () => {
       canFilter: true,
     });
 
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_person/)).not.toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_person/)).not.toBeInTheDocument();
     // …and there is no person page to fall back to either: #796 renders a non-owner's person as
     // plain text rather than a link into the owner-gated `/people/{id}`, which would 404. The row
     // still shows the person — it just carries no navigation.
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    await expect.element(page.getByRole('link')).not.toBeInTheDocument();
   });
 });
 
@@ -215,16 +229,18 @@ describe('DetailPanelPeople name hand-off', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Bob');
+    await expect.element(page.getByLabelText('filter_by_person: Bob')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Bob').element();
     const href = chip.getAttribute('href') ?? '';
-    await fireEvent.click(chip);
+    clickWithoutNavigating(chip);
 
     const names = consumeTypedSearchNames(href);
     expect(names.personNames.get(`person:${PERSON_UUID}`)).toBe('Bob');
@@ -233,7 +249,7 @@ describe('DetailPanelPeople name hand-off', () => {
   it('banks the SPACE person name under the bare id the Space filters by', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson()]),
       isOwner: false,
       previousRoute: '/photos',
@@ -241,9 +257,11 @@ describe('DetailPanelPeople name hand-off', () => {
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Alice');
+    await expect.element(page.getByLabelText('filter_by_person: Alice')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Alice').element();
     const href = chip.getAttribute('href') ?? '';
-    await fireEvent.click(chip);
+    clickWithoutNavigating(chip);
 
     const names = consumeTypedSearchNames(href);
     expect(names.personNames.get(SPACE_PERSON_UUID)).toBe('Alice');
@@ -257,17 +275,19 @@ describe('DetailPanelPeople name hand-off', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Bob');
+    await expect.element(page.getByLabelText('filter_by_person: Bob')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Bob').element();
     const href = chip.getAttribute('href') ?? '';
     expect(href).toContain('#12/50.08/14.43');
-    await fireEvent.click(chip);
+    clickWithoutNavigating(chip);
 
     const names = consumeTypedSearchNames(href.split('#', 1)[0]);
     expect(names.personNames.get(`person:${PERSON_UUID}`)).toBe('Bob');
@@ -276,7 +296,7 @@ describe('DetailPanelPeople name hand-off', () => {
   it('does not bank anything when there is no filter affordance', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson({ spacePersonId: undefined })]),
       isOwner: false,
       previousRoute: '/photos',
@@ -284,7 +304,7 @@ describe('DetailPanelPeople name hand-off', () => {
       canFilter: true,
     });
 
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
     expect(sessionStorage.length).toBe(0);
   });
 });
@@ -295,25 +315,27 @@ describe('DetailPanelPeople structure (R6)', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Bob');
+    await expect.element(page.getByLabelText('filter_by_person: Bob')).toBeInTheDocument();
 
-    await fireEvent.pointerEnter(chip);
+    const chip = page.getByLabelText('filter_by_person: Bob').element();
+
+    chip.dispatchEvent(new PointerEvent('pointerenter'));
     expect(assetViewerManagerMock.setHighlightedFaces).toHaveBeenCalled();
 
-    await fireEvent.pointerLeave(chip);
+    chip.dispatchEvent(new PointerEvent('pointerleave'));
     expect(assetViewerManagerMock.clearHighlightedFaces).toHaveBeenCalled();
 
-    await fireEvent.focus(chip);
+    chip.dispatchEvent(new FocusEvent('focus'));
     expect(assetViewerManagerMock.setHighlightedFaces).toHaveBeenCalledTimes(2);
 
-    await fireEvent.blur(chip);
+    chip.dispatchEvent(new FocusEvent('blur'));
     expect(assetViewerManagerMock.clearHighlightedFaces).toHaveBeenCalledTimes(2);
   });
 
@@ -323,15 +345,17 @@ describe('DetailPanelPeople structure (R6)', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: true,
     });
 
-    const chip = await screen.findByLabelText('filter_by_person: Bob');
-    const personPage = screen.getByLabelText('view_person: Bob');
+    await expect.element(page.getByLabelText('filter_by_person: Bob')).toBeInTheDocument();
+
+    const chip = page.getByLabelText('filter_by_person: Bob').element();
+    const personPage = page.getByLabelText('view_person: Bob').element();
 
     expect(chip.querySelector('a')).toBeNull();
     expect(chip.contains(personPage)).toBe(false);
@@ -341,7 +365,7 @@ describe('DetailPanelPeople structure (R6)', () => {
   it('links the ↗ to the SPACE person page inside a Space', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset([spacePerson()]),
       isOwner: false,
       previousRoute: '/photos',
@@ -349,7 +373,9 @@ describe('DetailPanelPeople structure (R6)', () => {
       canFilter: true,
     });
 
-    const personPage = await screen.findByLabelText('view_person: Alice');
+    await expect.element(page.getByLabelText('view_person: Alice')).toBeInTheDocument();
+
+    const personPage = page.getByLabelText('view_person: Alice').element();
     expect(personPage.getAttribute('href')).toContain(`/spaces/space-1/people/${SPACE_PERSON_UUID}`);
   });
 });
@@ -360,16 +386,16 @@ describe('DetailPanelPeople gating (E2)', () => {
       { id: PERSON_UUID, name: 'Bob', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
     ];
 
-    renderWithTooltips(DetailPanelPeople, {
+    await renderWithTooltips(DetailPanelPeople, {
       asset: buildAsset(),
       isOwner: true,
       previousRoute: '/photos',
       canFilter: false,
     });
 
-    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_person/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^view_person/)).not.toBeInTheDocument();
-    expect(screen.getByRole('link').getAttribute('href')).toContain(`/people/${PERSON_UUID}`);
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_person/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^view_person/)).not.toBeInTheDocument();
+    expect(page.getByRole('link').element().getAttribute('href')).toContain(`/people/${PERSON_UUID}`);
   });
 });

@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import AlbumPreview from './album-preview.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -17,8 +18,8 @@ describe('AlbumPreview', () => {
     await waitLocale('en-US');
   });
 
-  it('metadata line renders with date range', () => {
-    render(AlbumPreview, {
+  it('metadata line renders with date range', async () => {
+    await render(AlbumPreview, {
       props: {
         item: {
           id: 'a1',
@@ -32,13 +33,13 @@ describe('AlbumPreview', () => {
       } as never,
     });
     // Assert both item count and date range appear
-    expect(screen.getByText(/87 items/)).toBeInTheDocument();
-    expect(screen.getByText(/2024/)).toBeInTheDocument();
-    expect(screen.getByText(/2026/)).toBeInTheDocument();
+    await expect.element(page.getByText(/87 items/)).toBeInTheDocument();
+    await expect.element(page.getByText(/2024/)).toBeInTheDocument();
+    await expect.element(page.getByText(/2026/)).toBeInTheDocument();
   });
 
-  it('metadata line omits date range when startDate missing', () => {
-    render(AlbumPreview, {
+  it('metadata line omits date range when startDate missing', async () => {
+    await render(AlbumPreview, {
       props: {
         item: {
           id: 'a1',
@@ -51,40 +52,40 @@ describe('AlbumPreview', () => {
         },
       } as never,
     });
-    expect(screen.getByText('3 items')).toBeInTheDocument();
+    await expect.element(page.getByText('3 items')).toBeInTheDocument();
   });
 
-  it('null thumbnail renders placeholder icon', () => {
-    const { container } = render(AlbumPreview, {
+  it('null thumbnail renders placeholder icon', async () => {
+    await render(AlbumPreview, {
       props: {
         item: { id: 'a1', albumName: 'x', assetCount: 0, shared: false, albumThumbnailAssetId: null },
       } as never,
     });
-    expect(container.querySelector('[data-testid="album-preview-placeholder"]')).toBeInTheDocument();
+    await expect.element(page.getByTestId('album-preview-placeholder')).toBeInTheDocument();
   });
 
-  it('renders "Shared" pill when shared=true', () => {
-    render(AlbumPreview, {
+  it('renders "Shared" pill when shared=true', async () => {
+    await render(AlbumPreview, {
       props: {
         item: { id: 'a1', albumName: 'x', assetCount: 1, shared: true, albumThumbnailAssetId: 't' },
       } as never,
     });
-    expect(screen.getByText(/shared/i)).toBeInTheDocument();
+    await expect.element(page.getByText(/shared/i)).toBeInTheDocument();
   });
 
-  it('ICU plural: "1 item" vs "2 items"', () => {
-    const { unmount } = render(AlbumPreview, {
+  it('ICU plural: "1 item" vs "2 items"', async () => {
+    const { unmount } = await render(AlbumPreview, {
       props: {
         item: { id: 'a1', albumName: 'x', assetCount: 1, shared: false, albumThumbnailAssetId: null },
       } as never,
     });
-    expect(screen.getByText(/1 item\b/)).toBeInTheDocument();
-    unmount();
-    render(AlbumPreview, {
+    await expect.element(page.getByText(/1 item\b/)).toBeInTheDocument();
+    await unmount();
+    await render(AlbumPreview, {
       props: {
         item: { id: 'a1', albumName: 'x', assetCount: 2, shared: false, albumThumbnailAssetId: null },
       } as never,
     });
-    expect(screen.getByText(/2 items/)).toBeInTheDocument();
+    await expect.element(page.getByText(/2 items/)).toBeInTheDocument();
   });
 });

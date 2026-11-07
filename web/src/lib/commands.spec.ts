@@ -1,14 +1,16 @@
 import { getMyImmichLink } from '#lib/commands.ts';
-
-// `page` is a SvelteKit rune-backed object; the command only ever reads page.url.
-const mockPage = { url: new URL('https://abc123.noodlegallery.de/photos?at=2026-08-07#hash') };
-vi.mock('$app/state', () => ({
-  get page() {
-    return mockPage;
-  },
-}));
+import { resetPage, setPage } from '#test/unit/mocks/app-state.svelte.ts';
 
 describe('getMyImmichLink', () => {
+  // `page` is a SvelteKit rune-backed object; the command only ever reads page.url.
+  beforeEach(() => {
+    setPage({ url: new URL('https://abc123.noodlegallery.de/photos?at=2026-08-07#hash') });
+  });
+
+  afterEach(() => {
+    resetPage();
+  });
+
   it('builds the link on the instance the user is actually on', () => {
     // Upstream hardcodes https://my.immich.app, a proxy that redirects a visitor
     // to whichever instance THEY have configured there. A Noodle Gallery user has

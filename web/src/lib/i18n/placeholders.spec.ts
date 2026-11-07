@@ -1,7 +1,6 @@
 import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // Why this exists: the Face Cleanup console shipped a German banner that rendered, literally,
 // "{moving} von {name}s {faceCount} Gesichtern…" — a translation of a REWRITTEN English string whose old
@@ -18,7 +17,8 @@ import path from 'node:path';
 // every file in I18N_DIR regardless of ownership, which is why mr.json and ms.json were hand-patched to
 // keep the suite green — those patches are reverted now that the scope is correct.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
+// Relative to web/.
+const I18N_DIR = '../i18n/gallery/merged';
 
 // Extract the ICU arguments a message actually references.
 //
@@ -113,11 +113,18 @@ const flatten = (value: Record<string, unknown>, prefix = '', out: Messages = {}
   return out;
 };
 
-const read = (file: string): Messages =>
-  flatten(JSON.parse(fs.readFileSync(path.join(I18N_DIR, file), 'utf8')) as Record<string, unknown>);
+const locales = FORK_LOCALES.map((locale) => `${locale}.json`).sort();
+
+// The specs run in the browser, so the files are read up front through Vitest's commands.
+const files = new Map(
+  await Promise.all(
+    ['en.json', ...locales].map(async (file) => [file, await commands.readFile(`${I18N_DIR}/${file}`)] as const),
+  ),
+);
+
+const read = (file: string): Messages => flatten(JSON.parse(files.get(file)!) as Record<string, unknown>);
 
 const en = read('en.json');
-const locales = FORK_LOCALES.map((locale) => `${locale}.json`).sort();
 
 describe('i18n placeholders', () => {
   it('parses ICU arguments without mistaking plural branches for placeholders', () => {

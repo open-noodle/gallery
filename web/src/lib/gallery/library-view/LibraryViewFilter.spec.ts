@@ -1,5 +1,7 @@
 import { LibraryView } from '@immich/sdk';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import LibraryViewFilter from './LibraryViewFilter.svelte';
 import { libraryView } from './library-view.svelte';
 
@@ -8,38 +10,44 @@ describe('LibraryViewFilter', () => {
     libraryView.current = 'both';
   });
 
-  it('is a filter panel section offering both, personal and spaces, with the current view pressed', () => {
+  it('is a filter panel section offering both, personal and spaces, with the current view pressed', async () => {
     libraryView.current = LibraryView.Personal;
-    render(LibraryViewFilter);
+    await render(LibraryViewFilter);
 
-    expect(screen.getByTestId('filter-section-library-view')).toHaveTextContent('library_view');
-    expect(screen.getByRole('group', { name: 'library_view' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'library_view_both' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'library_view_personal' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'library_view_spaces' })).toHaveAttribute('aria-pressed', 'false');
+    await expect.element(page.getByTestId('filter-section-library-view')).toMatchTextContent('library_view');
+    await expect.element(page.getByRole('group', { name: 'library_view' })).toBeInTheDocument();
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_both' }))
+      .toHaveAttribute('aria-pressed', 'false');
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_personal' }))
+      .toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_spaces' }))
+      .toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('says which photos personal and spaces hold', () => {
-    render(LibraryViewFilter);
+  it('says which photos personal and spaces hold', async () => {
+    await render(LibraryViewFilter);
 
-    expect(screen.getByRole('button', { name: 'library_view_personal' })).toHaveAttribute(
-      'title',
-      'library_view_personal_description',
-    );
-    expect(screen.getByRole('button', { name: 'library_view_spaces' })).toHaveAttribute(
-      'title',
-      'library_view_spaces_description',
-    );
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_personal' }))
+      .toHaveAttribute('title', 'library_view_personal_description');
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_spaces' }))
+      .toHaveAttribute('title', 'library_view_spaces_description');
   });
 
   it('switches the view by click', async () => {
-    render(LibraryViewFilter);
+    await render(LibraryViewFilter);
 
-    await fireEvent.click(screen.getByRole('button', { name: 'library_view_spaces' }));
+    await page.getByRole('button', { name: 'library_view_spaces' }).click();
     expect(libraryView.current).toBe(LibraryView.Spaces);
-    expect(screen.getByRole('button', { name: 'library_view_spaces' })).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .element(page.getByRole('button', { name: 'library_view_spaces' }))
+      .toHaveAttribute('aria-pressed', 'true');
 
-    await fireEvent.click(screen.getByRole('button', { name: 'library_view_both' }));
+    await page.getByRole('button', { name: 'library_view_both' }).click();
     expect(libraryView.current).toBe('both');
   });
 });

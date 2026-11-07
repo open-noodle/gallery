@@ -1,4 +1,9 @@
 import type { ScanProgress, ScanResult } from '#lib/utils/google-takeout-scanner.ts';
+import * as zip from '@zip.js/zip.js';
+
+// Browser mode cannot swap a module that is already loaded (`vi.doMock` + `vi.resetModules` do nothing there),
+// so zip.js is spied from the start: real behaviour by default, overridden per test.
+vi.mock(import('@zip.js/zip.js'), { spy: true });
 
 /**
 Helper to create a zip blob in memory using zip.js.
@@ -80,8 +85,6 @@ describe('scanTakeoutFiles', () => {
   });
 
   it('does not extract media entries while scanning a zip', async () => {
-    vi.resetModules();
-
     const mediaArrayBuffer = vi.fn(() => Promise.resolve(new TextEncoder().encode('media-bytes').buffer));
     const sidecarArrayBuffer = vi.fn(() => Promise.resolve(new TextEncoder().encode(makeSidecar()).buffer));
     const close = vi.fn(() => Promise.resolve(undefined));
@@ -111,14 +114,11 @@ describe('scanTakeoutFiles', () => {
       };
     });
 
-    vi.doMock('@zip.js/zip.js', () => ({
-      BlobReader: blobReader,
-      configure,
-      ZipReader: zipReader,
-    }));
+    vi.mocked(zip.BlobReader).mockImplementation(blobReader as never);
+    vi.mocked(zip.configure).mockImplementation(configure);
+    vi.mocked(zip.ZipReader).mockImplementation(zipReader as never);
 
     try {
-      const { scanTakeoutFiles } = await import('#lib/utils/google-takeout-scanner.ts');
       const result = await scanTakeoutFiles({
         files: [new File(['zip-placeholder'], 'takeout.zip', { type: 'application/zip' })],
       });
@@ -137,10 +137,9 @@ describe('scanTakeoutFiles', () => {
       expect(zipReader).toHaveBeenCalledTimes(2);
       expect(close).toHaveBeenCalledTimes(2);
     } finally {
-      vi.doUnmock('@zip.js/zip.js');
-      vi.resetModules();
-      const mod = await import('#lib/utils/google-takeout-scanner.ts');
-      scanTakeoutFiles = mod.scanTakeoutFiles;
+      vi.mocked(zip.BlobReader).mockReset();
+      vi.mocked(zip.configure).mockReset();
+      vi.mocked(zip.ZipReader).mockReset();
     }
   });
 

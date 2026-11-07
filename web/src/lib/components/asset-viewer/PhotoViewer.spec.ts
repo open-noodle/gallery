@@ -3,9 +3,8 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import PhotoViewer from './PhotoViewer.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -72,7 +71,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
     authManager.setPreferences(factory.preferences());
   });
 
-  it('renders FaceEditor in its space mode for a non-owner space editor', () => {
+  it('renders FaceEditor in its space mode for a non-owner space editor', async () => {
     const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
@@ -80,25 +79,25 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
+    await renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
-    const stub = screen.getByTestId('face-editor-stub');
-    expect(stub).toHaveAttribute('data-space-id', 'space-1');
-    expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
+    const stub = page.getByTestId('face-editor-stub');
+    await expect.element(stub).toHaveAttribute('data-space-id', 'space-1');
+    await expect.element(stub).toHaveAttribute('data-asset-id', 'asset-1');
   });
 
-  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', () => {
+  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', async () => {
     const asset = factory.asset({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
+    await renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
-    const stub = screen.getByTestId('face-editor-stub');
-    expect(stub).toBeInTheDocument();
-    expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(stub).not.toHaveAttribute('data-space-id');
+    const stub = page.getByTestId('face-editor-stub');
+    await expect.element(stub).toBeInTheDocument();
+    await expect.element(stub).toHaveAttribute('data-asset-id', 'asset-1');
+    await expect.element(stub).not.toHaveAttribute('data-space-id');
   });
 
-  it('renders the owner FaceEditor (never both) for an editor when no space id is available', () => {
+  it('renders the owner FaceEditor (never both) for an editor when no space id is available', async () => {
     const asset = factory.asset({
       id: 'asset-1',
       ownerId: 'someone-else',
@@ -107,8 +106,9 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderWithTooltips(PhotoViewer, { cursor: { current: asset } });
+    await renderWithTooltips(PhotoViewer, { cursor: { current: asset } });
 
-    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
+    await expect.element(page.getByTestId('face-editor-stub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 });

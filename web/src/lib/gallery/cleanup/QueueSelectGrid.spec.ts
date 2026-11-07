@@ -1,7 +1,9 @@
 import QueueSelectGrid from '#lib/gallery/cleanup/QueueSelectGrid.svelte';
 import { AssetTypeEnum, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { SvelteSet } from 'svelte/reactivity';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const asset = (id: string, reason?: CleanupBlurReason): CleanupAssetDto => ({
   id,
@@ -26,7 +28,7 @@ const items = [
   asset('c', CleanupBlurReason.Bright),
 ];
 
-const renderGrid = (
+const renderGrid = async (
   variant: 'blurry' | 'screenshots',
   props: Partial<{ items: CleanupAssetDto[]; size: 'small' | 'medium' | 'large' }> = {},
 ) => {
@@ -34,81 +36,82 @@ const renderGrid = (
   const onToggle = vi.fn((id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id)));
   const onOpen = vi.fn();
   const onExpand = vi.fn();
-  render(QueueSelectGrid, { items, variant, selected, onToggle, onOpen, onExpand, size: 'medium', ...props });
+  await render(QueueSelectGrid, { items, variant, selected, onToggle, onOpen, onExpand, size: 'medium', ...props });
   return { onToggle, onOpen, onExpand };
 };
 
-const tile = (id: string) => screen.getByTestId(`cleanup-item-${id}`);
+const tile = (id: string) => page.getByTestId(`cleanup-item-${id}`);
 
 describe('QueueSelectGrid', () => {
-  it('renders the tiles in order', () => {
-    renderGrid('blurry');
+  it('renders the tiles in order', async () => {
+    await renderGrid('blurry');
 
-    expect(screen.getAllByTestId(/^cleanup-item-/).map((el) => el.dataset.testid)).toEqual([
-      'cleanup-item-a',
-      'cleanup-item-b',
-      'cleanup-item-c',
-    ]);
+    expect(
+      page
+        .getByTestId(/^cleanup-item-/)
+        .elements()
+        .map((el) => el.dataset.testid),
+    ).toEqual(['cleanup-item-a', 'cleanup-item-b', 'cleanup-item-c']);
   });
 
   it('toggles the selection on click', async () => {
-    const { onToggle } = renderGrid('blurry');
-    expect(tile('a')).toHaveAttribute('data-selected', 'false');
+    const { onToggle } = await renderGrid('blurry');
+    await expect.element(tile('a')).toHaveAttribute('data-selected', 'false');
 
-    await fireEvent.click(tile('a'));
+    await userEvent.click(tile('a'));
     expect(onToggle).toHaveBeenCalledWith('a');
-    expect(tile('a')).toHaveAttribute('data-selected', 'true');
+    await expect.element(tile('a')).toHaveAttribute('data-selected', 'true');
 
-    await fireEvent.click(tile('a'));
-    expect(tile('a')).toHaveAttribute('data-selected', 'false');
+    await userEvent.click(tile('a'));
+    await expect.element(tile('a')).toHaveAttribute('data-selected', 'false');
   });
 
   it('opens a tile on double-click', async () => {
-    const { onOpen } = renderGrid('screenshots');
+    const { onOpen } = await renderGrid('screenshots');
 
-    await fireEvent.dblClick(tile('b'));
+    await userEvent.dblClick(tile('b'));
 
     expect(onOpen).toHaveBeenCalledWith('b');
   });
 
-  it('shows reason badges in the blurry variant', () => {
-    renderGrid('blurry');
+  it('shows reason badges in the blurry variant', async () => {
+    await renderGrid('blurry');
 
-    expect(within(tile('a')).getByText('cleanup_reason_blurry')).toBeInTheDocument();
-    expect(within(tile('b')).getByText('cleanup_reason_dark')).toBeInTheDocument();
-    expect(within(tile('c')).getByText('cleanup_reason_bright')).toBeInTheDocument();
+    await expect.element(tile('a').getByText('cleanup_reason_blurry')).toBeInTheDocument();
+    await expect.element(tile('b').getByText('cleanup_reason_dark')).toBeInTheDocument();
+    await expect.element(tile('c').getByText('cleanup_reason_bright')).toBeInTheDocument();
   });
 
-  it('shows no reason badges for screenshots', () => {
-    renderGrid('screenshots');
+  it('shows no reason badges for screenshots', async () => {
+    await renderGrid('screenshots');
 
-    expect(screen.queryByText(/cleanup_reason_/)).toBeNull();
+    expect(page.getByText(/cleanup_reason_/).query()).toBeNull();
   });
 
-  it('shows screenshots whole, at their own shape', () => {
-    renderGrid('screenshots', { items: [{ ...asset('s'), width: 1080, height: 2340 }] });
+  it('shows screenshots whole, at their own shape', async () => {
+    await renderGrid('screenshots', { items: [{ ...asset('s'), width: 1080, height: 2340 }] });
 
-    const frame = within(tile('s')).getByTestId('cleanup-tile');
-    expect(frame.style.aspectRatio).toBe('1080 / 2340');
-    expect(within(frame).getByRole('img')).toHaveClass('object-contain');
+    const frame = tile('s').getByTestId('cleanup-tile');
+    expect(frame.element().style.aspectRatio).toBe('1080 / 2340');
+    await expect.element(frame.getByRole('img')).toHaveClass('object-contain');
   });
 
-  it('falls back to portrait when dimensions are missing', () => {
-    renderGrid('screenshots', { items: [{ ...asset('s'), width: null, height: null }] });
+  it('falls back to portrait when dimensions are missing', async () => {
+    await renderGrid('screenshots', { items: [{ ...asset('s'), width: null, height: null }] });
 
-    expect(within(tile('s')).getByTestId('cleanup-tile').style.aspectRatio).toBe('9 / 19.5');
+    expect(tile('s').getByTestId('cleanup-tile').element().style.aspectRatio).toBe('9 / 19.5');
   });
 
-  it('keeps blurry tiles square and cropped', () => {
-    renderGrid('blurry');
+  it('keeps blurry tiles square and cropped', async () => {
+    await renderGrid('blurry');
 
-    const frame = within(tile('a')).getByTestId('cleanup-tile');
-    expect(frame).toHaveClass('aspect-square');
-    expect(within(frame).getByRole('img')).toHaveClass('object-cover');
+    const frame = tile('a').getByTestId('cleanup-tile');
+    await expect.element(frame).toHaveClass('aspect-square');
+    await expect.element(frame.getByRole('img')).toHaveClass('object-cover');
   });
 
-  it('lays screenshots out in rows, wide ones wider, in reading order', () => {
-    renderGrid('screenshots', {
+  it('lays screenshots out in rows, wide ones wider, in reading order', async () => {
+    await renderGrid('screenshots', {
       size: 'large',
       items: [
         { ...asset('tall'), width: 1080, height: 2340 },
@@ -116,10 +119,10 @@ describe('QueueSelectGrid', () => {
       ],
     });
 
-    const grid = screen.getByTestId('cleanup-select-grid');
-    expect(grid).toHaveClass('flex', 'flex-wrap');
-    expect(grid.style.columnWidth).toBe('');
-    const [tall, wide] = [...grid.children] as HTMLElement[];
+    const grid = page.getByTestId('cleanup-select-grid');
+    await expect.element(grid).toHaveClass('flex', 'flex-wrap');
+    expect(grid.element().style.columnWidth).toBe('');
+    const [tall, wide] = [...grid.element().children] as HTMLElement[];
     expect(tall.dataset.asset).toBe('tall');
     expect(Number(wide.style.flexBasis.replace('px', ''))).toBeGreaterThan(
       Number(tall.style.flexBasis.replace('px', '')),
@@ -129,9 +132,9 @@ describe('QueueSelectGrid', () => {
   });
 
   it('opens the photo window from the expand button without toggling the tile', async () => {
-    const { onExpand, onToggle } = renderGrid('blurry');
+    const { onExpand, onToggle } = await renderGrid('blurry');
 
-    await fireEvent.click(screen.getByTestId('cleanup-expand-b'));
+    await userEvent.click(page.getByTestId('cleanup-expand-b'));
 
     expect(onExpand).toHaveBeenCalledWith('b', expect.any(DOMRect));
     expect(onToggle).not.toHaveBeenCalled();

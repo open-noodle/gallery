@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import PhotoRow from '../rows/photo-row.svelte';
 
 describe('photo-row', () => {
-  it('renders filename and subtitle from exifInfo', () => {
-    render(PhotoRow, {
+  it('renders filename and subtitle from exifInfo', async () => {
+    await render(PhotoRow, {
       props: {
         item: {
           id: 'a1',
@@ -13,12 +14,12 @@ describe('photo-row', () => {
         } as never,
       },
     });
-    expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
-    expect(screen.getByText(/Santa Cruz/)).toBeInTheDocument();
+    await expect.element(page.getByText('sunset.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText(/Santa Cruz/)).toBeInTheDocument();
   });
 
-  it('uses /api/ asset thumbnail URL', () => {
-    const { container } = render(PhotoRow, {
+  it('uses /api/ asset thumbnail URL', async () => {
+    const { container } = await render(PhotoRow, {
       props: { item: { id: 'a1', originalFileName: 'x.jpg' } as never },
     });
     const img = container.querySelector('img');
@@ -26,17 +27,17 @@ describe('photo-row', () => {
     expect(img?.getAttribute('src')).toContain('/api/');
   });
 
-  it('does NOT set role="option" — Command.Item wraps it', () => {
-    const { container } = render(PhotoRow, {
+  it('does NOT set role="option" — Command.Item wraps it', async () => {
+    const { container } = await render(PhotoRow, {
       props: { item: { id: 'a1', originalFileName: 'x.jpg' } as never },
     });
     expect(container.querySelector('[role="option"]')).toBeNull();
   });
 
-  it('renders without subtitle when exifInfo is missing', () => {
-    render(PhotoRow, {
+  it('renders without subtitle when exifInfo is missing', async () => {
+    await render(PhotoRow, {
       props: { item: { id: 'a1', originalFileName: 'plain.jpg' } as never },
     });
-    expect(screen.getByText('plain.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText('plain.jpg')).toBeInTheDocument();
   });
 });

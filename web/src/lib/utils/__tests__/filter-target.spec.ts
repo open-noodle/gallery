@@ -14,7 +14,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn().mockResolvedValue(undefined) }));
 
-vi.mock('$app/navigation', () => ({
+// Browser mode rejects an import of a name a mock does not export, so keep the global fakes' other exports.
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   goto: gotoMock,
 }));
 
@@ -22,7 +24,7 @@ vi.mock('$app/navigation', () => ({
 // docs for why this needs to be a real $state object rather than a plain vi.hoisted literal.
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock };
+  return { ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: reactivePageMock };
 });
 
 const u = (path: string) => new URL(`https://g.test${path}`);

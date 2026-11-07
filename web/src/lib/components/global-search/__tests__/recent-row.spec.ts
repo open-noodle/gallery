@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import RecentRow from '../rows/recent-row.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -18,30 +19,30 @@ describe('recent-row', () => {
     await waitLocale('en-US');
   });
 
-  it('renders query kind with text', () => {
-    render(RecentRow, {
+  it('renders query kind with text', async () => {
+    await render(RecentRow, {
       props: { entry: { kind: 'query', id: 'query:beach', text: 'beach', lastUsed: 1 } },
     });
-    expect(screen.getByTestId('query-row')).toBeInTheDocument();
-    expect(screen.getByText('beach')).toBeInTheDocument();
+    await expect.element(page.getByTestId('query-row')).toBeInTheDocument();
+    await expect.element(page.getByText('beach')).toBeInTheDocument();
   });
 
-  it('dispatches to PhotoRow for photo kind', () => {
-    render(RecentRow, {
+  it('dispatches to PhotoRow for photo kind', async () => {
+    await render(RecentRow, {
       props: { entry: { kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 1 } },
     });
-    expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText('sunset.jpg')).toBeInTheDocument();
   });
 
-  it('dispatches to PersonRow for person kind', () => {
-    render(RecentRow, {
+  it('dispatches to PersonRow for person kind', async () => {
+    await render(RecentRow, {
       props: { entry: { kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 } },
     });
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+    await expect.element(page.getByText('Alice')).toBeInTheDocument();
   });
 
-  it('dispatches to PlaceRow for place kind', () => {
-    render(RecentRow, {
+  it('dispatches to PlaceRow for place kind', async () => {
+    await render(RecentRow, {
       props: {
         entry: {
           kind: 'place',
@@ -53,19 +54,19 @@ describe('recent-row', () => {
         },
       },
     });
-    expect(screen.getByText('Paris')).toBeInTheDocument();
+    await expect.element(page.getByText('Paris')).toBeInTheDocument();
   });
 
-  it('dispatches to TagRow for tag kind', () => {
-    render(RecentRow, {
+  it('dispatches to TagRow for tag kind', async () => {
+    await render(RecentRow, {
       props: { entry: { kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 } },
     });
-    expect(screen.getByText('beach')).toBeInTheDocument();
+    await expect.element(page.getByText('beach')).toBeInTheDocument();
   });
 
   describe('album entry', () => {
-    it('renders album label and cover thumbnail from cmdk.recent', () => {
-      const { container } = render(RecentRow, {
+    it('renders album label and cover thumbnail from cmdk.recent', async () => {
+      const { container } = await render(RecentRow, {
         props: {
           entry: {
             kind: 'album',
@@ -77,14 +78,14 @@ describe('recent-row', () => {
           },
         },
       });
-      expect(screen.getByText('Iceland Trip 2024')).toBeInTheDocument();
+      await expect.element(page.getByText('Iceland Trip 2024')).toBeInTheDocument();
       const img = container.querySelector('img');
       expect(img).not.toBeNull();
       expect(img?.getAttribute('src')).toMatch(/^\/api\//);
     });
 
-    it('renders album with null thumbnail via placeholder', () => {
-      const { container } = render(RecentRow, {
+    it('renders album with null thumbnail via placeholder', async () => {
+      const { container } = await render(RecentRow, {
         props: {
           entry: {
             kind: 'album',
@@ -96,14 +97,14 @@ describe('recent-row', () => {
           },
         },
       });
-      expect(screen.getByText('No Thumbnail')).toBeInTheDocument();
+      await expect.element(page.getByText('No Thumbnail')).toBeInTheDocument();
       expect(container.querySelector('img')).toBeNull();
     });
   });
 
   describe('space entry', () => {
-    it('renders space label and color swatch from cmdk.recent', () => {
-      render(RecentRow, {
+    it('renders space label and color swatch from cmdk.recent', async () => {
+      await render(RecentRow, {
         props: {
           entry: {
             kind: 'space',
@@ -115,13 +116,13 @@ describe('recent-row', () => {
           },
         },
       });
-      expect(screen.getByText('Family')).toBeInTheDocument();
+      await expect.element(page.getByText('Family')).toBeInTheDocument();
     });
   });
 
   describe('navigate entry', () => {
-    it('renders navigate kind with translated label', () => {
-      render(RecentRow, {
+    it('renders navigate kind with translated label', async () => {
+      await render(RecentRow, {
         props: {
           entry: {
             kind: 'navigate',
@@ -135,7 +136,7 @@ describe('recent-row', () => {
         },
       });
       // 'photos' is a real i18n key; the translated label should be present
-      expect(screen.getByText(/photos/i)).toBeInTheDocument();
+      await expect.element(page.getByText(/photos/i)).toBeInTheDocument();
     });
   });
 });

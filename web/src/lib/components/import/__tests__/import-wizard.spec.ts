@@ -1,9 +1,9 @@
 import type { TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
 import { scanTakeoutFiles } from '#lib/utils/google-takeout-scanner.ts';
 import { uploadTakeoutItem } from '#lib/utils/google-takeout-uploader.ts';
-import '@testing-library/jest-dom';
-import { fireEvent, render, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import ImportWizard from '../import-wizard.svelte';
 
 vi.mock('#lib/utils/google-takeout-scanner.js', () => ({
@@ -20,32 +20,30 @@ describe('ImportWizard', () => {
     vi.resetAllMocks();
   });
 
-  it('renders step indicator', () => {
-    const { getByTestId } = render(ImportWizard);
+  it('renders step indicator', async () => {
+    const { getByTestId } = await render(ImportWizard);
     // Step indicator renders step-0 through step-4
-    expect(getByTestId('step-0')).toBeInTheDocument();
-    expect(getByTestId('step-4')).toBeInTheDocument();
+    await expect.element(getByTestId('step-0')).toBeInTheDocument();
+    await expect.element(getByTestId('step-4')).toBeInTheDocument();
   });
 
-  it('renders source step initially', () => {
-    const { getByTestId } = render(ImportWizard);
+  it('renders source step initially', async () => {
+    const { getByTestId } = await render(ImportWizard);
     // Source step shows Google source card
-    expect(getByTestId('source-google')).toBeInTheDocument();
+    await expect.element(getByTestId('source-google')).toBeInTheDocument();
   });
 
   it('advances to files step when Next clicked on source', async () => {
-    const user = userEvent.setup();
-    const { getByText, getByTestId } = render(ImportWizard);
+    const { getByText, getByTestId } = await render(ImportWizard);
 
     // Click Next on source step
-    await user.click(getByText('next'));
+    await userEvent.click(getByText('next'));
 
     // Should now show files step (drop zone)
-    expect(getByTestId('drop-zone')).toBeInTheDocument();
+    await expect.element(getByTestId('drop-zone')).toBeInTheDocument();
   });
 
   it('imports name-only Takeout items', async () => {
-    const user = userEvent.setup();
     const file = new File(['bytes'], 'IMG_001.jpg', { lastModified: 1_609_459_200_000 });
     const item: TakeoutMediaItem = {
       path: 'Takeout/Google Photos/Trip/IMG_001.jpg',
@@ -70,20 +68,21 @@ describe('ImportWizard', () => {
     });
     vi.mocked(uploadTakeoutItem).mockResolvedValue({ assetId: 'asset-1', status: 'imported' });
 
-    const { container, getByText, getByTestId } = render(ImportWizard);
+    const { container, getByText, getByTestId } = await render(ImportWizard);
 
-    await user.click(getByText('next'));
+    await userEvent.click(getByText('next'));
 
     const zipInput = container.querySelector('input[type="file"][accept=".zip"]') as HTMLInputElement;
-    await fireEvent.change(zipInput, {
-      target: { files: [new File(['zip'], 'takeout.zip', { type: 'application/zip' })] },
-    });
-    await user.click(getByTestId('next-button'));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['zip'], 'takeout.zip', { type: 'application/zip' }));
+    zipInput.files = transfer.files;
+    zipInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await userEvent.click(getByTestId('next-button'));
 
-    await waitFor(() => expect(getByTestId('import-button')).toBeInTheDocument());
-    await user.click(getByTestId('import-button'));
+    await expect.element(getByTestId('import-button')).toBeInTheDocument();
+    await userEvent.click(getByTestId('import-button'));
 
-    await waitFor(() => expect(uploadTakeoutItem).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(uploadTakeoutItem).toHaveBeenCalledOnce());
     expect(vi.mocked(uploadTakeoutItem).mock.calls[0][0]).toMatchObject({
       path: 'Takeout/Google Photos/Trip/IMG_001.jpg',
       name: 'IMG_001.jpg',

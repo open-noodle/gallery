@@ -1,10 +1,8 @@
 import SharedLinkExpirationHost from '#lib/gallery/__mocks__/shared-link-expiration-host.stub.svelte';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { Settings } from 'luxon';
-import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { page } from 'vitest/browser';
 
 // The server validates `expiresAt` with Zod's `z.iso.datetime()`, which only accepts
 // UTC ("Z") timestamps and rejects any string carrying a numeric timezone offset.
@@ -26,20 +24,25 @@ describe('SharedLinkExpiration component', () => {
   });
 
   // Preset buttons carry visible text; the date-picker trigger is icon-only.
-  const getPresetButtons = () => screen.getAllByRole('button').filter((button) => button.textContent?.trim());
+  const getPresetButtons = () =>
+    page
+      .getByRole('button')
+      .elements()
+      .filter((button) => button.textContent?.trim())
+      .map((button) => page.elementLocator(button));
+  const expiresAt = () => page.getByTestId('expires-at-value');
 
   it('emits a UTC (Z) ISO 8601 string when an expiry preset is selected', async () => {
-    renderWithTooltips(SharedLinkExpirationHost, {});
-    const user = userEvent.setup();
+    await renderWithTooltips(SharedLinkExpirationHost, {});
 
     const presetButtons = getPresetButtons();
     expect(presetButtons.length).toBeGreaterThan(1);
 
     // The last preset is a positive duration ("in 1 year"); the first is "never".
-    await user.click(presetButtons.at(-1)!);
-    await tick();
+    await presetButtons.at(-1)!.click();
+    await expect.poll(() => expiresAt().element().textContent).not.toBe('');
 
-    const value = screen.getByTestId('expires-at-value').textContent ?? '';
+    const value = expiresAt().element().textContent ?? '';
     expect(value).toMatch(ISO_UTC);
     expect(value).not.toContain('+');
     // Sanity: the emitted instant is a real, future date.
@@ -48,17 +51,14 @@ describe('SharedLinkExpiration component', () => {
   });
 
   it('clears the expiry when the "never" preset is selected', async () => {
-    renderWithTooltips(SharedLinkExpirationHost, {});
-    const user = userEvent.setup();
+    await renderWithTooltips(SharedLinkExpirationHost, {});
 
     const presetButtons = getPresetButtons();
     // Set a real expiry first, then "never" (the first preset) should clear it.
-    await user.click(presetButtons.at(-1)!);
-    await tick();
-    expect(screen.getByTestId('expires-at-value').textContent).not.toBe('');
+    await presetButtons.at(-1)!.click();
+    await expect.poll(() => expiresAt().element().textContent).not.toBe('');
 
-    await user.click(presetButtons[0]);
-    await tick();
-    expect(screen.getByTestId('expires-at-value').textContent).toBe('');
+    await presetButtons[0].click();
+    await expect.poll(() => expiresAt().element().textContent).toBe('');
   });
 });

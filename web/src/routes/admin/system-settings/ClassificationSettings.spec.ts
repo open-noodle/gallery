@@ -7,14 +7,14 @@ import {
   type AdminConfigDto,
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import ClassificationSettings from './ClassificationSettings.svelte';
 
-vi.mock('@immich/sdk', () => ({
+vi.mock('@immich/sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/sdk')>()),
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   scanClassification: vi.fn(),
@@ -66,6 +66,12 @@ const makeCategory = (
   ...overrides,
 });
 
+// A range input cannot be filled; set its value and fire the `input` event Svelte's binding listens to.
+const setSlider = (slider: HTMLElement | SVGElement, value: string) => {
+  (slider as HTMLInputElement).value = value;
+  slider.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 describe('ClassificationSettings', () => {
   beforeAll(async () => {
     // Load the real en bundle so the component's `$t('admin.classification_*')` / `$t('name')` etc.
@@ -87,46 +93,48 @@ describe('ClassificationSettings', () => {
   });
 
   it('should render empty state when no categories', async () => {
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('No classification categories yet. Add one to get started.')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(
+        page.getByText('No classification categories yet. Add one to get started.', { exact: true }).element(),
+      ).toBeInTheDocument();
     });
   });
 
   it('should render categories from config', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory()]));
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
   it('should show create form when Add Category is clicked', async () => {
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Add Category')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Add Category', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Add Category'));
+    await userEvent.click(page.getByText('Add Category', { exact: true }));
 
-    expect(screen.getByText('New Category')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(page.getByText('New Category', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByLabelText('Name', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('should save new category via updateConfig', async () => {
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Add Category')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Add Category', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Add Category'));
+    await userEvent.click(page.getByText('Add Category', { exact: true }));
 
-    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Receipts' } });
-    await fireEvent.input(screen.getByLabelText('Prompts (one per line)'), { target: { value: 'a receipt' } });
+    await userEvent.fill(page.getByLabelText('Name', { exact: true }), 'Receipts');
+    await userEvent.fill(page.getByLabelText('Prompts (one per line)', { exact: true }), 'a receipt');
 
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
         adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
@@ -146,19 +154,19 @@ describe('ClassificationSettings', () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
 
-    const slider = screen.getByRole('slider');
-    await fireEvent.input(slider, { target: { value: '0.40' } });
+    const slider = page.getByRole('slider').element();
+    setSlider(slider, '0.40');
 
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(modalManager.showDialog).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Rescan photos?',
@@ -171,16 +179,16 @@ describe('ClassificationSettings', () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
-    await fireEvent.input(screen.getByRole('slider'), { target: { value: '0.40' } });
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
+    setSlider(page.getByRole('slider').element(), '0.40');
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(scanClassification).toHaveBeenCalled();
       expect(toastManager.primary).toHaveBeenCalledWith('Rescan started. Existing auto-tags will be re-evaluated.');
     });
@@ -189,16 +197,16 @@ describe('ClassificationSettings', () => {
   it('should NOT show rescan dialog when similarity is decreased', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.35 })]));
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
-    await fireEvent.input(screen.getByRole('slider'), { target: { value: '0.20' } });
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
+    setSlider(page.getByRole('slider').element(), '0.20');
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalled();
     });
 
@@ -208,26 +216,28 @@ describe('ClassificationSettings', () => {
   it('should allow saving very loose similarity thresholds', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
 
-    const slider = screen.getByRole('slider');
+    const slider = page.getByRole('slider').element();
     expect(slider).toHaveAttribute('min', '0.01');
     expect(slider).toHaveAttribute('max', '1');
     expect(
-      screen.getByText(
-        'Start around 0.15-0.30, then lower it to match more loosely or raise it to match more strictly.',
-      ),
+      page
+        .getByText('Start around 0.15-0.30, then lower it to match more loosely or raise it to match more strictly.', {
+          exact: true,
+        })
+        .element(),
     ).toBeInTheDocument();
 
-    await fireEvent.input(slider, { target: { value: '0.11' } });
-    await fireEvent.click(screen.getByText('Save'));
+    setSlider(slider, '0.11');
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
         adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
@@ -241,16 +251,16 @@ describe('ClassificationSettings', () => {
   it('should allow saving very strict similarity thresholds', async () => {
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory({ similarity: 0.28 })]));
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
-    await fireEvent.input(screen.getByRole('slider'), { target: { value: '0.80' } });
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
+    setSlider(page.getByRole('slider').element(), '0.80');
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
         adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
@@ -262,17 +272,17 @@ describe('ClassificationSettings', () => {
   });
 
   it('should NOT show rescan dialog when creating a new category', async () => {
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Add Category')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Add Category', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Add Category'));
-    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Test' } });
-    await fireEvent.input(screen.getByLabelText('Prompts (one per line)'), { target: { value: 'test prompt' } });
-    await fireEvent.click(screen.getByText('Save'));
+    await userEvent.click(page.getByText('Add Category', { exact: true }));
+    await userEvent.fill(page.getByLabelText('Name', { exact: true }), 'Test');
+    await userEvent.fill(page.getByLabelText('Prompts (one per line)', { exact: true }), 'test prompt');
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalled();
     });
 
@@ -282,14 +292,14 @@ describe('ClassificationSettings', () => {
   it('should call scanClassification when Scan All Libraries is confirmed', async () => {
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Scan All Libraries')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Scan All Libraries', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Scan All Libraries'));
+    await userEvent.click(page.getByText('Scan All Libraries', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(scanClassification).toHaveBeenCalled();
     });
   });
@@ -297,14 +307,14 @@ describe('ClassificationSettings', () => {
   it('should NOT scan when Scan All Libraries dialog is cancelled', async () => {
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Scan All Libraries')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Scan All Libraries', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Scan All Libraries'));
+    await userEvent.click(page.getByText('Scan All Libraries', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(modalManager.showDialog).toHaveBeenCalled();
     });
 
@@ -312,45 +322,33 @@ describe('ClassificationSettings', () => {
   });
 
   it('should show face exclusion dropdown when creating a category', async () => {
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Add Category')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Add Category', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Add Category'));
+    await userEvent.click(page.getByText('Add Category', { exact: true }));
 
-    expect(screen.getByLabelText('Face exclusion')).toBeInTheDocument();
-    expect(screen.getByLabelText('Face exclusion')).toHaveValue('off');
+    expect(page.getByLabelText('Face exclusion', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByLabelText('Face exclusion', { exact: true }).element()).toHaveValue('off');
   });
 
   it('should save selected face exclusion for a new category', async () => {
-    const user = userEvent.setup();
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Add Category')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Add Category', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByText('Add Category'));
-    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Nature' } });
-    await fireEvent.input(screen.getByLabelText('Prompts (one per line)'), { target: { value: 'a landscape photo' } });
-    const faceExclusionSelect = screen.getByLabelText('Face exclusion') as HTMLSelectElement;
-    // Svelte's select binding reads `:checked`; mirror browser behavior because happy-dom does not match it.
-    const querySelectedOption = vi.spyOn(faceExclusionSelect, 'querySelector');
-    querySelectedOption.mockImplementation((selector: string) => {
-      if (selector === ':checked') {
-        return faceExclusionSelect.selectedOptions.item(0);
-      }
-      return Element.prototype.querySelector.call(faceExclusionSelect, selector);
-    });
+    await userEvent.click(page.getByText('Add Category', { exact: true }));
+    await userEvent.fill(page.getByLabelText('Name', { exact: true }), 'Nature');
+    await userEvent.fill(page.getByLabelText('Prompts (one per line)', { exact: true }), 'a landscape photo');
+    await userEvent.selectOptions(
+      page.getByLabelText('Face exclusion', { exact: true }),
+      ClassificationFaceExclusion.NamedVisiblePeople,
+    );
+    await userEvent.click(page.getByText('Save', { exact: true }));
 
-    try {
-      await user.selectOptions(faceExclusionSelect, ClassificationFaceExclusion.NamedVisiblePeople);
-      await fireEvent.click(screen.getByText('Save'));
-    } finally {
-      querySelectedOption.mockRestore();
-    }
-
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
         adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
@@ -379,14 +377,14 @@ describe('ClassificationSettings', () => {
       ]),
     );
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Legacy')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Legacy', { exact: true }).element()).toBeInTheDocument();
     });
 
-    await fireEvent.click(screen.getByLabelText('Edit'));
+    await userEvent.click(page.getByLabelText('Edit', { exact: true }));
 
-    expect(screen.getByLabelText('Face exclusion')).toHaveValue('off');
+    expect(page.getByLabelText('Face exclusion', { exact: true }).element()).toHaveValue('off');
   });
 
   it('should show non-Off face exclusion in the category summary', async () => {
@@ -394,9 +392,9 @@ describe('ClassificationSettings', () => {
       makeConfig([makeCategory({ faceExclusion: ClassificationFaceExclusion.NamedPeople })]),
     );
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Named people')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Named people', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -412,18 +410,18 @@ describe('ClassificationSettings', () => {
       ]),
     );
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText(categoryName)).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText(categoryName, { exact: true }).element()).toBeInTheDocument();
     });
 
-    const nameRow = screen.getByText(categoryName).closest('.min-w-0');
+    const nameRow = page.getByText(categoryName, { exact: true }).element().closest('.min-w-0');
     expect(nameRow).toBeInTheDocument();
-    expect(nameRow).not.toHaveTextContent('Tag and archive');
-    expect(nameRow).not.toHaveTextContent('Named, visible people');
+    expect(nameRow).not.toMatchTextContent('Tag and archive');
+    expect(nameRow).not.toMatchTextContent('Named, visible people');
 
-    const metadataRow = screen.getByText('Tag and archive').parentElement;
-    expect(metadataRow).toContainElement(screen.getByText('Named, visible people'));
+    const metadataRow = page.getByText('Tag and archive', { exact: true }).element().parentElement;
+    expect(metadataRow).toContainElement(page.getByText('Named, visible people', { exact: true }).element());
     expect(metadataRow).toHaveClass('flex', 'flex-wrap', 'gap-2');
   });
 
@@ -431,13 +429,13 @@ describe('ClassificationSettings', () => {
     mockFeatureFlags.configFile = true;
     vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory()]));
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Add Category').closest('button')).toBeDisabled();
-    expect(screen.getByText('Scan All Libraries').closest('button')).toBeDisabled();
+    expect(page.getByText('Add Category', { exact: true }).element().closest('button')).toBeDisabled();
+    expect(page.getByText('Scan All Libraries', { exact: true }).element().closest('button')).toBeDisabled();
   });
 
   it('should delete category via updateConfig', async () => {
@@ -445,16 +443,16 @@ describe('ClassificationSettings', () => {
       makeConfig([makeCategory(), makeCategory({ name: 'Receipts', prompts: ['receipt'] })]),
     );
 
-    render(ClassificationSettings);
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
-      expect(screen.getByText('Receipts')).toBeInTheDocument();
+    await render(ClassificationSettings);
+    await vi.waitFor(() => {
+      expect(page.getByText('Screenshots', { exact: true }).element()).toBeInTheDocument();
+      expect(page.getByText('Receipts', { exact: true }).element()).toBeInTheDocument();
     });
 
-    const deleteButtons = screen.getAllByLabelText('Delete');
-    await fireEvent.click(deleteButtons[0]);
+    const deleteButtons = page.getByLabelText('Delete', { exact: true }).elements();
+    await userEvent.click(deleteButtons[0]);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
         adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({

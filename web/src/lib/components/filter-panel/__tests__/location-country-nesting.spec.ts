@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import {
   createFilterState,
   type FilterPanelConfig,
@@ -56,33 +56,33 @@ const config: FilterPanelConfig = {
 };
 
 const renderPanel = (filters: Partial<FilterState>) =>
-  render(FilterPanel, {
-    props: { config, timeBuckets: [], filters: { ...createFilterState(), ...filters } },
-  });
+  render(FilterPanel, { config, timeBuckets: [], filters: { ...createFilterState(), ...filters } });
 
 describe('a city hydrated from the URL', () => {
   beforeEach(() => localStorage.clear());
 
   it('nests under its country, ticked, when the country came along', async () => {
-    renderPanel({ city: 'Cape Town', country: 'South Africa' });
+    await renderPanel({ city: 'Cape Town', country: 'South Africa' });
 
     // The country block auto-expands to reveal the level the selection lives on.
-    const city = await screen.findByTestId('location-city-Cape Town');
+    await expect.element(page.getByTestId('location-city-Cape Town')).toBeInTheDocument();
+    const city = page.getByTestId('location-city-Cape Town').element();
     expect(city.className).toContain('ml-5');
     expect(city.querySelector('.bg-immich-primary')).not.toBeNull();
 
     // Its sibling city proves the row really is the country's expanded list, not a lone fallback.
-    expect(screen.getByTestId('location-city-Durban')).toBeInTheDocument();
-    expect(screen.getByTestId('location-country-South Africa')).toBeInTheDocument();
+    await expect.element(page.getByTestId('location-city-Durban')).toBeInTheDocument();
+    await expect.element(page.getByTestId('location-country-South Africa')).toBeInTheDocument();
   });
 
   it('sits flat beside the countries — the reported #989 symptom — when the country is missing', async () => {
-    renderPanel({ city: 'Cape Town' });
+    await renderPanel({ city: 'Cape Town' });
 
-    const city = await screen.findByTestId('location-city-Cape Town');
+    await expect.element(page.getByTestId('location-city-Cape Town')).toBeInTheDocument();
+    const city = page.getByTestId('location-city-Cape Town').element();
     expect(city.className).not.toContain('ml-5');
 
     // No country expanded, so no sibling city is rendered anywhere.
-    expect(screen.queryByTestId('location-city-Durban')).toBeNull();
+    expect(page.getByTestId('location-city-Durban').query()).toBeNull();
   });
 });

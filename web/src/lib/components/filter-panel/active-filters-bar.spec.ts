@@ -1,11 +1,10 @@
 import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
 import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { render } from 'vitest-browser-svelte';
 
 describe('ActiveFiltersBar search chip', () => {
-  it('should render search chip when searchQuery is set', () => {
-    render(ActiveFiltersBar, {
+  it('should render search chip when searchQuery is set', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: createFilterState(),
         onRemoveFilter: vi.fn(),
@@ -14,12 +13,12 @@ describe('ActiveFiltersBar search chip', () => {
         onClearSearch: vi.fn(),
       },
     });
-    expect(screen.getByTestId('search-chip')).toHaveTextContent('sunset');
+    await expect.element(screen.getByTestId('search-chip')).toHaveTextContent('sunset');
   });
 
   it('should call onClearSearch when search chip is removed', async () => {
     const onClearSearch = vi.fn();
-    render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: createFilterState(),
         onRemoveFilter: vi.fn(),
@@ -28,12 +27,12 @@ describe('ActiveFiltersBar search chip', () => {
         onClearSearch,
       },
     });
-    await userEvent.click(screen.getByTestId('search-chip-close'));
+    await screen.getByTestId('search-chip-close').click();
     expect(onClearSearch).toHaveBeenCalled();
   });
 
-  it('should be visible when only search query is active (no structured filters)', () => {
-    render(ActiveFiltersBar, {
+  it('should be visible when only search query is active (no structured filters)', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: createFilterState(),
         onRemoveFilter: vi.fn(),
@@ -42,11 +41,11 @@ describe('ActiveFiltersBar search chip', () => {
         onClearSearch: vi.fn(),
       },
     });
-    expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+    await expect.element(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
   });
 
-  it('should not render search chip when searchQuery is empty', () => {
-    render(ActiveFiltersBar, {
+  it('should not render search chip when searchQuery is empty', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: createFilterState(),
         onRemoveFilter: vi.fn(),
@@ -55,15 +54,15 @@ describe('ActiveFiltersBar search chip', () => {
         onClearSearch: vi.fn(),
       },
     });
-    expect(screen.queryByTestId('search-chip')).not.toBeInTheDocument();
+    await expect.element(screen.getByTestId('search-chip')).not.toBeInTheDocument();
   });
 });
 
 describe('ActiveFiltersBar add-all-to-collection button', () => {
   const activeFilters = () => ({ ...createFilterState(), description: 'beach' });
 
-  it('renders when a filter is active, results exist, and a handler is provided', () => {
-    render(ActiveFiltersBar, {
+  it('renders when a filter is active, results exist, and a handler is provided', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: activeFilters(),
         onRemoveFilter: vi.fn(),
@@ -72,11 +71,11 @@ describe('ActiveFiltersBar add-all-to-collection button', () => {
         onAddAllToCollection: vi.fn(),
       },
     });
-    expect(screen.getByTestId('add-all-to-collection')).toBeInTheDocument();
+    await expect.element(screen.getByTestId('add-all-to-collection')).toBeInTheDocument();
   });
 
-  it('does not render when there are no results', () => {
-    render(ActiveFiltersBar, {
+  it('does not render when there are no results', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: activeFilters(),
         onRemoveFilter: vi.fn(),
@@ -85,11 +84,11 @@ describe('ActiveFiltersBar add-all-to-collection button', () => {
         onAddAllToCollection: vi.fn(),
       },
     });
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(screen.getByTestId('add-all-to-collection')).not.toBeInTheDocument();
   });
 
-  it('does not render on surfaces that pass no handler', () => {
-    render(ActiveFiltersBar, {
+  it('does not render on surfaces that pass no handler', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: activeFilters(),
         onRemoveFilter: vi.fn(),
@@ -97,11 +96,11 @@ describe('ActiveFiltersBar add-all-to-collection button', () => {
         resultCount: 42,
       },
     });
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(screen.getByTestId('add-all-to-collection')).not.toBeInTheDocument();
   });
 
-  it('does not render when no filter is active', () => {
-    render(ActiveFiltersBar, {
+  it('does not render when no filter is active', async () => {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: createFilterState(),
         onRemoveFilter: vi.fn(),
@@ -110,12 +109,12 @@ describe('ActiveFiltersBar add-all-to-collection button', () => {
         onAddAllToCollection: vi.fn(),
       },
     });
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(screen.getByTestId('add-all-to-collection')).not.toBeInTheDocument();
   });
 
   it('calls onAddAllToCollection when clicked', async () => {
     const onAddAllToCollection = vi.fn();
-    render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters: activeFilters(),
         onRemoveFilter: vi.fn(),
@@ -124,7 +123,7 @@ describe('ActiveFiltersBar add-all-to-collection button', () => {
         onAddAllToCollection,
       },
     });
-    await userEvent.click(screen.getByTestId('add-all-to-collection'));
+    await screen.getByTestId('add-all-to-collection').click();
     expect(onAddAllToCollection).toHaveBeenCalled();
   });
 });

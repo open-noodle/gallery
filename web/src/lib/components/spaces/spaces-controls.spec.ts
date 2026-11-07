@@ -1,9 +1,10 @@
 import SpacesControls from '#lib/components/spaces/spaces-controls.svelte';
 import { SpaceSortBy, spaceViewSettings } from '#lib/stores/space-view.store.ts';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',
@@ -131,29 +132,27 @@ describe('SpacesControls', () => {
     spaceViewSettings.reset();
   });
 
-  it('should render view toggle button', () => {
+  it('should render view toggle button', async () => {
     const spaces = [makeSpace()];
-    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
-    expect(getByTestId('view-toggle')).toBeDefined();
+    const { getByTestId } = await render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+    await expect.element(getByTestId('view-toggle')).toBeInTheDocument();
   });
 
   it('should toggle viewMode from card to list on click', async () => {
-    const user = userEvent.setup();
     const spaces = [makeSpace()];
-    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+    const { getByTestId } = await render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
 
     expect(get(spaceViewSettings).viewMode).toBe('card');
-    await user.click(getByTestId('view-toggle'));
+    await userEvent.click(getByTestId('view-toggle'));
     expect(get(spaceViewSettings).viewMode).toBe('list');
   });
 
   it('should toggle viewMode from list back to card on click', async () => {
-    const user = userEvent.setup();
     spaceViewSettings.update((s) => ({ ...s, viewMode: 'list' }));
     const spaces = [makeSpace()];
-    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+    const { getByTestId } = await render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
 
-    await user.click(getByTestId('view-toggle'));
+    await userEvent.click(getByTestId('view-toggle'));
     expect(get(spaceViewSettings).viewMode).toBe('card');
   });
 });

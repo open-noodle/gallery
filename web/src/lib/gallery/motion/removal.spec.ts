@@ -32,6 +32,9 @@ describe('animateRemoval', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       return this.matches('a') ? rect(10, 500, 40) : rect(300, 200, 120);
     });
+    // The rects above are fake, so the real hit test would find whatever the actual layout puts there.
+    // Report "can't tell", which the code treats as visible.
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(null);
   });
 
   afterEach(() => {

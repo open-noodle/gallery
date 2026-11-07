@@ -1,11 +1,9 @@
 // AssetAddToCollectionModal.spec.ts
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import '#lib/__mocks__/sdk.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import type { AlbumResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import AssetAddToCollectionModal from './AssetAddToCollectionModal.svelte';
 
 const { mockUser, mockAdd } = vi.hoisted(() => ({
@@ -35,9 +33,6 @@ const album = (id: string, name: string): AlbumResponseDto =>
   }) as unknown as AlbumResponseDto;
 
 beforeEach(() => {
-  vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-  vi.stubGlobal('visualViewport', getVisualViewportMock());
-  Element.prototype.animate = getAnimateMock();
   vi.resetAllMocks();
   mockUser.current = { id: 'me', isAdmin: false };
   mockAdd.mockResolvedValue(true);
@@ -47,29 +42,26 @@ beforeEach(() => {
   sdkMock.getAllSpaces.mockResolvedValue([]);
 });
 
-afterAll(async () => {
-  await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
-});
-
 describe('AssetAddToCollectionModal', () => {
   it('dispatches to the chosen collection and closes on success', async () => {
     const onClose = vi.fn();
-    render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose });
-    const tripButtons = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(tripButtons[0]);
+    await render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose });
+    await page.getByRole('button', { name: /Trip/ }).first().click();
     expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2'], {
       contributionMode: false,
     });
-    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
   it('restricts the picker to the space and dispatches in contribution mode when given restrictToSpaceId', async () => {
     sdkMock.getSharedSpaceAlbums.mockResolvedValue([{ ...album('sa1', 'Space Trip'), ownerId: 'them' }] as never);
     const onClose = vi.fn();
-    render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose, restrictToSpaceId: 'space-1' });
+    await render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose, restrictToSpaceId: 'space-1' });
 
-    const rows = await screen.findAllByRole('button', { name: /Space Trip/ });
-    await fireEvent.click(rows[0]);
+    await page
+      .getByRole('button', { name: /Space Trip/ })
+      .first()
+      .click();
 
     expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' });
     expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'sa1', kind: 'album' })], ['1', '2'], {
@@ -79,9 +71,8 @@ describe('AssetAddToCollectionModal', () => {
 
   it('closes without dispatching when the picker is dismissed', async () => {
     const onClose = vi.fn();
-    render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
-    const closeButtons = await screen.findAllByRole('button', { name: 'Close' });
-    await fireEvent.click(closeButtons[0]);
+    await render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
+    await page.getByRole('button', { name: 'Close' }).first().click();
     expect(mockAdd).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -89,10 +80,9 @@ describe('AssetAddToCollectionModal', () => {
   it('stays open when the dispatch reports failure', async () => {
     mockAdd.mockResolvedValue(false);
     const onClose = vi.fn();
-    render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
-    const tripButtons = await screen.findAllByRole('button', { name: /Trip/ });
-    await fireEvent.click(tripButtons[0]);
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledOnce());
+    await render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
+    await page.getByRole('button', { name: /Trip/ }).first().click();
+    await vi.waitFor(() => expect(mockAdd).toHaveBeenCalledOnce());
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -100,13 +90,15 @@ describe('AssetAddToCollectionModal', () => {
     let resolveAdd!: (value: boolean) => void;
     mockAdd.mockReturnValue(new Promise<boolean>((resolve) => (resolveAdd = resolve)));
     const onClose = vi.fn();
-    render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
-    const tripButtons = await screen.findAllByRole('button', { name: /Trip/ });
-    const row = tripButtons[0];
-    await fireEvent.click(row);
-    await fireEvent.click(row); // second click while the first dispatch is still pending
+    await render(AssetAddToCollectionModal, { assetIds: ['1'], onClose });
+    const row = page.getByRole('button', { name: /Trip/ }).first();
+    await expect.element(row).toBeInTheDocument();
+    const element = row.element();
+    // two clicks back to back, the second while the first dispatch is still pending
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(mockAdd).toHaveBeenCalledTimes(1);
     resolveAdd(true);
-    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 });

@@ -1,6 +1,6 @@
 import LazyChunks from '#lib/gallery/components/lazy-chunks.svelte';
-import { render } from '@testing-library/svelte';
 import { createRawSnippet, flushSync } from 'svelte';
+import { render } from 'vitest-browser-svelte';
 
 describe('LazyChunks', () => {
   let report: (entries: Array<{ target: Element; isIntersecting: boolean }>) => void;
@@ -29,13 +29,13 @@ describe('LazyChunks', () => {
       chunk,
     });
 
-  it('mounts only the chunks near the viewport, following the observer as it scrolls', () => {
+  it('mounts only the chunks near the viewport, following the observer as it scrolls', async () => {
     // Chunk 0 starts on screen; the others start far below it.
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const top = Number(this.dataset.chunk) * 10_000;
       return { top, bottom: top + 100 } as DOMRect;
     });
-    const { container } = renderChunks();
+    const { container } = await renderChunks();
     const chunks = [...container.querySelectorAll<HTMLElement>('[data-chunk]')];
 
     expect(chunks).toHaveLength(3);

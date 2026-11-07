@@ -1,8 +1,8 @@
 import SpaceCard from '#lib/components/spaces/space-card.svelte';
 import { SharedSpaceRole, type SharedSpaceMemberResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto => ({
   userId: 'user-1',
@@ -40,36 +40,36 @@ describe('SpaceCard component', () => {
     await waitLocale('en-US');
   });
 
-  it('should render space name', () => {
-    render(SpaceCard, { space: makeSpace() });
-    expect(screen.getByTestId('space-name')).toHaveTextContent('Family Photos');
+  it('should render space name', async () => {
+    await render(SpaceCard, { space: makeSpace() });
+    expect(page.getByTestId('space-name').element()).toMatchTextContent('Family Photos');
   });
 
-  it('should render asset and member counts', () => {
-    render(SpaceCard, { space: makeSpace({ assetCount: 42, memberCount: 3 }) });
-    const details = screen.getByTestId('space-details');
-    expect(details).toHaveTextContent('42');
-    expect(details).toHaveTextContent('3');
+  it('should render asset and member counts', async () => {
+    await render(SpaceCard, { space: makeSpace({ assetCount: 42, memberCount: 3 }) });
+    const details = page.getByTestId('space-details').element();
+    expect(details).toMatchTextContent('42');
+    expect(details).toMatchTextContent('3');
   });
 
-  it('should render collage when recentAssetIds are provided', () => {
-    render(SpaceCard, { space: makeSpace({ recentAssetIds: ['a1', 'a2'], recentAssetThumbhashes: ['', ''] }) });
-    expect(screen.getByTestId('collage-asymmetric')).toBeInTheDocument();
+  it('should render collage when recentAssetIds are provided', async () => {
+    await render(SpaceCard, { space: makeSpace({ recentAssetIds: ['a1', 'a2'], recentAssetThumbhashes: ['', ''] }) });
+    expect(page.getByTestId('collage-asymmetric').element()).toBeInTheDocument();
   });
 
-  it('should render empty collage when no recentAssetIds', () => {
-    render(SpaceCard, { space: makeSpace({ recentAssetIds: [] }) });
-    expect(screen.getByTestId('collage-empty')).toBeInTheDocument();
+  it('should render empty collage when no recentAssetIds', async () => {
+    await render(SpaceCard, { space: makeSpace({ recentAssetIds: [] }) });
+    expect(page.getByTestId('collage-empty').element()).toBeInTheDocument();
   });
 
-  it('should render member avatars when members are provided', () => {
+  it('should render member avatars when members are provided', async () => {
     const members = [makeMember({ userId: 'u1', name: 'Alice' }), makeMember({ userId: 'u2', name: 'Bob' })];
-    render(SpaceCard, { space: makeSpace({ members }) });
-    expect(screen.getByText('A')).toBeInTheDocument();
-    expect(screen.getByText('B')).toBeInTheDocument();
+    await render(SpaceCard, { space: makeSpace({ members }) });
+    expect(page.getByText('A', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('B', { exact: true }).element()).toBeInTheDocument();
   });
 
-  it('should show overflow badge when more than 4 members', () => {
+  it('should show overflow badge when more than 4 members', async () => {
     const members = [
       makeMember({ userId: 'u1', name: 'Alice' }),
       makeMember({ userId: 'u2', name: 'Bob' }),
@@ -78,98 +78,94 @@ describe('SpaceCard component', () => {
       makeMember({ userId: 'u5', name: 'Eve' }),
       makeMember({ userId: 'u6', name: 'Frank' }),
     ];
-    render(SpaceCard, { space: makeSpace({ members }) });
-    expect(screen.getByText('+2')).toBeInTheDocument();
+    await render(SpaceCard, { space: makeSpace({ members }) });
+    expect(page.getByText('+2', { exact: true }).element()).toBeInTheDocument();
   });
 
-  it('should have link to space detail page', () => {
-    render(SpaceCard, { space: makeSpace({ id: 'space-42' }) });
-    const link = screen.getByRole('link');
+  it('should have link to space detail page', async () => {
+    await render(SpaceCard, { space: makeSpace({ id: 'space-42' }) });
+    const link = page.getByRole('link').element();
     expect(link).toBeInTheDocument();
     expect(link.getAttribute('href')).toContain('space-42');
   });
 
-  it('should not render activity dot when newAssetCount is 0', () => {
-    render(SpaceCard, { space: makeSpace({ newAssetCount: 0 }) });
-    expect(screen.queryByTestId('activity-dot')).not.toBeInTheDocument();
+  it('should not render activity dot when newAssetCount is 0', async () => {
+    await render(SpaceCard, { space: makeSpace({ newAssetCount: 0 }) });
+    expect(page.getByTestId('activity-dot').query()).not.toBeInTheDocument();
   });
 
-  it('should render activity dot when newAssetCount > 0', () => {
-    render(SpaceCard, { space: makeSpace({ newAssetCount: 3 }) });
-    expect(screen.getByTestId('activity-dot')).toBeInTheDocument();
+  it('should render activity dot when newAssetCount > 0', async () => {
+    await render(SpaceCard, { space: makeSpace({ newAssetCount: 3 }) });
+    expect(page.getByTestId('activity-dot').element()).toBeInTheDocument();
   });
 
-  it('should show contributor name with count', () => {
-    render(SpaceCard, {
+  it('should show contributor name with count', async () => {
+    await render(SpaceCard, {
       space: makeSpace({
         newAssetCount: 3,
         lastContributor: { id: 'user-1', name: 'Pierre' },
       }),
     });
-    expect(screen.getByTestId('activity-line')).toHaveTextContent('Pierre added 3 new');
+    expect(page.getByTestId('activity-line').element()).toMatchTextContent('Pierre added 3 new');
   });
 
-  it('should show count only without contributor', () => {
-    render(SpaceCard, { space: makeSpace({ newAssetCount: 5 }) });
-    expect(screen.getByTestId('activity-line')).toHaveTextContent('5 new photos');
+  it('should show count only without contributor', async () => {
+    await render(SpaceCard, { space: makeSpace({ newAssetCount: 5 }) });
+    expect(page.getByTestId('activity-line').element()).toMatchTextContent('5 new photos');
   });
 
-  it('should cap display at 99+', () => {
-    render(SpaceCard, { space: makeSpace({ newAssetCount: 150 }) });
-    expect(screen.getByTestId('activity-line')).toHaveTextContent('99+ new photos');
+  it('should cap display at 99+', async () => {
+    await render(SpaceCard, { space: makeSpace({ newAssetCount: 150 }) });
+    expect(page.getByTestId('activity-line').element()).toMatchTextContent('99+ new photos');
   });
 
   describe('pin/unpin context menu', () => {
-    it('should not show menu button initially', () => {
-      render(SpaceCard, { space: makeSpace() });
-      expect(screen.queryByTestId('space-menu-button')).not.toBeInTheDocument();
+    it('should not show menu button initially', async () => {
+      await render(SpaceCard, { space: makeSpace() });
+      expect(page.getByTestId('space-menu-button').query()).not.toBeInTheDocument();
     });
 
     it('should show menu button on hover', async () => {
-      const user = userEvent.setup();
-      render(SpaceCard, { space: makeSpace() });
-      const card = screen.getByTestId('space-card');
-      await user.hover(card);
-      expect(screen.getByTestId('space-menu-button')).toBeInTheDocument();
+      await render(SpaceCard, { space: makeSpace() });
+      const card = page.getByTestId('space-card').element();
+      await userEvent.hover(card);
+      expect(page.getByTestId('space-menu-button').element()).toBeInTheDocument();
     });
 
     it('should show "Pin to top" when not pinned after hovering and clicking menu', async () => {
-      const user = userEvent.setup();
-      render(SpaceCard, { space: makeSpace(), isPinned: false });
-      const card = screen.getByTestId('space-card');
-      await user.hover(card);
-      await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('Pin to top')).toBeInTheDocument();
+      await render(SpaceCard, { space: makeSpace(), isPinned: false });
+      const card = page.getByTestId('space-card').element();
+      await userEvent.hover(card);
+      await userEvent.click(page.getByTestId('space-menu-button'));
+      expect(page.getByText('Pin to top', { exact: true }).element()).toBeInTheDocument();
     });
 
     it('should show "Unpin" when pinned after hovering and clicking menu', async () => {
-      const user = userEvent.setup();
-      render(SpaceCard, { space: makeSpace(), isPinned: true });
-      const card = screen.getByTestId('space-card');
-      await user.hover(card);
-      await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('Unpin')).toBeInTheDocument();
+      await render(SpaceCard, { space: makeSpace(), isPinned: true });
+      const card = page.getByTestId('space-card').element();
+      await userEvent.hover(card);
+      await userEvent.click(page.getByTestId('space-menu-button'));
+      expect(page.getByText('Unpin', { exact: true }).element()).toBeInTheDocument();
     });
 
     it('should call onTogglePin with space id when clicking "Pin to top"', async () => {
       const onTogglePin = vi.fn();
-      const user = userEvent.setup();
-      render(SpaceCard, { space: makeSpace({ id: 'space-42' }), isPinned: false, onTogglePin });
-      const card = screen.getByTestId('space-card');
-      await user.hover(card);
-      await user.click(screen.getByTestId('space-menu-button'));
-      await user.click(screen.getByText('Pin to top'));
+      await render(SpaceCard, { space: makeSpace({ id: 'space-42' }), isPinned: false, onTogglePin });
+      const card = page.getByTestId('space-card').element();
+      await userEvent.hover(card);
+      await userEvent.click(page.getByTestId('space-menu-button'));
+      await userEvent.click(page.getByText('Pin to top', { exact: true }));
       expect(onTogglePin).toHaveBeenCalledWith('space-42');
     });
 
-    it('should show pin overlay when isPinned is true', () => {
-      render(SpaceCard, { space: makeSpace(), isPinned: true });
-      expect(screen.getByTestId('pin-overlay')).toBeInTheDocument();
+    it('should show pin overlay when isPinned is true', async () => {
+      await render(SpaceCard, { space: makeSpace(), isPinned: true });
+      expect(page.getByTestId('pin-overlay').element()).toBeInTheDocument();
     });
 
-    it('should not show pin overlay when isPinned is false', () => {
-      render(SpaceCard, { space: makeSpace(), isPinned: false });
-      expect(screen.queryByTestId('pin-overlay')).not.toBeInTheDocument();
+    it('should not show pin overlay when isPinned is false', async () => {
+      await render(SpaceCard, { space: makeSpace(), isPinned: false });
+      expect(page.getByTestId('pin-overlay').query()).not.toBeInTheDocument();
     });
   });
 });

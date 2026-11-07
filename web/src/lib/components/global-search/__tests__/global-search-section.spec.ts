@@ -1,7 +1,7 @@
-import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import GlobalSearchSection from '../global-search-section.svelte';
 
 beforeAll(async () => {
@@ -22,8 +22,8 @@ describe('global-search-section empty-state', () => {
     renderRow: createRawSnippet(() => ({ render: () => '<span></span>' })),
   };
 
-  it('renders NOTHING when status is empty', () => {
-    const { container } = render(GlobalSearchSection, {
+  it('renders NOTHING when status is empty', async () => {
+    const { container } = await render(GlobalSearchSection, {
       props: { ...baseProps, status: { status: 'empty' } },
     });
     expect(container.querySelector('[data-command-group-heading]')).toBeNull();
@@ -31,14 +31,14 @@ describe('global-search-section empty-state', () => {
     expect(container.textContent?.trim()).toBe('');
   });
 
-  it('renders nothing when status is idle', () => {
-    const { container } = render(GlobalSearchSection, {
+  it('renders nothing when status is idle', async () => {
+    const { container } = await render(GlobalSearchSection, {
       props: { ...baseProps, status: { status: 'idle' } },
     });
     expect(container.textContent?.trim()).toBe('');
   });
 
-  it('accepts album items via the album idPrefix', () => {
+  it('accepts album items via the album idPrefix', async () => {
     const albumItem = {
       id: 'a1',
       albumName: 'x',
@@ -46,7 +46,7 @@ describe('global-search-section empty-state', () => {
       albumThumbnailAssetId: null,
       assetCount: 0,
     };
-    expect(() =>
+    await expect(
       render(GlobalSearchSection, {
         props: {
           heading: 'Albums',
@@ -59,17 +59,17 @@ describe('global-search-section empty-state', () => {
           onSeeAll: () => void albumItem,
         },
       }),
-    ).not.toThrow();
+    ).resolves.toBeDefined();
   });
 
-  it('accepts space items via the space idPrefix', () => {
+  it('accepts space items via the space idPrefix', async () => {
     const spaceItem = {
       id: 's1',
       name: 'My Space',
       ownerId: 'o1',
       assetCount: 0,
     };
-    expect(() =>
+    await expect(
       render(GlobalSearchSection, {
         props: {
           heading: 'Spaces',
@@ -80,6 +80,6 @@ describe('global-search-section empty-state', () => {
           onSeeAll: () => void spaceItem,
         },
       }),
-    ).not.toThrow();
+    ).resolves.toBeDefined();
   });
 });

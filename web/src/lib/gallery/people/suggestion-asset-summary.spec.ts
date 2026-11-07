@@ -1,10 +1,9 @@
 import { faceSuggestionContextExpanded as expanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
 import SuggestionAssetSummary from '#lib/gallery/people/suggestion-asset-summary.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -19,50 +18,49 @@ const SPACE_ID = 'bbbbbbbb-0000-4000-8000-000000000002';
 beforeEach(() => expanded.set(false));
 
 describe('suggestion-asset-summary', () => {
-  it('shows the taken date from fileCreatedAt, with no request', () => {
-    render(SuggestionAssetSummary, { props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z' } });
+  it('shows the taken date from fileCreatedAt, with no request', async () => {
+    await render(SuggestionAssetSummary, { props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z' } });
 
-    expect(screen.getByTestId('suggestion-context-date')).toHaveTextContent('Aug 12, 2015');
+    await expect.element(page.getByTestId('suggestion-context-date')).toMatchTextContent('Aug 12, 2015');
   });
 
-  it('omits the date row entirely when the suggestion carries no fileCreatedAt', () => {
-    render(SuggestionAssetSummary, { props: { assetId: ASSET_ID } });
+  it('omits the date row entirely when the suggestion carries no fileCreatedAt', async () => {
+    await render(SuggestionAssetSummary, { props: { assetId: ASSET_ID } });
 
-    expect(screen.queryByTestId('suggestion-context-date')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('suggestion-context-date')).not.toBeInTheDocument();
   });
 
-  it('links to the asset in a new tab, outside any space', () => {
-    render(SuggestionAssetSummary, { props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z' } });
+  it('links to the asset in a new tab, outside any space', async () => {
+    await render(SuggestionAssetSummary, { props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z' } });
 
-    const link = screen.getByTestId('suggestion-context-open');
-    expect(link).toHaveAttribute('href', `/photos/${ASSET_ID}`);
+    const link = page.getByTestId('suggestion-context-open');
+    await expect.element(link).toHaveAttribute('href', `/photos/${ASSET_ID}`);
     // The whole point of a new tab: the review queue, its position and the append-only `items` buffer all
     // survive the trip. `noopener` because the opened tab must not get a handle on the review window.
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    await expect.element(link).toHaveAttribute('target', '_blank');
+    await expect.element(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
   });
 
-  it('links into the space when the review is running inside one', () => {
-    render(SuggestionAssetSummary, {
+  it('links into the space when the review is running inside one', async () => {
+    await render(SuggestionAssetSummary, {
       props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z', spaceId: SPACE_ID },
     });
 
     // A space viewer may reach this asset ONLY through the space; /photos/{id} enforces the owner's
     // AssetView and would 403 for them.
-    expect(screen.getByTestId('suggestion-context-open')).toHaveAttribute(
-      'href',
-      `/spaces/${SPACE_ID}/photos/${ASSET_ID}`,
-    );
+    await expect
+      .element(page.getByTestId('suggestion-context-open'))
+      .toHaveAttribute('href', `/spaces/${SPACE_ID}/photos/${ASSET_ID}`);
   });
 
   it('Details flips the remembered preference and reports it to assistive tech', async () => {
-    render(SuggestionAssetSummary, { props: { assetId: ASSET_ID } });
-    const toggle = screen.getByTestId('suggestion-context-toggle');
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await render(SuggestionAssetSummary, { props: { assetId: ASSET_ID } });
+    const toggle = page.getByTestId('suggestion-context-toggle');
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
 
     await userEvent.click(toggle);
 
     expect(get(expanded)).toBe(true);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 });

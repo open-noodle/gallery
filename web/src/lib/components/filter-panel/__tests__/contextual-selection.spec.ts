@@ -1,8 +1,8 @@
 import { buildPersonFilterPatch } from '#lib/utils/filter-target.ts';
 import { getPhotosPersonFilterId } from '#lib/utils/photos-filter-options.ts';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import {
   createFilterState,
   type FilterPanelConfig,
@@ -43,13 +43,17 @@ const suggestions = (overrides: Partial<FilterSuggestionsResponse> = {}): Filter
 
 const renderPanel = (config: FilterPanelConfig, filters: Partial<FilterState>, extra: Record<string, unknown> = {}) =>
   render(FilterPanel, {
-    props: {
-      config,
-      timeBuckets: [],
-      filters: { ...createFilterState(), ...filters },
-      ...extra,
-    },
+    config,
+    timeBuckets: [],
+    filters: { ...createFilterState(), ...filters },
+    ...extra,
   });
+
+const findByTestId = async (testId: string) => {
+  const locator = page.getByTestId(testId);
+  await expect.element(locator).toBeInTheDocument();
+  return locator.element() as HTMLElement;
+};
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -68,7 +72,7 @@ describe('the panel reflects a contextual PERSON filter', () => {
       primaryProfile: { type: 'user-person', id: PERSON_UUID },
     });
 
-    renderPanel(
+    await renderPanel(
       {
         sections: ['people'],
         suggestionsProvider: () => Promise.resolve(suggestions({ people: [{ id: optionId, name: 'Bob' }] })),
@@ -77,12 +81,12 @@ describe('the panel reflects a contextual PERSON filter', () => {
       { personIds: patch.personIds },
     );
 
-    await waitFor(() => expect(screen.getByTestId(`people-item-${optionId}`)).toHaveTextContent('Bob'));
-    const row = screen.getByTestId(`people-item-${optionId}`);
-    expect(row).toHaveTextContent('Bob');
+    await expect.element(page.getByTestId(`people-item-${optionId}`)).toMatchTextContent('Bob');
+    const row = page.getByTestId(`people-item-${optionId}`).element();
+    expect(row).toMatchTextContent('Bob');
     expect(row.className).toContain('font-medium');
-    expect(screen.queryByTestId(`people-item-${PERSON_UUID}`)).toBeNull();
-    expect(screen.queryByText(PERSON_UUID)).toBeNull();
+    expect(page.getByTestId(`people-item-${PERSON_UUID}`).query()).toBeNull();
+    expect(page.getByText(PERSON_UUID).query()).toBeNull();
   });
 
   // A space person seen off the Space is the case the suggestions response can genuinely miss (it
@@ -91,7 +95,7 @@ describe('the panel reflects a contextual PERSON filter', () => {
   it('names an orphaned row from the banked name rather than showing the token', async () => {
     const token = 'space-person:bbbbbbbb-0000-4000-8000-000000000002';
 
-    renderPanel(
+    await renderPanel(
       {
         sections: ['people'],
         suggestionsProvider: () =>
@@ -102,9 +106,9 @@ describe('the panel reflects a contextual PERSON filter', () => {
       { personNames: new Map([[token, 'Alice']]) },
     );
 
-    const row = await screen.findByTestId(`people-item-${token}`);
-    expect(row).toHaveTextContent('Alice');
-    expect(screen.queryByText(token)).toBeNull();
+    const row = await findByTestId(`people-item-${token}`);
+    expect(row).toMatchTextContent('Alice');
+    expect(page.getByText(token).query()).toBeNull();
   });
 });
 
@@ -120,37 +124,37 @@ describe('the panel reflects a contextual CAMERA filter', () => {
   // Reported: the chip reads "Canon Canon EOS R6" but the panel only ever showed "Canon" — the make
   // was never expanded, so the model row it should have ticked was not even rendered.
   it('expands the selected make and ticks the selected model', async () => {
-    renderPanel(cameraConfig({ Canon: ['Canon EOS R5', 'Canon EOS R6'] }), {
+    await renderPanel(cameraConfig({ Canon: ['Canon EOS R5', 'Canon EOS R6'] }), {
       make: 'Canon',
       model: 'Canon EOS R6',
     });
 
-    const model = await screen.findByTestId('camera-model-Canon EOS R6');
+    const model = await findByTestId('camera-model-Canon EOS R6');
     expect(model.className).toContain('font-medium');
     expect(model.querySelector('.bg-immich-primary')).not.toBeNull();
 
     // The sibling model is rendered too — the drill-down is a real, browsable level, not a lone row.
-    expect(screen.getByTestId('camera-model-Canon EOS R5')).toBeInTheDocument();
+    expect(page.getByTestId('camera-model-Canon EOS R5').element()).toBeInTheDocument();
     // Only ONE make is expanded.
-    expect(screen.queryByTestId('camera-model-iPhone 15')).toBeNull();
+    expect(page.getByTestId('camera-model-iPhone 15').query()).toBeNull();
   });
 
   it('leaves a make-only filter collapsed and ticked on the make row', async () => {
-    renderPanel(cameraConfig({ Canon: ['Canon EOS R5', 'Canon EOS R6'] }), { make: 'Canon' });
+    await renderPanel(cameraConfig({ Canon: ['Canon EOS R5', 'Canon EOS R6'] }), { make: 'Canon' });
 
-    const make = await screen.findByTestId('camera-make-Canon');
+    const make = await findByTestId('camera-make-Canon');
     await settle();
 
     expect(make.querySelector('.bg-immich-primary')).not.toBeNull();
-    expect(screen.queryByTestId('camera-model-Canon EOS R6')).toBeNull();
+    expect(page.getByTestId('camera-model-Canon EOS R6').query()).toBeNull();
   });
 
   // The model list is narrowed by the rest of the filter set, so a model that is legitimately
   // filtered by can be absent from it. It must still show as the selection rather than vanish.
   it('keeps a selected model that the narrowed model list no longer contains', async () => {
-    renderPanel(cameraConfig({ Canon: ['Canon EOS R5'] }), { make: 'Canon', model: 'Canon EOS R6' });
+    await renderPanel(cameraConfig({ Canon: ['Canon EOS R5'] }), { make: 'Canon', model: 'Canon EOS R6' });
 
-    const model = await screen.findByTestId('camera-model-Canon EOS R6');
+    const model = await findByTestId('camera-model-Canon EOS R6');
     expect(model.querySelector('.bg-immich-primary')).not.toBeNull();
   });
 
@@ -159,17 +163,17 @@ describe('the panel reflects a contextual CAMERA filter', () => {
   // the stale selection it would snap the expansion back to the old make and the click would appear
   // to do nothing.
   it('follows a click to another make instead of snapping back to the selected one', async () => {
-    renderPanel(cameraConfig({ Canon: ['Canon EOS R6'], Apple: ['iPhone 15'] }), {
+    await renderPanel(cameraConfig({ Canon: ['Canon EOS R6'], Apple: ['iPhone 15'] }), {
       make: 'Canon',
       model: 'Canon EOS R6',
     });
 
-    await screen.findByTestId('camera-model-Canon EOS R6');
-    await fireEvent.click(screen.getByTestId('camera-make-Apple'));
+    await findByTestId('camera-model-Canon EOS R6');
+    await userEvent.click(page.getByTestId('camera-make-Apple'));
     await settle();
 
-    expect(screen.getByTestId('camera-model-iPhone 15')).toBeInTheDocument();
-    expect(screen.queryByTestId('camera-model-Canon EOS R6')).toBeNull();
+    expect(page.getByTestId('camera-model-iPhone 15').element()).toBeInTheDocument();
+    expect(page.getByTestId('camera-model-Canon EOS R6').query()).toBeNull();
   });
 });
 
@@ -194,12 +198,12 @@ describe('the panel reflects a contextual STATE filter', () => {
   });
 
   it('renders the state as a ticked row under its country', async () => {
-    renderPanel(locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }), {
+    await renderPanel(locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }), {
       country: 'Czech Republic',
       state: 'Prague',
     });
 
-    const row = await screen.findByTestId('location-state-Prague');
+    const row = await findByTestId('location-state-Prague');
     expect(row).toHaveAttribute('aria-pressed', 'true');
     expect(row.querySelector('.bg-immich-primary')).not.toBeNull();
   });
@@ -207,22 +211,22 @@ describe('the panel reflects a contextual STATE filter', () => {
   // The dot belongs to the deepest selection. A ticked country next to a ticked state would read as
   // "the whole country", which is not what is being filtered.
   it('does not also tick the country while a state is selected', async () => {
-    renderPanel(locationConfig({ 'Czech Republic': ['Prague'] }), { country: 'Czech Republic', state: 'Prague' });
+    await renderPanel(locationConfig({ 'Czech Republic': ['Prague'] }), { country: 'Czech Republic', state: 'Prague' });
 
-    await screen.findByTestId('location-state-Prague');
-    const country = screen.getByTestId('location-country-Czech Republic');
+    await findByTestId('location-state-Prague');
+    const country = page.getByTestId('location-country-Czech Republic').element();
     expect(country.querySelector('.bg-immich-primary')).toBeNull();
   });
 
   it('clears the state when its row is clicked, keeping the country', async () => {
     const onFiltersChange = vi.fn();
-    renderPanel(
+    await renderPanel(
       locationConfig({ 'Czech Republic': ['Prague'] }),
       { country: 'Czech Republic', state: 'Prague' },
       { onFiltersChange },
     );
 
-    await fireEvent.click(await screen.findByTestId('location-state-Prague'));
+    await userEvent.click(page.getByTestId('location-state-Prague'));
 
     expect(onFiltersChange).toHaveBeenCalledWith(
       expect.objectContaining({ country: 'Czech Republic', state: undefined, city: undefined }),
@@ -232,9 +236,9 @@ describe('the panel reflects a contextual STATE filter', () => {
   // A state with no country can only arrive by URL, and it still has to be visible and clearable.
   it('renders a country-less state at the top level and clears it on click', async () => {
     const onFiltersChange = vi.fn();
-    renderPanel(locationConfig(), { state: 'Prague' }, { onFiltersChange });
+    await renderPanel(locationConfig(), { state: 'Prague' }, { onFiltersChange });
 
-    await fireEvent.click(await screen.findByTestId('location-state-Prague'));
+    await userEvent.click(page.getByTestId('location-state-Prague'));
 
     expect(onFiltersChange).toHaveBeenCalledWith(
       expect.objectContaining({ country: undefined, state: undefined, city: undefined }),
@@ -246,9 +250,9 @@ describe('the panel reflects a contextual STATE filter', () => {
   // predicate onto the new selection and usually return nothing.
   it('drops the stale state when another country is picked', async () => {
     const onFiltersChange = vi.fn();
-    renderPanel(locationConfig(), { country: 'Czech Republic', state: 'Prague' }, { onFiltersChange });
+    await renderPanel(locationConfig(), { country: 'Czech Republic', state: 'Prague' }, { onFiltersChange });
 
-    await fireEvent.click(await screen.findByTestId('location-country-Germany'));
+    await userEvent.click(page.getByTestId('location-country-Germany'));
 
     expect(onFiltersChange).toHaveBeenCalledWith(
       expect.objectContaining({ country: 'Germany', state: undefined, city: undefined }),
@@ -257,13 +261,13 @@ describe('the panel reflects a contextual STATE filter', () => {
 
   it('drops the stale state when a city is picked', async () => {
     const onFiltersChange = vi.fn();
-    renderPanel(
+    await renderPanel(
       locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }),
       { country: 'Czech Republic', state: 'Prague' },
       { onFiltersChange },
     );
 
-    await fireEvent.click(await screen.findByTestId('location-city-Brno'));
+    await userEvent.click(page.getByTestId('location-city-Brno'));
 
     expect(onFiltersChange).toHaveBeenCalledWith(
       expect.objectContaining({ country: 'Czech Republic', city: 'Brno', state: undefined }),
@@ -273,7 +277,7 @@ describe('the panel reflects a contextual STATE filter', () => {
   // The collapsed panel's "something is filtered" dot reads hasActiveFilter, which only knew about
   // city and country — so a state-only filter looked like no filter at all from the outside too.
   it('marks the location section active for a state-only filter', async () => {
-    renderPanel(
+    await renderPanel(
       {
         sections: ['location', 'rating'],
         suggestionsProvider: () => Promise.resolve(suggestions({ countries: ['Czech Republic'] })),
@@ -284,22 +288,22 @@ describe('the panel reflects a contextual STATE filter', () => {
 
     // The section toggles live inside the cog's popover since #912, so open it before reaching for
     // one — the same `openSectionMenu` step filter-panel.spec.ts grew for its own toggle tests.
-    await fireEvent.click(await screen.findByTestId('section-menu-btn'));
+    await userEvent.click(page.getByTestId('section-menu-btn'));
 
-    await fireEvent.click(await screen.findByTestId('section-toggle-location'));
-    expect(screen.getByTestId('section-toggle-dot-location')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('section-toggle-location'));
+    expect(page.getByTestId('section-toggle-dot-location').element()).toBeInTheDocument();
   });
 
   // The healthy path this bug was mistaken for — pinned here so a regression in it is unambiguous.
   it('still ticks a contextual CITY under its country', async () => {
-    renderPanel(locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }), {
+    await renderPanel(locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }), {
       country: 'Czech Republic',
       city: 'Prague',
     });
 
-    const city = await screen.findByTestId('location-city-Prague');
+    const city = await findByTestId('location-city-Prague');
     expect(city.querySelector('.bg-immich-primary')).not.toBeNull();
-    expect(screen.queryByTestId('location-state-Prague')).toBeNull();
+    expect(page.getByTestId('location-state-Prague').query()).toBeNull();
   });
 });
 
@@ -325,7 +329,7 @@ describe('the panel keeps a selected entry visible in a long list', () => {
   }));
 
   it('hoists a selected tag from beyond the visible head', async () => {
-    renderPanel(
+    await renderPanel(
       {
         sections: ['tags'],
         suggestionsProvider: () => Promise.resolve(suggestions({ tags })),
@@ -334,20 +338,20 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { tagIds: ['tag-30'] },
     );
 
-    await waitFor(() => expect(screen.getAllByTestId(/^tags-item-/)).toHaveLength(10));
-    const row = await screen.findByTestId('tags-item-tag-30');
+    await vi.waitFor(() => expect(page.getByTestId(/^tags-item-/).elements()).toHaveLength(10));
+    const row = await findByTestId('tags-item-tag-30');
     expect(row).toHaveAttribute('aria-pressed', 'true');
     expect(row.querySelector('.bg-immich-primary')).not.toBeNull();
 
     // It is hoisted, not appended: it is the first row of the list.
-    const rendered = screen.getAllByTestId(/^tags-item-/);
+    const rendered = page.getByTestId(/^tags-item-/).elements();
     expect(rendered[0]).toBe(row);
     // And it does not cost an unselected row its slot — the head still shows 10.
     expect(rendered).toHaveLength(10);
   });
 
   it('hoists every selected tag, and keeps the show-more count honest', async () => {
-    renderPanel(
+    await renderPanel(
       {
         sections: ['tags'],
         suggestionsProvider: () => Promise.resolve(suggestions({ tags })),
@@ -356,14 +360,14 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { tagIds: ['tag-30', 'tag-35'] },
     );
 
-    await waitFor(() => expect(screen.getByTestId('tags-show-more')).toBeInTheDocument());
-    expect(screen.getByTestId('tags-item-tag-30')).toBeInTheDocument();
-    expect(screen.getByTestId('tags-item-tag-35')).toBeInTheDocument();
-    expect(screen.getByTestId('tags-show-more')).toHaveTextContent('30');
+    await expect.element(page.getByTestId('tags-show-more')).toBeInTheDocument();
+    expect(page.getByTestId('tags-item-tag-30').element()).toBeInTheDocument();
+    expect(page.getByTestId('tags-item-tag-35').element()).toBeInTheDocument();
+    expect(page.getByTestId('tags-show-more').element()).toMatchTextContent(/\b30\b/);
   });
 
   it('hoists a selected person from beyond the visible head', async () => {
-    renderPanel(
+    await renderPanel(
       {
         sections: ['people'],
         suggestionsProvider: () => Promise.resolve(suggestions({ people })),
@@ -372,17 +376,17 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { personIds: ['person-30'] },
     );
 
-    await waitFor(() => expect(screen.getAllByTestId(/^people-item-/)).toHaveLength(5));
-    const row = await screen.findByTestId('people-item-person-30');
+    await vi.waitFor(() => expect(page.getByTestId(/^people-item-/).elements()).toHaveLength(5));
+    const row = await findByTestId('people-item-person-30');
     expect(row.querySelector('.bg-immich-primary')).not.toBeNull();
 
-    const rendered = screen.getAllByTestId(/^people-item-/);
+    const rendered = page.getByTestId(/^people-item-/).elements();
     expect(rendered[0]).toBe(row);
     expect(rendered).toHaveLength(5);
   });
 
   it('leaves an unfiltered list in its original order', async () => {
-    renderPanel(
+    await renderPanel(
       {
         sections: ['tags'],
         suggestionsProvider: () => Promise.resolve(suggestions({ tags })),
@@ -391,8 +395,10 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       {},
     );
 
-    await screen.findByTestId('tags-item-tag-00');
-    const rendered = screen.getAllByTestId(/^tags-item-/);
-    expect(rendered.map((row) => row.dataset.testid)).toEqual(tags.slice(0, 10).map((tag) => `tags-item-${tag.id}`));
+    await findByTestId('tags-item-tag-00');
+    const rendered = page.getByTestId(/^tags-item-/).elements();
+    expect(rendered.map((row) => (row as HTMLElement).dataset.testid)).toEqual(
+      tags.slice(0, 10).map((tag) => `tags-item-${tag.id}`),
+    );
   });
 });

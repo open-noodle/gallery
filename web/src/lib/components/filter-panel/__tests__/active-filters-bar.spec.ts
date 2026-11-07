@@ -1,6 +1,6 @@
 import { mdiPin } from '@mdi/js';
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
 import ActiveFiltersBar from '../active-filters-bar.svelte';
 import { createFilterState } from '../filter-panel';
 
@@ -11,11 +11,11 @@ beforeAll(async () => {
 });
 
 describe('ActiveFiltersBar', () => {
-  it('should render chip for person filter with name', () => {
+  it('should render chip for person filter with name', async () => {
     const filters = createFilterState();
     filters.personIds = ['p1'];
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         personNames: new Map([['p1', 'Sarah Chen']]),
@@ -24,17 +24,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Sarah Chen');
   });
 
-  it('should render chip for location as "City, Country"', () => {
+  it('should render chip for location as "City, Country"', async () => {
     const filters = createFilterState();
     filters.city = 'Munich';
     filters.country = 'Germany';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -42,16 +42,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Munich, Germany');
   });
 
-  it('should render chip for country only when no city', () => {
+  it('should render chip for country only when no city', async () => {
     const filters = createFilterState();
     filters.country = 'Germany';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -59,17 +59,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Germany');
     expect(chips[0].textContent).not.toContain(',');
   });
 
-  it('should render chip for city only when no country', () => {
+  it('should render chip for city only when no country', async () => {
     const filters = createFilterState();
     filters.city = 'New York City';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -77,17 +77,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('New York City');
     expect(chips[0].textContent).not.toContain(',');
   });
 
-  it('should render chip for state alone (folds into the location chip)', () => {
+  it('should render chip for state alone (folds into the location chip)', async () => {
     const filters = createFilterState();
     filters.state = 'Bavaria';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -95,18 +95,18 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Bavaria');
   });
 
-  it('should render one location chip containing city, state and country together', () => {
+  it('should render one location chip containing city, state and country together', async () => {
     const filters = createFilterState();
     filters.city = 'Munich';
     filters.state = 'Bavaria';
     filters.country = 'Germany';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -114,7 +114,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Munich');
     expect(chips[0].textContent).toContain('Bavaria');
@@ -128,7 +128,7 @@ describe('ActiveFiltersBar', () => {
     filters.state = 'Bavaria';
     filters.country = 'Germany';
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -138,15 +138,15 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('location');
   });
 
-  it('should render chip for rating as "≥ 3 stars" (star shown as a leading icon)', () => {
+  it('should render chip for rating as "≥ 3 stars" (star shown as a leading icon)', async () => {
     const filters = createFilterState();
     filters.rating = 3;
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -154,17 +154,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('≥ 3 stars');
     expect(chips[0].textContent).not.toContain('3+');
   });
 
-  it('should render chip for a rating of 1 as "≥ 1 star" (singular)', () => {
+  it('should render chip for a rating of 1 as "≥ 1 star" (singular)', async () => {
     const filters = createFilterState();
     filters.rating = 1;
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -172,7 +172,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('≥ 1 star');
     expect(chips[0].textContent).not.toContain('1 stars');
@@ -183,7 +183,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.lensModel = 'RF24-70mm F2.8';
 
-    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -193,11 +193,11 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('RF24-70mm F2.8');
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('lens');
   });
 
@@ -207,7 +207,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.albumId = 'album-1';
 
-    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         albumNames: new Map([['album-1', 'Summer Trip']]),
@@ -219,20 +219,20 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Summer Trip');
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('album');
     expect(removedId).toBe('album-1');
   });
 
-  it('should fall back to the raw id for an album chip with no name resolved', () => {
+  it('should fall back to the raw id for an album chip with no name resolved', async () => {
     const filters = createFilterState();
     filters.albumId = 'album-2';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -240,7 +240,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('album-2');
   });
@@ -251,7 +251,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.ownerId = 'user-1';
 
-    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         ownerNames: new Map([['user-1', 'Jamie Rivera']]),
@@ -263,20 +263,20 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Jamie Rivera');
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('owner');
     expect(removedId).toBe('user-1');
   });
 
-  it('should fall back to the raw id for an owner chip with no name resolved', () => {
+  it('should fall back to the raw id for an owner chip with no name resolved', async () => {
     const filters = createFilterState();
     filters.ownerId = 'user-2';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -284,16 +284,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('user-2');
   });
 
-  it('should render chip for media type as "Photos only"', () => {
+  it('should render chip for media type as "Photos only"', async () => {
     const filters = createFilterState();
     filters.mediaType = 'image';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -301,16 +301,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Photos only');
   });
 
-  it('should render "Videos only" for video media type', () => {
+  it('should render "Videos only" for video media type', async () => {
     const filters = createFilterState();
     filters.mediaType = 'video';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -318,15 +318,15 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Videos only');
   });
 
-  it('should render chip for favorites filter', () => {
+  it('should render chip for favorites filter', async () => {
     const filters = { ...createFilterState(), isFavorite: true };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -334,7 +334,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Favorites');
   });
@@ -343,7 +343,7 @@ describe('ActiveFiltersBar', () => {
     let removedType: string | undefined;
     const filters = { ...createFilterState(), isFavorite: true };
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -353,14 +353,14 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('favorites');
   });
 
-  it('should render chip for has-no-album filter', () => {
+  it('should render chip for has-no-album filter', async () => {
     const filters = { ...createFilterState(), isNotInAlbum: true };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -368,7 +368,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Has no album');
   });
@@ -377,7 +377,7 @@ describe('ActiveFiltersBar', () => {
     let removedType: string | undefined;
     const filters = { ...createFilterState(), isNotInAlbum: true };
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -387,14 +387,14 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('albums');
   });
 
-  it('should render chip for has-album filter', () => {
+  it('should render chip for has-album filter', async () => {
     const filters = { ...createFilterState(), isInAlbum: true };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -402,7 +402,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Has album');
   });
@@ -411,7 +411,7 @@ describe('ActiveFiltersBar', () => {
     let removedType: string | undefined;
     const filters = { ...createFilterState(), isInAlbum: true };
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -421,14 +421,14 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('albums');
   });
 
-  it('should render a chip for isFavorite === false too (counted but previously never chipped)', () => {
+  it('should render a chip for isFavorite === false too (counted but previously never chipped)', async () => {
     const filters = { ...createFilterState(), isFavorite: false };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -436,7 +436,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Not favorite');
   });
@@ -445,7 +445,7 @@ describe('ActiveFiltersBar', () => {
     let removedType: string | undefined;
     const filters = { ...createFilterState(), isFavorite: false };
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: (type: string) => {
@@ -455,14 +455,14 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('favorites');
   });
 
-  it('should not render a has-no-album chip for false', () => {
+  it('should not render a has-no-album chip for false', async () => {
     const filters = { ...createFilterState(), isNotInAlbum: false };
 
-    const { queryAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -470,13 +470,13 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    expect(queryAllByTestId('active-chip')).toHaveLength(0);
+    expect(screen.getByTestId('active-chip').elements()).toHaveLength(0);
   });
 
-  it('should render no chips when no filters active', () => {
+  it('should render no chips when no filters active', async () => {
     const filters = createFilterState();
 
-    const { queryAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -484,7 +484,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = queryAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(0);
   });
 
@@ -499,7 +499,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.personIds = ['p1'];
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         personNames: new Map([['p1', 'Sarah Chen']]),
@@ -508,7 +508,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('person');
     expect(removedId).toBe('p1');
   });
@@ -523,7 +523,7 @@ describe('ActiveFiltersBar', () => {
     filters.rating = 4;
     filters.mediaType = 'image';
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -531,7 +531,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('clear-all-btn'));
+    await screen.getByTestId('clear-all-btn').click();
     expect(cleared).toBe(true);
   });
 
@@ -549,7 +549,7 @@ describe('ActiveFiltersBar', () => {
       cleared = true;
     };
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -557,16 +557,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('clear-all-btn'));
+    await screen.getByTestId('clear-all-btn').click();
     expect(cleared).toBe(true);
     // sortOrder is unchanged because the component only calls the callback
     expect(filters.sortOrder).toBe('asc');
   });
 
-  it('should show result count', () => {
+  it('should show result count', async () => {
     const filters = createFilterState();
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         resultCount: 1234,
@@ -575,16 +575,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const resultCount = getByTestId('result-count');
+    const resultCount = screen.getByTestId('result-count').element();
     expect(resultCount.textContent).toContain('1,234 results');
   });
 
-  it('should render camera chip as "Make Model"', () => {
+  it('should render camera chip as "Make Model"', async () => {
     const filters = createFilterState();
     filters.make = 'Canon';
     filters.model = 'EOS R5';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -592,18 +592,18 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Canon EOS R5');
   });
 
-  it('should render a camera chip for a model-only value (no make)', () => {
+  it('should render a camera chip for a model-only value (no make)', async () => {
     const filters = createFilterState();
     filters.model = 'iPhone 17 Pro Max';
 
     // make is absent, but ?model= is applied by every surface, so the bar MUST surface a
     // removable chip (label = the model) rather than hiding the filter entirely.
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -611,16 +611,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('iPhone 17 Pro Max');
   });
 
-  it('should render tag chips with names', () => {
+  it('should render tag chips with names', async () => {
     const filters = createFilterState();
     filters.tagIds = ['t1', 't2'];
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         tagNames: new Map([
@@ -632,17 +632,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(2);
     expect(chips[0].textContent).toContain('Vacation');
     expect(chips[1].textContent).toContain('Family');
   });
 
-  it('should render chip for year-only timeline filter', () => {
+  it('should render chip for year-only timeline filter', async () => {
     const filters = createFilterState();
     filters.selectedYear = 2015;
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -650,17 +650,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('2015');
   });
 
-  it('should render chip for year+month timeline filter as "Mon YYYY"', () => {
+  it('should render chip for year+month timeline filter as "Mon YYYY"', async () => {
     const filters = createFilterState();
     filters.selectedYear = 2015;
     filters.selectedMonth = 12;
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -668,17 +668,17 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Dec 2015');
   });
 
-  it('should reserve filter removal copy for explicit timeline filter chips', () => {
+  it('should reserve filter removal copy for explicit timeline filter chips', async () => {
     const filters = createFilterState();
     filters.selectedYear = 2015;
     filters.selectedMonth = 12;
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -686,16 +686,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    expect(getByTestId('active-chip')).toHaveTextContent('Dec 2015');
-    expect(getByTestId('chip-close')).toHaveAttribute('aria-label', 'Remove Dec 2015 filter');
+    await expect.element(screen.getByTestId('active-chip')).toHaveTextContent('Dec 2015');
+    await expect.element(screen.getByTestId('chip-close')).toHaveAttribute('aria-label', 'Remove Dec 2015 filter');
   });
 
-  it('should render bounded custom date range as one timeline chip', () => {
+  it('should render bounded custom date range as one timeline chip', async () => {
     const filters = createFilterState();
     filters.dateAfter = '2024-01-01';
     filters.dateBefore = '2024-12-31';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -703,16 +703,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Jan 1, 2024 - Dec 31, 2024');
   });
 
-  it('should render from-only custom date range as one timeline chip', () => {
+  it('should render from-only custom date range as one timeline chip', async () => {
     const filters = createFilterState();
     filters.dateAfter = '2024-01-01';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -720,16 +720,16 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('After Jan 1, 2024');
   });
 
-  it('should render to-only custom date range as one timeline chip', () => {
+  it('should render to-only custom date range as one timeline chip', async () => {
     const filters = createFilterState();
     filters.dateBefore = '2024-12-31';
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -737,19 +737,19 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Before Dec 31, 2024');
   });
 
-  it('should prefer custom date range chip over selected year and month', () => {
+  it('should prefer custom date range chip over selected year and month', async () => {
     const filters = createFilterState();
     filters.dateAfter = '2024-01-01';
     filters.dateBefore = '2024-12-31';
     filters.selectedYear = 2023;
     filters.selectedMonth = 8;
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -757,7 +757,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Jan 1, 2024 - Dec 31, 2024');
     expect(chips[0].textContent).not.toContain('Aug 2023');
@@ -772,7 +772,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.selectedYear = 2023;
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter,
@@ -780,7 +780,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(removedType).toBe('timeline');
   });
 
@@ -790,7 +790,7 @@ describe('ActiveFiltersBar', () => {
     filters.dateAfter = '2024-01-01';
     filters.dateBefore = '2024-12-31';
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter,
@@ -798,14 +798,14 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('chip-close'));
+    await screen.getByTestId('chip-close').click();
     expect(onRemoveFilter).toHaveBeenCalledWith('timeline', undefined);
   });
 
-  it('should not show Clear All when no filters active', () => {
+  it('should not show Clear All when no filters active', async () => {
     const filters = createFilterState();
 
-    const { queryByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -813,13 +813,13 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    expect(queryByTestId('clear-all-btn')).toBeNull();
+    expect(screen.getByTestId('clear-all-btn').query()).toBeNull();
   });
 
-  it('should show singular "result" for count of 1', () => {
+  it('should show singular "result" for count of 1', async () => {
     const filters = createFilterState();
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         resultCount: 1,
@@ -828,7 +828,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    const resultCount = getByTestId('result-count');
+    const resultCount = screen.getByTestId('result-count').element();
     expect(resultCount.textContent).toContain('1 result');
     expect(resultCount.textContent).not.toContain('results');
   });
@@ -839,7 +839,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.rating = 4;
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -849,7 +849,7 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('clear-all-btn'));
+    await screen.getByTestId('clear-all-btn').click();
     expect(onClearAll).toHaveBeenCalled();
     expect(onClearSearch).toHaveBeenCalled();
   });
@@ -860,7 +860,7 @@ describe('ActiveFiltersBar', () => {
     const filters = createFilterState();
     filters.rating = 4;
 
-    const { getByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -869,55 +869,55 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('clear-all-btn'));
+    await screen.getByTestId('clear-all-btn').click();
     expect(onClearAll).toHaveBeenCalled();
     expect(onClearSearch).not.toHaveBeenCalled();
   });
 
-  it('should render a description text chip with its value', () => {
+  it('should render a description text chip with its value', async () => {
     const filters = { ...createFilterState(), description: 'beach sunset' };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('beach sunset');
   });
 
-  it('should render a filename text chip with its value', () => {
+  it('should render a filename text chip with its value', async () => {
     const filters = { ...createFilterState(), originalFileName: 'IMG_1234' };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('IMG_1234');
   });
 
-  it('should render an OCR text chip with its value', () => {
+  it('should render an OCR text chip with its value', async () => {
     const filters = { ...createFilterState(), ocr: 'invoice total' };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
     });
 
-    const chips = getAllByTestId('active-chip');
+    const chips = screen.getByTestId('active-chip').elements();
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('invoice total');
   });
 
-  it('should not render text chips for empty / whitespace-only values', () => {
+  it('should not render text chips for empty / whitespace-only values', async () => {
     const filters = { ...createFilterState(), description: '  ', originalFileName: '', ocr: undefined };
 
-    const { queryAllByTestId } = render(ActiveFiltersBar, {
+    const screen = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
     });
 
-    expect(queryAllByTestId('active-chip')).toHaveLength(0);
+    expect(screen.getByTestId('active-chip').elements()).toHaveLength(0);
   });
 
   it('should dispatch the matching type when removing each text chip', async () => {
@@ -931,13 +931,13 @@ describe('ActiveFiltersBar', () => {
       const onRemoveFilter = vi.fn();
       const filters = { ...createFilterState(), [field]: value };
 
-      const { getByTestId } = render(ActiveFiltersBar, {
+      const screen = await render(ActiveFiltersBar, {
         props: { filters, onRemoveFilter, onClearAll: () => {} },
       });
 
-      await fireEvent.click(getByTestId('chip-close'));
+      await screen.getByTestId('chip-close').click();
       expect(onRemoveFilter).toHaveBeenCalledWith(type, undefined);
-      cleanup();
+      await screen.unmount();
     }
   });
 
@@ -956,16 +956,16 @@ describe('ActiveFiltersBar', () => {
       const onRemove = vi.fn();
       const onRemoveFilter = vi.fn();
 
-      const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+      const screen = await render(ActiveFiltersBar, {
         props: { filters, pinned: [pinnedChip(onRemove)], onRemoveFilter, onClearAll: () => {} },
       });
 
-      const chips = getAllByTestId(/^(pinned|active)-chip$/);
-      expect(chips.map((chip) => chip.dataset.testid)).toEqual(['pinned-chip', 'active-chip']);
-      expect(getByTestId('pinned-chip')).toHaveTextContent('Personal photos only');
-      expect(getByTestId('pinned-chip')).toHaveAttribute('title', 'Remembered between visits');
+      const chips = screen.getByTestId(/^(pinned|active)-chip$/).elements();
+      expect(chips.map((chip) => (chip as HTMLElement).dataset.testid)).toEqual(['pinned-chip', 'active-chip']);
+      await expect.element(screen.getByTestId('pinned-chip')).toHaveTextContent('Personal photos only');
+      await expect.element(screen.getByTestId('pinned-chip')).toHaveAttribute('title', 'Remembered between visits');
 
-      await fireEvent.click(getByTestId('pinned-chip-close'));
+      await screen.getByTestId('pinned-chip-close').click();
       expect(onRemove).toHaveBeenCalledOnce();
       expect(onRemoveFilter).not.toHaveBeenCalled();
     });
@@ -974,41 +974,40 @@ describe('ActiveFiltersBar', () => {
       const onRemove = vi.fn();
       const onClearAll = vi.fn();
 
-      const alone = render(ActiveFiltersBar, {
+      const alone = await render(ActiveFiltersBar, {
         props: { filters: createFilterState(), pinned: [pinnedChip(onRemove)], onRemoveFilter: () => {}, onClearAll },
       });
-      expect(alone.queryByTestId('clear-all-btn')).toBeNull();
-      cleanup();
+      expect(alone.getByTestId('clear-all-btn').query()).toBeNull();
+      await alone.unmount();
 
       const filters = createFilterState();
       filters.country = 'Germany';
-      const { getByTestId } = render(ActiveFiltersBar, {
+      const screen = await render(ActiveFiltersBar, {
         props: { filters, pinned: [pinnedChip(onRemove)], onRemoveFilter: () => {}, onClearAll },
       });
-      await fireEvent.click(getByTestId('clear-all-btn'));
+      await screen.getByTestId('clear-all-btn').click();
       expect(onClearAll).toHaveBeenCalledOnce();
       expect(onRemove).not.toHaveBeenCalled();
     });
   });
 
-  it('omits its own band and padding in embedded mode', () => {
+  it('omits its own band and padding in embedded mode', async () => {
     const filters = createFilterState();
     filters.country = 'Germany';
 
     // embedded: no self-drawn seam/padding (the host toolbar supplies them)
-    const embeddedResult = render(ActiveFiltersBar, {
+    const embeddedResult = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {}, embedded: true },
     });
-    expect(embeddedResult.getByTestId('active-filters-bar').className).not.toContain('border-b');
-    expect(embeddedResult.getByTestId('active-filters-bar').className).not.toContain('px-4');
-    cleanup();
+    expect(embeddedResult.getByTestId('active-filters-bar').element().className).not.toContain('border-b');
+    expect(embeddedResult.getByTestId('active-filters-bar').element().className).not.toContain('px-4');
+    await embeddedResult.unmount();
 
     // standalone (default): keeps the seam + padding
-    const standaloneResult = render(ActiveFiltersBar, {
+    const standaloneResult = await render(ActiveFiltersBar, {
       props: { filters, onRemoveFilter: () => {}, onClearAll: () => {}, embedded: false },
     });
-    expect(standaloneResult.getByTestId('active-filters-bar').className).toContain('border-b');
-    expect(standaloneResult.getByTestId('active-filters-bar').className).toContain('px-4');
-    cleanup();
+    expect(standaloneResult.getByTestId('active-filters-bar').element().className).toContain('border-b');
+    expect(standaloneResult.getByTestId('active-filters-bar').element().className).toContain('px-4');
   });
 });

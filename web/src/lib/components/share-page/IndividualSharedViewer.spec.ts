@@ -1,9 +1,10 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { factory } from '#test/unit/factories.ts';
 import { SharedLinkType, type SharedLinkResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import IndividualSharedViewer from './IndividualSharedViewer.svelte';
 
 const { mockAssetMultiSelectManager, mockAuthManager, mockGetAssetInfo } = vi.hoisted(() => ({
@@ -21,7 +22,8 @@ const { mockAssetMultiSelectManager, mockAuthManager, mockGetAssetInfo } = vi.ho
   mockGetAssetInfo: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   goto: vi.fn(),
 }));
 
@@ -72,18 +74,11 @@ vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
   mediaQueryManager: { maxMd: false },
 }));
 
-vi.mock('#lib/utils/asset-utils.js', () => ({
-  downloadArchive: vi.fn(),
-}));
+vi.mock('#lib/utils/asset-utils.js', { spy: true });
 
-vi.mock('#lib/utils/file-uploader.js', () => ({
-  fileUploadHandler: vi.fn(),
-  openFileUploadDialog: vi.fn(),
-}));
+vi.mock('#lib/utils/file-uploader.js', { spy: true });
 
-vi.mock('#lib/utils/timeline-util.js', () => ({
-  toTimelineAsset: vi.fn((asset) => asset),
-}));
+vi.mock('#lib/utils/timeline-util.js', { spy: true });
 
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
@@ -119,19 +114,19 @@ describe('IndividualSharedViewer GalleryViewer grouping', () => {
     mockGetAssetInfo.mockResolvedValue(factory.asset({ id: 'single-asset' }));
   });
 
-  it('enables GalleryViewer grouping for multi-asset shared views', () => {
-    renderViewer({
+  it('enables GalleryViewer grouping for multi-asset shared views', async () => {
+    await renderViewer({
       assets: [factory.asset({ id: 'shared-1' }), factory.asset({ id: 'shared-2' })],
       allowDownload: true,
     });
 
-    expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
+    await expect.element(page.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
   });
 
   it('keeps the existing single-asset shared-link viewer path out of GalleryViewer grouping', async () => {
-    renderViewer({ assets: [factory.asset({ id: 'single-asset' })], allowUpload: false });
+    await renderViewer({ assets: [factory.asset({ id: 'single-asset' })], allowUpload: false });
 
-    await waitFor(() => expect(mockGetAssetInfo).toHaveBeenCalledWith({ id: 'single-asset' }));
-    expect(screen.queryByTestId('gallery-viewer')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(mockGetAssetInfo).toHaveBeenCalledWith({ id: 'single-asset' }));
+    expect(page.getByTestId('gallery-viewer').query()).toBeNull();
   });
 });

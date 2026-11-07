@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import ScopedSearchButton from './scoped-search-button.svelte';
 
 beforeAll(async () => {
@@ -13,26 +12,26 @@ beforeAll(async () => {
 describe('ScopedSearchButton', () => {
   it('fires onclick so the host can open the search palette', async () => {
     const onclick = vi.fn();
-    render(ScopedSearchButton, { onclick });
+    const screen = await render(ScopedSearchButton, { onclick });
 
-    await fireEvent.click(screen.getByTestId('scoped-search-button'));
+    await screen.getByTestId('scoped-search-button').click();
 
     expect(onclick).toHaveBeenCalledOnce();
   });
 
-  it('is labelled and tooltipped, so the affordance is discoverable rather than a bare glyph', () => {
-    render(ScopedSearchButton, { onclick: vi.fn() });
+  it('is labelled and tooltipped, so the affordance is discoverable rather than a bare glyph', async () => {
+    const screen = await render(ScopedSearchButton, { onclick: vi.fn() });
 
     const button = screen.getByTestId('scoped-search-button');
-    expect(button).toHaveAttribute('aria-label', 'Search here');
-    expect(button).toHaveAttribute('title', 'Search here');
+    await expect.element(button).toHaveAttribute('aria-label', 'Search here');
+    await expect.element(button).toHaveAttribute('title', 'Search here');
   });
 
-  it('is a real button (keyboard reachable, never a submit)', () => {
-    render(ScopedSearchButton, { onclick: vi.fn() });
+  it('is a real button (keyboard reachable, never a submit)', async () => {
+    const screen = await render(ScopedSearchButton, { onclick: vi.fn() });
 
     const button = screen.getByTestId('scoped-search-button');
-    expect(button.tagName).toBe('BUTTON');
-    expect(button).toHaveAttribute('type', 'button');
+    expect(button.element().tagName).toBe('BUTTON');
+    await expect.element(button).toHaveAttribute('type', 'button');
   });
 });

@@ -1,10 +1,10 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import SuggestionAssetDetails from '#lib/gallery/asset-context/asset-context-details.svelte';
 import { factory } from '#test/unit/factories.ts';
 import type { AlbumResponseDto, AssetResponseDto, PersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
@@ -49,35 +49,35 @@ describe('suggestion-asset-details', () => {
   });
 
   it('loads the asset and shows place, file, camera and album membership', async () => {
-    render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
+    await render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
 
-    await screen.findByTestId('suggestion-context-location');
+    await expect.element(page.getByTestId('suggestion-context-location')).toBeInTheDocument();
     expect(getAssetMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('suggestion-context-location')).toHaveTextContent('Barcelona');
-    expect(screen.getByTestId('suggestion-context-file')).toHaveTextContent('IMG_2841.jpg');
-    expect(screen.getByTestId('suggestion-context-file')).toHaveTextContent('4032');
-    expect(screen.getByTestId('suggestion-context-camera')).toHaveTextContent('Canon');
-    expect(await screen.findByTestId('suggestion-context-albums')).toHaveTextContent('Spain 2015');
+    await expect.element(page.getByTestId('suggestion-context-location')).toMatchTextContent('Barcelona');
+    await expect.element(page.getByTestId('suggestion-context-file')).toMatchTextContent('IMG_2841.jpg');
+    await expect.element(page.getByTestId('suggestion-context-file')).toMatchTextContent('4032');
+    await expect.element(page.getByTestId('suggestion-context-camera')).toMatchTextContent('Canon');
+    await expect.element(page.getByTestId('suggestion-context-albums')).toMatchTextContent('Spain 2015');
   });
 
   it('names the people already recognised in the frame and counts the unnamed ones', async () => {
-    render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
+    await render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
 
-    const people = await screen.findByTestId('suggestion-context-people');
-    expect(people).toHaveTextContent('Alice');
-    expect(people).toHaveTextContent('Bob');
+    const people = page.getByTestId('suggestion-context-people');
+    await expect.element(people).toMatchTextContent('Alice');
+    await expect.element(people).toMatchTextContent('Bob');
     // An unrecognised face has no name to show — it must collapse into the counter rather than render an
     // empty chip.
-    expect(within(people).getAllByTestId('suggestion-context-person')).toHaveLength(2);
-    expect(people).toHaveTextContent('face_suggestion_unnamed_faces');
+    expect(people.getByTestId('suggestion-context-person').elements()).toHaveLength(2);
+    await expect.element(people).toMatchTextContent('face_suggestion_unnamed_faces');
   });
 
   it('scopes the lookup to the space when the review is running inside one', async () => {
-    render(SuggestionAssetDetails, {
+    await render(SuggestionAssetDetails, {
       props: { assetId: ASSET_ID, spaceId: SPACE_ID },
     });
 
-    await waitFor(() => expect(getAssetMock).toHaveBeenCalledWith({ id: ASSET_ID, spaceId: SPACE_ID }));
+    await vi.waitFor(() => expect(getAssetMock).toHaveBeenCalledWith({ id: ASSET_ID, spaceId: SPACE_ID }));
   });
 
   // Asset detail read through a space resolves each face to the space's person and says so with `spacePersonId`;
@@ -86,33 +86,34 @@ describe('suggestion-asset-details', () => {
     getAssetMock.mockResolvedValueOnce(
       loadedAsset({ people: [{ ...person('Alice'), spacePersonId: 'space-alice' } as PersonResponseDto] }),
     );
-    render(SuggestionAssetDetails, {
+    await render(SuggestionAssetDetails, {
       props: { assetId: ASSET_ID, spaceId: SPACE_ID },
     });
 
-    const avatar = within(await screen.findByTestId('suggestion-context-person')).getByRole('presentation');
-    expect(avatar.getAttribute('src')).toContain(`/shared-spaces/${SPACE_ID}/people/space-alice/thumbnail`);
+    const avatar = page.getByTestId('suggestion-context-person').getByRole('presentation');
+    await expect.element(avatar).toBeInTheDocument();
+    expect(avatar.element().getAttribute('src')).toContain(`/shared-spaces/${SPACE_ID}/people/space-alice/thumbnail`);
   });
 
   it('loads the next candidate’s asset when the review advances', async () => {
     const nextAssetId = 'cccccccc-0000-4000-8000-000000000003';
-    const { rerender } = render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
-    await waitFor(() => expect(getAssetMock).toHaveBeenCalledTimes(1));
+    const { rerender } = await render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
+    await vi.waitFor(() => expect(getAssetMock).toHaveBeenCalledTimes(1));
 
     await rerender({ assetId: nextAssetId });
 
-    await waitFor(() => expect(getAssetMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(getAssetMock).toHaveBeenCalledTimes(2));
     expect(getAssetMock).toHaveBeenLastCalledWith({ id: nextAssetId, spaceId: undefined });
   });
 
   it('stays empty, without throwing, when the metadata lookup fails', async () => {
     getAssetMock.mockRejectedValue(new Error('nope'));
-    render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
+    await render(SuggestionAssetDetails, { props: { assetId: ASSET_ID } });
 
-    await waitFor(() => expect(getAssetMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(getAssetMock).toHaveBeenCalled());
 
     // The summary row's date and link never needed this request; the panel just has nothing to show.
-    expect(screen.getByTestId('suggestion-context-details')).toBeInTheDocument();
-    expect(screen.queryByTestId('suggestion-context-location')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('suggestion-context-details')).toBeInTheDocument();
+    await expect.element(page.getByTestId('suggestion-context-location')).not.toBeInTheDocument();
   });
 });

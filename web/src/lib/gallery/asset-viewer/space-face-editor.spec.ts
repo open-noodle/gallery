@@ -3,9 +3,7 @@ import { getFaceEditorSpace } from '#lib/gallery/asset-viewer/space-face-editor.
 import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import type { SharedSpacePersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { page, userEvent } from 'vitest/browser';
 
 const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoisted(() => ({
   getSpacePeopleMock: vi.fn(),
@@ -38,11 +36,10 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-// Fabric.js draws to a real 2D canvas context, which happy-dom does not implement. The drag
-// GEOMETRY itself is covered directly and exhaustively by face-box-drag.spec.ts (the module
-// FaceEditor calls into) -- this stub only needs to let the component
-// mount and let getBoundingRect() return a stable box so the "which person did you pick" wiring
-// under test here can run without a real canvas.
+// The drag GEOMETRY itself is covered directly and exhaustively by face-box-drag.spec.ts (the
+// module FaceEditor calls into) -- this Fabric.js stub only needs to let the component mount
+// against the fake image below and let getBoundingRect() return a stable box, so the "which person
+// did you pick" wiring under test here does not depend on a real canvas's layout.
 vi.mock('fabric', () => {
   class FakeRect {
     left = 200;
@@ -101,6 +98,10 @@ const spacePerson = (overrides: Partial<SharedSpacePersonResponseDto> = {}): Sha
     ...overrides,
   }) as SharedSpacePersonResponseDto;
 
+// A candidate's accessible name is its thumbnail's title plus its label ("Bob Bob"), so pick the
+// row by its text rather than by an exact name.
+const bobButton = () => page.getByRole('button').filter({ hasText: 'Bob' });
+
 // Upstream's FaceEditor in its space mode: it closes itself through assetViewerManager.
 const renderEditor = (props: { onClose?: () => void } = {}) => {
   vi.spyOn(assetViewerManager, 'closeFaceEditMode').mockImplementation(props.onClose ?? vi.fn());
@@ -135,10 +136,10 @@ describe('FaceEditor with getFaceEditorSpace', () => {
   it('loads the space candidate list from getSpacePeople, not getAllPeople', async () => {
     getSpacePeopleMock.mockResolvedValue([spacePerson()]);
 
-    renderEditor();
+    await renderEditor();
 
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalledWith({ id: 'space-1', withHidden: false }));
-    expect(await screen.findByText('Bob')).toBeInTheDocument();
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalledWith({ id: 'space-1', withHidden: false }));
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
   });
 
   it('draws a box and attaches it to the selected space person', async () => {
@@ -146,12 +147,12 @@ describe('FaceEditor with getFaceEditorSpace', () => {
     createSpaceAssetFaceMock.mockResolvedValue({ id: 'new-face' });
     const onClose = vi.fn();
 
-    renderEditor({ onClose });
-    await screen.findByText('Bob');
+    await renderEditor({ onClose });
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Bob' }));
+    await userEvent.click(bobButton());
 
-    await waitFor(() => expect(createSpaceAssetFaceMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(createSpaceAssetFaceMock).toHaveBeenCalled());
     const call = createSpaceAssetFaceMock.mock.calls[0][0];
     expect(call.id).toBe('space-1');
     expect(call.assetId).toBe('asset-1');
@@ -165,26 +166,26 @@ describe('FaceEditor with getFaceEditorSpace', () => {
       spacePerson({ id: 'sp-2', name: 'Carol' }),
     ]);
 
-    renderEditor();
-    await screen.findByText('Bob');
-    expect(screen.getByText('Carol')).toBeInTheDocument();
+    await renderEditor();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByText('Carol')).toBeInTheDocument();
 
-    await userEvent.type(screen.getByPlaceholderText('search_people'), 'Car');
+    await userEvent.fill(page.getByPlaceholder('search_people'), 'Car');
 
-    expect(screen.queryByText('Bob')).toBeNull();
-    expect(screen.getByText('Carol')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Carol')).toBeInTheDocument();
   });
 
   it('opens the create-new-person modal instead of drawing an unassigned box', async () => {
     modalShowMock.mockResolvedValue(true);
     const onClose = vi.fn();
 
-    renderEditor({ onClose });
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await renderEditor({ onClose });
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+    await userEvent.click(page.getByRole('button', { name: 'create_person' }));
 
-    await waitFor(() => expect(modalShowMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(modalShowMock).toHaveBeenCalled());
     const [, modalProps] = modalShowMock.mock.calls[0] as [unknown, Record<string, unknown>];
     expect(modalProps.spaceId).toBe('space-1');
     expect(modalProps.assetId).toBe('asset-1');
@@ -207,11 +208,11 @@ describe('FaceEditor with getFaceEditorSpace', () => {
     createSpaceAssetFaceMock.mockResolvedValue({ id: 'new-face' });
     const onClose = vi.fn();
 
-    renderEditor({ onClose });
-    await screen.findByText('Bob');
-    await userEvent.click(screen.getByRole('button', { name: 'Bob' }));
+    await renderEditor({ onClose });
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    await userEvent.click(bobButton());
 
-    await waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
+    await vi.waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
     expect(refreshAssetPeopleMock.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0]);
   });
 
@@ -219,32 +220,32 @@ describe('FaceEditor with getFaceEditorSpace', () => {
     modalShowMock.mockResolvedValue(true);
     const onClose = vi.fn();
 
-    renderEditor({ onClose });
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+    await renderEditor({ onClose });
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await userEvent.click(page.getByRole('button', { name: 'create_person' }));
 
-    await waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
+    await vi.waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
     expect(refreshAssetPeopleMock.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0]);
   });
 
   it('does not refresh when the create-person modal is dismissed', async () => {
     modalShowMock.mockResolvedValue(false);
 
-    renderEditor();
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+    await renderEditor();
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await userEvent.click(page.getByRole('button', { name: 'create_person' }));
 
-    await waitFor(() => expect(modalShowMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(modalShowMock).toHaveBeenCalled());
     expect(refreshAssetPeopleMock).not.toHaveBeenCalled();
   });
 
   it('cancels without creating anything', async () => {
     const onClose = vi.fn();
 
-    renderEditor({ onClose });
-    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await renderEditor({ onClose });
+    await vi.waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole('button', { name: 'cancel' }));
+    await userEvent.click(page.getByRole('button', { name: 'cancel' }));
 
     expect(onClose).toHaveBeenCalled();
     expect(createSpaceAssetFaceMock).not.toHaveBeenCalled();

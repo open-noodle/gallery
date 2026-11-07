@@ -3,8 +3,8 @@ import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { factory } from '#test/unit/factories.ts';
 import { UserAvatarColor, getAllSpaces, getAssetSpaces } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
+import { render } from 'vitest-browser-svelte';
 import SpaceBadge from './SpaceBadge.svelte';
 import { spaceBadges } from './space-badges.svelte';
 
@@ -56,7 +56,7 @@ describe('space badge on a mounted thumbnail', () => {
 
   it('appears once the asset and the spaces list are known', async () => {
     answer({ a: ['family'] });
-    const { container } = render(SpaceBadge, { assetId: 'a' });
+    const { container } = await render(SpaceBadge, { assetId: 'a' });
     expect(badgeClass(container)).toBeNull();
 
     await settle();
@@ -67,7 +67,7 @@ describe('space badge on a mounted thumbnail', () => {
 
   it('follows a change to its asset without blinking', async () => {
     answer({ a: ['family'] });
-    const { container } = render(SpaceBadge, { assetId: 'a' });
+    const { container } = await render(SpaceBadge, { assetId: 'a' });
     await settle();
 
     answer({ a: ['family', 'trips'] });
@@ -81,7 +81,7 @@ describe('space badge on a mounted thumbnail', () => {
 
   it('asks again about every mounted thumbnail on another page', async () => {
     answer({});
-    const { container } = render(SpaceBadge, { assetId: 'a' });
+    const { container } = await render(SpaceBadge, { assetId: 'a' });
     await settle();
     expect(badgeClass(container)).toBeNull();
 
@@ -96,7 +96,7 @@ describe('space badge on a mounted thumbnail', () => {
 
   it("takes a space's new colour without a reload, keeping the old one until it is there", async () => {
     answer({ a: ['family'] });
-    const { container } = render(SpaceBadge, { assetId: 'a' });
+    const { container } = await render(SpaceBadge, { assetId: 'a' });
     await settle();
     expect(badgeClass(container)).toContain('text-green-400');
 

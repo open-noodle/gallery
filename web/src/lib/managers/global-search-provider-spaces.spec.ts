@@ -37,24 +37,14 @@ vi.mock('@immich/sdk', async () => ({
   getMlHealth: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({
+// Browser mode rejects an import of a name a mock does not export, so keep the global fake's other exports.
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   goto: vi.fn(),
 }));
 
-// The manager subscribes to svelte-i18n's locale on construction; stub it to a
-// deterministic value so the constructor does not attach to the real store.
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    locale: {
-      subscribe: (run: (v: string | null) => void) => {
-        run('en');
-        return () => {};
-      },
-    },
-  };
-});
+// The manager subscribes to svelte-i18n's locale on construction. It gets the real store: `vi.mock('svelte-i18n')`
+// has no effect in browser mode, where the unit setup has already loaded and initialised it.
 
 describe('runSpaces provider', () => {
   let sut: GlobalSearchManager;

@@ -8,9 +8,8 @@ import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetOrder, AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanel from '../DetailPanel.svelte';
 
 /**
@@ -67,15 +66,21 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   return { ...actual, getAllAlbums: getAllAlbumsMock, getAssetInfo: getAssetInfoMock };
 });
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock };
+  return { ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: reactivePageMock };
 });
 
 vi.mock('#lib/stores/face.svelte.js', () => ({ faceManager: faceManagerMock }));
-vi.mock('#lib/utils/people-utils.js', () => ({ zoomImageToBase64: zoomImageToBase64Mock }));
+vi.mock('#lib/utils/people-utils.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/people-utils.ts')>()),
+  zoomImageToBase64: zoomImageToBase64Mock,
+}));
 
 const authManagerMock = vi.hoisted(() => ({
   authenticated: true,
@@ -405,14 +410,15 @@ const SURFACES: Surface[] = [
 ];
 
 const filterUrlFromClick = async (label: string | RegExp) => {
-  await fireEvent.click(await screen.findByLabelText(label));
+  await page.getByLabelText(label, { exact: true }).click();
   expect(gotoMock).toHaveBeenCalledTimes(1);
   return gotoMock.mock.calls[0][0] as string;
 };
 
 const filterUrlFromLink = async (label: string | RegExp) => {
-  const link = await screen.findByLabelText(label);
-  const href = link.getAttribute('href');
+  const link = page.getByLabelText(label, { exact: true });
+  await expect.element(link).toBeInTheDocument();
+  const href = link.element().getAttribute('href');
   expect(href).toBeTruthy();
   return href as string;
 };
@@ -512,7 +518,7 @@ describe.each(SURFACES)(
 
       mockPage.reset(surface.url);
 
-      renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+      await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
       const url = await row.filterUrl();
 
@@ -547,12 +553,12 @@ describe('P1 — the album surface withholds the album filter rather than lying 
     const surface = SURFACES.find((s) => s.label === 'an album')!;
     mockPage.reset(surface.url);
 
-    renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+    await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
     // The album cards still render — they navigate. Only the filter affordance is withheld.
-    await waitFor(() => expect(screen.getByText('Iceland')).toBeInTheDocument());
-    expect(screen.queryByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(`filter_by_album: ${CURRENT_ALBUM.albumName}`)).not.toBeInTheDocument();
+    await expect.element(page.getByText('Iceland')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(`filter_by_album: ${CURRENT_ALBUM.albumName}`)).not.toBeInTheDocument();
   });
 });
 
@@ -562,7 +568,7 @@ describe('P1 under merge semantics (§5.6, E25)', () => {
   it('preserves an unrelated active filter the asset also satisfies', async () => {
     mockPage.reset(`${spaceSurface.url}?make=Canon`);
 
-    renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+    await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
     const url = await filterUrlFromClick(`filter_by_location: ${CITY}`);
     const options = optionsFor(spaceSurface, url);
@@ -581,7 +587,7 @@ describe('P1 under merge semantics (§5.6, E25)', () => {
   it('E25: a person click REPLACES an active person filter (appending would AND in a stranger)', async () => {
     mockPage.reset(`${spaceSurface.url}?people=${OTHER_SPACE_PERSON_ID}`);
 
-    renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+    await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
     const url = await filterUrlFromLink(`filter_by_person: ${PERSON_NAME}`);
     const options = optionsFor(spaceSurface, url);
@@ -602,7 +608,7 @@ describe('P1 under merge semantics (§5.6, E25)', () => {
   it('E25: a tag click REPLACES an active tag filter rather than appending to it', async () => {
     mockPage.reset(`${spaceSurface.url}?tags=${OTHER_TAG_ID}`);
 
-    renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+    await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
     const url = await filterUrlFromLink('filter_by_tag: holiday/2026');
     const options = optionsFor(spaceSurface, url);
@@ -644,7 +650,7 @@ describe('P1 — an own person on an own asset', () => {
   it.each(ownedSurfaces)('carries the scoped person token on $label', async (surface) => {
     mockPage.reset(surface.url);
 
-    renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
+    await renderWithTooltips(DetailPanel, { asset: subject.asset, currentAlbum: CURRENT_ALBUM });
 
     const url = await filterUrlFromLink(`filter_by_person: ${PERSON_NAME}`);
     const options = optionsFor(surface, url);

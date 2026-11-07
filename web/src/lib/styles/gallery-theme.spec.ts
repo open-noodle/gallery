@@ -1,10 +1,12 @@
 import { contrastRatio } from '#lib/styles/contrast.ts';
 import { readThemeTokens } from '#lib/styles/theme-tokens.ts';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { commands } from 'vitest/browser';
+
+// Relative to web/; a `?raw` import comes back empty because CSS is stubbed in unit tests.
+const css = await commands.readFile('src/styles/gallery-theme.css');
 
 describe('gallery-theme.css', () => {
-  const t = readThemeTokens();
+  const t = readThemeTokens(css);
 
   it('defines a light and a dark token block', () => {
     expect(Object.keys(t.light).length).toBeGreaterThan(0);
@@ -13,7 +15,7 @@ describe('gallery-theme.css', () => {
 });
 
 describe('L1 accent', () => {
-  const t = readThemeTokens();
+  const t = readThemeTokens(css);
   const PRIMARY = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((s) => `--immich-ui-primary-${s}`);
 
   it('defines the full primary ramp in both modes', () => {
@@ -40,7 +42,7 @@ describe('L1 accent', () => {
 });
 
 describe('L2 neutrals', () => {
-  const t = readThemeTokens();
+  const t = readThemeTokens(css);
   it('defines neutral anchors in both modes', () => {
     for (const name of ['--immich-ui-light', '--immich-ui-dark', '--immich-ui-muted', '--immich-ui-default-border']) {
       expect(t.light[name], `light ${name}`).toBeDefined();
@@ -62,8 +64,6 @@ describe('L2 neutrals', () => {
 });
 
 describe('L3 typography', () => {
-  const css = readFileSync(resolve(process.cwd(), 'src/styles/gallery-theme.css'), 'utf8');
-
   it('imports the self-hosted variable fonts', () => {
     expect(css).toMatch(/@import\s+['"]@fontsource-variable\/dm-sans['"]/);
     expect(css).toMatch(/@import\s+['"]@fontsource-variable\/bricolage-grotesque['"]/);
@@ -84,7 +84,6 @@ describe('L3 typography', () => {
 });
 
 describe('content panel chrome gutter', () => {
-  const css = readFileSync(resolve(process.cwd(), 'src/styles/gallery-theme.css'), 'utf8');
   const panelRule = (prefix: string) =>
     css.match(new RegExp(String.raw`${prefix}main:has\(> div\.absolute\.overflow-y-auto\)\s*\{[\s\S]*?\n\}`));
 

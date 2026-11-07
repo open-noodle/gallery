@@ -4,9 +4,8 @@ import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { type AssetResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanelDate from '../DetailPanelDate.svelte';
 
 // Task 4 of Slice 7 (asset-viewer-contextual-filters) — E14.
@@ -15,11 +14,14 @@ const { gotoMock } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock };
+  return { ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: reactivePageMock };
 });
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -61,12 +63,12 @@ beforeEach(() => {
 
 describe('DetailPanelDate filter (E14)', () => {
   it('filters by the date the row ACTUALLY DISPLAYS, not by a UTC re-bucketing of it', async () => {
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
 
     // What the row shows.
-    await waitFor(() => expect(screen.getByText(/Jan 1, 2026/)).toBeInTheDocument());
+    await expect.element(page.getByText(/Jan 1, 2026/)).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByLabelText(/^filter_by_date/));
+    await page.getByLabelText(/^filter_by_date/).click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { dateAfter: '2026-01-01', dateBefore: '2026-01-01' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -80,9 +82,9 @@ describe('DetailPanelDate filter (E14)', () => {
   it('falls back to localDateTime when there is no EXIF timestamp', async () => {
     const asset = buildAsset({ exifInfo: {}, localDateTime: '2026-04-16T17:37:26.000Z' });
 
-    renderWithTooltips(DetailPanelDate, { asset, isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, { asset, isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText(/^filter_by_date/));
+    await page.getByLabelText(/^filter_by_date/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     const params = new URLSearchParams(url.split('?', 2)[1]);
@@ -93,9 +95,9 @@ describe('DetailPanelDate filter (E14)', () => {
   it('filters the current surface and closes the viewer', async () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
 
-    await fireEvent.click(await screen.findByLabelText(/^filter_by_date/));
+    await page.getByLabelText(/^filter_by_date/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     expect(url.startsWith('/spaces/space-1')).toBe(true);
@@ -103,10 +105,14 @@ describe('DetailPanelDate filter (E14)', () => {
   });
 
   it('E2: a shared link renders no filter affordance', async () => {
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: false, canFilter: false });
+    await renderWithTooltips(DetailPanelDate, {
+      asset: buildAsset(AUCKLAND_NEW_YEAR),
+      isOwner: false,
+      canFilter: false,
+    });
 
-    await waitFor(() => expect(screen.getByText(/Jan 1, 2026/)).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_date/)).not.toBeInTheDocument();
+    await expect.element(page.getByText(/Jan 1, 2026/)).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_date/)).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
   });
 });
@@ -115,27 +121,31 @@ describe('DetailPanelDate edit (R3/R10)', () => {
   // R10 — the Playwright detail-panel spec CLICKS `detail-panel-edit-date-button` to open the date
   // modal. Dismantling the outer <button> moves that testid onto the owner-gated pencil.
   it('the ✏️ carries data-testid="detail-panel-edit-date-button" and opens the change-date modal', async () => {
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
 
-    const pencil = await screen.findByTestId('detail-panel-edit-date-button');
-    await fireEvent.click(pencil);
+    await page.getByTestId('detail-panel-edit-date-button').click();
 
     expect(modalManager.show).toHaveBeenCalled();
   });
 
   it('the row itself is no longer a <button>', async () => {
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: true, canFilter: true });
 
-    const pencil = await screen.findByTestId('detail-panel-edit-date-button');
+    const pencil = page.getByTestId('detail-panel-edit-date-button');
+    await expect.element(pencil).toBeInTheDocument();
     // The testid now identifies the pencil control itself, not a row wrapping the whole date.
-    expect(pencil.textContent).not.toContain('Jan 1, 2026');
+    expect(pencil.element().textContent).not.toContain('Jan 1, 2026');
   });
 
   it('a non-owner gets no ✏️, but can still filter', async () => {
-    renderWithTooltips(DetailPanelDate, { asset: buildAsset(AUCKLAND_NEW_YEAR), isOwner: false, canFilter: true });
+    await renderWithTooltips(DetailPanelDate, {
+      asset: buildAsset(AUCKLAND_NEW_YEAR),
+      isOwner: false,
+      canFilter: true,
+    });
 
-    await waitFor(() => expect(screen.getByLabelText(/^filter_by_date/)).toBeInTheDocument());
-    expect(screen.queryByTestId('detail-panel-edit-date-button')).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_date/)).toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-edit-date-button')).not.toBeInTheDocument();
     expect(modalManager.show).not.toHaveBeenCalled();
   });
 });

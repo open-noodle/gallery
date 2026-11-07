@@ -1,11 +1,9 @@
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import SidebarSettings from './sidebar-settings.svelte';
 
 const mocks = vi.hoisted(() => ({ sidebarMedia: { isFullSidebar: true, isWideSidebar: true } }));
@@ -29,41 +27,39 @@ describe('sidebar-settings', () => {
   beforeEach(() => {
     localStorage.clear();
     sidebarModeStore.mode = 'auto';
-    // Combobox positions its dropdown off these two browser APIs, which happy-dom doesn't
-    // implement; stub them the same way the other Combobox-rendering specs do.
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    vi.stubGlobal('visualViewport', getVisualViewportMock());
   });
 
   it('offers all three modes in the combobox', async () => {
-    const user = userEvent.setup();
-    renderSidebarSettings();
+    await renderSidebarSettings();
 
-    await user.click(screen.getByRole('combobox', { name: 'sidebar_mode' }));
+    await userEvent.click(page.getByRole('combobox', { name: 'sidebar_mode' }));
 
-    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    await expect.element(page.getByRole('option').first()).toBeInTheDocument();
+    const options = page
+      .getByRole('option')
+      .elements()
+      .map((option) => option.textContent);
     expect(options).toEqual(['sidebar_mode_auto', 'sidebar_mode_expanded', 'sidebar_mode_rail']);
   });
 
-  it('shows the current mode as the selected option', () => {
+  it('shows the current mode as the selected option', async () => {
     sidebarModeStore.mode = 'expanded';
 
-    renderSidebarSettings();
+    await renderSidebarSettings();
 
-    expect(screen.getByRole('combobox', { name: 'sidebar_mode' })).toHaveValue('sidebar_mode_expanded');
+    await expect.element(page.getByRole('combobox', { name: 'sidebar_mode' })).toHaveValue('sidebar_mode_expanded');
   });
 
   // The store setter itself is already covered by sidebar-mode.spec.ts ("writes the mode
   // through to the persisted store"); this drives the actual rendered control so it can only
   // pass if SidebarSettings wires selection through to the store.
   it('writes the selected mode and re-resolves the layout', async () => {
-    const user = userEvent.setup();
-    renderSidebarSettings();
+    await renderSidebarSettings();
 
-    await user.click(screen.getByRole('combobox', { name: 'sidebar_mode' }));
-    await user.click(screen.getByRole('option', { name: 'sidebar_mode_rail' }));
+    await userEvent.click(page.getByRole('combobox', { name: 'sidebar_mode' }));
+    await userEvent.click(page.getByRole('option', { name: 'sidebar_mode_rail' }));
 
-    expect(sidebarModeStore.mode).toBe('rail');
+    await expect.poll(() => sidebarModeStore.mode).toBe('rail');
     // isWideSidebar is true, so only an explicit rail choice produces a rail here.
     expect(sidebarModeStore.layout).toBe('rail');
   });

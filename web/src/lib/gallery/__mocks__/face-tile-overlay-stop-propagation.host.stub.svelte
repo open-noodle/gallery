@@ -4,7 +4,7 @@
   // Test-only host for FaceTileOverlay.spec.ts's stopPropagation probe.
   //
   // A raw `container.addEventListener('click', ...)` is NOT a faithful stand-in for "an ancestor tile button"
-  // here: @testing-library/svelte mounts the component with `target = container`, and Svelte 5 registers its
+  // here: vitest-browser-svelte's `render` mounts the component with `target = container`, and Svelte 5 registers its
   // OWN click-delegation listener on that very same `target` node (svelte/internal/client/render.js — "Add the
   // event listener to both the container and the document"). A listener added to `container` after render()
   // therefore sits on the SAME node as Svelte's delegation listener, and per native DOM semantics

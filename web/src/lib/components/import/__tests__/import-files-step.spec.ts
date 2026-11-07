@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import ImportFilesStep from '../import-files-step.svelte';
 
 function makeFile(name: string, size: number): File {
@@ -21,51 +21,43 @@ describe('ImportFilesStep', () => {
     vi.resetAllMocks();
   });
 
-  it('shows drop zone when no files selected', () => {
-    const { getByTestId } = render(ImportFilesStep, { props: defaultProps });
-    expect(getByTestId('drop-zone')).toBeInTheDocument();
+  it('shows drop zone when no files selected', async () => {
+    const { getByTestId } = await render(ImportFilesStep, defaultProps);
+    await expect.element(getByTestId('drop-zone')).toBeInTheDocument();
   });
 
-  it('shows file list when files selected', () => {
+  it('shows file list when files selected', async () => {
     const files = [makeFile('takeout-1.zip', 1024), makeFile('takeout-2.zip', 2048)];
-    const { getByText } = render(ImportFilesStep, {
-      props: { ...defaultProps, files, totalSize: 3072 },
-    });
+    const { getByText } = await render(ImportFilesStep, { ...defaultProps, files, totalSize: 3072 });
 
-    expect(getByText('takeout-1.zip')).toBeInTheDocument();
-    expect(getByText('takeout-2.zip')).toBeInTheDocument();
+    await expect.element(getByText('takeout-1.zip')).toBeInTheDocument();
+    await expect.element(getByText('takeout-2.zip')).toBeInTheDocument();
   });
 
-  it('disables Next when no files selected', () => {
-    const { getByTestId } = render(ImportFilesStep, { props: defaultProps });
-    expect(getByTestId('next-button')).toBeDisabled();
+  it('disables Next when no files selected', async () => {
+    const { getByTestId } = await render(ImportFilesStep, defaultProps);
+    await expect.element(getByTestId('next-button')).toBeDisabled();
   });
 
-  it('enables Next when files selected', () => {
+  it('enables Next when files selected', async () => {
     const files = [makeFile('takeout.zip', 1024)];
-    const { getByTestId } = render(ImportFilesStep, {
-      props: { ...defaultProps, files, totalSize: 1024 },
-    });
+    const { getByTestId } = await render(ImportFilesStep, { ...defaultProps, files, totalSize: 1024 });
 
-    expect(getByTestId('next-button')).not.toBeDisabled();
+    await expect.element(getByTestId('next-button')).toBeEnabled();
   });
 
   it('calls onBack when Back clicked', async () => {
-    const user = userEvent.setup();
-    const { getByText } = render(ImportFilesStep, { props: defaultProps });
+    const { getByText } = await render(ImportFilesStep, defaultProps);
 
-    await user.click(getByText('back'));
+    await userEvent.click(getByText('back'));
     expect(defaultProps.onBack).toHaveBeenCalledOnce();
   });
 
   it('calls onClearFiles when Clear clicked', async () => {
-    const user = userEvent.setup();
     const files = [makeFile('takeout.zip', 1024)];
-    const { getByText } = render(ImportFilesStep, {
-      props: { ...defaultProps, files, totalSize: 1024 },
-    });
+    const { getByText } = await render(ImportFilesStep, { ...defaultProps, files, totalSize: 1024 });
 
-    await user.click(getByText('import_clear'));
+    await userEvent.click(getByText('import_clear'));
     expect(defaultProps.onClearFiles).toHaveBeenCalledOnce();
   });
 });

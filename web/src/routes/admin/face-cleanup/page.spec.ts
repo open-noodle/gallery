@@ -1,7 +1,7 @@
 import { Route } from '#lib/route.ts';
-import '@testing-library/jest-dom';
-import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // The chooser at /admin/face-cleanup: two equal-weight cards (guided scan vs. manual review), covering
@@ -15,22 +15,8 @@ vi.mock('@immich/ui', async (original) => {
   const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
-    // Stub Icon to a no-op to avoid undefined-path errors in happy-dom (matches the sibling face-cleanup specs).
+    // Stub Icon to a no-op (matches the sibling face-cleanup specs).
     Icon: noop.default,
-  };
-});
-
-// Mock svelte-i18n: return the key as the translation (matches the sibling face-cleanup specs).
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    t: {
-      subscribe: (run: (fn: (key: string, opts?: unknown) => string) => void) => {
-        run((key: string) => key);
-        return () => {};
-      },
-    },
   };
 });
 
@@ -120,15 +106,15 @@ describe('+page.svelte (face cleanup chooser)', () => {
       ['completed', makeScan()],
     ] as const;
 
-    it.each(SCAN_STATES)('explains what the page is for — %s', (_label, scan) => {
-      render(Page, { props: { data: makePageData({ scan }) } });
+    it.each(SCAN_STATES)('explains what the page is for — %s', async (_label, scan) => {
+      await render(Page, { props: { data: makePageData({ scan }) } });
 
-      expect(screen.getByText('admin.face_cleanup_intro_lead')).toBeInTheDocument();
+      expect(page.getByText('admin.face_cleanup_intro_lead', { exact: true }).element()).toBeInTheDocument();
     });
 
     // L4
-    it('covers the scan, the per-face actions, and the scan-free manual route', () => {
-      render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
+    it('covers the scan, the per-face actions, and the scan-free manual route', async () => {
+      await render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
 
       for (const key of [
         'admin.face_cleanup_intro_scan_title',
@@ -138,50 +124,52 @@ describe('+page.svelte (face cleanup chooser)', () => {
         'admin.face_cleanup_intro_manual_title',
         'admin.face_cleanup_intro_manual_body',
       ]) {
-        expect(screen.getByText(key)).toBeInTheDocument();
+        expect(page.getByText(key, { exact: true }).element()).toBeInTheDocument();
       }
     });
 
     // L5 — read before the choice it informs.
-    it('is read before the two cards', () => {
-      render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
+    it('is read before the two cards', async () => {
+      await render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
 
-      const intro = screen.getByTestId('face-cleanup-intro');
-      const guided = screen.getByTestId('chooser-card-guided');
+      const intro = page.getByTestId('face-cleanup-intro').element();
+      const guided = page.getByTestId('chooser-card-guided').element();
 
       expect(intro.compareDocumentPosition(guided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // L7 — the replaced string is gone, not merely hidden.
-    it.each(SCAN_STATES)('no longer renders the retired first-visit copy — %s', (_label, scan) => {
-      render(Page, { props: { data: makePageData({ scan }) } });
+    it.each(SCAN_STATES)('no longer renders the retired first-visit copy — %s', async (_label, scan) => {
+      await render(Page, { props: { data: makePageData({ scan }) } });
 
-      expect(screen.queryByText('admin.face_cleanup_mode_first_visit_intro')).not.toBeInTheDocument();
+      expect(
+        page.getByText('admin.face_cleanup_mode_first_visit_intro', { exact: true }).query(),
+      ).not.toBeInTheDocument();
     });
   });
 
   // ---- 1. first visit (no scan has ever run) ----
   describe('first visit (scan = null)', () => {
-    it('guided card shows "needs a scan first" and a Run first scan action to the scan dashboard', () => {
-      render(Page, { props: { data: makePageData({ scan: null }) } });
+    it('guided card shows "needs a scan first" and a Run first scan action to the scan dashboard', async () => {
+      await render(Page, { props: { data: makePageData({ scan: null }) } });
 
-      const guided = screen.getByTestId('chooser-card-guided');
-      expect(guided).toHaveTextContent('admin.face_cleanup_mode_needs_scan');
+      const guided = page.getByTestId('chooser-card-guided').element();
+      expect(guided).toMatchTextContent('admin.face_cleanup_mode_needs_scan');
 
-      const cta = screen.getByTestId('chooser-guided-cta');
-      expect(cta).toHaveTextContent('admin.face_cleanup_mode_run_first_scan');
+      const cta = page.getByTestId('chooser-guided-cta').element();
+      expect(cta).toMatchTextContent('admin.face_cleanup_mode_run_first_scan');
       expect(cta).toHaveAttribute('href', Route.faceCleanupScan());
     });
 
-    it('manual card shows "no scan needed", is enabled, and links to the people browser', () => {
-      render(Page, { props: { data: makePageData({ scan: null }) } });
+    it('manual card shows "no scan needed", is enabled, and links to the people browser', async () => {
+      await render(Page, { props: { data: makePageData({ scan: null }) } });
 
-      const manual = screen.getByTestId('chooser-card-manual');
-      expect(manual).toHaveTextContent('admin.face_cleanup_mode_manual_no_scan_needed');
+      const manual = page.getByTestId('chooser-card-manual').element();
+      expect(manual).toMatchTextContent('admin.face_cleanup_mode_manual_no_scan_needed');
       expect(manual).not.toHaveAttribute('aria-disabled', 'true');
 
-      const cta = screen.getByTestId('chooser-manual-cta');
-      expect(cta).toHaveTextContent('admin.face_cleanup_mode_browse_people');
+      const cta = page.getByTestId('chooser-manual-cta').element();
+      expect(cta).toMatchTextContent('admin.face_cleanup_mode_browse_people');
       expect(cta).toHaveAttribute('href', Route.faceCleanupPeople());
       expect(cta).not.toHaveAttribute('aria-disabled', 'true');
       expect(cta).not.toBeDisabled();
@@ -190,8 +178,8 @@ describe('+page.svelte (face cleanup chooser)', () => {
 
   // ---- 2. returning, completed, flagged > 0 ----
   describe('returning, completed, flagged > 0', () => {
-    it('guided card shows the flagged and affected-people counts, with a Continue action', () => {
-      render(Page, {
+    it('guided card shows the flagged and affected-people counts, with a Continue action', async () => {
+      await render(Page, {
         props: {
           data: makePageData({
             scan: makeScan({ totals: makeTotals({ flaggedFaces: 42, affectedPersons: 7 }) }),
@@ -199,24 +187,24 @@ describe('+page.svelte (face cleanup chooser)', () => {
         },
       });
 
-      const guided = screen.getByTestId('chooser-card-guided');
-      expect(guided).toHaveTextContent('42');
-      expect(guided).toHaveTextContent('admin.face_cleanup_stat_flagged_sub');
+      const guided = page.getByTestId('chooser-card-guided').element();
+      expect(guided).toMatchTextContent('42');
+      expect(guided).toMatchTextContent('admin.face_cleanup_stat_flagged_sub');
 
-      const cta = screen.getByTestId('chooser-guided-cta');
-      expect(cta).toHaveTextContent('admin.face_cleanup_mode_continue');
+      const cta = page.getByTestId('chooser-guided-cta').element();
+      expect(cta).toMatchTextContent('admin.face_cleanup_mode_continue');
       expect(cta).toHaveAttribute('href', Route.faceCleanupScan());
     });
 
-    it('manual card shows the user count', () => {
-      render(Page, {
+    it('manual card shows the user count', async () => {
+      await render(Page, {
         props: {
           data: makePageData({ scan: makeScan(), users: [makeUser('u1'), makeUser('u2'), makeUser('u3')] }),
         },
       });
 
-      const manual = screen.getByTestId('chooser-card-manual');
-      expect(manual).toHaveTextContent('admin.face_cleanup_mode_manual_user_count');
+      const manual = page.getByTestId('chooser-card-manual').element();
+      expect(manual).toMatchTextContent('admin.face_cleanup_mode_manual_user_count');
     });
   });
 
@@ -225,47 +213,47 @@ describe('+page.svelte (face cleanup chooser)', () => {
     const runningScan = () =>
       makeScan({ status: 'running', progress: { scanned: 400, total: 1000 }, totals: null, finishedAt: null });
 
-    it('guided card shows progress and a View progress action', () => {
-      render(Page, { props: { data: makePageData({ scan: runningScan() }) } });
+    it('guided card shows progress and a View progress action', async () => {
+      await render(Page, { props: { data: makePageData({ scan: runningScan() }) } });
 
-      const guided = screen.getByTestId('chooser-card-guided');
-      expect(guided).toHaveTextContent('admin.face_cleanup_scan_running');
-      expect(guided).toHaveTextContent('400');
+      const guided = page.getByTestId('chooser-card-guided').element();
+      expect(guided).toMatchTextContent('admin.face_cleanup_scan_running');
+      expect(guided).toMatchTextContent('400');
 
-      const cta = screen.getByTestId('chooser-guided-cta');
-      expect(cta).toHaveTextContent('admin.face_cleanup_mode_view_progress');
+      const cta = page.getByTestId('chooser-guided-cta').element();
+      expect(cta).toMatchTextContent('admin.face_cleanup_mode_view_progress');
       expect(cta).toHaveAttribute('href', Route.faceCleanupScan());
     });
 
-    it('manual card is disabled — not a working link — and explains the scan conflict', () => {
-      render(Page, { props: { data: makePageData({ scan: runningScan() }) } });
+    it('manual card is disabled — not a working link — and explains the scan conflict', async () => {
+      await render(Page, { props: { data: makePageData({ scan: runningScan() }) } });
 
-      const manual = screen.getByTestId('chooser-card-manual');
-      expect(manual).toHaveTextContent('admin.face_cleanup_mode_manual_blocked_scanning');
+      const manual = page.getByTestId('chooser-card-manual').element();
+      expect(manual).toMatchTextContent('admin.face_cleanup_mode_manual_blocked_scanning');
       expect(manual).toHaveAttribute('aria-disabled', 'true');
 
-      const cta = screen.getByTestId('chooser-manual-cta');
+      const cta = page.getByTestId('chooser-manual-cta').element();
       expect(cta).not.toHaveAttribute('href');
       expect(cta).toHaveAttribute('aria-disabled', 'true');
       expect(cta).toBeDisabled();
     });
 
-    it('pending status is also treated as running for the manual-card block', () => {
-      render(Page, {
+    it('pending status is also treated as running for the manual-card block', async () => {
+      await render(Page, {
         props: {
           data: makePageData({ scan: makeScan({ status: 'pending', progress: null, totals: null, finishedAt: null }) }),
         },
       });
 
-      const cta = screen.getByTestId('chooser-manual-cta');
+      const cta = page.getByTestId('chooser-manual-cta').element();
       expect(cta).not.toHaveAttribute('href');
       expect(cta).toBeDisabled();
     });
   });
 
   // ---- 4. completed, 0 flagged ----
-  it('completed + 0 flagged: guided card shows the green "nothing flagged" state and a Re-scan action', () => {
-    render(Page, {
+  it('completed + 0 flagged: guided card shows the green "nothing flagged" state and a Re-scan action', async () => {
+    await render(Page, {
       props: {
         data: makePageData({
           scan: makeScan({ totals: makeTotals({ flaggedFaces: 0, affectedPersons: 0 }) }),
@@ -273,20 +261,20 @@ describe('+page.svelte (face cleanup chooser)', () => {
       },
     });
 
-    const guided = screen.getByTestId('chooser-card-guided');
-    expect(guided).toHaveTextContent('admin.face_cleanup_mode_nothing_flagged');
+    const guided = page.getByTestId('chooser-card-guided').element();
+    expect(guided).toMatchTextContent('admin.face_cleanup_mode_nothing_flagged');
 
-    const cta = screen.getByTestId('chooser-guided-cta');
-    expect(cta).toHaveTextContent('admin.face_cleanup_rescan');
+    const cta = page.getByTestId('chooser-guided-cta').element();
+    expect(cta).toMatchTextContent('admin.face_cleanup_rescan');
     expect(cta).toHaveAttribute('href', Route.faceCleanupScan());
 
     // Not blocked: only a RUNNING scan disables manual review.
-    expect(screen.getByTestId('chooser-manual-cta')).toHaveAttribute('href', Route.faceCleanupPeople());
+    expect(page.getByTestId('chooser-manual-cta').element()).toHaveAttribute('href', Route.faceCleanupPeople());
   });
 
   // ---- 5. failed ----
-  it('failed scan: guided card shows the red error line and a View details action', () => {
-    render(Page, {
+  it('failed scan: guided card shows the red error line and a View details action', async () => {
+    await render(Page, {
       props: {
         data: makePageData({
           scan: makeScan({ status: 'failed', totals: null, progress: null, error: 'boom' }),
@@ -294,49 +282,49 @@ describe('+page.svelte (face cleanup chooser)', () => {
       },
     });
 
-    const guided = screen.getByTestId('chooser-card-guided');
-    expect(guided).toHaveTextContent('admin.face_cleanup_scan_failed');
+    const guided = page.getByTestId('chooser-card-guided').element();
+    expect(guided).toMatchTextContent('admin.face_cleanup_scan_failed');
 
-    const cta = screen.getByTestId('chooser-guided-cta');
-    expect(cta).toHaveTextContent('admin.face_cleanup_mode_view_details');
+    const cta = page.getByTestId('chooser-guided-cta').element();
+    expect(cta).toMatchTextContent('admin.face_cleanup_mode_view_details');
     expect(cta).toHaveAttribute('href', Route.faceCleanupScan());
 
     // A failed scan is not a RUNNING scan: manual review must stay reachable.
-    expect(screen.getByTestId('chooser-manual-cta')).toHaveAttribute('href', Route.faceCleanupPeople());
+    expect(page.getByTestId('chooser-manual-cta').element()).toHaveAttribute('href', Route.faceCleanupPeople());
   });
 
   // ---- 6. equal weight, no recommendation ----
-  it('renders both cards as equal-weight columns in one grid, with no "recommended" marker on either', () => {
-    render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
+  it('renders both cards as equal-weight columns in one grid, with no "recommended" marker on either', async () => {
+    await render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
 
-    const guided = screen.getByTestId('chooser-card-guided');
-    const manual = screen.getByTestId('chooser-card-manual');
+    const guided = page.getByTestId('chooser-card-guided').element();
+    const manual = page.getByTestId('chooser-card-manual').element();
 
     expect(guided.parentElement).not.toBeNull();
     expect(guided.parentElement).toBe(manual.parentElement);
     expect(guided.parentElement).toHaveClass('lg:grid-cols-2');
 
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(/recommended/i)).not.toBeInTheDocument();
+    expect(page.getByText(/recommended/i).query()).not.toBeInTheDocument();
+    expect(page.getByTestId(/recommended/i).query()).not.toBeInTheDocument();
   });
 
   // ---- 7. destinations ----
-  it('guided card always links to the scan dashboard and manual card to the people browser', () => {
-    render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
+  it('guided card always links to the scan dashboard and manual card to the people browser', async () => {
+    await render(Page, { props: { data: makePageData({ scan: makeScan() }) } });
 
-    expect(screen.getByTestId('chooser-guided-cta')).toHaveAttribute('href', Route.faceCleanupScan());
-    expect(screen.getByTestId('chooser-manual-cta')).toHaveAttribute('href', Route.faceCleanupPeople());
+    expect(page.getByTestId('chooser-guided-cta').element()).toHaveAttribute('href', Route.faceCleanupScan());
+    expect(page.getByTestId('chooser-manual-cta').element()).toHaveAttribute('href', Route.faceCleanupPeople());
   });
 
   // ---- 8. breadcrumbs ----
-  it('renders a single breadcrumb that does not link to itself', () => {
-    render(Page, { props: { data: makePageData() } });
+  it('renders a single breadcrumb that does not link to itself', async () => {
+    await render(Page, { props: { data: makePageData() } });
 
-    const trail = within(screen.getByTestId('breadcrumbs'));
+    const trail = page.getByTestId('breadcrumbs');
 
-    // Present, and NOT a link. Written this way rather than as `queryByRole('link')` returning null, which
+    // Present, and NOT a link. Written this way rather than as `getByRole('link')` matching nothing, which
     // would also pass if the crumb had vanished entirely — the failure this is meant to catch.
-    expect(trail.getByText('admin.face_cleanup')).toBeInTheDocument();
-    expect(trail.queryAllByRole('link')).toHaveLength(0);
+    expect(trail.getByText('admin.face_cleanup', { exact: true }).element()).toBeInTheDocument();
+    expect(trail.getByRole('link').elements()).toHaveLength(0);
   });
 });

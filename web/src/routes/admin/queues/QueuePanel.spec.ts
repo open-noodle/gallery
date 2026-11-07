@@ -1,9 +1,8 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { QueueName, type QueueResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 import QueuePanel from './QueuePanel.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -65,11 +64,11 @@ describe('QueuePanel', () => {
   // always happens and that reprocessing runs only while pet detection is enabled — the old copy
   // only mentioned the purge.
   it('shows the updated force-reset warning for pet recognition', async () => {
-    renderWithTooltips(QueuePanel, { queues: [makeQueue()] });
+    await renderWithTooltips(QueuePanel, { queues: [makeQueue()] });
 
-    await fireEvent.click(screen.getByText('Reset'));
+    await userEvent.click(page.getByText('Reset'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mocks.showDialog).toHaveBeenCalledWith({
         prompt:
           'Are you sure you want to reprocess all pet recognition? This always deletes all named pets and their embeddings. Reprocessing only runs while pet detection is enabled.',

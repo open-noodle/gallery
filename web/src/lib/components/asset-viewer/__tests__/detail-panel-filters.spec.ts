@@ -3,9 +3,8 @@ import { buildContextualFilterUrl } from '#lib/utils/filter-target.ts';
 import { factory } from '#test/unit/factories.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { AssetTypeEnum, AssetVisibility, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DetailPanel from '../DetailPanel.svelte';
 
 // Task 2 of Slice 7 (asset-viewer-contextual-filters). Per the plan's R5, this is a NEW, dedicated
@@ -28,7 +27,10 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 // applyContextualFilter (via resolveFilterTarget) reads the reactive `page` from $app/state. A
 // plain vi.hoisted literal registers no signal and — more importantly here — can't be reset to a
@@ -36,7 +38,7 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 // reactive-page.mock.svelte.ts's own docs for why this needs to be the shared $state stand-in.
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock };
+  return { ...(await import('#test/unit/mocks/app-state.svelte.ts')), page: reactivePageMock };
 });
 
 const authManagerMock = vi.hoisted(() => ({
@@ -121,9 +123,9 @@ describe('DetailPanel camera filter', () => {
       mockPage.reset(url);
       const asset = buildAsset({ exifInfo: { make: 'Apple', model: 'iPhone 17 Pro Max' } });
 
-      renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+      await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-      await fireEvent.click(await screen.findByLabelText(/filter_by_camera/));
+      await page.getByLabelText(/filter_by_camera/).click();
 
       // Computed via the REAL (unmocked) buildContextualFilterUrl against the same mocked page.url
       // applyContextualFilter reads — this is the wiring test, not a re-test of the pure builder.
@@ -143,12 +145,12 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { model: 'iPhone 17 Pro Max', make: undefined } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-camera')).toBeInTheDocument());
-    expect(screen.getAllByLabelText(/filter_by_camera/)).toHaveLength(1);
+    await expect.element(page.getByTestId('detail-panel-camera')).toBeInTheDocument();
+    expect(page.getByLabelText(/filter_by_camera/).elements()).toHaveLength(1);
 
-    await fireEvent.click(screen.getByLabelText(/filter_by_camera/));
+    await page.getByLabelText(/filter_by_camera/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     expect(url).toContain('model=');
@@ -161,9 +163,9 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { make: 'Canon', model: 'EOS R5' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/filter_by_camera/));
+    await page.getByLabelText(/filter_by_camera/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     const decoded = new URLSearchParams(url.split('?', 2)[1]);
@@ -177,9 +179,9 @@ describe('DetailPanel camera filter', () => {
     );
     const asset = buildAsset({ exifInfo: { make: 'Apple', model: 'iPhone 17 Pro Max' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/search_everywhere/));
+    await page.getByLabelText(/search_everywhere/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     expect(url.startsWith('/photos')).toBe(true);
@@ -195,10 +197,10 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { make: 'Apple', model: 'iPhone 17 Pro Max' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await screen.findByLabelText(/filter_by_camera/);
-    expect(screen.queryByLabelText(/search_everywhere/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_camera/)).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/search_everywhere/)).not.toBeInTheDocument();
   });
 
   // Elsewhere the icon is shown.
@@ -206,9 +208,9 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
     const asset = buildAsset({ exifInfo: { make: 'Apple', model: 'iPhone 17 Pro Max' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByLabelText(/search_everywhere/)).toBeInTheDocument());
+    await expect.element(page.getByLabelText(/search_everywhere/)).toBeInTheDocument();
   });
 
   // R9/E6/E7 — make is truthy as a whitespace-only string ('   '), so the OLD `{#if make || model}`
@@ -218,11 +220,11 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { make: ' '.repeat(3), model: undefined } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-camera')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/filter_by_camera/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/search_everywhere/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-camera')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_camera/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/search_everywhere/)).not.toBeInTheDocument();
   });
 
   // E2 — a shared link gets NO filter affordance at all, and the old Route.search(...) anchors
@@ -232,11 +234,11 @@ describe('DetailPanel camera filter', () => {
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
     const asset = buildAsset({ exifInfo: { make: 'Apple', model: 'iPhone 17 Pro Max' } });
 
-    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    const { container } = await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-camera')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/filter_by_camera/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/search_everywhere/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-camera')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_camera/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/search_everywhere/)).not.toBeInTheDocument();
     expect(container.querySelector('a[href*="/search"]')).toBeNull();
     expect(gotoMock).not.toHaveBeenCalled();
   });
@@ -258,9 +260,9 @@ describe('DetailPanel shared-space coverage (#732)', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
     const asset = buildAsset({ ownerId: 'someone-else', exifInfo: { make: 'Apple', model: 'iPhone 17 Pro' } });
 
-    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    const { container } = await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/filter_by_camera/));
+    await page.getByLabelText(/filter_by_camera/).click();
 
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target.startsWith('/spaces/space-1')).toBe(true);
@@ -274,9 +276,9 @@ describe('DetailPanel shared-space coverage (#732)', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
     const asset = buildAsset({ ownerId: 'someone-else', exifInfo: { lensModel: 'iPhone 17 Pro front camera' } });
 
-    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    const { container } = await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/filter_by_lens/));
+    await page.getByLabelText(/filter_by_lens/).click();
 
     const [target] = gotoMock.mock.calls.at(-1) as [string];
     expect(target.startsWith('/spaces/space-1')).toBe(true);
@@ -299,9 +301,9 @@ describe('DetailPanel filename filter', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
     const asset = buildAsset({ originalFileName });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(`filter_by_filename: ${basename}`));
+    await page.getByLabelText(`filter_by_filename: ${basename}`).click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { originalFileName: basename });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -318,11 +320,11 @@ describe('DetailPanel filename filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ originalFileName: '.jpg' });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-filename')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_filename/)).not.toBeInTheDocument();
-    expect(screen.getByText('.jpg')).toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-filename')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_filename/)).not.toBeInTheDocument();
+    await expect.element(page.getByText('.jpg')).toBeInTheDocument();
   });
 
   // R6/R9 — the path toggle lives inside the SAME <p> as the filename text. Only the text becomes
@@ -331,10 +333,10 @@ describe('DetailPanel filename filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ originalFileName: 'IMG_1234.jpg', originalPath: '/photos/IMG_1234.jpg' });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByLabelText('show_file_location')).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText('show_file_location'));
+    await expect.element(page.getByLabelText('show_file_location')).toBeInTheDocument();
+    await page.getByLabelText('show_file_location').click();
 
     expect(gotoMock).not.toHaveBeenCalled();
   });
@@ -344,11 +346,11 @@ describe('DetailPanel filename filter', () => {
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
     const asset = buildAsset({ originalFileName: 'IMG_1234.jpg' });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-filename')).toBeInTheDocument());
-    expect(screen.getByText('IMG_1234.jpg')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^filter_by_filename/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-filename')).toBeInTheDocument();
+    await expect.element(page.getByText('IMG_1234.jpg')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_filename/)).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
   });
 });
@@ -358,9 +360,9 @@ describe('DetailPanel lens filter', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1');
     const asset = buildAsset({ exifInfo: { lensModel: 'RF 24-70mm f/2.8L' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/filter_by_lens/));
+    await page.getByLabelText(/filter_by_lens/).click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { lensModel: 'RF 24-70mm f/2.8L' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -372,9 +374,9 @@ describe('DetailPanel lens filter', () => {
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1?city=Berlin');
     const asset = buildAsset({ exifInfo: { lensModel: 'RF 24-70mm f/2.8L' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText(/search_everywhere/));
+    await page.getByLabelText(/search_everywhere/).click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     expect(url.startsWith('/photos')).toBe(true);
@@ -387,20 +389,20 @@ describe('DetailPanel lens filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { lensModel: 'RF 24-70mm f/2.8L' } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await screen.findByLabelText(/filter_by_lens/);
-    expect(screen.queryByLabelText(/search_everywhere/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_lens/)).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/search_everywhere/)).not.toBeInTheDocument();
   });
 
   it('R9: a whitespace-only lensModel is not rendered as clickable', async () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     const asset = buildAsset({ exifInfo: { lensModel: ' '.repeat(3) } });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-lens')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/filter_by_lens/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-lens')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_lens/)).not.toBeInTheDocument();
   });
 
   it('E2: a shared link renders no filter affordance and no /search anchor', async () => {
@@ -408,11 +410,11 @@ describe('DetailPanel lens filter', () => {
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
     const asset = buildAsset({ exifInfo: { lensModel: 'RF 24-70mm f/2.8L' } });
 
-    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+    const { container } = await renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-lens')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/filter_by_lens/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/search_everywhere/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-lens')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/filter_by_lens/)).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText(/search_everywhere/)).not.toBeInTheDocument();
     expect(container.querySelector('a[href*="/search"]')).toBeNull();
     expect(gotoMock).not.toHaveBeenCalled();
   });
@@ -449,9 +451,9 @@ describe('DetailPanel shared-by filter', () => {
     mockPage.reset('https://gallery.test/albums/album-1/photos/asset-1');
     const asset = buildAsset({ owner: OWNER });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_owner: Bob'));
+    await page.getByLabelText('filter_by_owner: Bob').click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { ownerId: 'owner-2' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -466,10 +468,10 @@ describe('DetailPanel shared-by filter', () => {
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
     const asset = buildAsset({ owner: OWNER });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum });
+    await renderWithTooltips(DetailPanel, { asset, currentAlbum });
 
-    expect(await screen.findByText('Bob')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^filter_by_owner/)).not.toBeInTheDocument();
+    await expect.element(page.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_owner/)).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
   });
 });
@@ -479,9 +481,9 @@ describe('DetailPanel appears-in album filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
-    await fireEvent.click(await screen.findByLabelText('filter_by_album: Iceland'));
+    await page.getByLabelText('filter_by_album: Iceland').click();
 
     const expected = buildContextualFilterUrl(mockPage.url, { albumId: 'album-7' });
     expect(gotoMock).toHaveBeenCalledWith(expected);
@@ -493,9 +495,10 @@ describe('DetailPanel appears-in album filter', () => {
     mockPage.reset('https://gallery.test/photos/asset-1');
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
-    const button = await screen.findByLabelText('filter_by_album: Iceland');
+    await expect.element(page.getByLabelText('filter_by_album: Iceland')).toBeInTheDocument();
+    const button = page.getByLabelText('filter_by_album: Iceland').element();
     expect(button.tagName).toBe('BUTTON');
     expect(button.closest('a')).toBeNull();
   });
@@ -510,12 +513,12 @@ describe('DetailPanel appears-in album filter', () => {
     mockPage.reset('https://gallery.test/albums/album-7/photos/asset-1');
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland'), albumDto('album-8', 'Norway')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: albumDto('album-7', 'Iceland') });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: albumDto('album-7', 'Iceland') });
 
     // The cards still render (they navigate to the album) — only the filter affordance is withheld.
-    await waitFor(() => expect(screen.getByText('Norway')).toBeInTheDocument());
-    expect(screen.queryByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('filter_by_album: Norway')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Norway')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_album: Norway')).not.toBeInTheDocument();
   });
 
   it('E2: a shared link renders no album filter affordance', async () => {
@@ -525,10 +528,10 @@ describe('DetailPanel appears-in album filter', () => {
     // affordance's absence regardless of what the fetch would have returned.
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('detail-panel-filename')).toBeInTheDocument());
-    expect(screen.queryByLabelText(/^filter_by_album/)).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('detail-panel-filename')).toBeInTheDocument();
+    await expect.element(page.getByLabelText(/^filter_by_album/)).not.toBeInTheDocument();
   });
 
   // E9b — a SPACE-scoped map drops an albumId filter (space ∩ album is unsatisfiable, the server
@@ -539,11 +542,11 @@ describe('DetailPanel appears-in album filter', () => {
     mockPage.reset('https://gallery.test/map/photos/asset-1?spaceId=space-1');
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
     // The album card still renders (it navigates); only the filter affordance is withheld.
-    await waitFor(() => expect(screen.getByText('Iceland')).toBeInTheDocument());
-    expect(screen.queryByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Iceland')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_album: Iceland')).not.toBeInTheDocument();
   });
 
   // Reverse guard: a GLOBAL (non-space) map is a legitimate album scope (/map?albumId=X), so the
@@ -552,9 +555,9 @@ describe('DetailPanel appears-in album filter', () => {
     mockPage.reset('https://gallery.test/map/photos/asset-1');
     getAllAlbumsMock.mockResolvedValue([albumDto('album-7', 'Iceland')]);
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset(), currentAlbum: null });
 
-    expect(await screen.findByLabelText('filter_by_album: Iceland')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('filter_by_album: Iceland')).toBeInTheDocument();
   });
 });
 
@@ -568,9 +571,9 @@ describe('DetailPanel embedded map: open in map view', () => {
     featureFlagsMock.value.map = true;
     mockPage.reset('https://gallery.test/spaces/space-1/photos/asset-1?make=Apple');
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
 
-    await fireEvent.click(await screen.findByTestId('map-stub-open-in-map-view'));
+    await page.getByTestId('map-stub-open-in-map-view').click();
 
     const [url] = gotoMock.mock.calls[0] as [string];
     expect(url.startsWith('/map?')).toBe(true);
@@ -585,10 +588,10 @@ describe('DetailPanel embedded map: open in map view', () => {
     featureFlagsMock.value.map = true;
     mockPage.reset('https://gallery.test/albums/album-1/photos/asset-1');
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('map-stub')).toBeInTheDocument());
-    expect(screen.queryByTestId('map-stub-open-in-map-view')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('map-stub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('map-stub-open-in-map-view')).not.toBeInTheDocument();
   });
 
   it('E2: a shared link gets no map-view control', async () => {
@@ -596,9 +599,9 @@ describe('DetailPanel embedded map: open in map view', () => {
     featureFlagsMock.value.map = true;
     mockPage.reset('https://gallery.test/share/abc/photos/asset-1');
 
-    renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
+    await renderWithTooltips(DetailPanel, { asset: buildAsset({ exifInfo: BERLIN }), currentAlbum: null });
 
-    await waitFor(() => expect(screen.getByTestId('map-stub')).toBeInTheDocument());
-    expect(screen.queryByTestId('map-stub-open-in-map-view')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('map-stub')).toBeInTheDocument();
+    await expect.element(page.getByTestId('map-stub-open-in-map-view')).not.toBeInTheDocument();
   });
 });

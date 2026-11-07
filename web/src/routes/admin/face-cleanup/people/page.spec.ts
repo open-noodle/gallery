@@ -3,9 +3,10 @@ import { Route } from '#lib/route.ts';
 import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
 import { factory } from '#test/unit/factories.ts';
 import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+import { getAll } from '../dom-queries.test-helpers';
 import Page from './+page.svelte';
 
 // Manual people browser at /admin/face-cleanup/people (Slice 6, §6.3 of
@@ -26,22 +27,8 @@ vi.mock('@immich/ui', async (original) => {
   const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
-    // Stub Icon to a no-op to avoid undefined-path errors in happy-dom (matches the sibling face-cleanup specs).
+    // Stub Icon to a no-op (matches the sibling face-cleanup specs).
     Icon: noop.default,
-  };
-});
-
-// Mock svelte-i18n: return the key as the translation (matches the sibling face-cleanup specs).
-vi.mock('svelte-i18n', async (orig) => {
-  const actual = await orig<typeof import('svelte-i18n')>();
-  return {
-    ...actual,
-    t: {
-      subscribe: (run: (fn: (key: string, opts?: unknown) => string) => void) => {
-        run((key: string) => key);
-        return () => {};
-      },
-    },
   };
 });
 
@@ -174,11 +161,11 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     const users = [makeUser('u1', 'Alice Owner'), makeUser('u2', 'Bob Owner'), makeUser('u3', 'Carol Owner')];
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    const select = screen.getByTestId('owner-select');
-    const options = within(select).getAllByRole('option');
+    const select = page.getByTestId('owner-select').element();
+    const options = getAll(page.elementLocator(select).getByRole('option'));
     expect(options.map((o) => o.textContent)).toEqual(['Alice Owner', 'Bob Owner', 'Carol Owner']);
   });
 
@@ -188,14 +175,14 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       const users = [makeUser('solo', 'Solo Admin')];
       vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([makePerson({ id: 'p1', name: 'Alice' })]));
 
-      render(Page, { props: { data: makePageData(users) } });
+      await render(Page, { props: { data: makePageData(users) } });
       await vi.advanceTimersByTimeAsync(0);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(getFaceRepairOwnerPeople).toHaveBeenCalledWith({ ownerId: 'solo', page: 0, query: undefined });
       });
-      expect(screen.queryByTestId('owner-select')).not.toBeInTheDocument();
-      expect(screen.getByText('Alice')).toBeInTheDocument();
+      expect(page.getByTestId('owner-select').query()).not.toBeInTheDocument();
+      expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
     });
   });
 
@@ -204,14 +191,14 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     const users = [makeUser('u1', 'Alice Owner'), makeUser('u2', 'Bob Owner')];
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([makePerson({ id: 'p1', name: 'Zed' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(screen.getByTestId('owner-select')).toBeInTheDocument();
-    await waitFor(() => {
+    expect(page.getByTestId('owner-select').element()).toBeInTheDocument();
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenCalledWith({ ownerId: 'u1', page: 0, query: undefined });
     });
-    expect(screen.getByText('Zed')).toBeInTheDocument();
+    expect(page.getByText('Zed', { exact: true }).element()).toBeInTheDocument();
   });
 
   // ---- 4. grid renders name, faceCount, and a thumbnail for each row ----
@@ -221,14 +208,14 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       makeResponse([makePerson({ id: 'p1', name: 'Alice', faceCount: 42, thumbnailFaceId: 'face-42' })]),
     );
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.getByText(/42/)).toBeInTheDocument();
-    const img = screen.getByTestId('person-tile-thumb-p1');
+    expect(page.getByText(/42/).element()).toBeInTheDocument();
+    const img = page.getByTestId('person-tile-thumb-p1').element();
     expect(img).toHaveAttribute('src', '/api/admin/face-repair/faces/face-42/thumbnail');
   });
 
@@ -239,13 +226,18 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       makeResponse([makePerson({ id: 'p1', name: '', faceCount: 5 })]),
     );
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('person-tile-p1')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('person-tile-p1').element()).toBeInTheDocument();
     });
-    expect(within(screen.getByTestId('person-tile-p1')).getByText('admin.face_cleanup_unnamed')).toBeInTheDocument();
+    expect(
+      page
+        .elementLocator(page.getByTestId('person-tile-p1').element())
+        .getByText('admin.face_cleanup_unnamed', { exact: true })
+        .element(),
+    ).toBeInTheDocument();
   });
 
   // ---- 6. null thumbnailFaceId renders a placeholder, not a broken image ----
@@ -255,14 +247,14 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       makeResponse([makePerson({ id: 'p1', name: 'Alice', thumbnailFaceId: null })]),
     );
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('person-tile-p1')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('person-tile-p1').element()).toBeInTheDocument();
     });
-    expect(screen.getByTestId('person-tile-placeholder-p1')).toBeInTheDocument();
-    expect(screen.queryByTestId('person-tile-thumb-p1')).not.toBeInTheDocument();
+    expect(page.getByTestId('person-tile-placeholder-p1').element()).toBeInTheDocument();
+    expect(page.getByTestId('person-tile-thumb-p1').query()).not.toBeInTheDocument();
   });
 
   // ---- 7. search re-fetches with query and renders the filtered rows ----
@@ -272,19 +264,19 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'Alice' })]))
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p2', name: 'Zoe' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument());
 
-    const input = screen.getByTestId('people-search-input');
-    await fireEvent.input(input, { target: { value: 'zoe' } });
+    const input = page.getByTestId('people-search-input').element();
+    await userEvent.fill(input, 'zoe');
     await vi.advanceTimersByTimeAsync(500);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenLastCalledWith({ ownerId: 'solo', page: 0, query: 'zoe' });
     });
-    expect(screen.getByText('Zoe')).toBeInTheDocument();
-    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+    expect(page.getByText('Zoe', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Alice', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   // ---- 8. "no results" is distinct from "this owner has no people" ----
@@ -293,13 +285,13 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       const users = [makeUser('solo', 'Solo Admin')];
       vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([]));
 
-      render(Page, { props: { data: makePageData(users) } });
+      await render(Page, { props: { data: makePageData(users) } });
       await vi.advanceTimersByTimeAsync(0);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('people-empty-owner')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('people-empty-owner').element()).toBeInTheDocument();
       });
-      expect(screen.queryByTestId('people-no-results')).not.toBeInTheDocument();
+      expect(page.getByTestId('people-no-results').query()).not.toBeInTheDocument();
     });
 
     it('shows the no-results state when a query returns nothing, distinct from the owner-empty state', async () => {
@@ -308,18 +300,18 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
         .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'Alice' })]))
         .mockResolvedValueOnce(makeResponse([]));
 
-      render(Page, { props: { data: makePageData(users) } });
+      await render(Page, { props: { data: makePageData(users) } });
       await vi.advanceTimersByTimeAsync(0);
-      await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+      await vi.waitFor(() => expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument());
 
-      const input = screen.getByTestId('people-search-input');
-      await fireEvent.input(input, { target: { value: 'nobody' } });
+      const input = page.getByTestId('people-search-input').element();
+      await userEvent.fill(input, 'nobody');
       await vi.advanceTimersByTimeAsync(500);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('people-no-results')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('people-no-results').element()).toBeInTheDocument();
       });
-      expect(screen.queryByTestId('people-empty-owner')).not.toBeInTheDocument();
+      expect(page.getByTestId('people-empty-owner').query()).not.toBeInTheDocument();
     });
   });
 
@@ -330,22 +322,22 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'Alice' })], { hasMore: true, total: 2 }))
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p2', name: 'Bob' })], { hasMore: false, total: 2 }));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument());
 
     // No "Load more" button — the sentinel entering the viewport is what loads the next page.
-    expect(screen.queryByTestId('people-load-more')).not.toBeInTheDocument();
-    await waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
+    expect(page.getByTestId('people-load-more').query()).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
     const observer = observerInstances.at(-1)!;
     observer.trigger({ target: observer.observedTarget!, isIntersecting: true });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenLastCalledWith({ ownerId: 'solo', page: 1, query: undefined });
     });
     // Appended, not replaced: both rows are present.
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    await expect.element(page.getByText('Bob', { exact: true })).toBeInTheDocument();
+    expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
   });
 
   // ---- F27: a failed later page must not wipe the pages already loaded, or reset Retry to page 0 ----
@@ -358,36 +350,36 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockRejectedValueOnce(new Error('network blip')) // page 2 (page 3) fails
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p3', name: 'Cara' })], { hasMore: false, total: 3 })); // retry succeeds
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument());
 
     // Load page 2 (Bob).
-    await waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
     observerInstances.at(-1)!.trigger({ target: observerInstances.at(-1)!.observedTarget!, isIntersecting: true });
-    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('Bob', { exact: true }).element()).toBeInTheDocument());
 
     // Load page 3 — this one fails.
-    await waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(observerInstances.length).toBeGreaterThan(0));
     observerInstances.at(-1)!.trigger({ target: observerInstances.at(-1)!.observedTarget!, isIntersecting: true });
 
-    await waitFor(() => expect(screen.getByTestId('people-load-more-error')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByTestId('people-load-more-error').element()).toBeInTheDocument());
     // The full-page error state must NOT take over — that would hide pages 1-2, which are still valid.
-    expect(screen.queryByTestId('people-load-error')).not.toBeInTheDocument();
-    expect(screen.getByTestId('people-grid')).toBeInTheDocument();
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(page.getByTestId('people-load-error').query()).not.toBeInTheDocument();
+    expect(page.getByTestId('people-grid').element()).toBeInTheDocument();
+    expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Bob', { exact: true }).element()).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByTestId('people-load-more-error-retry'));
+    await userEvent.click(page.getByTestId('people-load-more-error-retry').element());
 
     // Retry re-requests page 3 (index 2) — NOT page 0 — and appends onto the existing pages.
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenLastCalledWith({ ownerId: 'solo', page: 2, query: undefined });
     });
-    await waitFor(() => expect(screen.getByText('Cara')).toBeInTheDocument());
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
-    expect(screen.queryByTestId('people-load-more-error')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(page.getByText('Cara', { exact: true }).element()).toBeInTheDocument());
+    expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Bob', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('people-load-more-error').query()).not.toBeInTheDocument();
   });
 
   // S11.15 (pin): a failed FIRST page (unlike a failed later page above) still renders the full-page error
@@ -398,12 +390,12 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     const users = [makeUser('solo', 'Solo Admin')];
     vi.mocked(getFaceRepairOwnerPeople).mockRejectedValueOnce(new Error('network down'));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => expect(screen.getByTestId('people-load-error')).toBeInTheDocument());
-    expect(screen.queryByTestId('people-load-more-error')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('people-grid')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(page.getByTestId('people-load-error').element()).toBeInTheDocument());
+    expect(page.getByTestId('people-load-more-error').query()).not.toBeInTheDocument();
+    expect(page.getByTestId('people-grid').query()).not.toBeInTheDocument();
   });
 
   // ---- defaults to the admin's own account, not whichever owner sorts first alphabetically ----
@@ -412,13 +404,13 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     authManager.setUser(factory.user({ id: 'u2' }));
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([makePerson({ id: 'p1', name: 'From Bob' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenCalledWith({ ownerId: 'u2', page: 0, query: undefined });
     });
-    expect(screen.getByTestId('owner-select')).toHaveValue('u2');
+    expect(page.getByTestId('owner-select').element()).toHaveValue('u2');
   });
 
   // ---- the owner selection survives a remount (e.g. reviewing a person and navigating back) ----
@@ -428,26 +420,26 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'From U1' })]))
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p2', name: 'From U2' })]));
 
-    const { unmount } = render(Page, { props: { data: makePageData(users) } });
+    const { unmount } = await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('From U1')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('From U1', { exact: true }).element()).toBeInTheDocument());
 
-    await fireEvent.change(screen.getByTestId('owner-select'), { target: { value: 'u2' } });
-    await waitFor(() => expect(screen.getByText('From U2')).toBeInTheDocument());
+    await userEvent.selectOptions(page.getByTestId('owner-select').element(), 'u2');
+    await vi.waitFor(() => expect(page.getByText('From U2', { exact: true }).element()).toBeInTheDocument());
 
     // Simulates navigating away (e.g. into a person's review page) and back: the page fully remounts,
     // since /people and /people/[personId] share no layout and thus no component state.
-    unmount();
+    await unmount();
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValueOnce(
       makeResponse([makePerson({ id: 'p2', name: 'From U2' })]),
     );
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenLastCalledWith({ ownerId: 'u2', page: 0, query: undefined });
     });
-    expect(screen.getByTestId('owner-select')).toHaveValue('u2');
+    expect(page.getByTestId('owner-select').element()).toHaveValue('u2');
   });
 
   // ---- switching owner resets page to 0 and clears the list (no interleaving) ----
@@ -457,19 +449,19 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'From U1' })]))
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p2', name: 'From U2' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('From U1')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('From U1', { exact: true }).element()).toBeInTheDocument());
 
-    const select = screen.getByTestId('owner-select');
-    await fireEvent.change(select, { target: { value: 'u2' } });
+    const select = page.getByTestId('owner-select').element();
+    await userEvent.selectOptions(select, 'u2');
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(getFaceRepairOwnerPeople).toHaveBeenLastCalledWith({ ownerId: 'u2', page: 0, query: undefined });
     });
-    await waitFor(() => expect(screen.getByText('From U2')).toBeInTheDocument());
+    await vi.waitFor(() => expect(page.getByText('From U2', { exact: true }).element()).toBeInTheDocument());
     // The first owner's row must be gone, not interleaved with the second owner's.
-    expect(screen.queryByText('From U1')).not.toBeInTheDocument();
+    expect(page.getByText('From U1', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   // ---- 10. click a person navigates to /admin/face-cleanup/people/{id} ----
@@ -477,11 +469,11 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     const users = [makeUser('solo', 'Solo Admin')];
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([makePerson({ id: 'p1', name: 'Alice' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
-    const tile = screen.getByTestId('person-tile-p1');
+    await vi.waitFor(() => expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument());
+    const tile = page.getByTestId('person-tile-p1').element();
     expect(tile).toHaveAttribute('href', Route.viewFaceCleanupManualPerson({ id: 'p1' }));
   });
 
@@ -492,20 +484,20 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce(makeResponse([makePerson({ id: 'p1', name: 'Alice' })]));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-load-error')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-load-error').element()).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('people-empty-owner')).not.toBeInTheDocument();
+    expect(page.getByTestId('people-empty-owner').query()).not.toBeInTheDocument();
 
-    await fireEvent.click(screen.getByTestId('people-load-error-retry'));
+    await userEvent.click(page.getByTestId('people-load-error-retry').element());
 
-    await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('people-load-error')).not.toBeInTheDocument();
+    expect(page.getByTestId('people-load-error').query()).not.toBeInTheDocument();
   });
 
   // ---- 12. hidden / non-person-type rows: grid renders exactly what the endpoint returns ----
@@ -520,27 +512,27 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
     ];
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse(weirdRows));
 
-    render(Page, { props: { data: makePageData(users) } });
+    await render(Page, { props: { data: makePageData(users) } });
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('person-tile-p3')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('person-tile-p3').element()).toBeInTheDocument();
     });
-    expect(screen.getByTestId('person-tile-p1')).toBeInTheDocument();
-    expect(screen.getByTestId('person-tile-p2')).toBeInTheDocument();
-    expect(screen.getByTestId('person-tile-p3')).toBeInTheDocument();
+    expect(page.getByTestId('person-tile-p1').element()).toBeInTheDocument();
+    expect(page.getByTestId('person-tile-p2').element()).toBeInTheDocument();
+    expect(page.getByTestId('person-tile-p3').element()).toBeInTheDocument();
   });
 
   // ---- 13. breadcrumbs ----
-  it('renders a breadcrumb trail back to the face cleanup landing page', () => {
-    render(Page, { props: { data: makePageData([makeUser('u1', 'Alice')]) } });
+  it('renders a breadcrumb trail back to the face cleanup landing page', async () => {
+    await render(Page, { props: { data: makePageData([makeUser('u1', 'Alice')]) } });
 
-    const trail = within(screen.getByTestId('breadcrumbs'));
+    const trail = page.getByTestId('breadcrumbs');
 
-    const root = trail.getByRole('link', { name: 'admin.face_cleanup' });
+    const root = trail.getByRole('link', { name: 'admin.face_cleanup', exact: true }).element();
     expect(root).toHaveAttribute('href', Route.faceCleanup());
 
-    expect(trail.getByText('admin.face_cleanup_mode_manual')).toBeInTheDocument();
-    expect(trail.getAllByRole('link')).toHaveLength(1);
+    expect(trail.getByText('admin.face_cleanup_mode_manual', { exact: true }).element()).toBeInTheDocument();
+    expect(getAll(trail.getByRole('link'))).toHaveLength(1);
   });
 });
