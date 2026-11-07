@@ -1,5 +1,6 @@
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import type { VisibilityPerson } from './people-types';
 import PeopleVisibilityModalWrapper from './people-visibility-modal.test-wrapper.svelte';
 
@@ -16,8 +17,8 @@ const person = (overrides: Partial<VisibilityPerson> = {}): VisibilityPerson => 
 });
 
 describe('PeopleVisibilityModal pet badge', () => {
-  it('badges a pet with its translated species', () => {
-    render(PeopleVisibilityModalWrapper, {
+  it('badges a pet with its translated species', async () => {
+    await render(PeopleVisibilityModalWrapper, {
       props: {
         people: [person({ id: 'pet-1', displayName: 'Mochi', type: 'pet', species: 'cat' })],
         onClose: () => {},
@@ -26,13 +27,13 @@ describe('PeopleVisibilityModal pet badge', () => {
       },
     });
 
-    const badge = screen.getByTestId('pet-badge');
-    expect(badge).toHaveAttribute('role', 'img');
-    expect(badge).toHaveAttribute('aria-label', 'species_cat');
+    const badge = page.getByTestId('pet-badge');
+    await expect.element(badge).toHaveAttribute('role', 'img');
+    await expect.element(badge).toHaveAttribute('aria-label', 'species_cat');
   });
 
-  it('falls back to the generic pet label when no species is recorded', () => {
-    render(PeopleVisibilityModalWrapper, {
+  it('falls back to the generic pet label when no species is recorded', async () => {
+    await render(PeopleVisibilityModalWrapper, {
       props: {
         people: [person({ id: 'pet-2', displayName: 'Rex', type: 'pet' })],
         onClose: () => {},
@@ -41,11 +42,11 @@ describe('PeopleVisibilityModal pet badge', () => {
       },
     });
 
-    expect(screen.getByTestId('pet-badge')).toHaveAttribute('aria-label', 'pet');
+    await expect.element(page.getByTestId('pet-badge')).toHaveAttribute('aria-label', 'pet');
   });
 
-  it('renders no badge for a human', () => {
-    render(PeopleVisibilityModalWrapper, {
+  it('renders no badge for a human', async () => {
+    await render(PeopleVisibilityModalWrapper, {
       props: {
         people: [person({ type: 'person' })],
         onClose: () => {},
@@ -54,6 +55,7 @@ describe('PeopleVisibilityModal pet badge', () => {
       },
     });
 
-    expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Ada')).toBeInTheDocument();
+    expect(page.getByTestId('pet-badge').query()).toBeNull();
   });
 });

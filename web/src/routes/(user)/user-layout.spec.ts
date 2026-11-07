@@ -1,6 +1,5 @@
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 import UserLayout from './+layout.svelte';
 
 const { mockPage, mockAssetViewerManager } = vi.hoisted(() => ({
@@ -32,26 +31,26 @@ describe('(user) layout grid scroll target', () => {
     mockAssetViewerManager.gridScrollTarget = undefined;
   });
 
-  it('seeds the scroll target from ?at= on the personal timeline', () => {
+  it('seeds the scroll target from ?at= on the personal timeline', async () => {
     mockPage.url = new URL('https://gallery.test/photos?at=asset-2');
 
-    render(UserLayout);
+    await render(UserLayout);
 
     expect(mockAssetViewerManager.gridScrollTarget).toEqual({ at: 'asset-2' });
   });
 
-  it('seeds the scroll target from ?at= on a space timeline', () => {
+  it('seeds the scroll target from ?at= on a space timeline', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1?at=asset-2');
 
-    render(UserLayout);
+    await render(UserLayout);
 
     expect(mockAssetViewerManager.gridScrollTarget).toEqual({ at: 'asset-2' });
   });
 
-  it('clears the scroll target when the route carries no at', () => {
+  it('clears the scroll target when the route carries no at', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1');
 
-    render(UserLayout);
+    await render(UserLayout);
 
     expect(mockAssetViewerManager.gridScrollTarget).toEqual({ at: null });
   });

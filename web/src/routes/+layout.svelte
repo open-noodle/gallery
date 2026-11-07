@@ -21,7 +21,7 @@
   import { searchShortcuts } from '#lib/utils/search-shortcut.ts';
   import { getUiTranslations } from '#lib/utils/ui-translations.ts';
   import { getServerConfig } from '@immich/sdk';
-  import { TooltipProvider, modalManager, setLocale, setTranslations, toastManager } from '@immich/ui';
+  import { TooltipProvider, modalManager, setLocale, setTranslations, themeManager, toastManager } from '@immich/ui';
   import { QueryClientProvider } from '@tanstack/svelte-query';
   import { En } from 'media-chrome/lang/en';
   import { addTranslation } from 'media-chrome/utils/i18n';

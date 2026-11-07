@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { NAVIGATION_ITEMS, isAlmostExactNavMatch } from './navigation-items';
 
-// __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
-const here = dirname(fileURLToPath(import.meta.url));
+// The specs run in the browser, so the route tree comes from Vite's glob rather than off disk. Keys are
+// root-relative (`/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`); the loaders are never called.
+const ROUTES_ROOT = '/src/routes';
+const PAGE_DIRS = new Set(
+  Object.keys(import.meta.glob('/src/routes/**/+page.svelte')).map((file) => file.slice(0, -'/+page.svelte'.length)),
+);
+// Every directory on the way to a page. A directory with no page below it can never resolve a route, so
+// leaving those out does not change what resolveRoute accepts.
+const CHILD_DIRS = new Map<string, Set<string>>();
+for (const pageDir of PAGE_DIRS) {
+  const parts = pageDir.slice(ROUTES_ROOT.length).split('/').filter(Boolean);
+  let dir = ROUTES_ROOT;
+  for (const part of parts) {
+    CHILD_DIRS.set(dir, (CHILD_DIRS.get(dir) ?? new Set()).add(part));
+    dir += `/${part}`;
+  }
+}
+const join = (dir: string, name: string) => `${dir}/${name}`;
 
-// web/src/lib/managers/ -> up 2 dirs -> web/src/routes
-const ROUTES_ROOT = resolve(here, '..', '..', 'routes');
+// The source files, as raw text.
+const SOURCES = import.meta.glob<string>('/src/**/*.{ts,svelte,js}', { query: '?raw', import: 'default' });
 
 /**
 Resolves a NAVIGATION_ITEMS `route` (a URL pathname, optionally with a
@@ -28,7 +41,7 @@ Returns true iff some path through the directory tree consumes all of
 */
 function resolveRoute(pathname: string, dir = ROUTES_ROOT, segments = pathToSegments(pathname)): boolean {
   if (segments.length === 0) {
-    if (existsSync(join(dir, '+page.svelte'))) {
+    if (PAGE_DIRS.has(dir)) {
       return true;
     }
     // Even with no segments left, a route-group or optional-param directory
@@ -69,12 +82,7 @@ function pathToSegments(pathname: string): string[] {
 }
 
 function childDirs(dir: string): string[] {
-  if (!existsSync(dir)) {
-    return [];
-  }
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
+  return [...(CHILD_DIRS.get(dir) ?? [])];
 }
 
 function isRouteGroup(name: string): boolean {
@@ -162,33 +170,22 @@ describe('NAVIGATION_ITEMS schema', () => {
     }
   });
 
-  it("no source file references the migrated 'nav:theme' literal", () => {
+  it("no source file references the migrated 'nav:theme' literal", async () => {
     // Pinned invariant: after Task 6, the theme toggle lives as cmd:theme in
     // the commands registry. If this assertion trips, a stale 'nav:theme'
     // reference slipped back in — check navigation-items, global-search-manager,
     // or test fixtures. This drift-guard is what keeps dual rendering from
-    // regressing. The spec file itself is excluded via the suffix check.
-    function walk(dir: string, acc: string[] = []): string[] {
-      for (const entry of readdirSync(dir)) {
-        const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
-          walk(full, acc);
-        } else if (!full.endsWith('.spec.ts') && /\.(ts|svelte|js)$/.test(full)) {
-          acc.push(full);
-        }
-      }
-      return acc;
-    }
-    const srcRoot = resolve(here, '..', '..');
-    const files = walk(srcRoot);
-    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('nav:theme'));
+    // regressing. The spec files are excluded via the suffix check.
+    const files = Object.entries(SOURCES).filter(([file]) => !file.endsWith('.spec.ts'));
+    expect(files.length).toBeGreaterThan(100);
+    // In parallel: one request to Vite per file, one at a time, outlasts the test timeout in a full run.
+    const sources = await Promise.all(files.map(([file, load]) => load().then((source) => [file, source] as const)));
+    const offenders = sources.filter(([, source]) => source.includes('nav:theme')).map(([file]) => file);
     expect(offenders).toEqual([]);
-  });
+  }, 60_000);
 
-  it('drift guard: every systemSettings isOpen key exists in the accordion source', () => {
-    // From web/src/lib/managers/ up 2 dirs → web/src/, then into routes/admin/...
-    const sourcePath = resolve(here, '..', '..', 'routes', 'admin', 'system-settings', '+page.svelte');
-    const source = readFileSync(sourcePath, 'utf8');
+  it('drift guard: every systemSettings isOpen key exists in the accordion source', async () => {
+    const source = await SOURCES['/src/routes/admin/system-settings/+page.svelte']();
     const sourceKeys = new Set([...source.matchAll(/key:\s*'([a-z-]+)'/g)].map((m) => m[1]));
     const ourKeys = NAVIGATION_ITEMS.filter((i) => i.category === 'systemSettings').map((i) =>
       i.route.replace('/admin/system-settings?isOpen=', ''),
@@ -198,9 +195,8 @@ describe('NAVIGATION_ITEMS schema', () => {
     }
   });
 
-  it('drift guard: every accordion source key has a systemSettings navigation item', () => {
-    const sourcePath = resolve(here, '..', '..', 'routes', 'admin', 'system-settings', '+page.svelte');
-    const source = readFileSync(sourcePath, 'utf8');
+  it('drift guard: every accordion source key has a systemSettings navigation item', async () => {
+    const source = await SOURCES['/src/routes/admin/system-settings/+page.svelte']();
     const sourceKeys = new Set([...source.matchAll(/key:\s*'([a-z-]+)'/g)].map((m) => m[1]));
     const ourKeys = new Set(
       NAVIGATION_ITEMS.filter((i) => i.category === 'systemSettings').map((i) =>

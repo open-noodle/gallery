@@ -1,7 +1,10 @@
 import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
 import CleanupPhotoWindow from '#lib/gallery/cleanup/CleanupPhotoWindow.svelte';
 import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 
 const getAssetMock = vi.hoisted(() => vi.fn());
 vi.mock('#lib/managers/AssetCacheManager.svelte.js', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
@@ -22,7 +25,14 @@ const asset = (id: string): CleanupAssetDto => ({
   type: AssetTypeEnum.Image,
 });
 
-const shownId = () => screen.getByTestId('cleanup-photo-window-photo').dataset.assetId;
+const shownId = () => (page.getByTestId('cleanup-photo-window-photo').element() as HTMLElement).dataset.assetId;
+
+/** Dispatches a keydown like a key press on `target`; resolves to false when a handler prevented it. */
+const press = async (key: string, target: EventTarget = document) => {
+  const notPrevented = target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  await tick();
+  return notPrevented;
+};
 
 const removeFrom = (list: CleanupAssetDto[]) =>
   vi.fn((id: string) => {
@@ -33,7 +43,7 @@ const removeFrom = (list: CleanupAssetDto[]) =>
     return Promise.resolve(true);
   });
 
-const setup = (overrides: Record<string, unknown> = {}) => {
+const setup = async (overrides: Record<string, unknown> = {}) => {
   const list = [asset('a'), asset('b'), asset('c')];
   const props = {
     items: () => list,
@@ -45,7 +55,7 @@ const setup = (overrides: Record<string, unknown> = {}) => {
     onClose: vi.fn(),
     ...overrides,
   };
-  render(CleanupPhotoWindow, props);
+  await render(CleanupPhotoWindow, props);
   return { props, list };
 };
 
@@ -57,37 +67,39 @@ describe('CleanupPhotoWindow', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("shows the photo, the queue's signal and the photo details", async () => {
-    setup({ signal: () => ({ label: 'cleanup_reason_blurry' }) });
+    await setup({ signal: () => ({ label: 'cleanup_reason_blurry' }) });
 
     expect(shownId()).toBe('b');
-    expect(screen.getByTestId('cleanup-photo-window-photo')).toHaveAttribute('src', expect.stringContaining('/b/'));
-    expect(screen.getByTestId('cleanup-photo-window-signal')).toHaveTextContent('cleanup_reason_blurry');
-    await waitFor(() => expect(getAssetMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' })));
+    await expect
+      .element(page.getByTestId('cleanup-photo-window-photo'))
+      .toHaveAttribute('src', expect.stringContaining('/b/'));
+    await expect.element(page.getByTestId('cleanup-photo-window-signal')).toMatchTextContent('cleanup_reason_blurry');
+    await vi.waitFor(() => expect(getAssetMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' })));
   });
 
-  it("shows a burst frame's sharpness rank", () => {
-    setup({ signal: () => ({ sharpness: { value: 80, rank: 1, of: 8 } }) });
+  it("shows a burst frame's sharpness rank", async () => {
+    await setup({ signal: () => ({ sharpness: { value: 80, rank: 1, of: 8 } }) });
 
-    expect(screen.getByTestId('cleanup-photo-window-signal')).toHaveTextContent('cleanup_sharpest_of');
+    await expect.element(page.getByTestId('cleanup-photo-window-signal')).toMatchTextContent('cleanup_sharpest_of');
   });
 
   it('steps through the photos with the arrow keys', async () => {
-    setup();
+    await setup();
 
-    await fireEvent.keyDown(document, { key: 'ArrowRight' });
+    await press('ArrowRight');
     expect(shownId()).toBe('c');
-    await fireEvent.keyDown(document, { key: 'ArrowLeft' });
-    await fireEvent.keyDown(document, { key: 'ArrowLeft' });
+    await press('ArrowLeft');
+    await press('ArrowLeft');
     expect(shownId()).toBe('a');
   });
 
   it('moves on to the next photo after Keep', async () => {
-    const { props } = setup();
+    const { props } = await setup();
 
-    await fireEvent.keyDown(document, { key: 'k' });
+    await press('k');
 
     expect(props.onKeep).toHaveBeenCalledWith('b');
-    await waitFor(() => expect(shownId()).toBe('c'));
+    await vi.waitFor(() => expect(shownId()).toBe('c'));
   });
 
   it('advances into the next page after the last loaded photo', async () => {
@@ -96,40 +108,40 @@ describe('CleanupPhotoWindow', () => {
       list.push(asset('d'));
       return Promise.resolve(true);
     });
-    setup({ items: () => list, startId: 'a', loadMore, onKeep: removeFrom(list) });
+    await setup({ items: () => list, startId: 'a', loadMore, onKeep: removeFrom(list) });
 
-    await fireEvent.keyDown(document, { key: 'k' });
+    await press('k');
 
-    await waitFor(() => expect(shownId()).toBe('d'));
+    await vi.waitFor(() => expect(shownId()).toBe('d'));
     expect(loadMore).toHaveBeenCalledOnce();
   });
 
   it('closes past the last photo when there are no more pages', async () => {
     const list = [asset('a')];
-    const { props } = setup({
+    const { props } = await setup({
       items: () => list,
       startId: 'a',
       loadMore: vi.fn(() => Promise.resolve(false)),
       onKeep: removeFrom(list),
     });
 
-    await fireEvent.keyDown(document, { key: 'k' });
+    await press('k');
 
-    await waitFor(() => expect(props.onClose).toHaveBeenCalled());
+    await vi.waitFor(() => expect(props.onClose).toHaveBeenCalled());
   });
 
   it("trash goes through the queue's own path", async () => {
-    const { props } = setup();
+    const { props } = await setup();
 
-    await fireEvent.keyDown(document, { key: 'Delete' });
+    await press('Delete');
 
     expect(props.onTrash).toHaveBeenCalledWith('b');
   });
 
   it('stays on the frame when the action does not take the photo out of the list', async () => {
-    const { props } = setup({ advanceOnAction: false, onKeep: vi.fn(() => Promise.resolve(false)) });
+    const { props } = await setup({ advanceOnAction: false, onKeep: vi.fn(() => Promise.resolve(false)) });
 
-    await fireEvent.keyDown(document, { key: 'k' });
+    await press('k');
 
     expect(props.onKeep).toHaveBeenCalledWith('b');
     expect(shownId()).toBe('b');
@@ -137,29 +149,29 @@ describe('CleanupPhotoWindow', () => {
 
   it('opens the photo in a new tab with O', async () => {
     const open = vi.spyOn(globalThis, 'open').mockReturnValue(null);
-    setup();
+    await setup();
 
-    await fireEvent.keyDown(document, { key: 'o' });
+    await press('o');
 
     expect(open).toHaveBeenCalledWith('/photos/b', '_blank', 'noopener');
   });
 
   it('toggles the selection with Space when the queue has one', async () => {
     const selection = { has: vi.fn(() => false), toggle: vi.fn() };
-    setup({ selection });
+    await setup({ selection });
 
-    await fireEvent.keyDown(document, { key: ' ' });
+    await press(' ');
 
     expect(selection.toggle).toHaveBeenCalledWith('b');
   });
 
   it('ignores its keys while an action is waiting on a confirmation', async () => {
     const selection = { has: vi.fn(() => false), toggle: vi.fn() };
-    setup({ selection, onTrash: vi.fn(() => new Promise<boolean>(() => {})) });
+    await setup({ selection, onTrash: vi.fn(() => new Promise<boolean>(() => {})) });
 
-    await fireEvent.keyDown(document, { key: 'Delete' });
-    await fireEvent.keyDown(document, { key: 'ArrowRight' });
-    await fireEvent.keyDown(document, { key: ' ' });
+    await press('Delete');
+    await press('ArrowRight');
+    await press(' ');
 
     expect(shownId()).toBe('b');
     expect(selection.toggle).not.toHaveBeenCalled();
@@ -167,41 +179,47 @@ describe('CleanupPhotoWindow', () => {
 
   it('leaves Space to a focused button', async () => {
     const selection = { has: vi.fn(() => false), toggle: vi.fn() };
-    setup({ selection });
-    const keep = screen.getByRole('button', { name: 'keep' });
+    await setup({ selection });
+    const keep = page.getByRole('button', { name: 'keep' }).element() as HTMLElement;
     keep.focus();
 
-    const space = await fireEvent.keyDown(keep, { key: ' ' });
+    const space = await press(' ', keep);
 
     expect(selection.toggle).not.toHaveBeenCalled();
     expect(space).toBe(true);
   });
 
   it('does not claim Space in a queue without a selection', async () => {
-    setup();
+    await setup();
 
-    expect(await fireEvent.keyDown(document.body, { key: ' ' })).toBe(true);
+    expect(await press(' ', document.body)).toBe(true);
   });
 
   it('opens the full viewer from the link', async () => {
-    const { props } = setup();
+    const { props } = await setup();
 
-    await fireEvent.click(screen.getByTestId('cleanup-photo-window-viewer'));
+    await userEvent.click(page.getByTestId('cleanup-photo-window-viewer'));
 
     expect(props.openViewer).toHaveBeenCalledWith('b');
   });
 });
 
 describe('CleanupExpandButton', () => {
-  it('reports the tile it belongs to and stops the click from reaching the tile', () => {
+  it('reports the tile it belongs to and stops the click from reaching the tile', async () => {
     const onExpand = vi.fn();
-    render(CleanupExpandButton, { id: 'a', onExpand });
-    const click = new MouseEvent('click', { bubbles: true });
+    await render(CleanupExpandButton, { id: 'a', onExpand });
+    const pastTheRoot = vi.fn();
+    document.addEventListener('click', pastTheRoot);
+    onTestFinished(() => document.removeEventListener('click', pastTheRoot));
 
-    screen.getByTestId('cleanup-expand-a').dispatchEvent(click);
+    page
+      .getByTestId('cleanup-expand-a')
+      .element()
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(onExpand).toHaveBeenCalledWith('a', expect.any(DOMRect));
-    // Svelte delegates clicks to the root; a stopped event never reaches the tile's own handler.
-    expect(click.cancelBubble).toBe(true);
+    // Svelte delegates clicks to the root; a stopped event never reaches the tile's own handler, nor
+    // anything above the root. (The browser clears cancelBubble once dispatch ends, so check where it got to.)
+    expect(pastTheRoot).not.toHaveBeenCalled();
   });
 });

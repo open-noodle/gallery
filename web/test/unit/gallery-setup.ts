@@ -11,7 +11,17 @@ The app modules are imported inside beforeEach, never at the top: a setup file r
 hoisted vi.mock calls take effect, so a static import here would load e.g. handle-error.ts against
 the real @immich/ui and silently bypass the spec's toast mocks.
 */
+
 beforeEach(async () => {
+  // A spec on upstream's page fixtures (#test/unit/fixtures.ts) has already loaded the config from its mock data
+  // (Mock.setup runs before this hook); clearing the cache here would replace that data with the defaults.
+  const { MockRouter } = await import('#test/unit/mocks/router.ts');
+  try {
+    void MockRouter.instance;
+    return;
+  } catch {
+    // No page fixture: the spec renders components directly and gets the defaults.
+  }
   let modules;
   try {
     modules = await Promise.all([

@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import SpacePreview from './space-preview.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -39,49 +40,49 @@ const baseItem = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('SpacePreview', () => {
-  it('renders SpaceCollage with 4 asset thumbnails', () => {
-    const { container } = render(SpacePreview, { props: { item: baseItem() } as never });
+  it('renders SpaceCollage with 4 asset thumbnails', async () => {
+    const { container } = await render(SpacePreview, { props: { item: baseItem() } as never });
     // SpaceCollage renders an <img> per asset — the 4-asset grid layout yields four <img> elements.
     const imgs = container.querySelectorAll('img');
     expect(imgs.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('renders gradient fallback when recentAssetIds is empty', () => {
-    const { container } = render(SpacePreview, {
+  it('renders gradient fallback when recentAssetIds is empty', async () => {
+    const { container } = await render(SpacePreview, {
       props: { item: baseItem({ recentAssetIds: [], recentAssetThumbhashes: [] }) } as never,
     });
-    expect(container.querySelector('[data-testid="space-preview-gradient"]')).toBeInTheDocument();
+    await expect.element(page.getByTestId('space-preview-gradient')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('member strip shows up to 4 avatars without +N bubble at exactly 4', () => {
+  it('member strip shows up to 4 avatars without +N bubble at exactly 4', async () => {
     const members = Array.from({ length: 4 }, (_, i) => ({
       userId: `u${i}`,
       name: `u${i}`,
       avatarColor: 'primary',
     }));
-    const { container } = render(SpacePreview, {
+    const { container } = await render(SpacePreview, {
       props: { item: baseItem({ members, memberCount: 4 }) } as never,
     });
     expect(container.querySelectorAll('[data-testid="member-avatar"]')).toHaveLength(4);
     expect(container.querySelector('[data-testid="member-overflow"]')).toBeNull();
   });
 
-  it('member strip shows +N bubble at 5+', () => {
+  it('member strip shows +N bubble at 5+', async () => {
     const members = Array.from({ length: 5 }, (_, i) => ({
       userId: `u${i}`,
       name: `u${i}`,
       avatarColor: 'primary',
     }));
-    const { container } = render(SpacePreview, {
+    const { container } = await render(SpacePreview, {
       props: { item: baseItem({ members, memberCount: 5 }) } as never,
     });
     expect(container.querySelectorAll('[data-testid="member-avatar"]')).toHaveLength(4);
     expect(container.querySelector('[data-testid="member-overflow"]')?.textContent).toMatch(/\+1/);
   });
 
-  it('solo-member space renders self, not empty', () => {
-    const { container } = render(SpacePreview, {
+  it('solo-member space renders self, not empty', async () => {
+    const { container } = await render(SpacePreview, {
       props: {
         item: baseItem({
           members: [{ userId: 'me', name: 'Me', avatarColor: 'primary' }],
@@ -92,20 +93,20 @@ describe('SpacePreview', () => {
     expect(container.querySelectorAll('[data-testid="member-avatar"]')).toHaveLength(1);
   });
 
-  it('photo count uses ICU plural (singular)', () => {
-    render(SpacePreview, { props: { item: baseItem({ assetCount: 1 }) } as never });
-    expect(screen.getByText(/1 photo\b/)).toBeInTheDocument();
+  it('photo count uses ICU plural (singular)', async () => {
+    await render(SpacePreview, { props: { item: baseItem({ assetCount: 1 }) } as never });
+    await expect.element(page.getByText(/1 photo\b/)).toBeInTheDocument();
   });
 
-  it('photo count uses ICU plural (plural)', () => {
-    render(SpacePreview, { props: { item: baseItem({ assetCount: 420 }) } as never });
-    expect(screen.getByText(/420 photos/)).toBeInTheDocument();
+  it('photo count uses ICU plural (plural)', async () => {
+    await render(SpacePreview, { props: { item: baseItem({ assetCount: 420 }) } as never });
+    await expect.element(page.getByText(/420 photos/)).toBeInTheDocument();
   });
 
-  it('does NOT render lastContributor (intentional divergence from space-card)', () => {
-    render(SpacePreview, {
+  it('does NOT render lastContributor (intentional divergence from space-card)', async () => {
+    await render(SpacePreview, {
       props: { item: baseItem({ lastContributor: { id: 'u1', name: 'Alice' } }) } as never,
     });
-    expect(screen.queryByText(/Alice added/)).toBeNull();
+    expect(page.getByText(/Alice added/).query()).toBeNull();
   });
 });

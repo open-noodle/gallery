@@ -1,8 +1,8 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
+import { dispatchAndFlush } from '#lib/components/spaces/dom-events.test-helpers.ts';
 import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
@@ -15,10 +15,9 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import SpacePeoplePage from '../../../routes/(user)/spaces/[spaceId]/people/+page.svelte';
 
 const PAGE_SIZE = 100;
@@ -45,10 +44,14 @@ const { gotoMock, featureFlagsMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({ ...(await import('#test/unit/mocks/app-navigation.ts')), goto: gotoMock }));
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock, navigating: { to: null } };
+  return {
+    ...(await import('#test/unit/mocks/app-state.svelte.ts')),
+    page: reactivePageMock,
+    navigating: { to: null },
+  };
 });
 vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: featureFlagsMock,
@@ -123,7 +126,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function renderPage({
+async function renderPage({
   space = makeSpace(),
   members = [makeMember()],
   people = [makePerson()],
@@ -167,12 +170,32 @@ function renderPage({
   });
 }
 
+// Form fields whose current value is `value`, matched by value the way a
+// "by display value" query would (locators have no such query).
+const fieldsWithValue = (value: string) =>
+  [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')].filter(
+    (field) => field.value === value,
+  );
+const queryByDisplayValue = (value: string) => {
+  const fields = fieldsWithValue(value);
+  if (fields.length > 1) {
+    throw new Error(`Found ${fields.length} fields with the value "${value}"`);
+  }
+  return fields[0] ?? null;
+};
+const getByDisplayValue = (value: string) => {
+  const field = queryByDisplayValue(value);
+  if (!field) {
+    throw new Error(`Found no field with the value "${value}"`);
+  }
+  return field;
+};
+
 describe('Spaces people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     clearPeopleFaceStatisticsInfoCache();
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
-    Element.prototype.animate = getAnimateMock();
     gotoMock.mockResolvedValue(undefined);
     reactivePageMock.reset('http://localhost/spaces/space-1/people', { routeId: '/(user)/spaces/[spaceId]/people' });
     sdkMock.getSpacePeople.mockResolvedValue([]);
@@ -185,68 +208,72 @@ describe('Spaces people page', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the visible person count and detected face count next to the heading', () => {
-    renderPage({
+  it('shows the visible person count and detected face count next to the heading', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10) \u{B7} 1,980 faces');
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent(
+      '(10) \u{B7} 1,980 faces',
+    );
   });
 
-  it('derives the heading person count from overview statistics instead of loaded rows', () => {
-    renderPage({
+  it('derives the heading person count from overview statistics instead of loaded rows', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 60, hidden: 4, detectedFaceCount: 100 },
     });
 
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(56) \u{B7} 100 faces');
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(56) \u{B7} 100 faces');
   });
 
-  it('shows detected faces when all space people are hidden', () => {
-    renderPage({
+  it('shows detected faces when all space people are hidden', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1', isHidden: true })],
       peopleStatistics: { total: 1, hidden: 1, detectedFaceCount: 42 },
     });
 
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(0) \u{B7} 42 faces');
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(0) \u{B7} 42 faces');
   });
 
-  it('omits the heading description for an empty scope with no detected faces', () => {
-    renderPage({
+  it('omits the heading description for an empty scope with no detected faces', async () => {
+    await renderPage({
       people: [],
       peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
     });
 
-    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
+    expect(page.getByTestId('space-people-heading-description').query()).not.toBeInTheDocument();
   });
 
-  it('keeps loaded people and controls when overview statistics are unavailable', () => {
-    renderPage({
+  it('keeps loaded people and controls when overview statistics are unavailable', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' })],
       peopleStatistics: null,
       members: [makeMember({ role: SharedSpaceRole.Editor })],
     });
 
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
-    expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
+    expect(getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(page.getByPlaceholder('search_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('show_and_hide_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByTestId('space-people-heading-description').query()).not.toBeInTheDocument();
   });
 
-  it('does not call detailed face statistics on initial render', () => {
-    renderPage();
+  it('does not call detailed face statistics on initial render', async () => {
+    await renderPage();
 
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
-  it('renders a face statistics details button when overview stats exist', () => {
-    renderPage({
+  it('renders a face statistics details button when overview stats exist', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
     });
 
-    expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).element(),
+    ).toBeInTheDocument();
   });
 
   it('loads and renders detailed space face statistics when the info button is clicked', async () => {
@@ -259,73 +286,75 @@ describe('Spaces people page', () => {
         unassignedFaceCount: 4567,
       }),
     );
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
 
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1' });
-    expect(await screen.findByText('detected_faces')).toBeInTheDocument();
-    expect(screen.getByText('1,234')).toBeInTheDocument();
-    expect(screen.getByText('assigned_to_visible_people')).toBeInTheDocument();
-    expect(screen.getByText('2,345')).toBeInTheDocument();
-    expect(screen.getByText('named_visible_people')).toBeInTheDocument();
-    expect(screen.getByText('154')).toBeInTheDocument();
-    expect(screen.getByText('assigned_to_hidden_people')).toBeInTheDocument();
-    expect(screen.getByText('3,456')).toBeInTheDocument();
-    expect(screen.getByText('unassigned')).toBeInTheDocument();
-    expect(screen.getByText('4,567')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('detected_faces', { exact: true }).element())).toBeInTheDocument();
+    expect(page.getByText('1,234', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('assigned_to_visible_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('2,345', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('named_visible_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('154', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('assigned_to_hidden_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('3,456', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('unassigned', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('4,567', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('uses cached detailed space face statistics when the info UI is closed and reopened', async () => {
     sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(makeFaceStatistics({ detectedFaceCount: 1234 }));
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
     });
 
-    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    const trigger = page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).element();
     await userEvent.click(trigger);
-    expect(await screen.findByText('1,234')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('1,234', { exact: true }).element())).toBeInTheDocument();
 
     await userEvent.click(trigger);
     await userEvent.click(trigger);
 
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('1,234')).toBeInTheDocument();
+    expect(page.getByText('1,234', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('loads detailed space face statistics with the active supported name search', async () => {
     sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
     });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
 
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' });
   });
 
-  it('hides the face statistics details button during initial URL name search until filtered stats load', () => {
+  it('hides the face statistics details button during initial URL name search until filtered stats load', async () => {
     reactivePageMock.reset('http://localhost/spaces/space-1/people?searchedPeople=Ali', {
       routeId: '/(user)/spaces/[spaceId]/people',
     });
 
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
     });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).query(),
+    ).not.toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
@@ -355,21 +384,23 @@ describe('Spaces people page', () => {
       return clearStatsRequest.promise;
     });
 
-    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+    await renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
-      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 7 faces');
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 7 faces');
     });
-    expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).element(),
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByLabelText('clear_value'));
-    await waitFor(() => {
+    await userEvent.click(page.getByLabelText('clear_value', { exact: true }));
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
     });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Bob' } });
-    await waitFor(() => {
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Bob');
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Bob' }, expect.any(Object));
     });
 
@@ -377,16 +408,18 @@ describe('Spaces people page', () => {
     clearStatsRequest.resolve({ total: 2, hidden: 0, detectedFaceCount: 22 });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).query(),
+    ).not.toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
 
     bobPeopleRequest.resolve([people[1]]);
     bobStatsRequest.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
-    await waitFor(() => {
-      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 9 faces');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 9 faces');
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Bob' });
   });
 
@@ -418,19 +451,19 @@ describe('Spaces people page', () => {
       return Promise.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
     });
 
-    const view = renderPage({
+    const view = await renderPage({
       space: space1,
       people: [alice, bob],
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
     });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
-      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 7 faces');
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 7 faces');
     });
 
-    await userEvent.click(screen.getByLabelText('clear_value'));
-    await waitFor(() => {
+    await userEvent.click(page.getByLabelText('clear_value', { exact: true }));
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
     });
 
@@ -452,9 +485,9 @@ describe('Spaces people page', () => {
     clearStatsRequest.resolve({ total: 2, hidden: 0, detectedFaceCount: 22 });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 9 faces');
+    expect(getByDisplayValue('Charlie')).toBeInTheDocument();
+    expect(queryByDisplayValue('Alice')).not.toBeInTheDocument();
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 9 faces');
   });
 
   it('does not show stale search errors after navigating to another space', async () => {
@@ -473,14 +506,14 @@ describe('Spaces people page', () => {
     });
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
 
-    const view = renderPage({
+    const view = await renderPage({
       space: space1,
       people: [alice, bob],
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
     });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
         { id: 'space-1', name: 'Ali', limit: 100 },
         expect.any(Object),
@@ -505,7 +538,7 @@ describe('Spaces people page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(toastManager.danger).not.toHaveBeenCalled();
-    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
+    expect(getByDisplayValue('Charlie')).toBeInTheDocument();
   });
 
   it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {
@@ -514,24 +547,24 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeopleFaceStatistics
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 1111 }))
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 2222 }));
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
     });
 
-    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    const trigger = page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).element();
     await userEvent.click(trigger);
-    expect(await screen.findByText('1,111')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('1,111', { exact: true }).element())).toBeInTheDocument();
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     });
 
-    expect(screen.queryByText('1,111')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    expect(page.getByText('1,111', { exact: true }).query()).not.toBeInTheDocument();
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
 
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('2,222', { exact: true }).element())).toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(2);
   });
 
@@ -539,72 +572,82 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeopleFaceStatistics
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 1111 }))
       .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 2222 }));
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
     });
 
-    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    const trigger = page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).element();
     await userEvent.click(trigger);
-    expect(await screen.findByText('1,111')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('1,111', { exact: true }).element())).toBeInTheDocument();
 
     await userEvent.click(trigger);
     authManager.setUser(factory.user({ id: 'other-user-id' }));
     await userEvent.click(trigger);
 
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    expect(await vi.waitFor(() => page.getByText('2,222', { exact: true }).element())).toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(2);
   });
 
   it('renders a detailed face statistics error while keeping the primary face count in the header', async () => {
     sdkMock.getSpacePeopleFaceStatistics.mockRejectedValue(new Error('network'));
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10) \u{B7} 2,901 faces');
+    expect(await vi.waitFor(() => page.getByRole('alert').element())).toMatchTextContent(
+      'unable_to_load_face_statistics',
+    );
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent(
+      '(10) \u{B7} 2,901 faces',
+    );
   });
 
-  it('hides the face statistics details button when overview statistics are unavailable', () => {
-    renderPage({
+  it('hides the face statistics details button when overview statistics are unavailable', async () => {
+    await renderPage({
       people: [makePerson({ id: 'p1', name: 'Alice' })],
       peopleStatistics: null,
     });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).query(),
+    ).not.toBeInTheDocument();
   });
 
-  it('hides the face statistics details button when no face count is visible in the header', () => {
-    renderPage({
+  it('hides the face statistics details button when no face count is visible in the header', async () => {
+    await renderPage({
       people: [],
       peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
     });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).query(),
+    ).not.toBeInTheDocument();
   });
 
-  it('omits the face count from the header when the peopleStatistics feature flag is disabled', () => {
+  it('omits the face count from the header when the peopleStatistics feature flag is disabled', async () => {
     featureFlagsMock.value.peopleStatistics = false;
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10)');
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(10)');
   });
 
-  it('hides the face statistics details button when the peopleStatistics feature flag is disabled', () => {
+  it('hides the face statistics details button when the peopleStatistics feature flag is disabled', async () => {
     featureFlagsMock.value.peopleStatistics = false;
-    renderPage({
+    await renderPage({
       people: [makePerson({ id: 'p1' })],
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(
+      page.getByRole('button', { name: 'view_face_statistics_details', exact: true }).query(),
+    ).not.toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
@@ -613,20 +656,20 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeople.mockResolvedValue([people[0]]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
 
-    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+    await renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
         { id: 'space-1', name: 'Ali', limit: 100 },
         expect.any(Object),
       );
     });
     expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 7 faces');
+    expect(getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(queryByDisplayValue('Bob')).not.toBeInTheDocument();
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 7 faces');
   });
 
   it('clears search statistics back to the unfiltered space scope', async () => {
@@ -636,16 +679,16 @@ describe('Spaces people page', () => {
       .mockResolvedValueOnce({ total: 1, hidden: 0, detectedFaceCount: 7 })
       .mockResolvedValueOnce({ total: 2, hidden: 0, detectedFaceCount: 22 });
 
-    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+    await renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
-    await waitFor(() => {
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     });
 
-    await userEvent.click(screen.getByLabelText('clear_value'));
+    await userEvent.click(page.getByLabelText('clear_value', { exact: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
     });
   });
@@ -655,43 +698,41 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeople.mockResolvedValue([people[0]]);
     sdkMock.getSpacePeopleStatistics.mockRejectedValue(new Error('stats unavailable'));
 
-    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+    await renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
 
-    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'Ali');
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
         { id: 'space-1', name: 'Ali', limit: 100 },
         expect.any(Object),
       );
     });
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
+    expect(getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(queryByDisplayValue('Bob')).not.toBeInTheDocument();
+    expect(page.getByTestId('space-people-heading-description').query()).not.toBeInTheDocument();
   });
 
   it('updates the hidden count without losing the detected face count when a person is hidden', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({
+    const { baseElement } = await renderPage({
       people,
       peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 42 },
       members: [makeMember({ role: SharedSpaceRole.Editor })],
     });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('hide_person', { exact: true }));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('hide_person'));
-
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'p1',
         sharedSpacePersonUpdateDto: { isHidden: true },
       });
     });
-    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u{B7} 42 faces');
+    expect(page.getByTestId('space-people-heading-description').element()).toMatchTextContent('(1) \u{B7} 42 faces');
   });
 
   it('renders circular thumbnails for each person', async () => {
@@ -711,9 +752,9 @@ describe('Spaces people page', () => {
     }
     vi.stubGlobal('IntersectionObserver', VisibleObserver);
     const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
-    const { baseElement } = renderPage({ people });
+    const { baseElement } = await renderPage({ people });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const images = baseElement.querySelectorAll('img');
       const srcs = [...images].map((img) => img.getAttribute('src'));
       expect(srcs.some((s) => s?.includes('p1/thumbnail'))).toBe(true);
@@ -723,83 +764,83 @@ describe('Spaces people page', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows inline name input for editors', () => {
+  it('shows inline name input for editors', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    const nameInput = screen.getByDisplayValue('Alice');
+    const nameInput = getByDisplayValue('Alice');
     expect(nameInput).toBeInTheDocument();
     expect(nameInput.tagName).toBe('INPUT');
     expect(nameInput).toHaveAttribute('placeholder', 'add_a_name');
   });
 
-  it('does NOT show name input for viewers', () => {
+  it('does NOT show name input for viewers', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+    await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
-    const nameInput = screen.queryByDisplayValue('Alice');
+    const nameInput = queryByDisplayValue('Alice');
     expect(nameInput).toBeNull();
 
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(page.getByText('Alice', { exact: true }).element()).toBeInTheDocument();
   });
 
-  it('shows canonical name when alias is present', () => {
+  it('shows canonical name when alias is present', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice Johnson', alias: 'Mom' })];
-    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+    await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
-    expect(screen.getByText('Alice Johnson')).toBeInTheDocument();
-    expect(screen.queryByText('Mom')).not.toBeInTheDocument();
+    expect(page.getByText('Alice Johnson', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Mom', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   it('shows context menu button on hover for editors', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
     expect(card).toBeTruthy();
 
-    await fireEvent.mouseEnter(card);
+    await dispatchAndFlush(card, new MouseEvent('mouseenter'));
 
-    const menuButton = screen.getByLabelText('show_person_options');
+    const menuButton = page.getByLabelText('show_person_options', { exact: true }).element();
     expect(menuButton).toBeInTheDocument();
   });
 
   it('does NOT show context menu for viewers', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
-    await fireEvent.mouseEnter(card);
+    await dispatchAndFlush(card, new MouseEvent('mouseenter'));
 
-    expect(screen.queryByLabelText('show_person_options')).toBeNull();
+    expect(page.getByLabelText('show_person_options', { exact: true }).query()).toBeNull();
   });
 
   it('context menu has "Merge" option', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
-    await fireEvent.mouseEnter(card);
+    await dispatchAndFlush(card, new MouseEvent('mouseenter'));
 
-    const menuButton = screen.getByLabelText('show_person_options');
-    const user = userEvent.setup();
-    await user.click(menuButton);
+    const menuButton = page.getByLabelText('show_person_options', { exact: true }).element();
+    await userEvent.click(menuButton);
 
-    expect(screen.getByText('merge_people')).toBeInTheDocument();
-    expect(screen.queryByText('spaces_set_alias')).not.toBeInTheDocument();
+    expect(page.getByText('merge_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('spaces_set_alias', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   it('opens birthdate editing from spaces people management and saves through updateSpacePerson', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice', birthDate: null });
     const updatedPerson = { ...person, birthDate: null };
     sdkMock.updateSpacePerson.mockResolvedValue(updatedPerson);
-    const { baseElement } = renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({
+      people: [person],
+      members: [makeMember({ role: SharedSpaceRole.Editor })],
+    });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
-
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('set_date_of_birth'));
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('set_date_of_birth', { exact: true }));
 
     const modalProps = vi.mocked(modalManager.show).mock.calls[0][1] as unknown as {
       birthDate: string | null;
@@ -815,9 +856,9 @@ describe('Spaces people page', () => {
       sharedSpacePersonUpdateDto: { birthDate: '1990-06-15' },
     });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('set_date_of_birth'));
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('set_date_of_birth', { exact: true }));
 
     const reopenedModalProps = vi.mocked(modalManager.show).mock.calls[1][1] as unknown as {
       birthDate: string | null;
@@ -828,19 +869,17 @@ describe('Spaces people page', () => {
   it('opens the shared merge flow in-place instead of navigating to the old detail merge route', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
     sdkMock.getSpacePeople.mockResolvedValue(people);
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('merge_people', { exact: true }));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('merge_people'));
-
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.getSpacePeople).toHaveBeenCalledWith({ id: 'space-1', limit: 100 });
     });
     expect(gotoMock).not.toHaveBeenCalledWith('/spaces/space-1/people/p1?action=merge');
-    expect(screen.getByText('choose_matching_people_to_merge')).toBeInTheDocument();
+    expect(page.getByText('choose_matching_people_to_merge', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('merges selected space people into the current person like the global merge flow', async () => {
@@ -848,18 +887,16 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeople.mockResolvedValue(people);
     sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('merge_people', { exact: true }));
+    await vi.waitFor(() => page.getByText('choose_matching_people_to_merge', { exact: true }).element());
+    await userEvent.click(page.getByRole('button', { name: 'Bob', exact: true }));
+    await userEvent.click(page.getByRole('button', { name: 'merge', exact: true }));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('merge_people'));
-    await screen.findByText('choose_matching_people_to_merge');
-    await user.click(screen.getByRole('button', { name: 'Bob' }));
-    await user.click(screen.getByRole('button', { name: 'merge' }));
-
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'p1',
@@ -879,21 +916,19 @@ describe('Spaces people page', () => {
       message: 'raw',
     });
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('merge_people', { exact: true }));
+    await vi.waitFor(() => page.getByText('choose_matching_people_to_merge', { exact: true }).element());
+    await userEvent.click(page.getByRole('button', { name: 'Bob', exact: true }));
+    await userEvent.click(page.getByRole('button', { name: 'merge', exact: true }));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('merge_people'));
-    await screen.findByText('choose_matching_people_to_merge');
-    await user.click(screen.getByRole('button', { name: 'Bob' }));
-    await user.click(screen.getByRole('button', { name: 'merge' }));
-
-    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    await vi.waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
     expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(1);
     // Still on the merge selector — the merge did not commit and navigate away.
-    expect(screen.getByText('choose_matching_people_to_merge')).toBeInTheDocument();
+    expect(page.getByText('choose_matching_people_to_merge', { exact: true }).element()).toBeInTheDocument();
   });
 
   it('re-runs a merge with the cross-owner acknowledgement once the user confirms', async () => {
@@ -909,18 +944,16 @@ describe('Spaces people page', () => {
       })
       .mockResolvedValueOnce(undefined as never);
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+    await userEvent.hover(page.elementLocator(baseElement.querySelector('[role="group"]')!));
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }));
+    await userEvent.click(page.getByText('merge_people', { exact: true }));
+    await vi.waitFor(() => page.getByText('choose_matching_people_to_merge', { exact: true }).element());
+    await userEvent.click(page.getByRole('button', { name: 'Bob', exact: true }));
+    await userEvent.click(page.getByRole('button', { name: 'merge', exact: true }));
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('merge_people'));
-    await screen.findByText('choose_matching_people_to_merge');
-    await user.click(screen.getByRole('button', { name: 'Bob' }));
-    await user.click(screen.getByRole('button', { name: 'merge' }));
-
-    await waitFor(() => expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(2));
     expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(1, {
       id: 'space-1',
       personId: 'p1',
@@ -938,17 +971,16 @@ describe('Spaces people page', () => {
     sdkMock.updateSpacePerson.mockResolvedValue(person);
     sdkMock.getSpacePeople.mockResolvedValue([person]);
 
-    renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    const nameInput = screen.getByDisplayValue('Alice');
-    const user = userEvent.setup();
+    const nameInput = getByDisplayValue('Alice');
 
-    await user.click(nameInput);
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Alice Smith');
-    await fireEvent.focusOut(nameInput);
+    await userEvent.click(nameInput);
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Alice Smith');
+    await dispatchAndFlush(nameInput, new FocusEvent('focusout', { bubbles: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'space-1',
@@ -964,17 +996,16 @@ describe('Spaces people page', () => {
     sdkMock.updateSpacePerson.mockResolvedValue(person);
     sdkMock.getSpacePeople.mockResolvedValue([person]);
 
-    renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    const nameInput = screen.getByDisplayValue('Alice Johnson');
-    const user = userEvent.setup();
+    const nameInput = getByDisplayValue('Alice Johnson');
 
-    await user.click(nameInput);
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Alice Smith');
-    await fireEvent.focusOut(nameInput);
+    await userEvent.click(nameInput);
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Alice Smith');
+    await dispatchAndFlush(nameInput, new FocusEvent('focusout', { bubbles: true }));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'space-1',
@@ -987,38 +1018,38 @@ describe('Spaces people page', () => {
 
   it('does not call API when name is unchanged', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice' });
-    renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    const nameInput = screen.getByDisplayValue('Alice');
-    await fireEvent.focusIn(nameInput);
-    await fireEvent.focusOut(nameInput);
+    const nameInput = getByDisplayValue('Alice');
+    await dispatchAndFlush(nameInput, new FocusEvent('focusin', { bubbles: true }));
+    await dispatchAndFlush(nameInput, new FocusEvent('focusout', { bubbles: true }));
 
     expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
   });
 
-  it('empty state shows when no people', () => {
-    renderPage({ people: [] });
+  it('empty state shows when no people', async () => {
+    await renderPage({ people: [] });
 
-    expect(screen.getByText('spaces_no_people')).toBeInTheDocument();
-    expect(screen.getByText('spaces_no_people_description')).toBeInTheDocument();
+    expect(page.getByText('spaces_no_people', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('spaces_no_people_description', { exact: true }).element()).toBeInTheDocument();
   });
 
-  it('renders multiple person cards', () => {
+  it('renders multiple person cards', async () => {
     const people = [
       makePerson({ id: 'p1', name: 'Alice' }),
       makePerson({ id: 'p2', name: 'Bob' }),
       makePerson({ id: 'p3', name: 'Charlie' }),
     ];
-    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+    await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
+    expect(getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(getByDisplayValue('Bob')).toBeInTheDocument();
+    expect(getByDisplayValue('Charlie')).toBeInTheDocument();
   });
 
-  it('links each person thumbnail to their detail page', () => {
+  it('links each person thumbnail to their detail page', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people });
+    const { baseElement } = await renderPage({ people });
 
     const link = baseElement.querySelector('a[href="/spaces/space-1/people/p1"]');
     expect(link).toBeTruthy();
@@ -1026,41 +1057,35 @@ describe('Spaces people page', () => {
 
   describe('type filter', () => {
     it('renders all three filter options, with All selected by default', async () => {
-      renderPage({ people: [makePerson({ id: 'p1' })] });
-
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
+      await renderPage({ people: [makePerson({ id: 'p1' })] });
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
 
       // The trigger itself is also labelled 'all' (the current selection), so it appears twice
       // once the menu is open: once as the trigger, once as the highlighted option row.
-      expect(screen.getAllByRole('button', { name: 'all' })).toHaveLength(2);
-      expect(screen.getByRole('button', { name: 'people' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+      expect(page.getByRole('button', { name: 'all', exact: true }).elements()).toHaveLength(2);
+      expect(page.getByRole('button', { name: 'people', exact: true }).element()).toBeInTheDocument();
+      expect(page.getByRole('button', { name: 'pets', exact: true }).element()).toBeInTheDocument();
     });
 
     it('requests only pets when the Pets filter is selected', async () => {
-      renderPage({ people: [makePerson({ id: 'p1' })] });
+      await renderPage({ people: [makePerson({ id: 'p1' })] });
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
       });
     });
 
     it('carries the filter into the statistics request so the header agrees with the grid', async () => {
-      renderPage({ people: [makePerson({ id: 'p1' })] });
+      await renderPage({ people: [makePerson({ id: 'p1' })] });
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
       });
     });
@@ -1074,9 +1099,9 @@ describe('Spaces people page', () => {
 
       // `load` now delivers the filtered first page, so a full page means there is a second one to
       // fetch — and that request has to carry the same filter, or paging widens the list.
-      renderPage({ people: pets, peopleStatistics: { total: PAGE_SIZE, hidden: 0, detectedFaceCount: 0 } });
+      await renderPage({ people: pets, peopleStatistics: { total: PAGE_SIZE, hidden: 0, detectedFaceCount: 0 } });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
           expect.objectContaining({ $type: 'pet', offset: expect.any(Number) }),
         );
@@ -1084,62 +1109,58 @@ describe('Spaces people page', () => {
     });
 
     it('composes the filter with an active search rather than replacing it', async () => {
-      renderPage({ people: [makePerson({ id: 'p0', name: 'Alice' })] });
+      await renderPage({ people: [makePerson({ id: 'p0', name: 'Alice' })] });
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Rex', type: 'pet' })]);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
 
-      await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'rex' } });
-      await waitFor(() => {
+      await userEvent.fill(page.getByPlaceholder('search_people', { exact: true }), 'rex');
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(
           { id: 'space-1', name: 'rex' },
           expect.any(Object),
         );
       });
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet', name: 'rex' }));
       });
     });
 
     it('resets paging rather than appending onto the previous type when the filter changes', async () => {
-      renderPage({ people: [makePerson({ id: 'p1', name: 'Alice' })] });
+      await renderPage({ people: [makePerson({ id: 'p1', name: 'Alice' })] });
       const pets = [
         makePerson({ id: 'pet-1', name: 'Rex', type: 'pet' }),
         makePerson({ id: 'pet-2', name: 'Fido', type: 'pet' }),
       ];
       sdkMock.getSpacePeople.mockResolvedValue(pets);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 2, hidden: 0, detectedFaceCount: 0 });
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-
-      await waitFor(() => {
-        expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(queryByDisplayValue('Alice')).not.toBeInTheDocument();
       });
-      expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(2);
+      expect(page.getByPlaceholder('add_a_name', { exact: true }).elements()).toHaveLength(2);
     });
 
     it('sends no type parameter when All is selected', async () => {
-      renderPage({ people: [makePerson({ id: 'p1' })] });
+      await renderPage({ people: [makePerson({ id: 'p1' })] });
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
-
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-      await waitFor(() => {
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
       });
 
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1' })]);
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-      await user.click(screen.getByRole('button', { name: 'all' }));
+      // The menu animates out, so its 'pets' option stays mounted next to the trigger for a moment.
+      await expect.poll(() => page.getByRole('button', { name: 'pets', exact: true }).elements()).toHaveLength(1);
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const call = sdkMock.getSpacePeople.mock.calls.at(-1)![0];
         expect(call).not.toHaveProperty('$type');
       });
@@ -1151,14 +1172,14 @@ describe('Spaces people page', () => {
     it('issues no request on mount under a persisted non-All filter', async () => {
       peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
 
-      renderPage({
+      await renderPage({
         people: [makePerson({ id: 'pet-1', type: 'pet' })],
         peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 0 },
         hasSpacePeople: true,
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('space-people-heading-description')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(page.getByTestId('space-people-heading-description').element()).toBeInTheDocument();
       });
       expect(sdkMock.getSpacePeople).not.toHaveBeenCalled();
       expect(sdkMock.getSpacePeopleStatistics).not.toHaveBeenCalled();
@@ -1166,36 +1187,34 @@ describe('Spaces people page', () => {
 
     // The show/hide screen is the only place a misdetected species bucket can be corrected, so a
     // Pets filter matching nothing must not hide it. `load` hands over the unfiltered total for it.
-    it('keeps show/hide reachable when the active filter matches nothing', () => {
+    it('keeps show/hide reachable when the active filter matches nothing', async () => {
       peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
 
-      renderPage({
+      await renderPage({
         people: [],
         peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
         hasSpacePeople: true,
       });
 
-      expect(screen.getByRole('button', { name: 'show_and_hide_people' })).toBeInTheDocument();
+      expect(page.getByRole('button', { name: 'show_and_hide_people', exact: true }).element()).toBeInTheDocument();
     });
 
     it('does not send the filter to the face-statistics endpoint', async () => {
-      renderPage({
+      await renderPage({
         people: [makePerson({ id: 'p1' })],
         peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
       });
       sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 2901 });
-
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-      await waitFor(() => {
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
       });
 
-      await user.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+      await userEvent.click(page.getByRole('button', { name: 'view_face_statistics_details', exact: true }));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalled();
       });
       const call = sdkMock.getSpacePeopleFaceStatistics.mock.calls.at(-1)![0];
@@ -1203,27 +1222,26 @@ describe('Spaces people page', () => {
     });
 
     it('keeps the filter/sort controls and show/hide access when the Pets filter yields zero results', async () => {
-      renderPage({
+      await renderPage({
         people: [makePerson({ id: 'p1' })],
         peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 0 },
         members: [makeMember({ role: SharedSpaceRole.Editor })],
       });
       sdkMock.getSpacePeople.mockResolvedValue([]);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
+      await userEvent.click(page.getByRole('button', { name: 'all', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'pets', exact: true }));
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'all' }));
-      await user.click(screen.getByRole('button', { name: 'pets' }));
-
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
       });
 
       // The grid is empty (no pets), but a space with people at all must not lose the search bar,
       // the filter/sort dropdowns (the only way back to All), or the show/hide screen.
-      expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
-      expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
+      expect(page.getByPlaceholder('search_people', { exact: true }).element()).toBeInTheDocument();
+      // The menu animates out, so its 'pets' option stays mounted next to the trigger for a moment.
+      await expect.poll(() => page.getByRole('button', { name: 'pets', exact: true }).elements()).toHaveLength(1);
+      expect(page.getByText('show_and_hide_people', { exact: true }).element()).toBeInTheDocument();
     });
   });
 });

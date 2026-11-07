@@ -1,8 +1,8 @@
-import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { compileUtilities } from '#test/unit/tailwind.ts';
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import TagFilterRowNonDefaultProvider from '../tag-filter-row-non-default-provider.test-wrapper.svelte';
 import TagFilterRowToggleChecked from '../tag-filter-row-toggle-checked.test-wrapper.svelte';
 import TagFilterRow from '../tag-filter-row.svelte';
@@ -16,12 +16,13 @@ const LONG_NAME = 'Events/2024/Italy Summer Trip Rome Colosseum And Vatican Muse
 const OPEN_STATES = ['delayed-open', 'instant-open'];
 
 /**
-happy-dom reports 0 for both metrics, so overflow is simulated on the prototype — the action reads
-them during mount, before a test could reach the individual element.
+Overflow is simulated on the prototype rather than produced by real layout, so each test picks the
+verdict it needs independent of the frame's fonts and width — the action reads both metrics during
+mount, before a test could reach the individual element.
 
-Defining on HTMLElement.prototype only *shadows* happy-dom, which defines both as getters on
-Element.prototype (verified in happy-dom's Element.d.ts). The afterEach delete therefore removes
-only this shadow and restores happy-dom's own behaviour — it does not clobber it process-wide.
+Defining on HTMLElement.prototype only *shadows* the browser, which defines both as getters on
+Element.prototype. The afterEach delete therefore removes only this shadow and restores the real
+measurements — it does not clobber them for the rest of the run.
 
 The getters read through a mutable `heightMetrics` object rather than closing over the values
 passed to stubHeights directly, so a test can change the reported heights mid-test (R17) without
@@ -48,7 +49,7 @@ type RowProps = {
   onToggle: (id: string) => void;
 };
 
-function renderRow(props: Partial<RowProps> = {}) {
+async function renderRow(props: Partial<RowProps> = {}) {
   const onToggle = props.onToggle ?? vi.fn();
   const componentProps: RowProps = {
     id: props.id ?? 't1',
@@ -59,16 +60,16 @@ function renderRow(props: Partial<RowProps> = {}) {
   };
   return {
     onToggle,
-    ...render(TestWrapper as Component<{ component: Component<RowProps>; componentProps: RowProps }>, {
+    ...(await render(TestWrapper as Component<{ component: Component<RowProps>; componentProps: RowProps }>, {
       props: { component: TagFilterRow as Component<RowProps>, componentProps },
-    }),
+    })),
   };
 }
 
 // Renders TagFilterRow under bits-ui's own Tooltip.Provider (default options — no
 // disableCloseOnTriggerClick), instead of the app's @immich/ui TooltipProvider. Only R16 uses this;
 // see tag-filter-row-non-default-provider.test-wrapper.svelte for why.
-function renderNonDefaultProviderRow(props: Partial<RowProps> = {}) {
+async function renderNonDefaultProviderRow(props: Partial<RowProps> = {}) {
   const onToggle = props.onToggle ?? vi.fn();
   const componentProps: RowProps = {
     id: props.id ?? 't1',
@@ -79,62 +80,49 @@ function renderNonDefaultProviderRow(props: Partial<RowProps> = {}) {
   };
   return {
     onToggle,
-    ...render(TagFilterRowNonDefaultProvider as Component<RowProps>, { props: componentProps }),
+    ...(await render(TagFilterRowNonDefaultProvider as Component<RowProps>, { props: componentProps })),
   };
 }
 
-beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', getResizeObserverMock());
-});
-
 afterEach(() => {
-  cleanup();
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight');
   Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight');
-  vi.unstubAllGlobals();
 });
 
-// R7 ("opens the tooltip immediately on keyboard focus") was removed: @immich/ui's shared
-// TooltipProvider sets `ignoreNonKeyboardFocus`, so bits-ui only opens on focus when
-// `:focus-visible` matches. @testing-library/dom's fireEvent.focus only dispatches a synthetic
-// FocusEvent — it never calls the native `.focus()` method, so document.activeElement is never
-// updated and `:focus-visible` never matches under happy-dom. Confirmed with a real `.focus()`
-// call in isolation (matches `:focus-visible`) vs. fireEvent.focus (does not) — this is not
-// fixable from the component side. Moved to manual verification (Task 4).
 describe('TagFilterRow', () => {
-  it('R1: renders the complete name in the DOM', () => {
+  it('R1: renders the complete name in the DOM', async () => {
     stubHeights(0, 0);
-    const { getByTestId } = renderRow();
-    expect(getByTestId('tags-item-t1').textContent).toContain(LONG_NAME);
+    const { getByTestId } = await renderRow();
+    expect(getByTestId('tags-item-t1').element().textContent).toContain(LONG_NAME);
   });
 
-  it('R2: clamps the label rather than truncating it', () => {
+  it('R2: clamps the label rather than truncating it', async () => {
     stubHeights(0, 0);
-    const { getByTestId } = renderRow();
-    const label = getByTestId('tags-item-t1').querySelector('span');
+    const { getByTestId } = await renderRow();
+    const label = getByTestId('tags-item-t1').element().querySelector('span');
     expect(label?.className).toContain('line-clamp-2');
     expect(label?.className).not.toContain('truncate');
   });
 
   it('R3: keeps the e2e handle on the clickable element', async () => {
     stubHeights(0, 0);
-    const { getByTestId, onToggle } = renderRow({ id: 't1' });
-    await fireEvent.click(getByTestId('tags-item-t1'));
+    const { getByTestId, onToggle } = await renderRow({ id: 't1' });
+    await userEvent.click(getByTestId('tags-item-t1'));
     expect(onToggle).toHaveBeenCalledWith('t1');
   });
 
   it('R4: attaches a tooltip when the label is clipped', async () => {
     stubHeights(100, 40);
-    const { getByTestId } = renderRow();
+    const { getByTestId } = await renderRow();
     await tick();
-    expect('tooltipTrigger' in getByTestId('tags-item-t1').dataset).toBe(true);
+    expect('tooltipTrigger' in getByTestId('tags-item-t1').element().dataset).toBe(true);
   });
 
   it('R5: attaches no tooltip when the label fits', async () => {
     stubHeights(40, 40);
-    const { getByTestId } = renderRow();
+    const { getByTestId } = await renderRow();
     await tick();
-    expect('tooltipTrigger' in getByTestId('tags-item-t1').dataset).toBe(false);
+    expect('tooltipTrigger' in getByTestId('tags-item-t1').element().dataset).toBe(false);
   });
 
   it('R6: opens the tooltip on non-touch hover after the 700ms delay', async () => {
@@ -142,12 +130,12 @@ describe('TagFilterRow', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       stubHeights(100, 40);
-      const { getByTestId } = renderRow();
+      const { getByTestId } = await renderRow();
       await tick();
-      const row = getByTestId('tags-item-t1');
+      const row = getByTestId('tags-item-t1').element();
       expect(row.dataset.state).toBe('closed');
 
-      await fireEvent.pointerEnter(row, { pointerType: 'mouse' });
+      row.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
       vi.advanceTimersByTime(700);
       await tick();
 
@@ -157,24 +145,41 @@ describe('TagFilterRow', () => {
     }
   });
 
+  it('R7: opens the tooltip immediately on keyboard focus', async () => {
+    // @immich/ui's shared TooltipProvider sets `ignoreNonKeyboardFocus`, so bits-ui only opens on
+    // focus when `:focus-visible` matches — which a real Tab press produces and a programmatic focus
+    // event does not.
+    stubHeights(100, 40);
+    const { getByTestId } = await renderRow();
+    await tick();
+    const row = getByTestId('tags-item-t1').element();
+    expect(row.dataset.state).toBe('closed');
+
+    await userEvent.tab();
+
+    expect(document.activeElement).toBe(row);
+    expect(row.matches(':focus-visible')).toBe(true);
+    await vi.waitFor(() => expect(OPEN_STATES).toContain(row.dataset.state));
+    expect(row.dataset.state).toBe('instant-open');
+  });
+
   it('R8: toggles selection when a clipped row is clicked, and the tooltip stays open', async () => {
     // Only timers — faking requestAnimationFrame too can stall bits-ui/floating-ui during mount.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       stubHeights(100, 40);
-      const { getByTestId, onToggle } = renderRow({ id: 't7' });
+      const { getByTestId, onToggle } = await renderRow({ id: 't7' });
       await tick();
-      const row = getByTestId('tags-item-t7');
+      const row = getByTestId('tags-item-t7').element() as HTMLElement;
       expect(row.dataset.state).toBe('closed');
 
-      // Open via the hover path proven in R6 — focus-open cannot be exercised under happy-dom
-      // (see the note above the describe block explaining R7's removal).
-      await fireEvent.pointerEnter(row, { pointerType: 'mouse' });
+      // Open via the hover path proven in R6, so the click below lands on an already-open tooltip.
+      row.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
       vi.advanceTimersByTime(700);
       await tick();
       expect(OPEN_STATES).toContain(row.dataset.state);
 
-      await fireEvent.click(row);
+      row.click();
       await tick();
 
       expect(onToggle).toHaveBeenCalledWith('t7');
@@ -193,26 +198,26 @@ describe('TagFilterRow', () => {
 
   it('R9: toggles when the row has no tooltip at all', async () => {
     stubHeights(40, 40);
-    const { getByTestId, onToggle } = renderRow({ id: 't9' });
+    const { getByTestId, onToggle } = await renderRow({ id: 't9' });
     await tick();
 
-    await fireEvent.click(getByTestId('tags-item-t9'));
+    await userEvent.click(getByTestId('tags-item-t9'));
 
     expect(onToggle).toHaveBeenCalledWith('t9');
   });
 
-  it('R10: renders the checked state', () => {
+  it('R10: renders the checked state', async () => {
     stubHeights(0, 0);
-    const { getByTestId } = renderRow({ checked: true });
-    const row = getByTestId('tags-item-t1');
+    const { getByTestId } = await renderRow({ checked: true });
+    const row = getByTestId('tags-item-t1').element();
     expect(row.getAttribute('aria-pressed')).toBe('true');
     expect(row.querySelector('svg')).toBeTruthy();
   });
 
-  it('R11: renders the unchecked state', () => {
+  it('R11: renders the unchecked state', async () => {
     stubHeights(0, 0);
-    const { getByTestId } = renderRow({ checked: false });
-    const row = getByTestId('tags-item-t1');
+    const { getByTestId } = await renderRow({ checked: false });
+    const row = getByTestId('tags-item-t1').element();
     expect(row.getAttribute('aria-pressed')).toBe('false');
     expect(row.querySelector('svg')).toBeNull();
   });
@@ -222,21 +227,21 @@ describe('TagFilterRow', () => {
     // 'A'.repeat(120) unbreakable token here is inert as far as this assertion goes — this test would
     // pass unchanged even if the wrap utility were deleted from the component. It pins only that an
     // overflowing row always gets a tooltip. The actual "the wrap utility makes an unbreakable token
-    // overflow vertically instead of clipping horizontally" claim cannot be proven under happy-dom
-    // (no layout engine); it is proven only by the real-browser probe recorded in the design spec's
+    // overflow vertically instead of clipping horizontally" claim cannot be proven here, where the
+    // heights are stubbed; it is proven only by the real-browser probe recorded in the design spec's
     // "Hazard: an unbreakable token defeats height-based detection" section. R14 below covers the
     // half of it that *is* automatable — that the label's utility compiles to a real `overflow-wrap`
     // declaration rather than silently to nothing.
     stubHeights(100, 40);
-    const { getByTestId } = renderRow({ name: 'A'.repeat(120) });
+    const { getByTestId } = await renderRow({ name: 'A'.repeat(120) });
     await tick();
-    expect('tooltipTrigger' in getByTestId('tags-item-t1').dataset).toBe(true);
+    expect('tooltipTrigger' in getByTestId('tags-item-t1').element().dataset).toBe(true);
   });
 
-  it('R13: renders the dimmed variant', () => {
+  it('R13: renders the dimmed variant', async () => {
     stubHeights(0, 0);
-    const { getByTestId } = renderRow({ checked: true, dimmed: true });
-    const row = getByTestId('tags-item-t1');
+    const { getByTestId } = await renderRow({ checked: true, dimmed: true });
+    const row = getByTestId('tags-item-t1').element();
     expect(row.className).toContain('opacity-50');
     expect(row.className).toContain('font-medium');
   });
@@ -255,8 +260,8 @@ describe('TagFilterRow', () => {
     // (verified against Tailwind 4.3.2 — `line-clamp-2` emits only `overflow`, `display`,
     // `-webkit-box-orient` and `-webkit-line-clamp`), and neither does Tailwind's base layer.
     stubHeights(0, 0);
-    const { getByTestId } = renderRow();
-    const label = getByTestId('tags-item-t1').querySelector('span');
+    const { getByTestId } = await renderRow();
+    const label = getByTestId('tags-item-t1').element().querySelector('span');
     const classes = (label?.className ?? '').split(/\s+/).filter(Boolean);
     expect(classes.length).toBeGreaterThan(0);
 
@@ -266,24 +271,18 @@ describe('TagFilterRow', () => {
   });
 
   it('R15: shows the complete tag name in the open tooltip content', async () => {
-    // Queries the portalled tooltip content directly instead of via aria-describedby. bits-ui does
-    // portal the content and render the full name under happy-dom (confirmed with a full DOM dump
-    // during investigation). bits-ui DOES generate a content id for this wiring — tooltip-content.svelte
-    // sets `id = createId(uid)`, and the trigger reads `root?.contentNode?.id` for aria-describedby — so
-    // this is not bits-ui failing to thread an id through. Here, though, the trigger's aria-describedby
-    // stays an empty string regardless of extra tick()/microtask flushes. That is a happy-dom
-    // limitation, most likely `contentNode` resolving to the popper wrapper element rather than the
-    // inner content div that actually carries the id, not a gap in bits-ui's own behaviour.
-    // [data-tooltip-content] is bits-ui's own stable marker for the content element (derived from its
-    // "tooltip" component name), so this sidesteps the issue entirely.
+    // Queries the portalled tooltip content directly by [data-tooltip-content], bits-ui's own stable
+    // marker for the content element (derived from its "tooltip" component name), rather than
+    // following the trigger's aria-describedby, so the test does not depend on how bits-ui threads
+    // the content id onto the trigger.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       stubHeights(100, 40);
-      const { getByTestId } = renderRow();
+      const { getByTestId } = await renderRow();
       await tick();
-      const row = getByTestId('tags-item-t1');
+      const row = getByTestId('tags-item-t1').element();
 
-      await fireEvent.pointerEnter(row, { pointerType: 'mouse' });
+      row.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
       vi.advanceTimersByTime(700);
       await tick();
 
@@ -307,17 +306,17 @@ describe('TagFilterRow', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       stubHeights(100, 40);
-      const { getByTestId, onToggle } = renderNonDefaultProviderRow({ id: 't16' });
+      const { getByTestId, onToggle } = await renderNonDefaultProviderRow({ id: 't16' });
       await tick();
-      const row = getByTestId('tags-item-t16');
+      const row = getByTestId('tags-item-t16').element() as HTMLElement;
       expect(row.dataset.state).toBe('closed');
 
-      await fireEvent.pointerEnter(row, { pointerType: 'mouse' });
+      row.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
       vi.advanceTimersByTime(700);
       await tick();
       expect(OPEN_STATES).toContain(row.dataset.state);
 
-      await fireEvent.click(row);
+      row.click();
       await tick();
 
       expect(onToggle).toHaveBeenCalledWith('t16');
@@ -346,17 +345,17 @@ describe('TagFilterRow', () => {
     // update TagFilterRow gets from its real parent, tags-filter.svelte.
     stubHeights(40, 40); // fits at the unchecked (400) weight
     const onToggle = vi.fn();
-    const { getByTestId } = render(TagFilterRowToggleChecked, {
+    const { getByTestId } = await render(TagFilterRowToggleChecked, {
       props: { id: 't17', name: LONG_NAME, initialChecked: false, onToggle },
     });
     await tick();
-    expect('tooltipTrigger' in getByTestId('tags-item-t17').dataset).toBe(false);
+    expect('tooltipTrigger' in getByTestId('tags-item-t17').element().dataset).toBe(false);
 
     // Now overflows, standing in for the extra line the heavier weight would introduce.
     heightMetrics.scrollHeight = 60;
-    await fireEvent.click(getByTestId('toggle-checked'));
+    await userEvent.click(getByTestId('toggle-checked'));
     await tick();
 
-    expect('tooltipTrigger' in getByTestId('tags-item-t17').dataset).toBe(true);
+    expect('tooltipTrigger' in getByTestId('tags-item-t17').element().dataset).toBe(true);
   });
 });

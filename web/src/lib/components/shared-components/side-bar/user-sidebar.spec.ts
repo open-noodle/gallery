@@ -1,6 +1,7 @@
 import UserSidebar from '#lib/components/shared-components/side-bar/UserSidebar.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/photos') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -92,58 +93,58 @@ describe('UserSidebar', () => {
   // themselves. SidebarNavItem's default `pathname.startsWith('/spaces')` would keep the
   // Spaces heading lit at the same time, showing two selected rows at once.
   describe('Spaces selected state', () => {
-    const spacesLink = () => screen.getByRole('link', { name: /^spaces$/i });
+    const spacesLink = () => page.getByRole('link', { name: /^spaces$/i });
 
-    it('marks Spaces selected on the spaces list page', () => {
+    it('marks Spaces selected on the spaces list page', async () => {
       mockPage.url = new URL('https://gallery.test/spaces');
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(spacesLink()).toHaveAttribute('data-active', 'true');
+      await expect.element(spacesLink()).toHaveAttribute('data-active', 'true');
     });
 
-    it('does not mark Spaces selected once a space is open', () => {
+    it('does not mark Spaces selected once a space is open', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1');
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(spacesLink()).toHaveAttribute('data-active', 'false');
+      await expect.element(spacesLink()).toHaveAttribute('data-active', 'false');
     });
 
-    it('does not mark Spaces selected once a space album is open', () => {
+    it('does not mark Spaces selected once a space album is open', async () => {
       mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1');
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(spacesLink()).toHaveAttribute('data-active', 'false');
+      await expect.element(spacesLink()).toHaveAttribute('data-active', 'false');
     });
   });
 
-  it('shows a memories link under Library when memories are enabled and the sidebar is on', () => {
+  it('shows a memories link under Library when memories are enabled and the sidebar is on', async () => {
     mocks.authManager.preferences.memories.enabled = true;
     mocks.authManager.preferences.memories.sidebarWeb = true;
 
-    render(UserSidebar);
+    await render(UserSidebar);
 
-    expect(screen.getByRole('link', { name: /^memories$/i })).toHaveAttribute('href', '/memories');
+    await expect.element(page.getByRole('link', { name: /^memories$/i })).toHaveAttribute('href', '/memories');
   });
 
-  it('hides the memories link when memories are disabled, even with the sidebar on', () => {
+  it('hides the memories link when memories are disabled, even with the sidebar on', async () => {
     mocks.authManager.preferences.memories.enabled = false;
     mocks.authManager.preferences.memories.sidebarWeb = true;
 
-    render(UserSidebar);
+    await render(UserSidebar);
 
-    expect(screen.queryByRole('link', { name: /^memories$/i })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('link', { name: /^memories$/i })).not.toBeInTheDocument();
   });
 
-  it('hides the memories link when the sidebar preference is off, even with memories enabled', () => {
+  it('hides the memories link when the sidebar preference is off, even with memories enabled', async () => {
     mocks.authManager.preferences.memories.enabled = true;
     mocks.authManager.preferences.memories.sidebarWeb = false;
 
-    render(UserSidebar);
+    await render(UserSidebar);
 
-    expect(screen.queryByRole('link', { name: /^memories$/i })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('link', { name: /^memories$/i })).not.toBeInTheDocument();
   });
 
   // Rail mode collapses to icons only, so BottomInfo's full storage bar is swapped for the
@@ -155,35 +156,35 @@ describe('UserSidebar', () => {
   // BottomInfo's presence is read off the count on top of that baseline, not off `getBy`,
   // which would throw on the pre-existing multiple matches.
   describe('bottom storage indicator', () => {
-    it('renders the compact rail storage indicator when collapsed to a rail', () => {
+    it('renders the compact rail storage indicator when collapsed to a rail', async () => {
       sidebarMocks.sidebarModeStore.layout = 'rail';
       sidebarMocks.sidebarModeStore.hoverExpanded = false;
       sidebarMocks.sidebarModeStore.railExpanded = false;
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(screen.getByTestId('rail-storage-stub')).toBeInTheDocument();
-      expect(screen.getAllByTestId('noop-component')).toHaveLength(2);
+      await expect.element(page.getByTestId('rail-storage-stub')).toBeInTheDocument();
+      expect(page.getByTestId('noop-component').elements()).toHaveLength(2);
     });
 
-    it('renders BottomInfo when the rail is hover-expanded', () => {
+    it('renders BottomInfo when the rail is hover-expanded', async () => {
       sidebarMocks.sidebarModeStore.layout = 'rail';
       sidebarMocks.sidebarModeStore.hoverExpanded = true;
       sidebarMocks.sidebarModeStore.railExpanded = true;
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(screen.queryByTestId('rail-storage-stub')).not.toBeInTheDocument();
-      expect(screen.getAllByTestId('noop-component')).toHaveLength(3);
+      await expect.element(page.getByTestId('rail-storage-stub')).not.toBeInTheDocument();
+      expect(page.getByTestId('noop-component').elements()).toHaveLength(3);
     });
 
-    it('renders BottomInfo in the expanded layout', () => {
+    it('renders BottomInfo in the expanded layout', async () => {
       sidebarMocks.sidebarModeStore.layout = 'expanded';
 
-      render(UserSidebar);
+      await render(UserSidebar);
 
-      expect(screen.queryByTestId('rail-storage-stub')).not.toBeInTheDocument();
-      expect(screen.getAllByTestId('noop-component')).toHaveLength(3);
+      await expect.element(page.getByTestId('rail-storage-stub')).not.toBeInTheDocument();
+      expect(page.getByTestId('noop-component').elements()).toHaveLength(3);
     });
   });
 });

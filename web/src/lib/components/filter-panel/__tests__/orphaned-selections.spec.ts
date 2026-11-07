@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import { createFilterState, type FilterPanelConfig } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 import PeopleFilter from '../people-filter.svelte';
@@ -28,18 +29,16 @@ describe('Orphaned selections', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
     });
 
     // p3 should be rendered as orphaned
-    const orphanedItem = screen.getByTestId('people-item-p3');
+    const orphanedItem = page.getByTestId('people-item-p3').element();
     expect(orphanedItem).toBeTruthy();
     expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
@@ -47,16 +46,14 @@ describe('Orphaned selections', () => {
 
   it('should keep the cached person label when a selected person drops out of suggestions', async () => {
     const onSelectionChange = vi.fn();
-    const { rerender } = render(PeopleFilter, {
-      props: {
-        people: [{ id: 'p3', name: 'Charlie', thumbnailUrl: '/people/p3/thumbnail' }],
-        selectedIds: ['p3'],
-        onSelectionChange,
-      },
+    const { rerender } = await render(PeopleFilter, {
+      people: [{ id: 'p3', name: 'Charlie', thumbnailUrl: '/people/p3/thumbnail' }],
+      selectedIds: ['p3'],
+      onSelectionChange,
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p3').textContent).toContain('Charlie');
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p3').element().textContent).toContain('Charlie');
     });
 
     await rerender({
@@ -65,8 +62,8 @@ describe('Orphaned selections', () => {
       onSelectionChange,
     });
 
-    await waitFor(() => {
-      const orphanedItem = screen.getByTestId('people-item-p3');
+    await vi.waitFor(() => {
+      const orphanedItem = page.getByTestId('people-item-p3').element();
       expect(orphanedItem.textContent).toContain('Charlie');
       expect(orphanedItem.textContent).not.toContain('p3');
     });
@@ -86,22 +83,20 @@ describe('Orphaned selections', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p3')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p3').element()).toBeTruthy();
     });
 
     // Clicking orphaned item should deselect it
-    await fireEvent.click(screen.getByTestId('people-item-p3'));
+    await page.getByTestId('people-item-p3').click();
 
     // After deselection, orphaned item should disappear
-    await waitFor(() => {
-      expect(screen.queryByTestId('people-item-p3')).toBeNull();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p3').query()).toBeNull();
     });
   });
 
@@ -119,18 +114,16 @@ describe('Orphaned selections', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('location-country-Germany')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('location-country-Germany').element()).toBeTruthy();
     });
 
     // Japan should be rendered as orphaned
-    const orphanedItem = screen.getByTestId('location-country-Japan');
+    const orphanedItem = page.getByTestId('location-country-Japan').element();
     expect(orphanedItem).toBeTruthy();
     expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
@@ -150,18 +143,16 @@ describe('Orphaned selections', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('camera-make-Canon')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('camera-make-Canon').element()).toBeTruthy();
     });
 
     // Nikon should be rendered as orphaned
-    const orphanedItem = screen.getByTestId('camera-make-Nikon');
+    const orphanedItem = page.getByTestId('camera-make-Nikon').element();
     expect(orphanedItem).toBeTruthy();
     expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
@@ -192,14 +183,12 @@ describe('Empty section collapse', () => {
       selectedYear: 2024,
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [{ timeBucket: '2024-06-01', count: 10 }], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [{ timeBucket: '2024-06-01', count: 10 }], filters });
 
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      const section = screen.getByTestId('filter-section-people');
+    await vi.waitFor(() => {
+      const section = page.getByTestId('filter-section-people').element();
       expect(section).toBeTruthy();
       // Should show "(0)" in the section header
       expect(section.textContent).toContain('(0)');
@@ -227,18 +216,16 @@ describe('Empty section collapse', () => {
       selectedYear: 2023,
     };
 
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets: [{ timeBucket: '2023-06-01', count: 100 }],
-        filters,
-      },
+    await render(FilterPanel, {
+      config,
+      timeBuckets: [{ timeBucket: '2023-06-01', count: 100 }],
+      filters,
     });
 
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      const section = screen.getByTestId('filter-section-people');
+    await vi.waitFor(() => {
+      const section = page.getByTestId('filter-section-people').element();
       expect(section.textContent).toContain('(0)');
     });
   });
@@ -256,25 +243,23 @@ describe('Empty section collapse', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: {
-        config,
-        timeBuckets: [{ timeBucket: '2023-06-01', count: 100 }],
-      },
+    await render(FilterPanel, {
+      config,
+      timeBuckets: [{ timeBucket: '2023-06-01', count: 100 }],
     });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('people-item-p1').element()).toBeTruthy();
     });
 
     // Trigger re-fetch
-    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+    await page.getByTestId('year-btn-2023').click();
     await vi.advanceTimersByTimeAsync(250);
 
-    await waitFor(() => {
-      const section = screen.getByTestId('filter-section-people');
+    await vi.waitFor(() => {
+      const section = page.getByTestId('filter-section-people').element();
       expect(section.textContent).toContain('(0)');
     });
   });
@@ -308,21 +293,19 @@ describe('Cascade child auto-clear', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
     // Wait for initial camera load and expand
-    await waitFor(() => {
-      expect(screen.getByTestId('camera-make-Fujifilm')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('camera-make-Fujifilm').element()).toBeTruthy();
     });
 
     // Click make to expand and trigger model fetch
-    await fireEvent.click(screen.getByTestId('camera-make-Fujifilm'));
+    await page.getByTestId('camera-make-Fujifilm').click();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       // modelsFn should have been called — first returns X-T5 and X-H2
       expect(modelsFn).toHaveBeenCalled();
     });
@@ -346,20 +329,18 @@ describe('Cascade child auto-clear', () => {
       },
     };
 
-    render(FilterPanel, {
-      props: { config, timeBuckets: [], filters },
-    });
+    await render(FilterPanel, { config, timeBuckets: [], filters });
 
     await vi.advanceTimersByTimeAsync(0);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('location-country-Germany')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(page.getByTestId('location-country-Germany').element()).toBeTruthy();
     });
 
     // Click country to expand and trigger city fetch
-    await fireEvent.click(screen.getByTestId('location-country-Germany'));
+    await page.getByTestId('location-country-Germany').click();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(citiesFn).toHaveBeenCalled();
     });
   });

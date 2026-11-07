@@ -1,8 +1,8 @@
 import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
 import type { TakeoutAlbum, TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
-import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import ImportReviewStep from '../import-review-step.svelte';
 
 function makeItem(overrides?: Partial<TakeoutMediaItem>): TakeoutMediaItem {
@@ -70,63 +70,55 @@ describe('ImportReviewStep', () => {
     vi.resetAllMocks();
   });
 
-  it('renders summary stats', () => {
-    const { getByText } = render(ImportReviewStep, { props: defaultProps });
+  it('renders summary stats', async () => {
+    const { getByText } = await render(ImportReviewStep, defaultProps);
 
-    expect(getByText('100')).toBeInTheDocument();
-    expect(getByText('80')).toBeInTheDocument();
+    await expect.element(getByText('100')).toBeInTheDocument();
+    await expect.element(getByText('80')).toBeInTheDocument();
   });
 
-  it('lists albums with checkboxes', () => {
-    const { getByTestId } = render(ImportReviewStep, { props: defaultProps });
+  it('lists albums with checkboxes', async () => {
+    const { getByTestId } = await render(ImportReviewStep, defaultProps);
 
-    expect(getByTestId('album-Vacation')).toBeInTheDocument();
-    expect(getByTestId('album-Photos from 2023')).toBeInTheDocument();
+    await expect.element(getByTestId('album-Vacation')).toBeInTheDocument();
+    await expect.element(getByTestId('album-Photos from 2023')).toBeInTheDocument();
   });
 
-  it('auto-generated albums shown with correct checked state', () => {
-    const { getByTestId } = render(ImportReviewStep, { props: defaultProps });
+  it('auto-generated albums shown with correct checked state', async () => {
+    const { getByTestId } = await render(ImportReviewStep, defaultProps);
 
     // "Photos from 2023" is auto-generated and NOT in selectedAlbums
-    const autoAlbum = getByTestId('album-Photos from 2023');
-    expect(autoAlbum).toBeInTheDocument();
+    await expect.element(getByTestId('album-Photos from 2023')).toBeInTheDocument();
   });
 
   it('calls onToggleAlbum when album checkbox clicked', async () => {
-    const user = userEvent.setup();
-    const { getByTestId } = render(ImportReviewStep, { props: defaultProps });
+    const { getByTestId } = await render(ImportReviewStep, defaultProps);
 
-    const albumRow = getByTestId('album-Vacation');
-    const checkbox = albumRow.querySelector('button');
-    if (checkbox) {
-      await user.click(checkbox);
-      expect(onToggleAlbum).toHaveBeenCalledWith('Vacation');
-    }
+    const checkbox = getByTestId('album-Vacation').element().querySelector('button');
+    expect(checkbox).not.toBeNull();
+    await userEvent.click(checkbox!);
+    expect(onToggleAlbum).toHaveBeenCalledWith('Vacation');
   });
 
   it('calls onImport when Import button clicked', async () => {
-    const user = userEvent.setup();
-    const { getByTestId } = render(ImportReviewStep, { props: defaultProps });
+    const { getByTestId } = await render(ImportReviewStep, defaultProps);
 
-    await user.click(getByTestId('import-button'));
+    await userEvent.click(getByTestId('import-button'));
     expect(onImport).toHaveBeenCalledOnce();
   });
 
-  it('shows warning when items missing dates', () => {
+  it('shows warning when items missing dates', async () => {
     const stats = { ...defaultStats, withDate: 90 };
-    const { container } = render(ImportReviewStep, {
-      props: { ...defaultProps, stats },
-    });
+    const { container } = await render(ImportReviewStep, { ...defaultProps, stats });
 
     // The warning should exist somewhere in the rendered output
     expect(container.textContent).toContain('import_missing_dates_warning');
   });
 
-  it('import button shows correct count', () => {
-    const { getByTestId } = render(ImportReviewStep, { props: defaultProps });
+  it('import button shows correct count', async () => {
+    const { getByTestId } = await render(ImportReviewStep, defaultProps);
 
-    const button = getByTestId('import-button');
     // With dev fallback locale, i18n renders key as-is: "import_start"
-    expect(button.textContent).toContain('import_start');
+    await expect.element(getByTestId('import-button')).toMatchTextContent('import_start');
   });
 });

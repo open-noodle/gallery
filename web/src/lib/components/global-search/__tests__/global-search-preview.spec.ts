@@ -1,9 +1,13 @@
-import { render } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import GlobalSearchPreview from '../global-search-preview.svelte';
 
 // Avoid real navigation side-effects from child previews' Open buttons.
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(),
+}));
 
 // Mirror the mocking shape used by the per-kind preview specs so the @immich/ui
 // Button / IconButton chain resolves against the real module's Tooltip.Provider
@@ -14,7 +18,7 @@ vi.mock('@immich/ui', async (original) => {
 });
 
 describe('GlobalSearchPreview dispatcher', () => {
-  it('renders AlbumPreview when activeItem.kind is album', () => {
+  it('renders AlbumPreview when activeItem.kind is album', async () => {
     const activeItem = {
       kind: 'album' as const,
       data: {
@@ -25,12 +29,12 @@ describe('GlobalSearchPreview dispatcher', () => {
         assetCount: 1,
       },
     };
-    const { container } = render(GlobalSearchPreview, { props: { activeItem } as never });
+    await render(GlobalSearchPreview, { props: { activeItem } as never });
     // album-preview renders the placeholder frame when albumThumbnailAssetId is null.
-    expect(container.querySelector('[data-testid="album-preview-placeholder"]')).toBeInTheDocument();
+    await expect.element(page.getByTestId('album-preview-placeholder')).toBeInTheDocument();
   });
 
-  it('renders SpacePreview when activeItem.kind is space', () => {
+  it('renders SpacePreview when activeItem.kind is space', async () => {
     const activeItem = {
       kind: 'space' as const,
       data: {
@@ -44,8 +48,8 @@ describe('GlobalSearchPreview dispatcher', () => {
         members: [],
       },
     };
-    const { container } = render(GlobalSearchPreview, { props: { activeItem } as never });
+    await render(GlobalSearchPreview, { props: { activeItem } as never });
     // space-preview renders the gradient fallback when recentAssetIds is empty.
-    expect(container.querySelector('[data-testid="space-preview-gradient"]')).toBeInTheDocument();
+    await expect.element(page.getByTestId('space-preview-gradient')).toBeInTheDocument();
   });
 });

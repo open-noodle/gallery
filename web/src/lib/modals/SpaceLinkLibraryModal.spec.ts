@@ -1,12 +1,13 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { getIntersectionObserverMock } from '#lib/__mocks__/intersection-observer.mock.ts';
-import '#lib/__mocks__/sdk.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import { getVisualViewportMock } from '#lib/__mocks__/visual-viewport.mock.ts';
-import { type LibraryResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import SpaceLinkLibraryModal from './SpaceLinkLibraryModal.svelte';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
+import type { LibraryResponseDto } from '@immich/sdk';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+
+// The browser links every static import before any module body runs, so a static import of the
+// modal would load the real @immich/sdk before sdk.mock.ts registers its vi.mock. Loading it
+// after that registration gives it the mocked module.
+const { default: SpaceLinkLibraryModal } = await import('./SpaceLinkLibraryModal.svelte');
 
 const makeLibrary = (overrides: Partial<LibraryResponseDto> = {}): LibraryResponseDto => ({
   id: 'lib-1',
@@ -25,16 +26,7 @@ describe('SpaceLinkLibraryModal', () => {
   const onClose = vi.fn();
 
   beforeEach(() => {
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
-    vi.stubGlobal('visualViewport', getVisualViewportMock());
     vi.resetAllMocks();
-    Element.prototype.animate = getAnimateMock();
-  });
-
-  afterAll(async () => {
-    await waitFor(() => {
-      expect(document.body.style.pointerEvents).not.toBe('none');
-    });
   });
 
   it('lists libraries that are not already linked', async () => {
@@ -44,11 +36,11 @@ describe('SpaceLinkLibraryModal', () => {
       makeLibrary({ id: 'linked', name: 'Old Scans' }),
     ]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: ['linked'], onClose });
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: ['linked'], onClose });
 
-    expect(await screen.findByRole('button', { name: /Family Photos/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Drone Footage/ })).toBeInTheDocument();
-    expect(screen.queryByText('Old Scans')).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Family Photos/ })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: /Drone Footage/ })).toBeInTheDocument();
+    await expect.element(page.getByText('Old Scans')).not.toBeInTheDocument();
   });
 
   it('shows the asset count and import path in the row subtitle', async () => {
@@ -56,10 +48,10 @@ describe('SpaceLinkLibraryModal', () => {
       makeLibrary({ id: 'a', name: 'Family Photos', assetCount: 1240, importPaths: ['/mnt/photos'] }),
     ]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
-    await screen.findByText('Family Photos');
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await expect.element(page.getByText('Family Photos')).toBeInTheDocument();
 
-    expect(screen.getByText(/\/mnt\/photos/)).toBeInTheDocument();
+    await expect.element(page.getByText(/\/mnt\/photos/)).toBeInTheDocument();
   });
 
   it('filters the linkable libraries by search text', async () => {
@@ -68,41 +60,41 @@ describe('SpaceLinkLibraryModal', () => {
       makeLibrary({ id: 'b', name: 'Drone Footage' }),
     ]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
-    await screen.findByText('Family Photos');
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await expect.element(page.getByText('Family Photos')).toBeInTheDocument();
 
-    await fireEvent.input(screen.getByRole('textbox'), { target: { value: 'drone' } });
+    await userEvent.fill(page.getByRole('textbox'), 'drone');
 
-    expect(screen.queryByText('Family Photos')).not.toBeInTheDocument();
-    expect(screen.getByText('Drone Footage')).toBeInTheDocument();
+    await expect.element(page.getByText('Family Photos')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Drone Footage')).toBeInTheDocument();
   });
 
   it('shows the no-results message when the search matches nothing', async () => {
     sdkMock.getAllLibraries.mockResolvedValue([makeLibrary({ id: 'a', name: 'Family Photos' })]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
-    await screen.findByText('Family Photos');
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await expect.element(page.getByText('Family Photos')).toBeInTheDocument();
 
-    await fireEvent.input(screen.getByRole('textbox'), { target: { value: 'nonexistent' } });
+    await userEvent.fill(page.getByRole('textbox'), 'nonexistent');
 
-    expect(screen.getByText('search_no_result')).toBeInTheDocument();
+    await expect.element(page.getByText('search_no_result')).toBeInTheDocument();
   });
 
   it('shows the empty state when every library is already linked', async () => {
     sdkMock.getAllLibraries.mockResolvedValue([makeLibrary({ id: 'a', name: 'Family Photos' })]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: ['a'], onClose });
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: ['a'], onClose });
 
-    expect(await screen.findByText('spaces_linked_libraries_no_libraries')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await expect.element(page.getByText('spaces_linked_libraries_no_libraries')).toBeInTheDocument();
+    await expect.element(page.getByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('shows the empty state when libraries fail to load', async () => {
     sdkMock.getAllLibraries.mockRejectedValue(new Error('network'));
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
 
-    expect(await screen.findByText('spaces_linked_libraries_no_libraries')).toBeInTheDocument();
+    await expect.element(page.getByText('spaces_linked_libraries_no_libraries')).toBeInTheDocument();
   });
 
   it('links every selected library then closes with the linked count', async () => {
@@ -113,13 +105,13 @@ describe('SpaceLinkLibraryModal', () => {
     ]);
     sdkMock.linkLibrary.mockResolvedValue(undefined as never);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
 
-    await userEvent.click(await screen.findByRole('button', { name: /Alpha/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Gamma/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'link' }));
+    await userEvent.click(page.getByRole('button', { name: /Alpha/ }));
+    await userEvent.click(page.getByRole('button', { name: /Gamma/ }));
+    await userEvent.click(page.getByRole('button', { name: 'link' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.linkLibrary).toHaveBeenCalledWith({
         id: 'space-1',
         sharedSpaceLibraryLinkDto: { libraryId: 'a' },
@@ -134,19 +126,19 @@ describe('SpaceLinkLibraryModal', () => {
       sharedSpaceLibraryLinkDto: { libraryId: 'b' },
     });
     expect(sdkMock.linkLibrary).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith(2));
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledWith(2));
   });
 
   it('disables the submit button until a library is selected', async () => {
     sdkMock.getAllLibraries.mockResolvedValue([makeLibrary({ id: 'a', name: 'Alpha' })]);
 
-    render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
-    await screen.findByText('Alpha');
+    await render(SpaceLinkLibraryModal, { spaceId: 'space-1', linkedLibraryIds: [], onClose });
+    await expect.element(page.getByText('Alpha')).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'link' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { name: 'link' })).toBeDisabled();
 
-    await userEvent.click(screen.getByRole('button', { name: /Alpha/ }));
+    await userEvent.click(page.getByRole('button', { name: /Alpha/ }));
 
-    expect(screen.getByRole('button', { name: 'link' })).not.toBeDisabled();
+    await expect.element(page.getByRole('button', { name: 'link' })).not.toBeDisabled();
   });
 });

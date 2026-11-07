@@ -1,8 +1,10 @@
+import { isApplePlatform } from '#lib/gallery/search/search-hotkey.ts';
 import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
-import { fireEvent, render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent, type Locator } from 'vitest/browser';
 import GlobalSearchInputTrigger from '../global-search-input-trigger.svelte';
 
 const { mockPage } = vi.hoisted(() => ({
@@ -16,6 +18,30 @@ const { mockPage } = vi.hoisted(() => ({
 vi.mock('$app/state', () => ({ page: mockPage }));
 
 const { mediaState } = vi.hoisted(() => ({ mediaState: { pointerCoarse: false, minLg: false } }));
+
+// A touch tap the way a browser delivers it: a cancelable `pointerdown`, then focus
+// unless the handler prevented it, then pointerup and click.
+const tap = async (locator: Locator) => {
+  const element = locator.element() as HTMLElement;
+  const down = new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, cancelable: true });
+  element.dispatchEvent(down);
+  if (!down.defaultPrevented) {
+    element.focus();
+  }
+  element.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch', bubbles: true, cancelable: true }));
+  element.click();
+  await tick();
+};
+
+// A real click on `document.body` lands on its centre, which is inside the open
+// dropdown; click a spot that is genuinely outside instead.
+const clickOutside = async () => {
+  const outside = document.createElement('div');
+  outside.style.cssText = 'position:fixed;right:0;bottom:0;width:8px;height:8px';
+  document.body.append(outside);
+  await userEvent.click(outside);
+  outside.remove();
+};
 
 vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
   mediaQueryManager: {
@@ -42,60 +68,59 @@ describe('global-search-input-trigger', () => {
 
   it('opens a dropdown from an editable search field', async () => {
     const openSpy = vi.spyOn(globalSearchManager, 'open');
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.click(input);
-    await user.type(input, 'mountain');
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await userEvent.click(input);
+    await userEvent.type(input, 'mountain');
 
     expect(openSpy).toHaveBeenCalledWith('dropdown');
-    expect(input).toHaveValue('mountain');
+    await expect.element(input).toHaveValue('mountain');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
   });
 
   it('renders typed filter pills while using the inline dropdown search field', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.click(input);
-    await user.type(input, 'person:anna');
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await userEvent.click(input);
+    await userEvent.type(input, 'person:anna');
 
     const dropdownPanel = document.querySelector('[data-cmdk-dropdown-panel]');
 
     expect(dropdownPanel).not.toBeNull();
-    expect(dropdownPanel as HTMLElement).toContainElement(screen.getByTestId('typed-search-token-rail'));
-    expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
-    expect(screen.getByTestId('typed-search-token-person-key')).toHaveTextContent('person');
-    expect(screen.getByTestId('typed-search-token-person-value')).toHaveTextContent('anna');
+    await expect
+      .element(page.elementLocator(dropdownPanel as HTMLElement))
+      .toContainElement(page.getByTestId('typed-search-token-rail'));
+    await expect
+      .element(page.getByTestId('typed-search-token-person'))
+      .toHaveAttribute('data-status', 'pending-entity');
+    await expect.element(page.getByTestId('typed-search-token-person-key')).toMatchTextContent('person');
+    await expect.element(page.getByTestId('typed-search-token-person-value')).toMatchTextContent('anna');
   });
 
   it('keeps the dropdown panel closed until the search field receives focus', async () => {
-    const user = userEvent.setup();
-
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
 
-    await user.click(screen.getByRole('combobox', { name: 'cmdk_placeholder' }));
+    await userEvent.click(page.getByRole('combobox', { name: 'cmdk_placeholder' }));
 
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
     expect(globalSearchManager.presentation).toBe('dropdown');
   });
 
-  it('shows the committed page query while the search field is closed', () => {
+  it('shows the committed page query while the search field is closed', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountains');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('mountains');
+    await expect.element(page.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('mountains');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
-  it('shows committed raw typed search text while the search field is closed', () => {
+  it('shows committed raw typed search text while the search field is closed', async () => {
     mockPage.url = new URL('https://gallery.test/photos?people=person-cat');
     storeTypedSearchNames(
       '/photos?people=person-cat',
@@ -106,9 +131,9 @@ describe('global-search-input-trigger', () => {
       'person:cat',
     );
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('person:cat');
+    await expect.element(page.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('person:cat');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
@@ -122,72 +147,64 @@ describe('global-search-input-trigger', () => {
       },
       'tag:nature mountains',
     );
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    expect(input).toHaveValue('tag:nature mountains');
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await expect.element(input).toHaveValue('tag:nature mountains');
 
-    await user.click(input);
+    await userEvent.click(input);
 
-    expect(input).toHaveValue('tag:nature mountains');
+    await expect.element(input).toHaveValue('tag:nature mountains');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
   });
 
   it('pressing Enter after clearing the top search field clears the committed search', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountains');
     const activateSearchSpy = vi.spyOn(globalSearchManager, 'activateSearch').mockImplementation(async () => {});
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    expect(input).toHaveValue('mountains');
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await expect.element(input).toHaveValue('mountains');
 
-    await user.click(input);
-    await user.clear(input);
-    await user.keyboard('{Enter}');
+    await userEvent.click(input);
+    await userEvent.clear(input);
+    await userEvent.keyboard('{Enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('');
   });
 
   it('closes the dropdown on outside click', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    await user.click(screen.getByRole('combobox', { name: 'cmdk_placeholder' }));
+    await userEvent.click(page.getByRole('combobox', { name: 'cmdk_placeholder' }));
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
 
-    await user.click(document.body);
+    await clickOutside();
 
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
     expect(globalSearchManager.isOpen).toBe(false);
   });
 
   it('does not let the dropdown outside-click listener close the modal presentation', async () => {
-    const user = userEvent.setup();
-
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
     globalSearchManager.open('modal');
-    await user.click(document.body);
+    await clickOutside();
 
     expect(globalSearchManager.isOpen).toBe(true);
     expect(globalSearchManager.presentation).toBe('modal');
   });
 
   it('switches from dropdown to modal presentation on the keyboard launcher shortcut', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.click(input);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await userEvent.click(input);
     expect(globalSearchManager.presentation).toBe('dropdown');
 
-    await user.keyboard('{Control>}k{/Control}');
+    await userEvent.keyboard(isApplePlatform() ? '{Meta>}k{/Meta}' : '{Control>}k{/Control}');
 
     expect(globalSearchManager.isOpen).toBe(true);
     expect(globalSearchManager.presentation).toBe('modal');
@@ -196,12 +213,11 @@ describe('global-search-input-trigger', () => {
 
   it('opens the modal palette when the search field is tapped', async () => {
     const openSpy = vi.spyOn(globalSearchManager, 'open');
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.pointer({ keys: '[TouchA]', target: input });
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await tap(input);
 
     expect(openSpy).toHaveBeenCalledWith('modal');
     expect(globalSearchManager.presentation).toBe('modal');
@@ -209,80 +225,72 @@ describe('global-search-input-trigger', () => {
   });
 
   it('does not focus the search field when it is tapped', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await tap(input);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.pointer({ keys: '[TouchA]', target: input });
-
-    expect(input).not.toHaveFocus();
+    await expect.element(input).not.toHaveFocus();
   });
 
   it('opens the inline dropdown for pen input rather than the modal', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await fireEvent.pointerDown(input, { pointerType: 'pen' });
-    await user.click(input);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    input
+      .element()
+      .dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'pen', bubbles: true, cancelable: true }));
+    await userEvent.click(input);
 
     expect(globalSearchManager.presentation).toBe('dropdown');
   });
 
   it('opens the inline dropdown when a pointerdown carries no pointer type', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await fireEvent.pointerDown(input);
-    await user.click(input);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    input.element().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    await userEvent.click(input);
 
     expect(globalSearchManager.presentation).toBe('dropdown');
   });
 
   it('does not let focus downgrade an open modal to the inline dropdown', async () => {
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
     globalSearchManager.open('modal');
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await fireEvent.focus(input);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    (input.element() as HTMLElement).focus();
 
     expect(globalSearchManager.presentation).toBe('modal');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
   it('upgrades an already-open inline dropdown to the modal when tapped', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.click(input);
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await userEvent.click(input);
     expect(globalSearchManager.presentation).toBe('dropdown');
 
-    await user.pointer({ keys: '[TouchA]', target: input });
+    await tap(input);
 
     expect(globalSearchManager.presentation).toBe('modal');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
   it('reopens the modal on a second tap after the first modal was closed', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    await user.pointer({ keys: '[TouchA]', target: input });
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await tap(input);
     expect(globalSearchManager.presentation).toBe('modal');
 
     globalSearchManager.close();
     expect(globalSearchManager.isOpen).toBe(false);
 
-    await user.pointer({ keys: '[TouchA]', target: input });
+    await tap(input);
 
     expect(globalSearchManager.isOpen).toBe(true);
     expect(globalSearchManager.presentation).toBe('modal');
@@ -290,75 +298,72 @@ describe('global-search-input-trigger', () => {
   });
 
   it('opens the inline dropdown, not the modal, when focus arrives via Tab with no pointer event', async () => {
-    const user = userEvent.setup();
+    await render(GlobalSearchInputTrigger);
 
-    render(GlobalSearchInputTrigger);
+    await userEvent.tab();
 
-    await user.tab();
-
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    expect(input).toHaveFocus();
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await expect.element(input).toHaveFocus();
     expect(globalSearchManager.presentation).toBe('dropdown');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
   });
 
-  it('renders the placeholder and hotkey hint', () => {
-    render(GlobalSearchInputTrigger);
+  it('renders the placeholder and hotkey hint', async () => {
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('cmdk-input-trigger')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'cmdk_placeholder' })).toBeInTheDocument();
-    expect(screen.getByText(/^(⌘K|Ctrl\+K)$/)).toBeInTheDocument();
+    await expect.element(page.getByTestId('cmdk-input-trigger')).toBeInTheDocument();
+    await expect.element(page.getByRole('combobox', { name: 'cmdk_placeholder' })).toBeInTheDocument();
+    await expect.element(page.getByText(/^(⌘K|Ctrl\+K)$/)).toBeInTheDocument();
   });
 
-  it('shows the sort dropdown on the photos page when a query is active', () => {
+  it('shows the sort dropdown on the photos page when a query is active', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountain&sort=asc');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_oldest');
+    await expect.element(page.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_oldest');
   });
 
-  it('shows the sort dropdown on the photos page before a query exists', () => {
+  it('shows the sort dropdown on the photos page before a query exists', async () => {
     mockPage.url = new URL('https://gallery.test/photos');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
+    await expect.element(page.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
   });
 
-  it('shows the sort dropdown on a space detail page before a query exists', () => {
+  it('shows the sort dropdown on a space detail page before a query exists', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-123');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
+    await expect.element(page.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
   });
 
-  it('shows relevance on searchable pages with an active query', () => {
+  it('shows relevance on searchable pages with an active query', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-123?q=mountain');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_relevance');
+    await expect.element(page.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_relevance');
   });
 
-  it('hides the sort dropdown on non-searchable pages', () => {
+  it('hides the sort dropdown on non-searchable pages', async () => {
     mockPage.url = new URL('https://gallery.test/albums');
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('search-sort-btn')).not.toBeInTheDocument();
   });
 
   it('applies sort immediately from the top-bar trigger', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountain');
     const applySortSpy = vi.spyOn(globalSearchManager, 'applySearchSort').mockResolvedValue();
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    await user.click(screen.getByTestId('search-sort-btn'));
-    await user.click(screen.getByText('search_sort_newest'));
+    await userEvent.click(page.getByTestId('search-sort-btn'));
+    await userEvent.click(page.getByText('search_sort_newest'));
 
     expect(applySortSpy).toHaveBeenCalledWith('desc', 'mountain');
   });
@@ -366,39 +371,38 @@ describe('global-search-input-trigger', () => {
   it('applies sort immediately before a query exists', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-123');
     const applySortSpy = vi.spyOn(globalSearchManager, 'applySearchSort').mockResolvedValue();
-    const user = userEvent.setup();
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    await user.click(screen.getByTestId('search-sort-btn'));
-    await user.click(screen.getByText('search_sort_oldest'));
+    await userEvent.click(page.getByTestId('search-sort-btn'));
+    await userEvent.click(page.getByText('search_sort_oldest'));
 
     expect(applySortSpy).toHaveBeenCalledWith('asc', '');
   });
 
-  it('hides the keyboard hint when the pointer is coarse', () => {
+  it('hides the keyboard hint when the pointer is coarse', async () => {
     mediaState.pointerCoarse = true;
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.queryByText(/^(⌘K|Ctrl\+K)$/)).not.toBeInTheDocument();
+    await expect.element(page.getByText(/^(⌘K|Ctrl\+K)$/)).not.toBeInTheDocument();
   });
 
-  it('keeps the search field usable when the keyboard hint is hidden', () => {
+  it('keeps the search field usable when the keyboard hint is hidden', async () => {
     mediaState.pointerCoarse = true;
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
-    expect(input).toBeInTheDocument();
-    expect(screen.getByTestId('cmdk-input-trigger')).toBeInTheDocument();
+    const input = page.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await expect.element(input).toBeInTheDocument();
+    await expect.element(page.getByTestId('cmdk-input-trigger')).toBeInTheDocument();
   });
 
-  it('shows the keyboard hint when the pointer is not coarse', () => {
+  it('shows the keyboard hint when the pointer is not coarse', async () => {
     mediaState.pointerCoarse = false;
 
-    render(GlobalSearchInputTrigger);
+    await render(GlobalSearchInputTrigger);
 
-    expect(screen.getByText(/^(⌘K|Ctrl\+K)$/)).toBeInTheDocument();
+    await expect.element(page.getByText(/^(⌘K|Ctrl\+K)$/)).toBeInTheDocument();
   });
 });

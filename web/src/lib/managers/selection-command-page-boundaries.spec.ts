@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { commands } from 'vitest/browser';
 
-const root = resolve(import.meta.dirname, '../../..');
 const allowedPages = [
   'src/routes/(user)/photos/[[assetId=id]]/+page.svelte',
   'src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/+page.svelte',
@@ -25,15 +23,16 @@ const deniedPages = [
   'src/routes/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]/+page.svelte',
 ];
 
-const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
+// Paths are relative to web/.
+const read = (path: string) => commands.readFile(path);
 
 describe('v1.5A selection command page boundaries', () => {
-  it('registers selection context only on approved pages in this slice', () => {
+  it('registers selection context only on approved pages in this slice', async () => {
     for (const path of allowedPages) {
-      expect(read(path), `${path} should register v1.5A selection context`).toContain('registerSelectionContext');
+      expect(await read(path), `${path} should register v1.5A selection context`).toContain('registerSelectionContext');
     }
     for (const path of deniedPages) {
-      expect(read(path), `${path} is out of scope for v1.5A`).not.toContain('registerSelectionContext');
+      expect(await read(path), `${path} is out of scope for v1.5A`).not.toContain('registerSelectionContext');
     }
   });
 });

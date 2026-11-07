@@ -1,7 +1,8 @@
 import RewindOneAtATime from '#lib/gallery/cleanup/RewindOneAtATime.svelte';
 import { AssetTypeEnum, CleanupBlurReason, type AssetResponseDto, type CleanupAssetDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, within } from '@testing-library/svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 
 const mocks = vi.hoisted(() => ({
   getAssetInfo: vi.fn(),
@@ -32,8 +33,8 @@ const asset = (overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   ...overrides,
 });
 
-const renderOne = (current: CleanupAssetDto, inBurst = false) =>
-  render(RewindOneAtATime, {
+const renderOne = async (current: CleanupAssetDto, inBurst = false) =>
+  await render(RewindOneAtATime, {
     asset: current,
     index: 1,
     total: 1,
@@ -49,57 +50,58 @@ const renderOne = (current: CleanupAssetDto, inBurst = false) =>
   });
 
 describe('RewindOneAtATime hints', () => {
-  it('shows no hints card when no hint applies', () => {
-    renderOne(asset());
+  it('shows no hints card when no hint applies', async () => {
+    await renderOne(asset());
 
-    expect(screen.queryByTestId('cleanup-rewind-hints')).toBeNull();
+    expect(page.getByTestId('cleanup-rewind-hints').query()).toBeNull();
   });
 
-  it('links a burst photo to the Bursts queue', () => {
-    renderOne(asset(), true);
+  it('links a burst photo to the Bursts queue', async () => {
+    await renderOne(asset(), true);
 
-    const burst = screen.getByTestId('cleanup-hint-burst');
-    expect(burst).toHaveTextContent('cleanup_hint_burst');
-    expect(within(burst).getByRole('link')).toHaveAttribute('href', '/utilities/cleanup/bursts');
-    expect(screen.queryByTestId('cleanup-hint-quality')).toBeNull();
+    const burst = page.getByTestId('cleanup-hint-burst');
+    await expect.element(burst).toMatchTextContent('cleanup_hint_burst');
+    await expect.element(burst.getByRole('link')).toHaveAttribute('href', '/utilities/cleanup/bursts');
+    expect(page.getByTestId('cleanup-hint-quality').query()).toBeNull();
   });
 
   it.each([
     [CleanupBlurReason.Blurry, 'cleanup_hint_blurry'],
     [CleanupBlurReason.Dark, 'cleanup_hint_dark'],
     [CleanupBlurReason.Bright, 'cleanup_hint_bright'],
-  ])('links a photo flagged %s to the Blurry queue', (reason, label) => {
-    renderOne(asset({ reason }));
+  ])('links a photo flagged %s to the Blurry queue', async (reason, label) => {
+    await renderOne(asset({ reason }));
 
-    const hint = screen.getByTestId('cleanup-hint-quality');
-    expect(hint).toHaveTextContent(label);
-    expect(within(hint).getByRole('link')).toHaveAttribute('href', '/utilities/cleanup/blurry');
-    expect(screen.queryByTestId('cleanup-hint-burst')).toBeNull();
+    const hint = page.getByTestId('cleanup-hint-quality');
+    await expect.element(hint).toMatchTextContent(label);
+    await expect.element(hint.getByRole('link')).toHaveAttribute('href', '/utilities/cleanup/blurry');
+    expect(page.getByTestId('cleanup-hint-burst').query()).toBeNull();
   });
 
-  it('shows both hints together', () => {
-    renderOne(asset({ reason: CleanupBlurReason.Blurry }), true);
+  it('shows both hints together', async () => {
+    await renderOne(asset({ reason: CleanupBlurReason.Blurry }), true);
 
-    const card = screen.getByTestId('cleanup-rewind-hints');
+    const card = page.getByTestId('cleanup-rewind-hints');
     expect(
-      within(card)
-        .getAllByRole('link')
+      card
+        .getByRole('link')
+        .elements()
         .map((link) => link.getAttribute('href')),
     ).toEqual(['/utilities/cleanup/bursts', '/utilities/cleanup/blurry']);
   });
 });
 
 describe('RewindOneAtATime layout', () => {
-  it('sizes the stage to the photo, so a portrait photo is not boxed into 4:3', () => {
-    renderOne(asset({ id: 'tall', width: 3000, height: 4000 }));
-    expect(screen.getByTestId('cleanup-rewind-stage-tall').style.aspectRatio).toMatch(/^0.75/);
+  it('sizes the stage to the photo, so a portrait photo is not boxed into 4:3', async () => {
+    await renderOne(asset({ id: 'tall', width: 3000, height: 4000 }));
+    expect(page.getByTestId('cleanup-rewind-stage-tall').element().style.aspectRatio).toMatch(/^0.75/);
   });
 
-  it('links to the photo in a new tab', () => {
-    renderOne(asset({ id: 'p1' }));
-    const link = screen.getByTestId('cleanup-rewind-open-new-tab');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link.getAttribute('href')).toContain('p1');
+  it('links to the photo in a new tab', async () => {
+    await renderOne(asset({ id: 'p1' }));
+    const link = page.getByTestId('cleanup-rewind-open-new-tab');
+    await expect.element(link).toHaveAttribute('target', '_blank');
+    expect(link.element().getAttribute('href')).toContain('p1');
   });
 
   it('shows the date and the named people from the full record, read-only', async () => {
@@ -115,11 +117,12 @@ describe('RewindOneAtATime layout', () => {
       tags: [],
       exifInfo: {},
     } as unknown as AssetResponseDto);
-    renderOne(asset({ id: 'p2', localDateTime: '2016-10-29T14:32:00.000Z' }));
+    await renderOne(asset({ id: 'p2', localDateTime: '2016-10-29T14:32:00.000Z' }));
 
-    expect(screen.getByTestId('cleanup-rewind-info-date')).toHaveTextContent('2016');
-    const people = await screen.findByTestId('cleanup-rewind-info-people');
-    expect(people).toHaveTextContent('Anna');
-    expect(within(people).queryByRole('button')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-rewind-info-date')).toMatchTextContent('2016');
+    const people = page.getByTestId('cleanup-rewind-info-people');
+    await expect.element(people).toBeInTheDocument();
+    await expect.element(people).toMatchTextContent('Anna');
+    await expect.element(people.getByRole('button')).not.toBeInTheDocument();
   });
 });

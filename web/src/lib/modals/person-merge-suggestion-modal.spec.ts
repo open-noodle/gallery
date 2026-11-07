@@ -1,10 +1,8 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { Type, type PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { afterEach } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PersonMergeSuggestionModal from './PersonMergeSuggestionModal.svelte';
 
 vi.mock('../components/assets/thumbnail/ImageThumbnail.svelte', async () => {
@@ -22,13 +20,6 @@ vi.mock('@immich/ui', async (importOriginal) => {
 });
 
 const httpError = (status: number, data: Record<string, unknown>) => ({ __http: true, status, data, message: 'raw' });
-
-// Drain bits-ui Modal's deferred body-scroll-lock cleanup before happy-dom tears
-// down `document`. Otherwise CI can report an unhandled `document is not defined`
-// after all assertions in this file have passed.
-afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-});
 
 function person(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
   return {
@@ -55,7 +46,7 @@ describe('PersonMergeSuggestionModal', () => {
   });
 
   it('uses scoped identity repair when either side is a space primary profile', async () => {
-    render(PersonMergeSuggestionModal, {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({
         id: 'space-visible-person',
         primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
@@ -65,9 +56,9 @@ describe('PersonMergeSuggestionModal', () => {
       onClose: vi.fn(),
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+    await userEvent.click(page.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.mergeScopedPeople).toHaveBeenCalledWith({
         mergeScopedPeopleDto: {
           target: { type: 'person', id: 'person-target' },
@@ -81,7 +72,7 @@ describe('PersonMergeSuggestionModal', () => {
   // #1100: a space editor renaming a space person to an existing space person's name owns neither side,
   // so the owner-only legacy merge would be refused.
   it('uses scoped identity repair when both sides are space primary profiles', async () => {
-    render(PersonMergeSuggestionModal, {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({
         id: 'space-person-new',
         primaryProfile: { type: Type.SpacePerson, id: 'space-person-new', spaceId: 'space-1' },
@@ -94,9 +85,9 @@ describe('PersonMergeSuggestionModal', () => {
       onClose: vi.fn(),
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+    await userEvent.click(page.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.mergeScopedPeople).toHaveBeenCalledWith({
         mergeScopedPeopleDto: {
           target: { type: 'space-person', id: 'space-person-norgy', spaceId: 'space-1' },
@@ -108,16 +99,16 @@ describe('PersonMergeSuggestionModal', () => {
   });
 
   it('keeps legacy personal merge when both sides are personal profiles', async () => {
-    render(PersonMergeSuggestionModal, {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({ id: 'person-source' }),
       personToBeMergedInto: person({ id: 'person-target' }),
       potentialMergePeople: [],
       onClose: vi.fn(),
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+    await userEvent.click(page.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(sdkMock.mergePersonLegacy).toHaveBeenCalledWith({
         id: 'person-target',
         mergePersonDto: { ids: ['person-source'] },
@@ -133,16 +124,16 @@ describe('PersonMergeSuggestionModal', () => {
     );
     const onClose = vi.fn();
 
-    render(PersonMergeSuggestionModal, {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({ id: 'person-source' }),
       personToBeMergedInto: person({ id: 'person-target' }),
       potentialMergePeople: [],
       onClose,
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+    await userEvent.click(page.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    await vi.waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
     expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(1);
   });
@@ -155,16 +146,16 @@ describe('PersonMergeSuggestionModal', () => {
     vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     const onClose = vi.fn();
 
-    render(PersonMergeSuggestionModal, {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({ id: 'person-source' }),
       personToBeMergedInto: person({ id: 'person-target' }),
       potentialMergePeople: [],
       onClose,
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+    await userEvent.click(page.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() => expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(2));
     expect(sdkMock.mergePersonLegacy).toHaveBeenNthCalledWith(1, {
       id: 'person-target',
       mergePersonDto: { ids: ['person-source'] },
@@ -176,8 +167,8 @@ describe('PersonMergeSuggestionModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('renders the shared-space thumbnail for a space-primary candidate instead of the owner-only url', () => {
-    render(PersonMergeSuggestionModal, {
+  it('renders the shared-space thumbnail for a space-primary candidate instead of the owner-only url', async () => {
+    await render(PersonMergeSuggestionModal, {
       personToMerge: person({
         id: 'space-visible-person',
         name: 'Space Candidate',
@@ -189,7 +180,7 @@ describe('PersonMergeSuggestionModal', () => {
       onClose: vi.fn(),
     });
 
-    const src = screen.getByAltText('Space Candidate').getAttribute('src') ?? '';
+    const src = page.getByAltText('Space Candidate').element().getAttribute('src') ?? '';
     expect(src).toContain('/shared-spaces/space-1/people/space-person-1/thumbnail');
     expect(src).not.toContain('/people/space-visible-person/thumbnail');
   });

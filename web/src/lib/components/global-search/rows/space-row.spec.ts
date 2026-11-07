@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import SpaceRow from './space-row.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -30,28 +31,28 @@ describe('space-row', () => {
     isPending: false,
   };
 
-  it('renders space name', () => {
-    render(SpaceRow, { props: baseProps as never });
-    expect(screen.getByText('Family')).toBeInTheDocument();
+  it('renders space name', async () => {
+    await render(SpaceRow, { props: baseProps as never });
+    await expect.element(page.getByText('Family')).toBeInTheDocument();
   });
 
-  it('renders member-count pill with ICU plural (singular)', () => {
-    render(SpaceRow, {
+  it('renders member-count pill with ICU plural (singular)', async () => {
+    await render(SpaceRow, {
       props: { ...baseProps, item: { ...baseProps.item, memberCount: 1 } } as never,
     });
-    expect(screen.getByText(/1 member\b/)).toBeInTheDocument();
+    await expect.element(page.getByText(/1 member\b/)).toBeInTheDocument();
   });
 
-  it('renders member-count pill with ICU plural (plural)', () => {
-    render(SpaceRow, { props: baseProps as never });
-    expect(screen.getByText(/3 members/)).toBeInTheDocument();
+  it('renders member-count pill with ICU plural (plural)', async () => {
+    await render(SpaceRow, { props: baseProps as never });
+    await expect.element(page.getByText(/3 members/)).toBeInTheDocument();
   });
 
-  it('renders pending style when isPending=true', () => {
-    const { container } = render(SpaceRow, {
+  it('renders pending style when isPending=true', async () => {
+    const { container } = await render(SpaceRow, {
       props: { ...baseProps, isPending: true } as never,
     });
-    expect(container.querySelector('.opacity-50')).toBeInTheDocument();
-    expect(container.querySelector('[data-testid="pending-spinner"]')).toBeInTheDocument();
+    expect(container.querySelector('.opacity-50')).not.toBeNull();
+    await expect.element(page.getByTestId('pending-spinner')).toBeInTheDocument();
   });
 });

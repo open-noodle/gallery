@@ -2,11 +2,11 @@ import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '#lib/components/people/people-face-statistics-info-cache.ts';
 import { locale } from '#lib/stores/preferences.store.ts';
 import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PeopleFaceStatisticsInfo from './people-face-statistics-info.svelte';
 
 function deferred<T>() {
@@ -28,7 +28,7 @@ const statistics = (overrides: Partial<PeopleFaceStatisticsResponseDto> = {}): P
   ...overrides,
 });
 
-const renderInfo = (
+const renderInfo = async (
   props: Partial<{
     cacheKey: string;
     loadStatistics: () => Promise<PeopleFaceStatisticsResponseDto>;
@@ -41,7 +41,7 @@ const renderInfo = (
   };
   return {
     loadStatistics,
-    ...render(
+    ...(await render(
       TestWrapper as Component<{
         component: typeof PeopleFaceStatisticsInfo;
         componentProps: typeof componentProps;
@@ -52,7 +52,7 @@ const renderInfo = (
           componentProps,
         },
       },
-    ),
+    )),
   };
 };
 
@@ -68,16 +68,12 @@ describe('PeopleFaceStatisticsInfo', () => {
     locale.set('en-US');
   });
 
-  afterEach(() => {
-    cleanup();
-  });
-
-  it('renders an accessible icon button trigger without loading statistics on initial render', () => {
+  it('renders an accessible icon button trigger without loading statistics on initial render', async () => {
     const loadStatistics = vi.fn().mockResolvedValue(statistics());
 
-    renderInfo({ loadStatistics });
+    await renderInfo({ loadStatistics });
 
-    expect(screen.getByRole('button', { name: 'View face statistics details' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'View face statistics details' })).toBeInTheDocument();
     expect(loadStatistics).not.toHaveBeenCalled();
   });
 
@@ -85,99 +81,103 @@ describe('PeopleFaceStatisticsInfo', () => {
     const request = deferred<PeopleFaceStatisticsResponseDto>();
     const loadStatistics = vi.fn(() => request.promise);
 
-    renderInfo({ loadStatistics });
-    await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
+    await renderInfo({ loadStatistics });
+    await page.getByRole('button', { name: 'View face statistics details' }).click();
 
     expect(loadStatistics).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading face statistics');
+    await expect.element(page.getByRole('status')).toMatchTextContent('Loading face statistics');
   });
 
   it('exposes expanded state, controls, and keyboard activation through the button', async () => {
     const request = deferred<PeopleFaceStatisticsResponseDto>();
     const loadStatistics = vi.fn(() => request.promise);
 
-    renderInfo({ loadStatistics });
+    await renderInfo({ loadStatistics });
 
-    const trigger = screen.getByRole('button', { name: 'View face statistics details' });
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    const detailsId = trigger.getAttribute('aria-controls');
+    const trigger = page.getByRole('button', { name: 'View face statistics details' });
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'false');
+    const detailsId = trigger.element().getAttribute('aria-controls');
     expect(detailsId).toBeTruthy();
 
-    trigger.focus();
+    (trigger.element() as HTMLElement).focus();
     await userEvent.keyboard('{Enter}');
 
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'View face statistics details' })).toHaveAttribute('id', detailsId);
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect
+      .element(page.getByRole('dialog', { name: 'View face statistics details' }))
+      .toHaveAttribute('id', detailsId!);
   });
 
-  it('uses unique control ids for multiple instances', () => {
-    renderInfo({ cacheKey: 'people-a' });
-    renderInfo({ cacheKey: 'people-b' });
+  it('uses unique control ids for multiple instances', async () => {
+    await renderInfo({ cacheKey: 'people-a' });
+    await renderInfo({ cacheKey: 'people-b' });
 
-    const controls = screen
-      .getAllByRole('button', { name: 'View face statistics details' })
+    const controls = page
+      .getByRole('button', { name: 'View face statistics details' })
+      .elements()
       .map((trigger) => trigger.getAttribute('aria-controls'));
 
+    expect(controls).toHaveLength(2);
     expect(new Set(controls).size).toBe(2);
   });
 
   it('renders the details surface as a compact dialog for narrow viewports', async () => {
-    renderInfo();
-    await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
+    await renderInfo();
+    await page.getByRole('button', { name: 'View face statistics details' }).click();
 
-    const dialog = screen.getByRole('dialog', { name: 'View face statistics details' });
-    expect(dialog).toHaveClass('fixed');
-    expect(dialog).not.toHaveClass('absolute');
-    expect(dialog).toHaveClass('w-72');
-    expect(dialog).toHaveClass('max-w-[calc(100vw-1rem)]');
+    const dialog = page.getByRole('dialog', { name: 'View face statistics details' });
+    await expect.element(dialog).toHaveClass('fixed');
+    await expect.element(dialog).not.toHaveClass('absolute');
+    await expect.element(dialog).toHaveClass('w-72');
+    await expect.element(dialog).toHaveClass('max-w-[calc(100vw-1rem)]');
   });
 
   it('closes the details surface on Escape and outside click', async () => {
-    renderInfo();
+    await renderInfo();
 
-    const trigger = screen.getByRole('button', { name: 'View face statistics details' });
-    await userEvent.click(trigger);
-    expect(screen.getByRole('dialog', { name: 'View face statistics details' })).toBeInTheDocument();
+    const trigger = page.getByRole('button', { name: 'View face statistics details' });
+    await trigger.click();
+    await expect.element(page.getByRole('dialog', { name: 'View face statistics details' })).toBeInTheDocument();
 
     await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog', { name: 'View face statistics details' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('dialog', { name: 'View face statistics details' })).not.toBeInTheDocument();
 
-    await userEvent.click(trigger);
-    expect(screen.getByRole('dialog', { name: 'View face statistics details' })).toBeInTheDocument();
+    await trigger.click();
+    await expect.element(page.getByRole('dialog', { name: 'View face statistics details' })).toBeInTheDocument();
 
-    await fireEvent.mouseDown(document.body);
-    expect(screen.queryByRole('dialog', { name: 'View face statistics details' })).not.toBeInTheDocument();
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await expect.element(page.getByRole('dialog', { name: 'View face statistics details' })).not.toBeInTheDocument();
   });
 
   it('renders the diagnostic rows with locale-formatted values after a successful load', async () => {
-    renderInfo({ loadStatistics: vi.fn().mockResolvedValue(statistics()) });
+    await renderInfo({ loadStatistics: vi.fn().mockResolvedValue(statistics()) });
 
-    await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
+    await page.getByRole('button', { name: 'View face statistics details' }).click();
 
-    expect(await screen.findByText('Detected faces')).toBeInTheDocument();
-    expect(screen.getByText('1,234')).toBeInTheDocument();
-    expect(screen.getByText('Assigned to visible people')).toBeInTheDocument();
-    expect(screen.getByText('2,345')).toBeInTheDocument();
-    expect(screen.getByText('Named visible people')).toBeInTheDocument();
-    expect(screen.getByText('154')).toBeInTheDocument();
-    expect(screen.getByText('Assigned to hidden people')).toBeInTheDocument();
-    expect(screen.getByText('3,456')).toBeInTheDocument();
-    expect(screen.getByText('Unassigned')).toBeInTheDocument();
-    expect(screen.getByText('4,567')).toBeInTheDocument();
+    await expect.element(page.getByText('Detected faces')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('Assigned to visible people')).toBeInTheDocument();
+    await expect.element(page.getByText('2,345')).toBeInTheDocument();
+    await expect.element(page.getByText('Named visible people')).toBeInTheDocument();
+    await expect.element(page.getByText('154')).toBeInTheDocument();
+    await expect.element(page.getByText('Assigned to hidden people')).toBeInTheDocument();
+    await expect.element(page.getByText('3,456')).toBeInTheDocument();
+    await expect.element(page.getByText('Unassigned')).toBeInTheDocument();
+    await expect.element(page.getByText('4,567')).toBeInTheDocument();
   });
 
   it('uses cached statistics when reopening with the same cache key', async () => {
     const loadStatistics = vi.fn().mockResolvedValue(statistics());
-    renderInfo({ cacheKey: 'people', loadStatistics });
+    await renderInfo({ cacheKey: 'people', loadStatistics });
 
-    const trigger = screen.getByRole('button', { name: 'View face statistics details' });
-    await userEvent.click(trigger);
-    expect(await screen.findByText('1,234')).toBeInTheDocument();
-    await userEvent.click(trigger);
-    await userEvent.click(trigger);
+    const trigger = page.getByRole('button', { name: 'View face statistics details' });
+    await trigger.click();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
+    await trigger.click();
+    await trigger.click();
 
     expect(loadStatistics).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
   });
 
   it('loads fresh statistics for a new cache key and does not show stale rows', async () => {
@@ -185,19 +185,19 @@ describe('PeopleFaceStatisticsInfo', () => {
       .fn<() => Promise<PeopleFaceStatisticsResponseDto>>()
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 1111 }))
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 2222 }));
-    const view = renderInfo({ cacheKey: 'people-a', loadStatistics });
+    const view = await renderInfo({ cacheKey: 'people-a', loadStatistics });
 
-    await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
-    expect(await screen.findByText('1,111')).toBeInTheDocument();
+    await page.getByRole('button', { name: 'View face statistics details' }).click();
+    await expect.element(page.getByText('1,111')).toBeInTheDocument();
 
     await view.rerender({
       component: PeopleFaceStatisticsInfo,
       componentProps: { cacheKey: 'people-b', loadStatistics },
     });
 
-    expect(screen.queryByText('1,111')).not.toBeInTheDocument();
+    expect(page.getByText('1,111').query()).toBeNull();
     expect(loadStatistics).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    await expect.element(page.getByText('2,222')).toBeInTheDocument();
   });
 
   it('caches a slow old response under its original key without displaying it for the new key', async () => {
@@ -207,9 +207,9 @@ describe('PeopleFaceStatisticsInfo', () => {
       .fn<() => Promise<PeopleFaceStatisticsResponseDto>>()
       .mockReturnValueOnce(firstRequest.promise)
       .mockReturnValueOnce(secondRequest.promise);
-    const view = renderInfo({ cacheKey: 'old-key', loadStatistics });
+    const view = await renderInfo({ cacheKey: 'old-key', loadStatistics });
 
-    await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
+    await page.getByRole('button', { name: 'View face statistics details' }).click();
     await view.rerender({
       component: PeopleFaceStatisticsInfo,
       componentProps: { cacheKey: 'new-key', loadStatistics },
@@ -218,17 +218,17 @@ describe('PeopleFaceStatisticsInfo', () => {
     firstRequest.resolve(statistics({ detectedFaceCount: 1111 }));
     await Promise.resolve();
 
-    expect(screen.queryByText('1,111')).not.toBeInTheDocument();
+    expect(page.getByText('1,111').query()).toBeNull();
     expect(loadStatistics).toHaveBeenCalledTimes(2);
 
     secondRequest.resolve(statistics({ detectedFaceCount: 2222 }));
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    await expect.element(page.getByText('2,222')).toBeInTheDocument();
 
     await view.rerender({
       component: PeopleFaceStatisticsInfo,
       componentProps: { cacheKey: 'old-key', loadStatistics },
     });
-    expect(await screen.findByText('1,111')).toBeInTheDocument();
+    await expect.element(page.getByText('1,111')).toBeInTheDocument();
     expect(loadStatistics).toHaveBeenCalledTimes(2);
   });
 
@@ -238,18 +238,18 @@ describe('PeopleFaceStatisticsInfo', () => {
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 1234 }));
 
-    renderInfo({ loadStatistics });
+    await renderInfo({ loadStatistics });
 
-    const trigger = screen.getByRole('button', { name: 'View face statistics details' });
-    await userEvent.click(trigger);
+    const trigger = page.getByRole('button', { name: 'View face statistics details' });
+    await trigger.click();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load face statistics');
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect.element(page.getByRole('alert')).toMatchTextContent('Unable to load face statistics');
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
 
-    await userEvent.click(trigger);
-    await userEvent.click(trigger);
+    await trigger.click();
+    await trigger.click();
 
-    expect(await screen.findByText('1,234')).toBeInTheDocument();
+    await expect.element(page.getByText('1,234')).toBeInTheDocument();
     expect(loadStatistics).toHaveBeenCalledTimes(2);
   });
 });

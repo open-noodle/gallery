@@ -1,7 +1,6 @@
 import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // Why this exists: during the v3.1.0 rebase, a conflict in zh_Hant.json was resolved by a merge that compared
 // only TOP-LEVEL keys. main had added keys under the nested `admin` object, so main's whole `admin` subtree
@@ -13,8 +12,9 @@ import path from 'node:path';
 // locale still HAS, and prettier cannot see a missing translation. This is the guard for a fork string
 // disappearing from a locale that previously had it.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
-const OVERLAY_EN = path.resolve(process.cwd(), '../i18n/gallery/en.json');
+// Relative to web/.
+const I18N_DIR = '../i18n/gallery/merged';
+const OVERLAY_EN = '../i18n/gallery/en.json';
 
 type Messages = Record<string, string>;
 
@@ -30,10 +30,12 @@ const flatten = (value: Record<string, unknown>, prefix = '', out: Messages = {}
   return out;
 };
 
-const readFile = (file: string): Messages =>
-  flatten(JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>);
+const readFile = async (file: string): Promise<Messages> =>
+  flatten(JSON.parse(await commands.readFile(file, 'utf8')) as Record<string, unknown>);
 
-const translated = new Map(FORK_LOCALES.map((code) => [code, readFile(path.join(I18N_DIR, `${code}.json`))]));
+const translated = new Map(
+  await Promise.all(FORK_LOCALES.map(async (code) => [code, await readFile(`${I18N_DIR}/${code}.json`)] as const)),
+);
 
 /**
 A fork string is one this repo wrote: a key of the overlay's `i18n/gallery/en.json` that at least one of the
@@ -46,7 +48,7 @@ translated in a later pass.
 */
 const inSomeTranslated = new Set([...translated.values()].flatMap((messages) => Object.keys(messages)));
 
-const forkStrings = Object.keys(readFile(OVERLAY_EN)).filter((key) => inSomeTranslated.has(key));
+const forkStrings = Object.keys(await readFile(OVERLAY_EN)).filter((key) => inSomeTranslated.has(key));
 
 describe('i18n fork-string parity', () => {
   // Positive control. If the detection above ever silently matches nothing — a renamed locale, a moved i18n

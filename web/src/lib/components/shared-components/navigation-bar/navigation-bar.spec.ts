@@ -1,10 +1,11 @@
 import NavigationBar from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
 import TestWrapper from '#lib/gallery/components/query-test-wrapper.svelte';
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import sidebarMediaSource from '#lib/stores/sidebar-media.svelte.ts?raw';
 import type { Component } from 'svelte';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
+import appCssSource from '../../../../app.css?raw';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
@@ -13,9 +14,8 @@ const mocks = vi.hoisted(() => ({
     toggleRailOverlay: vi.fn(),
   },
   sidebarStore: { isOpen: false, toggle: vi.fn() },
-  // Real default: `false` under jsdom/happy-dom's static `matchMedia` mock in test-data/setup.ts.
-  // Tests that need to simulate a specific viewport (e.g. the >=850px regression guard below)
-  // set this explicitly.
+  // Default `false` (below the full-sidebar width). Tests that need to simulate a specific
+  // viewport (e.g. the >=850px regression guard below) set this explicitly.
   mediaQueryManager: { isFullSidebar: false },
 }));
 
@@ -81,19 +81,18 @@ const renderNavigationBar = (props: NavigationBarProps = {}) =>
     componentProps: props,
   });
 
-const menuButton = () => screen.getByRole('button', { name: /main_menu/i });
+// `includeHidden`: in the expanded layout the button is `display: none`, which role queries
+// skip by default, and the tests assert exactly that hidden state.
+const menuButton = () => page.getByRole('button', { name: /main_menu/i, includeHidden: true }).element() as HTMLElement;
 
 // Cross-checks the real Logo component's own rendered class, not just the wrapper span's
 // test-facing `data-variant` - a mutation that changes only Logo's `variant` prop while
 // leaving the sibling attribute untouched must still fail here. Logo's `variant="icon"`
 // applies `aspect-square`; `variant="inline"` does not (see Logo.svelte's `variantClasses`).
 const expectLogoImg = (variant: 'icon' | 'inline') => {
-  const logoImg = screen.getByTestId('navbar-logo').querySelector('img');
-  if (variant === 'icon') {
-    expect(logoImg).toHaveClass('aspect-square');
-  } else {
-    expect(logoImg).not.toHaveClass('aspect-square');
-  }
+  const logoImg = page.getByTestId('navbar-logo').element().querySelector('img');
+  expect(logoImg).not.toBeNull();
+  expect(logoImg!.classList.contains('aspect-square')).toBe(variant === 'icon');
 };
 
 describe('NavigationBar sidebar integration', () => {
@@ -109,10 +108,10 @@ describe('NavigationBar sidebar integration', () => {
     ${'expanded'} | ${true}
     ${'rail'}     | ${false}
     ${'overlay'}  | ${false}
-  `('menu button hidden=$hidden for $layout', ({ layout, hidden }) => {
+  `('menu button hidden=$hidden for $layout', async ({ layout, hidden }) => {
     mocks.sidebarModeStore.layout = layout;
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
 
     const button = menuButton();
     expect(button.dataset.hidden !== undefined).toBe(hidden);
@@ -124,20 +123,20 @@ describe('NavigationBar sidebar integration', () => {
   });
 
   // Spec coverage 26: rail must route to the real toggle, not upstream's open-only one.
-  it('toggles the rail overlay rather than sidebarStore in rail mode', () => {
+  it('toggles the rail overlay rather than sidebarStore in rail mode', async () => {
     mocks.sidebarModeStore.layout = 'rail';
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
     menuButton().click();
 
     expect(mocks.sidebarModeStore.toggleRailOverlay).toHaveBeenCalledOnce();
     expect(mocks.sidebarStore.toggle).not.toHaveBeenCalled();
   });
 
-  it('falls back to sidebarStore.toggle below 850px', () => {
+  it('falls back to sidebarStore.toggle below 850px', async () => {
     mocks.sidebarModeStore.layout = 'overlay';
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
     menuButton().click();
 
     expect(mocks.sidebarStore.toggle).toHaveBeenCalledOnce();
@@ -152,16 +151,16 @@ describe('NavigationBar sidebar integration', () => {
     ${'overlay'}  | ${'narrow'} | ${'grid-cols-[--spacing(32)_auto]'}
     ${'rail'}     | ${'rail'}   | ${'grid-cols-[--spacing(36)_auto]'}
     ${'expanded'} | ${'wide'}   | ${'grid-cols-[--spacing(64)_auto]'}
-  `('navbar first column is $column for $layout', ({ layout, column, columnClass }) => {
+  `('navbar first column is $column for $layout', async ({ layout, column, columnClass }) => {
     mocks.sidebarModeStore.layout = layout;
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
 
-    const grid = screen.getByTestId('navbar-grid');
-    expect(grid).toHaveAttribute('data-column', column);
+    const grid = page.getByTestId('navbar-grid');
+    await expect.element(grid).toHaveAttribute('data-column', column);
     // The literal Tailwind class actually applied, not just the semantic label above - a
     // mutation that swaps which class maps to which label would otherwise pass unnoticed.
-    expect(grid).toHaveClass(columnClass);
+    await expect.element(grid).toHaveClass(columnClass);
   });
 
   // The rail's hamburger takes the rail's own 5rem so the logo next to it starts exactly where
@@ -174,14 +173,14 @@ describe('NavigationBar sidebar integration', () => {
     ${'rail'}     | ${'rail'}   | ${'flex w-20 shrink-0 justify-center'}
     ${'overlay'}  | ${'inline'} | ${'contents'}
     ${'expanded'} | ${'inline'} | ${'contents'}
-  `('hamburger slot is $slot for $layout', ({ layout, slot, slotClass }) => {
+  `('hamburger slot is $slot for $layout', async ({ layout, slot, slotClass }) => {
     mocks.sidebarModeStore.layout = layout;
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
 
-    const menuSlot = screen.getByTestId('navbar-menu-slot');
-    expect(menuSlot).toHaveAttribute('data-slot', slot);
-    expect(menuSlot.className).toBe(slotClass);
+    const menuSlot = page.getByTestId('navbar-menu-slot');
+    await expect.element(menuSlot).toHaveAttribute('data-slot', slot);
+    expect(menuSlot.element().className).toBe(slotClass);
   });
 
   // The row's own inset is the other half of that pairing: in the rail it has to be zero, or the
@@ -191,12 +190,12 @@ describe('NavigationBar sidebar integration', () => {
     ${'rail'}     | ${false}
     ${'overlay'}  | ${true}
     ${'expanded'} | ${true}
-  `('row inset present=$inset for $layout', ({ layout, inset }) => {
+  `('row inset present=$inset for $layout', async ({ layout, inset }) => {
     mocks.sidebarModeStore.layout = layout;
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
 
-    const row = screen.getByTestId('navbar-menu-slot').parentElement!;
+    const row = page.getByTestId('navbar-menu-slot').element().parentElement!;
     expect(/\bmx-4\b/.test(row.className)).toBe(inset);
   });
 
@@ -206,12 +205,12 @@ describe('NavigationBar sidebar integration', () => {
     ${'overlay'}  | ${'icon'}
     ${'rail'}     | ${'icon'}
     ${'expanded'} | ${'inline'}
-  `('logo variant is $variant for $layout', ({ layout, variant }) => {
+  `('logo variant is $variant for $layout', async ({ layout, variant }) => {
     mocks.sidebarModeStore.layout = layout;
 
-    renderNavigationBar({ railAware: true });
+    await renderNavigationBar({ railAware: true });
 
-    expect(screen.getByTestId('navbar-logo')).toHaveAttribute('data-variant', variant);
+    await expect.element(page.getByTestId('navbar-logo')).toHaveAttribute('data-variant', variant);
     expectLogoImg(variant);
   });
 
@@ -223,11 +222,11 @@ describe('NavigationBar sidebar integration', () => {
   // `auto` mode, common laptop widths 850-1279px). Simulate exactly that: the store resolves
   // 'rail' (as it would at 900px in auto mode), but the real viewport is >=850px, so the
   // pre-rail behaviour must win.
-  it('keeps the old viewport-only behaviour without railAware, even at a rail-resolving layout', () => {
+  it('keeps the old viewport-only behaviour without railAware, even at a rail-resolving layout', async () => {
     mocks.sidebarModeStore.layout = 'rail';
     mocks.mediaQueryManager.isFullSidebar = true;
 
-    renderNavigationBar();
+    await renderNavigationBar();
     menuButton().click();
 
     const button = menuButton();
@@ -236,11 +235,11 @@ describe('NavigationBar sidebar integration', () => {
     expect(mocks.sidebarStore.toggle).toHaveBeenCalledOnce();
     expect(mocks.sidebarModeStore.toggleRailOverlay).not.toHaveBeenCalled();
 
-    const grid = screen.getByTestId('navbar-grid');
-    expect(grid).toHaveAttribute('data-column', 'wide');
-    expect(grid).toHaveClass('grid-cols-[--spacing(64)_auto]');
+    const grid = page.getByTestId('navbar-grid');
+    await expect.element(grid).toHaveAttribute('data-column', 'wide');
+    await expect.element(grid).toHaveClass('grid-cols-[--spacing(64)_auto]');
 
-    expect(screen.getByTestId('navbar-logo')).toHaveAttribute('data-variant', 'inline');
+    await expect.element(page.getByTestId('navbar-logo')).toHaveAttribute('data-variant', 'inline');
     expectLogoImg('inline');
   });
 });
@@ -250,11 +249,15 @@ describe('NavigationBar sidebar integration', () => {
 // That is one number living in two files, and neither knows about the other - a breakpoint
 // utility here, a MediaQuery over there - so it is asserted rather than assumed.
 describe('NavigationBar search trigger', () => {
-  const readSource = (relative: string) =>
-    readFileSync(path.resolve(expect.getState().testPath!, '../../../../../', relative), 'utf8');
+  const sources: Record<string, string> = {
+    'app.css': appCssSource,
+    'lib/stores/sidebar-media.svelte.ts': sidebarMediaSource,
+  };
+  const readSource = (relative: string) => sources[relative];
 
-  const searchTrigger = () => screen.getByTestId('navbar-search-trigger');
-  const searchButton = () => screen.getByRole('button', { name: /go_to_search/i });
+  const searchTrigger = () => page.getByTestId('navbar-search-trigger').element();
+  const searchButton = () =>
+    page.getByRole('button', { name: /go_to_search/i, includeHidden: true }).element() as HTMLElement;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -262,8 +265,8 @@ describe('NavigationBar search trigger', () => {
     mocks.mediaQueryManager.isFullSidebar = false;
   });
 
-  it('swaps the trigger for the magnifier at the width the sidebar becomes a rail', () => {
-    renderNavigationBar({ railAware: true });
+  it('swaps the trigger for the magnifier at the width the sidebar becomes a rail', async () => {
+    await renderNavigationBar({ railAware: true });
 
     // The breakpoint is read back off the markup rather than hard-coded, so the lookup below
     // resolves whichever one the component actually uses.
@@ -279,8 +282,8 @@ describe('NavigationBar search trigger', () => {
   // Complementary, both ways: one of the two is always reachable and never both at once. A
   // mutation that moved only one of the pair would otherwise leave a width with no search at
   // all, or with two.
-  it('shows exactly one of the trigger and the magnifier at any width', () => {
-    renderNavigationBar({ railAware: true });
+  it('shows exactly one of the trigger and the magnifier at any width', async () => {
+    await renderNavigationBar({ railAware: true });
 
     const breakpoint = /\b(?<name>[a-z\d]+):block\b/.exec(searchTrigger().className)!.groups!.name;
 
@@ -294,8 +297,8 @@ describe('NavigationBar search trigger', () => {
   // The action row has to span the bar while the trigger is gone: `justify-between` with a
   // single child parks it at the start, which would leave the icons beside the logo with the
   // rest of the bar empty after them.
-  it('spans the action row across the bar until the trigger returns', () => {
-    renderNavigationBar({ railAware: true });
+  it('spans the action row across the bar until the trigger returns', async () => {
+    await renderNavigationBar({ railAware: true });
 
     const breakpoint = /\b(?<name>[a-z\d]+):block\b/.exec(searchTrigger().className)!.groups!.name;
     const actions = searchButton().closest('section')!;
@@ -306,11 +309,11 @@ describe('NavigationBar search trigger', () => {
 
   // Small screens get the same mark as everything else. Upstream pinned them at the old 3rem,
   // which after the bar was thinned left it biggest exactly where the bar is tightest.
-  it('renders the mark at one size at every width', () => {
-    renderNavigationBar({ railAware: true });
+  it('renders the mark at one size at every width', async () => {
+    await renderNavigationBar({ railAware: true });
 
-    const logoImg = screen.getByTestId('navbar-logo').querySelector('img')!;
-    expect(logoImg).toHaveClass('h-10');
+    const logoImg = page.getByTestId('navbar-logo').element().querySelector('img')!;
+    expect(logoImg.classList.contains('h-10')).toBe(true);
     expect(logoImg.className).not.toMatch(/:h-/);
   });
 });

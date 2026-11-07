@@ -4,11 +4,11 @@ import * as sdk from '@immich/sdk';
 /**
 Reusable mock helpers for shared space SDK functions.
 
-Requires `$lib/__mocks__/sdk.mock` to be imported first (auto-mocks @immich/sdk).
+Requires `#lib/gallery/__mocks__/sdk.mock.ts` to be imported first (auto-mocks @immich/sdk).
 
 Usage:
 ```ts
-import '#lib/__mocks__/sdk.mock.ts';
+import '#lib/gallery/__mocks__/sdk.mock.ts';
 import { spacesApiMock } from '#lib/gallery/__mocks__/spaces-api.mock.ts';
 
 beforeEach(() => { vi.resetAllMocks(); });

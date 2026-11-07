@@ -1,7 +1,6 @@
-import { getAnimateMock } from '#lib/__mocks__/animate.mock.ts';
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
@@ -11,10 +10,9 @@ import { factory } from '#test/unit/factories.ts';
 import { defaultUserConfig } from '#test/unit/gallery-config-defaults.ts';
 import { AlbumUserRole, AssetOrder } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import AlbumPage from './+page.svelte';
 
 const {
@@ -31,7 +29,8 @@ const {
   mockOpenSearchPalette: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   goto: gotoMock,
   invalidate: vi.fn().mockResolvedValue(undefined),
   onNavigate: vi.fn(),
@@ -40,7 +39,11 @@ vi.mock('$app/navigation', () => ({
 // what the page's $effect sees.
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock, navigating: { to: null } };
+  return {
+    ...(await import('#test/unit/mocks/app-state.svelte.ts')),
+    page: reactivePageMock,
+    navigating: { to: null },
+  };
 });
 
 vi.mock('#lib/components/timeline/Timeline.svelte', async () => {
@@ -70,19 +73,11 @@ vi.mock('#lib/managers/feature-flags-manager.svelte.js', () => ({
   featureFlagsManager: mockFeatureFlagsManager as never,
 }));
 
-vi.mock('#lib/utils/navigation.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#lib/utils/navigation.ts')>();
-  return {
-    ...actual,
-    isAlbumsRoute: () => true,
-    // Spy that DELEGATES to the real implementation (not a no-op stub): the picker open/close
-    // handlers below call navigate({ assetGridRouteSearchParams: { at } }), which routes into the
-    // real replaceScrollTarget/goto machinery against mockPage + gotoMock above. A no-op stub would
-    // hide the exact bug this suite regression-tests (album.e2e-spec.ts:150 — closing the add-photos
-    // picker silently drops the album's own filter query).
-    navigate: vi.fn(actual.navigate),
-  };
-});
+// `#lib/utils/navigation.ts` is deliberately NOT mocked: the picker open/close handlers call the
+// real navigate({ assetGridRouteSearchParams: { at } }), which routes into the real
+// replaceScrollTarget/goto machinery against mockPage + gotoMock above. A no-op stub would hide the
+// exact bug this suite regression-tests (album.e2e-spec.ts:150 — closing the add-photos picker
+// silently drops the album's own filter query).
 
 function renderPage(album = factory.album({ assetCount: 2 })) {
   const owner = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)?.user ?? album.albumUsers[0]?.user;
@@ -162,7 +157,6 @@ describe('album detail filter panel route', () => {
       params: { albumId: 'album-1' },
     });
     assetMultiSelectManager.clear();
-    Element.prototype.animate = getAnimateMock();
     mockFeatureFlagsManager.value.map = false;
     // The map button follows the user config now (immich-32498), not the feature flags.
     queryClient.setQueryData(getUserConfigQuery().queryKey, {
@@ -176,17 +170,17 @@ describe('album detail filter panel route', () => {
   });
 
   it('renders the filter panel in view mode and select-assets mode', async () => {
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('discovery-panel')).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('discovery-panel')).toBeInTheDocument());
+    await expect.element(page.getByTestId('discovery-panel')).toBeInTheDocument();
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('discovery-panel')).toBeInTheDocument();
   });
 
   it('hides the filter panel when the active dataset is empty and no filters are active', async () => {
-    renderPage(factory.album({ assetCount: 0 }));
+    await renderPage(factory.album({ assetCount: 0 }));
 
-    await waitFor(() => expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('discovery-panel')).not.toBeInTheDocument();
   });
 
   // Unlike the pages built on UserPageLayout, this route's <main> is transparent, so the panel's
@@ -194,12 +188,12 @@ describe('album detail filter panel route', () => {
   // It therefore has to shape itself: rounded to the app's 16px surface radius and held off the
   // bottom edge, rather than running as a flush slab to the foot of the window.
   it('shapes the filter panel as a rounded card lifted off the bottom edge', async () => {
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('filter-panel-shell')).toBeInTheDocument());
+    await expect.element(page.getByTestId('filter-panel-shell')).toBeInTheDocument();
 
-    const clip = screen.getByTestId('album-filter-panel-surface');
-    expect(clip).toContainElement(screen.getByTestId('filter-panel-shell'));
+    const clip = page.getByTestId('album-filter-panel-surface').element();
+    expect(clip.contains(page.getByTestId('filter-panel-shell').element())).toBe(true);
     // rounded-lg is 16px in this theme — the same radius UserPageLayout gives every other page.
     expect(clip.className).toContain('rounded-lg');
     expect(clip.className).toContain('overflow-hidden');
@@ -209,7 +203,7 @@ describe('album detail filter panel route', () => {
   });
 
   it('registers cmdk selection context for album view mode only', async () => {
-    renderPage();
+    await renderPage();
 
     expect(registerSelectionContextMock).toHaveBeenCalledOnce();
     const options = registerSelectionContextMock.mock.calls[0][0];
@@ -220,7 +214,7 @@ describe('album detail filter panel route', () => {
     expect(options.getOnDelete()).toEqual(expect.any(Function));
     expect(options.getOnUndoDelete()).toEqual(expect.any(Function));
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
+    await userEvent.click(page.getByLabelText('add_photos'));
     expect(options.getAssets()).toEqual([]);
     expect(options.canAddToAlbum()).toBe(false);
     expect(options.getOnFavorite()).toBeUndefined();
@@ -229,8 +223,8 @@ describe('album detail filter panel route', () => {
     expect(options.getOnUndoDelete()).toBeUndefined();
   });
 
-  it('does not expose timeline-backed cmdk callbacks before the album timeline manager is bound', () => {
-    renderPage(factory.album({ id: 'without-bound-timeline-manager', assetCount: 2 }));
+  it('does not expose timeline-backed cmdk callbacks before the album timeline manager is bound', async () => {
+    await renderPage(factory.album({ id: 'without-bound-timeline-manager', assetCount: 2 }));
 
     expect(registerSelectionContextMock).toHaveBeenCalledOnce();
     const options = registerSelectionContextMock.mock.calls[0][0];
@@ -243,135 +237,128 @@ describe('album detail filter panel route', () => {
   });
 
   it('keeps the filter panel visible when timeline months exist but the manager asset count is zero', async () => {
-    renderPage(factory.album({ id: 'timeline-months-only', assetCount: 2 }));
+    await renderPage(factory.album({ id: 'timeline-months-only', assetCount: 2 }));
 
-    await waitFor(() => expect(screen.getByTestId('discovery-panel')).toBeInTheDocument());
+    await expect.element(page.getByTestId('discovery-panel')).toBeInTheDocument();
   });
 
   it('keeps separate filter state for view and select-assets, and reuses view filters for select-thumbnail', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Album Person');
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('people-item-person-picker')).toBeInTheDocument());
-    expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('people-item-person-picker')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-chip')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('people-item-person-picker'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
+    await userEvent.click(page.getByTestId('people-item-person-picker'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('Close'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
+    await userEvent.click(page.getByLabelText('Close'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Album Person');
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('Close'));
-    await user.click(screen.getByLabelText('album_options'));
-    await user.click(screen.getByText('select_album_cover'));
-    expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
+    await userEvent.click(page.getByLabelText('Close'));
+    await userEvent.click(page.getByLabelText('album_options'));
+    await userEvent.click(page.getByText('select_album_cover'));
+    await expect.element(page.getByTestId('discovery-panel')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Album Person');
   });
 
   it('applies favorites independently in album view and picker modes', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
-    await user.click(screen.getByTestId('favorites-only'));
+    await expect.element(page.getByTestId('favorites-only')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('favorites');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('favorites');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"isFavorite":true');
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
-    expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('favorites-only')).toBeInTheDocument();
+    await expect.element(page.getByTestId('active-chip')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('favorites-only'));
+    await userEvent.click(page.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('favorites');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId":"');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('favorites');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"timelineAlbumId":"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"isFavorite":true');
     // #763 slice 4: favorites no longer suppress partner scope in picker mode.
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"withPartners":true');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"withPartners":true');
   });
 
   it('keeps timelineAlbumId in picker options after filters change and shows filtered empty state', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('tags-item-tag-no-match')).toBeInTheDocument());
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('tags-item-tag-no-match')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"timelineAlbumId"');
 
-    await user.click(screen.getByTestId('tags-item-tag-picker'));
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
+    await userEvent.click(page.getByTestId('tags-item-tag-picker'));
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"timelineAlbumId"');
 
-    await user.click(screen.getByTestId('tags-item-tag-no-match'));
-    expect(screen.getByText('space_album_no_photos_to_add_match_filters')).toBeInTheDocument();
-    await user.click(screen.getByText('space_album_clear_all_filters'));
-    await waitFor(() =>
-      expect(screen.queryByText('space_album_no_photos_to_add_match_filters')).not.toBeInTheDocument(),
-    );
+    await userEvent.click(page.getByTestId('tags-item-tag-no-match'));
+    await expect.element(page.getByText('space_album_no_photos_to_add_match_filters')).toBeInTheDocument();
+    await userEvent.click(page.getByText('space_album_clear_all_filters'));
+    await expect.element(page.getByText('space_album_no_photos_to_add_match_filters')).not.toBeInTheDocument();
   });
 
   it('keeps already-in-album assets disabled after picker filters change', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('tags-item-tag-picker')).toBeInTheDocument());
-    await user.click(screen.getByTestId('tags-item-tag-picker'));
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('tags-item-tag-picker')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('tags-item-tag-picker'));
 
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
-    expect(screen.getByTestId('mock-disabled-asset')).toHaveAttribute('data-disabled', 'true');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"timelineAlbumId"');
+    await expect.element(page.getByTestId('mock-disabled-asset')).toHaveAttribute('data-disabled', 'true');
   });
 
   it('renders album browse grouping controls and passes mobile grouping props', async () => {
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: true }),
-    );
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
   });
 
   // #1051: searching an album already narrowed to the album — via the nav bar, which gave no hint
   // it would. This puts the trigger on the album itself.
   describe('scoped search button', () => {
     it('sits beside the album grouping control', async () => {
-      renderPage();
+      await renderPage();
 
-      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
     });
 
     it('opens the album-scoped search palette when clicked', async () => {
-      renderPage();
-      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+      await renderPage();
+      await userEvent.click(page.getByTestId('scoped-search-button'));
 
       expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
     });
 
     it('is hidden in select-assets mode, alongside the grouping control', async () => {
-      renderPage();
+      await renderPage();
 
-      await fireEvent.click(screen.getByLabelText('add_photos'));
+      await userEvent.click(page.getByLabelText('add_photos'));
 
-      await waitFor(() => expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument());
+      await expect.element(page.getByTestId('scoped-search-button')).not.toBeInTheDocument();
     });
 
     it('is hidden in select-thumbnail mode, where the grouping control also goes', async () => {
-      renderPage();
-      const user = userEvent.setup();
+      await renderPage();
 
-      await user.click(screen.getByLabelText('album_options'));
-      await user.click(screen.getByText('select_album_cover'));
+      await userEvent.click(page.getByLabelText('album_options'));
+      await userEvent.click(page.getByText('select_album_cover'));
 
-      expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).not.toBeInTheDocument();
     });
 
     // The grouping pill is swapped out in search mode; the search button must NOT be, or the
@@ -379,130 +366,124 @@ describe('album detail filter panel route', () => {
     it('stays available while album search results are showing', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
 
-      renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
+      await renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
 
-      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
-      expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('scoped-search-button')).toBeInTheDocument();
+      await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
     });
   });
 
   it('changes album grouping without changing album filters or URL state', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
-    await user.click(screen.getByTestId('timeline-grouping-year'));
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
+    await userEvent.click(page.getByTestId('timeline-grouping-year'));
 
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"year"');
-    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Album Person');
-    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"year"');
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('Album Person');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent('null');
   });
 
   it('clicking album year and month buckets zooms without temporal chips', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await user.click(screen.getByTestId('activate-year-bucket'));
-    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"'));
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015 }));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"albumId"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent(JSON.stringify({ year: 2015 }));
 
-    await user.click(screen.getByTestId('activate-month-bucket'));
-    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"day"'));
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015, month: 8 }));
+    await userEvent.click(page.getByTestId('activate-month-bucket'));
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"albumId"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('timeline-anchor'))
+      .toMatchTextContent(JSON.stringify({ year: 2015, month: 8 }));
   });
 
   it('album bucket activation preserves non-time album filters without adding temporal chips', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
-    await user.click(screen.getByTestId('activate-year-bucket'));
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"'));
-    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Album Person');
-    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent('2015');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
-    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015 }));
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('Album Person');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toMatchTextContent('2015');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"albumId"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent(JSON.stringify({ year: 2015 }));
   });
 
   it('ignores album bucket activation while selection mode is active', async () => {
-    renderPage();
+    await renderPage();
     assetMultiSelectManager.selectAsset(factory.timelineAsset({ id: 'selected-asset' }));
 
-    await userEvent.setup().click(await screen.findByTestId('activate-year-bucket'));
+    await userEvent.click(page.getByTestId('activate-year-bucket'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"day"');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent('null');
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('explicit album timeline filters still show chips and clear without changing grouping', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await user.click(await screen.findByTestId('timeline-grouping-month'));
-    await user.click(await screen.findByTestId('year-btn-2024'));
+    await userEvent.click(page.getByTestId('timeline-grouping-month'));
+    await userEvent.click(page.getByTestId('year-btn-2024'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"');
-    });
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2024');
+    await expect
+      .element(page.getByTestId('timeline-options'))
+      .toMatchTextContent('"takenAfter":"2024-01-01T00:00:00.000Z"');
+    await expect
+      .element(page.getByTestId('timeline-options'))
+      .toMatchTextContent('"takenBefore":"2025-01-01T00:00:00.000Z"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
 
-    await user.click(screen.getByRole('button', { name: 'filter_remove_chip' }));
+    await userEvent.click(page.getByRole('button', { name: 'filter_remove_chip' }));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
-      expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
-      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
+    await expect.element(page.getByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenAfter"');
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"takenBefore"');
+    await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"grouping":"month"');
+    await expect.element(page.getByTestId('timeline-anchor')).toMatchTextContent('null');
   });
 
   it('does not render browse grouping controls in album select-assets or select-thumbnail modes', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument());
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"grouping"');
+    await userEvent.click(page.getByLabelText('add_photos'));
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"grouping"');
 
-    await fireEvent.click(screen.getByLabelText('Close'));
-    await user.click(screen.getByLabelText('album_options'));
-    await user.click(screen.getByText('select_album_cover'));
+    await userEvent.click(page.getByLabelText('Close'));
+    await userEvent.click(page.getByLabelText('album_options'));
+    await userEvent.click(page.getByText('select_album_cover'));
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"grouping"');
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: false }),
-    );
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).not.toMatchTextContent('"grouping"');
+    await expect
+      .element(page.getByTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: false }));
   });
 
   it('resets both filter states and label caches when navigating to another album', async () => {
     const firstAlbum = factory.album({ id: 'album-1', assetCount: 2 });
     const secondAlbum = factory.album({ id: 'album-2', assetCount: 2 });
-    const view = renderPage(firstAlbum);
-    const user = userEvent.setup();
+    const view = await renderPage(firstAlbum);
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Person');
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('First Album Person');
 
     // A real navigation to another album always moves page.url/page.params in lockstep with
     // data.album (the URL change is what drives the new load in the first place). Move them here
@@ -516,44 +497,43 @@ describe('album detail filter panel route', () => {
     queryClient.setQueryData(getAlbumInfoQuery(secondAlbum.id).queryKey, secondAlbum);
     await view.rerender({ component: AlbumPage, componentProps: { params: { albumId: secondAlbum.id } } });
 
-    await waitFor(() => expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument());
-    expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('active-chip')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('active-chip')).not.toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Second Album Person');
-    expect(screen.queryByText('First Album Person')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
+    await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Second Album Person');
+    await expect.element(page.getByText('First Album Person')).not.toBeInTheDocument();
   });
 
   it('merges grouping and the filter bar into one toolbar row in browse mode', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
     // activate a filter so the bar renders
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
 
-    const grouping = await screen.findByTestId('timeline-desktop-grouping-control');
-    const bar = screen.getByTestId('active-filters-bar');
+    await expect.element(page.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    const grouping = page.getByTestId('timeline-desktop-grouping-control').element();
+    const bar = page.getByTestId('active-filters-bar').element();
     // grouping wrapper and the bar's flex-1 column share the FilterToolbar root
     expect(grouping.parentElement).toBe(bar.parentElement?.parentElement);
   });
 
   it('shows the add-all-to-collection button once an album filter is active', async () => {
-    renderPage();
-    const user = userEvent.setup();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-    await user.click(screen.getByTestId('people-item-person-view'));
+    await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+    await userEvent.click(page.getByTestId('people-item-person-view'));
 
-    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-all-to-collection')).toBeInTheDocument();
   });
 
   it('does not show the add-all-to-collection button without an active album filter', async () => {
-    renderPage();
+    await renderPage();
 
-    await screen.findByTestId('timeline-options');
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('timeline-options')).toBeInTheDocument();
+    await expect.element(page.getByTestId('add-all-to-collection')).not.toBeInTheDocument();
   });
 
   // Slice 6 — the owner chip on an album is named from the album users the page already holds, so
@@ -563,10 +543,10 @@ describe('album detail filter panel route', () => {
     const owner = album.albumUsers[0].user;
     mockPage.url = new URL(`https://gallery.test/albums/album-1?owner=${owner.id}`);
 
-    renderPage(album);
+    await renderPage(album);
 
-    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveTextContent(owner.name));
-    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent(owner.id);
+    await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent(owner.name);
+    await expect.element(page.getByTestId('active-filters-bar')).not.toMatchTextContent(owner.id);
     expect(sdkMock.getUser).not.toHaveBeenCalled();
   });
 
@@ -577,25 +557,22 @@ describe('album detail filter panel route', () => {
 
     it('hydrates the album timeline filters from the URL', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple&rating=4&lens=RF24-70mm');
-      renderPage(album1());
+      await renderPage(album1());
 
-      const options = await screen.findByTestId('timeline-options');
-      await waitFor(() => {
-        expect(options.textContent).toContain('"make":"Apple"');
-        expect(options.textContent).toContain('"rating":4');
-        expect(options.textContent).toContain('"lensModel":"RF24-70mm"');
-      });
-      expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+      const options = page.getByTestId('timeline-options');
+      await expect.element(options).toMatchTextContent('"make":"Apple"');
+      await expect.element(options).toMatchTextContent('"rating":4');
+      await expect.element(options).toMatchTextContent('"lensModel":"RF24-70mm"');
+      await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
     });
 
     it('writes a filter chosen in the panel back to the URL', async () => {
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
-      await user.click(screen.getByTestId('people-item-person-view'));
+      await expect.element(page.getByTestId('people-item-person-view')).toBeInTheDocument();
+      await userEvent.click(page.getByTestId('people-item-person-view'));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(gotoMock).toHaveBeenCalledWith('/albums/album-1?people=person-view', {
           replace: true,
           reset: false,
@@ -605,12 +582,11 @@ describe('album detail filter panel route', () => {
 
     it('writes chip removal back to the URL', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await user.click(await screen.findByRole('button', { name: 'filter_remove_chip' }));
+      await userEvent.click(page.getByRole('button', { name: 'filter_remove_chip' }));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(gotoMock).toHaveBeenCalledWith('/albums/album-1', {
           replace: true,
           reset: false,
@@ -622,15 +598,15 @@ describe('album detail filter panel route', () => {
     // notice and re-hydrate — this is the same code path a reload and a shared URL take.
     it('re-hydrates when the URL changes underneath it (back/forward)', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple&rating=4');
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"rating":4'));
+      await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"rating":4');
 
       // The browser Back button: no remount, just a new URL.
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
 
-      await waitFor(() => {
-        const options = screen.getByTestId('timeline-options');
+      await vi.waitFor(() => {
+        const options = page.getByTestId('timeline-options').element();
         expect(options.textContent).toContain('"make":"Apple"');
         expect(options.textContent).not.toContain('"rating"');
       });
@@ -640,46 +616,45 @@ describe('album detail filter panel route', () => {
     // writes `?year=2024`, so it survives the page's own goto() round trip on its own — no
     // carry-over slot smuggling it across. Picking a year and THEN a second filter must keep both.
     it('writes a picked year to the URL and keeps it across a second filter change', async () => {
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await user.click(await screen.findByTestId('year-btn-2024'));
-      await waitFor(() =>
-        expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"'),
-      );
+      await userEvent.click(page.getByTestId('year-btn-2024'));
+      await expect
+        .element(page.getByTestId('timeline-options'))
+        .toMatchTextContent('"takenAfter":"2024-01-01T00:00:00.000Z"');
       // A year IS in the URL codec, so picking one writes.
-      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      await vi.waitFor(() => expect(gotoMock).toHaveBeenCalled());
       const [yearTarget] = gotoMock.mock.calls.at(-1) as [string];
       expect(yearTarget).toContain('year=2024');
 
-      await user.click(await screen.findByTestId('people-item-person-view'));
+      await userEvent.click(page.getByTestId('people-item-person-view'));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const [target] = gotoMock.mock.calls.at(-1) as [string];
         expect(target).toContain('people=person-view');
         expect(target).toContain('year=2024');
       });
-      await waitFor(() => {
-        const options = screen.getByTestId('timeline-options').textContent ?? '';
+      await vi.waitFor(() => {
+        const options = page.getByTestId('timeline-options').element().textContent ?? '';
         expect(options).toContain('"personIds":["person-view"]');
         // survived the round trip
         expect(options).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
         expect(options).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
       });
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
+      await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2024');
     });
 
     // D2 — a shared album link carries the year.
     it('hydrates a shared ?year= link into the picker, the chip and the timeline query', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?year=2023');
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => {
-        const options = screen.getByTestId('timeline-options').textContent ?? '';
+      await vi.waitFor(() => {
+        const options = page.getByTestId('timeline-options').element().textContent ?? '';
         expect(options).toContain('"takenAfter":"2023-01-01T00:00:00.000Z"');
         expect(options).toContain('"takenBefore":"2024-01-01T00:00:00.000Z"');
       });
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2023');
+      await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2023');
     });
 
     // replaceScrollTarget (navigation.ts) writes `?at=<assetId>` into the URL when the asset viewer
@@ -687,13 +662,12 @@ describe('album detail filter panel route', () => {
     // read as a filter change, or the page rebuilds an identical FilterState (and with it the
     // timeline options object) on every viewer close.
     it('keeps the year when the asset viewer closes (?at= is not a filter change)', async () => {
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await user.click(await screen.findByTestId('year-btn-2024'));
-      await waitFor(() =>
-        expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"'),
-      );
+      await userEvent.click(page.getByTestId('year-btn-2024'));
+      await expect
+        .element(page.getByTestId('timeline-options'))
+        .toMatchTextContent('"takenAfter":"2024-01-01T00:00:00.000Z"');
 
       // Simulate the asset viewer closing: replaceScrollTarget appends `at` to the CURRENT url,
       // which now carries year=2024 (the page wrote it, and gotoMock landed page.url on it).
@@ -701,12 +675,12 @@ describe('album detail filter panel route', () => {
       withAt.searchParams.set('at', 'asset-1');
       mockPage.url = withAt;
 
-      await waitFor(() => {
-        const options = screen.getByTestId('timeline-options').textContent ?? '';
+      await vi.waitFor(() => {
+        const options = page.getByTestId('timeline-options').element().textContent ?? '';
         expect(options).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
         expect(options).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
       });
-      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
+      await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('2024');
     });
 
     // E9 — the route already scopes the query to this album, and the server's albumId is a SCALAR
@@ -714,25 +688,24 @@ describe('album detail filter panel route', () => {
     // not merely redundant.
     it('E9: ignores a stray albumId param and keeps its own album scope', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?albumId=album-2&make=Apple');
-      renderPage(album1());
+      await renderPage(album1());
 
-      const options = await screen.findByTestId('timeline-options');
-      await waitFor(() => expect(options.textContent).toContain('"make":"Apple"'));
-      expect(options.textContent).toContain('"albumId":"album-1"');
-      expect(options.textContent).not.toContain('album-2');
+      const options = page.getByTestId('timeline-options');
+      await expect.element(options).toMatchTextContent('"make":"Apple"');
+      await expect.element(options).toMatchTextContent('"albumId":"album-1"');
+      await expect.element(options).not.toMatchTextContent('album-2');
     });
 
     // The picker filters the asset PICKER, not the album timeline. They must never reach the URL.
     it('does not write picker filters to the URL', async () => {
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await fireEvent.click(screen.getByLabelText('add_photos'));
-      await waitFor(() => expect(screen.getByTestId('people-item-person-picker')).toBeInTheDocument());
+      await userEvent.click(page.getByLabelText('add_photos'));
+      await expect.element(page.getByTestId('people-item-person-picker')).toBeInTheDocument();
       gotoMock.mockClear();
-      await user.click(screen.getByTestId('people-item-person-picker'));
+      await userEvent.click(page.getByTestId('people-item-person-picker'));
 
-      expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
+      await expect.element(page.getByTestId('active-chip')).toMatchTextContent('Picker Person');
       expect(gotoMock).not.toHaveBeenCalled();
     });
 
@@ -742,19 +715,18 @@ describe('album detail filter panel route', () => {
     // replaceScrollTarget must preserve the album's `?tags=…` query through that round trip, or the
     // URL-backed $effect re-hydrates albumFilters from a filter-less URL and the chip vanishes.
     it('keeps the album tag filter across opening and closing the add-photos picker', async () => {
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('tags-item-tag-view')).toBeInTheDocument());
-      await user.click(screen.getByTestId('tags-item-tag-view'));
-      expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Tag');
+      await expect.element(page.getByTestId('tags-item-tag-view')).toBeInTheDocument();
+      await userEvent.click(page.getByTestId('tags-item-tag-view'));
+      await expect.element(page.getByTestId('active-chip')).toMatchTextContent('First Album Tag');
 
-      await fireEvent.click(screen.getByLabelText('add_photos'));
+      await userEvent.click(page.getByLabelText('add_photos'));
       // The picker shows its OWN (empty) filter state, not the album's — this is expected, not the bug.
-      expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('active-chip')).not.toBeInTheDocument();
 
-      await fireEvent.click(screen.getByLabelText('Close'));
-      expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Tag');
+      await userEvent.click(page.getByLabelText('Close'));
+      await expect.element(page.getByTestId('active-chip')).toMatchTextContent('First Album Tag');
     });
 
     // Finding (#767c): the grid and the map of one album must agree on what a shared/bookmarked
@@ -763,11 +735,10 @@ describe('album detail filter panel route', () => {
     // renders a "1 filter" chip over the ENTIRE unfiltered album.
     it('hydrates the album description filter from the URL and forwards it to the timeline query', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?description=beach');
-      renderPage(album1());
+      await renderPage(album1());
 
-      const options = await screen.findByTestId('timeline-options');
-      await waitFor(() => expect(options.textContent).toContain('"description":"beach"'));
-      expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+      await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"description":"beach"');
+      await expect.element(page.getByTestId('active-filters-bar')).toBeInTheDocument();
     });
 
     it('passes the album filters to the album map', async () => {
@@ -775,9 +746,9 @@ describe('album detail filter panel route', () => {
       sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
 
-      renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
+      await renderPage(factory.album({ id: 'album-1', assetCount: 2 }));
 
-      await waitFor(() =>
+      await vi.waitFor(() =>
         expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'album-1', make: 'Apple' }),
           expect.anything(),
@@ -794,39 +765,33 @@ describe('album detail filter panel route', () => {
     it('runs the search in place instead of showing the browse timeline', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
 
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach'),
-      );
-      expect(screen.queryByTestId('timeline-options')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+      await expect.element(page.getByTestId('timeline-options')).not.toBeInTheDocument();
     });
 
     it('scopes the search to the album it was launched from', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
 
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1'),
-      );
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
     });
 
     it('shows the browse timeline when there is no query', async () => {
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('timeline-options')).toBeInTheDocument());
-      expect(screen.queryByTestId('smart-search-results')).not.toBeInTheDocument();
+      await expect.element(page.getByTestId('timeline-options')).toBeInTheDocument();
+      await expect.element(page.getByTestId('smart-search-results')).not.toBeInTheDocument();
     });
 
     it('hydrates filters from the URL into the search', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach&make=Apple');
 
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-make', 'Apple'),
-      );
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-filter-make', 'Apple');
     });
 
     it('keeps the query in the URL when a filter changes during a search', async () => {
@@ -848,13 +813,12 @@ describe('album detail filter panel route', () => {
         mediaTypes: [],
         hasUnnamedPeople: false,
       } as never);
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('people-item-person-from-facets')).toBeInTheDocument());
-      await user.click(screen.getByTestId('people-item-person-from-facets'));
+      await expect.element(page.getByTestId('people-item-person-from-facets')).toBeInTheDocument();
+      await userEvent.click(page.getByTestId('people-item-person-from-facets'));
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const [target] = gotoMock.mock.calls.at(-1) as [string];
         expect(target).toContain('q=beach');
         expect(target).toContain('people=person-from-facets');
@@ -862,15 +826,13 @@ describe('album detail filter panel route', () => {
     });
 
     it('re-hydrates when the URL changes under it (back/forward, shared link)', async () => {
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('timeline-options')).toBeInTheDocument());
+      await expect.element(page.getByTestId('timeline-options')).toBeInTheDocument();
 
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=sunset');
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset'),
-      );
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset');
     });
 
     // The navbar sort dropdown renders on every searchable page, browse mode included, so an
@@ -878,15 +840,15 @@ describe('album detail filter panel route', () => {
     it('lets an explicit sort override the album order in browse mode', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?sort=asc');
 
-      renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Desc }));
+      await renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Desc }));
 
-      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
+      await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"order":"asc"');
     });
 
     it("keeps the album's own order in browse mode when the URL carries no sort", async () => {
-      renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Asc }));
+      await renderPage(factory.album({ id: 'album-1', assetCount: 2, order: AssetOrder.Asc }));
 
-      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
+      await expect.element(page.getByTestId('timeline-options')).toMatchTextContent('"order":"asc"');
     });
 
     const facetsWith = (people: Array<{ id: string; name: string }> = []) =>
@@ -920,12 +882,11 @@ describe('album detail filter panel route', () => {
       // Spied, not rendered: the real modal mounts CollectionPickerModal, which needs album/space
       // data this suite does not stub. The assertion is about what the page HANDS the modal.
       const showSpy = vi.spyOn(modalManager, 'show').mockResolvedValue(undefined as never);
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await user.click(await screen.findByTestId('add-all-to-collection'));
+      await userEvent.click(page.getByTestId('add-all-to-collection'));
 
-      await waitFor(() => expect(showSpy).toHaveBeenCalled());
+      await vi.waitFor(() => expect(showSpy).toHaveBeenCalled());
       const props = showSpy.mock.calls.at(-1)![1] as unknown as { terms: { query?: string } };
       expect(props.terms.query).toBe('beach');
       expect(props).toMatchObject({ smartSearchEnabled: true, total: 3 });
@@ -937,9 +898,9 @@ describe('album detail filter panel route', () => {
     // path threw, and the delete path silently no-opped while the asset stayed on screen.
     it('offers bulk handlers in search mode that act on the results, not the unmounted timeline', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('smart-search-results')).toBeInTheDocument());
+      await expect.element(page.getByTestId('smart-search-results')).toBeInTheDocument();
 
       const options = registerSelectionContextMock.mock.calls.at(-1)![0];
       const onFavorite = options.getOnFavorite();
@@ -956,30 +917,27 @@ describe('album detail filter panel route', () => {
     it('names a person chip picked from the search facets', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
       sdkMock.searchSmartFacets.mockResolvedValue(facetsWith([{ id: 'person-from-facets', name: 'Search Person' }]));
-      renderPage(album1());
-      const user = userEvent.setup();
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('people-item-person-from-facets')).toBeInTheDocument());
-      await user.click(screen.getByTestId('people-item-person-from-facets'));
+      await expect.element(page.getByTestId('people-item-person-from-facets')).toBeInTheDocument();
+      await userEvent.click(page.getByTestId('people-item-person-from-facets'));
 
-      await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Search Person'));
+      await expect.element(page.getByTestId('active-filters-bar')).toMatchTextContent('Search Person');
     });
 
     // Until the new facets land, the previous query's total keeps annotating the new results.
     it('drops the previous query facets when the query changes', async () => {
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
-      renderPage(album1());
+      await renderPage(album1());
 
-      await waitFor(() => expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '3'));
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-total', '3');
 
       // A slow response for the new query — the stale total must not survive in the meantime.
       sdkMock.searchSmartFacets.mockImplementation((() => new Promise(() => {})) as never);
       mockPage.url = new URL('https://gallery.test/albums/album-1?q=mountain');
 
-      await waitFor(() =>
-        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'mountain'),
-      );
-      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'mountain');
+      await expect.element(page.getByTestId('smart-search-results')).toHaveAttribute('data-total', '');
     });
   });
 });

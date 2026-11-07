@@ -1,7 +1,7 @@
-import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
+import { sdkMock } from '#lib/gallery/__mocks__/sdk.mock.ts';
 import type { SharedSpacePersonResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import ManageSpacePeopleVisibilityWrapper from './manage-space-people-visibility.test-wrapper.svelte';
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -37,7 +37,7 @@ describe('ManageSpacePeopleVisibility', () => {
     sdkMock.updateSpacePerson.mockResolvedValue({} as SharedSpacePersonResponseDto);
   });
 
-  function renderComponent(people: SharedSpacePersonResponseDto[] = [makePerson()]) {
+  async function renderComponent(people: SharedSpacePersonResponseDto[] = [makePerson()]) {
     return render(ManageSpacePeopleVisibilityWrapper, {
       props: {
         people,
@@ -48,44 +48,44 @@ describe('ManageSpacePeopleVisibility', () => {
     });
   }
 
-  it('should render all people including hidden ones', () => {
+  it('should render all people including hidden ones', async () => {
     const people = [
       makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
       makePerson({ id: 'p2', name: 'Bob', isHidden: true }),
     ];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.getByTestId('visibility-person-p1')).toBeInTheDocument();
-    expect(screen.getByTestId('visibility-person-p2')).toBeInTheDocument();
+    expect(page.getByTestId('visibility-person-p1').element()).toBeInTheDocument();
+    expect(page.getByTestId('visibility-person-p2').element()).toBeInTheDocument();
   });
 
-  it('should show canonical name when alias is present', () => {
+  it('should show canonical name when alias is present', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice Johnson', alias: 'Mom' })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.getByText('Alice Johnson')).toBeInTheDocument();
-    expect(screen.queryByText('Mom')).not.toBeInTheDocument();
+    expect(page.getByText('Alice Johnson', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('Mom', { exact: true }).query()).not.toBeInTheDocument();
   });
 
-  it('should show hidden people with aria-pressed true', () => {
+  it('should show hidden people with aria-pressed true', async () => {
     const people = [
       makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
       makePerson({ id: 'p2', name: 'Bob', isHidden: true }),
     ];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('visibility-person-p2')).toHaveAttribute('aria-pressed', 'true');
+    expect(page.getByTestId('visibility-person-p1').element()).toHaveAttribute('aria-pressed', 'false');
+    expect(page.getByTestId('visibility-person-p2').element()).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('should toggle hidden state on click', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice', isHidden: false })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    const button = screen.getByTestId('visibility-person-p1');
+    const button = page.getByTestId('visibility-person-p1').element();
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
-    await fireEvent.click(button);
+    await userEvent.click(button);
 
     expect(button).toHaveAttribute('aria-pressed', 'true');
   });
@@ -95,15 +95,15 @@ describe('ManageSpacePeopleVisibility', () => {
       makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
       makePerson({ id: 'p2', name: 'Bob', isHidden: false }),
     ];
-    renderComponent(people);
+    await renderComponent(people);
 
     // Toggle p1 to hidden
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
+    await userEvent.click(page.getByTestId('visibility-person-p1'));
 
     // Click save
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await userEvent.click(page.getByTestId('save-visibility'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledTimes(1);
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -116,52 +116,52 @@ describe('ManageSpacePeopleVisibility', () => {
   });
 
   it('should call onClose when close button is clicked', async () => {
-    renderComponent();
+    await renderComponent();
 
-    await fireEvent.click(screen.getByTestId('close-visibility'));
+    await userEvent.click(page.getByTestId('close-visibility'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   // --- Pet badge tests ---
 
-  it('should render the pet badge for a pet person', () => {
+  it('should render the pet badge for a pet person', async () => {
     const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.getByTestId('pet-badge')).toBeInTheDocument();
+    expect(page.getByTestId('pet-badge').element()).toBeInTheDocument();
   });
 
-  it('should not render the pet badge for a human person', () => {
+  it('should not render the pet badge for a human person', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice', type: 'person' })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
+    expect(page.getByTestId('pet-badge').query()).not.toBeInTheDocument();
   });
 
-  it('should give the pet badge a non-empty accessible name', () => {
+  it('should give the pet badge a non-empty accessible name', async () => {
     const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    expect(screen.getByTestId('pet-badge')).toHaveAccessibleName();
+    expect(page.getByTestId('pet-badge').element()).toHaveAccessibleName();
   });
 
-  it('should badge a pet with no species with a generic label', () => {
+  it('should badge a pet with no species with a generic label', async () => {
     // SharedSpacePersonResponseDto has no `species` field at all, so a space pet always falls
     // through to getPetBadgeLabel's generic fallback ($t('pet')) — this is the designed
     // behaviour, not a data gap to fill in.
     const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
-    renderComponent(people);
+    await renderComponent(people);
 
-    const badge = screen.getByTestId('pet-badge');
+    const badge = page.getByTestId('pet-badge').element();
     expect(badge.getAttribute('aria-label')).toBe('pet');
   });
 
   // --- Pagination tests ---
 
-  it('should render loading text when hasMore and loading are true', () => {
+  it('should render loading text when hasMore and loading are true', async () => {
     const people = [makePerson({ id: 'p1' })];
-    render(ManageSpacePeopleVisibilityWrapper, {
+    await render(ManageSpacePeopleVisibilityWrapper, {
       props: {
         people,
         spaceId: 'space-1',
@@ -173,12 +173,12 @@ describe('ManageSpacePeopleVisibility', () => {
       },
     });
 
-    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(page.getByText('loading', { exact: true }).element()).toBeInTheDocument();
   });
 
-  it('should not render loading text when hasMore is false', () => {
+  it('should not render loading text when hasMore is false', async () => {
     const people = [makePerson({ id: 'p1' })];
-    render(ManageSpacePeopleVisibilityWrapper, {
+    await render(ManageSpacePeopleVisibilityWrapper, {
       props: {
         people,
         spaceId: 'space-1',
@@ -189,7 +189,7 @@ describe('ManageSpacePeopleVisibility', () => {
       },
     });
 
-    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+    expect(page.getByText('loading', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   it('should preserve toggle overrides when people list grows via pagination', async () => {
@@ -198,7 +198,7 @@ describe('ManageSpacePeopleVisibility', () => {
       makePerson({ id: 'p2', name: 'Bob', isHidden: false }),
     ];
 
-    const { rerender } = render(ManageSpacePeopleVisibilityWrapper, {
+    const { rerender } = await render(ManageSpacePeopleVisibilityWrapper, {
       props: {
         people,
         spaceId: 'space-1',
@@ -210,8 +210,8 @@ describe('ManageSpacePeopleVisibility', () => {
     });
 
     // Toggle p1 to hidden
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(page.getByTestId('visibility-person-p1'));
+    expect(page.getByTestId('visibility-person-p1').element()).toHaveAttribute('aria-pressed', 'true');
 
     // Simulate loading more people (rerender with expanded list)
     const morePeople = [...people, makePerson({ id: 'p3', name: 'Charlie', isHidden: false })];
@@ -225,15 +225,15 @@ describe('ManageSpacePeopleVisibility', () => {
     });
 
     // p1 override should be preserved
-    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    expect(page.getByTestId('visibility-person-p1').element()).toHaveAttribute('aria-pressed', 'true');
     // p3 should be visible (not toggled)
-    expect(screen.getByTestId('visibility-person-p3')).toHaveAttribute('aria-pressed', 'false');
+    expect(page.getByTestId('visibility-person-p3').element()).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('should save only overrides for loaded people', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice', isHidden: false })];
 
-    render(ManageSpacePeopleVisibilityWrapper, {
+    await render(ManageSpacePeopleVisibilityWrapper, {
       props: {
         people,
         spaceId: 'space-1',
@@ -245,12 +245,12 @@ describe('ManageSpacePeopleVisibility', () => {
     });
 
     // Toggle p1
-    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
+    await userEvent.click(page.getByTestId('visibility-person-p1'));
 
     // Save
-    await fireEvent.click(screen.getByTestId('save-visibility'));
+    await userEvent.click(page.getByTestId('save-visibility'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledTimes(1);
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(expect.objectContaining({ personId: 'p1' }));
     });

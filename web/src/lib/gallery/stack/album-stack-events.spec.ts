@@ -1,8 +1,8 @@
 import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import type { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
+import { render } from 'vitest-browser-svelte';
 
 describe('AlbumStackEvents', () => {
   const reloadAlbumStacks = vi.fn();
@@ -14,7 +14,7 @@ describe('AlbumStackEvents', () => {
   });
 
   it('asks the album timeline to reload after stack edits', async () => {
-    render(AlbumStackEvents, { albumId: 'album-1', timelineManager });
+    await render(AlbumStackEvents, { albumId: 'album-1', timelineManager });
     await tick();
 
     eventManager.emit('StackCreate', stack);
@@ -25,7 +25,7 @@ describe('AlbumStackEvents', () => {
   });
 
   it('reloads after photos are added to this album, not another', async () => {
-    render(AlbumStackEvents, { albumId: 'album-1', timelineManager });
+    await render(AlbumStackEvents, { albumId: 'album-1', timelineManager });
     await tick();
 
     eventManager.emit('AlbumAddAssets', { assetIds: ['a'], albumIds: ['other-album'] });

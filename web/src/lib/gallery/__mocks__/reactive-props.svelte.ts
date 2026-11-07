@@ -9,7 +9,7 @@ bindable-prop write-back (see `prop()` in `svelte/internal/client/reactivity/pro
 wires up automatic write-back to an *imperatively* mounted component's props object when that
 object carries `STATE_SYMBOL` - i.e. when it was created via `$state(...)`
 (`is_entry_props = STATE_SYMBOL in props`). A plain object literal handed to
-`render(Component, props)` from `@testing-library/svelte` never receives a bindable prop's
+`render(Component, props)` from `vitest-browser-svelte` never receives a bindable prop's
 written-back value, so a test asserting "the component did not clobber this bound prop" would
 pass unconditionally with a plain object - regardless of whether the component actually
 clobbers it.

@@ -3,9 +3,10 @@ import { reactivePageMock as mockPage } from '#lib/gallery/__mocks__/reactive-pa
 import { memoryManager } from '#lib/managers/memory-manager.svelte.ts';
 import { factory } from '#test/unit/factories.ts';
 import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import { goto } from '$app/navigation';
 import MemoryViewer from './MemoryViewer.svelte';
 
@@ -45,14 +46,21 @@ const { mockAssetMultiSelectManager, mockAssetViewerManager, mockAuthManager, mo
 // `handlePromiseError(...)`, which calls `.catch()` on the return value -- so a bare `vi.fn()`
 // makes any test that reaches that path die with "Cannot read properties of undefined (reading
 // 'catch')" instead of asserting. That is why the effect had no coverage at all.
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn(() => Promise.resolve()),
+}));
 
 // A REACTIVE stand-in for $app/state's `page` -- memoryManager's `current` is `$derived.by(...)`
 // off `page.params.id` / `page.url.searchParams`, so a non-reactive plain object would not
 // re-trigger that derivation when a test reassigns `mockPage.params`/`mockPage.url`.
 vi.mock('$app/state', async () => {
   const { reactivePageMock } = await import('#lib/gallery/__mocks__/reactive-page.mock.svelte.ts');
-  return { page: reactivePageMock, navigating: { to: null } };
+  return {
+    ...(await import('#test/unit/mocks/app-state.svelte.ts')),
+    page: reactivePageMock,
+    navigating: { to: null },
+  };
 });
 
 vi.mock('#lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
@@ -221,9 +229,9 @@ describe('MemoryViewer view in timeline (#1047)', () => {
   });
 
   it('sends a photo from the viewer’s own library to the personal timeline', async () => {
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
+    await expect.element(page.getByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
   });
 
   // The timeline collapses a stack to its primary asset, so a stack child has no tile of its
@@ -235,12 +243,11 @@ describe('MemoryViewer view in timeline (#1047)', () => {
       stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
     });
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
-      'href',
-      '/spaces/space-1?at=stack-primary',
-    );
+    await expect
+      .element(page.getByLabelText('view_in_timeline'))
+      .toHaveAttribute('href', '/spaces/space-1?at=stack-primary');
   });
 
   it('lands on the stack primary for a stacked photo in the personal library', async () => {
@@ -249,9 +256,9 @@ describe('MemoryViewer view in timeline (#1047)', () => {
       stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
     });
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=stack-primary');
+    await expect.element(page.getByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=stack-primary');
   });
 
   // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
@@ -261,12 +268,11 @@ describe('MemoryViewer view in timeline (#1047)', () => {
   it('sends a photo the viewer only has through a Space to that Space timeline', async () => {
     mockGetAssetInfo.mockResolvedValue({ ...memoryManager.memories[0].assets[0], resolvedSpaceId: 'space-1' });
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
-      'href',
-      '/spaces/space-1?at=memory-asset-1',
-    );
+    await expect
+      .element(page.getByLabelText('view_in_timeline'))
+      .toHaveAttribute('href', '/spaces/space-1?at=memory-asset-1');
   });
 });
 
@@ -300,17 +306,18 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
   });
 
   it('resolves the viewer position within the memory from the url', async () => {
-    const { container } = renderViewer();
+    const { container } = await renderViewer();
 
-    const galleryViewer = await screen.findByTestId('gallery-viewer');
+    await expect.element(page.getByTestId('gallery-viewer')).toBeInTheDocument();
+    const galleryViewer = page.getByTestId('gallery-viewer');
 
     // `current.memory.assets` (memoryManager.current, real derivation) feeds the gallery strip.
     // If the url ever resolved `dup-asset` against the wrong memory -- e.g. a regression back to
     // a global assetId lookup that ignores the memoryId route param -- this would show memory-1's
     // assets instead.
-    expect(container.querySelector('[data-testid="asset-row-m2-only"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-testid="asset-row-m1-only"]')).not.toBeInTheDocument();
-    expect(galleryViewer).toHaveAttribute('data-asset-count', '2');
+    expect(container.querySelector('[data-testid="asset-row-m2-only"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="asset-row-m1-only"]')).toBeNull();
+    await expect.element(galleryViewer).toHaveAttribute('data-asset-count', '2');
   });
 
   // Fork feature #625 (asset grouping in the gallery viewer). Upstream's viewer does not pass
@@ -318,17 +325,18 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
   // whenever this fork delta is dropped during a rebase. Asserting on the stub's
   // `data-enable-grouping` attribute makes that loss loud instead of silent.
   it('enables asset grouping on the memory gallery strip (#625)', async () => {
-    renderViewer();
+    await renderViewer();
 
-    const galleryViewer = await screen.findByTestId('gallery-viewer');
+    await expect.element(page.getByTestId('gallery-viewer')).toBeInTheDocument();
+    const galleryViewer = page.getByTestId('gallery-viewer');
 
-    expect(galleryViewer).toHaveAttribute('data-enable-grouping', 'true');
+    await expect.element(galleryViewer).toHaveAttribute('data-enable-grouping', 'true');
   });
 
   it('links progress bar segments to assets scoped to the current memory', async () => {
-    const { container } = renderViewer();
+    const { container } = await renderViewer();
 
-    await screen.findByTestId('gallery-viewer');
+    await expect.element(page.getByTestId('gallery-viewer')).toBeInTheDocument();
 
     // The progress-bar segments (one `<a class="relative grow py-2">` per asset in
     // `current.memory.assets`) are built from `current.getAssetHref`, which always routes through
@@ -380,32 +388,32 @@ describe('MemoryViewer date overlay for a memory spanning years (#1029)', () => 
   it("shows the FIRST asset's date when it is the one being viewed", async () => {
     viewAsset('memory-1', 'berlin-2021');
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
-    expect(screen.queryByText(/August 26, 2025/)).not.toBeInTheDocument();
+    await expect.element(page.getByText(/August 26, 2021/)).toBeInTheDocument();
+    expect(page.getByText(/August 26, 2025/).query()).toBeNull();
   });
 
   it("shows the SECOND asset's own date, not the memory's first", async () => {
     viewAsset('memory-1', 'berlin-2025');
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
-    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
+    await expect.element(page.getByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(page.getByText(/August 26, 2021/).query()).toBeNull();
   });
 
   // `current` is `$derived.by()` off the reactive page mock, so reassigning the url is how the
   // viewed asset changes in production. A fresh render cannot prove the overlay reacts.
   it('updates the date when paging from the 2021 photo into the 2025 one', async () => {
     viewAsset('memory-1', 'berlin-2021');
-    renderViewer();
-    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
+    await renderViewer();
+    await expect.element(page.getByText(/August 26, 2021/)).toBeInTheDocument();
 
     viewAsset('memory-1', 'berlin-2025');
 
-    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument());
+    await expect.element(page.getByText(/August 26, 2025/)).toBeInTheDocument();
+    await expect.element(page.getByText(/August 26, 2021/)).not.toBeInTheDocument();
   });
 
   it('indexes within the current memory, not across the whole viewer', async () => {
@@ -420,11 +428,11 @@ describe('MemoryViewer date overlay for a memory spanning years (#1029)', () => 
     ];
     viewAsset('memory-2', 'berlin-2025');
 
-    renderViewer();
+    await renderViewer();
 
-    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
-    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/March 14, 2019/)).not.toBeInTheDocument();
+    await expect.element(page.getByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(page.getByText(/August 26, 2021/).query()).toBeNull();
+    expect(page.getByText(/March 14, 2019/).query()).toBeNull();
   });
 });
 
@@ -457,9 +465,9 @@ describe('MemoryViewer bail-out effect', () => {
   });
 
   it('does not navigate away while the memory resolves', async () => {
-    renderViewer();
+    await renderViewer();
 
-    await screen.findByTestId('gallery-viewer');
+    await expect.element(page.getByTestId('gallery-viewer')).toBeInTheDocument();
 
     expect(goto).not.toHaveBeenCalled();
   });
@@ -470,9 +478,9 @@ describe('MemoryViewer bail-out effect', () => {
       params: { id: 'does-not-exist' },
     });
 
-    renderViewer();
+    await renderViewer();
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(goto).toHaveBeenCalledWith(
         memoryManager.memoriesHref,
         expect.objectContaining({ replace: true, reset: false }),

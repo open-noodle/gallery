@@ -1,7 +1,8 @@
 import TestWrapper from '#lib/components/TestWrapper.svelte';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import FavoritesPage from './+page.svelte';
 
 type TimelineStubGlobals = typeof globalThis & {
@@ -123,6 +124,9 @@ function renderPage() {
 }
 
 describe('Favorites page timeline grouping', () => {
+  const byTestId = (id: string) => page.getByTestId(id);
+  const options = () => byTestId('timeline-options');
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAssetMultiSelectManager.selectionActive = false;
@@ -135,15 +139,15 @@ describe('Favorites page timeline grouping', () => {
   });
 
   it('renders desktop grouping controls and mobile grouping props for favorites', async () => {
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
-      JSON.stringify({ grouping: 'day', hasHandler: true }),
-    );
-    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"isFavorite":true');
-    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
+    await expect.element(byTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    await expect.element(byTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .element(byTestId('timeline-mobile-grouping-props'))
+      .toMatchTextContent(JSON.stringify({ grouping: 'day', hasHandler: true }));
+    await expect.element(options()).toMatchTextContent('"isFavorite":true');
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
   });
 
   // #763: a favorite is a per-user `asset_favorite` row, so this page must be cross-scope like the
@@ -158,11 +162,10 @@ describe('Favorites page timeline grouping', () => {
   // API-level e2e cannot catch it because its helper hardcodes `withSharedSpaces=true` — the very
   // flag the page omitted. Asserted on the serialised options because the timeline is stubbed here.
   it('requests favorites across shared spaces and partners, not just owned assets', async () => {
-    renderPage();
+    await renderPage();
 
-    const options = await screen.findByTestId('timeline-options');
-    expect(options).toHaveTextContent('"withSharedSpaces":true');
-    expect(options).toHaveTextContent('"withPartners":true');
+    await expect.element(options()).toMatchTextContent('"withSharedSpaces":true');
+    await expect.element(options()).toMatchTextContent('"withPartners":true');
   });
 
   // The cross-scope flags are only half the contract: timeline.service.ts rejects both of them with
@@ -171,123 +174,111 @@ describe('Favorites page timeline grouping', () => {
   // on this page fail — the page renders empty either way, so only this assertion separates "asks
   // for the right scope" from "asks for a scope the server will refuse".
   it('pins the visibility the cross-scope flags require, so the request is not rejected', async () => {
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('timeline-options')).toHaveTextContent('"visibility":"timeline"');
+    await expect.element(options()).toMatchTextContent('"visibility":"timeline"');
   });
 
   // Guards the composition rather than the constant: `options` is $derived by spreading
   // baseTimelineOptions, so a refactor that rebuilds it per grouping could drop the flags on every
   // surface except the initial render. Activating a year bucket regroups to month.
   it('keeps the cross-scope flags after a bucket change regroups the timeline', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await byTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withSharedSpaces":true');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withPartners":true');
-    });
+    await expect.element(options()).toMatchTextContent('"grouping":"month"');
+    await expect.element(options()).toMatchTextContent('"withSharedSpaces":true');
+    await expect.element(options()).toMatchTextContent('"withPartners":true');
   });
 
   it('year and month buckets keep favorite options without temporal chips', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await byTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"isFavorite":true');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
-    });
+    await expect.element(options()).toMatchTextContent('"grouping":"month"');
+    await expect.element(options()).toMatchTextContent('"isFavorite":true');
+    await expect.element(options()).not.toMatchTextContent('"takenAfter"');
+    await expect.element(options()).not.toMatchTextContent('"takenBefore"');
+    expect(byTestId('active-filters-bar').query()).toBeNull();
+    await expect.element(byTestId('timeline-anchor')).toMatchTextContent('{"year":2015}');
 
-    await fireEvent.click(screen.getByTestId('activate-month-bucket'));
+    await byTestId('activate-month-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"isFavorite":true');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
-      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
-      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015,"month":8}');
-    });
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
+    await expect.element(options()).toMatchTextContent('"isFavorite":true');
+    await expect.element(options()).not.toMatchTextContent('"takenAfter"');
+    await expect.element(options()).not.toMatchTextContent('"takenBefore"');
+    expect(byTestId('active-filters-bar').query()).toBeNull();
+    await expect.element(byTestId('timeline-anchor')).toMatchTextContent('{"year":2015,"month":8}');
   });
 
   it('bucket activation does not render a temporal result count chip', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await byTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
-    });
-    expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"month"');
+    await expect.element(byTestId('timeline-anchor')).toMatchTextContent('{"year":2015}');
+    expect(byTestId('result-count').query()).toBeNull();
+    expect(byTestId('active-filters-bar').query()).toBeNull();
   });
 
   it('manual grouping changes do not create temporal chips', async () => {
-    renderPage();
+    await renderPage();
 
-    await fireEvent.click(await screen.findByTestId('timeline-grouping-year'));
+    await byTestId('timeline-grouping-year').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
-    });
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"year"');
+    expect(byTestId('active-filters-bar').query()).toBeNull();
     // The grouping change preserves position via a scroll anchor, not a filter chip.
-    expect(screen.getByTestId('timeline-anchor')).not.toHaveTextContent('null');
+    await expect.element(byTestId('timeline-anchor')).not.toMatchTextContent('null');
   });
 
-  it('selection mode hides desktop grouping controls', () => {
+  it('selection mode hides desktop grouping controls', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    await expect.element(byTestId('timeline-stub')).toBeInTheDocument();
+    expect(byTestId('timeline-desktop-grouping-control').query()).toBeNull();
   });
 
   it('ignores bucket activation while selection mode is active', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
 
-    renderPage();
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await renderPage();
+    await byTestId('activate-year-bucket').click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
-      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
-    });
-    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    await expect.element(options()).toMatchTextContent('"grouping":"day"');
+    await expect.element(byTestId('timeline-anchor')).toMatchTextContent('null');
+    expect(byTestId('active-filters-bar').query()).toBeNull();
   });
 
   it('unfiltered empty placeholder does not render orphaned grouping controls', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 0;
 
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
-    });
+    await expect.element(byTestId('timeline-stub')).toBeInTheDocument();
+    await expect.element(byTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
   it('shows the add-all-to-collection button when the surface has results', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 3;
 
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+    await expect.element(byTestId('add-all-to-collection')).toBeInTheDocument();
   });
 
   it('hides the add-all-to-collection button when empty', async () => {
     timelineStubGlobals.__timelineStubAssetCount = 0;
 
-    renderPage();
+    await renderPage();
 
-    await screen.findByTestId('timeline-stub');
-    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+    await expect.element(byTestId('timeline-stub')).toBeInTheDocument();
+    expect(byTestId('add-all-to-collection').query()).toBeNull();
   });
 });

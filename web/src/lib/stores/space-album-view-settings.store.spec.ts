@@ -1,4 +1,4 @@
-import { AlbumSortBy, AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
+import { AlbumViewMode, SortOrder } from '#lib/stores/preferences.store.ts';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
 import { get } from 'svelte/store';
@@ -25,30 +25,7 @@ describe('space-album-view-settings store', () => {
     expect(localStorage.getItem('album-view-settings')).toBeNull();
   });
 
-  // S23 — a stored preference must survive the default change.
-  //
-  // `persisted()` reads localStorage once, when the module is evaluated. Writing
-  // to localStorage afterwards and calling `.update()` does NOT re-read it — this
-  // was verified empirically against this repo: the naive version leaves sortBy at
-  // the default and fails. The store must be re-imported after seeding storage.
-  //
-  // Keep this test LAST in the file: vi.resetModules() means later tests would
-  // otherwise get a different store instance than the one imported at the top.
-  it('prefers a stored sortBy over the new default', async () => {
-    localStorage.setItem(
-      'space-album-view-settings',
-      JSON.stringify({
-        view: AlbumViewMode.Cover,
-        sortBy: AlbumSortBy.Title,
-        sortOrder: SortOrder.Asc,
-        groupBy: SpaceAlbumGroupBy.None,
-        groupOrder: SortOrder.Desc,
-        collapsedGroups: {},
-      }),
-    );
-    vi.resetModules();
-    const reloaded = await import('#lib/stores/space-album-view-settings.store.ts');
-    expect(get(reloaded.spaceAlbumViewSettings).sortBy).toBe(AlbumSortBy.Title);
-    expect(get(reloaded.spaceAlbumViewSettings).sortOrder).toBe(SortOrder.Asc);
-  });
+  // S23 (a stored sortBy survives the default change) is in space-album-view-settings.store.load.spec.ts:
+  // `persisted()` caches each store by key for the page's lifetime and browser mode cannot reset modules,
+  // so reading storage on load needs a file of its own.
 });

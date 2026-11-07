@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import CameraFilter from '../camera-filter.svelte';
 import type { PersonOption } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
@@ -23,17 +24,17 @@ const mockPeople: PersonOption[] = [
 ];
 
 describe('PeopleFilter', () => {
-  it('should render people with checkboxes', () => {
-    const { getByTestId } = render(PeopleFilter, {
+  it('should render people with checkboxes', async () => {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople.slice(0, 3),
         selectedIds: [],
         onSelectionChange: () => {},
       },
     });
-    expect(getByTestId('people-item-p1')).toBeTruthy();
-    expect(getByTestId('people-item-p2')).toBeTruthy();
-    expect(getByTestId('people-item-p3')).toBeTruthy();
+    expect(getByTestId('people-item-p1').element()).toBeTruthy();
+    expect(getByTestId('people-item-p2').element()).toBeTruthy();
+    expect(getByTestId('people-item-p3').element()).toBeTruthy();
   });
 
   it('should support multi-select (selecting B keeps A selected)', async () => {
@@ -42,7 +43,7 @@ describe('PeopleFilter', () => {
       selected = ids;
     };
 
-    const { getByTestId, rerender } = render(PeopleFilter, {
+    const { getByTestId, rerender } = await render(PeopleFilter, {
       props: {
         people: mockPeople.slice(0, 3),
         selectedIds: [],
@@ -51,7 +52,7 @@ describe('PeopleFilter', () => {
     });
 
     // Select first person
-    await fireEvent.click(getByTestId('people-item-p1'));
+    await userEvent.click(getByTestId('people-item-p1'));
     expect(selected).toEqual(['p1']);
 
     // Rerender with new selectedIds to simulate parent state update
@@ -62,7 +63,7 @@ describe('PeopleFilter', () => {
     });
 
     // Select second person
-    await fireEvent.click(getByTestId('people-item-p2'));
+    await userEvent.click(getByTestId('people-item-p2'));
     expect(selected).toEqual(['p1', 'p2']);
   });
 
@@ -72,7 +73,7 @@ describe('PeopleFilter', () => {
       selected = ids;
     };
 
-    const { getByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople.slice(0, 3),
         selectedIds: ['p1', 'p2'],
@@ -81,7 +82,7 @@ describe('PeopleFilter', () => {
     });
 
     // Deselect p1
-    await fireEvent.click(getByTestId('people-item-p1'));
+    await userEvent.click(getByTestId('people-item-p1'));
     expect(selected).toEqual(['p2']);
   });
 
@@ -91,7 +92,7 @@ describe('PeopleFilter', () => {
       selected = ids;
     };
 
-    const { getByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople.slice(0, 3),
         selectedIds: [],
@@ -99,12 +100,12 @@ describe('PeopleFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('people-item-p3'));
+    await userEvent.click(getByTestId('people-item-p3'));
     expect(selected).toEqual(['p3']);
   });
 
   it('should filter list via search input', async () => {
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople.slice(0, 5),
         selectedIds: [],
@@ -112,20 +113,20 @@ describe('PeopleFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('people-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Chen' } });
+    const searchInput = getByTestId('people-search-input').element();
+    await userEvent.fill(searchInput, 'Chen');
 
     // Sarah Chen and Max Chen should be visible
-    expect(queryByTestId('people-item-p1')).toBeTruthy();
-    expect(queryByTestId('people-item-p2')).toBeTruthy();
+    expect(getByTestId('people-item-p1').query()).toBeTruthy();
+    expect(getByTestId('people-item-p2').query()).toBeTruthy();
     // Others should be hidden
-    expect(queryByTestId('people-item-p3')).toBeNull();
-    expect(queryByTestId('people-item-p4')).toBeNull();
-    expect(queryByTestId('people-item-p5')).toBeNull();
+    expect(getByTestId('people-item-p3').query()).toBeNull();
+    expect(getByTestId('people-item-p4').query()).toBeNull();
+    expect(getByTestId('people-item-p5').query()).toBeNull();
   });
 
-  it('should show "Show N more" when list exceeds 5 items', () => {
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+  it('should show "Show N more" when list exceeds 5 items', async () => {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople,
         selectedIds: [],
@@ -134,19 +135,19 @@ describe('PeopleFilter', () => {
     });
 
     // First 5 should be visible
-    expect(queryByTestId('people-item-p1')).toBeTruthy();
-    expect(queryByTestId('people-item-p5')).toBeTruthy();
+    expect(getByTestId('people-item-p1').query()).toBeTruthy();
+    expect(getByTestId('people-item-p5').query()).toBeTruthy();
     // 6th and 7th should be hidden
-    expect(queryByTestId('people-item-p6')).toBeNull();
-    expect(queryByTestId('people-item-p7')).toBeNull();
+    expect(getByTestId('people-item-p6').query()).toBeNull();
+    expect(getByTestId('people-item-p7').query()).toBeNull();
 
     // "Show 2 more" link should appear
-    const showMore = getByTestId('people-show-more');
+    const showMore = getByTestId('people-show-more').element();
     expect(showMore.textContent).toContain('Show 2 more');
   });
 
   it('should expand list when "Show N more" is clicked', async () => {
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople,
         selectedIds: [],
@@ -154,38 +155,38 @@ describe('PeopleFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('people-show-more'));
+    await userEvent.click(getByTestId('people-show-more'));
 
     // Now all 7 should be visible
-    expect(queryByTestId('people-item-p6')).toBeTruthy();
-    expect(queryByTestId('people-item-p7')).toBeTruthy();
+    expect(getByTestId('people-item-p6').query()).toBeTruthy();
+    expect(getByTestId('people-item-p7').query()).toBeTruthy();
   });
 
-  it('should render thumbnail images when thumbnailUrl is provided', () => {
+  it('should render thumbnail images when thumbnailUrl is provided', async () => {
     const people: PersonOption[] = [
       { id: '1', name: 'Alice', thumbnailUrl: '/shared-spaces/s1/people/1/thumbnail' },
       { id: '2', name: 'Bob', thumbnailUrl: '/shared-spaces/s1/people/2/thumbnail' },
     ];
-    const { container } = render(PeopleFilter, {
+    const { container } = await render(PeopleFilter, {
       props: { people, selectedIds: [], onSelectionChange: vi.fn() },
     });
     const images = container.querySelectorAll('img');
     expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute('src', '/shared-spaces/s1/people/1/thumbnail');
-    expect(images[1]).toHaveAttribute('src', '/shared-spaces/s1/people/2/thumbnail');
+    expect(images[0].getAttribute('src')).toBe('/shared-spaces/s1/people/1/thumbnail');
+    expect(images[1].getAttribute('src')).toBe('/shared-spaces/s1/people/2/thumbnail');
   });
 
-  it('should render gradient avatar when thumbnailUrl is not provided', () => {
+  it('should render gradient avatar when thumbnailUrl is not provided', async () => {
     const people: PersonOption[] = [{ id: '1', name: 'Alice' }];
-    const { container, getByText } = render(PeopleFilter, {
+    const { container, getByText } = await render(PeopleFilter, {
       props: { people, selectedIds: [], onSelectionChange: vi.fn() },
     });
     expect(container.querySelector('img')).toBeNull();
-    expect(getByText('A')).toBeTruthy();
+    expect(getByText('A', { exact: true }).element()).toBeTruthy();
   });
 
   it('should show all search results without truncation', async () => {
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: mockPeople,
         selectedIds: [],
@@ -195,14 +196,14 @@ describe('PeopleFilter', () => {
 
     // Search for "Chen" — should match Sarah Chen and Max Chen (2 results)
     // But also test with more results: search for common substring
-    const searchInput = getByTestId('people-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Chen' } });
+    const searchInput = getByTestId('people-search-input').element();
+    await userEvent.fill(searchInput, 'Chen');
 
     // Both matches should be visible (not truncated)
-    expect(queryByTestId('people-item-p1')).toBeTruthy();
-    expect(queryByTestId('people-item-p2')).toBeTruthy();
+    expect(getByTestId('people-item-p1').query()).toBeTruthy();
+    expect(getByTestId('people-item-p2').query()).toBeTruthy();
     // Non-matches hidden
-    expect(queryByTestId('people-item-p3')).toBeNull();
+    expect(getByTestId('people-item-p3').query()).toBeNull();
   });
 
   it('should show all search results even when more than INITIAL_SHOW_COUNT match', async () => {
@@ -218,7 +219,7 @@ describe('PeopleFilter', () => {
       { id: 'p8', name: 'Jones Hank' },
     ];
 
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: manyPeople,
         selectedIds: [],
@@ -226,23 +227,23 @@ describe('PeopleFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('people-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Smith' } });
+    const searchInput = getByTestId('people-search-input').element();
+    await userEvent.fill(searchInput, 'Smith');
 
     // All 7 Smith matches should be visible — no truncation at 5
-    expect(queryByTestId('people-item-p1')).toBeTruthy();
-    expect(queryByTestId('people-item-p2')).toBeTruthy();
-    expect(queryByTestId('people-item-p3')).toBeTruthy();
-    expect(queryByTestId('people-item-p4')).toBeTruthy();
-    expect(queryByTestId('people-item-p5')).toBeTruthy();
-    expect(queryByTestId('people-item-p6')).toBeTruthy();
-    expect(queryByTestId('people-item-p7')).toBeTruthy();
+    expect(getByTestId('people-item-p1').query()).toBeTruthy();
+    expect(getByTestId('people-item-p2').query()).toBeTruthy();
+    expect(getByTestId('people-item-p3').query()).toBeTruthy();
+    expect(getByTestId('people-item-p4').query()).toBeTruthy();
+    expect(getByTestId('people-item-p5').query()).toBeTruthy();
+    expect(getByTestId('people-item-p6').query()).toBeTruthy();
+    expect(getByTestId('people-item-p7').query()).toBeTruthy();
     // Non-match hidden
-    expect(queryByTestId('people-item-p8')).toBeNull();
+    expect(getByTestId('people-item-p8').query()).toBeNull();
   });
 
-  it('should show empty message when no people', () => {
-    const { getByTestId } = render(PeopleFilter, {
+  it('should show empty message when no people', async () => {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: [],
         selectedIds: [],
@@ -250,11 +251,11 @@ describe('PeopleFilter', () => {
       },
     });
 
-    expect(getByTestId('people-empty').textContent).toBe('No people found');
+    expect(getByTestId('people-empty').element().textContent).toBe('No people found');
   });
 
-  it('should display orphaned selected person name from typed search cache', () => {
-    const { getByTestId } = render(PeopleFilter, {
+  it('should display orphaned selected person name from typed search cache', async () => {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: [{ id: 'p-other', name: 'Other Person' }],
         selectedIds: ['p-cat'],
@@ -263,13 +264,13 @@ describe('PeopleFilter', () => {
       },
     });
 
-    const orphanItem = getByTestId('people-item-p-cat');
+    const orphanItem = getByTestId('people-item-p-cat').element();
     expect(orphanItem.textContent).toContain('cat');
     expect(orphanItem.textContent).not.toContain('p-cat');
   });
 
-  it('should show typed selected person even when suggestions are empty', () => {
-    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+  it('should show typed selected person even when suggestions are empty', async () => {
+    const { getByTestId } = await render(PeopleFilter, {
       props: {
         people: [],
         selectedIds: ['p-cat'],
@@ -278,8 +279,8 @@ describe('PeopleFilter', () => {
       },
     });
 
-    expect(queryByTestId('people-empty')).toBeNull();
-    expect(getByTestId('people-item-p-cat').textContent).toContain('cat');
+    expect(getByTestId('people-empty').query()).toBeNull();
+    expect(getByTestId('people-item-p-cat').element().textContent).toContain('cat');
   });
 });
 
@@ -294,8 +295,8 @@ describe('LocationFilter', () => {
     return Promise.resolve(cityMap[country] ?? []);
   };
 
-  it('should render countries with radio buttons', () => {
-    const { getByTestId } = render(LocationFilter, {
+  it('should render countries with radio buttons', async () => {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -303,9 +304,9 @@ describe('LocationFilter', () => {
       },
     });
 
-    expect(getByTestId('location-country-Germany')).toBeTruthy();
-    expect(getByTestId('location-country-Italy')).toBeTruthy();
-    expect(getByTestId('location-country-France')).toBeTruthy();
+    expect(getByTestId('location-country-Germany').element()).toBeTruthy();
+    expect(getByTestId('location-country-Italy').element()).toBeTruthy();
+    expect(getByTestId('location-country-France').element()).toBeTruthy();
   });
 
   it('should be single-select (selecting B deselects A)', async () => {
@@ -316,7 +317,7 @@ describe('LocationFilter', () => {
       lastCity = city;
     };
 
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -325,18 +326,18 @@ describe('LocationFilter', () => {
     });
 
     // Select Germany
-    await fireEvent.click(getByTestId('location-country-Germany'));
+    await userEvent.click(getByTestId('location-country-Germany'));
     expect(lastCountry).toBe('Germany');
     expect(lastCity).toBeUndefined();
 
     // Select Italy (should deselect Germany)
-    await fireEvent.click(getByTestId('location-country-Italy'));
+    await userEvent.click(getByTestId('location-country-Italy'));
     expect(lastCountry).toBe('Italy');
     expect(lastCity).toBeUndefined();
   });
 
   it('should show cities when country is expanded', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -344,20 +345,20 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
+    await userEvent.click(getByTestId('location-country-Germany'));
 
     // Wait for async city fetch
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeTruthy();
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-city-Hamburg')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeTruthy();
+      expect(getByTestId('location-city-Berlin').query()).toBeTruthy();
+      expect(getByTestId('location-city-Hamburg').query()).toBeTruthy();
     });
   });
 
   it('should cap expanded city lists and expand cities with city-level show more', async () => {
     const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany'],
         onCityFetch: () => Promise.resolve(cities),
@@ -365,27 +366,27 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
+    await userEvent.click(getByTestId('location-country-Germany'));
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-City 1')).toBeTruthy();
-      expect(queryByTestId('location-city-City 10')).toBeTruthy();
-      expect(queryByTestId('location-city-City 11')).toBeNull();
-      expect(queryByTestId('location-city-City 12')).toBeNull();
-      expect(getByTestId('location-city-show-more-Germany').textContent).toContain('Show 2 more');
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-City 1').query()).toBeTruthy();
+      expect(getByTestId('location-city-City 10').query()).toBeTruthy();
+      expect(getByTestId('location-city-City 11').query()).toBeNull();
+      expect(getByTestId('location-city-City 12').query()).toBeNull();
+      expect(getByTestId('location-city-show-more-Germany').element().textContent).toContain('Show 2 more');
     });
 
-    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
+    await userEvent.click(getByTestId('location-city-show-more-Germany'));
 
-    expect(queryByTestId('location-city-City 11')).toBeTruthy();
-    expect(queryByTestId('location-city-City 12')).toBeTruthy();
+    expect(getByTestId('location-city-City 11').query()).toBeTruthy();
+    expect(getByTestId('location-city-City 12').query()).toBeTruthy();
   });
 
   it('should keep a selected city visible when it is outside the initial city cap', async () => {
     const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
     const onSelectionChange = vi.fn();
 
-    const { queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany'],
         selectedCountry: 'Germany',
@@ -395,12 +396,12 @@ describe('LocationFilter', () => {
       },
     });
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-City 9')).toBeTruthy();
-      expect(queryByTestId('location-city-City 10')).toBeNull();
-      expect(queryByTestId('location-city-City 11')).toBeTruthy();
-      expect(queryByTestId('location-city-City 12')).toBeNull();
-      expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-City 9').query()).toBeTruthy();
+      expect(getByTestId('location-city-City 10').query()).toBeNull();
+      expect(getByTestId('location-city-City 11').query()).toBeTruthy();
+      expect(getByTestId('location-city-City 12').query()).toBeNull();
+      expect(getByTestId('location-city-show-more-Germany').query()).toBeTruthy();
     });
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
@@ -408,7 +409,7 @@ describe('LocationFilter', () => {
   it('should mark a city-only selection as selected under its matching country', async () => {
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['United States of America'],
         selectedCity: 'New York City',
@@ -417,20 +418,20 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-United States of America'));
+    await userEvent.click(getByTestId('location-country-United States of America'));
     onSelectionChange.mockClear();
 
-    await waitFor(() => expect(queryByTestId('location-city-New York City')).toBeTruthy());
-    const selectedCity = getByTestId('location-city-New York City');
+    await vi.waitFor(() => expect(getByTestId('location-city-New York City').query()).toBeTruthy());
+    const selectedCity = getByTestId('location-city-New York City').element();
     expect(selectedCity.className).toContain('font-medium');
     expect(selectedCity.textContent).toContain('New York City');
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
-  it('should show a selected city-only filter before a country is expanded', () => {
+  it('should show a selected city-only filter before a country is expanded', async () => {
     const onSelectionChange = vi.fn();
 
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['United States of America'],
         selectedCity: 'New York City',
@@ -439,7 +440,7 @@ describe('LocationFilter', () => {
       },
     });
 
-    const selectedCity = getByTestId('location-city-New York City');
+    const selectedCity = getByTestId('location-city-New York City').element();
     expect(selectedCity.className).toContain('font-medium');
     expect(selectedCity.textContent).toContain('New York City');
     expect(onSelectionChange).not.toHaveBeenCalled();
@@ -448,7 +449,7 @@ describe('LocationFilter', () => {
   it('should clear a city-only selection when clicking the selected city', async () => {
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['United States of America'],
         selectedCity: 'New York City',
@@ -457,11 +458,11 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-United States of America'));
-    await waitFor(() => expect(queryByTestId('location-city-New York City')).toBeTruthy());
+    await userEvent.click(getByTestId('location-country-United States of America'));
+    await vi.waitFor(() => expect(getByTestId('location-city-New York City').query()).toBeTruthy());
     onSelectionChange.mockClear();
 
-    await fireEvent.click(getByTestId('location-city-New York City'));
+    await userEvent.click(getByTestId('location-city-New York City'));
 
     expect(onSelectionChange).toHaveBeenCalledWith(undefined, undefined);
   });
@@ -469,7 +470,7 @@ describe('LocationFilter', () => {
   it('should keep a selected city visible when it does not match the active search', async () => {
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'Italy'],
         selectedCountry: 'Germany',
@@ -479,13 +480,13 @@ describe('LocationFilter', () => {
       },
     });
 
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+    await vi.waitFor(() => expect(getByTestId('location-city-Berlin').query()).toBeTruthy());
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Italy' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'Italy');
 
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+    expect(getByTestId('location-city-Berlin').query()).toBeTruthy();
+    expect(getByTestId('location-country-Italy').query()).toBeTruthy();
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
@@ -495,7 +496,7 @@ describe('LocationFilter', () => {
       France: Array.from({ length: 12 }, (_, index) => `French City ${index + 1}`),
     };
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'France'],
         onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
@@ -503,16 +504,16 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy());
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(getByTestId('location-city-show-more-Germany').query()).toBeTruthy());
 
-    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
-    expect(queryByTestId('location-city-German City 11')).toBeTruthy();
+    await userEvent.click(getByTestId('location-city-show-more-Germany'));
+    expect(getByTestId('location-city-German City 11').query()).toBeTruthy();
 
-    await fireEvent.click(getByTestId('location-country-France'));
-    await waitFor(() => {
-      expect(queryByTestId('location-city-French City 10')).toBeTruthy();
-      expect(queryByTestId('location-city-French City 11')).toBeNull();
+    await userEvent.click(getByTestId('location-country-France'));
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-French City 10').query()).toBeTruthy();
+      expect(getByTestId('location-city-French City 11').query()).toBeNull();
     });
   });
 
@@ -528,7 +529,7 @@ describe('LocationFilter', () => {
     const onSelectionChange = vi.fn();
     const onCityFetch = vi.fn((country: string) => (country === 'Germany' ? germanyPromise : francePromise));
 
-    const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
+    const { getByTestId, rerender } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'France'],
         onCityFetch,
@@ -536,14 +537,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
-    await fireEvent.click(getByTestId('location-country-France'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
-    await waitFor(() => expect(queryByTestId('location-city-French City 1')).toBeNull());
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
+    await userEvent.click(getByTestId('location-country-France'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
+    await vi.waitFor(() => expect(getByTestId('location-city-French City 1').query()).toBeNull());
 
     resolveFrance(['French City 1']);
-    await waitFor(() => expect(queryByTestId('location-city-French City 1')).toBeTruthy());
+    await vi.waitFor(() => expect(getByTestId('location-city-French City 1').query()).toBeTruthy());
     await rerender({
       countries: ['Germany', 'France'],
       selectedCountry: 'France',
@@ -555,9 +556,9 @@ describe('LocationFilter', () => {
 
     resolveGermany(['German City 1']);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await waitFor(() => {
-      expect(queryByTestId('location-city-French City 1')).toBeTruthy();
-      expect(queryByTestId('location-city-German City 1')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-French City 1').query()).toBeTruthy();
+      expect(getByTestId('location-city-German City 1').query()).toBeNull();
     });
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
@@ -575,7 +576,7 @@ describe('LocationFilter', () => {
     const onCityFetch = vi.fn(() => germanyRequests.shift() ?? Promise.resolve([]));
     const onSelectionChange = vi.fn();
 
-    const { queryByTestId, rerender } = render(LocationFilter, {
+    const { getByTestId, rerender } = await render(LocationFilter, {
       props: {
         countries: ['Germany'],
         selectedCountry: 'Germany',
@@ -586,7 +587,7 @@ describe('LocationFilter', () => {
       },
     });
 
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
     await rerender({
       countries: ['Germany'],
       selectedCountry: 'Germany',
@@ -595,17 +596,17 @@ describe('LocationFilter', () => {
       onCityFetch,
       onSelectionChange,
     });
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(2));
 
     resolveSecondGermany(['Berlin']);
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+    await vi.waitFor(() => expect(getByTestId('location-city-Berlin').query()).toBeTruthy());
     onSelectionChange.mockClear();
 
     resolveFirstGermany(['Munich']);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-city-Munich')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Berlin').query()).toBeTruthy();
+      expect(getByTestId('location-city-Munich').query()).toBeNull();
     });
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
@@ -622,7 +623,7 @@ describe('LocationFilter', () => {
     const onCityFetch = vi.fn((country: string) => (country === 'Germany' ? germanyPromise : francePromise));
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'France'],
         onCityFetch,
@@ -630,19 +631,19 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
 
     rejectGermany(new Error('city fetch failed'));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await fireEvent.click(getByTestId('location-country-France'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
+    await userEvent.click(getByTestId('location-country-France'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
 
     resolveFrance(['Paris']);
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Paris')).toBeTruthy();
-      expect(queryByTestId('location-city-Munich')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Paris').query()).toBeTruthy();
+      expect(getByTestId('location-city-Munich').query()).toBeNull();
     });
     expect(onSelectionChange).toHaveBeenCalledWith('France', undefined);
   });
@@ -659,7 +660,7 @@ describe('LocationFilter', () => {
     const onCityFetch = vi.fn((country: string) => (country === 'Germany' ? germanyPromise : francePromise));
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'France'],
         onCityFetch,
@@ -667,22 +668,22 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
 
     resolveGermany(['Munich']);
-    await waitFor(() => expect(queryByTestId('location-city-Munich')).toBeTruthy());
+    await vi.waitFor(() => expect(getByTestId('location-city-Munich').query()).toBeTruthy());
 
-    await fireEvent.click(getByTestId('location-country-France'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
+    await userEvent.click(getByTestId('location-country-France'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
     onSelectionChange.mockClear();
 
     rejectFrance(new Error('city fetch failed'));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeNull();
-      expect(getByTestId('location-country-France')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeNull();
+      expect(getByTestId('location-country-France').element()).toBeTruthy();
     });
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
@@ -691,7 +692,7 @@ describe('LocationFilter', () => {
     const fetchPromise = Promise.resolve([]);
     const onCityFetch = vi.fn(() => fetchPromise);
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany'],
         onCityFetch,
@@ -699,12 +700,12 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
     await fetchPromise;
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-show-more-Germany')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-show-more-Germany').query()).toBeNull();
     });
   });
 
@@ -716,7 +717,7 @@ describe('LocationFilter', () => {
       lastCity = city;
     };
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -725,20 +726,20 @@ describe('LocationFilter', () => {
     });
 
     // First expand Germany
-    await fireEvent.click(getByTestId('location-country-Germany'));
+    await userEvent.click(getByTestId('location-country-Germany'));
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeTruthy();
     });
 
     // Select Munich — should auto-fill Germany
-    await fireEvent.click(getByTestId('location-city-Munich'));
+    await userEvent.click(getByTestId('location-city-Munich'));
     expect(lastCountry).toBe('Germany');
     expect(lastCity).toBe('Munich');
   });
 
-  it('should show empty message when no locations', () => {
-    const { getByTestId } = render(LocationFilter, {
+  it('should show empty message when no locations', async () => {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: [],
         onCityFetch: mockCityFetch,
@@ -746,7 +747,7 @@ describe('LocationFilter', () => {
       },
     });
 
-    expect(getByTestId('location-empty').textContent).toBe('No locations found');
+    expect(getByTestId('location-empty').element().textContent).toBe('No locations found');
   });
 
   // --- Search tests ---
@@ -766,7 +767,7 @@ describe('LocationFilter', () => {
   ];
 
   it('should filter countries via search input', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -774,18 +775,18 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Ger' } });
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'Ger');
 
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    expect(queryByTestId('location-country-France')).toBeNull();
-    expect(queryByTestId('location-country-Italy')).toBeNull();
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+    expect(getByTestId('location-country-France').query()).toBeNull();
+    expect(getByTestId('location-country-Italy').query()).toBeNull();
   });
 
   it('should not fetch all country cities for one-character searches', async () => {
     const onCityFetch = vi.fn(() => Promise.resolve([]));
 
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch,
@@ -793,14 +794,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'a' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'a');
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(onCityFetch).not.toHaveBeenCalled();
   });
 
   it('should not use cached city matches for one-character searches', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany'],
         onCityFetch: () => Promise.resolve(['Berlin']),
@@ -808,14 +809,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => expect(getByTestId('location-city-Berlin').query()).toBeTruthy());
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'b' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'b');
 
-    expect(queryByTestId('location-country-Germany')).toBeNull();
-    expect(queryByTestId('location-city-Berlin')).toBeNull();
-    expect(getByTestId('location-no-results').textContent).toBe('No matching locations');
+    expect(getByTestId('location-country-Germany').query()).toBeNull();
+    expect(getByTestId('location-city-Berlin').query()).toBeNull();
+    expect(getByTestId('location-no-results').element().textContent).toBe('No matching locations');
   });
 
   it('should search matching city names when the query also matches a country name', async () => {
@@ -824,7 +825,7 @@ describe('LocationFilter', () => {
       Switzerland: ['Geneva'],
     };
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'Switzerland'],
         onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
@@ -832,17 +833,17 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ge' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'ge');
 
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Germany')).toBeTruthy();
-      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
-      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+      expect(getByTestId('location-country-Switzerland').query()).toBeTruthy();
+      expect(getByTestId('location-city-Geneva').query()).toBeTruthy();
     });
   });
 
   it('should search city names and show matching cities under their country', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -850,13 +851,13 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'ber');
 
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Germany')).toBeTruthy();
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-country-Italy')).toBeNull();
-      expect(queryByTestId('location-city-Munich')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+      expect(getByTestId('location-city-Berlin').query()).toBeTruthy();
+      expect(getByTestId('location-country-Italy').query()).toBeNull();
+      expect(getByTestId('location-city-Munich').query()).toBeNull();
     });
   });
 
@@ -869,7 +870,7 @@ describe('LocationFilter', () => {
       country === 'Switzerland' ? switzerlandPromise : Promise.resolve([]),
     );
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'Switzerland'],
         onCityFetch,
@@ -877,24 +878,24 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', undefined));
+    await userEvent.fill(getByTestId('location-search-input'), 'gene');
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', undefined));
 
-    expect(queryByTestId('location-no-results')).toBeNull();
+    expect(getByTestId('location-no-results').query()).toBeNull();
 
     resolveSwitzerland(['Geneva']);
 
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
-      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
-      expect(queryByTestId('location-no-results')).toBeNull();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-country-Switzerland').query()).toBeTruthy();
+      expect(getByTestId('location-city-Geneva').query()).toBeTruthy();
+      expect(getByTestId('location-no-results').query()).toBeNull();
     });
   });
 
   it('should not show no-results before debounced city search fetches start', async () => {
     const onCityFetch = vi.fn(() => Promise.resolve([]));
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: ['Germany', 'Switzerland'],
         onCityFetch,
@@ -902,10 +903,10 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'gene');
 
     expect(onCityFetch).not.toHaveBeenCalled();
-    expect(queryByTestId('location-no-results')).toBeNull();
+    expect(getByTestId('location-no-results').query()).toBeNull();
   });
 
   it('should refetch city search results when context changes with the same active query', async () => {
@@ -918,7 +919,7 @@ describe('LocationFilter', () => {
       return Promise.resolve([]);
     });
 
-    const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
+    const { getByTestId, rerender } = await render(LocationFilter, {
       props: {
         countries,
         context: { takenAfter: '2026-01-01' },
@@ -927,9 +928,9 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-01-01' }));
-    await waitFor(() => expect(queryByTestId('location-no-results')).toBeTruthy());
+    await userEvent.fill(getByTestId('location-search-input'), 'gene');
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-01-01' }));
+    await vi.waitFor(() => expect(getByTestId('location-no-results').query()).toBeTruthy());
 
     await rerender({
       countries,
@@ -938,10 +939,10 @@ describe('LocationFilter', () => {
       onSelectionChange: () => {},
     });
 
-    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-02-01' }));
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
-      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
+    await vi.waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-02-01' }));
+    await vi.waitFor(() => {
+      expect(getByTestId('location-country-Switzerland').query()).toBeTruthy();
+      expect(getByTestId('location-city-Geneva').query()).toBeTruthy();
     });
   });
 
@@ -950,7 +951,7 @@ describe('LocationFilter', () => {
       Mexico: ['Merida'],
     };
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
@@ -958,20 +959,20 @@ describe('LocationFilter', () => {
       },
     });
 
-    expect(queryByTestId('location-country-Mexico')).toBeNull();
+    expect(getByTestId('location-country-Mexico').query()).toBeNull();
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'meri' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'meri');
 
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Mexico')).toBeTruthy();
-      expect(queryByTestId('location-city-Merida')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-country-Mexico').query()).toBeTruthy();
+      expect(getByTestId('location-city-Merida').query()).toBeTruthy();
     });
   });
 
   it('should select a city from city search results', async () => {
     const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -979,16 +980,16 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+    await userEvent.fill(getByTestId('location-search-input'), 'ber');
 
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
-    await fireEvent.click(getByTestId('location-city-Berlin'));
+    await vi.waitFor(() => expect(getByTestId('location-city-Berlin').query()).toBeTruthy());
+    await userEvent.click(getByTestId('location-city-Berlin'));
 
     expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', 'Berlin');
   });
 
   it('should search case-insensitively', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -996,14 +997,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'germany' } });
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'germany');
 
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
   });
 
   it('should show all search results without truncation', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -1011,23 +1012,23 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
+    const searchInput = getByTestId('location-search-input').element();
     // "an" matches 4 countries — all shown regardless of truncation
-    await fireEvent.input(searchInput, { target: { value: 'an' } });
+    await userEvent.fill(searchInput, 'an');
 
-    expect(queryByTestId('location-country-Canada')).toBeTruthy();
-    expect(queryByTestId('location-country-France')).toBeTruthy();
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    expect(queryByTestId('location-country-Japan')).toBeTruthy();
+    expect(getByTestId('location-country-Canada').query()).toBeTruthy();
+    expect(getByTestId('location-country-France').query()).toBeTruthy();
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+    expect(getByTestId('location-country-Japan').query()).toBeTruthy();
     // Non-matches hidden
-    expect(queryByTestId('location-country-Argentina')).toBeNull();
-    expect(queryByTestId('location-country-Brazil')).toBeNull();
-    expect(queryByTestId('location-country-China')).toBeNull();
-    expect(queryByTestId('location-country-Spain')).toBeNull();
+    expect(getByTestId('location-country-Argentina').query()).toBeNull();
+    expect(getByTestId('location-country-Brazil').query()).toBeNull();
+    expect(getByTestId('location-country-China').query()).toBeNull();
+    expect(getByTestId('location-country-Spain').query()).toBeNull();
   });
 
-  it('should show "Show N more" when list exceeds 10 countries', () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+  it('should show "Show N more" when list exceeds 10 countries', async () => {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -1036,18 +1037,18 @@ describe('LocationFilter', () => {
     });
 
     // First 10 should be visible
-    expect(queryByTestId('location-country-Argentina')).toBeTruthy();
-    expect(queryByTestId('location-country-Japan')).toBeTruthy();
+    expect(getByTestId('location-country-Argentina').query()).toBeTruthy();
+    expect(getByTestId('location-country-Japan').query()).toBeTruthy();
     // 11th and 12th should be hidden
-    expect(queryByTestId('location-country-Mexico')).toBeNull();
-    expect(queryByTestId('location-country-Spain')).toBeNull();
+    expect(getByTestId('location-country-Mexico').query()).toBeNull();
+    expect(getByTestId('location-country-Spain').query()).toBeNull();
 
-    const showMore = getByTestId('location-show-more');
+    const showMore = getByTestId('location-show-more').element();
     expect(showMore.textContent).toContain('Show 2 more');
   });
 
   it('should expand list when "Show N more" is clicked', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -1055,14 +1056,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('location-show-more'));
+    await userEvent.click(getByTestId('location-show-more'));
 
-    expect(queryByTestId('location-country-Mexico')).toBeTruthy();
-    expect(queryByTestId('location-country-Spain')).toBeTruthy();
+    expect(getByTestId('location-country-Mexico').query()).toBeTruthy();
+    expect(getByTestId('location-country-Spain').query()).toBeTruthy();
   });
 
   it('should show "No matching locations" for empty search results', async () => {
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -1070,14 +1071,16 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'zzzzz' } });
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'zzzzz');
 
-    await waitFor(() => expect(getByTestId('location-no-results').textContent).toBe('No matching locations'));
+    await vi.waitFor(() =>
+      expect(getByTestId('location-no-results').element().textContent).toBe('No matching locations'),
+    );
   });
 
   it('should show "No matching locations" immediately for one-character empty search results', async () => {
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: manyCountries,
         onCityFetch: mockCityFetch,
@@ -1085,14 +1088,14 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'q' } });
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'q');
 
-    expect(getByTestId('location-no-results').textContent).toBe('No matching locations');
+    expect(getByTestId('location-no-results').element().textContent).toBe('No matching locations');
   });
 
   it('should keep orphaned country visible during search', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries, // Germany, Italy, France
         selectedCountry: 'Switzerland', // Not in list = orphaned
@@ -1101,19 +1104,19 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'Italy');
 
     // Orphaned country still visible
-    expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
+    expect(getByTestId('location-country-Switzerland').query()).toBeTruthy();
     // Matched country visible
-    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+    expect(getByTestId('location-country-Italy').query()).toBeTruthy();
     // Non-matched countries hidden
-    expect(queryByTestId('location-country-Germany')).toBeNull();
+    expect(getByTestId('location-country-Germany').query()).toBeNull();
   });
 
   it('should keep selected country visible during search', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         selectedCountry: 'Germany',
@@ -1122,18 +1125,18 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
+    const searchInput = getByTestId('location-search-input').element();
 
-    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+    await userEvent.fill(searchInput, 'Italy');
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+    expect(getByTestId('location-country-Italy').query()).toBeTruthy();
 
-    await fireEvent.input(searchInput, { target: { value: '' } });
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    await userEvent.fill(searchInput, '');
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
   });
 
   it('should show cities when searching for a country and clicking it', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -1141,19 +1144,19 @@ describe('LocationFilter', () => {
       },
     });
 
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Germany' } });
-    await fireEvent.click(getByTestId('location-country-Germany'));
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'Germany');
+    await userEvent.click(getByTestId('location-country-Germany'));
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeTruthy();
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-city-Hamburg')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeTruthy();
+      expect(getByTestId('location-city-Berlin').query()).toBeTruthy();
+      expect(getByTestId('location-city-Hamburg').query()).toBeTruthy();
     });
   });
 
-  it('should not show search input when no countries exist', () => {
-    const { queryByTestId } = render(LocationFilter, {
+  it('should not show search input when no countries exist', async () => {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: [],
         onCityFetch: mockCityFetch,
@@ -1161,12 +1164,12 @@ describe('LocationFilter', () => {
       },
     });
 
-    expect(queryByTestId('location-search-input')).toBeNull();
-    expect(queryByTestId('location-empty')).toBeTruthy();
+    expect(getByTestId('location-search-input').query()).toBeNull();
+    expect(getByTestId('location-empty').query()).toBeTruthy();
   });
 
   it('should restore expanded country with cities after search is cleared', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { getByTestId } = await render(LocationFilter, {
       props: {
         countries: mockCountries,
         onCityFetch: mockCityFetch,
@@ -1175,22 +1178,22 @@ describe('LocationFilter', () => {
     });
 
     // Select and expand Germany to load cities
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+    await userEvent.click(getByTestId('location-country-Germany'));
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeTruthy();
     });
 
     // Search hides Germany (and its cities)
-    const searchInput = getByTestId('location-search-input');
-    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
-    expect(queryByTestId('location-country-Germany')).toBeNull();
-    expect(queryByTestId('location-city-Munich')).toBeNull();
+    const searchInput = getByTestId('location-search-input').element();
+    await userEvent.fill(searchInput, 'Italy');
+    expect(getByTestId('location-country-Germany').query()).toBeNull();
+    expect(getByTestId('location-city-Munich').query()).toBeNull();
 
     // Clear search — Germany and cities reappear
-    await fireEvent.input(searchInput, { target: { value: '' } });
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+    await userEvent.fill(searchInput, '');
+    expect(getByTestId('location-country-Germany').query()).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('location-city-Munich').query()).toBeTruthy();
     });
   });
 });
@@ -1206,8 +1209,8 @@ describe('CameraFilter', () => {
     return Promise.resolve(modelMap[make] ?? []);
   };
 
-  it('should render makes with radio buttons', () => {
-    const { getByTestId } = render(CameraFilter, {
+  it('should render makes with radio buttons', async () => {
+    const { getByTestId } = await render(CameraFilter, {
       props: {
         makes: mockMakes,
         onModelFetch: mockModelFetch,
@@ -1215,9 +1218,9 @@ describe('CameraFilter', () => {
       },
     });
 
-    expect(getByTestId('camera-make-Canon')).toBeTruthy();
-    expect(getByTestId('camera-make-Sony')).toBeTruthy();
-    expect(getByTestId('camera-make-Nikon')).toBeTruthy();
+    expect(getByTestId('camera-make-Canon').element()).toBeTruthy();
+    expect(getByTestId('camera-make-Sony').element()).toBeTruthy();
+    expect(getByTestId('camera-make-Nikon').element()).toBeTruthy();
   });
 
   it('should be single-select (selecting B deselects A)', async () => {
@@ -1226,7 +1229,7 @@ describe('CameraFilter', () => {
       lastMake = make;
     };
 
-    const { getByTestId } = render(CameraFilter, {
+    const { getByTestId } = await render(CameraFilter, {
       props: {
         makes: mockMakes,
         onModelFetch: mockModelFetch,
@@ -1234,15 +1237,15 @@ describe('CameraFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('camera-make-Canon'));
+    await userEvent.click(getByTestId('camera-make-Canon'));
     expect(lastMake).toBe('Canon');
 
-    await fireEvent.click(getByTestId('camera-make-Sony'));
+    await userEvent.click(getByTestId('camera-make-Sony'));
     expect(lastMake).toBe('Sony');
   });
 
   it('should show models when make is expanded', async () => {
-    const { getByTestId, queryByTestId } = render(CameraFilter, {
+    const { getByTestId } = await render(CameraFilter, {
       props: {
         makes: mockMakes,
         onModelFetch: mockModelFetch,
@@ -1250,12 +1253,12 @@ describe('CameraFilter', () => {
       },
     });
 
-    await fireEvent.click(getByTestId('camera-make-Canon'));
+    await userEvent.click(getByTestId('camera-make-Canon'));
 
-    await waitFor(() => {
-      expect(queryByTestId('camera-model-EOS R5')).toBeTruthy();
-      expect(queryByTestId('camera-model-EOS R6')).toBeTruthy();
-      expect(queryByTestId('camera-model-EOS 5D')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('camera-model-EOS R5').query()).toBeTruthy();
+      expect(getByTestId('camera-model-EOS R6').query()).toBeTruthy();
+      expect(getByTestId('camera-model-EOS 5D').query()).toBeTruthy();
     });
   });
 
@@ -1267,7 +1270,7 @@ describe('CameraFilter', () => {
       lastModel = model;
     };
 
-    const { getByTestId, queryByTestId } = render(CameraFilter, {
+    const { getByTestId } = await render(CameraFilter, {
       props: {
         makes: mockMakes,
         onModelFetch: mockModelFetch,
@@ -1276,20 +1279,20 @@ describe('CameraFilter', () => {
     });
 
     // Expand Canon
-    await fireEvent.click(getByTestId('camera-make-Canon'));
+    await userEvent.click(getByTestId('camera-make-Canon'));
 
-    await waitFor(() => {
-      expect(queryByTestId('camera-model-EOS R5')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(getByTestId('camera-model-EOS R5').query()).toBeTruthy();
     });
 
     // Select a model — should auto-fill make
-    await fireEvent.click(getByTestId('camera-model-EOS R5'));
+    await userEvent.click(getByTestId('camera-model-EOS R5'));
     expect(lastMake).toBe('Canon');
     expect(lastModel).toBe('EOS R5');
   });
 
-  it('should show empty message when no cameras', () => {
-    const { getByTestId } = render(CameraFilter, {
+  it('should show empty message when no cameras', async () => {
+    const { getByTestId } = await render(CameraFilter, {
       props: {
         makes: [],
         onModelFetch: mockModelFetch,
@@ -1297,7 +1300,7 @@ describe('CameraFilter', () => {
       },
     });
 
-    expect(getByTestId('camera-empty').textContent).toBe('No cameras found');
+    expect(getByTestId('camera-empty').element().textContent).toBe('No cameras found');
   });
 });
 
@@ -1309,12 +1312,12 @@ describe('storageKey prop', () => {
   // The section toggles now live inside the cog's popover, so anything that clicks or queries one
   // has to open it first.
   async function openSectionMenu() {
-    await fireEvent.click(screen.getByTestId('section-menu-btn'));
+    await userEvent.click(page.getByTestId('section-menu-btn'));
   }
 
   it('should use custom storage key for localStorage persistence', async () => {
     const customKey = 'gallery-filter-photos';
-    render(FilterPanel, {
+    await render(FilterPanel, {
       props: {
         config: { sections: ['rating', 'media', 'tags'], providers: {} },
         timeBuckets: [],
@@ -1322,8 +1325,8 @@ describe('storageKey prop', () => {
       },
     });
     await openSectionMenu();
-    const ratingToggle = screen.getByTestId('section-toggle-rating');
-    await fireEvent.click(ratingToggle);
+    const ratingToggle = page.getByTestId('section-toggle-rating');
+    await userEvent.click(ratingToggle);
     const stored = localStorage.getItem(customKey);
     expect(stored).toBeTruthy();
     const parsed = JSON.parse(stored!) as string[];
@@ -1332,15 +1335,15 @@ describe('storageKey prop', () => {
   });
 
   it('should use default key when storageKey not provided', async () => {
-    render(FilterPanel, {
+    await render(FilterPanel, {
       props: {
         config: { sections: ['rating', 'media'], providers: {} },
         timeBuckets: [],
       },
     });
     await openSectionMenu();
-    const ratingToggle = screen.getByTestId('section-toggle-rating');
-    await fireEvent.click(ratingToggle);
+    const ratingToggle = page.getByTestId('section-toggle-rating');
+    await userEvent.click(ratingToggle);
     expect(localStorage.getItem('gallery-filter-visible-sections')).toBeTruthy();
   });
 });

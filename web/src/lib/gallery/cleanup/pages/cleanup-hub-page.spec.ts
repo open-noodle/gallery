@@ -3,9 +3,10 @@ import { todayMonthDay } from '#lib/gallery/cleanup/cleanup.ts';
 import { finishedDay } from '#lib/gallery/cleanup/finished-day.ts';
 import { pop } from '#lib/gallery/motion/index.ts';
 import { CleanupCountQueue, type CleanupCountResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import CleanupPage from './CleanupHubPage.svelte';
 
 const sdk = vi.hoisted(() => ({
@@ -41,7 +42,7 @@ const COUNTS: Record<CleanupCountQueue, CleanupCountResponseDto> = {
   [CleanupCountQueue.Blurry]: { count: 9, bytes: 500, analysedPercent: 72 },
 };
 
-const renderPage = () => {
+const renderPage = async () => {
   const props = { data: { meta: { title: 'cleanup' } } };
   return render(TestWrapper as Component<{ component: typeof CleanupPage; componentProps: typeof props }>, {
     component: CleanupPage,
@@ -104,33 +105,34 @@ describe('Cleanup hub page', () => {
   });
 
   it('fetches every panel on mount and fills the hub', async () => {
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('cleanup-cal-101')).toHaveAttribute('data-state', 'reviewed'));
+    await expect.element(page.getByTestId('cleanup-cal-101')).toHaveAttribute('data-state', 'reviewed');
     expect(sdk.getCleanupQueueCount).toHaveBeenCalledTimes(5);
     expect(sdk.getCleanupCalendar).toHaveBeenCalledWith({ tz: expect.any(String) });
-    expect(screen.getByTestId('cleanup-hub-subtitle')).toHaveTextContent('cleanup_days_reviewed · cleanup_streak');
-    expect(screen.getByTestId('cleanup-could-still-free')).toHaveTextContent('cleanup_could_still_free');
-    expect(screen.getAllByTestId(/^cleanup-queue-(?!skeleton)/)).toHaveLength(5);
-    expect(screen.getByText('cleanup_trash_holds')).toBeInTheDocument();
+    await expect
+      .element(page.getByTestId('cleanup-hub-subtitle'))
+      .toMatchTextContent('cleanup_days_reviewed · cleanup_streak');
+    await expect.element(page.getByTestId('cleanup-could-still-free')).toMatchTextContent('cleanup_could_still_free');
+    expect(page.getByTestId(/^cleanup-queue-(?!skeleton)/).elements()).toHaveLength(5);
+    await expect.element(page.getByText('cleanup_trash_holds')).toBeInTheDocument();
   });
 
   it('leaves out the trash footer and its request when the trash is turned off', async () => {
     flags.value.trash = false;
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(sdk.getCleanupQueueCount).toHaveBeenCalledTimes(5));
+    await vi.waitFor(() => expect(sdk.getCleanupQueueCount).toHaveBeenCalledTimes(5));
     expect(sdk.getCleanupTrash).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
+    expect(page.getByTestId('cleanup-trash-footer').query()).toBeNull();
   });
 
-  it("starts today's rewind from the banner", () => {
-    renderPage();
+  it("starts today's rewind from the banner", async () => {
+    await renderPage();
 
-    expect(screen.getByTestId('cleanup-banner-start')).toHaveAttribute(
-      'href',
-      `/utilities/cleanup/rewind/${todayMonthDay()}`,
-    );
+    await expect
+      .element(page.getByTestId('cleanup-banner-start'))
+      .toHaveAttribute('href', `/utilities/cleanup/rewind/${todayMonthDay()}`);
   });
 
   it('shows today in the banner, loading its busiest year once', async () => {
@@ -140,11 +142,11 @@ describe('Cleanup hub page', () => {
         { year: 2019, count: 9 },
       ],
     });
-    renderPage();
+    await renderPage();
 
-    const banner = screen.getByTestId('cleanup-day-banner');
-    await waitFor(() => expect(within(banner).getByText('cleanup_banner_photos_years')).toBeInTheDocument());
-    expect(within(banner).getByText('cleanup_banner_today')).toBeInTheDocument();
+    const banner = page.getByTestId('cleanup-day-banner');
+    await expect.element(banner.getByText('cleanup_banner_photos_years')).toBeInTheDocument();
+    await expect.element(banner.getByText('cleanup_banner_today')).toBeInTheDocument();
     expect(sdk.getCleanupRewindYears).toHaveBeenCalledWith({ monthDay: todayMonthDay() }, expect.anything());
     expect(sdk.getCleanupRewindAssets).toHaveBeenCalledTimes(1);
     expect(sdk.getCleanupRewindAssets).toHaveBeenCalledWith(
@@ -155,27 +157,29 @@ describe('Cleanup hub page', () => {
 
   it('swaps the banner to a hovered day and back to today when the pointer leaves the calendar', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    renderPage();
+    await renderPage();
     await vi.advanceTimersByTimeAsync(0);
 
-    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-102'));
+    await userEvent.hover(page.getByTestId('cleanup-cal-102'));
     await vi.advanceTimersByTimeAsync(150);
-    expect(screen.getByTestId('cleanup-day-banner')).toHaveTextContent('January 2');
-    expect(screen.getByTestId('cleanup-banner-start')).toHaveAttribute('href', '/utilities/cleanup/rewind/102');
+    await expect.element(page.getByTestId('cleanup-day-banner')).toMatchTextContent('January 2');
+    await expect
+      .element(page.getByTestId('cleanup-banner-start'))
+      .toHaveAttribute('href', '/utilities/cleanup/rewind/102');
 
-    await fireEvent.pointerLeave(screen.getByTestId('cleanup-calendar'));
+    page.getByTestId('cleanup-calendar').element().dispatchEvent(new PointerEvent('pointerleave'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(within(screen.getByTestId('cleanup-day-banner')).getByText('cleanup_banner_today')).toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-day-banner').getByText('cleanup_banner_today')).toBeInTheDocument();
   });
 
   it('pins a slim banner once the full one has scrolled away', async () => {
-    renderPage();
-    await waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
-    expect(screen.queryByTestId('cleanup-banner-slim')).not.toBeInTheDocument();
+    await renderPage();
+    await vi.waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
+    await expect.element(page.getByTestId('cleanup-banner-slim')).not.toBeInTheDocument();
 
     const scrolledAway = { isIntersecting: false, boundingClientRect: { top: -200 } } as IntersectionObserverEntry;
     observers.callbacks.at(-1)!([scrolledAway], {} as IntersectionObserver);
-    await waitFor(() => expect(screen.getByTestId('cleanup-banner-slim')).toBeInTheDocument());
+    await expect.element(page.getByTestId('cleanup-banner-slim')).toBeInTheDocument();
 
     const back = {
       isIntersecting: true,
@@ -183,12 +187,12 @@ describe('Cleanup hub page', () => {
       boundingClientRect: { top: 80 },
     } as IntersectionObserverEntry;
     observers.callbacks.at(-1)!([back], {} as IntersectionObserver);
-    await waitFor(() => expect(screen.queryByTestId('cleanup-banner-slim')).not.toBeInTheDocument());
+    await expect.element(page.getByTestId('cleanup-banner-slim')).not.toBeInTheDocument();
   });
 
   it('pins once most of the banner has scrolled away, even while a strip of it still shows', async () => {
-    renderPage();
-    await waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
+    await renderPage();
+    await vi.waitFor(() => expect(observers.callbacks.length).toBeGreaterThan(0));
 
     const mostlyGone = {
       isIntersecting: true,
@@ -198,14 +202,14 @@ describe('Cleanup hub page', () => {
     } as unknown as IntersectionObserverEntry;
     observers.callbacks.at(-1)!([mostlyGone], {} as IntersectionObserver);
 
-    await waitFor(() => expect(screen.getByTestId('cleanup-banner-slim')).toBeInTheDocument());
+    await expect.element(page.getByTestId('cleanup-banner-slim')).toBeInTheDocument();
   });
 
   it('pops the day just finished in rewind', async () => {
     finishedDay.set(101);
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(pop).toHaveBeenCalledWith(screen.getByTestId('cleanup-cal-101')));
+    await vi.waitFor(() => expect(pop).toHaveBeenCalledWith(page.getByTestId('cleanup-cal-101').element()));
     expect(finishedDay.take()).toBeUndefined();
   });
 
@@ -214,23 +218,21 @@ describe('Cleanup hub page', () => {
     sdk.getCleanupQueueCount.mockImplementation(({ queue }: { queue: CleanupCountQueue }) =>
       queue === CleanupCountQueue.Bursts ? bursts.promise : Promise.resolve(COUNTS[queue]),
     );
-    renderPage();
+    await renderPage();
 
-    await waitFor(() =>
-      expect(screen.getByTestId('cleanup-queue-space_hogs')).toHaveTextContent('cleanup_queue_count_files'),
-    );
-    expect(screen.getByTestId('cleanup-could-still-free-pending')).toBeInTheDocument();
-    expect(screen.queryByTestId('cleanup-could-still-free')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-queue-space_hogs')).toMatchTextContent('cleanup_queue_count_files');
+    await expect.element(page.getByTestId('cleanup-could-still-free-pending')).toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-could-still-free')).not.toBeInTheDocument();
 
     bursts.resolve(COUNTS[CleanupCountQueue.Bursts]);
-    await waitFor(() => expect(screen.getByTestId('cleanup-could-still-free')).toBeInTheDocument());
-    expect(screen.queryByTestId('cleanup-could-still-free-pending')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-could-still-free')).toBeInTheDocument();
+    await expect.element(page.getByTestId('cleanup-could-still-free-pending')).not.toBeInTheDocument();
   });
 
   it('fetches row covers for every list queue except bursts', async () => {
-    renderPage();
+    await renderPage();
 
-    await waitFor(() => expect(sdk.getCleanupQueue).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(sdk.getCleanupQueue).toHaveBeenCalledTimes(3));
     const queues = sdk.getCleanupQueue.mock.calls.map(([args]) => (args as { queue: string }).queue);
     expect(new Set(queues)).toEqual(new Set(['blurry', 'screenshots', 'space_hogs']));
   });
@@ -244,27 +246,27 @@ describe('Cleanup hub page', () => {
     sdk.getCleanupRewindAssets.mockImplementation(({ monthDay }: { monthDay: number }) =>
       Promise.resolve({ assets: [asset(`day-${monthDay}`)] }),
     );
-    renderPage();
+    await renderPage();
     await vi.advanceTimersByTimeAsync(0);
     sdk.getCleanupRewindYears.mockClear();
 
     // 102 then 103 inside the 150 ms window: only 103 is fetched
-    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-102'));
+    await userEvent.hover(page.getByTestId('cleanup-cal-102'));
     await vi.advanceTimersByTimeAsync(100);
-    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-103'));
+    await userEvent.hover(page.getByTestId('cleanup-cal-103'));
     await vi.advanceTimersByTimeAsync(150);
     expect(sdk.getCleanupRewindYears.mock.calls.map(([args]) => args)).toEqual([{ monthDay: 103 }]);
-    expect(screen.getByAltText('day-103.jpg')).toBeInTheDocument();
+    await expect.element(page.getByAltText('day-103.jpg')).toBeInTheDocument();
 
     // 101's request is still in flight when 104 starts: its late answer is dropped
-    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-101'));
+    await userEvent.hover(page.getByTestId('cleanup-cal-101'));
     await vi.advanceTimersByTimeAsync(150);
-    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-104'));
+    await userEvent.hover(page.getByTestId('cleanup-cal-104'));
     await vi.advanceTimersByTimeAsync(150);
     slow.resolve({ years: [{ year: 2020, count: 9 }] });
     await vi.advanceTimersByTimeAsync(0);
-    expect(screen.getByAltText('day-104.jpg')).toBeInTheDocument();
-    expect(screen.queryByAltText('day-101.jpg')).not.toBeInTheDocument();
+    await expect.element(page.getByAltText('day-104.jpg')).toBeInTheDocument();
+    await expect.element(page.getByAltText('day-101.jpg')).not.toBeInTheDocument();
     expect(sdk.getCleanupRewindAssets).not.toHaveBeenCalledWith(
       expect.objectContaining({ monthDay: 101 }),
       expect.anything(),
@@ -273,14 +275,14 @@ describe('Cleanup hub page', () => {
 
   it('does not restart the peek when the hovered cell then receives focus', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    renderPage();
+    await renderPage();
     await vi.advanceTimersByTimeAsync(0);
     sdk.getCleanupRewindYears.mockClear();
 
-    const cell = screen.getByTestId('cleanup-cal-102');
-    await fireEvent.mouseEnter(cell);
+    const cell = page.getByTestId('cleanup-cal-102');
+    await userEvent.hover(cell);
     await vi.advanceTimersByTimeAsync(150);
-    await fireEvent.focus(cell);
+    (cell.element() as HTMLElement).focus();
     await vi.advanceTimersByTimeAsync(150);
 
     expect(sdk.getCleanupRewindYears).toHaveBeenCalledTimes(1);
