@@ -1543,6 +1543,8 @@
   "version_announcement_closing": "Je vriend, Pierre",
   "video_face_sightings_count": "{count, plural, one {Gezien op # moment} other {Gezien op # momenten}}",
   "video_face_sightings_show_at": "Tonen op {time}",
+  "video_person_sightings_none": "Geen momenten vastgelegd in deze video",
+  "video_person_sightings_show": "Momenten in deze video tonen",
   "videos_only": "Alleen video's",
   "view_face_statistics_details": "Details van gezichtsstatistieken bekijken",
   "view_in_map": "Bekijk op kaart",

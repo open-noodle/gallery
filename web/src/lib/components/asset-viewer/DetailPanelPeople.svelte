@@ -1,6 +1,7 @@
 <script lang="ts">
   import AvatarSourceToggle from '$lib/gallery/asset-viewer/AvatarSourceToggle.svelte';
   import PersonTile from '$lib/gallery/asset-viewer/PersonTile.svelte';
+  import VideoPersonMoments from '$lib/gallery/asset-viewer/VideoPersonMoments.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { faceManager } from '$lib/stores/face.svelte';
@@ -125,5 +126,6 @@
         />
       {/each}
     </div>
+    <VideoPersonMoments {asset} />
   </section>
 {/if}

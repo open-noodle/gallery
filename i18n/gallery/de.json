@@ -1546,6 +1546,8 @@
   "version_announcement_closing": "Dein Freund, Pierre",
   "video_face_sightings_count": "{count, plural, one {An # Moment gesehen} other {An # Momenten gesehen}}",
   "video_face_sightings_show_at": "Bei {time} anzeigen",
+  "video_person_sightings_none": "Keine Momente in diesem Video erfasst",
+  "video_person_sightings_show": "Momente in diesem Video anzeigen",
   "videos_only": "Nur Videos",
   "view_face_statistics_details": "Details zu Gesichtsstatistiken anzeigen",
   "view_in_map": "Auf Karte anzeigen",

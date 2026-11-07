@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { createRawSnippet } from 'svelte';
 import VideoFaceSightings from './VideoFaceSightings.svelte';
 import { videoFaceBox } from './video-face-box.svelte';
 
@@ -35,7 +36,7 @@ describe('VideoFaceSightings', () => {
 
   it('shows nothing for a face without sightings', async () => {
     getAssetFaceSightings.mockResolvedValue({ sightings: [] });
-    render(VideoFaceSightings, { faceId: 'face-1' });
+    render(VideoFaceSightings, { faceIds: ['face-1'] });
 
     await waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
     expect(screen.queryByTestId('video-face-sightings')).not.toBeInTheDocument();
@@ -43,13 +44,13 @@ describe('VideoFaceSightings', () => {
 
   it('shows nothing when the server has no such route or fails', async () => {
     getAssetFaceSightings.mockRejectedValue(new Error('404'));
-    render(VideoFaceSightings, { faceId: 'face-1' });
+    render(VideoFaceSightings, { faceIds: ['face-1'] });
 
     await waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
     expect(screen.queryByTestId('video-face-sightings')).not.toBeInTheDocument();
   });
 
-  it('shows every sighting in the given order, with the best one starred and lazy crops keyed by time', async () => {
+  it('shows every sighting in time order, with the best one starred and lazy crops keyed by time', async () => {
     getAssetFaceSightings.mockResolvedValue({
       sightings: [
         { time: 2.5, score: 0.8, isBest: false, box },
@@ -57,7 +58,7 @@ describe('VideoFaceSightings', () => {
         { time: 3725, score: 0.7, isBest: false, box },
       ],
     });
-    render(VideoFaceSightings, { faceId: 'face-1' });
+    render(VideoFaceSightings, { faceIds: ['face-1'] });
 
     const buttons = await screen.findAllByRole('button');
     expect(getAssetFaceSightings).toHaveBeenCalledWith({ id: 'face-1' }, expect.anything());
@@ -81,7 +82,7 @@ describe('VideoFaceSightings', () => {
       ],
     });
     seekViewerVideo.mockReturnValue(true);
-    render(VideoFaceSightings, { faceId: 'face-1' });
+    render(VideoFaceSightings, { faceIds: ['face-1'] });
 
     const [first, second] = await screen.findAllByRole('button');
     await userEvent.click(second);
@@ -93,11 +94,55 @@ describe('VideoFaceSightings', () => {
 
   it('takes the face box away when the strip closes', async () => {
     getAssetFaceSightings.mockResolvedValue({ sightings: [{ time: 42, score: 0.95, isBest: true, box }] });
-    const { unmount } = render(VideoFaceSightings, { faceId: 'face-1' });
+    const { unmount } = render(VideoFaceSightings, { faceIds: ['face-1'] });
     await screen.findByRole('button');
     videoFaceBox.show(box, 42);
 
     unmount();
     expect(videoFaceBox.current).toBeUndefined();
+  });
+
+  it('lists the moments of several faces together in time order, each crop cut from its own face', async () => {
+    getAssetFaceSightings.mockImplementation(({ id }: { id: string }) =>
+      Promise.resolve({
+        sightings:
+          id === 'face-1'
+            ? [
+                { time: 8.5, score: 0.8, isBest: true, box },
+                { time: 33.5, score: 0.7, isBest: false, box },
+              ]
+            : [{ time: 31.5, score: 0.9, isBest: true, box }],
+      }),
+    );
+    render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
+
+    const buttons = await screen.findAllByRole('button');
+    expect(buttons.map((button) => button.textContent?.trim())).toEqual(['0:08', '0:31', '0:33']);
+    const sources = screen.getAllByRole('presentation', { hidden: true }).map((image) => image.getAttribute('src'));
+    expect(sources[0]).toMatch(/\/faces\/face-1\//);
+    expect(sources[1]).toMatch(/\/faces\/face-2\//);
+    expect(sources[2]).toMatch(/\/faces\/face-1\//);
+  });
+
+  it('still lists one face when another fails', async () => {
+    getAssetFaceSightings.mockImplementation(({ id }: { id: string }) =>
+      id === 'face-1'
+        ? Promise.reject(new Error('404'))
+        : Promise.resolve({ sightings: [{ time: 31.5, score: 0.9, isBest: true, box }] }),
+    );
+    render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
+
+    expect(await screen.findAllByRole('button')).toHaveLength(1);
+  });
+
+  it('shows what it is given for nothing found, but only once it has looked', async () => {
+    let answer = (_: { sightings: [] }) => {};
+    getAssetFaceSightings.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const empty = createRawSnippet(() => ({ render: () => '<p>nothing here</p>' }));
+    render(VideoFaceSightings, { faceIds: ['face-1'], empty });
+
+    expect(screen.queryByText('nothing here')).not.toBeInTheDocument();
+    answer({ sightings: [] });
+    expect(await screen.findByText('nothing here')).toBeInTheDocument();
   });
 });

@@ -1559,6 +1559,8 @@
   "version_announcement_closing": "敬祝順心，Pierre",
   "video_face_sightings_count": "出現在 {count} 個時刻",
   "video_face_sightings_show_at": "跳至 {time}",
+  "video_person_sightings_none": "此影片中沒有記錄的時刻",
+  "video_person_sightings_show": "顯示此影片中出現的時刻",
   "videos_only": "僅影片",
   "view_face_statistics_details": "查看臉孔統計詳細資料",
   "view_in_map": "在地圖中檢視",

@@ -93,7 +93,7 @@
 
   <div class="p-4 text-sm">
     {#if videoFaceId}
-      <VideoFaceSightings faceId={videoFaceId} />
+      <VideoFaceSightings faceIds={[videoFaceId]} />
     {/if}
     <div class="mb-4 flex gap-2">
       <Input placeholder={$t('search_people')} bind:value={query} oninput={() => onQueryChange?.(query)} size="tiny" />

@@ -1543,6 +1543,8 @@
   "version_announcement_closing": "Il tuo amico, Pierre",
   "video_face_sightings_count": "{count, plural, one {Visto in # momento} other {Visto in # momenti}}",
   "video_face_sightings_show_at": "Mostra a {time}",
+  "video_person_sightings_none": "Nessun momento registrato in questo video",
+  "video_person_sightings_show": "Mostra i momenti in questo video",
   "videos_only": "Solo video",
   "view_face_statistics_details": "Visualizza i dettagli delle statistiche sui volti",
   "view_in_map": "Visualizza sulla mappa",

@@ -1561,6 +1561,8 @@
   "version_announcement_closing": "您的朋友，Pierre",
   "video_face_sightings_count": "出现在 {count} 个时刻",
   "video_face_sightings_show_at": "跳转到 {time}",
+  "video_person_sightings_none": "此视频中没有记录的时刻",
+  "video_person_sightings_show": "显示此视频中出现的时刻",
   "videos_only": "仅视频",
   "view_face_statistics_details": "查看人脸统计详情",
   "view_in_map": "在地图中查看",

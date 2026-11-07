@@ -6,47 +6,63 @@
   import { getAssetFaceSightings, type VideoFaceSightingDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiStar } from '@mdi/js';
+  import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
 
   /**
    * Every moment a video face's person was seen, as crops in time order; a click pauses the viewer's video there, with
-   * a box around the face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Renders nothing for a face with no sightings, on any
-   * error, and against a server without the route, so the picker looks as it did before.
+   * a box around the face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Given several faces (one person
+   * tracked more than once in the video), it lists all their moments together. Renders nothing, or `empty` once loaded,
+   * for faces with no sightings, on any error, and against a server without the route, so the picker looks as it did
+   * before.
    */
   interface Props {
-    faceId: string;
+    faceIds: string[];
+    empty?: Snippet;
   }
 
-  let { faceId }: Props = $props();
+  let { faceIds, empty }: Props = $props();
 
-  let sightings: VideoFaceSightingDto[] = $state([]);
-  let activeTime: number | undefined = $state();
+  type Sighting = VideoFaceSightingDto & { faceId: string; key: string };
+
+  let sightings: Sighting[] = $state([]);
+  let loaded = $state(false);
+  let activeKey: string | undefined = $state();
+
+  const load = async (faceId: string, signal: AbortSignal): Promise<Sighting[]> => {
+    try {
+      const response = await getAssetFaceSightings({ id: faceId }, { signal });
+      return response.sightings.map((sighting) => ({ ...sighting, faceId, key: `${faceId}:${sighting.time}` }));
+    } catch {
+      return [];
+    }
+  };
 
   $effect(() => {
-    const id = faceId;
+    const ids = [...faceIds];
     const controller = new AbortController();
     sightings = [];
-    activeTime = undefined;
-    getAssetFaceSightings({ id }, { signal: controller.signal })
-      .then((response) => {
-        if (!controller.signal.aborted) {
-          sightings = response.sightings;
-        }
-      })
-      .catch(() => {});
+    loaded = false;
+    activeKey = undefined;
+    void Promise.all(ids.map((id) => load(id, controller.signal))).then((lists) => {
+      if (!controller.signal.aborted) {
+        sightings = lists.flat().sort((a, b) => a.time - b.time);
+        loaded = true;
+      }
+    });
     return () => {
       controller.abort();
-      // The box belongs to this face's strip, so it goes with it.
+      // The box belongs to this strip, so it goes with it.
       videoFaceBox.clear();
     };
   });
 
-  const thumbnailUrl = (time: number) =>
+  const thumbnailUrl = ({ faceId, time }: Sighting) =>
     createUrl(`/faces/${faceId}/sightings/thumbnail`, { ...authManager.params, time });
 
-  const show = ({ time, box }: VideoFaceSightingDto) => {
+  const show = ({ time, box, key }: Sighting) => {
     if (seekViewerVideo(time, box)) {
-      activeTime = time;
+      activeKey = key;
     }
   };
 </script>
@@ -57,21 +73,21 @@
       {$t('video_face_sightings_count', { values: { count: sightings.length } })}
     </p>
     <div class="flex gap-2 overflow-x-auto pb-2">
-      {#each sightings as sighting (sighting.time)}
+      {#each sightings as sighting (sighting.key)}
         {@const label = formatSightingTime(sighting.time)}
         <button
           type="button"
           class="relative shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
           aria-label={$t('video_face_sightings_show_at', { values: { time: label } })}
-          aria-pressed={activeTime === sighting.time}
+          aria-pressed={activeKey === sighting.key}
           onclick={() => show(sighting)}
         >
           <img
-            src={thumbnailUrl(sighting.time)}
+            src={thumbnailUrl(sighting)}
             alt=""
             loading="lazy"
             draggable="false"
-            class="size-16 rounded-lg bg-gray-200 object-cover dark:bg-gray-700 {activeTime === sighting.time
+            class="size-16 rounded-lg bg-gray-200 object-cover dark:bg-gray-700 {activeKey === sighting.key
               ? 'ring-2 ring-primary'
               : ''}"
           />
@@ -85,4 +101,6 @@
       {/each}
     </div>
   </div>
+{:else if loaded && empty}
+  {@render empty()}
 {/if}

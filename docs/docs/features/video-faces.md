@@ -60,7 +60,9 @@ people found to 24. It takes about five times as long per frame, so leave it off
   Gallery may not be sure it is the same person and keep both views. Give both the same name.
 - **You can see every moment a person appears.** When you choose a name for a face in a video, the panel shows a row
   of that face at each moment Gallery saw it, with the clearest view starred. Click one to jump the video to that
-  moment, with a box around the face, which helps when a single crop is not enough to tell who it is.
+  moment, with a box around the face, which helps when a single crop is not enough to tell who it is. To find where
+  someone appears without editing faces, open the info panel and click the film button on their picture under
+  People.
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no
 frame will show them clearly.

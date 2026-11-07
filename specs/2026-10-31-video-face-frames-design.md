@@ -454,6 +454,19 @@ In the asset viewer, on a video, the "Select face" picker (owner's `AssignFaceSi
   detected on the poster by an older build, or with video sampling off), when the request fails, and against a server
   without the route.
 
+The same strip opens from the info panel, so a named person's moments do not need the edit pencils. On a video, each
+People tile with a face in it (`faceManager.facesByPersonId`, the lookup the hover highlight uses, which matches for
+space members too) gets a film button in its top-left corner, labelled "Show moments in this video: Alice"
+(`video_person_sightings_show`). It opens `VideoPersonMoments` under the People grid: the person's name, a close
+button, and the strip over **all** of the person's faces in the video (one person tracked more than once), merged
+in time order, each crop cut from its own face. A second click, the close button, or another person's button
+closes or switches it; the button shows pressed while open. The pick is held with its asset id
+(`video-person-sightings.svelte.ts`), so another asset never shows it. Where no face of the person has stored
+sightings, it says "No moments recorded in this video" (`video_person_sightings_none`) instead of showing nothing,
+because here the user asked. Added after the first real-video test: the user named a person and found the big pencil
+then the small pencil a long way round to where they are in the clip. Anyone who can read the asset can read the
+sightings, so viewers get the button too.
+
 The order was "a handful, best first" in the Phase 1 summary. Showing all of them changes that: in time order the
 strip reads as a timeline the user scrubs through, and the star finds the best one.
 
@@ -530,7 +543,9 @@ timeline is the original's), and the playback and original URLs of a trimmed vid
 Server work is all fork code (`GalleryFaceController`, `VideoFaceService`, `VideoFaceRepository`, a fork DTO).
 Upstream files: `AssignFaceSidePanel.svelte` passes the face to the picker (one prop line), and
 `VideoNativeViewer.svelte` registers its player by swapping the fork's volume attachment for `galleryViewerVideo` (no
-change in size) and renders `VideoFaceBox` (an import and one line, +2 against the upstream tag). `PersonPickerPanel.svelte` and
+change in size) and renders `VideoFaceBox` (an import and one line, +2 against the upstream tag), and
+`DetailPanelPeople.svelte` renders `VideoPersonMoments` under the People grid (an import and one line, +2); the film
+button lives in the fork's `PersonTile.svelte`. `PersonPickerPanel.svelte` and
 `SpacePersonSidePanel.svelte` are fork files. The open-api spec and SDK are generated.
 
 ### Cost
@@ -554,8 +569,14 @@ browser cache.
 - Web (`VideoFaceSightings.spec.ts`): hidden when empty, on error and for a photo; tiles in time order with the best
   starred and lazy images keyed by time; a click seeks with the sighting's box; the box goes when the strip closes.
   `video-seek.spec.ts`: seek with and without a registered player, cleanup on unregister, the box shown by a seek and
-  cleared by play, by a scrub away and by unregistering. `VideoFaceBox.spec.ts`: nothing drawn without a box or before
-  the video's size is known; the box placed on a letterboxed picture.
+  cleared by play, by a scrub away and by unregistering; the muted wake-up play before each seek, quick seeks
+  sharing it and landing on the latest, a play that never starts or is refused, a seek dropped when its video goes.
+  `VideoFaceBox.spec.ts`: nothing drawn without a box or before the video's size is known; the box placed on a
+  letterboxed picture. `VideoFaceSightings.spec.ts` also: several faces merged in time order with each crop from its
+  own face, one face failing, the empty message only once loaded. `DetailPanelPeople.gallery.spec.ts`: no film button
+  on a photo or for a person with no face in the video; the button opens all the person's moments, shows pressed,
+  closes on a second click or the close button, switches between people, says when nothing was recorded, and does
+  not carry over to another asset.
 
 ## Open questions
 

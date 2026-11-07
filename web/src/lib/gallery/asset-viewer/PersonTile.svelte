@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { videoPersonSightings } from '$lib/gallery/asset-viewer/video-person-sightings.svelte';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import { assetViewerManager, type Faces } from '$lib/managers/asset-viewer-manager.svelte';
   import { Route } from '$lib/route';
@@ -13,9 +14,9 @@
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { resolvePersonAvatar } from '$lib/utils/person-avatar';
   import { getPetBadgeLabel } from '$lib/utils/pet-species';
-  import { type AssetResponseDto } from '@immich/sdk';
+  import { AssetTypeEnum, type AssetResponseDto } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
-  import { mdiOpenInNew, mdiPaw } from '@mdi/js';
+  import { mdiFilmstrip, mdiOpenInNew, mdiPaw } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
@@ -85,6 +86,16 @@
     }),
   );
   const filterHref = $derived(getPersonFilterHref());
+  // In a video, the person's moments (specs/2026-10-31-video-face-frames-design.md, Phase 2) open under the People grid.
+  const canShowMoments = $derived(asset.type === AssetTypeEnum.Video && personFaces.length > 0);
+  const showingMoments = $derived(videoPersonSightings.isShowing(asset.id, person.id));
+  const toggleMoments = () =>
+    videoPersonSightings.toggle({
+      assetId: asset.id,
+      personId: person.id,
+      name: person.name,
+      faceIds: personFaces.map((face) => face.id),
+    });
   const personPageHref = $derived(getPersonPageHref());
 </script>
 
@@ -158,6 +169,21 @@
         shape="round"
         color="secondary"
         variant="ghost"
+      />
+    </div>
+  {/if}
+  {#if canShowMoments}
+    <div class="absolute top-1 left-1 rounded-full {showingMoments ? 'bg-primary text-light' : 'bg-light/80'}">
+      <IconButton
+        icon={mdiFilmstrip}
+        aria-label="{$t('video_person_sightings_show')}: {person.name}"
+        aria-pressed={showingMoments}
+        size="small"
+        shape="round"
+        color="secondary"
+        variant="ghost"
+        onclick={toggleMoments}
+        data-testid="person-moments-button"
       />
     </div>
   {/if}
