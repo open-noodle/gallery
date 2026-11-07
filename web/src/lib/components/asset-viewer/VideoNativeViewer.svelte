@@ -2,6 +2,7 @@
   import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import VideoRemoteViewer from '$lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import { assetViewerFadeDuration } from '$lib/constants';
+  import VideoFaceBox from '$lib/gallery/asset-viewer/VideoFaceBox.svelte';
   import { galleryViewerVideo } from '$lib/gallery/asset-viewer/viewer-video';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { castManager } from '$lib/managers/cast-manager.svelte';
@@ -508,6 +509,7 @@
       {#if assetViewerManager.isFaceEditMode && videoPlayer && hasLoadedMetadata}
         <FaceEditorPanel htmlElement={videoPlayer} {containerWidth} {containerHeight} {assetId} {asset} />
       {/if}
+      <VideoFaceBox video={hasLoadedMetadata ? videoPlayer : undefined} {containerWidth} {containerHeight} />
     {/if}
   </div>
 {/if}

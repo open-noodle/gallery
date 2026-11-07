@@ -2387,7 +2387,19 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
+export type VideoFaceSightingBoxDto = {
+    /** Left edge, as a fraction of the frame width */
+    x1: number;
+    /** Right edge, as a fraction of the frame width */
+    x2: number;
+    /** Top edge, as a fraction of the frame height */
+    y1: number;
+    /** Bottom edge, as a fraction of the frame height */
+    y2: number;
+};
 export type VideoFaceSightingDto = {
+    /** Where the face was in the frame at that moment */
+    box: VideoFaceSightingBoxDto;
     /** Whether this is the best view, the one the face crop is cut from */
     isBest: boolean;
     /** Detector confidence for this sighting */

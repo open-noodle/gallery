@@ -522,6 +522,8 @@ export const widenSmallFace = (box: BoundingBox, frame: { width: number; height:
 type StoredSightings = {
   sightings: VideoFaceSighting[];
   timeSeconds: number;
+  imageWidth: number;
+  imageHeight: number;
   trimStart: number | null;
   trimEnd: number | null;
 };
@@ -531,21 +533,44 @@ const SIGHTING_TIME_TOLERANCE = 0.001;
 
 const toPlayerTime = (t: number, trimStart: number) => Math.round((t - trimStart) * 1000) / 1000;
 
+const toFrameFraction = (value: number, size: number) =>
+  Math.min(1, Math.max(0, Math.round((value / size) * 1e4) / 1e4));
+
 /**
  * A face's sightings on the player's timeline, in time order (Phase 2). A trimmed video plays its trimmed encode, whose
  * zero is the trim start, so each time is shifted by it, and sightings outside the trim are left out. The trim is the
  * current one, not the one the video was sampled under.
  */
-export const sightingsForPlayer = ({ sightings, timeSeconds, trimStart, trimEnd }: StoredSightings) => {
+export const sightingsForPlayer = ({
+  sightings,
+  timeSeconds,
+  imageWidth,
+  imageHeight,
+  trimStart,
+  trimEnd,
+}: StoredSightings) => {
+  // The boxes are in the sampled frame's pixels, which imageWidth/imageHeight describe; without them no box can be
+  // placed, and such a face was not written by video sampling.
+  if (!(imageWidth > 0 && imageHeight > 0)) {
+    return [];
+  }
+
   const start = trimStart ?? 0;
   const end = trimEnd ?? Infinity;
   return sightings
     .filter(({ t }) => t >= start - SIGHTING_TIME_TOLERANCE && t <= end + SIGHTING_TIME_TOLERANCE)
     .sort((a, b) => a.t - b.t)
-    .map(({ t, score }) => ({
+    .map(({ t, score, x1, y1, x2, y2 }) => ({
       time: Math.max(0, toPlayerTime(t, start)),
       score,
       isBest: Math.abs(t - timeSeconds) < SIGHTING_TIME_TOLERANCE,
+      // As fractions of the frame, so the player can draw the box at whatever size it shows the video.
+      box: {
+        x1: toFrameFraction(x1, imageWidth),
+        y1: toFrameFraction(y1, imageHeight),
+        x2: toFrameFraction(x2, imageWidth),
+        y2: toFrameFraction(y2, imageHeight),
+      },
     }));
 };
 

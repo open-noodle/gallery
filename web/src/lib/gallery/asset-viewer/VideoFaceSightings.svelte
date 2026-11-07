@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { videoFaceBox } from '$lib/gallery/asset-viewer/video-face-box.svelte';
   import { formatSightingTime, seekViewerVideo } from '$lib/gallery/asset-viewer/video-seek';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { createUrl } from '$lib/utils';
@@ -8,8 +9,8 @@
   import { t } from 'svelte-i18n';
 
   /**
-   * Every moment a video face's person was seen, as crops in time order; a click pauses the viewer's video there
-   * (specs/2026-10-31-video-face-frames-design.md, Phase 2). Renders nothing for a face with no sightings, on any
+   * Every moment a video face's person was seen, as crops in time order; a click pauses the viewer's video there, with
+   * a box around the face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Renders nothing for a face with no sightings, on any
    * error, and against a server without the route, so the picker looks as it did before.
    */
   interface Props {
@@ -33,14 +34,18 @@
         }
       })
       .catch(() => {});
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      // The box belongs to this face's strip, so it goes with it.
+      videoFaceBox.clear();
+    };
   });
 
   const thumbnailUrl = (time: number) =>
     createUrl(`/faces/${faceId}/sightings/thumbnail`, { ...authManager.params, time });
 
-  const show = (time: number) => {
-    if (seekViewerVideo(time)) {
+  const show = ({ time, box }: VideoFaceSightingDto) => {
+    if (seekViewerVideo(time, box)) {
       activeTime = time;
     }
   };
@@ -59,7 +64,7 @@
           class="relative shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
           aria-label={$t('video_face_sightings_show_at', { values: { time: label } })}
           aria-pressed={activeTime === sighting.time}
-          onclick={() => show(sighting.time)}
+          onclick={() => show(sighting)}
         >
           <img
             src={thumbnailUrl(sighting.time)}

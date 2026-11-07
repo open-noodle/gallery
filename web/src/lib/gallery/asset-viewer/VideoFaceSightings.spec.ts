@@ -2,6 +2,9 @@ import '@testing-library/jest-dom';
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import VideoFaceSightings from './VideoFaceSightings.svelte';
+import { videoFaceBox } from './video-face-box.svelte';
+
+const box = { x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.5 };
 
 vi.mock('svelte-i18n', () => ({
   t: {
@@ -49,9 +52,9 @@ describe('VideoFaceSightings', () => {
   it('shows every sighting in the given order, with the best one starred and lazy crops keyed by time', async () => {
     getAssetFaceSightings.mockResolvedValue({
       sightings: [
-        { time: 2.5, score: 0.8, isBest: false },
-        { time: 42, score: 0.95, isBest: true },
-        { time: 3725, score: 0.7, isBest: false },
+        { time: 2.5, score: 0.8, isBest: false, box },
+        { time: 42, score: 0.95, isBest: true, box },
+        { time: 3725, score: 0.7, isBest: false, box },
       ],
     });
     render(VideoFaceSightings, { faceId: 'face-1' });
@@ -70,11 +73,11 @@ describe('VideoFaceSightings', () => {
     expect(buttons[1]).toContainElement(screen.getByTestId('best'));
   });
 
-  it('seeks the video to a sighting when it is clicked, and marks it', async () => {
+  it('seeks the video to a sighting with its face box when it is clicked, and marks it', async () => {
     getAssetFaceSightings.mockResolvedValue({
       sightings: [
-        { time: 2.5, score: 0.8, isBest: false },
-        { time: 42, score: 0.95, isBest: true },
+        { time: 2.5, score: 0.8, isBest: false, box },
+        { time: 42, score: 0.95, isBest: true, box },
       ],
     });
     seekViewerVideo.mockReturnValue(true);
@@ -83,8 +86,18 @@ describe('VideoFaceSightings', () => {
     const [first, second] = await screen.findAllByRole('button');
     await userEvent.click(second);
 
-    expect(seekViewerVideo).toHaveBeenCalledWith(42);
+    expect(seekViewerVideo).toHaveBeenCalledWith(42, box);
     expect(second).toHaveAttribute('aria-pressed', 'true');
     expect(first).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('takes the face box away when the strip closes', async () => {
+    getAssetFaceSightings.mockResolvedValue({ sightings: [{ time: 42, score: 0.95, isBest: true, box }] });
+    const { unmount } = render(VideoFaceSightings, { faceId: 'face-1' });
+    await screen.findByRole('button');
+    videoFaceBox.show(box, 42);
+
+    unmount();
+    expect(videoFaceBox.current).toBeUndefined();
   });
 });

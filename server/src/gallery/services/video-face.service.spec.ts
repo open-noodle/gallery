@@ -131,15 +131,18 @@ describe(VideoFaceService.name, () => {
           { t: 3, score: 0.6, ...box },
         ],
         timeSeconds: 8,
+        imageWidth: 100,
+        imageHeight: 200,
         originalPath: '/data/library/video.mp4',
         trimStart: 2,
         trimEnd: null,
       });
 
+      const fraction = { x1: 0.1, y1: 0.05, x2: 0.5, y2: 0.25 };
       await expect(sut.getSightings(auth, 'face-1')).resolves.toEqual({
         sightings: [
-          { time: 1, score: 0.6, isBest: false },
-          { time: 6, score: 0.9, isBest: true },
+          { time: 1, score: 0.6, isBest: false, box: fraction },
+          { time: 6, score: 0.9, isBest: true, box: fraction },
         ],
       });
       expect(mocks.videoFace.getSightings).toHaveBeenCalledWith('face-1');
@@ -183,6 +186,8 @@ describe(VideoFaceService.name, () => {
         { t: 9.5, score: 0.7, x1: 200, y1: 100, x2: 400, y2: 300 },
       ],
       timeSeconds: 4,
+      imageWidth: 2560,
+      imageHeight: 1440,
       originalPath: 'upload/owner/video.mp4',
       trimStart: 1.5,
       trimEnd: null,

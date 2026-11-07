@@ -426,6 +426,7 @@ describe('widenSmallFace', () => {
 
 describe('sightings on the player timeline', () => {
   const box = { x1: 10, y1: 10, x2: 50, y2: 50 };
+  const fraction = { x1: 0.0391, y1: 0.0694, x2: 0.1953, y2: 0.3472 };
   const stored = {
     sightings: [
       { t: 12.5, score: 0.9, ...box },
@@ -433,22 +434,37 @@ describe('sightings on the player timeline', () => {
       { t: 30, score: 0.7, ...box },
     ],
     timeSeconds: 12.5,
+    imageWidth: 256,
+    imageHeight: 144,
     trimStart: null,
     trimEnd: null,
   };
 
   it('lists every sighting in time order, with the best view marked', () => {
     expect(sightingsForPlayer(stored)).toEqual([
-      { time: 2.25, score: 0.8, isBest: false },
-      { time: 12.5, score: 0.9, isBest: true },
-      { time: 30, score: 0.7, isBest: false },
+      { time: 2.25, score: 0.8, isBest: false, box: fraction },
+      { time: 12.5, score: 0.9, isBest: true, box: fraction },
+      { time: 30, score: 0.7, isBest: false, box: fraction },
     ]);
   });
 
   it('shifts times by the trim start and leaves out sightings outside the trim', () => {
     expect(sightingsForPlayer({ ...stored, trimStart: 2.5, trimEnd: 20 })).toEqual([
-      { time: 10, score: 0.9, isBest: true },
+      { time: 10, score: 0.9, isBest: true, box: fraction },
     ]);
+  });
+
+  it('gives each box as fractions of the frame, kept inside it', () => {
+    const [sighting] = sightingsForPlayer({
+      ...stored,
+      sightings: [{ t: 1, score: 1, x1: -8, y1: 36, x2: 128, y2: 150 }],
+    });
+    expect(sighting.box).toEqual({ x1: 0, y1: 0.25, x2: 0.5, y2: 1 });
+  });
+
+  it('lists nothing when the frame size is unknown, since no box could be placed', () => {
+    expect(sightingsForPlayer({ ...stored, imageWidth: 0 })).toEqual([]);
+    expect(findSightingAt({ ...stored, imageHeight: 0 }, 12.5)).toBeUndefined();
   });
 
   it('rounds times to the millisecond', () => {

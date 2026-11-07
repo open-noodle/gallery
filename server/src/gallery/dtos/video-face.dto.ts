@@ -5,6 +5,18 @@ import z from 'zod';
 
 const playerSeconds = (description: string) => z.number().meta({ format: 'double' }).min(0).describe(description);
 
+const frameFraction = (description: string) =>
+  z.number().meta({ format: 'double' }).min(0).max(1).describe(description);
+
+const VideoFaceSightingBoxSchema = z
+  .object({
+    x1: frameFraction('Left edge, as a fraction of the frame width'),
+    y1: frameFraction('Top edge, as a fraction of the frame height'),
+    x2: frameFraction('Right edge, as a fraction of the frame width'),
+    y2: frameFraction('Bottom edge, as a fraction of the frame height'),
+  })
+  .meta({ id: 'VideoFaceSightingBoxDto' });
+
 const VideoFaceSightingSchema = z
   .object({
     time: playerSeconds(
@@ -12,6 +24,7 @@ const VideoFaceSightingSchema = z
     ),
     score: z.number().meta({ format: 'double' }).describe('Detector confidence for this sighting'),
     isBest: z.boolean().describe('Whether this is the best view, the one the face crop is cut from'),
+    box: VideoFaceSightingBoxSchema.describe('Where the face was in the frame at that moment'),
   })
   .meta({ id: 'VideoFaceSightingDto' });
 

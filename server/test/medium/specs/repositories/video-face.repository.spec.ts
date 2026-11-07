@@ -258,6 +258,8 @@ describe(VideoFaceRepository.name, () => {
       await expect(sut.getSightings(faceId)).resolves.toEqual({
         sightings,
         timeSeconds: 3.25,
+        imageWidth: 1920,
+        imageHeight: 1080,
         originalPath: asset.originalPath,
         trimStart: null,
         trimEnd: null,

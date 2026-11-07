@@ -142,6 +142,8 @@ export class VideoFaceRepository {
       .select([
         'asset_face_video_frame.sightings',
         'asset_face_video_frame.timeSeconds',
+        'asset_face.imageWidth',
+        'asset_face.imageHeight',
         'asset.originalPath',
         'asset_video_trim.startTime as trimStart',
         'asset_video_trim.endTime as trimEnd',

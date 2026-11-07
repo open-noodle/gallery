@@ -50344,8 +50344,51 @@
         ],
         "type": "string"
       },
+      "VideoFaceSightingBoxDto": {
+        "properties": {
+          "x1": {
+            "description": "Left edge, as a fraction of the frame width",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "x2": {
+            "description": "Right edge, as a fraction of the frame width",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "y1": {
+            "description": "Top edge, as a fraction of the frame height",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "y2": {
+            "description": "Bottom edge, as a fraction of the frame height",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "x1",
+          "x2",
+          "y1",
+          "y2"
+        ],
+        "type": "object"
+      },
       "VideoFaceSightingDto": {
         "properties": {
+          "box": {
+            "$ref": "#/components/schemas/VideoFaceSightingBoxDto",
+            "description": "Where the face was in the frame at that moment"
+          },
           "isBest": {
             "description": "Whether this is the best view, the one the face crop is cut from",
             "type": "boolean"
@@ -50363,6 +50406,7 @@
           }
         },
         "required": [
+          "box",
           "isBest",
           "score",
           "time"

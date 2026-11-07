@@ -446,6 +446,10 @@ In the asset viewer, on a video, the "Select face" picker (owner's `AssignFaceSi
 - Clicking a tile seeks the player to that moment and pauses it, so the frame stays on screen beside the picker.
   The tile stays highlighted until another one is clicked. Tiles are buttons labelled "Show at 0:42"
   (`video_face_sightings_show_at`).
+- While paused there, the face is marked on the video as a photo marks a highlighted face: a white rounded box with
+  the rest of the picture dimmed. The box goes when the video plays, when it is scrubbed to another moment, when
+  another tile is clicked, and when the picker closes. Added after the first test on real videos: in a crowd, a
+  paused frame alone did not say which of the people the sighting was.
 - The strip is absent, with no placeholder, for a photo, for a video face that has no stored sightings (a face
   detected on the poster by an older build, or with video sampling off), when the request fails, and against a server
   without the route.
@@ -460,13 +464,18 @@ Two routes on `GalleryFaceController`, under `Permission.FaceRead`, with the sam
 `Permission.AssetRead`, which already covers space members through `checkAccess`'s grants, so the access oracle is
 the enumerating test).
 
-**`GET /faces/{id}/sightings`** returns `{ sightings: [{ time, score, isBest }] }`:
+**`GET /faces/{id}/sightings`** returns `{ sightings: [{ time, score, isBest, box }] }`:
 
 - `time` is seconds in the **player's** timeline, rounded to the millisecond. Sightings are stored in the original's
   timeline; a trimmed video plays its trimmed encode, whose zero is the trim start, so `time = t − trimStart`. The
   trim is read from `asset_video_trim` when the request is made, not when the video was sampled, so a trim changed
   later still maps correctly. Sightings outside the current trim window are left out.
 - `isBest` marks the sighting at the frame row's `timeSeconds`.
+- `box` is where the face was at that moment, `{ x1, y1, x2, y2 }` as fractions of the frame (0 to 1, rounded to four
+  places, clamped inside it). Sightings are stored in the sampled frame's pixels, which the face's
+  `imageWidth`/`imageHeight` describe, so fractions let the player draw the box at whatever size it shows the video,
+  whichever encode it plays. A face without a usable `imageWidth`/`imageHeight` lists no sightings; video sampling
+  always writes them.
 - A face with no `asset_face_video_frame` row (a photo face, a poster face, a manual face) returns an empty list,
   not a 404: "no sightings" is an ordinary answer, and the client hides the strip either way.
 
@@ -487,10 +496,17 @@ the enumerating test).
 
 ### Seeking the player
 
-The side panel and the player have no reference to each other. A small fork manager,
-`web/src/lib/gallery/asset-viewer/video-seek.svelte.ts`, holds the current `<video>` element: `VideoNativeViewer`
-registers it with one `$effect` call (registration returns the cleanup that clears it), and the strip calls
-`videoSeek.seekTo(time)`. A seek with no registered player does nothing. The time is already in the player's
+The side panel and the player have no reference to each other. A fork module,
+`web/src/lib/gallery/asset-viewer/video-seek.ts`, holds the current `<video>` element: `VideoNativeViewer` registers
+it through the fork attachment `galleryViewerVideo`, which replaced the fork's existing volume attachment on the same
+element and composes both, and the attachment's cleanup clears it. The strip calls `seekViewerVideo(time, box)`. A
+seek with no registered player does nothing.
+
+The box lives in `video-face-box.svelte.ts` (the box and the moment it belongs to). `VideoFaceBox.svelte` draws it
+over the video with the face editor's geometry (`computeImageContentMetrics`: the video fitted to its container and
+centred), with `pointer-events: none` so the player's controls still work. The attachment clears the box on the
+video's `play` event and on a `seeking` event more than 0.1 s from the box's moment, which leaves the seek that
+placed it alone; the strip clears it when it unmounts. The time is already in the player's
 timeline, which holds for every source `VideoNativeViewer` plays: HLS is used only for unedited videos (whose
 timeline is the original's), and the playback and original URLs of a trimmed video both serve the trimmed encode
 (`edited=true` is the default).
@@ -506,7 +522,8 @@ timeline is the original's), and the playback and original URLs of a trimmed vid
 
 Server work is all fork code (`GalleryFaceController`, `VideoFaceService`, `VideoFaceRepository`, a fork DTO).
 Upstream files: `AssignFaceSidePanel.svelte` passes the face to the picker (one prop line), and
-`VideoNativeViewer.svelte` registers its player (an import and one call). `PersonPickerPanel.svelte` and
+`VideoNativeViewer.svelte` registers its player by swapping the fork's volume attachment for `galleryViewerVideo` (no
+change in size) and renders `VideoFaceBox` (an import and one line, +2 against the upstream tag). `PersonPickerPanel.svelte` and
 `SpacePersonSidePanel.svelte` are fork files. The open-api spec and SDK are generated.
 
 ### Cost
@@ -526,9 +543,12 @@ browser cache.
   number.
 - Medium (`video-face.repository.spec.ts`): `getSightings` with and without a trim, for a face without a frame row,
   and on a trashed video.
+- Unit (`video-faces.spec.ts`): boxes as frame fractions, clamped inside the frame; no sightings without a frame size.
 - Web (`VideoFaceSightings.spec.ts`): hidden when empty, on error and for a photo; tiles in time order with the best
-  starred and lazy images keyed by time; a click seeks and pauses through the manager. `video-seek.spec.ts`: seek with
-  and without a registered player, cleanup on unregister.
+  starred and lazy images keyed by time; a click seeks with the sighting's box; the box goes when the strip closes.
+  `video-seek.spec.ts`: seek with and without a registered player, cleanup on unregister, the box shown by a seek and
+  cleared by play, by a scrub away and by unregistering. `VideoFaceBox.spec.ts`: nothing drawn without a box or before
+  the video's size is known; the box placed on a letterboxed picture.
 
 ## Open questions
 
