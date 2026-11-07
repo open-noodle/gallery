@@ -1,10 +1,10 @@
-import { getAssetSpaces, getSharedSpaceAssetLinkedAlbums, removeAssets, SharedSpaceRole } from '@immich/sdk';
-import { modalManager, toastManager } from '@immich/ui';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
-import { canRemoveFrom, fetchSelectionSpaces, removableSpaces, removeFromSpace } from './space-removal';
 import { factory } from '#test/unit/factories.ts';
+import { getAssetSpaces, getSharedSpaceAssetLinkedAlbums, removeAssets, SharedSpaceRole } from '@immich/sdk';
+import { modalManager, toastManager } from '@immich/ui';
+import { canRemoveFrom, fetchSelectionSpaces, removableSpaces, removeFromSpace } from './space-removal';
 
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
@@ -102,7 +102,7 @@ describe('removeFromSpace', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(true);
     vi.mocked(getSharedSpaceAssetLinkedAlbums).mockResolvedValue([]);
     emit = vi.spyOn(eventManager, 'emit');
     clear = vi.spyOn(assetMultiSelectManager, 'clear').mockImplementation(() => {});
@@ -114,14 +114,14 @@ describe('removeFromSpace', () => {
   });
 
   it('removes nothing when the user declines', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
     expect(await removeFromSpace('family', ['a1'])).toEqual([]);
     expect(removeAssets).not.toHaveBeenCalled();
   });
 
   it('asks about "this space" from inside it, and names the space from elsewhere', async () => {
-    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    vi.mocked(modalManager.showDialog as (...args: unknown[]) => Promise<boolean>).mockResolvedValue(false);
 
     await removeFromSpace('family', ['a1']);
     await removeFromSpace('family', ['a1', 'a2'], 'Family');

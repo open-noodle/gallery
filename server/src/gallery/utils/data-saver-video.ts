@@ -33,9 +33,9 @@ export const parseBitrate = (bitrate: string) => {
 const BITRATE_HEADROOM = 1.25;
 
 /**
- * Whether a video needs a copy. The original's stream is the yardstick even for a trimmed video, since a trim is a
- * stream copy of the original and keeps its resolution and bitrate. An unknown bitrate counts as too high.
- */
+Whether a video needs a copy. The original's stream is the yardstick even for a trimmed video, since a trim is a
+stream copy of the original and keeps its resolution and bitrate. An unknown bitrate counts as too high.
+*/
 export const isDataSaverCopyNeeded = (
   config: DataSaverVideoConfig,
   videoStream: Pick<VideoStreamInfo, 'width' | 'height' | 'bitrate'>,
@@ -50,10 +50,10 @@ export const isDataSaverCopyNeeded = (
 };
 
 /**
- * Where a video's copy lives on the given backend: an absolute path on disk, a relative key on S3, the form
- * MediaService.persistFile stores for encoded videos. Deterministic, so the AssetDelete handler can find the file after
- * the cascade has already removed its row.
- */
+Where a video's copy lives on the given backend: an absolute path on disk, a relative key on S3, the form
+MediaService.persistFile stores for encoded videos. Deterministic, so the AssetDelete handler can find the file after
+the cascade has already removed its row.
+*/
 export const dataSaverVideoPath = (asset: { id: string; ownerId: string }, backend: StorageBackend) =>
   backend instanceof DiskStorageBackend
     ? dataSaverVideoDiskPath(asset)

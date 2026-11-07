@@ -804,10 +804,10 @@ export class SharedSpaceRepository {
   }
 
   /**
-   * The spaces of `userId` that show each of `assetIds`, by any path (added to the space, in a linked album, in a
-   * linked library), whether or not the space or album is hidden from the user's timeline: the thumbnail space
-   * badge. One row per (asset, space). Hidden, locked and trashed assets are in no space, as everywhere else.
-   */
+  The spaces of `userId` that show each of `assetIds`, by any path (added to the space, in a linked album, in a
+  linked library), whether or not the space or album is hidden from the user's timeline: the thumbnail space
+  badge. One row per (asset, space). Hidden, locked and trashed assets are in no space, as everywhere else.
+  */
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   @ChunkedArray({ paramIndex: 1 })
   async getMemberSpaceIdsByAssetIds(

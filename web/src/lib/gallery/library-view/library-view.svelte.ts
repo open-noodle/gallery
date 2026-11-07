@@ -36,10 +36,10 @@ const hasTimelineSpace = () =>
   );
 
 /**
- * The view reads the spaces list. Hold the spaces query open while the timeline is on screen, so every space
- * change (`invalidateSpaces`) refetches it; otherwise the view stays applied with its section and chip hidden
- * until something else refetches the list. While a refetch runs, the last list stays up.
- */
+The view reads the spaces list. Hold the spaces query open while the timeline is on screen, so every space
+change (`invalidateSpaces`) refetches it; otherwise the view stays applied with its section and chip hidden
+until something else refetches the list. While a refetch runs, the last list stays up.
+*/
 export const keepSpacesLoaded = () => {
   const spacesQuery = createQuery(getAllSpacesQuery, () => queryClient);
   $effect(() => {
@@ -53,18 +53,18 @@ export const keepSpacesLoaded = () => {
 export const libraryViewShown = () => hasTimelineSpace() === true;
 
 /**
- * The timeline query fields of the current view: none without a space on the timeline. Spaces not loaded yet keep the
- * remembered view, so the timeline does not load twice.
- */
+The timeline query fields of the current view: none without a space on the timeline. Spaces not loaded yet keep the
+remembered view, so the timeline does not load twice.
+*/
 export const libraryViewOptions = (): { libraryView?: LibraryView } => {
   const view = libraryView.current;
-  return view !== 'both' && hasTimelineSpace() !== false ? { libraryView: view } : {};
+  return view === 'both' || hasTimelineSpace() === false ? {} : { libraryView: view };
 };
 
 /**
- * The view's chip in the active filters bar. The view is the one remembered filter, so a narrowed timeline
- * always says so, even with the filter panel closed; Clear all leaves it, its own close button goes back to Both.
- */
+The view's chip in the active filters bar. The view is the one remembered filter, so a narrowed timeline
+always says so, even with the filter panel closed; Clear all leaves it, its own close button goes back to Both.
+*/
 export const libraryViewChips = (): PinnedFilterChip[] => {
   const view = libraryView.current;
   if (view === 'both') {

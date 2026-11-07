@@ -203,10 +203,10 @@ export class DataSaverVideoService extends BaseService {
   }
 
   /**
-   * The Data Saver copy, readable by anyone who can view the video, shared links included. Without one it serves what
-   * /video/playback would, so the app can always ask here first; that response is revalidated rather than cached, so
-   * the copy is picked up once it lands.
-   */
+  The Data Saver copy, readable by anyone who can view the video, shared links included. Without one it serves what
+  /video/playback would, so the app can always ask here first; that response is revalidated rather than cached, so
+  the copy is picked up once it lands.
+  */
   async playbackDataSaverVideo(auth: AuthDto, id: string, range?: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
 

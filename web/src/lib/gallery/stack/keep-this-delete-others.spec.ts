@@ -1,7 +1,7 @@
+import { factory } from '#test/unit/factories.ts';
 import type { StackResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
 import { keepThisDeleteOthersPrompt } from './keep-this-delete-others';
-import { factory } from '#test/unit/factories.ts';
 
 const $t = ((key: string, options?: { values?: Record<string, unknown> }) =>
   JSON.stringify({ key, ...options?.values })) as MessageFormatter;

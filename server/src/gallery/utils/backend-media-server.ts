@@ -387,9 +387,9 @@ export class BackendMediaServer {
   }
 
   /**
-   * The image a face's box refers to: the best frame of a video face sampled across the whole video
-   * (specs/2026-10-31-video-face-frames-design.md), else the asset's preview, else its thumbnail.
-   */
+  The image a face's box refers to: the best frame of a video face sampled across the whole video
+  (specs/2026-10-31-video-face-frames-design.md), else the asset's preview, else its thumbnail.
+  */
   async getFaceThumbnailSource({ id, assetId }: { id: string; assetId: string }): Promise<string | null> {
     const framePath = await this.deps.videoFaceRepository.getFramePath(id);
     if (framePath) {
@@ -406,10 +406,10 @@ export class BackendMediaServer {
   }
 
   /**
-   * The person thumbnail's source and crop region. For a video whose representative face was sampled across the whole
-   * video, that is the face's best frame, with a small face widened to show its surroundings (widenSmallFace).
-   * Otherwise the preview and the face box, as upstream crops them.
-   */
+  The person thumbnail's source and crop region. For a video whose representative face was sampled across the whole
+  video, that is the face's best frame, with a small face widened to show its surroundings (widenSmallFace).
+  Otherwise the preview and the face box, as upstream crops them.
+  */
   async getPersonThumbnailSource(
     { ownerId, personGroupId }: { ownerId: string; personGroupId: string },
     data: { type: AssetType; previewPath: string | null; oldWidth: number; oldHeight: number } & BoundingBox,

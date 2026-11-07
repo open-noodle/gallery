@@ -49,10 +49,7 @@ describe('library view', () => {
 
   it('counts as both, and is not shown, while none of my spaces is on my timeline', () => {
     libraryView.current = LibraryView.Personal;
-    librarySpaces.list = spaces(
-      { userId: 'other', showInTimeline: true },
-      { userId: 'me', showInTimeline: false },
-    );
+    librarySpaces.list = spaces({ userId: 'other', showInTimeline: true }, { userId: 'me', showInTimeline: false });
     expect(libraryViewShown()).toBe(false);
     expect(libraryViewOptions()).toEqual({});
 
