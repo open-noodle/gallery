@@ -36,21 +36,57 @@ export const registerSeekableVideo: Attachment<HTMLVideoElement> = (video) => {
   };
 };
 
+/** How long (in ms) the wake-up play may take before the seek goes ahead without it. */
+const WAKE_TIMEOUT = 300;
+
+/** The latest seek asked for, applied once the wake-up play for its video is done. */
+let target: { video: HTMLVideoElement; time: number; box?: VideoFaceSightingBoxDto } | undefined;
+let waking: HTMLVideoElement | undefined;
+
+/**
+ * Safari stops drawing a paused video's seeks once the window is resized: the clock and the face box move, the
+ * picture stays on the old frame until the video plays again. So each seek starts with a muted play and pause, which
+ * keeps it drawing; other browsers only see a moment of silent playback. Seeks asked for meanwhile wait for the same
+ * play, so the mute state read here is always the viewer's own.
+ */
+const wakeAndSeek = async (video: HTMLVideoElement) => {
+  waking = video;
+  const muted = video.muted;
+  video.muted = true;
+  await Promise.race([video.play().catch(() => {}), new Promise((resolve) => setTimeout(resolve, WAKE_TIMEOUT))]);
+  video.pause();
+  video.muted = muted;
+  if (waking === video) {
+    waking = undefined;
+  }
+
+  if (target?.video !== video) {
+    return;
+  }
+  const { time, box } = target;
+  target = undefined;
+  if (current !== video) {
+    return;
+  }
+  video.currentTime = time;
+  if (box) {
+    videoFaceBox.show(box, time);
+  }
+};
+
 /**
  * Pauses the viewer's video at `time`, in seconds on its own timeline, so the frame stays on screen, with `box` drawn
- * around the face when given. Returns whether a video was there to seek.
+ * around the face when given. Returns whether a video was there to seek; the seek itself lands a moment later.
  */
 export const seekViewerVideo = (time: number, box?: VideoFaceSightingBoxDto): boolean => {
   if (!current) {
     return false;
   }
 
-  current.pause();
-  current.currentTime = time;
-  if (box) {
-    videoFaceBox.show(box, time);
-  } else {
-    videoFaceBox.clear();
+  videoFaceBox.clear();
+  target = { video: current, time, box };
+  if (waking !== current) {
+    void wakeAndSeek(current);
   }
   return true;
 };

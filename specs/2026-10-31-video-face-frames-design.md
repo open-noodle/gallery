@@ -502,6 +502,13 @@ it through the fork attachment `galleryViewerVideo`, which replaced the fork's e
 element and composes both, and the attachment's cleanup clears it. The strip calls `seekViewerVideo(time, box)`. A
 seek with no registered player does nothing.
 
+Each seek starts with a muted `play()` and `pause()` (given up to 300 ms to start), then sets `currentTime` and shows
+the box. The first real-video test found that Safari, once the window is resized, stops drawing a paused video's
+seeks: the clock and the box moved, the picture stayed on the old frame, and pressing play brought it back. Clicks
+made while that play is under way go to the same play and land on the latest one, so the mute state it restores is
+always the viewer's own. Costs: the mute toggle passes through the persisted volume preference and ends where it
+started, and if the video never played before, the viewer's first-`playing` handler moves focus to it.
+
 The box lives in `video-face-box.svelte.ts` (the box and the moment it belongs to). `VideoFaceBox.svelte` draws it
 over the video with the face editor's geometry (`computeImageContentMetrics`: the video fitted to its container and
 centred), with `pointer-events: none` so the player's controls still work. The attachment clears the box on the
