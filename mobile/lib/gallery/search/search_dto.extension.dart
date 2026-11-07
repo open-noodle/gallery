@@ -25,6 +25,9 @@ extension GallerySmartSearchDto on SmartSearchDto {
     // space-person token resolves). #763: favorites are per-user, so the server composes
     // shared-space visibility with the favorite filter (slice 4) — no need to suppress it here.
     withSharedSpaces = const Optional.present(true);
+    // The Dart generator (openapi-generator 7.25.0, AbstractDartCodegen.toDefaultValue) defaults every optional list to
+    // Optional.present(const []), and mobile has no aspect ratio filter.
+    aspectClasses = const Optional.absent();
     return filter.display.isUntagged ? _ExplicitNullTagIdsSmartSearchDto(this) : this;
   }
 }
@@ -41,6 +44,8 @@ extension GalleryMetadataSearchDto on MetadataSearchDto {
     order = _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter));
     // See GallerySmartSearchDto.withGallery.
     withSharedSpaces = const Optional.present(true);
+    // See GallerySmartSearchDto.withGallery.
+    aspectClasses = const Optional.absent();
     return filter.display.isUntagged ? _ExplicitNullTagIdsMetadataSearchDto(this) : this;
   }
 }
