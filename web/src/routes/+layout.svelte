@@ -1,12 +1,10 @@
 <script lang="ts">
-  import { afterNavigate, beforeNavigate } from '$app/navigation';
-  import { page } from '$app/state';
   import { shortcut, shortcuts } from '#lib/actions/shortcut.ts';
   import { getMyImmichLink } from '#lib/commands.ts';
-  import GlobalSearch from '#lib/components/global-search/global-search.svelte';
-  import { setupMotion } from '#lib/gallery/motion/index.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import GlobalSearch from '#lib/components/global-search/global-search.svelte';
   import OpenInAppBanner from '#lib/components/shared-components/open-in-app-banner.svelte';
+  import { setupMotion } from '#lib/gallery/motion/index.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { closePaletteOnNavigate } from '#lib/managers/close-palette-on-navigate.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
@@ -21,28 +19,23 @@
   import { copyToClipboard } from '#lib/utils.ts';
   import { maintenanceShouldRedirect } from '#lib/utils/maintenance.ts';
   import { searchShortcuts } from '#lib/utils/search-shortcut.ts';
+  import { getUiTranslations } from '#lib/utils/ui-translations.ts';
   import { getServerConfig } from '@immich/sdk';
-  import {
-    modalManager,
-    setLocale,
-    setTranslations,
-    Theme,
-    themeManager,
-    toastManager,
-    TooltipProvider,
-  } from '@immich/ui';
+  import { TooltipProvider, modalManager, setLocale, setTranslations, toastManager } from '@immich/ui';
+  import { QueryClientProvider } from '@tanstack/svelte-query';
   import { En } from 'media-chrome/lang/en';
   import { addTranslation } from 'media-chrome/utils/i18n';
-  import { QueryClientProvider } from '@tanstack/svelte-query';
   import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { get } from 'svelte/store';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  import { page } from '$app/state';
+  import '../app.css';
   import DownloadPanel from './DownloadPanel.svelte';
   import ErrorLayout from './ErrorLayout.svelte';
   import NavigationLoadingBar from './NavigationLoadingBar.svelte';
   import UploadPanel from './UploadPanel.svelte';
   import VersionAnnouncement from './VersionAnnouncement.svelte';
-  import '../app.css';
 
   interface Props {
     children?: Snippet;
@@ -81,34 +74,7 @@
   };
 
   $effect(() => {
-    setTranslations({
-      cancel: $t('cancel'),
-      close: $t('close'),
-      confirm: $t('confirm'),
-      expand: $t('expand'),
-      collapse: $t('collapse'),
-      search_placeholder: $t('search'),
-      search_no_results: $t('no_results'),
-      prompt_default: $t('are_you_sure_to_do_this'),
-      show_password: $t('show_password'),
-      hide_password: $t('hide_password'),
-      dark_theme: themeManager.value === Theme.Dark ? $t('light_theme') : $t('dark_theme'),
-      open_menu: $t('open'),
-      command_palette_prompt_default: $t('command_palette_prompt'),
-      command_palette_to_select: $t('command_palette_to_select'),
-      command_palette_to_navigate: $t('command_palette_to_navigate'),
-      command_palette_to_close: $t('command_palette_to_close'),
-      command_palette_to_show_all: $t('command_palette_to_show_all'),
-      navigate_next: $t('next'),
-      navigate_previous: $t('previous'),
-      open_calendar: $t('open_calendar'),
-      toast_success_title: $t('success'),
-      toast_info_title: $t('info'),
-      toast_warning_title: $t('warning'),
-      toast_danger_title: $t('error'),
-      save: $t('save'),
-      supporter: $t('supporter'),
-    });
+    setTranslations(getUiTranslations($t));
 
     addTranslation($lang, {
       ...MediaChromeDefaults,

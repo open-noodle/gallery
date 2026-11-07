@@ -1,10 +1,10 @@
 import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder } from 'kysely';
-import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
-import type { ViewerScope } from 'src/utils/viewer-scope.js';
 import { withLibraryView } from 'src/gallery/utils/library-view.js';
+import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
+import type { ViewerScope } from 'src/utils/viewer-scope.js';
 
 /**
 The filter panel's shared vocabulary, defined once for every fork surface that answers it: the

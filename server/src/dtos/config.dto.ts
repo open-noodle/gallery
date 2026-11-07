@@ -2,7 +2,6 @@ import { CronExpression } from '@nestjs/schedule';
 import { validateCronExpression } from 'cron';
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import type { DeepPartial } from 'src/types.js';
 import {
   AudioCodec,
   AudioCodecSchema,
@@ -51,6 +50,7 @@ import {
   galleryTopLevelDefaults,
 } from 'src/gallery/dtos/config.dto.js';
 import { GalleryDataSaverVideoSchema, galleryDataSaverVideoDefaults } from 'src/gallery/dtos/data-saver-video.dto.js';
+import type { DeepPartial } from 'src/types.js';
 
 const { Admin, User, Public } = ConfigVisibility;
 

@@ -1,5 +1,5 @@
-import { trim } from 'lodash-es';
 import type { ExpressionBuilder } from 'kysely';
+import { trim } from 'lodash-es';
 import { DB } from 'src/schema/index.js';
 
 const escapeLikePattern = (value: string) => value.replaceAll(/[\\%_]/g, String.raw`\$&`);

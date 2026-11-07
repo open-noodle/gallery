@@ -1,7 +1,7 @@
 <script lang="ts">
+  import type { TagResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiTag } from '@mdi/js';
-  import type { TagResponseDto } from '@immich/sdk';
 
   interface Props {
     item: TagResponseDto;

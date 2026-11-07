@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { refreshAll } from '$app/navigation';
   import PersonSuggestionBanner from '#lib/components/faces-page/person-suggestion-banner.svelte';
   import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
@@ -16,6 +15,7 @@
     type PersonResponseDto,
   } from '@immich/sdk';
   import { modalManager } from '@immich/ui';
+  import { refreshAll } from '$app/navigation';
 
   // Face suggestions banner and review on the person page. `onConfirmed` runs after a review that
   // confirmed faces has reloaded the page data, so the page can refresh its thumbnail.

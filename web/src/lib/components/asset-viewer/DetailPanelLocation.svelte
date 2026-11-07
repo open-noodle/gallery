@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import GeolocationPointPickerModal from '#lib/modals/GeolocationPointPickerModal.svelte';
   import { applyContextualFilter, buildContextualMapUrl } from '#lib/utils/filter-target.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
@@ -7,6 +6,7 @@
   import { Icon, IconButton, modalManager } from '@immich/ui';
   import { mdiMapMarkerOutline, mdiMapOutline, mdiPencil } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   type Props = {
     isOwner: boolean;

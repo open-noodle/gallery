@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type Mock, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto.js';
 import { BaseService } from 'src/services/base.service.js';

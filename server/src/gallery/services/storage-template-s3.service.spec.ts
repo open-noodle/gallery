@@ -1,7 +1,7 @@
-import type { JobItem, SystemMetadata } from 'src/types.js';
 import { DatabaseLock, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
+import type { JobItem, SystemMetadata } from 'src/types.js';
 import { factory } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 

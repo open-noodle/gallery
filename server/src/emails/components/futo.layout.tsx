@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Body, Container, Font, Head, Hr, Html, Img, Link, Preview, Section, Tailwind, Text } from 'react-email';
 import tailwindPresetEmail from 'tailwindcss-preset-email';
-import { ImmichFooter } from './footer.template.js';
+import { ImmichFooter } from 'src/emails/components/footer.template.js';
 
 interface FutoLayoutProps {
   children: React.ReactNode;

@@ -1,4 +1,4 @@
-import { Column, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { Column, Index, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 @Table('storage_migration_log')

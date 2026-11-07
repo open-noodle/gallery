@@ -21,7 +21,6 @@
   import { deleteAssets } from '#lib/utils/actions.ts';
   import { selectAllAssets } from '#lib/utils/asset-utils.ts';
   import { isModalOpen, modalManager } from '@immich/ui';
-  import { goto } from '$app/navigation';
 
   type Props = {
     timelineManager: TimelineManager;

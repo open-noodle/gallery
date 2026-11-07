@@ -1,6 +1,10 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
-import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { SharedSpaceRole, UserAvatarColor } from '@immich/sdk';
+import {
+  SharedSpaceRole,
+  UserAvatarColor,
+  type SharedSpaceMemberResponseDto,
+  type SharedSpaceResponseDto,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';

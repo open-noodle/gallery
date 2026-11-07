@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { ArgOf } from 'src/repositories/event.repository.js';
 import { OnEvent } from 'src/decorators.js';
 import { AssetVisibility } from 'src/enum.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 

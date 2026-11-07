@@ -3,7 +3,7 @@ import { AssetStatus, TimeBucketSize } from 'src/enum.js';
 import { withAlbumStackCollapse } from 'src/gallery/utils/album-stack-collapse.js';
 import { withOwnArchiveOnly } from 'src/gallery/utils/favorites-scope.js';
 import { withLibraryView } from 'src/gallery/utils/library-view.js';
-import { type TimeBucketOptions, getBoundingCircle, withBoundingBox } from 'src/repositories/asset.repository.js';
+import { getBoundingCircle, withBoundingBox, type TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { withAssetFilter } from 'src/utils/asset-filter.js';
 import {
@@ -19,13 +19,13 @@ import {
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { hasFaceIdentities, hasSpacePeople } from 'src/utils/people-filter.js';
 import {
-  type TimelineRescue,
   albumMembership,
   hiddenFromOwnTimeline,
   ownedOrSharedWithViewer,
   spaceAssetPathBranches,
   spaceVisibilityGate,
   timelineHiddenScopeIsEmpty,
+  type TimelineRescue,
 } from 'src/utils/shared-space-album-scope.js';
 
 // Postgres writes years past 9999 unsigned (`12345-01-01`), while `toISOString()` uses the ISO 8601

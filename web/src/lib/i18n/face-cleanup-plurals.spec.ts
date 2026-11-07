@@ -1,7 +1,7 @@
 import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { convertBCP47 } from '#lib/utils/i18n.ts';
 import { IntlMessageFormat } from 'intl-messageformat';
-import { init, locale, register, waitLocale, _, type Translations } from 'svelte-i18n';
+import { _, init, locale, register, waitLocale, type Translations } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';

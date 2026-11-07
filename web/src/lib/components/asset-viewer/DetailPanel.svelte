@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import DetailPanelDate from '#lib/components/asset-viewer/DetailPanelDate.svelte';
   import DetailPanelDescription from '#lib/components/asset-viewer/DetailPanelDescription.svelte';
   import DetailPanelLocation from '#lib/components/asset-viewer/DetailPanelLocation.svelte';
+  import DetailPanelPeople from '#lib/components/asset-viewer/DetailPanelPeople.svelte';
   import DetailPanelRating from '#lib/components/asset-viewer/DetailPanelStarRating.svelte';
   import DetailPanelTags from '#lib/components/asset-viewer/DetailPanelTags.svelte';
   import { timeToLoadTheMap } from '#lib/constants.ts';
   import AppearsInAlbum from '#lib/gallery/asset-viewer/AppearsInAlbum.svelte';
+  import FilterValue from '#lib/gallery/asset-viewer/FilterValue.svelte';
+  import MapProviderLinks from '#lib/gallery/asset-viewer/MapProviderLinks.svelte';
+  import SpacePeopleSidePanel from '#lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte';
   import { useAssetSpace } from '#lib/gallery/asset-viewer/asset-space.ts';
   import {
     cameraFilter,
@@ -15,32 +18,29 @@
     lensFilter,
     ownerFilter,
   } from '#lib/gallery/asset-viewer/detail-panel-filters.ts';
-  import FilterValue from '#lib/gallery/asset-viewer/FilterValue.svelte';
-  import MapProviderLinks from '#lib/gallery/asset-viewer/MapProviderLinks.svelte';
-  import SpacePeopleSidePanel from '#lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { refreshAssetPeople } from '#lib/utils/refresh-asset-people.ts';
+  import { getAlbumsByAssetQuery } from '#lib/queries/album.query.ts';
+  import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
+  import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
   import { Route } from '#lib/route.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { canEditAsset } from '#lib/utils/asset-editability.ts';
   import { delay, getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { getCameraName } from '#lib/utils/camera-utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
+  import { refreshAssetPeople } from '#lib/utils/refresh-asset-people.ts';
   import { getParentPath } from '#lib/utils/tree-utils.ts';
-  import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { Icon, IconButton, LoadingSpinner, Text } from '@immich/ui';
   import { mdiCamera, mdiCameraIris, mdiClose, mdiImageOutline, mdiInformationOutline } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import PersonSidePanel from '../faces-page/PersonSidePanel.svelte';
   import UserAvatar from '../shared-components/UserAvatar.svelte';
-  import DetailPanelPeople from '#lib/components/asset-viewer/DetailPanelPeople.svelte';
-  import { getAlbumsByAssetQuery } from '#lib/queries/album.query.ts';
-  import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
-  import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
-  import { getCameraName } from '#lib/utils/camera-utils.ts';
 
   const query = createPreloadedQuery(getPublicConfigQuery);
   const publicConfig = $derived(query.data);

@@ -1,12 +1,14 @@
 <script lang="ts">
-  import FaceEditorPanel from '#lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import VideoRemoteViewer from '#lib/components/asset-viewer/VideoRemoteViewer.svelte';
+  import FaceEditorPanel from '#lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import { assetViewerFadeDuration } from '#lib/constants.ts';
   import { persistVideoVolume } from '#lib/gallery/asset-viewer/video-volume.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { castManager } from '#lib/managers/cast-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { castManager } from '#lib/managers/cast-manager.svelte.ts';
   import { mediaCapabilitiesManager } from '#lib/managers/media-capabilities-manager.svelte.ts';
+  import { createPreloadedQuery } from '#lib/queries/client.ts';
+  import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
   import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '#lib/stores/preferences.store.ts';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '#lib/utils.ts';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
@@ -45,8 +47,6 @@
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import './immich-time-range';
-  import { createPreloadedQuery } from '#lib/queries/client.ts';
-  import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
 
   const query = createPreloadedQuery(getPublicConfigQuery);
   const publicConfig = $derived(query.data);

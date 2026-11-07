@@ -1,5 +1,4 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Table } from '@immich/sql-tools';
-import type { Generated, Timestamp } from '@immich/sql-tools';
+import { Column, CreateDateColumn, ForeignKeyColumn, Table, type Generated, type Timestamp } from '@immich/sql-tools';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 
 /** One sampled sighting of a video face: `t` in the original's timeline, box in the best frame's pixel space. */

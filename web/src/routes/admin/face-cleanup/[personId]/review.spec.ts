@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createReviewModel, STATE_COLOR, STATE_ICON, type FaceState, type FlaggedFace } from './review.svelte';
+import { STATE_COLOR, STATE_ICON, createReviewModel, type FaceState, type FlaggedFace } from './review.svelte';
 
 // State must never be encoded in colour alone: owner/stay/other used to share one check mark on the tile badge,
 // leaving indigo-vs-violet as the only thing separating "moved away" from "locked in place" — unreadable for a

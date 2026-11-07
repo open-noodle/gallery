@@ -1,8 +1,8 @@
 import { OutputInfo } from 'sharp';
-import type { RawImageInfo } from 'src/types.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType } from 'src/enum.js';
 import { MediaService } from 'src/services/media.service.js';
+import type { RawImageInfo } from 'src/types.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { getForGenerateThumbnail } from 'test/mappers.js';
 import { factory } from 'test/small.factory.js';

@@ -1,10 +1,10 @@
 import { Stats } from 'node:fs';
 import { Mock } from 'vitest';
-import type { SystemMetadata } from 'src/types.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetPathType, AssetType, JobStatus, SystemMetadataKey } from 'src/enum.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageTemplateService } from 'src/services/storage-template.service.js';
+import type { SystemMetadata } from 'src/types.js';
 import { AlbumFactory } from 'test/factories/album.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { UserFactory } from 'test/factories/user.factory.js';

@@ -2,8 +2,7 @@
 // Upstream's own search UI is carried dormant alongside it (present, verbatim, never mounted):
 // see web/src/lib/components/shared-components/search-bar/DORMANT.md before touching either.
 // Do not import `$lib/managers/search-manager.svelte` — that is upstream's dormant manager.
-import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
 import { Route } from '#lib/route.ts';
@@ -66,7 +65,7 @@ import { page } from '$app/state';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
-import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
+import { NAVIGATION_ITEMS, isAlmostExactNavMatch, type NavigationItem } from './navigation-items';
 
 // SvelteKit 3's page.url is read-only; the URL helpers take a URL. This is a throwaway copy, not reactive state.
 const currentPageUrl = () => new URL(page.url.href);

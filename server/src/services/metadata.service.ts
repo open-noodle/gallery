@@ -5,8 +5,6 @@ import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
 import { Stats } from 'node:fs';
 import { join, parse } from 'node:path';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { JobOf } from 'src/types.js';
 import { Asset, AssetFile } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import {
@@ -25,11 +23,13 @@ import {
 import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
 import { isExtractedMotionPath } from 'src/gallery/utils/motion-path.js';
 import { getMotionVideoPath } from 'src/gallery/utils/storage-keys.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
 import { getAssetFiles } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { mergeTimeZone } from 'src/utils/date.js';

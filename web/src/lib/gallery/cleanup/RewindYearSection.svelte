@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
-  import { flipMotion, pop } from '#lib/gallery/motion/index.ts';
-  import { flip } from 'svelte/animate';
   import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
   import type { RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
+  import { flipMotion, pop } from '#lib/gallery/motion/index.ts';
   import type { CleanupAssetDto } from '@immich/sdk';
   import { Button, Heading, Icon } from '@immich/ui';
   import { mdiCheck, mdiHeart } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { flip } from 'svelte/animate';
 
   type Props = {
     year: number;

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
-import type { JobOf, SystemFlags } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { ErrorMessages } from 'src/constants.js';
@@ -18,6 +17,7 @@ import {
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobOf, SystemFlags } from 'src/types.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
 import { detectMediaLocation } from 'src/utils/storage.js';
 

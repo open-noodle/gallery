@@ -8,9 +8,9 @@ import type {
 } from '#lib/managers/timeline-manager/types.ts';
 import {
   AssetOrder,
+  TimeBucketSize,
   getTimeBucketCovers,
   getTimeBuckets,
-  TimeBucketSize,
   type TimeBucketCoverResponseDto,
   type TimeBucketsResponseDto,
 } from '@immich/sdk';

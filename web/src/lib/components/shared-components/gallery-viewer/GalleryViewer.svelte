@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
-  import { goto } from '$app/navigation';
   import { shortcuts, type ShortcutOptions } from '#lib/actions/shortcut.ts';
-  import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
   import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
+  import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
   import Thumbnail from '#lib/components/assets/thumbnail/Thumbnail.svelte';
   import TimelineBucketCard from '#lib/components/timeline/TimelineBucketCard.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
@@ -31,14 +29,16 @@
   import { buildGalleryViewerBuckets, getGalleryViewerAssetDate } from '#lib/utils/gallery-viewer-grouping.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getJustifiedLayoutFromAssets } from '#lib/utils/layout-utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { navigate } from '#lib/utils/navigation.ts';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
   import { isTimelineAsset, toTimelineAsset } from '#lib/utils/timeline-util.ts';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
   import { TUNABLES } from '#lib/utils/tunables.ts';
   import { type AssetResponseDto } from '@immich/sdk';
   import { modalManager } from '@immich/ui';
   import { debounce } from 'lodash-es';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
 
   const {
     TIMELINE: { INTERSECTION_EXPAND_TOP, INTERSECTION_EXPAND_BOTTOM },

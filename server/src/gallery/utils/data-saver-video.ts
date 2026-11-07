@@ -1,10 +1,10 @@
-import type { DataSaverVideoConfig } from 'src/gallery/dtos/data-saver-video.dto.js';
-import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
-import type { VideoFormat, VideoStreamInfo } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder } from 'src/enum.js';
+import type { DataSaverVideoConfig } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
+import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import type { VideoFormat, VideoStreamInfo } from 'src/types.js';
 
 // Data Saver video (specs/2026-11-01-data-saver-video-design.md).
 

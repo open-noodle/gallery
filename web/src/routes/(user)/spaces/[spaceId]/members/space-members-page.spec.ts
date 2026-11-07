@@ -1,8 +1,7 @@
 import { sdkMock } from '#lib/__mocks__/sdk.mock.ts';
 import TestWrapper from '#lib/components/TestWrapper.svelte';
 import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
-import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { SharedSpaceRole } from '@immich/sdk';
+import { SharedSpaceRole, type SharedSpaceMemberResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';

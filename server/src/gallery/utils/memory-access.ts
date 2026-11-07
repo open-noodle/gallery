@@ -1,4 +1,4 @@
-import { type ExpressionBuilder, sql } from 'kysely';
+import { sql, type ExpressionBuilder } from 'kysely';
 import { AssetVisibility } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { spaceAlbumAssetExists } from 'src/utils/shared-space-album-scope.js';

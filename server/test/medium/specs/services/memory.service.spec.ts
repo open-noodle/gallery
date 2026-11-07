@@ -1,6 +1,5 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import type { ThemeSearchAsset, ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
 import {
   AssetFileType,
@@ -12,6 +11,7 @@ import {
   UserMetadataKey,
 } from 'src/enum.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import type { ThemeSearchAsset, ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { RULE_DAILY_LIMIT, RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';

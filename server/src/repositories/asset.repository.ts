@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
+  expressionBuilder,
+  sql,
   type ExpressionBuilder,
   type Insertable,
   type Kysely,
@@ -8,17 +10,14 @@ import {
   type Selectable,
   type ShallowDehydrateObject,
   type Updateable,
-  expressionBuilder,
-  sql,
 } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
-import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
-import { type LockableProperty, Stack, lockableProperties } from 'src/database.js';
+import { LockableProperty, Stack, lockableProperties } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
-import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
+import { isMetadataHidden, type AuthDto } from 'src/dtos/auth.dto.js';
 import {
   AssetFileType,
   AssetOrder,
@@ -30,6 +29,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { albumStackBadge } from 'src/gallery/utils/album-stack-collapse.js';
+import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { stackHasSeveralLiveAssets } from 'src/gallery/utils/stack-badge.js';
 import { withTimeBucketAssetFilters } from 'src/gallery/utils/time-bucket-filter.js';
@@ -59,7 +59,7 @@ import {
   withTags,
 } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
-import { type TimelineHiddenScope, ownedOrSharedWithViewer } from 'src/utils/shared-space-album-scope.js';
+import { ownedOrSharedWithViewer, type TimelineHiddenScope } from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export type AssetStats = Record<AssetType, number>;

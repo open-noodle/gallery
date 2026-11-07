@@ -1,13 +1,13 @@
 <script lang="ts">
   import { shortcut } from '#lib/actions/shortcut.ts';
-  import DeferredPersonThumbnail from '#lib/components/people/deferred-person-thumbnail.svelte';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import DeferredPersonThumbnail from '#lib/components/people/deferred-person-thumbnail.svelte';
+  import PeopleGrid from '#lib/components/people/people-grid.svelte';
   import type {
     VisibilityChange,
     VisibilityPerson,
     VisibilitySaveResult,
   } from '#lib/components/people/people-types.ts';
-  import PeopleGrid from '#lib/components/people/people-grid.svelte';
   import { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
   import { ToggleVisibility } from '#lib/constants.ts';
   import { locale } from '#lib/stores/preferences.store.ts';

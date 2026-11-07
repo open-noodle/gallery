@@ -7,8 +7,13 @@ import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
 import { lang } from '#lib/stores/preferences.store.ts';
 import { buildSpaceTimelineOptions } from '#lib/utils/space-filter-options.ts';
 import { storeTypedSearchNames } from '#lib/utils/typed-search/typed-search-name-cache.ts';
-import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { AssetTypeEnum, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
+import {
+  AssetTypeEnum,
+  AssetVisibility,
+  SharedSpaceRole,
+  type SharedSpaceMemberResponseDto,
+  type SharedSpaceResponseDto,
+} from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';

@@ -1,17 +1,17 @@
 import { ForbiddenException } from '@nestjs/common';
+import { AssetBulkUpdateDto, UpdateAssetDto } from 'src/dtos/asset.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetVisibility } from 'src/enum.js';
 import type { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
+import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import type { AccessRepository } from 'src/repositories/access.repository.js';
 import type { AlbumRepository } from 'src/repositories/album.repository.js';
 import type { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import type { AssetRepository } from 'src/repositories/asset.repository.js';
 import type { LoggingRepository } from 'src/repositories/logging.repository.js';
 import type { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { AssetBulkUpdateDto, UpdateAssetDto } from 'src/dtos/asset.dto.js';
-import { AssetVisibility } from 'src/enum.js';
-import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
-import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
-import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 
 export type AssetUpdateRepositories = {
   accessRepository: AccessRepository;

@@ -1,7 +1,7 @@
-import type { JobItem } from 'src/types.js';
 import { JobName, QueueName } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageService } from 'src/services/storage.service.js';
+import type { JobItem } from 'src/types.js';
 
 // Report deletion only touches the database, so it stays safe on S3.
 const S3_SAFE_INTEGRITY_JOBS = new Set<JobName>([JobName.IntegrityDeleteReportType, JobName.IntegrityDeleteReports]);

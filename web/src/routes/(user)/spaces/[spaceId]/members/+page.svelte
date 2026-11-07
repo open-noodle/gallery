@@ -1,25 +1,25 @@
 <script lang="ts">
-  import { invalidateAll } from '$app/navigation';
-  import SpaceMemberPermissionSettings from '#lib/gallery/components/spaces/space-member-permission-settings.svelte';
   import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
   import RoleBadge from '#lib/components/spaces/role-badge.svelte';
+  import SpaceMemberPermissionSettings from '#lib/gallery/components/spaces/space-member-permission-settings.svelte';
+  import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
+  import { formatTimeAgo } from '#lib/gallery/utils/time-ago.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { showAddSpaceMembersModal } from '#lib/gallery/spaces/add-space-members.ts';
-  import { formatTimeAgo } from '#lib/gallery/utils/time-ago.ts';
   import {
-    removeMember,
     SharedSpaceRole,
+    UserAvatarColor,
+    removeMember,
     updateMember,
     updateSpace,
-    UserAvatarColor,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceUpdateDto,
   } from '@immich/sdk';
-  import { Button, Field, modalManager, Select, type SelectOption } from '@immich/ui';
+  import { Button, Field, Select, modalManager, type SelectOption } from '@immich/ui';
   import { mdiAccountPlusOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();

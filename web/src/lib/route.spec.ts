@@ -1,7 +1,7 @@
 import { createFilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { OpenQueryParam } from '#lib/constants.ts';
 import { Route } from '#lib/route.ts';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

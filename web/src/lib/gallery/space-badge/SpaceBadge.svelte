@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { UserAvatarColor } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';
+  import { page } from '$app/state';
   import { spaceBadges } from './space-badges.svelte';
 
   interface Props {

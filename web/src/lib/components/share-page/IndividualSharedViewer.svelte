@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
-  import { goto } from '$app/navigation';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import RemoveFromSharedLink from '#lib/components/timeline/actions/RemoveFromSharedLinkAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import { AssetAction } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -16,12 +15,13 @@
   import { downloadArchive } from '#lib/utils/asset-utils.ts';
   import { fileUploadHandler, openFileUploadDialog } from '#lib/utils/file-uploader.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import { getAssetInfo, type SharedLinkResponseDto } from '@immich/sdk';
   import { IconButton, toastManager } from '@immich/ui';
-  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { mdiDownload, mdiFileImagePlusOutline, mdiSelectAll } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import ControlAppBar from '../shared-components/ControlAppBar.svelte';
   import GalleryViewer from '../shared-components/gallery-viewer/GalleryViewer.svelte';
 

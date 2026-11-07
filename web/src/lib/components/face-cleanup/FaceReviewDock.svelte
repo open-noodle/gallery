@@ -3,7 +3,7 @@
   import { mdiInformationOutline } from '@mdi/js';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
-  import { effectKeyFor, FACE_ACTIONS, type FaceActionId, type FaceReviewMode } from './face-actions';
+  import { FACE_ACTIONS, effectKeyFor, type FaceActionId, type FaceReviewMode } from './face-actions';
 
   // The ONE footer dock for both review modes. It used to be two near-identical copies that drifted (different
   // radii, paddings, text sizes, and an (i) button in guided only) — see design §1.3.

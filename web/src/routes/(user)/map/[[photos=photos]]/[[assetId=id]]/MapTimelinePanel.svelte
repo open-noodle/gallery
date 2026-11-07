@@ -1,7 +1,11 @@
 <script lang="ts">
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
+  import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import type { SelectionBBox } from '#lib/components/shared-components/map/types.ts';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -11,19 +15,15 @@
   import LinkLivePhotoAction from '#lib/components/timeline/actions/LinkLivePhotoAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
-  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import Portal from '#lib/elements/Portal.svelte';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getStackBulkActions } from '#lib/services/stack.service.ts';
-  import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-  import { clearTimelineTemporalFilter } from '#lib/utils/timeline-temporal-filters.ts';
   import { type OnLink, type OnUnlink } from '#lib/utils/actions.ts';
   import { buildMapTimelineOptions } from '#lib/utils/map-filter-options.ts';
+  import { clearTimelineTemporalFilter } from '#lib/utils/timeline-temporal-filters.ts';
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';

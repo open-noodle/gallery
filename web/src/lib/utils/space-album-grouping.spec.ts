@@ -1,4 +1,4 @@
-import { AlbumSortBy, albumViewSettings, SortOrder } from '#lib/stores/preferences.store.ts';
+import { AlbumSortBy, SortOrder, albumViewSettings } from '#lib/stores/preferences.store.ts';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import {
   collapseAllAlbumGroups,

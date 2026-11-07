@@ -1,9 +1,9 @@
 <script lang="ts">
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
   import { OnboardingRole } from '#lib/types.ts';
-  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { t } from 'svelte-i18n';
 
   const query = createPreloadedQuery(getServerConfigQuery);

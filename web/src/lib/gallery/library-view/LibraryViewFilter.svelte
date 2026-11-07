@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { LibraryView } from '@immich/sdk';
   import FilterSection from '#lib/components/filter-panel/filter-section.svelte';
+  import { LibraryView } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import { libraryView, type LibraryViewMode } from './library-view.svelte';
 

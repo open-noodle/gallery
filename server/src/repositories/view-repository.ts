@@ -1,5 +1,5 @@
-import { InjectKysely } from 'nestjs-kysely';
 import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility } from 'src/enum.js';
 import { folderPathMatch } from 'src/gallery/utils/folder-path.js';
@@ -8,10 +8,10 @@ import { DB } from 'src/schema/index.js';
 import { asUuid, withExif } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
-  type TimelineHiddenScope,
   hiddenFromOwnTimeline,
   ownedOrSharedWithViewer,
   timelineHiddenScopeIsEmpty,
+  type TimelineHiddenScope,
 } from 'src/utils/shared-space-album-scope.js';
 
 // #1041 §3: `ownedOrSpaceAccessible` already ORs a visible-path branch alongside the owner term

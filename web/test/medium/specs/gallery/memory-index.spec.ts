@@ -1,5 +1,5 @@
+import { factory } from '#test/common/factories.ts';
 import { expect, test } from '#test/medium/fixtures.ts';
-import { factory } from '#test/medium/mock/factories.ts';
 
 // Gallery's memories index page: lists memories by title and opens one in the memory viewer.
 test('lists memories and opens one in the viewer', async ({ page, data }) => {

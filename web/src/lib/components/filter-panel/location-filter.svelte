@@ -1,10 +1,9 @@
 <script lang="ts">
-  import type { FilterContext } from './filter-panel';
-
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
+  import type { FilterContext } from './filter-panel';
 
   interface Props {
     countries: string[];

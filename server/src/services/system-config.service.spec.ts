@@ -1,5 +1,4 @@
 import { BadRequestException } from '@nestjs/common';
-import type { DeepPartial } from 'src/types.js';
 import { AdminConfigDto, SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import {
   AudioCodec,
@@ -20,6 +19,7 @@ import {
 } from 'src/enum.js';
 import { MEMORY_TYPE_KEYS } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
+import type { DeepPartial } from 'src/types.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 

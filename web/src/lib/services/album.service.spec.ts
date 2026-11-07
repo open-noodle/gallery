@@ -3,8 +3,7 @@ import { addAssetsToAlbumWithOutcome } from '#lib/gallery/album/album-add.ts';
 import { handleLinkAlbumToSpace } from '#lib/gallery/album/link-album-to-space.ts';
 import { notifyAddToAlbum } from '#lib/gallery/album/notify-add-to-album.ts';
 import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
-import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
-import type { BulkIdResponseDto } from '@immich/sdk';
+import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto, type BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAlbumActions } from './album.service';
 
