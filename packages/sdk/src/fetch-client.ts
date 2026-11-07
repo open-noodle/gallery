@@ -2379,13 +2379,9 @@ export type AssetFaceCreateDto = {
     /** Face bounding box Y coordinate */
     y: number;
 };
-export type AssetFaceDeleteDto = {
-    /** Force delete even if person has other faces */
-    force: boolean;
-};
-export type FaceDto = {
-    /** Face ID */
-    id: string;
+export type VideoFaceMergeDto = {
+    /** Faces of one video to combine into one; faces not sampled from the video are left as they are */
+    faceIds: string[];
 };
 export type VideoFaceSightingBoxDto = {
     /** Left edge, as a fraction of the frame width */
@@ -2407,9 +2403,29 @@ export type VideoFaceSightingDto = {
     /** When the face was seen, in seconds on the player's timeline: from the trim start for a trimmed video */
     time: number;
 };
+export type VideoFaceMergeResponseDto = {
+    /** The face that was kept: the one with the most sightings */
+    faceId: string;
+    /** Its sightings, now including those of the merged faces */
+    sightings: VideoFaceSightingDto[];
+};
+export type AssetFaceDeleteDto = {
+    /** Force delete even if person has other faces */
+    force: boolean;
+};
+export type FaceDto = {
+    /** Face ID */
+    id: string;
+};
 export type VideoFaceSightingsResponseDto = {
     /** Every sighting inside the current trim, in time order; empty for a face not sampled from a video */
     sightings: VideoFaceSightingDto[];
+};
+export type VideoFaceSightingMoveResponseDto = {
+    /** The sightings the face has left; empty when its last one moved and the face was deleted */
+    sightings: VideoFaceSightingDto[];
+    /** The sightings of the face the sighting moved into */
+    targetSightings: VideoFaceSightingDto[];
 };
 export type VideoFaceSightingSplitResponseDto = {
     /** The new face the sighting moved to: unassigned, made by hand */
@@ -7848,6 +7864,21 @@ export function createFace({ assetFaceCreateDto }: {
     })));
 }
 /**
+ * Combine video faces
+ */
+export function mergeVideoFaces({ videoFaceMergeDto }: {
+    videoFaceMergeDto: VideoFaceMergeDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceMergeResponseDto;
+    }>("/faces/sightings/merge", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: videoFaceMergeDto
+    })));
+}
+/**
  * Delete a face
  */
 export function deleteFace({ id, assetFaceDeleteDto }: {
@@ -7904,6 +7935,25 @@ export function getAssetFaceSightings({ id }: {
         data: VideoFaceSightingsResponseDto;
     }>(`/faces/${encodeURIComponent(id)}/sightings`, {
         ...opts
+    }));
+}
+/**
+ * Move a face sighting into another face
+ */
+export function moveAssetFaceSighting({ id, time, toFaceId }: {
+    id: string;
+    time: number;
+    toFaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: VideoFaceSightingMoveResponseDto;
+    }>(`/faces/${encodeURIComponent(id)}/sightings/move${QS.query(QS.explode({
+        time,
+        toFaceId
+    }))}`, {
+        ...opts,
+        method: "POST"
     }));
 }
 /**

@@ -697,3 +697,53 @@ export const detectionAt = <T extends { boundingBox: BoundingBox }>(detections: 
   }
   return found;
 };
+
+const asFound = ({ t, x1, y1, x2, y2, score }: VideoFaceSighting): VideoFaceSighting => ({ t, x1, y1, x2, y2, score });
+
+/**
+ * Takes the sighting at `time` out of a face to move it into another face of the same video: as `removeSightingAt` does,
+ * but the face's last sighting may go too, which leaves no `change` (the face goes). `moved` is the sighting as found.
+ */
+export const takeSightingAt = (
+  stored: StoredSightings,
+  time: number,
+): { moved: VideoFaceSighting; change?: SightingChange } | undefined => {
+  const change = removeSightingAt(stored, time);
+  if (!change) {
+    return;
+  }
+
+  const moved = asFound(storedAt(stored, time)!);
+  return change === 'last' ? { moved } : { moved, change };
+};
+
+/**
+ * Adds sightings moved in from other faces of the same video. One the face already stored at that moment and had moved
+ * away (marked removed) comes back in place, as the best view again if it was that; one it shows already stays as is;
+ * any other is appended. The face's best view otherwise stays.
+ */
+export const addSightings = (stored: StoredSightings, added: VideoFaceSighting[]): SightingChange => {
+  const sightings = [...stored.sightings];
+  let best: VideoFaceSighting | undefined;
+  for (const sighting of added) {
+    const index = sightings.findIndex(({ t }) => Math.abs(t - sighting.t) < SIGHTING_TIME_TOLERANCE);
+    if (index === -1) {
+      sightings.push(asFound(sighting));
+      continue;
+    }
+
+    const existing = sightings[index];
+    if (!existing.removed) {
+      continue;
+    }
+
+    sightings[index] = asFound(existing);
+    if (existing.wasBest) {
+      best = sightings[index];
+    }
+  }
+  return best ? { sightings, best } : { sightings };
+};
+
+/** The sightings a face shows, removed ones left out: what merging it into another face moves. */
+export const liveSightings = (stored: StoredSightings) => stored.sightings.filter(({ removed }) => !removed);

@@ -3,10 +3,12 @@ import {
   type Detection,
   FaceTracker,
   acceptTrack,
+  addSightings,
   detectionAt,
   findAgain,
   findSightingAt,
   isSharpenTimeFor,
+  liveSightings,
   matchExistingFaces,
   mergeDetections,
   normalize,
@@ -19,6 +21,7 @@ import {
   sightingQuality,
   sightingsForPlayer,
   splitSightingAt,
+  takeSightingAt,
   trackEmbedding,
   widenSmallFace,
   withSighting,
@@ -563,6 +566,35 @@ describe('removing and restoring a sighting', () => {
   it("does not move a face's last sighting, or one that is not shown", () => {
     expect(splitSightingAt({ ...stored, sightings: [best] }, 12.5)).toBe('last');
     expect(splitSightingAt(stored, 13)).toBeUndefined();
+  });
+
+  it('takes a sighting to move into another face, the last one included', () => {
+    expect(takeSightingAt(stored, 30)).toEqual({
+      moved: late,
+      change: { sightings: [best, early, { ...late, removed: true }] },
+    });
+    expect(takeSightingAt({ ...stored, sightings: [best] }, 12.5)).toEqual({ moved: best });
+    expect(takeSightingAt(stored, 13)).toBeUndefined();
+  });
+
+  it('adds sightings moved in, appending new moments and keeping the best view', () => {
+    const moved = { t: 40, score: 0.99, ...box };
+    expect(addSightings(stored, [moved, { ...early, removed: true, wasBest: true }])).toEqual({
+      sightings: [best, early, late, moved],
+    });
+  });
+
+  it('brings back in place a moment it had moved away, as the best view again if it was that', () => {
+    const away = {
+      ...stored,
+      sightings: [{ ...best, removed: true, wasBest: true }, early, { ...late, removed: true }],
+    };
+    expect(addSightings(away, [late])).toEqual({ sightings: [{ ...best, removed: true, wasBest: true }, early, late] });
+    expect(addSightings(away, [best])).toEqual({ sightings: [best, early, { ...late, removed: true }], best });
+  });
+
+  it('lists the sightings a face shows, for merging it into another', () => {
+    expect(liveSightings({ ...stored, sightings: [best, { ...late, removed: true }] })).toEqual([best]);
   });
 
   it('finds nothing to restore at a sighting that was not removed', () => {

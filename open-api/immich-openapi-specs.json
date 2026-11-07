@@ -9226,6 +9226,62 @@
         "x-immich-state": "Stable"
       }
     },
+    "/faces/sightings/merge": {
+      "post": {
+        "description": "Combine faces of one video into the one with the most sightings, which takes every sighting of the others; the others are deleted. Faces not sampled from the video are left as they are.",
+        "operationId": "mergeVideoFaces",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoFaceMergeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoFaceMergeResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Combine video faces",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.delete",
+        "x-immich-state": "Stable"
+      }
+    },
     "/faces/{id}": {
       "delete": {
         "description": "Delete a face identified by the id. Optionally can be force deleted.",
@@ -9479,6 +9535,85 @@
           }
         ],
         "x-immich-permission": "face.read",
+        "x-immich-state": "Stable"
+      }
+    },
+    "/faces/{id}/sightings/move": {
+      "post": {
+        "description": "Move one moment of a video face into another face of the same video, such as the face of the person it shows. A moment the other face had moved away comes back in place, so moving it back undoes a move. Moving a face's last sighting deletes that face.",
+        "operationId": "moveAssetFaceSighting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "time",
+            "required": true,
+            "in": "query",
+            "description": "The sighting's time, as GET /faces/{id}/sightings returned it",
+            "schema": {
+              "minimum": 0,
+              "format": "double",
+              "type": "number"
+            }
+          },
+          {
+            "name": "toFaceId",
+            "required": true,
+            "in": "query",
+            "description": "The face of the same video the sighting moves into",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoFaceSightingMoveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Move a face sighting into another face",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "face.delete",
         "x-immich-state": "Stable"
       }
     },
@@ -50546,6 +50681,46 @@
         ],
         "type": "string"
       },
+      "VideoFaceMergeDto": {
+        "properties": {
+          "faceIds": {
+            "description": "Faces of one video to combine into one; faces not sampled from the video are left as they are",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "minItems": 2,
+            "type": "array"
+          }
+        },
+        "required": [
+          "faceIds"
+        ],
+        "type": "object"
+      },
+      "VideoFaceMergeResponseDto": {
+        "properties": {
+          "faceId": {
+            "description": "The face that was kept: the one with the most sightings",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "sightings": {
+            "description": "Its sightings, now including those of the merged faces",
+            "items": {
+              "$ref": "#/components/schemas/VideoFaceSightingDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "faceId",
+          "sightings"
+        ],
+        "type": "object"
+      },
       "VideoFaceSightingBoxDto": {
         "properties": {
           "x1": {
@@ -50612,6 +50787,29 @@
           "isBest",
           "score",
           "time"
+        ],
+        "type": "object"
+      },
+      "VideoFaceSightingMoveResponseDto": {
+        "properties": {
+          "sightings": {
+            "description": "The sightings the face has left; empty when its last one moved and the face was deleted",
+            "items": {
+              "$ref": "#/components/schemas/VideoFaceSightingDto"
+            },
+            "type": "array"
+          },
+          "targetSightings": {
+            "description": "The sightings of the face the sighting moved into",
+            "items": {
+              "$ref": "#/components/schemas/VideoFaceSightingDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sightings",
+          "targetSightings"
         ],
         "type": "object"
       },

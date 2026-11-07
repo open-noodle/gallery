@@ -382,6 +382,46 @@ describe(VideoFaceRepository.name, () => {
     });
   });
 
+  describe('moveSightings', () => {
+    it('writes both faces, repoints a person shown by a deleted face, and deletes it with its frame row', async () => {
+      const { ctx, user, asset, sut } = await setup();
+      const kept = newUuid();
+      const gone = newUuid();
+      const a = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const b = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [
+          { id: kept, assetId: asset.id, ...box },
+          { id: gone, assetId: asset.id, ...box, boundingBoxX1: 300, boundingBoxX2: 360 },
+        ],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(kept, { sightings: [a] }), frame(gone, { timeSeconds: 7.5, sightings: [b] })],
+      });
+      const { person } = await ctx.newPerson({ ownerId: user.id, faceAssetId: gone });
+
+      const repointed = await sut.moveSightings({
+        faces: [{ faceId: kept, sightings: [a, b] }],
+        faceId: kept,
+        deleteFaceIds: [gone],
+      });
+
+      expect(repointed).toEqual([{ ownerId: user.id, personGroupId: person.personGroupId }]);
+      await expect(sut.getSightings(kept)).resolves.toMatchObject({ sightings: [a, b] });
+      await expect(sut.getSightings(gone)).resolves.toBeUndefined();
+      const cover = await defaultDatabase
+        .selectFrom('person')
+        .select('faceAssetId')
+        .where('ownerId', '=', user.id)
+        .where('personGroupId', '=', person.personGroupId)
+        .executeTakeFirstOrThrow();
+      expect(cover.faceAssetId).toBe(kept);
+      const left = await defaultDatabase.selectFrom('asset_face').select('id').where('id', '=', gone).execute();
+      expect(left).toEqual([]);
+    });
+  });
+
   describe('storage migration', () => {
     it('streams, counts and re-points best frames with the person thumbnails', async () => {
       const { asset, sut } = await setup();

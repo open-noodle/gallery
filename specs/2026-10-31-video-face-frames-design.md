@@ -474,7 +474,12 @@ hold `FaceDelete`, which only the owner has. The menu has "Move to another perso
 unassigned" and "Remove the moment at 0:42" (`video_face_sighting_move_person`, `_move_new`, `_move_unassigned`,
 `video_face_sighting_remove`).
 
-A move splits the moment off into a face of its own, then gives that face to the target through the reassign the
+A move to a person who already has a face in this video (found in the asset's faces, other than the strip's own)
+joins that face (`POST /faces/{id}/sightings/move`), so the person keeps one face here instead of gaining one per
+move; moving the moment back puts it back in its old place, and so does the Undo. When the moment was its face's
+last, that face goes, and the Undo splits the moment out again and gives it back to the strip's person. If the
+server refuses the target (a face not sampled from the video), the move falls back to a face of its own. Otherwise a
+move splits the moment off into a face of its own, then gives that face to the target through the reassign the
 face editor already uses (`PUT /faces/{id}` with the person; `POST /people` first for a new person, which starts
 unnamed). "Another person" picks from the owner's people in the existing `PeoplePickerModal`, leaving out the
 strip's own person in the info panel. The tile leaves the strip, the info panel reloads the asset's faces so the
@@ -502,6 +507,14 @@ a new person is that person's only moment, and could not be moved on or deleted 
 back" (`video_face_sighting_remove_failed`, `video_face_sighting_restore_failed`) and leaves the strip as it was.
 Added after the first real-video test, for the case the open question below describes: a moment in a person's strip
 that is someone else and should belong to nobody. Neither a move nor a removal recomputes the old face's embedding.
+
+A person can still have several faces in one video: the tracker splits one at a head turn, and moves made before
+joining existed made one face per moment. The info panel's strip then offers the owner "Combine into one face"
+(`video_person_faces_combine`, a merge icon beside the close button), which folds them into the face with the most
+moments (`POST /faces/sightings/merge`), says "Faces combined" (`video_person_faces_combined`), and has no undo; the
+edit people dialog then lists one face for them. After any move, undo or combine, the strip follows the person's
+faces as the asset now has them. Added after the third test: a moment moved to B and back left A with three
+one-moment faces, three rows in the edit people dialog.
 
 A strip over several faces (the info panel's, for a person tracked more than once, or given moments one move at a
 time, each its own face) stars one moment: the best view the detector was surest of, not each face's. Found in the
@@ -593,6 +606,27 @@ brings it back; both return the face's sightings as `GET` does:
 - The old face's sightings, the new face, its `face_search` row and its frame row are written in one transaction
   (`VideoFaceRepository.splitSighting`), after both frame files are written.
 
+**`POST /faces/{id}/sightings/move?time=&toFaceId=`** moves a moment into another face of the same video and returns
+`{ sightings, targetSightings }`, the two faces' sightings after it:
+
+- `FaceDelete` on both faces (owner only). Both need a frame row, the same asset and the same frame size, or 400:
+  boxes are only comparable in one frame space. Moving to the same face is 400.
+- The source loses the moment as `DELETE` takes it out (best view promoted, `removed` kept), except that its last
+  sighting may go too (`takeSightingAt`): the face is then deleted, and `sightings` is empty.
+- The target takes it with `addSightings`: a sighting it already stored at that moment and had moved away comes
+  back in place, as the best view again when it was (`wasBest`), which is what makes moving back an undo; one it
+  already shows stays; any other is appended. Its best view otherwise stays.
+- One transaction (`VideoFaceRepository.moveSightings`) writes both faces and, when the source goes, points any
+  person whose cover was the source at the target, then deletes the source (frame row and embedding cascade). The
+  service then unlinks the deleted face's identity, as upstream's face delete does, deletes its frame file, and
+  queues person thumbnails for promoted faces and repointed people.
+
+**`POST /faces/sightings/merge`** with `{ faceIds }` (at least two) combines faces of one video and returns
+`{ faceId, sightings }`: the kept face, the one with the most live sightings, takes every live sighting of the others
+(`addSightings`, so one at a moment it already has is not doubled) and keeps its best view; the others are deleted as
+above, their people repointed to it. Faces without a frame row are skipped; fewer than two sampled faces, faces of
+different videos or frame sizes, or missing access is 400. Like any face delete, a combine has no undo.
+
 ### Seeking the player
 
 The side panel and the player have no reference to each other. A fork module,
@@ -624,7 +658,7 @@ timeline is the original's), and the playback and original URLs of a trimmed vid
 - **Mobile and stock Immich clients:** no assign UI calls these routes; nothing changes.
 - **Database:** no schema change. Phase 1's rows already carry the sightings; a removed one is a flag inside them,
   which an older Gallery build would ignore and show again.
-- **Remove, restore and move:** the routes ship with the strip. No released server has the read route, so a web build that
+- **Remove, restore, move and combine:** the routes ship with the strip. No released server has the read route, so a web build that
   shows the strip is always talking to a server that has these too.
 
 ### Layering
@@ -674,8 +708,18 @@ browser cache.
   to a new person and to unassigned, a closed picker moving nothing, the Undo deleting the new face and restoring the
   moment, a failed reassign leaving the moment unassigned with its Undo, a failed split moving nothing; a face's only
   moment getting the whole-face menu (with the person known), the face moved to a picked or new person and given back
-  on undo, the face deleted only once confirmed; one star across several faces. `DetailPanelPeople.gallery.spec.ts`
-  also: a person's moments closing once their only face has gone to someone else.
+  on undo, the face deleted only once confirmed; one star across several faces; a move to a person with a face here
+  joining it (moved back on undo), a face's only moment joining it (split back out to the strip's person on undo),
+  falling back to a face of its own when the server refuses. `DetailPanelPeople.gallery.spec.ts` also: a person's
+  moments closing once their only face has gone to someone else; "Combine into one face" for the owner only, with
+  more than one face, the strip following the faces left.
+- Unit (`video-faces.spec.ts`) also: `takeSightingAt` including the last sighting, `addSightings` appending, restoring
+  a moved-away moment in place (as best when it was), `liveSightings`. `video-face.service.spec.ts`: a move between
+  faces keeping both best views; the source deleted with its last sighting, identity unlinked, frame deleted, person
+  repointed and thumbnail queued; a move back restoring in place as the best view; refusals for another video,
+  another frame size, the same face, a missing face and missing access; combining into the face with the most
+  sightings, and its refusals. Controller: both routes under `FaceDelete`, the query and body validated. Medium:
+  `moveSightings` writing faces, repointing a person's cover and deleting the emptied face (not run locally).
 - Unit (`video-faces.spec.ts`): removing marks the sighting and keeps the best; removing the best promotes the
   highest score left, preferring the trim, and marks `wasBest`; the last one is kept; nothing found at a time with no
   shown sighting; restore brings a sighting back as it was, and a `wasBest` one as the best; removed sightings are
@@ -704,9 +748,9 @@ browser cache.
   joining two tracks that never share a frame. The name then goes on the face cut from the best view, and the other
   person has no face in that video, so a search for them misses it. If a merged sighting is among the best three, it
   also pulls the averaged embedding toward the wrong person. A rescan builds the same track again. The Phase 2 strip
-  shows such a mix, and the owner can move a wrong moment to its own face and give it to the right person, or remove
-  it. That is one moment at a time, the old face's embedding stays averaged, and a rescan merges the moment back into
-  the old track (the moved face stays, so it then shows twice). The fuller fix would split a sighting together with
+  shows such a mix, and the owner can move a wrong moment to the right person (into their face here when they have
+  one), or remove it. That is one moment at a time, the old face's embedding stays averaged, and a rescan merges the
+  moment back into the old track (a moved face of its own stays, so the moment then shows twice). The fuller fix would split a sighting together with
   the sightings nearer to it than to the best view, and store the split as a constraint the tracker honours on
   rescan, so the next "Refresh faces" does not merge them again. The threshold is the one recognition already uses to
   tie two photos to one person, so merges are expected to be rarer than head-turn splits. This waits until moving one

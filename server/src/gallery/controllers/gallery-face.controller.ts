@@ -1,10 +1,14 @@
-import { Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { NextFunction, Response } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import {
+  VideoFaceMergeDto,
+  VideoFaceMergeResponseDto,
+  VideoFaceSightingMoveDto,
+  VideoFaceSightingMoveResponseDto,
   VideoFaceSightingSplitResponseDto,
   VideoFaceSightingThumbnailDto,
   VideoFaceSightingTimeDto,
@@ -105,6 +109,36 @@ export class GalleryFaceController {
     @Query() { time }: VideoFaceSightingTimeDto,
   ): Promise<VideoFaceSightingSplitResponseDto> {
     return this.service.splitSighting(auth, id, time);
+  }
+
+  @Post(':id/sightings/move')
+  @HttpCode(HttpStatus.OK)
+  @Authenticated({ permission: Permission.FaceDelete })
+  @Endpoint({
+    summary: 'Move a face sighting into another face',
+    description:
+      "Move one moment of a video face into another face of the same video, such as the face of the person it shows. A moment the other face had moved away comes back in place, so moving it back undoes a move. Moving a face's last sighting deletes that face.",
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  moveAssetFaceSighting(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() dto: VideoFaceSightingMoveDto,
+  ): Promise<VideoFaceSightingMoveResponseDto> {
+    return this.service.moveSighting(auth, id, dto);
+  }
+
+  @Post('sightings/merge')
+  @HttpCode(HttpStatus.OK)
+  @Authenticated({ permission: Permission.FaceDelete })
+  @Endpoint({
+    summary: 'Combine video faces',
+    description:
+      'Combine faces of one video into the one with the most sightings, which takes every sighting of the others; the others are deleted. Faces not sampled from the video are left as they are.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  mergeVideoFaces(@Auth() auth: AuthDto, @Body() { faceIds }: VideoFaceMergeDto): Promise<VideoFaceMergeResponseDto> {
+    return this.service.mergeFaces(auth, faceIds);
   }
 
   @Get(':id/sightings/thumbnail')

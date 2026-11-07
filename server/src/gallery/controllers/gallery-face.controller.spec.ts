@@ -134,4 +134,76 @@ describe(GalleryFaceController.name, () => {
       expect(service[call]).not.toHaveBeenCalled();
     });
   });
+
+  describe('POST /faces/:id/sightings/move', () => {
+    const url = '/faces/6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60/sightings/move';
+    const toFaceId = '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f61';
+
+    it('should be an authenticated route with the face delete permission', async () => {
+      await request(ctx.getHttpServer()).post(`${url}?time=1.5&toFaceId=${toFaceId}`);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: expect.objectContaining({ permission: Permission.FaceDelete }) }),
+      );
+    });
+
+    it('should pass the face, the time and the target face to the service', async () => {
+      service.moveSighting.mockResolvedValue({ sightings: [], targetSightings: [] });
+      const { status } = await request(ctx.getHttpServer())
+        .post(`${url}?time=1.5&toFaceId=${toFaceId}`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(service.moveSighting).toHaveBeenCalledWith(undefined, '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60', {
+        time: 1.5,
+        toFaceId,
+      });
+    });
+
+    it.each(['?time=1.5', `?toFaceId=${toFaceId}`, '?time=1.5&toFaceId=nope'])(
+      'should reject a missing or invalid query (%s)',
+      async (query) => {
+        const { status } = await request(ctx.getHttpServer())
+          .post(`${url}${query}`)
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(400);
+        expect(service.moveSighting).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('POST /faces/sightings/merge', () => {
+    const faceIds = ['6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f60', '6d3c2a1e-0f4b-4c8d-9e7a-1b2c3d4e5f61'];
+
+    it('should be an authenticated route with the face delete permission', async () => {
+      await request(ctx.getHttpServer()).post('/faces/sightings/merge').send({ faceIds });
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: expect.objectContaining({ permission: Permission.FaceDelete }) }),
+      );
+    });
+
+    it('should pass the faces to the service', async () => {
+      service.mergeFaces.mockResolvedValue({ faceId: faceIds[0], sightings: [] });
+      const { status } = await request(ctx.getHttpServer())
+        .post('/faces/sightings/merge')
+        .send({ faceIds })
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(service.mergeFaces).toHaveBeenCalledWith(undefined, faceIds);
+    });
+
+    it.each([{}, { faceIds: [faceIds[0]] }, { faceIds: ['nope', 'nada'] }])(
+      'should reject fewer than two faces or invalid ids (%j)',
+      async (body) => {
+        const { status } = await request(ctx.getHttpServer())
+          .post('/faces/sightings/merge')
+          .send(body)
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(400);
+        expect(service.mergeFaces).not.toHaveBeenCalled();
+      },
+    );
+  });
 });

@@ -45,6 +45,42 @@ const VideoFaceSightingSplitResponseSchema = z
   })
   .meta({ id: 'VideoFaceSightingSplitResponseDto' });
 
+const VideoFaceSightingMoveSchema = z
+  .object({
+    time: z.coerce
+      .number()
+      .min(0)
+      .meta({ format: 'double' })
+      .describe("The sighting's time, as GET /faces/{id}/sightings returned it"),
+    toFaceId: z.uuidv4().describe('The face of the same video the sighting moves into'),
+  })
+  .meta({ id: 'VideoFaceSightingMoveDto' });
+
+const VideoFaceSightingMoveResponseSchema = z
+  .object({
+    sightings: z
+      .array(VideoFaceSightingSchema)
+      .describe('The sightings the face has left; empty when its last one moved and the face was deleted'),
+    targetSightings: z.array(VideoFaceSightingSchema).describe('The sightings of the face the sighting moved into'),
+  })
+  .meta({ id: 'VideoFaceSightingMoveResponseDto' });
+
+const VideoFaceMergeSchema = z
+  .object({
+    faceIds: z
+      .array(z.uuidv4())
+      .min(2)
+      .describe('Faces of one video to combine into one; faces not sampled from the video are left as they are'),
+  })
+  .meta({ id: 'VideoFaceMergeDto' });
+
+const VideoFaceMergeResponseSchema = z
+  .object({
+    faceId: z.uuidv4().describe('The face that was kept: the one with the most sightings'),
+    sightings: z.array(VideoFaceSightingSchema).describe('Its sightings, now including those of the merged faces'),
+  })
+  .meta({ id: 'VideoFaceMergeResponseDto' });
+
 const VideoFaceSightingThumbnailSchema = z
   .object({
     time: z.coerce
@@ -68,4 +104,8 @@ const VideoFaceSightingTimeSchema = z
 export class VideoFaceSightingsResponseDto extends createZodDto(VideoFaceSightingsResponseSchema) {}
 export class VideoFaceSightingTimeDto extends createZodDto(VideoFaceSightingTimeSchema) {}
 export class VideoFaceSightingSplitResponseDto extends createZodDto(VideoFaceSightingSplitResponseSchema) {}
+export class VideoFaceSightingMoveDto extends createZodDto(VideoFaceSightingMoveSchema) {}
+export class VideoFaceSightingMoveResponseDto extends createZodDto(VideoFaceSightingMoveResponseSchema) {}
+export class VideoFaceMergeDto extends createZodDto(VideoFaceMergeSchema) {}
+export class VideoFaceMergeResponseDto extends createZodDto(VideoFaceMergeResponseSchema) {}
 export class VideoFaceSightingThumbnailDto extends createZodDto(VideoFaceSightingThumbnailSchema) {}

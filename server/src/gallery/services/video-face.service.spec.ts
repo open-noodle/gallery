@@ -29,6 +29,17 @@ const storedWith = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
   trimEnd: null,
 });
 
+// Two faces of one video, for moving sightings between them.
+const faceA = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
+  ...storedWith(sightings, timeSeconds),
+  framePath: 'thumbs/owner/fa/ce/face-a.jpeg',
+});
+
+const faceB = (sightings: VideoFaceSighting[], timeSeconds = 9) => ({
+  ...storedWith(sightings, timeSeconds),
+  framePath: 'thumbs/owner/fa/ce/face-b.jpeg',
+});
+
 describe(VideoFaceService.name, () => {
   let sut: VideoFaceService;
   let mocks: ServiceMocks;
@@ -531,6 +542,160 @@ describe(VideoFaceService.name, () => {
 
       await expect(sut.splitSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.videoFace.getSightings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('moveSighting and mergeFaces', () => {
+    const auth = AuthFactory.create();
+    const a1 = { t: 4, score: 0.9, x1: 100, y1: 100, x2: 200, y2: 200 };
+    const a2 = { t: 6, score: 0.5, x1: 300, y1: 100, x2: 400, y2: 200 };
+    const b1 = { t: 9, score: 0.8, x1: 500, y1: 100, x2: 600, y2: 200 };
+    let put: ReturnType<typeof vi.fn>;
+    let remove: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mocks.access.person.checkFaceOwnerAccess.mockImplementation((_userId, ids) => Promise.resolve(new Set(ids)));
+      mocks.videoFace.getPeopleRepresentedBy.mockResolvedValue([]);
+      mocks.videoFace.moveSightings.mockResolvedValue([]);
+      mocks.media.probe.mockResolvedValue({ videoStreams: [{ index: 0 }] } as any);
+      vi.spyOn((sut as any).backendMedia, 'getProbeInput').mockResolvedValue('/data/upload/owner/video.mp4');
+      put = vi.fn().mockResolvedValue(undefined);
+      remove = vi.fn().mockResolvedValue(undefined);
+      vi.spyOn((sut as any).backendMedia, 'backendFor').mockResolvedValue({ put, delete: remove });
+      (sut as any).frames = {
+        extractFrame: vi.fn(async (_input: string, output: string, t: number) => {
+          await writeFile(output, Buffer.from(`frame at ${t}`));
+        }),
+      };
+    });
+
+    const storedBy = (faces: Record<string, ReturnType<typeof faceA> | undefined>) =>
+      mocks.videoFace.getSightings.mockImplementation((id: string) => Promise.resolve(faces[id]));
+
+    it('moves a sighting into another face of the video, keeping both best views', async () => {
+      storedBy({ 'face-a': faceA([a1, a2]), 'face-b': faceB([b1]) });
+
+      const response = await sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' });
+
+      expect(response.sightings.map(({ time }) => time)).toEqual([4]);
+      expect(response.targetSightings.map(({ time, isBest }) => [time, isBest])).toEqual([
+        [6, false],
+        [9, true],
+      ]);
+      expect(mocks.videoFace.moveSightings).toHaveBeenCalledWith({
+        faces: [
+          { faceId: 'face-b', sightings: [b1, a2], best: undefined },
+          { faceId: 'face-a', sightings: [a1, { ...a2, removed: true }], best: undefined },
+        ],
+        faceId: 'face-b',
+        deleteFaceIds: [],
+      });
+      expect(put).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+    });
+
+    it('deletes the source face when its last sighting moves, and repoints the person it showed', async () => {
+      storedBy({ 'face-a': faceA([a1]), 'face-b': faceB([b1]) });
+      mocks.videoFace.moveSightings.mockResolvedValue([{ ownerId: 'owner-1', personGroupId: 'group-a' }]);
+
+      const response = await sut.moveSighting(auth, 'face-a', { time: 4, toFaceId: 'face-b' });
+
+      expect(response.sightings).toEqual([]);
+      expect(mocks.videoFace.moveSightings).toHaveBeenCalledWith({
+        faces: [{ faceId: 'face-b', sightings: [b1, a1], best: undefined }],
+        faceId: 'face-b',
+        deleteFaceIds: ['face-a'],
+      });
+      expect(mocks.faceIdentity.unlinkFaces).toHaveBeenCalledWith(['face-a']);
+      expect(remove).toHaveBeenCalledWith('thumbs/owner/fa/ce/face-a.jpeg');
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: 'PersonGenerateThumbnail', data: { ownerId: 'owner-1', personGroupId: 'group-a' } },
+      ]);
+    });
+
+    it('brings a moved moment back in place when it moves back, as the best view if it was that', async () => {
+      storedBy({
+        'face-a': faceA([{ ...a1, removed: true, wasBest: true }, a2], 6),
+        'face-b': faceB([b1, a1]),
+      });
+
+      const response = await sut.moveSighting(auth, 'face-b', { time: 4, toFaceId: 'face-a' });
+
+      expect(response.targetSightings.find(({ isBest }) => isBest)?.time).toBe(4);
+      expect(put).toHaveBeenCalledWith('thumbs/owner/fa/ce/face-a.jpeg', Buffer.from('frame at 4'), {
+        contentType: 'image/jpeg',
+      });
+      expect(mocks.videoFace.moveSightings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          faces: [
+            {
+              faceId: 'face-a',
+              sightings: [a1, a2],
+              best: {
+                timeSeconds: 4,
+                box: { boundingBoxX1: 100, boundingBoxY1: 100, boundingBoxX2: 200, boundingBoxY2: 200 },
+              },
+            },
+            { faceId: 'face-b', sightings: [b1, { ...a1, removed: true }], best: undefined },
+          ],
+        }),
+      );
+    });
+
+    it('moves only between faces of the same video at the same frame size, with access to both', async () => {
+      storedBy({ 'face-a': faceA([a1, a2]), 'face-b': { ...faceB([b1]), assetId: 'asset-2' } });
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      storedBy({ 'face-a': faceA([a1, a2]), 'face-b': { ...faceB([b1]), imageWidth: 640 } });
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-a' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      storedBy({ 'face-a': faceA([a1, a2]), 'face-b': undefined });
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-a']));
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.videoFace.moveSightings).not.toHaveBeenCalled();
+    });
+
+    it('combines faces into the one with the most sightings, deleting the others', async () => {
+      storedBy({ 'face-a': faceA([a1]), 'face-b': faceB([b1, { ...a2, t: 11 }]), 'face-c': undefined });
+
+      const response = await sut.mergeFaces(auth, ['face-a', 'face-b', 'face-c']);
+
+      expect(response.faceId).toBe('face-b');
+      expect(response.sightings.map(({ time }) => time)).toEqual([4, 9, 11]);
+      expect(mocks.videoFace.moveSightings).toHaveBeenCalledWith({
+        faces: [{ faceId: 'face-b', sightings: [b1, { ...a2, t: 11 }, a1], best: undefined }],
+        faceId: 'face-b',
+        deleteFaceIds: ['face-a'],
+      });
+      expect(mocks.faceIdentity.unlinkFaces).toHaveBeenCalledWith(['face-a']);
+      expect(remove).toHaveBeenCalledWith('thumbs/owner/fa/ce/face-a.jpeg');
+    });
+
+    it('needs two sampled faces of one video to combine, with access to all of them', async () => {
+      storedBy({ 'face-a': faceA([a1]), 'face-b': undefined });
+      await expect(sut.mergeFaces(auth, ['face-a', 'face-b'])).rejects.toBeInstanceOf(BadRequestException);
+      await expect(sut.mergeFaces(auth, ['face-a', 'face-a'])).rejects.toBeInstanceOf(BadRequestException);
+
+      storedBy({ 'face-a': faceA([a1]), 'face-b': { ...faceB([b1]), assetId: 'asset-2' } });
+      await expect(sut.mergeFaces(auth, ['face-a', 'face-b'])).rejects.toBeInstanceOf(BadRequestException);
+
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-a']));
+      await expect(sut.mergeFaces(auth, ['face-a', 'face-b'])).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.videoFace.moveSightings).not.toHaveBeenCalled();
     });
   });
 });

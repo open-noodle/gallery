@@ -217,6 +217,40 @@ export class VideoFaceRepository {
     });
   }
 
+  /**
+   * Moves sightings between faces of one video, in one transaction: writes each face's sightings (and best view when
+   * that moved), points a person whose representative face is going at `faceId` instead, and deletes the faces left
+   * with nothing (`deleteFaceIds`; their frame rows and embeddings go with them). Returns the repointed people, whose
+   * thumbnails are now cut from another face.
+   */
+  async moveSightings({
+    faces,
+    faceId,
+    deleteFaceIds,
+  }: {
+    faces: { faceId: string; sightings: VideoFaceSighting[]; best?: SightingBest }[];
+    faceId: string;
+    deleteFaceIds: string[];
+  }) {
+    return this.db.transaction().execute(async (trx) => {
+      for (const face of faces) {
+        await writeSightings(trx, face.faceId, face.sightings, face.best);
+      }
+      if (deleteFaceIds.length === 0) {
+        return [];
+      }
+
+      const repointed = await trx
+        .updateTable('person')
+        .set({ faceAssetId: asUuid(faceId) })
+        .where('person.faceAssetId', 'in', deleteFaceIds)
+        .returning(['person.ownerId', 'person.personGroupId'])
+        .execute();
+      await trx.deleteFrom('asset_face').where('asset_face.id', 'in', deleteFaceIds).execute();
+      return repointed;
+    });
+  }
+
   /** The best frame of a person's representative face, for the person thumbnail. */
   @GenerateSql({ params: [{ ownerId: DummyValue.UUID, personGroupId: DummyValue.UUID }] })
   async getRepresentativeFramePath({ ownerId, personGroupId }: { ownerId: string; personGroupId: string }) {

@@ -6,16 +6,20 @@
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import PeoplePickerModal from '$lib/modals/PeoplePickerModal.svelte';
+  import { faceManager } from '$lib/stores/face.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
     createPerson,
     deleteFace,
     getAssetFaceSightings,
+    isHttpError,
+    moveAssetFaceSighting,
     reassignFacesById,
     removeAssetFaceSighting,
     restoreAssetFaceSighting,
     splitAssetFaceSighting,
     type VideoFaceSightingDto,
+    type VideoFaceSightingMoveResponseDto,
   } from '@immich/sdk';
   import { Icon, modalManager, toastManager } from '@immich/ui';
   import {
@@ -38,7 +42,8 @@
    * before. With `canEdit` (the asset's owner), each moment of a face that has more than one gets a menu that moves it
    * to another person, a new person or unassigned (a face of its own), or takes it out of the face, each with a few
    * seconds to undo it; taking out the best view makes the next best one it. A face's only moment is the whole face:
-   * given `personId`, its menu moves the face to another or a new person (undone by giving it back) or deletes it.
+   * given `personId`, its menu moves the face to another or a new person (undone by giving it back) or deletes it. A
+   * move to a person who already has a face in this video joins that face.
    */
   interface Props {
     faceIds: string[];
@@ -258,6 +263,62 @@
     toastManager.primary($t('video_face_sighting_face_deleted'));
   };
 
+  /**
+   * Moves the moment into a face the person already has in this video, so they keep one face here instead of gaining
+   * one per move. When it was the source face's last moment, that face goes, and the undo splits the moment out again
+   * and gives it back to the strip's person. Undefined when the server refuses the target (a face not sampled from
+   * the video), for the caller to fall back to a face of the moment's own.
+   */
+  const joinFace = async (
+    { faceId, time, key }: Sighting,
+    toFaceId: string,
+    target: { name: string },
+  ): Promise<boolean | undefined> => {
+    let response: VideoFaceSightingMoveResponseDto;
+    try {
+      response = await moveAssetFaceSighting({ id: faceId, time, toFaceId });
+    } catch (error) {
+      if (isHttpError(error) && error.status === 400) {
+        return;
+      }
+      handleError(error, $t('video_face_sighting_move_failed'));
+      return false;
+    }
+    takeOut(key);
+    replaceFace(faceId, response.sightings);
+    replaceFace(toFaceId, response.targetSightings);
+    onFacesChanged?.();
+
+    const sourceGone = response.sightings.length === 0;
+    const owner = personId;
+    showUndo(
+      target.name
+        ? $t('video_face_sighting_moved_person', { values: { name: target.name } })
+        : $t('video_face_sighting_moved'),
+      async () => {
+        try {
+          if (sourceGone) {
+            const split = await splitAssetFaceSighting({ id: toFaceId, time });
+            if (owner) {
+              await reassignFacesById({ id: owner, faceDto: { id: split.faceId } });
+            }
+          } else {
+            const back = await moveAssetFaceSighting({ id: toFaceId, time, toFaceId: faceId });
+            replaceFace(faceId, back.targetSightings);
+          }
+        } catch (error) {
+          handleError(error, $t('video_face_sighting_restore_failed'));
+        }
+        onFacesChanged?.();
+      },
+    );
+    return true;
+  };
+
+  /** A face the person already has in this video, other than the ones this strip shows. */
+  const faceOf = (person: string) =>
+    faceManager.facesByPersonId.get(person)?.find(({ id }) => !faceIds.includes(id))?.id;
+
   const moveToPerson = async (sighting: Sighting, wholeFace: boolean) => {
     const people = await modalManager.show(PeoplePickerModal, { excludedIds: personId ? [personId] : [] });
     const person = people?.[0];
@@ -265,6 +326,10 @@
       return;
     }
     const target = { kind: 'person', id: person.id, name: person.name } as const;
+    const existing = faceOf(person.id);
+    if (existing && (await joinFace(sighting, existing, target)) !== undefined) {
+      return;
+    }
     await (wholeFace ? moveFace(sighting, target) : move(sighting, target));
   };
 
