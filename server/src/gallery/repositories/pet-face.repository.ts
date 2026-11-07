@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { type ExpressionBuilder, type Insertable, type Kysely, type Transaction, sql } from 'kysely';
+import { sql, type ExpressionBuilder, type Insertable, type Kysely, type Transaction } from 'kysely';
 import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import z from 'zod';
-import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, VectorIndex } from 'src/enum.js';
 import { personIdentityId, personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
@@ -11,6 +10,7 @@ import { probes } from 'src/repositories/database.repository.js';
 import { SearchEmbeddingOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
 
 // Pet equivalent of FaceEmbeddingSearch, scoped to pet_search instead of face_search. Deliberately

@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { NextFunction, Response } from 'express';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   FaceRepairClusterFacesRequestDto,
   FaceRepairClusterFacesResponseDto,

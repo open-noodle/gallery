@@ -4,8 +4,8 @@
   import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiCheckCircle, mdiImageMultipleOutline } from '@mdi/js';
-  import type { Action } from 'svelte/action';
   import { t } from 'svelte-i18n';
+  import type { Action } from 'svelte/action';
 
   /**
   "Add to space" — the pool of an expanded space, offered as a child row alongside that

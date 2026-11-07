@@ -1,4 +1,4 @@
-import { type ExpressionBuilder, sql } from 'kysely';
+import { sql, type ExpressionBuilder } from 'kysely';
 import type { DB } from 'src/schema/index.js';
 import { albumMembership } from 'src/utils/shared-space-album-scope.js';
 

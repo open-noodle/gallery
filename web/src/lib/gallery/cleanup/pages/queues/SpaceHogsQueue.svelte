@@ -1,19 +1,19 @@
 <script lang="ts">
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
-  import SpaceHogList from '#lib/gallery/cleanup/SpaceHogList.svelte';
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
-  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
-  import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import SpaceHogList from '#lib/gallery/cleanup/SpaceHogList.svelte';
   import { keep, trashWithUndo } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
+  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
   import {
     CLEANUP_SDK_QUEUES,
     CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
     CLEANUP_SPACE_HOG_MIN_SIZES,
   } from '#lib/gallery/cleanup/cleanup.ts';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import {

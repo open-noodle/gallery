@@ -1,7 +1,4 @@
 <script lang="ts">
-  import { browser } from '$app/env';
-  import { afterNavigate } from '$app/navigation';
-  import { page } from '$app/state';
   import { ANDROID_INSTALL_URL, IOS_APP_STORE_URL } from '#lib/constants.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { isAssetViewerRoute } from '#lib/utils/navigation.ts';
@@ -9,6 +6,9 @@
   import { Button, IconButton } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { browser } from '$app/env';
+  import { afterNavigate } from '$app/navigation';
+  import { page } from '$app/state';
 
   const DISMISSAL_KEY = 'gallery.openInApp.dismissedUntil';
   const DISMISSAL_DAYS = 30;

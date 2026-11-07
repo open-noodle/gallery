@@ -1,8 +1,5 @@
 <script lang="ts">
-  import { Button, Icon, Modal, ModalBody, ModalFooter } from '@immich/ui';
-  import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
-  import { DateTime } from 'luxon';
-  import { locale, t } from 'svelte-i18n';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import { dateFormats } from '#lib/constants.ts';
   import { getContentMetrics, type ContentMetrics } from '#lib/utils/container-utils.ts';
   import {
@@ -11,7 +8,10 @@
     getBoundingBox,
     isUsableFaceBox,
   } from '#lib/utils/people-utils.ts';
-  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
+  import { Button, Icon, Modal, ModalBody, ModalFooter } from '@immich/ui';
+  import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
+  import { DateTime } from 'luxon';
+  import { locale, t } from 'svelte-i18n';
 
   // #1061: a 250px face crop cannot separate two similar-looking children. This shows the SOURCE PHOTO with
   // the detection boxed, through the admin-gated preview route — never /photos/{assetId}, which enforces

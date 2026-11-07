@@ -1,7 +1,7 @@
 import { IncomingHttpHeaders } from 'node:http';
 import { SemVer, coerce, lt } from 'semver';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { immichVersion, serverVersion } from 'src/constants.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { getAppVersionFromUA } from 'src/utils/request.js';
 
 /** Sent by the Gallery web, mobile and CLI clients on every request; the value is the client version. */

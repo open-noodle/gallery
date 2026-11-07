@@ -1,6 +1,6 @@
 import { Route } from '#lib/route.ts';
+import { factory } from '#test/common/factories.ts';
 import { expect, test } from '#test/medium/fixtures.ts';
-import { factory } from '#test/medium/mock/factories.ts';
 import { SourceType, type AssetFaceResponseDto } from '@immich/sdk';
 import type { Page } from '@playwright/test';
 

@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
-  import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
@@ -14,6 +13,7 @@
   import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
   import { mdiArrowLeft } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

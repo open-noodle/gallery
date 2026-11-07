@@ -10,7 +10,7 @@ import {
 import { executeMutation } from '#lib/queries/client.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
-import { addAssetsToAlbum, BulkIdErrorReason } from '@immich/sdk';
+import { BulkIdErrorReason, addAssetsToAlbum } from '@immich/sdk';
 
 /**
 Single-album add that reports WHICH assets the server accepted.

@@ -1,18 +1,21 @@
 <script lang="ts">
-  import { goto, onNavigate } from '$app/navigation';
   import { scrollMemoryClearer } from '#lib/actions/scroll-memory.svelte.ts';
-  import ArchiveAction from '#lib/gallery/actions/ArchiveAction.svelte';
+  import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
+  import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import AlbumDescription from '#lib/components/album-page/AlbumDescription.svelte';
   import AlbumMap from '#lib/components/album-page/AlbumMap.svelte';
   import AlbumSharedSpaceLinks from '#lib/components/album-page/AlbumSharedSpaceLinks.svelte';
   import AlbumSummary from '#lib/components/album-page/AlbumSummary.svelte';
+  import AlbumTitle from '#lib/components/album-page/AlbumTitle.svelte';
   import ActivityStatus from '#lib/components/asset-viewer/ActivityStatus.svelte';
   import ActivityViewer from '#lib/components/asset-viewer/ActivityViewer.svelte';
-  import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
-  import OnEvents from '#lib/components/OnEvents.svelte';
-  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -22,19 +25,29 @@
   import RotateAction from '#lib/components/timeline/actions/RotateAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
   import { AlbumPageViewMode } from '#lib/constants.ts';
-  import { createAlbumPickerFilters, createAlbumTimeline } from '#lib/gallery/filtered-timeline/album-timeline.ts';
-  import FilteredTimeline from '#lib/gallery/filtered-timeline/FilteredTimeline.svelte';
   import LinkAlbumToSpaceMenuOption from '#lib/gallery/LinkAlbumToSpaceMenuOption.svelte';
+  import ArchiveAction from '#lib/gallery/actions/ArchiveAction.svelte';
+  import FilteredTimeline from '#lib/gallery/filtered-timeline/FilteredTimeline.svelte';
+  import { createAlbumPickerFilters, createAlbumTimeline } from '#lib/gallery/filtered-timeline/album-timeline.ts';
+  import AlbumStackBulkActions from '#lib/gallery/stack/AlbumStackBulkActions.svelte';
+  import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
+  import AlbumStackMenuOptions from '#lib/gallery/stack/AlbumStackMenuOptions.svelte';
   import { activityManager } from '#lib/managers/activity-manager.svelte.ts';
-  import { assetMultiSelectManager, AssetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { AssetMultiSelectManager, assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { registerAlbumContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+  import {
+    deleteAlbumMutation,
+    getAlbumInfoQuery,
+    invalidateAlbum,
+    updateAlbumInfoMutation,
+  } from '#lib/queries/album.query.ts';
+  import { createPreloadedQuery, executeMutation } from '#lib/queries/client.ts';
+  import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { Route } from '#lib/route.ts';
   import { getAlbumActions, getAlbumAssetsActions, isAlbumEditor, isAlbumOwner } from '#lib/services/album.service.ts';
   import { getGlobalActions } from '#lib/services/app.service.ts';
@@ -45,9 +58,7 @@
   import { handleError } from '#lib/utils/handle-error.ts';
   import { isAlbumsRoute, navigate, type AssetGridRouteSearchParams } from '#lib/utils/navigation.ts';
   import { AlbumUserRole } from '@immich/sdk';
-
   import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton } from '@immich/ui';
-
   import {
     mdiAccountEye,
     mdiAccountEyeOutline,
@@ -63,21 +74,8 @@
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
+  import { goto, onNavigate } from '$app/navigation';
   import type { PageProps } from './$types';
-  import AlbumDescription from '#lib/components/album-page/AlbumDescription.svelte';
-  import AlbumTitle from '#lib/components/album-page/AlbumTitle.svelte';
-  import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
-  import {
-    deleteAlbumMutation,
-    getAlbumInfoQuery,
-    invalidateAlbum,
-    updateAlbumInfoMutation,
-  } from '#lib/queries/album.query.ts';
-  import { createPreloadedQuery, executeMutation } from '#lib/queries/client.ts';
-  import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
-  import AlbumStackBulkActions from '#lib/gallery/stack/AlbumStackBulkActions.svelte';
-  import AlbumStackEvents from '#lib/gallery/stack/AlbumStackEvents.svelte';
-  import AlbumStackMenuOptions from '#lib/gallery/stack/AlbumStackMenuOptions.svelte';
 
   let { params }: PageProps = $props();
 

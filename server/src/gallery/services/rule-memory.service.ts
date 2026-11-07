@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
-import type { SystemConfig } from 'src/dtos/config.dto.js';
-import type { MemoryRule, MemoryRuleCandidate } from 'src/gallery/services/memory-rules/memory-rule.interface.js';
-import type { ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
-import type { MemoriesState, RuleMemoryData } from 'src/types.js';
 import { UserAdmin } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { DatabaseLock, JobName, MemoryType, QueueName, SystemMetadataKey } from 'src/enum.js';
+import type { MemoryRule, MemoryRuleCandidate } from 'src/gallery/services/memory-rules/memory-rule.interface.js';
 import {
   getAdminAvailableMemoryTypeKeys,
   getMemoryTypeFloor,
@@ -16,9 +14,11 @@ import {
   isMemoryTypeVisible,
 } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
 import { createMemoryRules } from 'src/gallery/services/memory-rules/memory-type.registry.js';
-import { type ReservableMemory, planReservation } from 'src/gallery/services/memory-rules/reservation.util.js';
+import { planReservation, type ReservableMemory } from 'src/gallery/services/memory-rules/reservation.util.js';
 import { MemoryThemeSearchAdapter } from 'src/gallery/services/memory-rules/theme-search.adapter.js';
+import type { ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { MemoriesState, RuleMemoryData } from 'src/types.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
 /** Upstream's on-this-day look-ahead (`DAYS` in memory.service.ts); the nightly reconcile covers the same window. */

@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
-  import { page } from '$app/state';
-  import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
+  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import { setViewerSpace } from '#lib/gallery/viewer-space.ts';
-  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { handlePromiseError } from '#lib/utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { navigate } from '#lib/utils/navigation.ts';
-  import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
+  import { getAssetInfo, type AssetResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   interface Props {
     results: AssetResponseDto[];

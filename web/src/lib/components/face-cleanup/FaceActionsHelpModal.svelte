@@ -1,9 +1,8 @@
 <script lang="ts">
   import { Button, Icon, Modal, ModalBody, ModalFooter } from '@immich/ui';
   import { mdiInformationOutline } from '@mdi/js';
-  import { t } from 'svelte-i18n';
-  import type { Translations } from 'svelte-i18n';
-  import { bodyKeyFor, effectKeyFor, FACE_ACTIONS, type FaceActionId, type FaceReviewMode } from './face-actions';
+  import { t, type Translations } from 'svelte-i18n';
+  import { FACE_ACTIONS, bodyKeyFor, effectKeyFor, type FaceActionId, type FaceReviewMode } from './face-actions';
 
   // ONE modal for both modes (design §3.3), replacing guided's ActionsHelpModal and manual's
   // ManualActionsHelpModal. The two used to be a deliberate fork because their action SETS differ — but the

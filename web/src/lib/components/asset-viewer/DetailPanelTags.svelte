@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -11,6 +10,7 @@
   import { Badge, IconButton, Link, Text } from '@immich/ui';
   import { mdiOpenInNew } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   interface Props {
     asset: AssetResponseDto;

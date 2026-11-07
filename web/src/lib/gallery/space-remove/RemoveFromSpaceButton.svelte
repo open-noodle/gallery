@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
   import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import SpacePickerModal from '#lib/modals/SpacePickerModal.svelte';
   import { queryClient } from '#lib/queries/client.ts';
   import type { AssetSpacesItemDto } from '@immich/sdk';
   import { IconButton, modalManager } from '@immich/ui';

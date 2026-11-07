@@ -1,39 +1,37 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
-  import { browser } from '$app/env';
-  import { SvelteSet } from 'svelte/reactivity';
-  import { t } from 'svelte-i18n';
   import { mdiClose, mdiTune } from '@mdi/js';
   import { untrack, type Snippet } from 'svelte';
-  import type {
-    FilterPanelConfig,
-    FilterSection as FilterSectionType,
-    FilterState,
-    FilterSuggestionsResponse,
-    PersonOption,
-    TagOption,
-  } from './filter-panel';
+  import { t } from 'svelte-i18n';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { browser } from '$app/env';
+  import AlbumsFilter from './albums-filter.svelte';
+  import CameraFilter from './camera-filter.svelte';
+  import FavoritesFilter from './favorites-filter.svelte';
+  import { getSectionAvailability, type SectionAvailability } from './filter-availability';
   import {
     ALL_FILTER_SECTIONS,
+    PRE_LEDGER_FILTER_SECTIONS,
     buildFilterContext,
     createFilterState,
     getActiveFilterCount,
     loadFilterCollapsed,
-    PRE_LEDGER_FILTER_SECTIONS,
     saveFilterCollapsed,
+    type FilterPanelConfig,
+    type FilterSection as FilterSectionType,
+    type FilterState,
+    type FilterSuggestionsResponse,
+    type PersonOption,
+    type TagOption,
   } from './filter-panel';
-  import { getSectionAvailability, type SectionAvailability } from './filter-availability';
-  import FilterSection from './filter-section.svelte';
   import FilterSectionMenu from './filter-section-menu.svelte';
-  import TemporalPicker from './temporal-picker.svelte';
-  import PeopleFilter from './people-filter.svelte';
+  import FilterSection from './filter-section.svelte';
   import LocationFilter from './location-filter.svelte';
-  import CameraFilter from './camera-filter.svelte';
-  import TagsFilter from './tags-filter.svelte';
-  import RatingFilter from './rating-filter.svelte';
   import MediaTypeFilter from './media-type-filter.svelte';
-  import FavoritesFilter from './favorites-filter.svelte';
-  import AlbumsFilter from './albums-filter.svelte';
+  import PeopleFilter from './people-filter.svelte';
+  import RatingFilter from './rating-filter.svelte';
+  import TagsFilter from './tags-filter.svelte';
+  import TemporalPicker from './temporal-picker.svelte';
   import TextFilter from './text-filter.svelte';
 
   interface Props {

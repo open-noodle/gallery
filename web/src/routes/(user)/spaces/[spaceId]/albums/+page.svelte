@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
-  import { page } from '$app/state';
-  import { onMount } from 'svelte';
   import SpaceAlbumFolderBreadcrumb from '#lib/components/spaces/space-album-folder-breadcrumb.svelte';
   import SpaceAlbumsControls from '#lib/components/spaces/space-albums-controls.svelte';
   import SpaceAlbumsList from '#lib/components/spaces/space-albums-list.svelte';
+  import { createAlbum } from '#lib/gallery/album/album-add.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import AlbumHideFromMyTimelineConfirmModal from '#lib/modals/AlbumHideFromMyTimelineConfirmModal.svelte';
@@ -14,18 +12,17 @@
   import SpaceLinkAlbumModal from '#lib/modals/SpaceLinkAlbumModal.svelte';
   import { Route } from '#lib/route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { createAlbum } from '#lib/gallery/album/album-add.ts';
   import { canDrop, type DragPayload } from '#lib/utils/space-album-folder-dnd.ts';
   import { getFolderPath } from '#lib/utils/space-album-folders.ts';
   import {
-    getAlbumTimelineHidePreview,
+    SharedSpaceRole,
     createSharedSpaceAlbumFolder,
     deleteSharedSpaceAlbumFolder,
+    getAlbumTimelineHidePreview,
     getSharedSpaceAlbumFolders,
     getSharedSpaceAlbums,
     linkAlbum,
     setSharedSpaceAlbumFolder,
-    SharedSpaceRole,
     unlinkAlbum,
     updateAlbumTimelineForMember,
     updateSharedSpaceAlbum,
@@ -37,7 +34,10 @@
   } from '@immich/sdk';
   import { Button, Icon, modalManager } from '@immich/ui';
   import { mdiFolderPlusOutline, mdiImageMultipleOutline, mdiLinkVariantPlus, mdiPlus } from '@mdi/js';
+  import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/state';
   import type { PageData } from './$types';
 
   interface Props {

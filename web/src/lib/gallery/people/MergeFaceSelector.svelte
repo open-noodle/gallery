@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import PeopleMergeSelector from '#lib/components/people/people-merge-selector.svelte';
   import { Route } from '#lib/route.ts';
-  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import {
     createCrossOwnerMergeHandlers,
     runMergeWithCrossOwnerConfirmation,
     runScopedMergeWithCrossOwnerConfirmation,
   } from '#lib/utils/cross-owner-merge.ts';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { isSpaceScopedPerson, toScopedPersonRef } from '#lib/utils/scoped-person-ref.ts';
   import {
     getAllPeople,
@@ -19,6 +18,7 @@
   } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
 
   // The person page's merge view: upstream's MergeFaceSelector props, with the merge routed for
   // space people and the cross-owner confirmation.

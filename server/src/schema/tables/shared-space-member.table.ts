@@ -4,10 +4,10 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
+  type Generated,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { SharedSpaceRole } from 'src/enum.js';

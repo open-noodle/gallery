@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
+  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
+  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import InfiniteScrollSentinel from '#lib/components/shared-components/infinite-scroll-sentinel.svelte';
   import { Route } from '#lib/route.ts';
@@ -17,19 +22,14 @@
   import { mdiArrowLeft, mdiArrowRight, mdiClose, mdiInformationOutline } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
-  import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
-  import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
-  import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
-  import FaceTileOverlay from '#lib/components/face-cleanup/FaceTileOverlay.svelte';
-  import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
-  import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
-  import { faceCleanupBreadcrumbs, manualCrumb } from '../../breadcrumbs';
+  import { goto } from '$app/navigation';
   import PersonPicker from '../../[personId]/PersonPicker.svelte';
+  import { faceCleanupBreadcrumbs, manualCrumb } from '../../breadcrumbs';
   import type { PageData } from './$types';
   import {
-    createManualReviewModel,
     MANUAL_STATE_COLOR,
     MANUAL_STATE_ICON,
+    createManualReviewModel,
     type ManualFaceState,
   } from './manual-review.svelte';
 

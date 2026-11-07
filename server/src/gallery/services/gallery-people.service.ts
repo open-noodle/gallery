@@ -1,5 +1,4 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   DetachScopedPersonDto,
@@ -17,6 +16,7 @@ import { JobName, Permission } from 'src/enum.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { findOrFail } from 'src/utils/misc.js';

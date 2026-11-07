@@ -2,9 +2,9 @@
   import Combobox from '#lib/components/shared-components/Combobox.svelte';
   import DateInput from '#lib/elements/DateInput.svelte';
   import DurationInput from '#lib/elements/DurationInput.svelte';
+  import { getEditableAssetsWithWarning } from '#lib/gallery/utils/editable-assets.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
   import { getPreferredTimeZone, getTimezones, toIsoDate, type ZoneOption } from '#lib/modals/timezone-utils.ts';
-  import { getEditableAssetsWithWarning } from '#lib/gallery/utils/editable-assets.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { updateAssets } from '@immich/sdk';
   import { Field, FormModal, Label, Switch } from '@immich/ui';

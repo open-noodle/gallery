@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { STATE_COLOR, STATE_ICON } from '../../[personId]/review.svelte';
 import {
-  createManualReviewModel,
   MANUAL_STATE_COLOR,
   MANUAL_STATE_ICON,
+  createManualReviewModel,
   type ManualFace,
   type ManualFaceState,
   type ManualResolveRequest,

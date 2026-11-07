@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { flipMotion } from '#lib/gallery/motion/index.ts';
-  import { flip } from 'svelte/animate';
   import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { AssetTypeEnum, type CleanupAssetDto } from '@immich/sdk';
   import { Button, Card } from '@immich/ui';
   import { Duration } from 'luxon';
   import { locale, t } from 'svelte-i18n';
+  import { flip } from 'svelte/animate';
 
   type Props = {
     items: CleanupAssetDto[];

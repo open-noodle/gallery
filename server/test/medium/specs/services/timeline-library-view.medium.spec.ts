@@ -9,9 +9,9 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { DB } from 'src/schema/index.js';
 import { TimelineService } from 'src/services/timeline.service.js';
+import { newMediumService } from 'test/medium.factory.js';
 import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { SPACE_BUCKET } from 'test/medium/fixtures/two-owner-space.js';
-import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 

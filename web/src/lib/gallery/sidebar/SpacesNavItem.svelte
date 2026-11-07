@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import RecentSpaces from '#lib/components/shared-components/side-bar/recent-spaces.svelte';
   import SidebarNavItem from '#lib/components/sidebar/sidebar-nav-item.svelte';
-  import { Route } from '#lib/route.ts';
   import { recentSpacesDropdown } from '#lib/gallery/stores/preferences.store.ts';
+  import { Route } from '#lib/route.ts';
   import { mdiAccountGroup, mdiAccountGroupOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
+  import { page } from '$app/state';
 </script>
 
 <!-- Exact match, not SidebarNavItem's default `startsWith`: the rows this expands into (spaces, and

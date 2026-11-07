@@ -1,4 +1,4 @@
-import { Column, ForeignKeyColumn, type Generated, Index, Table } from '@immich/sql-tools';
+import { Column, ForeignKeyColumn, Index, Table, type Generated } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
 

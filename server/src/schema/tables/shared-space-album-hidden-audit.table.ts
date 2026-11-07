@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { Column, CreateDateColumn, Index, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Append-only delete log for shared_space_album_hidden. Unhiding an album is a ROW DELETE,

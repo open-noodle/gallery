@@ -6,10 +6,10 @@
   import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import { mdiCallMerge, mdiMerge, mdiSwapHorizontal, mdiSwapVertical } from '@mdi/js';
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
   import { flip } from 'svelte/animate';
   import { quintOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import { t } from 'svelte-i18n';
 
   interface Props {
     person: T;

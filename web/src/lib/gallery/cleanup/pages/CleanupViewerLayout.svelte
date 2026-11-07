@@ -1,6 +1,6 @@
 <script lang="ts">
-  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { handlePromiseError } from '#lib/utils.ts';

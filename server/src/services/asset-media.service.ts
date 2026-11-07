@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import sanitize from 'sanitize-filename';
-import type { UploadFile, UploadRequest } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { Asset, AuthSharedLink } from 'src/database.js';
 import {
@@ -31,6 +30,7 @@ import {
 import { videoPlaybackCacheControl } from 'src/gallery/utils/video-playback.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { UploadFile, UploadRequest } from 'src/types.js';
 import { requireUploadAccess } from 'src/utils/access.js';
 import { asUploadRequest, onBeforeLink } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';

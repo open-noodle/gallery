@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { removeFromSpace } from '#lib/gallery/space-remove/space-removal.ts';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { IconButton } from '@immich/ui';
   import { mdiImageRemoveOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import OnboardingMobileApp from '../../auth/onboarding/OnboardingMobileApp.svelte';
   import { t } from 'svelte-i18n';
+  import OnboardingMobileApp from '../../auth/onboarding/OnboardingMobileApp.svelte';
 </script>
 
 <svelte:head>

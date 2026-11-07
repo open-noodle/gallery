@@ -7,10 +7,10 @@ import {
   MANUAL_STATE_ICON,
 } from '../../../routes/admin/face-cleanup/people/[personId]/manual-review.svelte';
 import {
-  bodyKeyFor,
-  effectKeyFor,
   FACE_ACTIONS,
   GUIDED_STATE_IDS,
+  bodyKeyFor,
+  effectKeyFor,
   type FaceActionId,
   type FaceReviewMode,
 } from './face-actions';

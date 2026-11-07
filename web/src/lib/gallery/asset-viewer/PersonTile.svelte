@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import { cropFacesFromAsset } from '#lib/gallery/stores/preferences.store.ts';
   import { assetViewerManager, type Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
-  import { cropFacesFromAsset } from '#lib/gallery/stores/preferences.store.ts';
   import { getAssetUrls } from '#lib/utils.ts';
   import {
     buildContextualFilterUrl,
@@ -17,6 +16,7 @@
   import { Icon, IconButton } from '@immich/ui';
   import { mdiOpenInNew, mdiPaw } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
 

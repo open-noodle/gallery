@@ -1,7 +1,6 @@
-import type { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { isDiskPath, type DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import type { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import type { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
-import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 
 /**
 The process's storage backends, set once by StorageService.onBootstrap; StorageService's static getters delegate

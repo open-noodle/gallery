@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import PeopleVisibilityModal from '#lib/components/people/people-visibility-modal.svelte';
   import type {
     VisibilityChange,
     VisibilityPerson,
     VisibilitySaveResult,
   } from '#lib/components/people/people-types.ts';
+  import PeopleVisibilityModal from '#lib/components/people/people-visibility-modal.svelte';
   import { getPeopleThumbnailUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getAllPeople, updatePeople, type PersonResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

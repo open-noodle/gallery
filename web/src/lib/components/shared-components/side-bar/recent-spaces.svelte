@@ -1,23 +1,23 @@
 <script lang="ts">
-  import { page } from '$app/state';
-  import { Route } from '#lib/route.ts';
+  import { getAllSpacesQuery, getSpaceAlbumsQuery } from '#lib/gallery/spaces/space.query.ts';
   import {
     isSpaceAlbumsExpanded,
     recentSpaceAlbumsExpanded,
     setSpaceAlbumsExpanded,
   } from '#lib/gallery/stores/preferences.store.ts';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { Route } from '#lib/route.ts';
   import { sidebarModeStore } from '#lib/stores/sidebar-mode.svelte.ts';
   import { pinnedSpaceIds } from '#lib/stores/space-view.store.ts';
-  import { getAllSpacesQuery, getSpaceAlbumsQuery } from '#lib/gallery/spaces/space.query.ts';
-  import { queryClient } from '#lib/queries/client.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
-  import { splitPinnedSpaces } from '#lib/utils/space-utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
+  import { splitPinnedSpaces } from '#lib/utils/space-utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiChevronRight, mdiDotsHorizontal } from '@mdi/js';
   import { createQueries, createQuery } from '@tanstack/svelte-query';
-  import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { page } from '$app/state';
 
   const sortByActivity = <T extends { lastActivityAt?: string | null }>(a: T, b: T): number => {
     const aTime = a.lastActivityAt ?? '';

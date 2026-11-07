@@ -9,7 +9,7 @@
     updateConfig,
     type AdminConfigDto,
   } from '@immich/sdk';
-  import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
+  import { Button, IconButton, Switch, Text, modalManager, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';

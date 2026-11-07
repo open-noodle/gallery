@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
+import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
 

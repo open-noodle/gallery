@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type SystemConfig, defaults } from 'src/dtos/config.dto.js';
+import { defaults, type SystemConfig } from 'src/dtos/config.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import {
   ImmichStartupError,

@@ -3,9 +3,9 @@
   import AlbumListItem from '#lib/components/asset-viewer/AlbumListItem.svelte';
   import NewAlbumListItem from '#lib/components/shared-components/album-selection/NewAlbumListItem.svelte';
   import {
-    albumToCollection,
     CollectionModalRowConverter,
     CollectionModalRowType,
+    albumToCollection,
     collectionKey,
     isSelectableRowType,
     isValidNewSpaceName,
@@ -35,8 +35,8 @@
   import { Button, Icon, Modal, ModalBody, ModalFooter, Text } from '@immich/ui';
   import { mdiImageMultipleOutline, mdiInformationOutline, mdiKeyboardReturn } from '@mdi/js';
   import { onMount } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
+  import { SvelteSet } from 'svelte/reactivity';
 
   interface Props {
     assetCount: number;

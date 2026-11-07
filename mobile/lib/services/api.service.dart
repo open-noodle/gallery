@@ -45,6 +45,8 @@ class ApiService {
   late CleanupApi cleanupApi;
   late DuplicatesApi duplicatesApi;
   late TimelineApi timelineApi;
+  late PasskeysApi passkeysApi;
+  late ConfigPublicApi configPublicApi;
 
   ApiService() {
     // The below line ensures that the api clients are initialized when the service is instantiated
@@ -87,6 +89,8 @@ class ApiService {
     cleanupApi = CleanupApi(_apiClient);
     duplicatesApi = DuplicatesApi(_apiClient);
     timelineApi = TimelineApi(_apiClient);
+    passkeysApi = PasskeysApi(_apiClient);
+    configPublicApi = ConfigPublicApi(_apiClient);
   }
 
   Future<String> resolveAndSetEndpoint(String serverUrl) async {

@@ -1,8 +1,8 @@
 import {
+  NEUTRAL_IMAGE_ADJUST,
   imageAdjustFilter,
   isNeutralImageAdjust,
   isSameImageAdjust,
-  NEUTRAL_IMAGE_ADJUST,
   type ImageAdjust,
 } from '#lib/gallery/edit/image-adjust.ts';
 import type { EditActions, EditToolManager } from '#lib/managers/edit/edit-manager.svelte.ts';

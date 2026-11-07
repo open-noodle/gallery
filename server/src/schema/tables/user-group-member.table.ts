@@ -1,4 +1,4 @@
-import { CreateDateColumn, ForeignKeyColumn, type Generated, Table, Timestamp } from '@immich/sql-tools';
+import { CreateDateColumn, ForeignKeyColumn, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { UserGroupTable } from 'src/schema/tables/user-group.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 

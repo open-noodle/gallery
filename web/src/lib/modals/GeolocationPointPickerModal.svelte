@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { isDefined } from '#lib';
   import { clickOutside } from '#lib/actions/click-outside.ts';
   import { listNavigation } from '#lib/actions/list-navigation.ts';
@@ -11,6 +10,7 @@
   import type { LatLng } from '#lib/types.ts';
   import { delay } from '#lib/utils/asset-utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { searchPlaces, type AssetResponseDto, type PlacesResponseDto } from '@immich/sdk';
   import { ConfirmModal, LoadingSpinner } from '@immich/ui';
   import { mdiMapMarkerMultipleOutline } from '@mdi/js';

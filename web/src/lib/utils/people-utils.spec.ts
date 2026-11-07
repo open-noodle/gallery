@@ -4,7 +4,6 @@ import type { Size } from '#lib/utils/container-utils.ts';
 import {
   appendUniqueById,
   clampFaceBoxToImage,
-  type FaceBox,
   getAdminFacePreviewUrl,
   getBoundingBox,
   getFaceCropTransform,
@@ -13,6 +12,7 @@ import {
   sortPeople,
   sortPeopleForManagement,
   zoomImageToBase64,
+  type FaceBox,
 } from '#lib/utils/people-utils.ts';
 import { AssetTypeEnum } from '@immich/sdk';
 import { get } from 'svelte/store';

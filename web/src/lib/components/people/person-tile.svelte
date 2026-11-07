@@ -1,7 +1,7 @@
 <script lang="ts">
   import { focusOutside } from '#lib/actions/focus-outside.ts';
-  import DeferredPersonThumbnail from '#lib/components/people/deferred-person-thumbnail.svelte';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import DeferredPersonThumbnail from '#lib/components/people/deferred-person-thumbnail.svelte';
   import type { ManagedPerson } from '#lib/components/people/people-types.ts';
   import type { ThumbnailLoadQueue } from '#lib/components/people/thumbnail-load-queue.svelte.ts';
   import { getPetBadgeLabel } from '#lib/utils/pet-species.ts';

@@ -9,7 +9,7 @@ import {
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { CacheControl } from 'src/enum.js';

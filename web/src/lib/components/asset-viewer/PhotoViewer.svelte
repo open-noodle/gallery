@@ -2,10 +2,10 @@
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import { zoomImageAction } from '#lib/actions/zoom-image.ts';
   import AdaptiveImage from '#lib/components/AdaptiveImage.svelte';
-  import FaceEditorPanel from '#lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
-  import OcrBoundingBox from '#lib/components/asset-viewer/OcrBoundingBox.svelte';
   import AssetViewerEvents from '#lib/components/AssetViewerEvents.svelte';
   import Thumbhash from '#lib/components/Thumbhash.svelte';
+  import OcrBoundingBox from '#lib/components/asset-viewer/OcrBoundingBox.svelte';
+  import FaceEditorPanel from '#lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import { assetViewerManager, type Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { castManager } from '#lib/managers/cast-manager.svelte.ts';
   import { faceManager } from '#lib/stores/face.svelte.ts';

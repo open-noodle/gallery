@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import type { ValueFilter } from '#lib/gallery/asset-viewer/detail-panel-filters.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { applyContextualFilter, resolveFilterTarget } from '#lib/utils/filter-target.ts';
   import { IconButton } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import type { Snippet } from 'svelte';
-  import type { ClassValue } from 'svelte/elements';
   import { t } from 'svelte-i18n';
+  import type { ClassValue } from 'svelte/elements';
+  import { page } from '$app/state';
 
   /**
   A detail panel value that, clicked, filters the surface the viewer was opened on by it. Plain

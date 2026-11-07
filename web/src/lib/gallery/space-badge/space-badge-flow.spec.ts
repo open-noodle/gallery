@@ -2,7 +2,7 @@ import { spacesQueryKey } from '#lib/gallery/spaces/space.query.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { factory } from '#test/unit/factories.ts';
-import { getAllSpaces, getAssetSpaces, UserAvatarColor } from '@immich/sdk';
+import { UserAvatarColor, getAllSpaces, getAssetSpaces } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import SpaceBadge from './SpaceBadge.svelte';

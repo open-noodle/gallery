@@ -1,6 +1,6 @@
-import type { Bitmap } from 'src/types.js';
-import { type ImageAdjust, NEUTRAL_IMAGE_ADJUST } from 'src/gallery/dtos/image-adjust.dto.js';
+import { NEUTRAL_IMAGE_ADJUST, type ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import { applyImageAdjust } from 'src/gallery/utils/image-adjust.js';
+import type { Bitmap } from 'src/types.js';
 
 const adjust = (values: Partial<ImageAdjust>): ImageAdjust => ({ ...NEUTRAL_IMAGE_ADJUST, ...values });
 

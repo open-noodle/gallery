@@ -2,11 +2,11 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  type Generated,
   Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
+  type Generated,
 } from '@immich/sql-tools';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';

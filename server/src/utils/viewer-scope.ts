@@ -5,12 +5,12 @@
 // `shared-space-album-scope.ts`, which turns these ids into SQL.
 import { BadRequestException } from '@nestjs/common';
 import { Kysely, SqlBool, Transaction, sql } from 'kysely';
-import type { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SearchFilter } from 'src/dtos/search.dto.js';
 import { AssetVisibility } from 'src/enum.js';
-import { type LibraryViewOptions, checkLibraryView } from 'src/gallery/utils/library-view.js';
+import { checkLibraryView, type LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import type { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { anyUuid } from 'src/utils/database.js';

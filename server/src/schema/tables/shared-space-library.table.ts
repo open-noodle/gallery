@@ -3,10 +3,10 @@ import {
   AfterInsertTrigger,
   CreateDateColumn,
   ForeignKeyColumn,
-  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
+  type Generated,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { shared_space_library_after_insert_user, shared_space_library_delete_audit } from 'src/schema/functions.js';

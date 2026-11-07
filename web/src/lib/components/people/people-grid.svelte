@@ -1,6 +1,5 @@
 <script lang="ts" generics="T extends { id: string }">
-  import type { Snippet } from 'svelte';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
 
   interface Props {

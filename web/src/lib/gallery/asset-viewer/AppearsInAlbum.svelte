@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import AlbumListItemDetails from '#lib/components/asset-viewer/AlbumListItemDetails.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
@@ -9,6 +8,7 @@
   import { IconButton } from '@immich/ui';
   import { mdiFilterOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/state';
 
   type Props = { album: AlbumResponseDto };
 

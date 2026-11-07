@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { FOCUS_RING } from '#lib/gallery/cleanup/cleanup.ts';
-  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
   import CleanupExpandButton from '#lib/gallery/cleanup/CleanupExpandButton.svelte';
+  import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import {
+    FOCUS_RING,
+    burstMarkOf,
+    burstTimeRange,
+    dominantCity,
+    type BurstMark,
+  } from '#lib/gallery/cleanup/cleanup.ts';
   import { duration as motionDuration, pop } from '#lib/gallery/motion/index.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
-  import { burstMarkOf, burstTimeRange, dominantCity, type BurstMark } from '#lib/gallery/cleanup/cleanup.ts';
   import { AssetMediaSize, CleanupBurstSource, type CleanupBurstGroupDto } from '@immich/sdk';
   import { Button, Card, Icon } from '@immich/ui';
   import { mdiCheck } from '@mdi/js';

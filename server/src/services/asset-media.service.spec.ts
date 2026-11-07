@@ -5,7 +5,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Readable } from 'node:stream';
-import type { UploadBody } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AssetFile } from 'src/database.js';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto.js';
@@ -18,6 +17,7 @@ import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interfa
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
+import type { UploadBody } from 'src/types.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFileFactory } from 'test/factories/asset-file.factory.js';

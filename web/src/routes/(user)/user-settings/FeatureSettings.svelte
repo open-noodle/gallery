@@ -1,14 +1,14 @@
 <script lang="ts">
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { createPreloadedQuery } from '#lib/queries/client.ts';
+  import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
+  import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { AssetOrder, updateMyPreferences } from '@immich/sdk';
   import { Button, Field, NumberInput, Select, Switch, toastManager } from '@immich/ui';
   import { t, type Translations } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
-  import { createPreloadedQuery } from '#lib/queries/client.ts';
-  import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
-  import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
 
   const query = createPreloadedQuery(getUserConfigQuery);
   const config = $derived(query.data);

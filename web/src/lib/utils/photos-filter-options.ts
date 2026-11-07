@@ -1,5 +1,4 @@
-import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-import { applyTextFilters, buildFilterContext } from '#lib/components/filter-panel/filter-panel.ts';
+import { applyTextFilters, buildFilterContext, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { handleRemoveFilter } from '#lib/utils/filter-remove.ts';
 import { getGlobalPersonThumbnailUrl, getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
 import { AssetOrder, AssetTypeEnum, AssetVisibility, type FilterSuggestionsPersonDto } from '@immich/sdk';

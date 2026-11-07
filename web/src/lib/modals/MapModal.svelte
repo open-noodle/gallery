@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { timeToLoadTheMap } from '#lib/constants.ts';
   import { delay } from '#lib/utils/asset-utils.ts';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import type { MapMarkerResponseDto } from '@immich/sdk';
   import { LoadingSpinner, Modal, ModalBody } from '@immich/ui';
   import { t } from 'svelte-i18n';

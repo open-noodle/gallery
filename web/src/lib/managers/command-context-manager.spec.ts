@@ -1,7 +1,13 @@
 import { commandContextManager } from '#lib/managers/command-context-manager.svelte.ts';
 import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
-import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
+import {
+  AlbumUserRole,
+  AssetVisibility,
+  SharedSpaceRole,
+  type AlbumResponseDto,
+  type SharedSpaceMemberResponseDto,
+  type SharedSpaceResponseDto,
+} from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RegisterAlbumContextHarness from './__tests__/register-album-context-harness.svelte';

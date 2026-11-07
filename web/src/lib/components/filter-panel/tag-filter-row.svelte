@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Tooltip } from '@immich/ui';
   import { clampOverflow } from '#lib/actions/clamp-overflow.ts';
+  import { Tooltip } from '@immich/ui';
 
   interface Props {
     id: string;

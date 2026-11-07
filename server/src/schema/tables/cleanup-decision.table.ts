@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, type Generated, Table, Timestamp } from '@immich/sql-tools';
+import { Column, CreateDateColumn, ForeignKeyColumn, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { CleanupDecisionType, CleanupQueue } from 'src/enum.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';

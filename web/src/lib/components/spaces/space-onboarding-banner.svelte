@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { dismissedOnboardingSpaceIds } from '#lib/stores/space-view.store.ts';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
+  import { Icon } from '@immich/ui';
   import {
     mdiAccountPlusOutline,
     mdiCheck,
@@ -10,9 +12,7 @@
     mdiImageFilterHdrOutline,
     mdiImagePlusOutline,
   } from '@mdi/js';
-  import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
-  import { dismissedOnboardingSpaceIds } from '#lib/stores/space-view.store.ts';
 
   interface Props {
     space: SharedSpaceResponseDto;

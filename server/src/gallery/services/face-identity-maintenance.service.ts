@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
+import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type {
   AccessibleIdentityFaceMatch,
   SharedSpaceFaceMatchBackfillTarget,
 } from 'src/repositories/face-identity.repository.js';
-import type { JobItem, JobOf } from 'src/types.js';
-import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
-import { OnEvent, OnJob } from 'src/decorators.js';
-import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
 } from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobItem, JobOf } from 'src/types.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
 
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;

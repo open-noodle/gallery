@@ -1,4 +1,4 @@
-import { CreateDateColumn, ForeignKeyColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { CreateDateColumn, ForeignKeyColumn, Index, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { CreateIdColumn } from 'src/decorators.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';

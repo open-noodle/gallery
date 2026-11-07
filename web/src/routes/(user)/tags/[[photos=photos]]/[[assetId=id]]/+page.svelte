@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import UserPageLayout, { headerId } from '#lib/components/layouts/UserPageLayout.svelte';
@@ -10,6 +9,7 @@
   import Sidebar from '#lib/components/sidebar/Sidebar.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -21,19 +21,19 @@
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import { AssetAction } from '#lib/constants.ts';
   import SkipLink from '#lib/elements/SkipLink.svelte';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { registerSelectionContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getTagActions } from '#lib/services/tag.service.ts';
-  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
-  import { joinPaths, TreeNode } from '#lib/utils/tree-utils.ts';
+  import { TreeNode, joinPaths } from '#lib/utils/tree-utils.ts';
   import { AssetVisibility, getAllTags, type TagResponseDto } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, Text } from '@immich/ui';
   import { mdiDotsVertical, mdiTag, mdiTagMultiple } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

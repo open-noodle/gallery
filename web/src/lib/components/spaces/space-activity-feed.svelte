@@ -1,7 +1,7 @@
 <script lang="ts">
   import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
-  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { formatTimeAgo } from '#lib/gallery/utils/time-ago.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { UserAvatarColor, type SharedSpaceActivityResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiChevronDown } from '@mdi/js';

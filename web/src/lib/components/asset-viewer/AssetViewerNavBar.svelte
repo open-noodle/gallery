@@ -7,6 +7,8 @@
   import SetVisibilityAction from '#lib/components/asset-viewer/actions/SetVisibilityAction.svelte';
   import type { OnAction, PreAction } from '#lib/components/asset-viewer/actions/action.ts';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import { getSpatialSceneActions } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
+  import { viewerAlbumId } from '#lib/gallery/stack/album-stack-strip.ts';
   import { getViewerSpace } from '#lib/gallery/viewer-space.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -14,14 +16,12 @@
   import { getAlbumAssetActions } from '#lib/services/album.service.ts';
   import { getGlobalActions } from '#lib/services/app.service.ts';
   import { getAssetActions } from '#lib/services/asset.service.ts';
-  import { getSpatialSceneActions } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
   import { getPersonAssetActions } from '#lib/services/person.service.ts';
   import { getStackActions } from '#lib/services/stack.service.ts';
   import { getSharedLink, withoutIcons } from '#lib/utils.ts';
   import type { OnUndoDelete } from '#lib/utils/actions.ts';
   import { canEditAsset } from '#lib/utils/asset-editability.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
-  import { viewerAlbumId } from '#lib/gallery/stack/album-stack-strip.ts';
   import {
     AssetTypeEnum,
     AssetVisibility,

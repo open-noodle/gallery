@@ -1,9 +1,9 @@
 import {
+  SPACE_ITEM_MIME,
   canDrop,
   getActiveDragPayload,
   readDragPayload,
   setActiveDragPayload,
-  SPACE_ITEM_MIME,
   writeDragPayload,
 } from '#lib/utils/space-album-folder-dnd.ts';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';

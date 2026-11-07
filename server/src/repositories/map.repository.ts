@@ -15,10 +15,10 @@ import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { NaturalEarthCountriesTable } from 'src/schema/tables/natural-earth-countries.table.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
-  type ViewerSpaces,
   ownedOrSharedWithViewer,
   sharedWithViewer,
   spaceVisibilityGate,
+  type ViewerSpaces,
 } from 'src/utils/shared-space-album-scope.js';
 
 export interface MapMarkerSearchOptions {

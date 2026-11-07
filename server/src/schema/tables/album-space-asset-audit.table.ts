@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { Column, CreateDateColumn, Index, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Delete-audit for album_space_asset cross-owner contributions (#764). Trigger-driven

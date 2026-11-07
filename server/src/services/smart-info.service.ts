@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { JobOf, VideoInfo } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { MachineLearningConfig, SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetType, AssetVisibility, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobOf, VideoInfo } from 'src/types.js';
 import { batched, getCLIPModelInfo, isSmartSearchEnabled } from 'src/utils/misc.js';
 import { elementWiseMean } from 'src/utils/vector.js';
 

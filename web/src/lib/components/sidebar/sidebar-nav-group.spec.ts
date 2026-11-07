@@ -1,7 +1,7 @@
 import SidebarNavGroup from '#lib/components/sidebar/sidebar-nav-group.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {

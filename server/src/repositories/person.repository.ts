@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type ExpressionBuilder, type Insertable, type Kysely, type Transaction, type Updateable, sql } from 'kysely';
+import { sql, type ExpressionBuilder, type Insertable, type Kysely, type Transaction, type Updateable } from 'kysely';
 import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetFace } from 'src/database.js';
@@ -29,7 +29,7 @@ import {
   withFilePath,
 } from 'src/utils/database.js';
 import { isLeapDayObserved } from 'src/utils/date.js';
-import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
+import { paginationHelper, type PaginationOptions } from 'src/utils/pagination.js';
 import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
 
 export interface PersonSearchOptions {

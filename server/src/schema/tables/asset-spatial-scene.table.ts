@@ -1,5 +1,4 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Table } from '@immich/sql-tools';
-import type { Generated, Timestamp } from '@immich/sql-tools';
+import { Column, CreateDateColumn, ForeignKeyColumn, Table, type Generated, type Timestamp } from '@immich/sql-tools';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 
 // A photo's Spatial Scene depth map (specs/2026-10-29-spatial-scene-design.md), beside the asset rather than an

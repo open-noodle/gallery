@@ -1,14 +1,14 @@
 <script lang="ts">
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
-  import QueueSelectGrid from '#lib/gallery/cleanup/QueueSelectGrid.svelte';
   import CleanupPhotoWindow from '#lib/gallery/cleanup/CleanupPhotoWindow.svelte';
+  import QueueSelectGrid from '#lib/gallery/cleanup/QueueSelectGrid.svelte';
+  import { keep, trashWithUndo } from '#lib/gallery/cleanup/cleanup-actions.ts';
+  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
+  import { queueShortcuts } from '#lib/gallery/cleanup/cleanup-shortcuts.ts';
+  import { CLEANUP_SDK_QUEUES } from '#lib/gallery/cleanup/cleanup.ts';
   import { TILE_SIZES, tileSize, type TileSize } from '#lib/gallery/cleanup/tile-size.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { CleanupQueuePager, type Removed } from '#lib/gallery/cleanup/cleanup-queue-pager.svelte.ts';
-  import { keep, trashWithUndo } from '#lib/gallery/cleanup/cleanup-actions.ts';
-  import { CLEANUP_SDK_QUEUES } from '#lib/gallery/cleanup/cleanup.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import {

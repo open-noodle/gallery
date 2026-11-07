@@ -1,18 +1,18 @@
 <script lang="ts">
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
-  import { createScanTriageModel, type ScanTriageModel } from './scan-triage.svelte';
-  import ConfidentLane from './ConfidentLane.svelte';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { declineFaceRepair, getFaceRepairPersonFaces, getLatestScan, resolveFaces, triggerScan } from '@immich/sdk';
   import { Button, ConfirmModal, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiClose, mdiRadar, mdiRefresh, mdiTune } from '@mdi/js';
-  import AdvancedScanModal, { type AdvancedScanParams } from './AdvancedScanModal.svelte';
-  import ReviewFirstLane from './ReviewFirstLane.svelte';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { faceCleanupBreadcrumbs, guidedCrumb } from '../breadcrumbs';
-  import { handleError } from '#lib/utils/handle-error.ts';
   import type { PageData } from './$types';
+  import AdvancedScanModal, { type AdvancedScanParams } from './AdvancedScanModal.svelte';
+  import ConfidentLane from './ConfidentLane.svelte';
+  import ReviewFirstLane from './ReviewFirstLane.svelte';
+  import { createScanTriageModel, type ScanTriageModel } from './scan-triage.svelte';
 
   // Local types for the loosely-typed SDK response
   interface ScanTotals {

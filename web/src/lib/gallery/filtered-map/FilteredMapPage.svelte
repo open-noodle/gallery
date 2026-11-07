@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import FilterPanel from '#lib/components/filter-panel/filter-panel.svelte';
-  import FilterToggleButton from '#lib/components/filter-panel/filter-toggle-button.svelte';
-  import { getActiveFilterCount } from '#lib/components/filter-panel/filter-panel.ts';
-  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import FilterPanel from '#lib/components/filter-panel/filter-panel.svelte';
+  import { getActiveFilterCount } from '#lib/components/filter-panel/filter-panel.ts';
+  import FilterToggleButton from '#lib/components/filter-panel/filter-toggle-button.svelte';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import { IconButton } from '@immich/ui';
   import { mdiArrowLeft } from '@mdi/js';
   import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { MapFilterController } from './map-filter-controller.svelte';
 
   type Props = {

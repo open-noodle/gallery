@@ -3,8 +3,8 @@
   import { isValidNewSpaceName } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiPlus } from '@mdi/js';
-  import type { Action } from 'svelte/action';
   import { t } from 'svelte-i18n';
+  import type { Action } from 'svelte/action';
 
   interface Props {
     searchQuery?: string;

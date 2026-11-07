@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { SmartSearchFacetsDto } from 'src/dtos/search.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import {

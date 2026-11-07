@@ -1,7 +1,7 @@
 <script lang="ts">
+  import type { PlacesResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiMapMarker } from '@mdi/js';
-  import type { PlacesResponseDto } from '@immich/sdk';
 
   interface Props {
     item: PlacesResponseDto;

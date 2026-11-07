@@ -1,6 +1,7 @@
 <script lang="ts">
   import { shortcut } from '#lib/actions/shortcut.ts';
   import AlbumMap from '#lib/components/album-page/AlbumMap.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
@@ -19,7 +20,6 @@
   import { fileUploadHandler, openFileUploadDialog } from '#lib/utils/file-uploader.ts';
   import type { AlbumResponseDto, SharedLinkResponseDto } from '@immich/sdk';
   import { ActionButton, IconButton } from '@immich/ui';
-  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { mdiDownload, mdiFileImagePlusOutline, mdiPresentationPlay } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import ControlAppBar from '../shared-components/ControlAppBar.svelte';

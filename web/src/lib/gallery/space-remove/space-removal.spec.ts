@@ -2,7 +2,7 @@ import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manage
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { factory } from '#test/unit/factories.ts';
-import { getAssetSpaces, getSharedSpaceAssetLinkedAlbums, removeAssets, SharedSpaceRole } from '@immich/sdk';
+import { SharedSpaceRole, getAssetSpaces, getSharedSpaceAssetLinkedAlbums, removeAssets } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { canRemoveFrom, fetchSelectionSpaces, removableSpaces, removeFromSpace } from './space-removal';
 

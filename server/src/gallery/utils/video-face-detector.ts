@@ -2,25 +2,15 @@ import { Duration } from 'luxon';
 import { mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { SystemConfig } from 'src/dtos/config.dto.js';
-import type { VideoFaceChanges, VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
-import type { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
-import type { AssetRepository } from 'src/repositories/asset.repository.js';
-import type { CryptoRepository } from 'src/repositories/crypto.repository.js';
-import type { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import type { JobRepository } from 'src/repositories/job.repository.js';
-import type { LoggingRepository } from 'src/repositories/logging.repository.js';
-import type { BoundingBox, MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
-import type { MediaRepository } from 'src/repositories/media.repository.js';
-import type { JobItem } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetType, JobName, JobStatus, SourceType, StorageFolder } from 'src/enum.js';
+import type { VideoFaceChanges, VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
+import type { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 import {
-  type Detection,
-  type ExistingVideoFace,
   FaceTracker,
   VIDEO_FACE_LOW_SCORE,
   VIDEO_FACE_SAMPLER_VERSION,
@@ -38,9 +28,19 @@ import {
   sightingQuality,
   trackEmbedding,
   withSighting,
+  type Detection,
+  type ExistingVideoFace,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import type { AssetRepository } from 'src/repositories/asset.repository.js';
+import type { CryptoRepository } from 'src/repositories/crypto.repository.js';
+import type { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import type { JobRepository } from 'src/repositories/job.repository.js';
+import type { LoggingRepository } from 'src/repositories/logging.repository.js';
+import type { BoundingBox, MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
+import type { MediaRepository } from 'src/repositories/media.repository.js';
+import type { JobItem } from 'src/types.js';
 
 type VideoFaceDetectorDependencies = {
   assetRepository: AssetRepository;

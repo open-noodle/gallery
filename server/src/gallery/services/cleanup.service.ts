@@ -1,6 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
@@ -57,7 +55,9 @@ import {
   suggestKeep,
 } from 'src/gallery/utils/cleanup.js';
 import { readGreyscalePixels } from 'src/gallery/utils/image-quality.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 
 export type CleanupCountQueue = 'space_hogs' | 'bursts' | 'screenshots' | 'blurry' | 'duplicates';

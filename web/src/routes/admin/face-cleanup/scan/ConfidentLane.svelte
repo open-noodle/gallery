@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { Route } from '#lib/route.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { Icon } from '@immich/ui';
   import { mdiArrowRight, mdiCheckCircle, mdiChevronDown, mdiClose } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { Route } from '#lib/route.ts';
   import type { ScanTriageModel } from './scan-triage.svelte';
 
   type Props = { model: ScanTriageModel; applying: boolean; onApprove: () => void };

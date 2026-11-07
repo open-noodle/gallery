@@ -1,8 +1,8 @@
 import type { Updateable } from 'kysely';
+import { personIdentityId, personSidecarColumns, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import type { DatabaseRepository } from 'src/repositories/database.repository.js';
 import type { PersonId, PersonRepository } from 'src/repositories/person.repository.js';
 import type { PersonTable } from 'src/schema/tables/person.table.js';
-import { personIdentityId, personSidecarColumns, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 
 /**
 Updates a personal person's type and keeps every profile on its identity in sync. Face clusters

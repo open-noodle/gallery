@@ -1,7 +1,7 @@
 import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
 import { OpenQueryParam, QueryParameter, type SharedLinkTab } from '#lib/constants.ts';
 import { encodeFilterParams } from '#lib/utils/filter-url.ts';
-import { getBaseUrl, IntegrityReport, QueueName, type MetadataSearchDto, type SmartSearchDto } from '@immich/sdk';
+import { IntegrityReport, QueueName, getBaseUrl, type MetadataSearchDto, type SmartSearchDto } from '@immich/sdk';
 import { omitBy } from 'lodash-es';
 
 const asQueueSlug = (name: QueueName) => {

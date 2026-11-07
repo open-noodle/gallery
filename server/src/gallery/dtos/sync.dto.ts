@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import type { SyncAssetExifV1, SyncAssetV1, SyncAssetV2, SyncItem } from 'src/dtos/sync.dto.js';
 import { ExtraModel } from 'src/decorators.js';
+import type { SyncAssetExifV1, SyncAssetV1, SyncAssetV2, SyncItem } from 'src/dtos/sync.dto.js';
 import { SyncEntityType, SyncRequestType, SyncRequestTypeSchema } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { isoDatetimeToDate } from 'src/validation.js';

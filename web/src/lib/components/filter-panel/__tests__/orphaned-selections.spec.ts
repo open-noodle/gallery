@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { FilterPanelConfig } from '../filter-panel';
-import { createFilterState } from '../filter-panel';
+import { createFilterState, type FilterPanelConfig } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 import PeopleFilter from '../people-filter.svelte';
 

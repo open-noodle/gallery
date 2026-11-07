@@ -1,5 +1,5 @@
-import type { DataSaverVideoConfig } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { VideoCodec } from 'src/enum.js';
+import type { DataSaverVideoConfig } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { dataSaverSettings, isDataSaverCopyNeeded, parseBitrate } from 'src/gallery/utils/data-saver-video.js';
 
 const config: DataSaverVideoConfig = {

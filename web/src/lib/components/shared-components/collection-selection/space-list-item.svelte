@@ -7,8 +7,8 @@
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAccountMultipleOutline, mdiCheckCircle, mdiChevronDown, mdiChevronUp } from '@mdi/js';
-  import type { Action } from 'svelte/action';
   import { t } from 'svelte-i18n';
+  import type { Action } from 'svelte/action';
 
   interface Props {
     space: SharedSpaceResponseDto;

@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { ComboBoxOption } from '#lib/components/shared-components/Combobox.svelte';
   import { SIDEBAR_MODES, sidebarModeStore, type SidebarMode } from '#lib/stores/sidebar-mode.svelte.ts';
-  import SettingCombobox from './SettingCombobox.svelte';
   import { t } from 'svelte-i18n';
+  import SettingCombobox from './SettingCombobox.svelte';
 
   const labels: Record<SidebarMode, string> = $derived({
     auto: $t('sidebar_mode_auto'),

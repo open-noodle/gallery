@@ -1,9 +1,9 @@
 import {
+  SearchSuggestionType,
   getAllPeople,
   getFilterSuggestions,
   getSearchSuggestions,
   searchPerson,
-  SearchSuggestionType,
 } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveLiveTypedSearchSuggestions } from './typed-search-live-suggestions';

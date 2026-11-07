@@ -1,9 +1,9 @@
 import {
   AssetTypeEnum,
+  SearchSuggestionType,
   getFilterSuggestions,
   getSearchSuggestions,
   searchPerson,
-  SearchSuggestionType,
 } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseTypedSearch } from './typed-search-parser';

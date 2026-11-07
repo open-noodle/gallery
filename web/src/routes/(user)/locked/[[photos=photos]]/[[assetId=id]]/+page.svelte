@@ -1,20 +1,19 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
   import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
-  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { AssetAction } from '#lib/constants.ts';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
@@ -22,6 +21,7 @@
   import { AssetVisibility } from '@immich/sdk';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { type Kysely, sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { SyncAck } from 'src/types.js';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemoryType } from 'src/enum.js';
 import { personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { DB } from 'src/schema/index.js';
+import type { SyncAck } from 'src/types.js';
 import { petFacePredicate } from 'src/utils/database.js';
 import { syncFavoriteFor } from 'src/utils/favorite.js';
 

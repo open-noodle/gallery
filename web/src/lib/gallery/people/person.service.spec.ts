@@ -4,27 +4,27 @@ import * as handleErrorModule from '#lib/utils/handle-error.ts';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
 import { factory } from '#test/unit/factories.ts';
 import {
-  getMembers,
-  getPersonFaces,
-  getSpacePersonFaces,
   RepresentativeFaceSource,
   SharedSpaceRole,
   Type,
+  getMembers,
+  getPersonFaces,
+  getSpacePersonFaces,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,
   updateSpacePersonRepresentativeFace,
   type PersonFacePageResponseDto,
-  type SharedSpaceMemberResponseDto,
   type PersonResponseDto,
+  type SharedSpaceMemberResponseDto,
   type SharedSpacePersonResponseDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  getPersonFacesPage,
   getPersonFaceThumbnail,
+  getPersonFacesPage,
   handleUpdatePersonBirthDate,
   isSpaceEditor,
   updatePersonName,

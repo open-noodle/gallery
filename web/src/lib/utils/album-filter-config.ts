@@ -5,7 +5,7 @@ import {
   type FilterState,
 } from '#lib/components/filter-panel/filter-panel.ts';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
-import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
+import { AssetTypeEnum, SearchSuggestionType, getFilterSuggestions, getSearchSuggestions } from '@immich/sdk';
 
 /**
 Album *detail* is scoped to a single album, and gallery/utils/time-bucket-filter.ts guards both `isInAlbum` and

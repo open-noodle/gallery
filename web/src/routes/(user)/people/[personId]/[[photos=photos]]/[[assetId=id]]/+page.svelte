@@ -3,11 +3,15 @@
   import { listNavigation } from '#lib/actions/list-navigation.ts';
   import { scrollMemoryClearer } from '#lib/actions/scroll-memory.svelte.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
-  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import PersonIndicator from '#lib/components/faces-page/PersonIndicator.svelte';
+  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
-  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -16,40 +20,34 @@
   import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
-  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
-  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
   import { PersonPageViewMode, QueryParameter, SessionStorageKey } from '#lib/constants.ts';
-  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
-  import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
-  import { Route } from '#lib/route.ts';
-  import { getAssetBulkActions } from '#lib/services/asset.service.ts';
+  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import MergeFaceSelector from '#lib/gallery/people/MergeFaceSelector.svelte';
   import PersonSuggestions from '#lib/gallery/people/PersonSuggestions.svelte';
-  import { getPersonActions } from '#lib/services/person.service.ts';
-  import { lang, locale } from '#lib/stores/preferences.store.ts';
-  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
-  import { queryClient } from '#lib/queries/client.ts';
-  import { createQuery } from '@tanstack/svelte-query';
-  import { websocketEvents } from '#lib/stores/websocket.ts';
-  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
-  import { handleError } from '#lib/utils/handle-error.ts';
-  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
-  import { afterNavigate, goto, refreshAll } from '$app/navigation';
-  import { page } from '$app/state';
-  import { timelineGroupingProps } from '#lib/gallery/filtered-timeline/timeline-grouping.svelte.ts';
   import {
     getPersonPageActions,
     getPersonTypeAction,
     isSpaceEditor,
     updatePersonName,
   } from '#lib/gallery/people/person.service.ts';
-
+  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
+  import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
+  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { Route } from '#lib/route.ts';
+  import { getAssetBulkActions } from '#lib/services/asset.service.ts';
+  import { getPersonActions } from '#lib/services/person.service.ts';
+  import { lang, locale } from '#lib/stores/preferences.store.ts';
+  import { websocketEvents } from '#lib/stores/websocket.ts';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
+  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { AssetVisibility, searchPerson, type PersonResponseDto } from '@immich/sdk';
   import {
     ActionButton,
@@ -61,9 +59,12 @@
     type ActionItem,
   } from '@immich/ui';
   import { mdiAccountMultipleCheckOutline, mdiArrowLeft, mdiDotsVertical } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import { DateTime } from 'luxon';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { afterNavigate, goto, refreshAll } from '$app/navigation';
+  import { page } from '$app/state';
   import type { PageData } from './$types';
   import EditNameInput from './EditNameInput.svelte';
   import UnmergeFaceSelector from './UnmergeFaceSelector.svelte';
@@ -364,7 +365,10 @@
     onAction: () => {
       viewMode = PersonPageViewMode.MERGE_PEOPLE;
     },
+    shortcuts: { key: 'm' },
   };
+
+  const personActionsEnabled = $derived(!assetViewerManager.isViewing && !assetMultiSelectManager.selectionActive);
 </script>
 
 <OnEvents
@@ -373,6 +377,12 @@
   onAssetsDelete={updateAssetCount}
   onAssetsArchive={updateAssetCount}
   onAssetsUnarchive={updateAssetCount}
+/>
+<CommandPaletteDefaultProvider
+  name={$t('person')}
+  actions={personActionsEnabled
+    ? [SelectRepresentativeFace, SetDateOfBirth, HidePerson, ShowPerson, Merge, Favorite, Unfavorite]
+    : []}
 />
 
 <main
@@ -433,14 +443,17 @@
                       title={canEditSpacePerson ? $t('edit_name') : undefined}
                       onclick={() => (isEditingName = canEditSpacePerson)}
                     >
-                      <ImageThumbnail
-                        circle
-                        shadow
-                        url={thumbnailData}
-                        altText={person.name}
-                        widthStyle="3.375rem"
-                        heightStyle="3.375rem"
-                      />
+                      <div class="@container relative size-13.5">
+                        <ImageThumbnail
+                          circle
+                          shadow
+                          url={thumbnailData}
+                          altText={person.name}
+                          widthStyle="100%"
+                          hidden={person.isHidden}
+                        />
+                        <PersonIndicator {person} />
+                      </div>
                       <div class="flex flex-col justify-center px-4 text-start text-primary">
                         <p class="w-40 truncate font-medium">{person.name || $t('add_a_name')}</p>
                         <p class="text-sm text-gray-500 dark:text-gray-400">

@@ -1,4 +1,4 @@
-import { AfterInsertTrigger, Column, CreateDateColumn, type Generated, Table, Timestamp } from '@immich/sql-tools';
+import { AfterInsertTrigger, Column, CreateDateColumn, Table, Timestamp, type Generated } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 import { library_user_delete_after_audit } from 'src/schema/functions.js';
 

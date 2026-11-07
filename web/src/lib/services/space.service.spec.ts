@@ -1,6 +1,6 @@
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import * as handleErrorModule from '#lib/utils/handle-error.ts';
-import { addAssets, updateSpace, UserAvatarColor } from '@immich/sdk';
+import { UserAvatarColor, addAssets, updateSpace } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';

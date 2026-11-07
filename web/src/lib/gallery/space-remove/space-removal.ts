@@ -2,10 +2,10 @@ import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manage
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import {
+  SharedSpaceRole,
   getAssetSpaces,
   getSharedSpaceAssetLinkedAlbums,
   removeAssets,
-  SharedSpaceRole,
   type AssetSpacesItemDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';

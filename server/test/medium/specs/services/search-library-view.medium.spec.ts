@@ -10,8 +10,8 @@ import { SearchRepository } from 'src/repositories/search.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SearchService } from 'src/services/search.service.js';
-import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { newMediumService } from 'test/medium.factory.js';
+import { seedLibraryView } from 'test/medium/fixtures/library-view.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { invalidateAll } from '$app/navigation';
   import SpaceLinkLibraryModal from '#lib/modals/SpaceLinkLibraryModal.svelte';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { unlinkLibrary, type SharedSpaceLinkedLibraryDto, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Button, Icon, modalManager } from '@immich/ui';
   import { mdiBookshelf, mdiLinkVariantOff, mdiLinkVariantPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

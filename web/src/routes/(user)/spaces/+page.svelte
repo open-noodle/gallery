@@ -4,16 +4,16 @@
   import SpaceCard from '#lib/components/spaces/space-card.svelte';
   import SpacesControls from '#lib/components/spaces/spaces-controls.svelte';
   import SpacesTable from '#lib/components/spaces/spaces-table.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import SpaceCreateModal from '#lib/modals/SpaceCreateModal.svelte';
   import { Route } from '#lib/route.ts';
   import { pinnedSpaceIds, spaceViewSettings } from '#lib/stores/space-view.store.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { splitPinnedSpaces } from '#lib/utils/space-utils.ts';
   import { type SharedSpaceResponseDto } from '@immich/sdk';
   import { Button, modalManager } from '@immich/ui';
   import { mdiPlus } from '@mdi/js';
-  import { goto } from '$app/navigation';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {

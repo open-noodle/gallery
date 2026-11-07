@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { ImportManager, ImportStep } from '#lib/managers/import-manager.svelte.ts';
-  import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
-  import { scanTakeoutFiles } from '#lib/utils/google-takeout-scanner.ts';
-  import type { ScanResult } from '#lib/utils/google-takeout-scanner.ts';
+  import { ImportManager, ImportStep, type ImportOptions } from '#lib/managers/import-manager.svelte.ts';
+  import { scanTakeoutFiles, type ScanResult } from '#lib/utils/google-takeout-scanner.ts';
   import { createImportAlbums, uploadTakeoutItem } from '#lib/utils/google-takeout-uploader.ts';
   import { Container } from '@immich/ui';
   import { t } from 'svelte-i18n';

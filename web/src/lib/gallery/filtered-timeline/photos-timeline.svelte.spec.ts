@@ -4,7 +4,7 @@ import { invalidateSpaces, spacesQueryKey } from '#lib/gallery/spaces/space.quer
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { factory } from '#test/unit/factories.ts';
-import { getAllSpaces, LibraryView, type SharedSpaceResponseDto } from '@immich/sdk';
+import { LibraryView, getAllSpaces, type SharedSpaceResponseDto } from '@immich/sdk';
 import { flushSync } from 'svelte';
 import { createPhotosTimeline, photosTimelineConfig } from './photos-timeline.ts';
 

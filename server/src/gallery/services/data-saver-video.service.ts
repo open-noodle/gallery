@@ -1,11 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { JobItem, JobOf, VideoInterfaces } from 'src/types.js';
-import type { ImmichMediaResponse } from 'src/utils/file.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   AssetType,
   AssetVisibility,
@@ -25,8 +22,11 @@ import {
   dataSaverVideoPath,
   isDataSaverCopyNeeded,
 } from 'src/gallery/utils/data-saver-video.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import type { JobItem, JobOf, VideoInterfaces } from 'src/types.js';
+import type { ImmichMediaResponse } from 'src/utils/file.js';
 import { BaseConfig } from 'src/utils/media.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 

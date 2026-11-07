@@ -1,12 +1,12 @@
 // Fork query-shape tests for search: smart facets, filter suggestions, searchSmart and searchAssetBuilder.
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import type { DB } from 'src/schema/index.js';
 import { AssetOrder, AssetVisibility } from 'src/enum.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { buildSearchSmartQueries } from 'src/gallery/utils/smart-search.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
+import type { DB } from 'src/schema/index.js';
 import { searchAssetBuilderWithLocalTaken } from 'src/utils/asset-filter.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 

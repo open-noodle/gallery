@@ -473,7 +473,14 @@ jobs:
       - name: Start Docker Compose
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: docker compose up -d --build --renew-anon-volumes --force-recreate --remove-orphans --wait --wait-timeout 300
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker compose up -d --build --renew-anon-volumes --force-recreate --remove-orphans --wait --wait-timeout 300 2>&1 | tee "${RUNNER_TEMP}/docker-compose-up.log" && exit 0
+            grep -q toomanyrequests "${RUNNER_TEMP}/docker-compose-up.log" || exit 1
+            sleep $((attempt * 15))
+          done
+          exit 1
       - name: Wait for e2e server
         run: node ../.github/scripts/wait-for-url.mjs http://127.0.0.1:2285/api/server/ping
       - name: Run e2e tests (api & cli)
@@ -571,7 +578,14 @@ jobs:
       - name: Docker build
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: docker compose up -d --build --renew-anon-volumes --force-recreate --remove-orphans --wait --wait-timeout 300
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker compose up -d --build --renew-anon-volumes --force-recreate --remove-orphans --wait --wait-timeout 300 2>&1 | tee "${RUNNER_TEMP}/docker-compose-up.log" && exit 0
+            grep -q toomanyrequests "${RUNNER_TEMP}/docker-compose-up.log" || exit 1
+            sleep $((attempt * 15))
+          done
+          exit 1
       - name: Wait for e2e server
         run: node ../.github/scripts/wait-for-url.mjs http://127.0.0.1:2285/api/server/ping
       - name: Run e2e tests (web)

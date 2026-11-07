@@ -1,39 +1,36 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { scrollMemory } from '#lib/actions/scroll-memory.svelte.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import SearchPeople from '#lib/components/faces-page/PeopleSearch.svelte';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import PeopleFaceStatisticsInfo from '#lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
   import type { ManagedPerson } from '#lib/components/people/people-types.ts';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
-  import SearchPeople from '#lib/components/faces-page/PeopleSearch.svelte';
-  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-  import OnEvents from '#lib/components/OnEvents.svelte';
   import { PEOPLE_PAGE_SIZE, QueryParameter, SessionStorageKey } from '#lib/constants.ts';
+  import Dropdown from '#lib/elements/Dropdown.svelte';
+  import { isSpaceEditor, updatePersonName } from '#lib/gallery/people/person.service.ts';
   import { searchPeopleWithSharedSpaces } from '#lib/gallery/people/space-person-name-merge.ts';
+  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
-  import { Route } from '#lib/route.ts';
-  import { isSpaceEditor, updatePersonName } from '#lib/gallery/people/person.service.ts';
-  import { getPersonActions } from '#lib/services/person.service.ts';
-  import Dropdown from '#lib/elements/Dropdown.svelte';
-  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/gallery/stores/preferences.store.ts';
-  import { locale } from '#lib/stores/preferences.store.ts';
-  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
   import { queryClient } from '#lib/queries/client.ts';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { Route } from '#lib/route.ts';
+  import { getPersonActions } from '#lib/services/person.service.ts';
+  import { locale } from '#lib/stores/preferences.store.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
-  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { handlePromiseError } from '#lib/utils.ts';
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { clearQueryParam } from '#lib/utils/navigation.ts';
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '#lib/utils/people-filter.ts';
-  import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
   import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
+  import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
+  import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import {
     getAllPeople,
     getPeopleFaceStatistics,
@@ -45,18 +42,21 @@
   } from '@immich/sdk';
   import { Button, Icon, modalManager, toastManager } from '@immich/ui';
   import {
+    mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
+    mdiAccountMultipleOutline,
     mdiAccountOff,
     mdiDotsVertical,
     mdiEyeOutline,
-    mdiAccountGroupOutline,
-    mdiAccountMultipleOutline,
     mdiPaw,
     mdiSortAlphabeticalAscending,
     mdiSortNumericDescending,
   } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
 
   interface Props {
     data: {

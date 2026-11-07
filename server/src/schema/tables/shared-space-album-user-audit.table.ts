@@ -2,10 +2,10 @@ import {
   AfterInsertTrigger,
   Column,
   CreateDateColumn,
-  type Generated,
   Index,
   Table,
   Timestamp,
+  type Generated,
 } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 import { shared_space_album_user_delete_after_audit } from 'src/schema/functions.js';

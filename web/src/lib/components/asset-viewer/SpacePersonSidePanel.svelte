@@ -5,9 +5,9 @@
   import PersonPickerPanel from '#lib/components/faces-page/PersonPickerPanel.svelte';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
-  import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import {
     attachSpacePersonFace,

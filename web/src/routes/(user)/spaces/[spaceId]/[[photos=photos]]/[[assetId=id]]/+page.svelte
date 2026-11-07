@@ -1,37 +1,37 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
+  import SpaceAssetLimitWarning from '#lib/components/spaces/space-asset-limit-warning.svelte';
   import SpaceNewAssetsDivider from '#lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '#lib/components/spaces/space-onboarding-banner.svelte';
-  import SpaceAssetLimitWarning from '#lib/components/spaces/space-asset-limit-warning.svelte';
   import SelectionToolbar from '#lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
-  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import { createSpaceTimeline } from '#lib/gallery/filtered-timeline/space-timeline.ts';
+  import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
   import FilteredTimeline from '#lib/gallery/filtered-timeline/FilteredTimeline.svelte';
+  import { createSpaceTimeline } from '#lib/gallery/filtered-timeline/space-timeline.ts';
+  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { registerSpaceContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import { spaceUiManager } from '#lib/managers/space-ui-manager.svelte.ts';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
-  import { MAX_SPACE_ASSETS_PER_REQUEST } from '#lib/constants.ts';
-  import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import {
-    addAssets,
     AssetVisibility,
+    SharedSpaceRole,
+    UserAvatarColor,
+    addAssets,
     getSpace,
     markSpaceViewed,
-    SharedSpaceRole,
     updateSpace,
-    UserAvatarColor,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { IconButton, toastManager } from '@immich/ui';
   import { mdiImageOutline, mdiPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto, invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
 
   type ViewMode = 'view' | 'select-assets' | 'select-cover';

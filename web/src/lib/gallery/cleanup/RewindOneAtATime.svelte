@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
-  import { flipMotion } from '#lib/gallery/motion/index.ts';
-  import { flip } from 'svelte/animate';
   import CleanupTile from '#lib/gallery/cleanup/CleanupTile.svelte';
+  import RewindPhotoInfo from '#lib/gallery/cleanup/RewindPhotoInfo.svelte';
+  import { CleanupRoute } from '#lib/gallery/cleanup/cleanup-route.ts';
   import type { RewindMark } from '#lib/gallery/cleanup/rewind-session.svelte.ts';
+  import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
+  import { flipMotion } from '#lib/gallery/motion/index.ts';
+  import { Route } from '#lib/route.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { AssetMediaSize, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
-  import ShortcutKeycap from '#lib/gallery/components/shortcut-keycap.svelte';
-  import RewindPhotoInfo from '#lib/gallery/cleanup/RewindPhotoInfo.svelte';
-  import { Route } from '#lib/route.ts';
   import { Icon, Text } from '@immich/ui';
   import {
     mdiArrowRight,
@@ -22,6 +21,7 @@
   } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { locale, t, type Translations } from 'svelte-i18n';
+  import { flip } from 'svelte/animate';
 
   type Props = {
     asset?: CleanupAssetDto;

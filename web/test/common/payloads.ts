@@ -1,3 +1,10 @@
+import {
+  galleryServerConfig,
+  galleryServerFeatures,
+  withGalleryAdminConfig,
+  withGalleryQueues,
+  type UpstreamShape,
+} from '#test/common/gallery/payloads.ts';
 import type { ResponseOf } from '#test/common/types.ts';
 import {
   AudioCodec,
@@ -15,6 +22,7 @@ import {
 } from '@immich/sdk';
 
 const serverConfig = (overrides: Partial<ResponseOf<'getServerConfig'>> = {}): ResponseOf<'getServerConfig'> => ({
+  ...galleryServerConfig,
   loginPageMessage: '',
   trashDays: 30,
   userDeleteDelay: 7,
@@ -75,6 +83,7 @@ const userConfig = (overrides: Partial<ResponseOf<'getUserConfig'>> = {}): Respo
 const notifications = (): ResponseOf<'getNotifications'> => [];
 
 const serverFeatures = (overrides: Partial<ResponseOf<'getServerFeatures'>> = {}): ResponseOf<'getServerFeatures'> => ({
+  ...galleryServerFeatures,
   smartSearch: false,
   facialRecognition: false,
   duplicateDetection: false,
@@ -146,7 +155,9 @@ const versionHistory = (): ResponseOf<'getVersionHistory'> => [
   },
 ];
 
-const adminConfig = (overrides: Partial<ResponseOf<'getAdminConfig'>> = {}): ResponseOf<'getAdminConfig'> => ({
+const adminConfig = (
+  overrides: Partial<ResponseOf<'getAdminConfig'>> = {},
+): UpstreamShape<ResponseOf<'getAdminConfig'>> => ({
   backup: { database: { enabled: true, cronExpression: '0 02 * * *', keepLastAmount: 14 } },
   ffmpeg: {
     crf: 23,
@@ -289,7 +300,7 @@ const serverVersion = (): ResponseOf<'getServerVersion'> => ({
   featureLevel: 1,
 });
 
-const queues = (): ResponseOf<'getQueuesLegacy'> => ({
+const queues = (): UpstreamShape<ResponseOf<'getQueuesLegacy'>> => ({
   backgroundTask: idleQueue(),
   backupDatabase: idleQueue(),
   duplicateDetection: idleQueue(),
@@ -331,9 +342,9 @@ export const payload = {
   storage,
   versionHistory,
   mediaTypes,
-  adminConfig,
+  adminConfig: withGalleryAdminConfig(adminConfig),
   serverVersion,
-  queues,
+  queues: withGalleryQueues(queues),
   notifications,
   backups,
   integrityReport,

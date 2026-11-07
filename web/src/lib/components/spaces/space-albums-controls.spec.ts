@@ -3,7 +3,7 @@ import SpaceAlbumsControlsWrapper from '#lib/components/spaces/space-albums-cont
 import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '#lib/stores/preferences.store.ts';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '#lib/stores/space-album-view-settings.store.ts';
 import { SpaceAlbumSortBy } from '#lib/utils/space-album-sort.ts';
-import { render, screen, within, fireEvent } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';

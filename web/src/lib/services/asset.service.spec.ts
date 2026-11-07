@@ -12,8 +12,8 @@ import { setSharedLink } from '#lib/utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { factory } from '#test/unit/factories.ts';
 import {
-  getAssetInfo,
   LibraryView,
+  getAssetInfo,
   updateAsset,
   updateAssetFavorites,
   type AssetResponseDto,
