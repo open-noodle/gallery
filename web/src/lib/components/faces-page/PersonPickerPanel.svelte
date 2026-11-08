@@ -2,7 +2,7 @@
   import PersonPickerGrid, { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
   import { IconButton, Input } from '@immich/ui';
   import { mdiArrowLeftThin } from '@mdi/js';
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
@@ -58,6 +58,10 @@
     headerActions,
     searchActions,
   }: Props = $props();
+
+  let searchInputEl: HTMLInputElement | null = $state(null);
+
+  onMount(() => searchInputEl?.focus());
 </script>
 
 <section
@@ -86,7 +90,13 @@
 
   <div class="p-4 text-sm">
     <div class="mb-4 flex gap-2">
-      <Input placeholder={$t('search_people')} bind:value={query} oninput={() => onQueryChange?.(query)} size="tiny" />
+      <Input
+        placeholder={$t('search_people')}
+        bind:value={query}
+        bind:ref={searchInputEl}
+        oninput={() => onQueryChange?.(query)}
+        size="tiny"
+      />
       {#if searchActions}
         {@render searchActions()}
       {/if}
