@@ -101,6 +101,10 @@ runs all of them. Each is published in Gallery's Hugging Face org as `open-noodl
   all seven open. `DepthEstimator._infer` therefore drops the other open graphs before opening the one a photo needs,
   and runs photos one at a time on a static provider. Dropping a graph frees its memory fully; reopening it from the
   compile cache takes 1–2 s (a first compile about 20 s). With it, 16 photos across six canvases peaked at 7.6 GB, in the 10 GB limit the report OOMed at.
+- **`MACHINE_LEARNING_DEPTH_CPU`.** Runs depth on the CPU provider, with a small model's int8 copy, while the other
+  models keep the accelerator. On the HD 630 the CPU (i7-7700K, two threads) took 1.1–3.9 s a photo at 1.5 GB, as fast
+  as the GPU, while a newer iGPU is likely faster on the GPU, so it is the operator's choice. An ML environment
+  variable rather than an admin setting: it describes the ML host, which the server cannot see.
 - **Cost.** Measured on an Apple M2 CPU (ONNX Runtime CPU provider, 4 threads, 1440 px previews): fp32 about 650 ms per
   photo (99 MB of weights); the int8 export about 490 ms (27 MB), with output correlating 0.999 with fp32 and a mean
   absolute difference under 1%. Ship int8 as the default. Expect two to three seconds per photo on a typical NAS CPU,

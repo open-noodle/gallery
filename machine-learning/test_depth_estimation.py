@@ -15,7 +15,7 @@ import immich_ml.main as ml_main
 from immich_ml.config import settings
 from immich_ml.models.constants import get_model_source
 from immich_ml.models.depth_estimation import DepthEstimator
-from immich_ml.models.depth_estimation.depth import CANVASES
+from immich_ml.models.depth_estimation.depth import CANVASES, depth_settings
 from immich_ml.schemas import (
     DepthEstimationOptions,
     ModelSource,
@@ -205,6 +205,16 @@ class TestDepthEstimation:
 
         assert list(session.graphs) == [Shape(batch=1, height=518, width=924)]
         assert build.call_count == 2  # the repeated canvas reused its open graph
+
+    def test_cpu_setting_runs_the_int8_copy_on_the_cpu(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(depth_settings, "cpu", True)
+        estimator = self._estimator(mocker, cpu_only=False)
+        make = mocker.patch("immich_ml.models.depth_estimation.depth.OrtSession")
+
+        estimator._make_session()
+
+        assert estimator.model_path == estimator.model_dir / "model_int8.onnx"
+        assert make.call_args.kwargs["providers"] == ["CPUExecutionProvider"]
 
     def test_load_logs_the_file_precision_and_provider(self, mocker: MockerFixture) -> None:
         estimator = self._estimator(mocker, cpu_only=False)

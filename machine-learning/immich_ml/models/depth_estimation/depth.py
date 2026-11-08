@@ -8,6 +8,7 @@ import numpy as np
 import onnxruntime as ort
 from numpy.typing import NDArray
 from PIL import Image
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from immich_ml.config import log
 from immich_ml.models.constants import SUPPORTED_PROVIDERS
@@ -53,6 +54,19 @@ INT8_FILE = "model_int8.onnx"
 INT8_MODELS = frozenset({"depth-anything-v2-small", "distill-any-depth-small"})
 
 
+class DepthSettings(BaseSettings):
+    """`MACHINE_LEARNING_DEPTH_CPU=true` runs depth on the CPU provider, with the int8 copy of a small model, while the
+    other models keep the accelerator. On an integrated GPU a canvas pins gigabytes of shared memory (about 6 GB for a
+    16:9 canvas of the small model), and an older one runs depth no faster than the CPU does (issue #1282)."""
+
+    model_config = SettingsConfigDict(env_prefix="MACHINE_LEARNING_DEPTH_", case_sensitive=False)
+
+    cpu: bool = False
+
+
+depth_settings = DepthSettings()
+
+
 def _cpu_only() -> bool:
     available = set(ort.get_available_providers())
     return [provider for provider in SUPPORTED_PROVIDERS if provider in available][:1] == ["CPUExecutionProvider"]
@@ -64,7 +78,8 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
     Answers with an 8-bit depth map, normalised per photo, and the metrics the server decides eligibility from. Each
     model repository ships `depth/model.onnx` (fp32), and the small ones also `depth/model_int8.onnx` (dynamic int8
     weights). The int8 copy is used only when the CPU provider runs a small model: it is about a quarter faster there,
-    while accelerators either cannot run its integer ops or gain nothing from them. See INT8_MODELS.
+    while accelerators either cannot run its integer ops or gain nothing from them. See INT8_MODELS. The CPU provider
+    runs depth when it is the only one, or when DepthSettings asks for it.
     """
 
     depends = []
@@ -73,7 +88,8 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
     shape_policy = ShapePolicy(dims=CANVASES)
 
     def __init__(self, model_name: str, **model_kwargs: Any) -> None:
-        self.int8 = model_name in INT8_MODELS and _cpu_only()
+        self.cpu = depth_settings.cpu or _cpu_only()
+        self.int8 = model_name in INT8_MODELS and self.cpu
         self._switch = Lock()
         super().__init__(model_name, **model_kwargs)
 
@@ -88,6 +104,13 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
         unused = "model.onnx" if self.int8 else INT8_FILE
         return [*super().ignore_patterns, f"*/{unused}"]
 
+    def _make_session(self) -> ModelSession:
+        if self.cpu and self.model_format == ModelFormat.ONNX:
+            return OrtSession(
+                self.model_path, self.shape_policy, providers=["CPUExecutionProvider"], threads=self.threads
+            )
+        return super()._make_session()
+
     def _load(self) -> ModelSession:
         session = super()._load()
         if isinstance(session, OrtSession):
@@ -97,7 +120,7 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
             canvases = "at each photo's own aspect" if session.dynamic else f"one of {len(session.shapes)} canvases"
             log.info(
                 f"Depth model '{self.model_name}' runs {self.model_path.name} ({precision}) on {session.providers[0]}, "
-                f"{canvases}"
+                f"{canvases}{' (MACHINE_LEARNING_DEPTH_CPU)' if depth_settings.cpu else ''}"
             )
         return session
 

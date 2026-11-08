@@ -131,6 +131,11 @@ against about 1.5 GB on the processor. Gallery keeps only one photo shape ready 
 allow the machine learning service at least 8 GB if Spatial Scene runs on an integrated GPU.
 Moving between shapes, for example from a landscape photo to a portrait one, adds a second or two.
 
+On an older integrated GPU like that one, the processor is just as fast. To run Spatial Scene on
+the processor while smart search, face recognition and OCR keep the GPU, set
+`MACHINE_LEARNING_DEPTH_CPU=true` on the machine learning container. A small model then also
+downloads its smaller copy.
+
 `distill-any-depth-large` does not fit on an integrated GPU: preparing it for a single photo shape
 needed more than 12 GB.
 
