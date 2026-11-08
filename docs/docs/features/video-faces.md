@@ -80,6 +80,8 @@ The same row appears when you name a face in a video: click the pencil next to *
 It helps when one crop is not enough to tell who someone is, such as two people who look alike or a small face in a
 crowd.
 
+<img src={require('./img/video-faces-picker.webp').default} alt='The Select face panel for an unnamed face shows its 50 moments above the people search; the video is paused at 2:11 with a white box around the face' title='Naming a face, with its moments above the people to choose from' />
+
 ## Correcting a face
 
 Sometimes a moment shows someone else: two people standing in the same spot a moment apart can be followed as one
