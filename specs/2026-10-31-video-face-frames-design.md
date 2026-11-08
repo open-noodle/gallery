@@ -734,6 +734,72 @@ browser cache.
   (`video-face.repository.spec.ts`): `setSightings` with and without a new best view, and `splitSighting` making an
   unassigned manual face with its frame row and `face_search` row (not run locally: needs Docker).
 
+## Phase 3: moments on mobile, view only
+
+The app shows a person's moments in a video and jumps the player to them, as the web's info panel does. Correcting
+faces (move, remove, combine) stays on the web: the app has no face editing to build on yet (no assign, reassign or
+delete face), so that would be a new editor designed for a phone, and it waits until people ask for it.
+
+### What the user sees
+
+- In the asset viewer's details, on a video, each person in the **People** row with a face in that video gets a
+  small film badge on the top-left of their picture. Tapping the picture still opens the person page, as before;
+  only the badge is new. The badge is a separate tap target, so the two cannot be confused.
+- Tapping the badge opens the person's moments in a row under the People row (a second tap, or the close button,
+  closes it): their name, "Seen at N moments" (`video_face_sightings_count`), and a crop per moment in time order,
+  with the time under it and one star on the best view the detector was surest of. Several faces of the person in
+  the video are listed together, as on the web. With nothing recorded it says so (`video_person_sightings_none`).
+- Tapping a crop pauses the video at that moment and draws the white rounded box around the face with the rest of
+  the picture dimmed. The box goes when the video plays, or when the position moves more than 2 s from the moment
+  (a scrub). The details sheet keeps the video in view above it, so the jump is visible while the row stays open.
+- Inline under People rather than in a bottom sheet: a sheet would cover the video the crops seek.
+
+### How it works
+
+- Face ids come from `GET /faces?id=<asset>` (the endpoint the web's face manager reads), grouped by person id,
+  fetched when the details of a video open. The moments are `GET /faces/{id}/sightings` per face, merged; crops are
+  `GET /faces/{id}/sightings/thumbnail?time=` through `RemoteImageProvider`, which adds the session headers.
+- Rule 6 (version mixing): the app probes `GET /faces/{id}/sightings` for the video's first face once; a 404 there,
+  for a face id the server just listed, means the server predates the route, and no badge is shown. An older app on
+  a newer server sees nothing new.
+- The player is `videoPlayerProvider(asset.id)`: `seekTo` then `pause`, which flushes the seek at once. The iOS
+  plugin seeks with zero tolerance and ExoPlayer seeks exactly by default, so the paused frame is the moment's.
+- The box is drawn inside `NativeVideoViewer`'s stack, which `PhotoView.customChild` sizes to the video's own
+  aspect (`childSize` is the asset's width and height, `tightMode`), so the box is the sighting's frame fractions of
+  that stack with no letterbox to subtract, and it follows pinch zoom.
+- Fork code lives in `mobile/lib/gallery/video_faces/`; the faces API is built from the shared client
+  (`FacesApi(peopleApi.apiClient)`), so `ApiService` is not touched. Strings are the web's overlay keys, which the
+  app reads from the same merged i18n.
+
+### Layering
+
+Upstream files get hooks only: `people_details.widget.dart` passes its avatar list through the fork's
+`withVideoMomentsBadges` and renders the moments row under the People row (an import, two changed lines and one
+new one), and `video_viewer.widget.dart` renders the box overlay
+in its stack (an import and one line).
+
+### Testing
+
+- `mobile/test/gallery/video_faces/video_moments_test.dart`: moments merged across faces in time order, one star
+  (the surest best view), times formatted as the player shows them, the 2 s rule for leaving a moment, the box as
+  frame fractions of the picture; the repository over the real generated client and an in-memory server (faces
+  grouped by person with unassigned ones left out, the route probe, moments merged with an unreadable face skipped,
+  the crop URL); no badges on a server without the route; in widgets, the badge on a video's people with a face and
+  not on a photo, the row opening with one star and closing on a second tap, the empty message, a tapped moment
+  seeking then pausing the player and boxing the face until it plays, and the box going on a scrub and when the row
+  closes. The existing people strip, video viewer and memory card tests still pass with the hooks in place.
+- On a phone: a release build on an iPhone 16 Pro Max against the test stack. The badge is easy to hit without opening
+  the person page, the row under People reads well, and the box lands on the face, also after pinch zoom.
+
+### Limits
+
+- Space people: a person shown from a Space carries the Space person's id, while `GET /faces` names the global
+  person, so their badge does not appear. The owner's own videos, the common case, work.
+- No editing, as above.
+- Zoomed in, a jump does not pan to the face: the box is drawn where the face is, which can be outside the zoomed
+  view. Found on the first phone test and accepted for now; panning would need the asset page's `PhotoView`
+  controller, another hook in an upstream file.
+
 ## Open questions
 
 - Should the scene-cut threshold (0.3) be configurable? It stays a constant until a video shows it needs tuning.
