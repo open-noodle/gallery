@@ -82,6 +82,19 @@ crowd.
 
 <img src={require('./img/video-faces-picker.webp').default} alt='The Select face panel for an unnamed face shows its 50 moments above the people search; the video is paused at 2:11 with a white box around the face' title='Naming a face, with its moments above the people to choose from' />
 
+### In the mobile app
+
+Open a video and swipe up to its details. Under **People**, each person who appears in the video has a small film
+badge on the top-left of their picture. Tapping the picture still opens the person, as before. Tap the badge to open
+a row of their moments under the pictures, then tap a moment: the video above pauses there with the same white box
+around their face. Tap the badge again, or the close button, to close the row.
+
+<img src={require('./img/video-faces-mobile-badge.webp').default} width="45%" alt='The People row in a video’s details, with a small film badge on the top-left of each person’s picture' title='The film badge on each person who appears in the video' />
+<img src={require('./img/video-faces-mobile-moments.webp').default} width="45%" alt='Alex’s badge is on and his 48 moments are listed under People; the 0:29 moment is selected, and the video above is paused there with a white box around his face' title='A person’s moments, with the video paused on one of them' />
+
+The app shows moments but doesn't change them: to correct a moment, use the web. People shown through a shared space
+don't get the badge in the app yet.
+
 ## Correcting a face
 
 Sometimes a moment shows someone else: two people standing in the same spot a moment apart can be followed as one
@@ -109,7 +122,8 @@ puts it back where it was.
 - **Running face detection on the video again undoes corrections.** It follows everyone through the video afresh, so
   removed moments come back, and moved ones are added back to the face they came from.
 
-Only the video's owner can change moments. Anyone who can see the video can view them.
+Only the video's owner can change moments, on the web. Anyone who can see the video can view them, in the browser or
+the app.
 
 ## How long it takes
 
