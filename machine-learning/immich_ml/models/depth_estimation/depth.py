@@ -1,5 +1,6 @@
 import base64
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import cv2
@@ -8,6 +9,7 @@ import onnxruntime as ort
 from numpy.typing import NDArray
 from PIL import Image
 
+from immich_ml.config import log
 from immich_ml.models.constants import SUPPORTED_PROVIDERS
 from immich_ml.models.gallery_hosted import GalleryHostedModel
 from immich_ml.models.transforms import decode_pil, widen
@@ -15,11 +17,13 @@ from immich_ml.schemas import (
     DepthEstimationOptions,
     DepthEstimationOutput,
     ModelFormat,
+    ModelSession,
     ModelSource,
     ModelTask,
     ModelType,
     Shape,
 )
+from immich_ml.sessions.ort import GraphSpec, OrtSession
 from immich_ml.sessions.policy import ShapePolicy
 
 # Every supported model is a Depth Anything V2 network (DINOv2 encoder, DPT head), so they share preprocessing: a short
@@ -31,7 +35,8 @@ _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 # A static-shape provider compiles one graph per shape, so a photo snaps to the canvas nearest its aspect ratio:
-# square, 4:3, 3:2 and 16:9, both ways round. The CPU provider takes any size and gets the photo's own aspect.
+# square, 4:3, 3:2 and 16:9, both ways round. The CPU provider takes any size and gets the photo's own aspect. Only one
+# canvas graph stays open at a time: see DepthEstimator._infer.
 CANVASES = tuple(
     Shape(batch=1, height=h, width=w)
     for long in (518, 686, 770, 924)
@@ -69,6 +74,7 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
 
     def __init__(self, model_name: str, **model_kwargs: Any) -> None:
         self.int8 = model_name in INT8_MODELS and _cpu_only()
+        self._switch = Lock()
         super().__init__(model_name, **model_kwargs)
 
     @property
@@ -82,15 +88,27 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
         unused = "model.onnx" if self.int8 else INT8_FILE
         return [*super().ignore_patterns, f"*/{unused}"]
 
+    def _load(self) -> ModelSession:
+        session = super()._load()
+        if isinstance(session, OrtSession):
+            # the precision the session's graphs are prepared at, as GraphSpec decides it for this provider
+            half = GraphSpec(self.model_path, {}, (), session.providers, []).half
+            precision = "int8" if self.int8 else "fp16" if half else "fp32"
+            canvases = "at each photo's own aspect" if session.dynamic else f"one of {len(session.shapes)} canvases"
+            log.info(
+                f"Depth model '{self.model_name}' runs {self.model_path.name} ({precision}) on {session.providers[0]}, "
+                f"{canvases}"
+            )
+        return session
+
     def _predict(self, inputs: Image.Image | bytes, options: DepthEstimationOptions) -> DepthEstimationOutput:
         image = decode_pil(inputs)
         if image.mode != "RGB":
             image = image.convert("RGB")
         height, width = self._input_size(image.height, image.width)
-        graph = self.session.for_shape(Shape(batch=1, height=height, width=width))
         pixels = np.asarray(image.resize((width, height), Image.Resampling.BICUBIC), dtype=np.float32) / 255.0
         blob = ((pixels - _MEAN) / _STD).transpose(2, 0, 1)[None].astype(np.float32)
-        raw = widen(graph.run(None, {graph.get_inputs()[0].name: blob})[0])
+        raw = widen(self._infer(Shape(batch=1, height=height, width=width), blob))
         disparity = self._normalise(raw.reshape(raw.shape[-2:]))
         encoded = cv2.imencode(".png", (disparity * 255).round().astype(np.uint8))[1]
         metrics = self.metrics(disparity)
@@ -103,6 +121,21 @@ class DepthEstimator(GalleryHostedModel[DepthEstimationOptions]):
             "foregroundRatio": metrics["foregroundRatio"],
             "focus": metrics["focus"],
         }
+
+    def _infer(self, shape: Shape, blob: NDArray[np.float32]) -> NDArray[Any]:
+        session = self.session
+        if not isinstance(session, OrtSession) or session.dynamic:
+            graph = session.for_shape(shape)
+            return graph.run(None, {graph.get_inputs()[0].name: blob})[0]
+        # A static provider keeps a graph per canvas, and on an integrated GPU each pins 2-6 GB of shared memory, so
+        # all seven open at once outgrow most hosts (issue #1282). Only the canvas this photo needs stays open:
+        # reopening one from the compile cache takes a second or two. Photos run one at a time here, so a graph is never
+        # dropped mid-run, and OpenVINO runs each graph it imports before importing the next (see OrtSession.warm).
+        with self._switch:
+            for other in [open_shape for open_shape in session.graphs if open_shape != shape]:
+                del session.graphs[other]
+            graph = session.for_shape(shape)
+            return graph.run(None, {graph.get_inputs()[0].name: blob})[0]
 
     def _input_size(self, height: int, width: int) -> tuple[int, int]:
         canvases = [(shape.height, shape.width) for shape in self.session.shapes if shape.height and shape.width]
