@@ -3,7 +3,7 @@
   import VideoFaceSightings from '#lib/gallery/asset-viewer/VideoFaceSightings.svelte';
   import { IconButton, Input } from '@immich/ui';
   import { mdiArrowLeftThin } from '@mdi/js';
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
@@ -66,6 +66,10 @@
     searchActions,
     videoFace,
   }: Props = $props();
+
+  let searchInputEl: HTMLInputElement | null = $state(null);
+
+  onMount(() => searchInputEl?.focus());
 </script>
 
 <section
@@ -97,7 +101,13 @@
       <VideoFaceSightings faceIds={[videoFace.id]} canEdit={videoFace.canEdit} />
     {/if}
     <div class="mb-4 flex gap-2">
-      <Input placeholder={$t('search_people')} bind:value={query} oninput={() => onQueryChange?.(query)} size="tiny" />
+      <Input
+        placeholder={$t('search_people')}
+        bind:value={query}
+        bind:ref={searchInputEl}
+        oninput={() => onQueryChange?.(query)}
+        size="tiny"
+      />
       {#if searchActions}
         {@render searchActions()}
       {/if}
