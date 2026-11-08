@@ -21,6 +21,7 @@ from immich_ml.schemas import (
     ModelSource,
     Shape,
 )
+from immich_ml.sessions.ort import GraphSpec, OrtSession
 
 
 def _graph_session(batches: tuple[int, ...] = (2, 1)) -> mock.Mock:
@@ -182,6 +183,43 @@ class TestDepthEstimation:
 
         assert estimator.model_path == estimator.model_dir / "model.onnx"
         assert estimator.ignore_patterns == ["*.armnn", "*.rknn", "*/model_int8.onnx"]
+
+    def test_static_provider_keeps_only_the_canvas_in_use_open(self, mocker: MockerFixture) -> None:
+        """On an integrated GPU each canvas pins gigabytes of shared memory, so seven open at once ran hosts out of
+        memory (issue #1282)."""
+
+        def graph(spec: GraphSpec) -> mock.Mock:
+            built = mock.Mock()
+            built.get_inputs.return_value = [mock.Mock()]
+            built.run.return_value = [self._disc(spec.pins["height"], spec.pins["width"], 100)[None]]
+            return built
+
+        estimator = self._estimator(mocker, cpu_only=False)
+        build = mocker.patch("immich_ml.sessions.ort.OrtGraph", side_effect=graph)
+        session = OrtSession("model.onnx", estimator.shape_policy, providers=["OpenVINOExecutionProvider"])
+        estimator.session = session
+        landscape, wide = Image.new("RGB", (4032, 3024)), Image.new("RGB", (1920, 1080))
+
+        for image in (landscape, wide, wide):
+            estimator.predict(image, options=DepthEstimationOptions())
+
+        assert list(session.graphs) == [Shape(batch=1, height=518, width=924)]
+        assert build.call_count == 2  # the repeated canvas reused its open graph
+
+    def test_load_logs_the_file_precision_and_provider(self, mocker: MockerFixture) -> None:
+        estimator = self._estimator(mocker, cpu_only=False)
+        mocker.patch(
+            "immich_ml.models.depth_estimation.depth.GalleryHostedModel._load",
+            return_value=OrtSession("model.onnx", estimator.shape_policy, providers=["OpenVINOExecutionProvider"]),
+        )
+        log = mocker.patch("immich_ml.models.depth_estimation.depth.log")
+
+        estimator._load()
+
+        log.info.assert_called_once_with(
+            "Depth model 'depth-anything-v2-small' runs model.onnx (fp32) on OpenVINOExecutionProvider, "
+            "one of 7 canvases"
+        )
 
     def test_download_targets_expected_repo(self, mocker: MockerFixture) -> None:
         mocker.patch("immich_ml.models.depth_estimation.depth._cpu_only", return_value=True)
