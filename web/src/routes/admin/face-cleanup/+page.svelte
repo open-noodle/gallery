@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
-  import { Button, Icon } from '@immich/ui';
-  import { mdiAccountSearch, mdiArrowRight, mdiRadar, mdiSwapHorizontal } from '@mdi/js';
+  import { triggerScan } from '@immich/sdk';
+  import { Button, Icon, toastManager } from '@immich/ui';
+  import { mdiAccountSearch, mdiArrowRight, mdiRadar, mdiRefresh, mdiSwapHorizontal } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
   import { faceCleanupBreadcrumbs } from './breadcrumbs';
@@ -53,6 +55,22 @@
 
   const formatDate = (dateStr: string | null | undefined) => (dateStr ? new Date(dateStr).toLocaleString() : null);
 
+  let starting = $state(false);
+
+  // Starts a scan here, then opens the scan page, which picks up the running scan and shows its progress.
+  const rescan = async () => {
+    starting = true;
+    try {
+      await triggerScan({ faceRepairScanTriggerRequestDto: {} });
+      await goto(Route.faceCleanupScan());
+    } catch (error: unknown) {
+      const status = (error as { status?: number }).status;
+      toastManager.danger($t(status === 409 ? 'admin.face_cleanup_scan_conflict' : 'admin.face_cleanup_scan_error'));
+    } finally {
+      starting = false;
+    }
+  };
+
   // Tinted status-chip palette (background + text + dot) keyed by semantic tone. Kept as literal class
   // strings so Tailwind's source scanner emits every variant even though the tone is chosen at runtime.
   const tone = {
@@ -92,17 +110,32 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t)}>
   <div class="mx-auto max-w-screen-xl p-6 sm:p-8">
-    <!-- Header. The last-scan chip stays on the right; the explainer below is unconditional (design §3.4) —
-         it used to be gated on `firstVisit`, which hid it from every visit after the first scan. -->
+    <!-- Header. The last-scan chip and its re-scan button stay on the right; the explainer below is
+         unconditional (design §3.4) — it used to be gated on `firstVisit`, which hid it after the first scan. -->
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">{$t('admin.face_cleanup')}</h1>
-      {#if !firstVisit && scan?.finishedAt}
-        <span
-          class="inline-flex flex-none items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-        >
-          <span class="size-1.5 rounded-full bg-gray-400"></span>
-          {$t('admin.face_cleanup_last_scan')} · {formatDate(scan.finishedAt)}
-        </span>
+      {#if !firstVisit}
+        <div class="flex flex-wrap items-center gap-2">
+          {#if scan?.finishedAt}
+            <span
+              class="inline-flex flex-none items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <span class="size-1.5 rounded-full bg-gray-400"></span>
+              {$t('admin.face_cleanup_last_scan')} · {formatDate(scan.finishedAt)}
+            </span>
+          {/if}
+          <Button
+            color="primary"
+            size="small"
+            disabled={starting || scanRunning}
+            onclick={rescan}
+            data-testid="face-cleanup-rescan"
+            class="gap-2"
+          >
+            <Icon icon={mdiRefresh} size="16" />
+            {$t('admin.face_cleanup_rescan')}
+          </Button>
+        </div>
       {/if}
     </div>
 
