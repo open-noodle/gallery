@@ -93,6 +93,14 @@ runs all of them. Each is published in Gallery's Hugging Face org as `open-noodl
 - **Fixed shapes for accelerators.** A static-shape provider compiles one graph per shape, so a photo snaps to the
   nearest of seven canvases: square, 4:3, 3:2 and 16:9 both ways round, short side 518. The CPU provider takes the
   photo's own aspect, up to 160 patches a side.
+- **One canvas open at a time** (issue #1282). On an integrated GPU, OpenVINO's working buffers for a graph are shared
+  memory pinned by the driver: charged to the container, never reclaimed, and growing with the square of the token
+  count. Measured on an Intel HD 630 (Gen9, 24 EUs), small model, fp32: 518×518 2.0–2.6 GB, 4:3 3.3–3.9 GB, 16:9
+  5.9 GB, so all seven open came to about 28 GB and OOM-killed the shared ML container. The large model's compile alone
+  passed 12 GB. Requests open canvases lazily (`warm()` runs only for preloaded models), so a library run ended with
+  all seven open. `DepthEstimator._infer` therefore drops the other open graphs before opening the one a photo needs,
+  and runs photos one at a time on a static provider. Dropping a graph frees its memory fully; reopening it from the
+  compile cache takes 1–2 s (a first compile about 20 s). With it, 16 photos across six canvases peaked at 7.6 GB, in the 10 GB limit the report OOMed at.
 - **Cost.** Measured on an Apple M2 CPU (ONNX Runtime CPU provider, 4 threads, 1440 px previews): fp32 about 650 ms per
   photo (99 MB of weights); the int8 export about 490 ms (27 MB), with output correlating 0.999 with fp32 and a mean
   absolute difference under 1%. Ship int8 as the default. Expect two to three seconds per photo on a typical NAS CPU,
