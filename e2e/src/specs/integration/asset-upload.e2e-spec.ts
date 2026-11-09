@@ -38,7 +38,7 @@ test.describe('Asset Upload Integration', () => {
     await page.waitForSelector('#immich-asset-viewer');
 
     await page.getByRole('button', { name: 'Info' }).click();
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
   });
 
   test('asset can be deleted and disappears from timeline', async ({ context, page }) => {

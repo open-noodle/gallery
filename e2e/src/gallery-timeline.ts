@@ -45,7 +45,7 @@ export const thumbnailUtils = {
     return page.locator(`[data-thumbnail-focus-container][data-asset="${assetId}"] button[role="checkbox"]`);
   },
   async expectThumbnailIsFavorite(page: Page, assetId: string) {
-    await expect(thumbnailUtils.withAssetId(page, assetId).locator('[data-icon-favorite]')).toHaveCount(1);
+    await expect(thumbnailUtils.withAssetId(page, assetId).locator('[data-testid="favorite-icon"]')).toHaveCount(1);
   },
   async expectInViewport(page: Page, assetId: string) {
     const box = await poll(page, () => thumbnailUtils.withAssetId(page, assetId).boundingBox());

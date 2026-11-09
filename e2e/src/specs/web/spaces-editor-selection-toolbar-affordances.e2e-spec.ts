@@ -53,7 +53,7 @@ async function selectAssetAndResolveEditable(
   );
 
   await checkbox.click();
-  const controlBar = page.locator('#control-bar');
+  const controlBar = page.locator('[data-testid="control-bar"]');
   await expect(controlBar).toBeVisible();
 
   let editableAssetIds: string[] | null = null;
@@ -204,7 +204,7 @@ test.describe("Spaces — SelectionToolbar editor-widened affordances on a space
     await expect(ownThumb).toBeVisible();
     await ownThumb.hover();
     await thumbnailUtils.selectButton(page, editorAsset.id).click();
-    await expect(page.locator('#control-bar')).toBeVisible();
+    await expect(page.locator('[data-testid="control-bar"]')).toBeVisible();
 
     // ... then add Bob's, which flips isAllUserOwned to false and triggers the debounced resolve.
     const { controlBar, editableAssetIds } = await selectAssetAndResolveEditable(page, bobAssetId);
