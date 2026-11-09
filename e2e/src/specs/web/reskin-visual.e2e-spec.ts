@@ -26,6 +26,11 @@ const gotoThemed = async (
   await page.goto(path);
   await page.waitForLoadState('networkidle');
   await page.evaluate((t) => document.documentElement.classList.toggle('dark', t === 'dark'), theme);
+  // Colours ease over 200 ms (the sidebar items' transition-all), so a scan right after the toggle
+  // can read light-theme text on a dark background. Wait for those transitions to finish.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((animation) => !(animation instanceof CSSTransition)),
+  );
 };
 
 test.describe('re-skin hardening', () => {
