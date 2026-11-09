@@ -69,4 +69,14 @@ describe('installViewerZoom', () => {
     thumbnail().querySelector<HTMLElement>('[data-icon-select]')!.click();
     expect(flyers()).toBe(0);
   });
+
+  it('puts no copy up while photos are being selected, when a click selects instead of opening', () => {
+    const photo = thumbnail().querySelector('img')!;
+    // The selection bar (ControlAppBar) is on screen whenever a selection is active.
+    const bar = document.createElement('div');
+    bar.dataset.testid = 'control-bar';
+    document.body.append(bar);
+    photo.click();
+    expect(flyers()).toBe(0);
+  });
 });

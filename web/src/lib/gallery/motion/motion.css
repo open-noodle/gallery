@@ -473,7 +473,7 @@ section > div > [data-motion-memory]:last-child {
 }
 
 /* The selection bar slides down over the top bar when photos are selected. */
-#control-bar {
+[data-testid='control-bar'] {
   animation:
     gallery-fade-in var(--motion-quick) var(--ease-standard),
     gallery-drop-in var(--spring-bouncy-duration) var(--spring-bouncy);
@@ -545,7 +545,7 @@ section > div > [data-motion-memory]:last-child {
 
   #sidebar div.relative.flex + div,
   #sidebar div.relative.flex > button.absolute svg,
-  #control-bar,
+  [data-testid='control-bar'],
   [data-motion-reveal] {
     animation: none;
   }
