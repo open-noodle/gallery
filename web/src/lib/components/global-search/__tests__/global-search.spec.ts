@@ -3,6 +3,7 @@ import { commandContextManager } from '#lib/managers/command-context-manager.sve
 import { GlobalSearchManager, type Provider, type Sections } from '#lib/managers/global-search-manager.svelte.ts';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '#lib/stores/cmdk-recent.ts';
+import { resolveLiveTypedSearchSuggestions } from '#lib/utils/typed-search/typed-search-live-suggestions.ts';
 import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchSmart } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { tick } from 'svelte';
@@ -83,6 +84,11 @@ vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
     },
   },
 }));
+// The live filter rows are seeded by hand. setQuery / setInputCaret arm a 150 ms timer
+// that would resolve the real suggestions (empty here) and overwrite the seed whenever
+// rendering takes longer than that, as it does on CI runners. Keep that request pending.
+vi.mock(import('#lib/utils/typed-search/typed-search-live-suggestions.ts'), { spy: true });
+
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
   return {
@@ -144,6 +150,10 @@ function stubAllEntitySections(m: GlobalSearchManager) {
   providers.tags.run = () =>
     Promise.resolve({ status: 'ok' as const, items: [{ id: 't1', name: 'beach' } as never], total: 1 });
 }
+
+beforeEach(() => {
+  vi.mocked(resolveLiveTypedSearchSuggestions).mockImplementation(() => new Promise(() => {}));
+});
 
 describe('global-search root', () => {
   beforeEach(() => {
