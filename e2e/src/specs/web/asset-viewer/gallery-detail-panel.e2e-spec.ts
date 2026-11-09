@@ -59,7 +59,7 @@ test.describe('Detail Panel (Gallery)', () => {
     await page.goto(`/photos/${fullyTaggedAsset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
 
     // All 7 section testids must be visible together.
     for (const testid of [
