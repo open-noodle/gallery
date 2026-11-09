@@ -298,7 +298,8 @@ const createViewer = (page: Page) => {
     description: page.getByPlaceholder('add_a_description'),
     rating: page.getByTestId('star-container'),
     editDateButton: page.getByTestId('detail-panel-edit-date-button'),
-    editLocationButton: page.getByTitle('edit_location'),
+    // Gallery: the location pencil is its own IconButton, whose title is a tooltip, not an attribute.
+    editLocationButton: page.getByRole('button', { name: 'edit_location', exact: true }),
     changeDate: {
       dateInput: page.getByLabel('date_and_time', { exact: true }),
       timezoneInput: page.getByRole('combobox', { name: 'timezone' }),

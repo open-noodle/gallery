@@ -136,7 +136,6 @@
         <IconButton
           icon={mdiPencil}
           aria-label={$t('edit_location')}
-          title={$t('edit_location')}
           size="small"
           shape="round"
           color="secondary"
