@@ -10,6 +10,9 @@ test('arrow keys move between the assets of a duplicate group', async ({ page, d
   await app.duplicates.viewButton.first().click();
   await expect(app.viewer.root).toBeVisible();
   const viewedAssetId = () => new URL(page.url()).pathname.split('/').at(-1);
+  // Gallery: the viewer mounts through lazyComponent as soon as the asset is set, a moment before
+  // navigate() puts its id in the URL.
+  await expect.poll(viewedAssetId).not.toBe('duplicates');
   const initial = viewedAssetId();
   expect([first.id, second.id]).toContain(initial);
 
