@@ -26,6 +26,8 @@ run = "prettier --write ."
 
 [tasks.lint]
 env._.path = "./node_modules/.bin"
+# Gallery: typed lint of the fork-sized tree peaks near Node's default 4 GB heap and ran out on CI.
+env.NODE_OPTIONS = "--max-old-space-size=8192"
 run = "eslint \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings 0"
 
 [tasks."lint-fix"]
