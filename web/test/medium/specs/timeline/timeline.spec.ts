@@ -271,6 +271,15 @@ test.describe('timeline', () => {
       const assets = data.addTimeline();
       const yearMonths = yearMonthsOf(assets);
       await page.goto(Route.photos({ at: assets[0].id }));
+      // Gallery: the scrubber mounts late enough here that it is still flying in (Svelte's fly ignores
+      // reduced motion), so its box would be measured mid-slide. Wait for it to settle.
+      await expect
+        .poll(() =>
+          app.timeline
+            .scrubber(yearMonths[0])
+            .evaluate((element) => element.closest('[data-id="scrubber"]')!.getAnimations().length),
+        )
+        .toBe(0);
 
       const first = (await app.timeline.scrubber(yearMonths[0]).boundingBox())!;
       await app.timeline.scrubber(yearMonths[0]).hover();

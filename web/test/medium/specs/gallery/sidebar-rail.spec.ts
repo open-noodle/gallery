@@ -1,11 +1,14 @@
 import { Route } from '#lib/route.ts';
 import { expect, test } from '#test/medium/fixtures.ts';
+import { restoreViewport } from '#test/medium/gallery/viewport.ts';
 
 // Gallery's sidebar rail (narrow screens): rail layout, hover expansion, explicit rail choice, the hamburger.
 const sidebar = '[data-testid="sidebar-parent"]';
 const grid = '[data-testid="user-page-grid"]';
 
 test.describe('sidebar rail', () => {
+  test.afterEach(restoreViewport);
+
   test('shows the rail at 1000px and expands on hover without moving the grid', async ({ page }) => {
     await page.setViewportSize({ width: 1000, height: 900 });
     await page.goto(Route.photos());
