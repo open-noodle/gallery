@@ -12,7 +12,7 @@
   `ghcr.io/immich-app/immich-server:v3.4.0-rc.3` is published.
 - **Product gate**: did not fire. Two owner decisions at Checkpoint 1: port every fork web spec to Vitest browser
   mode now (immich-33008), and take mobile passkeys (immich-33005) but switched off in Gallery builds.
-- **Risk**: MEDIUM (the web test port touches ~330 files). **Recommendation**: PROCEED to remote CI.
+- **Risk**: MEDIUM (the web test port touches ~330 files). **Remote CI**: green; see the end of this report.
 - Backups: `backup/rolling-v34-pre-forksync-1107` (pre-cycle tip `991afe2b8d8`, pushed),
   `backup/rolling-v34-post-forksync-1107` (after the fork sync, pushed).
 
@@ -135,4 +135,57 @@ suite: 461 files, 7055 tests.
 
 ## Remote CI verification
 
-Pending.
+GitHub had switched Actions off for the repository on 2026-11-06 (every dispatch: HTTP 422 "Actions has been
+disabled for this repository", while every setting the API shows said enabled). Re-enabled from the banner on the
+repository's Actions tab. Final tip `4d48956f4db`; every later commit only touches tests or CI.
+
+| Workflow                                 | Run           | Commit        | Result |
+| ---------------------------------------- | ------------- | ------------- | ------ |
+| Test (21 jobs)                           | `42680443566` | `4d48956f4db` | PASS   |
+| Static Code Analysis                     | `42658035075` | `da453100139` | PASS   |
+| Docker                                   | `42676122470` | `82f442c25f5` | PASS   |
+| Gallery Rebase Smoke                     | `42658046000` | `da453100139` | PASS   |
+| Gallery Build Mobile (development)       | `42519907423` | `2a68a9f2247` | PASS   |
+| Storage Migration Tests / E2E            | `42520042018` / `42520086134` | `2a68a9f2247` | PASS |
+| Gallery ML Smoke / Mobile Smoke          | `42520171704` / `42520215713` | `2a68a9f2247` | PASS |
+| Release Candidate Build `rolling-v34-rc12` | `42658066317` | `da453100139` | PASS |
+| Revert-to-Immich (rc12 + stock `v3.4.0-rc.3`) | `42672141531` | `366ed2d888a` | PASS |
+
+Mobile, ML and storage code did not change after `2a68a9f2247`.
+
+What CI found, fixed on the branch:
+
+- **Production**: rc.3 replaced `ControlAppBar`'s `id="control-bar"` with a `data-testid`. The fork's viewer zoom
+  used the id to tell a selecting click from an opening one, and `motion.css` animated the selection bar by it:
+  selecting photos put a stray zoom copy up and the bar no longer slid in. Both follow the test id; a
+  viewer-zoom case covers the guard. Same rename for `detail-panel`, `data-icon-favorite` → `favorite-icon`,
+  `memory-viewer`: fork e2e and medium specs follow it.
+- **rc.3's medium harness**: every POST counts as a mutation a spec must assert; Gallery's POST reads
+  (`getAssetSpaces` and seven more) are declared in `test/common/gallery/handlers.ts` and added to the
+  dispatcher's read list by one loop. One page per worker leaked state: two fork specs left it at 390px, and
+  localStorage kept the info panel open into the next test (the fork's init script now clears storage on each
+  test's first load, keyed on a cookie the teardown clears). Upstream specs edited where Gallery differs, each
+  with a `// Gallery:` comment: the location pencil is an `IconButton` (title is a tooltip, not an attribute),
+  the scrubber is measured after its fly-in, the duplicates viewer test waits for the URL (Gallery mounts the
+  viewer through `lazyComponent`), and the add-to-album count case is skipped (Gallery's album-or-space picker).
+- **Web unit**: `global-search` seeded live filter rows that any caret sync (CI's Chromium fires `select` after
+  render) reset; the spec stubs the live scheduler. `cleanup-hub-page` hovers through `mouseenter`, since
+  parallel files share the real mouse.
+- **Server lint** ran out of Node's default 4 GB heap on CI (it peaks near 4.7 GB); the task gets 8 GB.
+- **Revert gate, upstream bug**: since rc.3 (its four `futo_backups_*` enums), a vacuumed `pg_enum` is read
+  through its `(enumtypid, enumlabel)` index, and `@immich/sql-tools` 0.7.0 reads enum values without
+  `ORDER BY`, so stock Immich reports every non-alphabetical enum as drift after any VACUUM. Reproduced on
+  stock rc.3 alone (fresh database, `VACUUM ANALYZE`, boot: six enums). Users of either app see only drift
+  warnings. The gate now takes its stock baseline on a vacuumed database. Worth reporting to sql-tools.
+
+Open, not fixed:
+
+- `gallery-album-filters.e2e-spec.ts:101` passed on retry once (`42680443566`): with the add-photos picker open,
+  the album page's own filter query (Album Tag) ran again and the picker showed its result instead of the Picker
+  Tag one. The album page keeps one timeline whose options switch between the album's filters and the picker's;
+  something reloads it with the album's while picking. Likely a real, rare bug; not seen in eight runs on
+  `main`.
+- The ARM server e2e job once lost its server mid-run (exit 135, SIGBUS, nothing logged); it passed on the next
+  three runs.
+- Locally only (a German macOS region): three medium timeline specs type dates in month-first order into a native
+  date input that the region shows day-first; they pass on CI.
