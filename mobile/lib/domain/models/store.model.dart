@@ -29,6 +29,9 @@ enum StoreKey<T> {
   photosLibraryView<String>._(90008),
   // Data Saver video's "on mobile data" switch (lib/gallery/video/data_saver_video.dart).
   dataSaverVideoOnMobileData<bool>._(90009),
+  // App Lock (lib/providers/app_lock.provider.dart).
+  appLockEnabled<bool>._(90010),
+  appLockTimeout<int>._(90011),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
