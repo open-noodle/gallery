@@ -6,7 +6,7 @@ import { CleanupCountQueue, type CleanupCountResponseDto } from '@immich/sdk';
 import type { Component } from 'svelte';
 import { expect } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { page, userEvent } from 'vitest/browser';
+import { page } from 'vitest/browser';
 import CleanupPage from './CleanupHubPage.svelte';
 
 const sdk = vi.hoisted(() => ({
@@ -57,6 +57,12 @@ const deferred = <T>() => {
 };
 
 const asset = (id: string) => ({ id, thumbhash: null, originalFileName: `${id}.jpg` });
+
+// Hover by firing the cell's own mouseenter. Spec files running in parallel share one real mouse, so
+// moving it here (userEvent.hover) lets another file's pointer move fire the calendar's pointerleave,
+// which sends the banner back to today and aborts the peek under test.
+const hoverDay = (monthDay: number) =>
+  page.getByTestId(`cleanup-cal-${monthDay}`).element().dispatchEvent(new MouseEvent('mouseenter'));
 
 describe('Cleanup hub page', () => {
   afterEach(() => {
@@ -160,7 +166,7 @@ describe('Cleanup hub page', () => {
     await renderPage();
     await vi.advanceTimersByTimeAsync(0);
 
-    await userEvent.hover(page.getByTestId('cleanup-cal-102'));
+    hoverDay(102);
     await vi.advanceTimersByTimeAsync(150);
     await expect.element(page.getByTestId('cleanup-day-banner')).toMatchTextContent('January 2');
     await expect
@@ -251,17 +257,17 @@ describe('Cleanup hub page', () => {
     sdk.getCleanupRewindYears.mockClear();
 
     // 102 then 103 inside the 150 ms window: only 103 is fetched
-    await userEvent.hover(page.getByTestId('cleanup-cal-102'));
+    hoverDay(102);
     await vi.advanceTimersByTimeAsync(100);
-    await userEvent.hover(page.getByTestId('cleanup-cal-103'));
+    hoverDay(103);
     await vi.advanceTimersByTimeAsync(150);
     expect(sdk.getCleanupRewindYears.mock.calls.map(([args]) => args)).toEqual([{ monthDay: 103 }]);
     await expect.element(page.getByAltText('day-103.jpg')).toBeInTheDocument();
 
     // 101's request is still in flight when 104 starts: its late answer is dropped
-    await userEvent.hover(page.getByTestId('cleanup-cal-101'));
+    hoverDay(101);
     await vi.advanceTimersByTimeAsync(150);
-    await userEvent.hover(page.getByTestId('cleanup-cal-104'));
+    hoverDay(104);
     await vi.advanceTimersByTimeAsync(150);
     slow.resolve({ years: [{ year: 2020, count: 9 }] });
     await vi.advanceTimersByTimeAsync(0);
@@ -280,7 +286,7 @@ describe('Cleanup hub page', () => {
     sdk.getCleanupRewindYears.mockClear();
 
     const cell = page.getByTestId('cleanup-cal-102');
-    await userEvent.hover(cell);
+    hoverDay(102);
     await vi.advanceTimersByTimeAsync(150);
     (cell.element() as HTMLElement).focus();
     await vi.advanceTimersByTimeAsync(150);
