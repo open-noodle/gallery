@@ -10,12 +10,26 @@ import { pipeline } from 'node:stream';
 import { Observable } from 'rxjs';
 import type { ImmichFile, UploadFile, UploadFiles } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
-import { RouteKey } from 'src/enum.js';
+import { ImmichHeader, RouteKey } from 'src/enum.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import { asUploadRequest, mapToUploadFile } from 'src/utils/asset.util.js';
+import { fromChecksum, fromMaybeArray } from 'src/utils/request.js';
+
+// rejects empty files, Exiv2 `.exv` blobs (\xff\x01Exiv2) and files whose hash differs from x-immich-checksum
+export function getUploadError(size: number, head: Buffer, digest?: Buffer, checksum?: string) {
+  if (size === 0) {
+    return 'File is empty';
+  }
+  if (head.subarray(0, 6).equals(Buffer.from([0xff, 0x01, 0x45, 0x78, 0x69, 0x76]))) {
+    return 'File is an Exiv2 metadata blob';
+  }
+  if (digest && checksum && !digest.equals(fromChecksum(checksum))) {
+    return 'Checksum mismatch';
+  }
+}
 
 export function getFile(files: UploadFiles, property: 'assetData' | 'sidecarData') {
   const file = files[property]?.[0];
@@ -118,10 +132,14 @@ export class FileUploadInterceptor implements NestInterceptor {
       const hash = file.fieldname === UploadFieldName.ASSET_DATA ? createHash('sha1') : null;
 
       let size = 0;
+      let head = Buffer.alloc(0);
 
       file.stream.on('data', (chunk) => {
         hash?.update(chunk);
         size += chunk.length;
+        if (head.length < 6) {
+          head = Buffer.concat([head, chunk]).subarray(0, 6);
+        }
       });
 
       pipeline(file.stream, writeStream, (error) => {
@@ -129,13 +147,15 @@ export class FileUploadInterceptor implements NestInterceptor {
           hash?.destroy();
           return callback(error);
         }
-        if (size === 0) {
-          return callback(new BadRequestException('File is empty'));
+        const checksum = hash?.digest();
+        const message = getUploadError(size, head, checksum, fromMaybeArray(request.headers[ImmichHeader.Checksum]));
+        if (message) {
+          return callback(new BadRequestException(message));
         }
         callback(null, {
           path,
           size,
-          checksum: hash?.digest(),
+          checksum,
         });
       });
     } catch (error: Error | any) {
