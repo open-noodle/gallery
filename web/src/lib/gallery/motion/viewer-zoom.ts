@@ -163,7 +163,7 @@ landed on a control inside it (the select circle), which never opens it: a copy 
 the page until CLICK_MAX_AGE_MS dropped it. Not links: a hovered thumbnail is covered by one.
 */
 const opensViewer = (event: Event) =>
-  !document.querySelector('#control-bar') &&
+  !document.querySelector('[data-testid="control-bar"]') &&
   !(event.target instanceof Element && event.target.closest('button, input, [role="checkbox"]')) &&
   (event instanceof KeyboardEvent
     ? event.key === 'Enter'
