@@ -422,6 +422,11 @@ jobs:
 
           boot_server "$STOCK_IMAGE" pre
           if ! wait_for_geodata_init pre; then exit 1; fi
+          # Every later check runs on a vacuumed database: each boot that applies migrations vacuums it.
+          # Take the baseline in that state too. Since v3.4.0-rc.3 a vacuumed pg_enum is read through its
+          # (enumtypid, enumlabel) index, and sql-tools reads enum values without ORDER BY, so stock Immich
+          # reports its own non-alphabetical enums as drift after any vacuum.
+          docker exec database psql -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" -v ON_ERROR_STOP=1 -c 'VACUUM ANALYZE' >/dev/null
           extract_drift > /tmp/drift-baseline.txt
           echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
           cat /tmp/drift-baseline.txt || true
