@@ -319,7 +319,7 @@ describe('SelectionToolbar', () => {
     });
 
     expect(page.getByLabelText('menu').query()).toBeNull();
-    expect(container.querySelector('#control-bar')).toBeNull();
+    expect(container.querySelector('[data-testid="control-bar"]')).toBeNull();
   });
 });
 
