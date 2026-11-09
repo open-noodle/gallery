@@ -85,7 +85,7 @@ const openDetailPanel = async (page: Page, path: string) => {
   await page.goto(path, { waitUntil: 'commit' });
   await page.waitForSelector('#immich-asset-viewer');
   await page.getByRole('button', { name: 'Info' }).click();
-  await expect(page.locator('#detail-panel')).toBeVisible();
+  await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
 };
 
 /**
@@ -179,7 +179,7 @@ test.describe('Asset viewer contextual filters', () => {
     await page.goto(`/spaces/${spaceId}/photos/${assetId}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.getByRole('button', { name: 'Info' }).click();
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
   };
 
   test('clicking the camera filters the Space, closes the viewer, and leaves a removable chip', async ({

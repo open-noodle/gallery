@@ -39,8 +39,8 @@ async function selectAsset(page: Page, assetId: string): Promise<Locator> {
   const checkbox = thumbnailUtils.selectButton(page, assetId);
   await expect(checkbox).toBeVisible();
   await checkbox.click();
-  await expect(page.locator('#control-bar')).toBeVisible();
-  return page.locator('#control-bar');
+  await expect(page.locator('[data-testid="control-bar"]')).toBeVisible();
+  return page.locator('[data-testid="control-bar"]');
 }
 
 // Opens the toolbar's "⋯" overflow menu (Download, Remove-from-album, Set-cover, Delete, and the
