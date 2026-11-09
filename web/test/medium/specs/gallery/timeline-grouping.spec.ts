@@ -1,9 +1,12 @@
 import { Route } from '#lib/route.ts';
 import { expect, test } from '#test/medium/fixtures.ts';
+import { restoreViewport } from '#test/medium/gallery/viewport.ts';
 import { DateTime } from 'luxon';
 
 // Gallery's timeline grouping (years, months, days), served by the bucketSize handlers in gallery/time-buckets.ts.
 test.describe('timeline grouping', () => {
+  test.afterEach(restoreViewport);
+
   test('zooms from years to months to days without temporal chips on Photos', async ({ page, data }) => {
     data.addTimeline({ years: 2 });
     await page.goto(Route.photos());
