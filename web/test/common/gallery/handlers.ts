@@ -1,6 +1,19 @@
 import type { MockData } from '#test/common/data.ts';
 import { galleryTimeBucketHandlers } from '#test/common/gallery/time-buckets.ts';
-import type { Handlers } from '#test/common/types.ts';
+import type { Handlers, OperationId } from '#test/common/types.ts';
+
+// Gallery endpoints that use POST to read (a body too large for a query string). The dispatcher treats
+// them like upstream's `searchAssets`: not a mutation a spec has to assert.
+export const galleryReadOperations: OperationId[] = [
+  'getAlbumAddTargets',
+  'getAssetSpaces',
+  'getCleanupAssetsInSpaces',
+  'getEditableAssets',
+  'getFaceRepairClusterFaces',
+  'getSearchOptions',
+  'getSharedSpaceAssetLinkedAlbums',
+  'searchSmartFacets',
+];
 
 // Default answers for the Gallery endpoints the web app calls on most pages, so upstream's unit and medium specs
 // run against Gallery's web unchanged. Registered after upstream's handlers in the shared dispatcher
