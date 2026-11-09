@@ -4,7 +4,7 @@ import { expect, test } from '#test/medium/fixtures.ts';
 // Gallery's memories index page: lists memories by title and opens one in the memory viewer.
 test('lists memories and opens one in the viewer', async ({ page, data }) => {
   const assets = data.addTimeline({ years: 1 });
-  data.addMemories(
+  data.addMemories([
     factory.memory({
       memoryAt: '2024-04-23T00:00:00.000Z',
       showAt: '2026-04-23T00:00:00.000Z',
@@ -19,7 +19,7 @@ test('lists memories and opens one in the viewer', async ({ page, data }) => {
       title: 'March history',
       assets: assets.slice(3, 6),
     }),
-  );
+  ]);
   await page.goto('/memories');
 
   const memoryLink = page.getByRole('link', { name: /april/i }).first();
@@ -28,5 +28,5 @@ test('lists memories and opens one in the viewer', async ({ page, data }) => {
 
   // Route.viewMemory scopes the viewer by memory id and carries the first asset as `assetId`.
   await expect(page).toHaveURL(/\/memories\/[0-9a-f-]{36}\?assetId=/);
-  await expect(page.locator('#memory-viewer')).toBeVisible();
+  await expect(page.getByTestId('memory-viewer')).toBeVisible();
 });

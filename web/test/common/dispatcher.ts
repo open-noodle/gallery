@@ -1,12 +1,15 @@
 import type { MockData } from '#test/common/data.ts';
 import { Spy } from '#test/common/expectations.ts';
-import { galleryHandlers } from '#test/common/gallery/handlers.ts';
+import { galleryHandlers, galleryReadOperations } from '#test/common/gallery/handlers.ts';
 import { createHandlers } from '#test/common/handlers.ts';
 import { getOperation, hasOperation, matchOperation, toCall } from '#test/common/spec.ts';
 import type { Call, Handler, Handlers, OperationId } from '#test/common/types.ts';
 
 const mutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const readOperations = new Set<OperationId>(['searchAssets', 'getDownloadInfo', 'downloadArchive', 'checkBulkUpload']);
+for (const operationId of galleryReadOperations) {
+  readOperations.add(operationId);
+}
 
 export type Response = {
   status: number;

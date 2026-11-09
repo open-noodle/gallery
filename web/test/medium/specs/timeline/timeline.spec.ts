@@ -170,7 +170,9 @@ test.describe('timeline', () => {
       await expect(app.timeline.selected).toHaveCount(0);
     });
 
-    test('add to album shows the selection count title', async ({ page, data, app }) => {
+    // Gallery: the selection bar's add-to-album opens Gallery's album-or-space picker, which has no
+    // selection-count title; its own specs cover it.
+    test.skip('add to album shows the selection count title', async ({ page, data, app }) => {
       const assets = data.addTimeline({ years: 1 });
       await page.goto(Route.photos());
 

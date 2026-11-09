@@ -17,7 +17,7 @@ test('the toggle switches avatars to profile faces and the choice survives a rel
 }) => {
   const asset = factory.asset({ width: 1000, height: 800 });
   const people = [factory.person({ name: 'Alice Johnson' }), factory.person({ name: 'Bob Smith' })];
-  data.addAsset(asset).addPeople(...people);
+  data.addAssets(asset).addPeople(people);
   const faces: AssetFaceResponseDto[] = people.map((person, index) => ({
     id: `avatar-face-${index + 1}`,
     // A non-zero box: a degenerate crop yields no avatar, so crop mode would go untested.
