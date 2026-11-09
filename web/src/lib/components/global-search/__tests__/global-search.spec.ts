@@ -3,7 +3,6 @@ import { commandContextManager } from '#lib/managers/command-context-manager.sve
 import { GlobalSearchManager, type Provider, type Sections } from '#lib/managers/global-search-manager.svelte.ts';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '#lib/stores/cmdk-recent.ts';
-import { resolveLiveTypedSearchSuggestions } from '#lib/utils/typed-search/typed-search-live-suggestions.ts';
 import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchSmart } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { tick } from 'svelte';
@@ -84,11 +83,6 @@ vi.mock('#lib/stores/media-query-manager.svelte.js', () => ({
     },
   },
 }));
-// The live filter rows are seeded by hand. setQuery / setInputCaret arm a 150 ms timer
-// that would resolve the real suggestions (empty here) and overwrite the seed whenever
-// rendering takes longer than that, as it does on CI runners. Keep that request pending.
-vi.mock(import('#lib/utils/typed-search/typed-search-live-suggestions.ts'), { spy: true });
-
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
   return {
@@ -151,8 +145,14 @@ function stubAllEntitySections(m: GlobalSearchManager) {
     Promise.resolve({ status: 'ok' as const, items: [{ id: 't1', name: 'beach' } as never], total: 1 });
 }
 
+// Every case seeds `liveTypedSearchStatus` by hand. Any caret sync (the input's select, keyup or
+// pointerup) reschedules the live lookup, which first sets the status to loading and so drops the
+// seeded rows; on CI the browser fires such an event after render. Keep the seed in place.
 beforeEach(() => {
-  vi.mocked(resolveLiveTypedSearchSuggestions).mockImplementation(() => new Promise(() => {}));
+  vi.spyOn(
+    GlobalSearchManager.prototype as unknown as { scheduleLiveTypedSearchSuggestions: () => void },
+    'scheduleLiveTypedSearchSuggestions',
+  ).mockImplementation(() => {});
 });
 
 describe('global-search root', () => {
@@ -452,6 +452,7 @@ describe('global-search root', () => {
     const selectSpy = vi.spyOn(m, 'selectLiveTypedSearchChoice').mockImplementation(() => {});
     m.open();
     m.setQuery('beach person:ann');
+    m.setInputCaret('beach person:ann'.length);
     m.liveTypedSearchStatus = {
       status: 'ok',
       key: 'person',
@@ -468,6 +469,7 @@ describe('global-search root', () => {
       ],
     };
     await render(GlobalSearch, { props: { manager: m } });
+    page.getByRole('combobox').element().dispatchEvent(new Event('select'));
 
     const liveFilterHeading = page.getByText(/cmdk_filter_match_person|person filter matches/i).element();
     const topResultHeading = page.getByText(/cmdk_top_result|top result/i).element();
