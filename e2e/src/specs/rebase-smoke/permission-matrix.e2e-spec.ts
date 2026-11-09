@@ -118,7 +118,7 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
     await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toBeVisible();
     // Owner-only: the "Show file location" IconButton is visible inside the filename section.
     // aria-label is $t('show_file_location') = "Show file location" per i18n/en.json:2478.
@@ -135,7 +135,7 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
     // #734 (#992): a space Owner/Editor may edit an asset whose owner is a member of the same space.
     // The owner added this asset directly and is the space's Owner, so the editor gets the date
     // pencil (DetailPanelDate's gate is DetailPanel's `canEdit`). The viewer still does not (Test 6).
@@ -150,7 +150,7 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
     // A viewer may not edit even a member's asset (#734 widens editing to space Owner/Editor only),
     // so the date pencil — its own IconButton since #778 — is not rendered at all.
     await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);

@@ -74,7 +74,7 @@ test.describe('asset viewer reopen', () => {
     await page.locator(`[data-thumbnail-focus-container][data-asset="${assetWithPerson.id}"]`).click();
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toContainText('Stale Carryover Person');
+    await expect(page.locator('[data-testid="detail-panel"]')).toContainText('Stale Carryover Person');
 
     // go back to the timeline
     await page.goBack();
@@ -84,12 +84,12 @@ test.describe('asset viewer reopen', () => {
     // reopen the viewer on the asset without people
     await page.locator(`[data-thumbnail-focus-container][data-asset="${assetWithLocation.id}"]`).click();
     await page.waitForSelector('#immich-asset-viewer');
-    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).toBeVisible();
 
     // people must clear, and the location map + tags of the new asset must render —
     // all three stayed stale/missing until a manual refresh before the fix
-    await expect(page.locator('#detail-panel')).not.toContainText('Stale Carryover Person');
-    await expect(page.locator('#detail-panel .maplibregl-map')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).not.toContainText('Stale Carryover Person');
+    await expect(page.locator('[data-testid="detail-panel"] .maplibregl-map')).toBeVisible();
     await expect(page.locator('[data-testid="detail-panel-tags"]')).toContainText('reopen-tag');
   });
 
@@ -101,13 +101,13 @@ test.describe('asset viewer reopen', () => {
     await page.locator(`[data-thumbnail-focus-container][data-asset="${assetWithPerson.id}"]`).click();
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
-    await expect(page.locator('#detail-panel')).toContainText('Stale Carryover Person');
+    await expect(page.locator('[data-testid="detail-panel"]')).toContainText('Stale Carryover Person');
 
     // navigate to the older asset inside the viewer
     await page.keyboard.press('ArrowRight');
     await expect(page).toHaveURL(new RegExp(assetWithLocation.id));
 
-    await expect(page.locator('#detail-panel')).not.toContainText('Stale Carryover Person');
-    await expect(page.locator('#detail-panel .maplibregl-map')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel"]')).not.toContainText('Stale Carryover Person');
+    await expect(page.locator('[data-testid="detail-panel"] .maplibregl-map')).toBeVisible();
   });
 });
