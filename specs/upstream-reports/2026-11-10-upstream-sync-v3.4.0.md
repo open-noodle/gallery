@@ -98,4 +98,20 @@ regeneration (no repository changed), ML (version string only).
 
 ## Remote CI verification
 
-Pending.
+Code commit `66fbb3abe2e`; `bc7db3f5f3b` adds only the passkey note to this report.
+
+| Workflow                                         | Run                           | Commit        | Result                                    |
+| ------------------------------------------------ | ----------------------------- | ------------- | ----------------------------------------- |
+| Test                                             | `42883913442`                 | `66fbb3abe2e` | PASS                                      |
+| Static Code Analysis                             | `42884004094`                 | `66fbb3abe2e` | PASS                                      |
+| Docker                                           | `42884185474`                 | `66fbb3abe2e` | PASS                                      |
+| Gallery Rebase Smoke                             | `42884095690`                 | `66fbb3abe2e` | PASS                                      |
+| Storage Migration Tests / E2E                    | `42884278714` / `42884557965` | `66fbb3abe2e` | PASS                                      |
+| Gallery ML Smoke / Mobile Smoke                  | `42884373325` / `42884463086` | `66fbb3abe2e` | PASS                                      |
+| Gallery Build Mobile: Android                    | `42884648064`                 | `66fbb3abe2e` | PASS                                      |
+| Gallery Build Mobile: iOS                        | `42884648064`                 | `66fbb3abe2e` | not run: no macOS runner (twice, 0 steps) |
+| Release Candidate Build `rolling-v34-rc13` (+ML) | `42891921152`                 | `bc7db3f5f3b` | PASS                                      |
+| Revert-to-Immich (rc13 + stock `v3.4.0`)         | `42893915052`                 | `bc7db3f5f3b` | PASS                                      |
+
+No CI-only breaks this cycle. iOS last compiled on CI at `2a68a9f2247` (rc.3 cycle); this cycle's only iOS-relevant
+change is `sqlite_async` 0.14.8, which the local mobile suite and the Android build cover on the Dart side.
