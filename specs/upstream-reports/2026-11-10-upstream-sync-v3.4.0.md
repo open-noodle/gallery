@@ -113,5 +113,21 @@ Code commit `66fbb3abe2e`; `bc7db3f5f3b` adds only the passkey note to this repo
 | Release Candidate Build `rolling-v34-rc13` (+ML) | `42891921152`                 | `bc7db3f5f3b` | PASS                                      |
 | Revert-to-Immich (rc13 + stock `v3.4.0`)         | `42893915052`                 | `bc7db3f5f3b` | PASS                                      |
 
+**RC tag reuse**: `rolling-v34-rc13` already existed (the rc.3 build of 2026-11-09, which staging ran), and
+`gallery-rc-build.yml` accepted the reused tag, so the v3.4.0 build replaced it. The rc.3 image is still in GHCR by
+digest (`gallery-server@sha256:c053c0b22913b84b06a74436774078cff272dfde91ae59bdfb7fc26d40b1c2d9`,
+`gallery-ml@sha256:5a5d697bd0b9a678461875cf72d8847d10dfd671240a1c7b6871dd5f7448c9a1`). The same code was rebuilt as
+`rolling-v34-rc14` (run `42903173583`, from `a23bdd74e7e`, which differs from the revert-gate image only in this
+report) and that is what staging runs. Worth a guard in the RC workflow: refuse a tag that already exists.
+
+## Staging
+
+`rolling-v34-rc14` server and ML (infra-gitops `c54e904` ML, `325cdd2` server), replacing rc13 (rc.3). Live-DB
+migration parity: 0 orphans, 0 pending, so nothing ran. Boot: `No schema drift detected` on both workers, 0 restarts,
+only the known LegacyRouteConverter warning. `/server/version` is 3.4.0 for a stock client and 5.10.0-rc.1 for a
+Gallery client; `/public/config` reports `passkey.enabled: false`; ML answers from the server pod. Pre-deploy dump
+`~/gallery-backups/staging-pre-rolling-v34-rc14-2026-11-10.dump` (63 MB, sha256 matched the in-pod copy); rollback is
+restoring it and pinning the rc.3 digests above.
+
 No CI-only breaks this cycle. iOS last compiled on CI at `2a68a9f2247` (rc.3 cycle); this cycle's only iOS-relevant
 change is `sqlite_async` 0.14.8, which the local mobile suite and the Android build cover on the Dart side.
