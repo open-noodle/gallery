@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { parse } from 'node:path';
 import { Readable } from 'node:stream';
 import sanitize from 'sanitize-filename';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
@@ -17,6 +16,7 @@ import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
+import { getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
 class LazyS3Readable extends Readable {
@@ -171,22 +171,24 @@ export class DownloadService extends BaseService {
 
       const { originalPath, editedPath, originalFileName } = asset;
 
-      let filename = sanitize(originalFileName) || 'unnamed';
+      const name = getFileNameWithoutExtension(sanitize(originalFileName) || 'unnamed');
+      const extension = getFilenameExtension(editedPath || originalPath);
+      let filename = name + extension;
+
       const count = paths[filename] || 0;
       paths[filename] = count + 1;
       if (count !== 0) {
-        const parsedFilename = parse(filename);
-        filename = `${parsedFilename.name}+${count}${parsedFilename.ext}`;
+        filename = `${name}+${count}${extension}`;
       }
 
-      let filePath = edited && editedPath ? editedPath : originalPath;
+      let filePath = editedPath || originalPath;
 
       if (isDiskPath(filePath)) {
         // Disk asset — resolve symlinks and add by path
         try {
           filePath = await this.storageRepository.realpath(filePath);
         } catch {
-          this.logger.warn('Unable to resolve realpath', { originalPath });
+          this.logger.warn('Unable to resolve realpath', { filePath });
         }
         zip.addFile(filePath, filename);
       } else {
