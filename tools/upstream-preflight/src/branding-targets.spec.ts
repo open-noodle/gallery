@@ -58,7 +58,7 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the branch is rebased onto upstream Immich v3.4.0-rc.3, so
+  // M8 — the branch is rebased onto upstream Immich v3.4.0, so
   // `branding/config.json` upstream.version is bumped to match. The
   // gallery-revert-to-immich-validation workflow boots the Gallery image
   // against `ghcr.io/immich-app/immich-server:v${upstream.version}`, so this
@@ -86,7 +86,7 @@ describe('branding target paths', () => {
   // had an entry for it and the tagged release now owns it.
   //
   // Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.4.0-rc.3 (base is immich v3.4.0-rc.3)', () => {
-    expect(CONFIG.upstream.version).toBe('3.4.0-rc.3');
+  it('M8: config.json upstream.version is 3.4.0 (base is immich v3.4.0)', () => {
+    expect(CONFIG.upstream.version).toBe('3.4.0');
   });
 });
