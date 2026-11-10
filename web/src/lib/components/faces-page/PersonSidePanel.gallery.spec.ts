@@ -99,7 +99,7 @@ describe('PersonSidePanel', () => {
     await waitFor(() =>
       expect(deleteFaceMock).toHaveBeenCalledWith({ id: 'face-1', assetFaceDeleteDto: { force: false } }),
     );
-    expect(showDialogMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'confirm_delete_face' }));
+    expect(showDialogMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'confirm_delete_unassigned_face' }));
     expect(emitSpy).not.toHaveBeenCalledWith('PersonAssetDelete', expect.anything());
     expect(setAssetIdMock).toHaveBeenCalledWith('asset-1');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'delete_face' })).not.toBeInTheDocument());

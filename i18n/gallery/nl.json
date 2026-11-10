@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Kies filterwaarde",
   "cmdk_typed_search_issues_heading": "Zoekfilters",
   "cmdk_unnamed_person": "Naamloze persoon",
+  "confirm_delete_unassigned_face": "Weet je zeker dat je dit niet-toegewezen gezicht wilt verwijderen uit het item?",
   "confirm_keep_this_delete_others_in_album": "{count, plural, one {Het andere item in de stack wordt} other {De # andere items in de stack worden}} uit je bibliotheek verwijderd, niet alleen uit dit album gehaald. Weet je zeker dat je wilt doorgaan?",
   "create_group": "Groep aanmaken",
   "create_space": "Gedeelde Space aanmaken",

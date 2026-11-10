@@ -820,6 +820,7 @@
   "cmdk_typed_search_choices_heading": "選擇篩選值",
   "cmdk_typed_search_issues_heading": "搜尋篩選條件",
   "cmdk_unnamed_person": "未命名人物",
+  "confirm_delete_unassigned_face": "您確定要從該項目中刪除這張未指派的臉孔嗎？",
   "confirm_keep_this_delete_others_in_album": "堆疊中的其他 {count} 個項目將從您的媒體庫中刪除，而不只是從此相簿中移除。您確定要繼續嗎？",
   "create_group": "建立群組",
   "create_space": "建立共享 Space",
