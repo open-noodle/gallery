@@ -6,7 +6,7 @@ import type { PageLoad } from './$types';
 
 export const load = (async ({ url }) => {
   await authenticate(url);
-  const [, $t] = await Promise.all([queryClient.query(getAllAlbumsQuery()), getFormatter()]);
+  const [, $t] = await Promise.all([queryClient.query({ ...getAllAlbumsQuery(), staleTime: 0 }), getFormatter()]);
 
   return {
     meta: {

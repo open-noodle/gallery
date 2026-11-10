@@ -25,6 +25,7 @@
   import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
   import { Route } from '#lib/route.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
+  import { truncateMiddle } from '#lib/utils.ts';
   import { canEditAsset } from '#lib/utils/asset-editability.ts';
   import { delay, getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
@@ -184,18 +185,19 @@
         <div><Icon icon={mdiImageOutline} size="24" /></div>
 
         <div>
-          <p class="flex place-items-center gap-2 break-all whitespace-pre-wrap">
+          <div class="flex place-items-start justify-end gap-2 break-all whitespace-pre-wrap">
             <FilterValue
               label={$t('filter_by_filename')}
               filter={filenameFilter(asset)}
               class="break-all whitespace-pre-wrap"
             >
-              {asset.originalFileName}
+              <span title={asset.originalFileName}>{truncateMiddle(asset.originalFileName)}</span>
             </FilterValue>
             {#if asset.originalPath}
               <IconButton
                 icon={mdiInformationOutline}
                 aria-label={$t('show_file_location')}
+                class="shrink-0"
                 size="small"
                 shape="round"
                 color="secondary"
@@ -203,7 +205,7 @@
                 onclick={() => assetViewerManager.toggleAssetPath()}
               />
             {/if}
-          </p>
+          </div>
           {#if assetViewerManager.isShowAssetPath}
             <p class="pb-2 text-xs break-all opacity-50 hover:text-primary" transition:slide={{ duration: 250 }}>
               <!-- eslint-disable-next-line svelte/no-navigation-without-resolve this is supposed to be treated as an absolute/external link -->
