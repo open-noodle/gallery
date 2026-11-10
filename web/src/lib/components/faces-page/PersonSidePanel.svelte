@@ -163,7 +163,9 @@
   const deleteAssetFace = async (face: AssetFaceResponseDto) => {
     try {
       const isConfirmed = await modalManager.showDialog({
-        prompt: $t('confirm_delete_face', { values: { name: face.person?.name ?? $t('face_unassigned') } }),
+        prompt: face.person
+          ? $t('confirm_delete_face', { values: { name: face.person.name } })
+          : $t('confirm_delete_unassigned_face'),
       });
       if (!isConfirmed) {
         return;

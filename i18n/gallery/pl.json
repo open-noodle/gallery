@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Wybierz wartość filtra",
   "cmdk_typed_search_issues_heading": "Filtry wyszukiwania",
   "cmdk_unnamed_person": "Osoba bez nazwy",
+  "confirm_delete_unassigned_face": "Czy na pewno chcesz usunąć tę nieprzypisaną twarz z zasobów?",
   "confirm_keep_this_delete_others_in_album": "{count, plural, one {Pozostały zasób w tym stosie zostanie usunięty} few {Pozostałe # zasoby w tym stosie zostaną usunięte} many {Pozostałych # zasobów w tym stosie zostanie usuniętych} other {Pozostałe # zasobu w tym stosie zostaną usunięte}} z biblioteki, a nie tylko z tego albumu. Czy na pewno chcesz kontynuować?",
   "create_group": "Utwórz grupę",
   "create_space": "Utwórz udostępniony Space",

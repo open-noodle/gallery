@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Scegli il valore del filtro",
   "cmdk_typed_search_issues_heading": "Filtri di ricerca",
   "cmdk_unnamed_person": "Persona senza nome",
+  "confirm_delete_unassigned_face": "Sei sicuro di voler eliminare questo volto non assegnato dalla risorsa?",
   "confirm_keep_this_delete_others_in_album": "{count, plural, one {L'altra risorsa del gruppo verrà eliminata dalla tua libreria, non solo rimossa da questo album.} other {Le altre # risorse del gruppo verranno eliminate dalla tua libreria, non solo rimosse da questo album.}} Sei sicuro di voler continuare?",
   "create_group": "Crea gruppo",
   "create_space": "Crea Space condiviso",

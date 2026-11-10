@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Choisir une valeur de filtre",
   "cmdk_typed_search_issues_heading": "Filtres de recherche",
   "cmdk_unnamed_person": "Personne sans nom",
+  "confirm_delete_unassigned_face": "Êtes-vous sûr de vouloir supprimer ce visage non attribué du média ?",
   "confirm_keep_this_delete_others_in_album": "{count, plural, one {L'autre média de la pile sera supprimé de votre bibliothèque, et pas seulement retiré de cet album.} other {Les # autres médias de la pile seront supprimés de votre bibliothèque, et pas seulement retirés de cet album.}} Êtes-vous sûr de vouloir continuer ?",
   "create_group": "Créer un groupe",
   "create_space": "Créer un espace partagé",
