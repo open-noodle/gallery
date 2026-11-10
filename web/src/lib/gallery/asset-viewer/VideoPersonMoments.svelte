@@ -36,7 +36,7 @@
     const faceIds = (faceManager.facesByPersonId.get(current.personId) ?? []).map(({ id }) => id);
     if (faceIds.length === 0) {
       videoPersonSightings.clear();
-    } else if (faceIds.toSorted().join(',') !== current.faceIds.toSorted().join(',')) {
+    } else if (faceIds.length !== current.faceIds.length || faceIds.some((id) => !current.faceIds.includes(id))) {
       videoPersonSightings.current = { ...current, faceIds };
     }
   };
