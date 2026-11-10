@@ -31,6 +31,13 @@ Pre-rebase detectors (deleted literals vs fork tooling, deleted members still us
 removed ids / test ids, i18n and migration paths): nothing. The deleted-member scan named `invalidateAlbums`, whose
 body changed but which still exists.
 
+## Decision: passkeys stay off
+
+immich-33133 disables passkeys on `release/v3.4` only; upstream `main` still has them on by default, so Immich held
+them back from 3.4.0 rather than dropping them (the PR gives no reason). Owner decision (2026-11-10): keep upstream's
+disable, so Gallery matches Immich 3.4.0 and carries no revert in upstream files. Passkeys come back with the upstream
+release that re-enables them; mobile also needs a Gallery associated domain first (`mobile/lib/gallery/passkeys.dart`).
+
 ## How the replay was driven
 
 One `git rebase v3.4.0`, `rerere` off. The driver took the fork side only for UU conflicts in the 48 files v3.4.0
