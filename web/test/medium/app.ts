@@ -117,7 +117,8 @@ export const createApp = (page: Page, data: MockData) => {
     },
 
     navbar: {
-      logoLink: link('Immich logo'),
+      // Gallery: the navbar shows Gallery's own Logo.svelte, whose alt text is "Gallery logo".
+      logoLink: link('Gallery logo'),
     },
 
     timeline: createTimeline(page, data),
