@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Folder breadcrumb: move and rename, design mockup</title>
+    <style>
+      .gx {
+        --bg: #0f1012;
+        --card: #18191c;
+        --card2: #1f2024;
+        --line: #2a2b30;
+        --mut: #8b8e96;
+        --txt: #eceef2;
+        --pri: #adcbfa;
+        --warn: #fbbf24;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--txt);
+        font: 14px/1.4 Inter, system-ui, sans-serif;
+        padding: 40px 24px 64px;
+        min-height: 100vh;
+      }
+      header.intro {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+      }
+      header.intro h1 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      header.intro p {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--mut);
+        max-width: 720px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 28px;
+      }
+      .tabs {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .tab {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: 999px;
+        padding: 7px 14px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--mut);
+      }
+      .tab[aria-selected='true'] {
+        background: var(--pri);
+        border-color: var(--pri);
+        color: #0f1012;
+      }
+      .stage-frame {
+        position: relative;
+      }
+      .stage-frame .page {
+        min-height: 760px;
+        grid-template-rows: auto 1fr;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgb(0 0 0 / 0.55);
+        display: grid;
+        place-items: center;
+        z-index: 3;
+      }
+      .dialog {
+        width: 400px;
+        background: var(--card2);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.6);
+      }
+      .dialog.wide {
+        width: 520px;
+      }
+      .toast {
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+        z-index: 2;
+        width: 340px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: var(--card2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 12px 28px -10px rgb(0 0 0 / 0.6);
+      }
+      .toast.static {
+        position: relative;
+        right: auto;
+        bottom: auto;
+      }
+      .toast b {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .toast small {
+        display: block;
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 2px;
+      }
+      .toast .state {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+        text-align: center;
+        font-weight: 700;
+        line-height: 16px;
+      }
+      .toast .state.ok {
+        color: var(--pri);
+      }
+      .toast .state.bad {
+        color: var(--warn);
+      }
+      .toast .spin {
+        border: 2px solid var(--line);
+        border-top-color: var(--pri);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .toast .bar {
+        height: 4px;
+        margin-top: 8px;
+        background: var(--line);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .toast .bar i {
+        display: block;
+        height: 100%;
+        width: 32%;
+        background: var(--pri);
+      }
+      .toast .x {
+        margin-left: auto;
+        background: none;
+        border: 0;
+        color: var(--mut);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .toast-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .dialog h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 14px;
+      }
+      .dialog label {
+        display: block;
+        font-size: 12px;
+        color: var(--mut);
+      }
+      .field {
+        width: 100%;
+        margin-top: 6px;
+        background: var(--bg);
+        border: 1px solid var(--pri);
+        border-radius: 8px;
+        color: var(--txt);
+        padding: 9px 10px;
+        font: inherit;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 10px;
+      }
+      .hint.warn {
+        color: var(--warn);
+      }
+      .dialog .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--txt);
+      }
+      .btn.primary {
+        background: var(--pri);
+        border-color: var(--pri);
+        color: #0f1012;
+        font-weight: 600;
+      }
+      .btn[disabled] {
+        opacity: 0.4;
+      }
+      .picker {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 6px;
+        max-height: 340px;
+        overflow-y: auto;
+        font: 12.5px/1.6 ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+      .prow {
+        --d: 8px;
+        position: relative;
+        padding: 5px 8px 5px calc(var(--d) + 16px);
+        border-radius: 6px;
+        color: var(--txt);
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .prow.parent::before {
+        content: '';
+        position: absolute;
+        left: calc(var(--d) + 3px);
+        top: 50%;
+        width: 5px;
+        height: 5px;
+        border-right: 1.5px solid var(--mut);
+        border-bottom: 1.5px solid var(--mut);
+        transform: translateY(-65%) rotate(-45deg);
+      }
+      .prow.parent.open::before {
+        transform: translateY(-35%) rotate(45deg);
+      }
+      .prow.sub {
+        --d: 24px;
+      }
+      .prow.sub2 {
+        --d: 40px;
+      }
+      .prow.sub3 {
+        --d: 56px;
+      }
+      .prow.sel {
+        background: var(--card2);
+        outline: 1px solid var(--pri);
+      }
+      .prow.dim {
+        color: #55575e;
+      }
+      .prow.blocked small {
+        color: var(--warn);
+      }
+      .prow small {
+        font: 11px/1.6 Inter, system-ui, sans-serif;
+        color: var(--mut);
+      }
+      .frame {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      /* ===== Sidebar + header slice, matching the folders page ===== */
+      .page {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        min-height: 300px;
+      }
+      .sidebar {
+        background: var(--card);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        font: 12.5px/1.6 ui-monospace, 'SF Mono', Menlo, monospace;
+        color: var(--mut);
+      }
+      .sidebar .row {
+        padding: 2px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sidebar .row.active {
+        background: var(--card2);
+        color: var(--txt);
+        outline: 1px solid var(--pri);
+      }
+      .content {
+        padding: 0;
+      }
+
+      /* ===== ControlBar: back arrow, breadcrumbs, menu on the right ===== */
+      .controlbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+      }
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--txt);
+        font-size: 18px;
+        cursor: default;
+      }
+      .icon-btn.active {
+        background: var(--card2);
+        outline: 1px solid var(--line);
+      }
+      .icon-btn.disabled {
+        color: #55575e;
+      }
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 14px;
+        min-width: 0;
+      }
+      .crumbs a {
+        color: var(--pri);
+        text-decoration: none;
+      }
+      .crumbs .sep {
+        color: var(--mut);
+      }
+      .crumbs .current {
+        color: var(--txt);
+        font-weight: 600;
+      }
+      .spacer {
+        flex: 1;
+      }
+
+      /* ===== Menu ===== */
+      .menu {
+        position: absolute;
+        right: 18px;
+        top: calc(100% + 6px);
+        width: 240px;
+        background: var(--card2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.6);
+        padding: 6px;
+        z-index: 2;
+      }
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        color: var(--txt);
+      }
+      .menu-item.hovered {
+        background: #2a2d35;
+      }
+      .menu-item.disabled {
+        color: #55575e;
+      }
+      .menu-item .ico {
+        width: 18px;
+        text-align: center;
+        color: var(--mut);
+      }
+      .menu-item.disabled .ico {
+        color: #55575e;
+      }
+      .menu-item .why {
+        display: block;
+        font-size: 11.5px;
+        color: var(--warn);
+        margin-top: 2px;
+      }
+      .menu hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 6px 4px;
+      }
+
+      .grid-area {
+        padding: 22px 18px;
+        min-height: 180px;
+        color: var(--mut);
+        font-size: 13px;
+      }
+      .grid-area .tiles {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .tile {
+        width: 110px;
+        text-align: center;
+        color: var(--txt);
+        font-size: 12px;
+      }
+      .tile .folder {
+        height: 64px;
+        border-radius: 12px;
+        background: #26313f;
+        margin-bottom: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--pri);
+        font-size: 26px;
+      }
+
+      /* ===== Top bar: logo, search, notifications, avatar ===== */
+      .topbar {
+        grid-column: 1 / -1;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        min-width: 150px;
+      }
+      .logo i {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: conic-gradient(from 200deg, #4250af, #d6457a, #e0a106, #2fa84f, #4250af);
+      }
+      .topsearch {
+        flex: 1;
+        max-width: 480px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        color: var(--mut);
+        font-size: 13px;
+      }
+      .bell {
+        position: relative;
+        margin-left: auto;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--txt);
+      }
+      .bell.active {
+        background: var(--card2);
+        outline: 1px solid var(--line);
+      }
+      .bell svg {
+        width: 20px;
+        height: 20px;
+      }
+      .bell .dot {
+        position: absolute;
+        top: 7px;
+        right: 8px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--pri);
+        box-shadow: 0 0 0 2px var(--card);
+      }
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--pri);
+        color: #0f1012;
+        font-weight: 600;
+        font-size: 13px;
+      }
+
+      /* ===== Notification drawer: open under the bell ===== */
+      .drawer {
+        position: absolute;
+        top: 52px;
+        right: 40px;
+        width: 360px;
+        z-index: 4;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--card2);
+        box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.6);
+        padding: 12px 14px;
+      }
+      .drawer-head {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .drawer-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #262a33;
+        font-size: 13px;
+      }
+      .drawer-item b {
+        font-weight: 600;
+      }
+      .drawer-item small {
+        display: block;
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 2px;
+      }
+      .drawer-item .state {
+        color: var(--warn);
+        font-weight: 700;
+      }
+      .drawer-item .unread-dot {
+        flex: none;
+        margin: 6px 0 0 auto;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--pri);
+      }
+
+      /* ===== Notes ===== */
+      .notes {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--mut);
+        border-top: 1px solid var(--line);
+        padding-top: 22px;
+      }
+      .notes b {
+        color: var(--txt);
+      }
+    </style>
+  </head>
+  <body class="gx">
+    <header class="intro">
+      <h1>Folder breadcrumb: move and rename</h1>
+      <p>
+        A menu on the right of the folder breadcrumb bar offers Rename folder and Move folder for the folder you are in. Tiles and
+        sidebar items have no actions in this version; open the folder to rename or move it.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-s="1" aria-selected="true">1 · Read-only</button>
+      <button class="tab" role="tab" data-s="2">2 · Rename and move menu</button>
+      <button class="tab" role="tab" data-s="3">3 · Rename dialog</button>
+      <button class="tab" role="tab" data-s="4">4 · Move dialog</button>
+      <button class="tab" role="tab" data-s="5">5 · Destination read-only</button>
+      <button class="tab" role="tab" data-s="6">6 · Move in progress</button>
+      <button class="tab" role="tab" data-s="7">7 · Move succeeded</button>
+      <button class="tab" role="tab" data-s="8">8 · Move failed</button>
+    </div>
+
+    <main>
+      <section class="screen" id="s2">
+        <div class="frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+                <div class="spacer"></div>
+                <button class="icon-btn active" aria-label="Folder actions" aria-expanded="true">&#8942;</button>
+
+                <div class="menu" role="menu">
+                  <div class="menu-item hovered" role="menuitem"><span class="ico">&#9998;</span>Rename folder</div>
+                  <div class="menu-item" role="menuitem"><span class="ico">&#8680;</span>Move folder&hellip;</div>
+                </div>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s1" hidden>
+        <div class="frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+                <div class="spacer"></div>
+                <button class="icon-btn active" aria-label="Folder actions" aria-expanded="true">&#8942;</button>
+
+                <div class="menu" role="menu">
+                  <div class="menu-item disabled" role="menuitem" aria-disabled="true">
+                    <span class="ico">&#9998;</span>
+                    <span>
+                      Rename folder
+                      <span class="why">Library is read-only</span>
+                    </span>
+                  </div>
+                  <div class="menu-item disabled" role="menuitem" aria-disabled="true">
+                    <span class="ico">&#8680;</span>
+                    <span>
+                      Move folder&hellip;
+                      <span class="why">Library is read-only</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="grid-area">Items stay visible but disabled, with the reason shown, as decision 3 requires.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s3" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+              <div class="scrim">
+                <div class="dialog" role="dialog" aria-label="Rename folder">
+                  <h2>Rename folder</h2>
+                  <label for="rn">Folder name</label>
+                  <input class="field" id="rn" value="Asiel 2006 - April" />
+                  <p class="hint warn">A folder named &quot;Asiel 2006 - April&quot; already exists here.</p>
+                  <p class="hint">Cannot contain /, be empty, or be . or ..</p>
+                  <div class="actions">
+                    <button class="btn">Cancel</button>
+                    <button class="btn primary" disabled>Rename</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s4" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+              <div class="scrim">
+                <div class="dialog wide" role="dialog" aria-label="Move folder">
+                  <h2>Move folder</h2>
+                  <label>Move &quot;Asiel 2006&quot; into</label>
+                  <div class="picker">
+                    <div class="prow parent open sel"><span>backup/tamara-4/Tamara Asiel/Asielfotos</span><small>external library · Tamara</small></div>
+                    <div class="prow sub parent"><span>Asiel 2005</span></div>
+                    <div class="prow sub dim"><span>Asiel 2006</span><small>current</small></div>
+                    <div class="prow sub parent"><span>Asiel 2007</span></div>
+                    <div class="prow parent open"><span>tank/archive-2005</span><small>external library · Tamara</small></div>
+                    <div class="prow sub parent open"><span>Family</span></div>
+                    <div class="prow sub2 parent open"><span>Birthdays</span></div>
+                    <div class="prow sub3"><span>2016 party</span></div>
+                    <div class="prow sub3"><span>2017 zoo</span></div>
+                    <div class="prow sub2"><span>Summer 2019</span></div>
+                    <div class="prow sub"><span>Receipts</span></div>
+                    <div class="prow parent open"><span>nas/tamara-scans</span><small>external library · Tamara</small></div>
+                    <div class="prow sub parent open"><span>Negatives</span></div>
+                    <div class="prow sub2 parent open"><span>Kodak 1998</span></div>
+                    <div class="prow sub3"><span>Roll 04</span></div>
+                    <div class="prow sub3"><span>Roll 05</span></div>
+                    <div class="prow sub2"><span>Slides</span></div>
+                    <div class="prow sub parent open"><span>Misc</span></div>
+                    <div class="prow sub2 parent open"><span>Unsorted</span></div>
+                    <div class="prow sub3"><span>old-phone-dump</span></div>
+                    <div class="prow parent open"><span>upload/library/tamara</span><small>user library · Tamara</small></div>
+                    <div class="prow sub"><span>Holiday 2024</span></div>
+                    <div class="prow sub"><span>Holiday 2025</span></div>
+                  </div>
+                  <p class="hint">Moves can go to any library owned by Tamara. Libraries owned by others are not listed.</p>
+                  <div class="actions">
+                    <button class="btn">Cancel</button>
+                    <button class="btn primary">Move here</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="screen" id="s5" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+              <div class="scrim">
+                <div class="dialog wide" role="dialog" aria-label="Move folder">
+                  <h2>Move folder</h2>
+                  <label>Move &quot;Asiel 2006&quot; into</label>
+                  <div class="picker">
+                    <div class="prow parent open"><span>backup/tamara-4/Tamara Asiel/Asielfotos</span><small>external library · Tamara</small></div>
+                    <div class="prow sub parent"><span>Asiel 2005</span></div>
+                    <div class="prow sub dim"><span>Asiel 2006</span><small>current</small></div>
+                    <div class="prow sub parent"><span>Asiel 2007</span></div>
+                    <div class="prow parent open"><span>tank/archive-2005</span><small>external library · Tamara</small></div>
+                    <div class="prow sub parent open"><span>Family</span></div>
+                    <div class="prow sub2 parent open"><span>Birthdays</span></div>
+                    <div class="prow sub3"><span>2016 party</span></div>
+                    <div class="prow sub3"><span>2017 zoo</span></div>
+                    <div class="prow sub2"><span>Summer 2019</span></div>
+                    <div class="prow sub"><span>Receipts</span></div>
+                    <div class="prow parent open sel blocked dim"><span>nas/tamara-scans</span><small>external library · read-only</small></div>
+                    <div class="prow sub parent open"><span>Negatives</span></div>
+                    <div class="prow sub2 parent open"><span>Kodak 1998</span></div>
+                    <div class="prow sub3"><span>Roll 04</span></div>
+                    <div class="prow sub3 dim"><span>Roll 05</span><small>read-only</small></div>
+                    <div class="prow sub2"><span>Slides</span></div>
+                    <div class="prow sub parent open"><span>Misc</span></div>
+                    <div class="prow sub2 parent open"><span>Unsorted</span></div>
+                    <div class="prow sub3"><span>old-phone-dump</span></div>
+                    <div class="prow parent open"><span>upload/library/tamara</span><small>user library · Tamara</small></div>
+                    <div class="prow sub"><span>Holiday 2024</span></div>
+                    <div class="prow sub"><span>Holiday 2025</span></div>
+                  </div>
+                  <p class="hint warn">nas/tamara-scans is read-only. Folders can't be moved here.</p>
+                  <div class="actions">
+                    <button class="btn">Cancel</button>
+                    <button class="btn primary" disabled>Move here</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s6" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+            </div>
+            <div class="toast" role="status">
+              <span class="state spin" aria-hidden="true"></span>
+              <div>
+                <b>Moving &quot;Asiel 2006&quot;</b>
+                <small>to tank/archive-2005 · 1,240 of 3,812 files</small>
+                <div class="bar"><i></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="screen" id="s7" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank/archive-2005</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+            </div>
+            <div class="toast" role="status">
+              <span class="state ok">&#10003;</span>
+              <div>
+                <b>Moved &quot;Asiel 2006&quot;</b>
+                <small>to tank/archive-2005 · 3,812 files.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="screen" id="s8" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell active" aria-label="Notifications" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot" aria-label="Unread"></span></button>
+              <div class="avatar">P</div>
+            </header>
+            <div class="drawer" role="dialog" aria-label="Notifications">
+              <div class="drawer-head">Notifications</div>
+              <div class="drawer-item">
+                <span class="state">!</span>
+                <div>
+                  <b>Move failed: &quot;Asiel 2006&quot;</b>
+                  <small>nas/tamara-scans is read-only. Folders can't be moved here.</small>
+                </div>
+                <span class="unread-dot" aria-label="Unread"></span>
+              </div>
+            </div>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+            </div>
+            <div class="toast" role="status">
+              <span class="state bad">!</span>
+              <div>
+                <b>Move failed: &quot;Asiel 2006&quot;</b>
+                <small>nas/tamara-scans is read-only. Folders can't be moved here.</small>
+              </div>
+              <button class="x" aria-label="Dismiss">&times;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section class="notes" style="margin-top: 28px">
+      <div><b>Placement.</b> The menu sits on the right of the existing ControlBar, after the breadcrumbs. The back arrow stays on the left.</div>
+      <div><b>Scope.</b> Actions apply to the folder shown in the bar (the last crumb). Tiles and sidebar items have no menu in this version.</div>
+      <div><b>Library roots.</b> The menu is hidden on an external library or user library root, because moving it would be a library-level change.</div>
+      <div><b>Read-only.</b> Items stay visible but disabled, with a reason. The server repeats the check at action time.</div>
+      <div><b>States.</b> Read-only destination: the picker shows the reason and Move here is disabled (stage 5). In progress: a progress panel, not a notification, so it stays out of the drawer (stage 6). Succeeded: a toast that dismisses itself (stage 7). Failed: a toast that stays until dismissed, plus one drawer entry (stage 8).</div>
+      <div><b>Top bar.</b> Shown in every stage. The bell opens the notification drawer. It shows an unread dot only while a notification is unread, which is the failed move (stage 8, drawer open).</div>
+    </section>
+    <script>
+      const tabs = document.querySelectorAll('.tab');
+      const show = (n) => {
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.s === String(n))));
+        document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== `s${n}`));
+      };
+      tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.s)));
+      show(1);
+    </script>
+  </body>
+</html>
