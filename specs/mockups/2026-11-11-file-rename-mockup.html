@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>File rename: asset viewer, design mockup</title>
+    <style>
+      .gx {
+        --bg: #0f1012;
+        --card: #18191c;
+        --card2: #1f2024;
+        --line: #2a2b30;
+        --mut: #8b8e96;
+        --txt: #eceef2;
+        --pri: #adcbfa;
+        --warn: #fbbf24;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--txt);
+        font: 14px/1.4 Inter, system-ui, sans-serif;
+        padding: 40px 24px 64px;
+        min-height: 100vh;
+      }
+      header.intro {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+      }
+      header.intro h1 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      header.intro p {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--mut);
+        max-width: 720px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 28px;
+      }
+      .tabs {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .tab {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: 999px;
+        padding: 7px 14px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--mut);
+      }
+      .tab[aria-selected='true'] {
+        background: var(--pri);
+        border-color: var(--pri);
+        color: #0f1012;
+      }
+      .frame {
+        position: relative;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+        min-height: 620px;
+        display: grid;
+        grid-template-columns: 1fr 340px;
+      }
+      .photo {
+        background: linear-gradient(160deg, #2b3340, #15181e 70%);
+        display: grid;
+        place-items: center;
+        color: var(--mut);
+        font-size: 13px;
+      }
+      .info {
+        background: var(--card);
+        border-left: 1px solid var(--line);
+        padding: 22px 20px;
+        display: grid;
+        align-content: start;
+        gap: 18px;
+      }
+      .info-row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        font-size: 14px;
+      }
+      .info-row .ico {
+        width: 24px;
+        flex: none;
+        text-align: center;
+        color: var(--mut);
+        font-size: 18px;
+        line-height: 1.2;
+      }
+      .info-row .val {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        min-width: 0;
+        word-break: break-all;
+      }
+      .info-row small {
+        display: block;
+        color: var(--mut);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .ibtn {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--mut);
+        font-size: 14px;
+        cursor: default;
+      }
+      .ibtn[data-go] {
+        cursor: pointer;
+        color: var(--pri);
+      }
+      .ibtn:hover {
+        background: var(--card2);
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgb(0 0 0 / 0.55);
+        display: grid;
+        place-items: center;
+        z-index: 3;
+      }
+      .dialog {
+        width: 400px;
+        background: var(--card2);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.6);
+      }
+      .dialog h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 14px;
+      }
+      .dialog label {
+        display: block;
+        font-size: 12px;
+        color: var(--mut);
+      }
+      .namefield {
+        display: flex;
+        align-items: center;
+        margin-top: 6px;
+        background: var(--bg);
+        border: 1px solid var(--pri);
+        border-radius: 8px;
+        padding-right: 10px;
+      }
+      .field {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: 0;
+        color: var(--txt);
+        padding: 9px 10px;
+        font: inherit;
+        outline: none;
+      }
+      .ext {
+        color: var(--mut);
+        font-size: 14px;
+      }
+      .dialog .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--txt);
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--pri);
+        border-color: var(--pri);
+        color: #0f1012;
+        font-weight: 600;
+      }
+      .toast {
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+        z-index: 2;
+        width: 340px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: var(--card2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 12px 28px -10px rgb(0 0 0 / 0.6);
+      }
+      .toast b {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .toast .state {
+        flex: none;
+        color: var(--pri);
+        font-weight: 700;
+      }
+      .toast .x {
+        margin-left: auto;
+        background: none;
+        border: 0;
+        color: var(--mut);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1;
+      }
+      .notes {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--mut);
+        border-top: 1px solid var(--line);
+        padding-top: 22px;
+      }
+      .notes b {
+        color: var(--txt);
+      }
+    </style>
+  </head>
+  <body class="gx">
+    <header class="intro">
+      <h1>File rename: asset viewer</h1>
+      <p>A pencil on the filename row in the info panel renames the file. Only the owner sees it.</p>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-s="1" aria-selected="true">1 · Owner, info panel</button>
+      <button class="tab" role="tab" data-s="2">2 · Rename dialog</button>
+      <button class="tab" role="tab" data-s="3">3 · Renamed</button>
+      <button class="tab" role="tab" data-s="4">4 · Space viewer, no pencil</button>
+    </div>
+
+    <main>
+      <section class="screen" id="s1">
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file" data-go="2">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="s2" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file" data-go="2">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+          <div class="scrim">
+            <div class="dialog" role="dialog" aria-label="Rename file">
+              <h2>Rename file</h2>
+              <label for="fn">Name</label>
+              <div class="namefield">
+                <input class="field" id="fn" value="Beach 2006-08" />
+                <span class="ext">.jpg</span>
+              </div>
+              <div class="actions">
+                <button class="btn" data-go="1">Cancel</button>
+                <button class="btn primary" data-go="3">Rename</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s3" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                Beach 2006-08.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+          <div class="toast" role="status">
+            <span class="state">&#10003;</span>
+            <div><b>Renamed to Beach 2006-08.jpg</b></div>
+            <button class="x" aria-label="Dismiss">&times;</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s4" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02</div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <section class="notes" style="margin-top: 28px">
+      <div><b>Placement.</b> The pencil sits on the filename row, next to the existing location button. The date row already has an owner-only pencil for the same kind of edit.</div>
+      <div><b>Why not the overflow menu.</b> The filename is already in the info panel, and the viewer's overflow menu already holds many actions. Two entry points for one value would drift apart, so the mockup uses one.</div>
+      <div><b>Who can rename.</b> Owners only, gated like the date pencil. A space viewer sees the filename and location button with no pencil (stage 4).</div>
+      <div><b>Dialog.</b> The name field is the filename without its extension. The extension is shown after the field and cannot be changed here.</div>
+      <div><b>Open.</b> The mockup does not decide whether the file on disk is renamed or only the name Gallery shows. That needs a decision before the rename spec.</div>
+    </section>
+
+    <script>
+      const tabs = document.querySelectorAll('.tab');
+      const show = (n) => {
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.s === String(n))));
+        document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== `s${n}`));
+      };
+      tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.s)));
+      document.querySelectorAll('[data-go]').forEach((el) => el.addEventListener('click', () => show(el.dataset.go)));
+      show(1);
+    </script>
+  </body>
+</html>
