@@ -110,4 +110,20 @@ start from the session, so both were left to CI.
 
 ## Remote CI verification
 
-(filled in below once the runs finish)
+Code commit `56fb9144cc3` (all runs). A first Test run on `7035ecdc671` failed only SQL Schema Checks, with the
+expected drift in `shared.link.repository.sql`; that diff was applied from the job log (Docker Desktop would not start
+locally) and checked by hand: both cover subqueries carry the #1018 tether and the cover's `duration` reads
+`asset_video_trim`.
+
+| Workflow                         | Run           | Result                                         |
+| -------------------------------- | ------------- | ---------------------------------------------- |
+| Test                             | `43083060590` | PASS (21 jobs, incl. SQL, server and web medium) |
+| Static Code Analysis             | `43083153239` | PASS                                           |
+| Gallery Rebase Smoke             | `43083242515` | PASS                                           |
+| Gallery Build Mobile             | `43083329088` | PASS, Android and iOS (iOS ran this time)      |
+| Docker                           | `43083595444` | PASS                                           |
+| Storage Migration Tests / E2E    | `43083679946` / `43083936688` | PASS                           |
+| Gallery ML Smoke / Mobile Smoke  | `43083761992` / `43083849629` | PASS                           |
+| Revert-to-Immich                 | not run       | needs an RC image of this branch               |
+
+No CI-only breaks and no flakes this cycle.
