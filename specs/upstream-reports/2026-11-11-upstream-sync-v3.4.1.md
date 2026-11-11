@@ -146,3 +146,12 @@ v3.4.1, and the v2 model revision is an ML-side setting the server does not send
   the in-pod copy). The CNPG pod's `/tmp` is read-only (dump to the data volume), and `kubectl exec cat` truncated the
   copy even in 50 MB chunks; 8 MB `dd` chunks with size checks worked. Rollback: restore that dump and
   `git revert 72b14e8` in infra-gitops (a v3.3.5-based build refuses the three v3.4 rows).
+
+## Staging
+
+Server `rolling-v34-rc15` (infra-gitops `85afee0`), replacing rc14 (v3.4.0); ML stays `rolling-v34-rc14`, since
+v3.4.1 changes only the ML version string and #1300 is mobile-only. Live-DB parity: 0 orphans, 0 pending, so nothing
+ran. Boot: `No schema drift detected` on both workers, 0 restarts. `/server/version` is 3.4.1 for a stock client and
+5.10.0-rc.1 for a Gallery client; ArgoCD `Synced / Healthy`. Pre-deploy dump
+`~/gallery-backups/staging-pre-rolling-v34-rc15-2026-11-11.dump` (63 MB, sha256 `2a9ec522…`, matched the in-pod copy);
+rollback is pinning rc14 again (no migrations to undo).
