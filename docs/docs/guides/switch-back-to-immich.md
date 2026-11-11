@@ -29,7 +29,7 @@ Upstream Immich also starts on a Gallery database without the cleanup script. Yo
 
 1. Back up your database as in [step 1](#1-back-up-your-database).
 2. Open **Administration > Job Queues** and wait until no queue has active or waiting jobs. Stop the Gallery containers as in [step 2](#2-stop-the-gallery-stack), including the Redis flush.
-3. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack. Set `IMMICH_VERSION` to exactly the Immich release your Gallery release is built on, not a floating tag such as `v3`. It is `upstream.version` in `branding/config.json` at your release's tag, for example `https://github.com/open-noodle/gallery/blob/v5.4.0/branding/config.json` (find your version as in [step 3](#3-download-the-cleanup-script)). For the current `main` branch it is `v3.4.0`. A newer Immich runs its own database migrations, and Gallery then refuses to start on that database until you restore the backup from step 1.
+3. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack. Set `IMMICH_VERSION` to exactly the Immich release your Gallery release is built on, not a floating tag such as `v3`. It is `upstream.version` in `branding/config.json` at your release's tag, for example `https://github.com/open-noodle/gallery/blob/v5.4.0/branding/config.json` (find your version as in [step 3](#3-download-the-cleanup-script)). For the current `main` branch it is `v3.4.1`. A newer Immich runs its own database migrations, and Gallery then refuses to start on that database until you restore the backup from step 1.
 
 Immich shows each user their own photos and videos, with their own favorites. Workflow steps with a Gallery action, such as adding uploads to a space, do nothing while Immich runs. If Immich's server stops at startup with `cannot resolve import "extism:host/user" "gallery"`, your Gallery release is older than this guide: update Gallery, start it once and stop it again before you switch, so it replaces its workflow plugin with one Immich can load. A trimmed video plays at full length and shows its full duration, but its thumbnail is still taken from the trimmed part. Immich's schema check warns about Gallery's database functions and about Gallery's rows in `migration_overrides` (for functions, triggers and indexes); those warnings are expected here.
 
@@ -153,7 +153,7 @@ The stock Immich mobile app picks up the new albums as shared albums on its next
 
 ## 5. Switch your compose file to upstream Immich
 
-Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin the Immich release your Gallery release is built on: `upstream.version` in `branding/config.json` at your release's tag, as in [Trying Immich first](#trying-immich-first). For the current `main` branch it is `v3.4.0`. After the cleanup script has run, a newer Immich release also works.
+Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin the Immich release your Gallery release is built on: `upstream.version` in `branding/config.json` at your release's tag, as in [Trying Immich first](#trying-immich-first). For the current `main` branch it is `v3.4.1`. After the cleanup script has run, a newer Immich release also works.
 
 ```yaml title="docker-compose.yml"
 services:
@@ -175,7 +175,7 @@ Remove any Gallery-only environment variables from your `.env` file, such as `IM
 ```yaml title=".env"
 #IMMICH_VERSION=v5
 // highlight-next-line
-IMMICH_VERSION=v3.4.0
+IMMICH_VERSION=v3.4.1
 ```
 
 ## 6. Start the stack
