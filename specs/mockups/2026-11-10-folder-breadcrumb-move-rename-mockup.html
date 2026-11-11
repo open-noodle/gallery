@@ -398,6 +398,9 @@
         font-size: 13.5px;
         color: var(--txt);
       }
+      .menu-item[data-go] {
+        cursor: pointer;
+      }
       .menu-item.hovered {
         background: #2a2d35;
       }
@@ -650,9 +653,9 @@
                 <button class="icon-btn active" aria-label="Folder actions" aria-expanded="true">&#8942;</button>
 
                 <div class="menu" role="menu">
-                  <div class="menu-item hovered" role="menuitem"><span class="ico">&#9998;</span>Rename folder</div>
-                  <div class="menu-item" role="menuitem"><span class="ico">&#8680;</span>Move folder&hellip;</div>
-                  <div class="menu-item" role="menuitem"><span class="ico">&#8615;</span>Move into your library&hellip;</div>
+                  <div class="menu-item hovered" role="menuitem" data-go="3"><span class="ico">&#9998;</span>Rename folder</div>
+                  <div class="menu-item" role="menuitem" data-go="4"><span class="ico">&#8680;</span>Move folder&hellip;</div>
+                  <div class="menu-item" role="menuitem" data-go="5"><span class="ico">&#8615;</span>Move into your library&hellip;</div>
                 </div>
               </div>
               <div class="grid-area">
@@ -1188,6 +1191,7 @@
         document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== `s${n}`));
       };
       tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.s)));
+      document.querySelectorAll('[data-go]').forEach((el) => el.addEventListener('click', () => show(el.dataset.go)));
       show(1);
     </script>
   </body>
