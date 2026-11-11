@@ -17,7 +17,7 @@ Current behaviour, in code:
 - Rename one file from the asset viewer, and move one file or a whole folder, without losing the asset's id or its metadata.
 - Keep the operation safe: the disk and the database must not disagree after a failure.
 - Work only where the server can actually write. Read-only mounts fail clearly and up front.
-- Touch only external-library files. An install can also hold upload-managed assets on S3, and those are never renamed, moved or rewritten by this feature (decision 9).
+- Write only into external libraries. A move can take an upload-managed asset (on disk or on S3) into an external library, but nothing moves into upload-managed storage, and upload-managed assets are never renamed (decision 9).
 - Never run at the same time as a storage migration or an integrity check (decision 10).
 
 ## Non-goals (v1)
@@ -27,6 +27,7 @@ Current behaviour, in code:
 - Changing a library's owner. Moves never cross owners.
 - Export file naming. That belongs to the download path, not to disk.
 - Changing how upload-managed (non-external) assets are stored. The storage template already handles those.
+- Moving files into upload-managed storage, on disk or on S3. Those imports follow the storage template, which is a different flow.
 - Mobile UI for rename and move. v1 is web only; see the API and client constraints.
 
 ## Decisions
@@ -46,6 +47,7 @@ Alternatives considered:
 - Folder: browse, restricted to the library's import paths. Typed paths go wrong often (container paths versus host paths, see the troubleshooting section of `docs/docs/features/libraries.md`). The existing folder view (Account Settings > Features > Folders) is a tree browser and can be reused for the move dialog.
 - Move targets are folders under the import paths of libraries the user owns, including other libraries of the same owner. Libraries owned by someone else are not listed at all, not shown disabled. The target must lie under one of that library's import paths, and must not be hidden by an exclusion pattern, or the file is offlined on the next scan.
 - A move across libraries changes the asset's library as well as its path. Across mounts `rename` fails with EXDEV, so the move is copy-then-delete. The row rewrite in decision 4 must cover the library id, and open question 1 decides whether the new checksum can collide.
+- Upload-managed storage (the media location on disk, and S3) is never a target. The move dialog lists external libraries only. The asset and the target library must have the same owner.
 
 ### 3. Writability probe
 
@@ -68,15 +70,19 @@ Open question, to settle before implementation: the new checksum after a move.
 
 Option A is the working assumption. The uniqueness constraint on `checksum` (per library or global) has not been checked yet, and it decides whether the rewrite can collide with an existing row.
 
+A move from upload-managed storage takes the same path checksum as a rename, so a rescan finds the asset. The asset loses the content checksum it had, and with it deduplication against uploads (open question 8).
+
 ### 5. Ordering and failure handling
 
 0. Take the file-operation lock (decision 10). Hold it until step 6, and refuse with a clear error if it is already held.
 1. Probe the source and target folders.
-2. Pause the library watcher for the affected import path, or mark the paths as in-flight, so a concurrent scan does not treat the move as a delete plus an add.
+2. Pause the library watcher for the affected import path, including the target, or mark the paths as in-flight, so a concurrent scan does not treat the move or its copy as a delete plus an add, or import the copy as a new asset.
 3. Rename the file on disk. Then the sidecar, if present.
 4. Update the asset row (`originalPath`, `originalFileName`, checksum) in one transaction.
 5. If step 4 fails, rename the file back and report the error.
 6. Resume the watcher.
+
+Upload-managed source (move only): step 3 writes a copy to a hidden temporary file in the target folder, verifies its size and content checksum against the asset, and renames it into place. Step 5 removes that new file, never the source. The source is deleted after step 4 commits. If that delete fails, the failure is logged and the leftover is listed for manual cleanup, since the asset already points at the new location.
 
 Open: a crash between steps 3 and 4 leaves the disk and the database out of sync. Options are a small journal table or a reconciliation pass on the next library scan that matches files by checksum or by size and mtime. Pick one before implementation.
 
@@ -110,11 +116,16 @@ One install can hold two kinds of asset at once:
 - External-library assets: the original is on disk, `libraryId` is set and `isExternal = true`, and `originalPath` is an absolute path.
 - Upload-managed assets: the original is a storage key on S3 (`originalPath` has no leading slash), or a file under the media location on disk. Their `libraryId` is null.
 
-This feature acts only on the first kind.
+This feature renames external assets only. It moves both kinds, and nothing moves into upload-managed storage.
 
-- Rename and move check `isExternal = true` and an absolute `originalPath` before any disk call. Any other asset is refused with an error. It is not skipped silently, so the user sees why.
-- A folder move selects by `libraryId` and `isExternal = true` as well as the path prefix. A prefix alone also matches upload-managed originals on disk, which have absolute paths too.
-- Derived files (thumbnails, previews, encoded videos, depth maps, Data Saver copies) are keyed by asset id under the media location. They do not move with a rename, and the feature does not touch them.
+- Rename: external assets only. Rename checks `isExternal = true` and an absolute `originalPath` before any disk call. Any other asset is refused with an error, not skipped silently, so the user sees why. An upload-managed asset is not renamed, because its key or file name belongs to the storage template.
+- Move source: an external asset, an upload-managed original on disk, or an upload-managed original on S3.
+- Move target: always a folder under an external library's import path. A target under the media location, or an S3 key, is refused before any change.
+- A move from upload-managed storage makes the asset external. `libraryId` and `isExternal = true` are set, and `originalPath` becomes the absolute target path. The asset keeps its id, album membership and edits. The storage template no longer applies to it.
+- An S3 source is streamed into a hidden temporary file in the target folder. Its size and content checksum are verified against the asset, and the file is renamed into place. The S3 object is deleted only after the database commit. `moveS3File` has no S3-to-disk direction (it covers S3 to S3 and disk to S3), so this path is new code.
+- An upload-managed disk source uses the same order. The writability probe (decision 3) runs on the target only, because the server owns the media location. Across mounts the move is copy-then-delete (decision 2).
+- A folder move selects by `libraryId` and `isExternal = true` as well as the path prefix. A prefix alone also matches upload-managed originals on disk, which have absolute paths too. Folder moves apply to external folders only.
+- Derived files (thumbnails, previews, encoded videos, depth maps, Data Saver copies) are keyed by asset id under the media location. They do not move with a rename or a move, and the feature does not touch them.
 - Medium: a move started while a storage migration holds the lock is refused, with no change on disk or in the database.
 - Medium: storage migration and integrity jobs wait while a move holds the lock, and an integrity run during a move records no false missing or untracked report.
 - Medium: a folder move with a prefix that matches an upload-managed original on disk leaves that asset unchanged; a prefix with `_` or `%` matches only its own folder.
@@ -132,9 +143,7 @@ Three operations write `asset.originalPath` or `asset_file.path`, or read the li
 
 Decision: the three never run at the same time. They share one exclusive lock, a new `DatabaseLock` entry separate from `IntegrityCheck` (`server/src/enum.ts`). It is taken with `databaseRepository.withLock` or `tryLock`, which use a session advisory lock on a pinned connection, so it also holds across worker processes.
 
-- Rename and move take it with `tryLock` before the probe in decision 3. If it is he
-6. Storage migration `toS3` selects every absolute `originalPath` and `asset_file.path` with no `isExternal` or `libraryId` filter (`server/src/repositories/storage-migration.repository.ts`). Its `computeTargetPath` comment says an external path "keeps the whole path without its leading slash". If that is what happens, a `toS3` run turns external originals into S3 keys and breaks their rename. Confirm with a test. If it is confirmed, fix the migration to exclude external assets before this feature ships; the fix belongs to the migration, not to this spec.
-7. Lock granularity: a folder move can run for a long time. Hold the lock for the whole move (storage migration waits for it), or per batch (a migration can start between batches, and the move must then re-check the lock)?ld, the request fails with a clear message (for example "a storage migration or an integrity check is running") and changes nothing.
+- Rename and move take it with `tryLock` before the probe in decision 3. If it is held, the request fails with a clear message (for example "a storage migration or an integrity check is running") and changes nothing.
 - Storage migration start and rollback, and each integrity job run, take it when they run. If it is held, the job waits and retries rather than failing.
 - The lock is released in a `finally`. A session advisory lock is also released when its connection closes, so a crashed holder does not block the others.
 - The probe file from decision 3 is created under the same lock, so an integrity scan never sees it.
@@ -155,15 +164,22 @@ Decision: the three never run at the same time. They share one exclusive lock, a
 - Medium: storage migration and integrity jobs wait while a move holds the lock, and an integrity run during a move records no false missing or untracked report.
 - Medium: a folder move with a prefix that matches an upload-managed original on disk leaves that asset unchanged; a prefix with `_` or `%` matches only its own folder.
 - Medium: an asset whose sidecar is an S3 key is refused as a whole.
+- Medium: a move from upload-managed disk and from S3 into an external library keeps the id, sets `isExternal` and `libraryId`, and removes the source only after the commit; derived files are unchanged.
+- Medium: a forced failure during an S3-to-disk move leaves the object, the row and the target folder as they were, apart from the removed temporary file.
+- Medium: a move into the media location or an S3 key is refused, with no change.
+- Medium: a rename of an upload-managed asset is refused.
+- Medium: after a move from S3, a `toS3` storage migration run leaves the asset's path alone (needs the open question 6 fix).
+- Medium: the watcher does not import the in-flight copy at the target.
 - Authorization matrix as described in decision 7.
 - E2E: one happy-path rename from the asset viewer.
 
 ## Open questions
 
 1. Uniqueness constraint on `checksum`: per library, or global? Decides whether the rewrite can collide.
-2. Crash recovery between disk rename and database update: journal table or reconciliation on rescan?
+2. Crash recovery between disk rename and database update, and between the copy into an external folder and the database update (uploads and S3 sources): journal table or reconciliation on rescan? A crash after the copy leaves a file the scanner would import as a second asset.
 3. Who may rename or move: owner only, or admins too?
 4. Does a move need to refuse when the target folder is excluded by a pattern, or only warn?
 5. Should the folder browser show read-only folders as browsable but not selectable?
-6. Storage migration `toS3` selects every absolute `originalPath` and `asset_file.path` with no `isExternal` or `libraryId` filter (`server/src/repositories/storage-migration.repository.ts`). Its `computeTargetPath` comment says an external path "keeps the whole path without its leading slash". If that is what happens, a `toS3` run turns external originals into S3 keys and breaks their rename. Confirm with a test. If it is confirmed, fix the migration to exclude external assets before this feature ships; the fix belongs to the migration, not to this spec.
+6. Storage migration `toS3` selects every absolute `originalPath` and `asset_file.path` with no `isExternal` or `libraryId` filter (`server/src/repositories/storage-migration.repository.ts`). Its `computeTargetPath` comment says an external path "keeps the whole path without its leading slash". If that is what happens, a `toS3` run turns external originals into S3 keys and breaks their rename. Confirm with a test. If it is confirmed, fix the migration to exclude external assets before this feature ships; the fix belongs to the migration, not to this spec. This also matters for moved assets: one moved out of S3 has an absolute path, so the same selection would send it back to S3.
 7. Lock granularity: a folder move can run for a long time. Hold the lock for the whole move (storage migration waits for it), or per batch (a migration can start between batches, and the move must then re-check the lock)?
+8. Checksum of an upload-managed asset moved into an external library: take the path checksum (decision 4, which loses content deduplication against uploads), or keep the content checksum and make the rescan match it?
