@@ -192,6 +192,13 @@ order by
 
 -- SharedLinkRepository.getAll
 select
+  "id"
+from
+  "shared_link"
+where
+  "userId" = $1
+  and "type" = 'INDIVIDUAL'
+select
   "shared_link".*,
   (
     select
@@ -215,7 +222,8 @@ select
           "shared_link_asset"
           inner join "asset" on "asset"."id" = "shared_link_asset"."assetId"
         where
-          "shared_link"."id" = "shared_link_asset"."sharedLinkId"
+          "shared_link_asset"."sharedLinkId" = "shared_link"."id"
+          and "asset"."fileCreatedAt" = "cover"."fileCreatedAt"
           and "asset"."deletedAt" is null
           and (
             "asset"."ownerId" = "shared_link"."userId"
@@ -281,12 +289,148 @@ select
               )
             )
           )
-        order by
-          "asset"."fileCreatedAt" asc
         limit
-          $5
+          1
       ) as agg
   ) as "assets",
+  to_json("album") as "album"
+from
+  "shared_link"
+  left join "shared_link_space" on "shared_link_space"."sharedLinkId" = "shared_link"."id"
+  left join (
+    select
+      "shared_link_asset"."sharedLinkId",
+      min("asset"."fileCreatedAt") as "fileCreatedAt"
+    from
+      "shared_link_asset"
+      inner join "asset" on "asset"."id" = "shared_link_asset"."assetId"
+      inner join "shared_link" on "shared_link"."id" = "shared_link_asset"."sharedLinkId"
+      left join "shared_link_space" on "shared_link_space"."sharedLinkId" = "shared_link_asset"."sharedLinkId"
+    where
+      "shared_link_asset"."sharedLinkId" = any ($5::uuid[])
+      and "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = "shared_link"."userId"
+        or (
+          "shared_link_space"."spaceId" is not null
+          and exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_member"
+            where
+              "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
+              and "shared_space_member"."userId" = "shared_link"."userId"
+              and "shared_space_member"."role" in ($6, $7)
+          )
+          and "asset"."visibility" in ($8, $9)
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = "shared_link_space"."spaceId"
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = "shared_link_space"."spaceId"
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+              )
+            )
+          )
+        )
+      )
+    group by
+      "shared_link_asset"."sharedLinkId"
+  ) as "cover" on "cover"."sharedLinkId" = "shared_link"."id"
+  left join lateral (
+    select
+      "album".*,
+      (
+        select
+          coalesce(json_agg(agg), '[]')
+        from
+          (
+            select
+              "album_user"."role",
+              (
+                select
+                  to_json(obj)
+                from
+                  (
+                    select
+                      "id",
+                      "name",
+                      "email",
+                      "avatarColor",
+                      "profileImagePath",
+                      "profileChangedAt"
+                    from
+                      (
+                        select
+                          1
+                      ) as "dummy"
+                  ) as obj
+              ) as "user"
+            from
+              "album_user"
+              inner join "user" on "user"."id" = "album_user"."userId"
+            where
+              "album_user"."role" = 'owner'
+              and "album_user"."albumId" = "album"."id"
+          ) as agg
+      ) as "albumUsers"
+    from
+      "album"
+    where
+      "album"."id" = "shared_link"."albumId"
+      and "album"."deletedAt" is null
+  ) as "album" on true
+where
+  "shared_link"."userId" = $10
+  and (
+    "shared_link"."type" = 'INDIVIDUAL'
+    or "album"."id" is not null
+  )
+order by
+  "shared_link"."createdAt" desc
+
+-- SharedLinkRepository.getAll (album)
+select
+  "shared_link".*,
   to_json("album") as "album"
 from
   "shared_link"
@@ -335,12 +479,12 @@ from
       and "album"."deletedAt" is null
   ) as "album" on true
 where
-  "shared_link"."userId" = $6
+  "shared_link"."userId" = $1
   and (
-    "shared_link"."type" = $7
+    "shared_link"."type" = 'INDIVIDUAL'
     or "album"."id" is not null
   )
-  and "shared_link"."albumId" = $8
+  and "shared_link"."albumId" = $2
 order by
   "shared_link"."createdAt" desc
 
