@@ -132,6 +132,7 @@ This feature renames external assets only. It moves both kinds, and nothing move
 - Medium: an asset whose sidecar is an S3 key is refused as a whole.
 - Sidecars of an external asset sit beside the original and follow it (decision 5). If a sidecar's path is an S3 key, the operation is refused as a whole, not applied to the original alone.
 - Storage migration is a second writer of the same columns. Decision 10 keeps the two apart.
+- Folder view origin. The folder tree shows S3 keys and disk paths together (`ViewRepository.getUniqueOriginalPaths`, `getAssetsByOriginalPath`). An S3 key has no leading slash, so an S3 folder such as `upload/admin` is a top-level node beside `/`. The contents query matches `%<folder>/%`, a substring match, so the S3 folder also returns disk originals under `/data/upload/admin/`, and a disk folder returns S3 keys with the same segments. A move started from either folder could take the wrong assets. Fix, a prerequisite for folder moves: anchor the contents query to the exact folder prefix, `originalPath LIKE '<folder>/%' ESCAPE '\'` with the folder escaped by `escapeLikePattern`, and keep direct children only with `NOT LIKE '<folder>/%/%'`. The tree's trailing-slash normalisation stays. The change is one in-place edit to an upstream file (`server/src/repositories/view-repository.ts`); the PR reports its diff against the upstream tag (`AGENTS.md`, rule 5).
 
 ### 10. No concurrent runs with storage migration or integrity checks
 
@@ -170,6 +171,7 @@ Decision: the three never run at the same time. They share one exclusive lock, a
 - Medium: a rename of an upload-managed asset is refused.
 - Medium: after a move from S3, a `toS3` storage migration run leaves the asset's path alone (needs the open question 6 fix).
 - Medium: the watcher does not import the in-flight copy at the target.
+- Medium, folder view origin (decision 9), in a sibling file under `server/test/medium/specs/gallery/`: an S3 folder `upload/admin` does not return the disk original `/data/upload/admin/x.jpg`; the disk folder `/data/upload/admin` does not return the S3 key `upload/admin/x.jpg`; only direct children are returned; a folder name with `_` or `%` matches only itself.
 - Authorization matrix as described in decision 7.
 - E2E: one happy-path rename from the asset viewer.
 
