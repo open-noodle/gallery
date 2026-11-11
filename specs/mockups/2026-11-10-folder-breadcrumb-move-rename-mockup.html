@@ -905,13 +905,7 @@
               <div class="scrim">
                 <div class="dialog wide" role="dialog" aria-label="Move into your library">
                   <h2>Move into your library</h2>
-                  <p class="hint">
-                    Everything under &quot;Asiel 2006&quot; moves into your user library. Each file is renamed by the storage template
-                    set up for this instance, shown here as <b>{{y}}/{{MM}}/{{filename}}</b>. The date comes from the photo, not
-                    the folder name: the December file below was taken in August, so it goes to 08, and it gets +1 because the
-                    Augustus file already took IMG_0007.jpg.
-                  </p>
-                  <p class="hint">The files leave the external library. Each asset keeps its id, albums, faces and edits.</p>
+                  <p class="hint">Everything under &quot;Asiel 2006&quot; moves into your library and is renamed by the storage template.</p>
                   <label>3,812 files</label>
                   <div class="picker">
                     <div class="prow"><span>Current path, relative to Asiel 2006</span><small>New name in your library</small></div>
@@ -924,9 +918,6 @@
                     <div class="prow"><span>Asiel 2006 - Februari/clip.mov</span><small>&rarr; 2006/02/clip.mov</small></div>
                     <div class="prow dim"><span>&hellip; and 3,805 more</span></div>
                   </div>
-                  <p class="hint warn">
-                    Moving back out to an external library is possible later, but the files are not copied back automatically.
-                  </p>
                   <div class="actions">
                     <button class="btn">Cancel</button>
                     <button class="btn primary">Move 3,812 files</button>
@@ -1186,6 +1177,7 @@
       <div><b>Library roots.</b> The menu is hidden on an external library or user library root, because moving it would be a library-level change.</div>
       <div><b>Read-only.</b> Items stay visible but disabled, with a reason. The server repeats the check at action time.</div>
       <div><b>Import into library.</b> The menu item opens a confirmation (stage 5) before anything moves. It lists every file under the folder with its path relative to the folder and the name the storage template gives it in your user library; a name taken by an earlier file in the same batch gets the +N suffix. Confirming starts the same background job as a move (stages 7 to 9). The external move picker (stage 4) still lists external libraries only.</div>
+      <div><b>Import dialog copy.</b> Only the title, the sentence, the list and the button show in the frame. The files leave the external library, and each asset keeps its id, albums, faces and edits. The month comes from the photo's date, not the folder name: the December file was taken in August, so it goes to 08, and it gets +1 because the Augustus file already took IMG_0007.jpg. Moving back out to an external library is possible later, but the files are not copied back automatically.</div>
       <div><b>States.</b> Read-only destination: the picker shows the reason and Move here is disabled (stage 6). In progress: a progress panel, not a notification, so it stays out of the drawer (stage 7). Succeeded: a toast that dismisses itself (stage 8). Failed: a toast that stays until dismissed, plus one drawer entry (stage 9).</div>
       <div><b>Top bar.</b> Shown in every stage. The bell opens the notification drawer. It shows an unread dot only while a notification is unread, which is the failed move (stage 9, drawer open).</div>
     </section>
