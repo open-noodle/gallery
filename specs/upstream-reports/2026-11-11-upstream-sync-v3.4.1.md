@@ -124,7 +124,7 @@ locally) and checked by hand: both cover subqueries carry the #1018 tether and t
 | Docker                           | `43083595444` | PASS                                           |
 | Storage Migration Tests / E2E    | `43083679946` / `43083936688` | PASS                           |
 | Gallery ML Smoke / Mobile Smoke  | `43083761992` / `43083849629` | PASS                           |
-| Revert-to-Immich                 | not run       | needs an RC image of this branch               |
+| Revert-to-Immich                 | `43102453425` | PASS (`rolling-v34-rc15` vs stock `immich-server:v3.4.1`) |
 
 No CI-only breaks and no flakes this cycle.
 
