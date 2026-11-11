@@ -43,8 +43,15 @@ class GalleryDemoLoginButton extends HookConsumerWidget {
         // Invalidate all api repository provider instance to take into account the demo endpoint and access token.
         invalidateAllApiRepositoryProviders(ref);
 
-        await ref.read(serverInfoProvider.notifier).getServerInfo();
-        final result = await ref.read(authProvider.notifier).demoLogin();
+        // Read the notifiers now, after the invalidation (the auth notifier depends on those repositories,
+        // so one read before it is stale) and before getServerInfo(). That call updates serverInfoProvider,
+        // which the login form watches; the form builds a new GlobalKey for its Form on every build, so the
+        // rebuild recreates everything inside the Form, this button included, and [ref] is dead after it.
+        final authNotifier = ref.read(authProvider.notifier);
+        final serverInfoNotifier = ref.read(serverInfoProvider.notifier);
+
+        await serverInfoNotifier.getServerInfo();
+        final result = await authNotifier.demoLogin();
         await onLoggedIn(result);
       } catch (error, stack) {
         _log.severe('Error logging into demo mode: $error', error, stack);
@@ -60,7 +67,9 @@ class GalleryDemoLoginButton extends HookConsumerWidget {
           gravity: ToastGravity.TOP,
         );
       } finally {
-        isDemoLoginLoading.value = false;
+        if (context.mounted) {
+          isDemoLoginLoading.value = false;
+        }
       }
     }
 
