@@ -53,7 +53,7 @@ const webSupportedImage = {
 const heif = {
   '.heic': ['image/heic'],
   '.heif': ['image/heif'],
-  '.hif': ['image/hif'],
+  '.hif': ['image/heif'],
 };
 
 const webUnsupportedImage = {
