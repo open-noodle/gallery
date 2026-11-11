@@ -47,7 +47,7 @@ Alternatives considered:
 - Folder: browse, restricted to the library's import paths. Typed paths go wrong often (container paths versus host paths, see the troubleshooting section of `docs/docs/features/libraries.md`). The existing folder view (Account Settings > Features > Folders) is a tree browser and can be reused for the move dialog.
 - Move targets are folders under the import paths of libraries the user owns, including other libraries of the same owner. Libraries owned by someone else are not listed at all, not shown disabled. The target must lie under one of that library's import paths, and must not be hidden by an exclusion pattern, or the file is offlined on the next scan.
 - A move across libraries changes the asset's library as well as its path. Across mounts `rename` fails with EXDEV, so the move is copy-then-delete. The row rewrite in decision 4 must cover the library id, and open question 1 decides whether the new checksum can collide.
-- The external move dialog lists external libraries only. The user library is not a target of that dialog: a folder import into it is a separate operation (decision 11). The asset and the target library must have the same owner.
+- The external move dialog lists external libraries only. The user library is not a target of that dialog: a folder import into it is a separate operation (decision 11). The asset and the target library must have the same owner. Moving one half of a live photo moves the whole pair (decision 12).
 
 ### 3. Writability probe
 
@@ -172,16 +172,25 @@ Implementation findings, from reading the code:
 - **Template off.** The menu item is disabled with the reason "The storage template is off", and the server refuses the action. Without a template there is no name to apply. The upload default (`upload/<owner>/…`) is not used, because it is not the template the user asked for.
 - **S3 template gate.** While `StorageTemplateS3State` is `pending` (`server/src/gallery/services/storage-template-s3.service.ts`), the import is refused with a reason that points to Storage Template Migration. An import into S3 would be a template move that the admin has not yet approved (`isManualOnlyTemplateMove`). Refused, as decided (question 13).
 - **Metadata.** A file without `fileSizeInByte` or without extracted metadata cannot be rendered. It is listed in the dialog as "not moved: metadata not extracted yet" and stays in place. The other files proceed (question 11: list and skip).
-- **Live photo pairs.** A live photo is two asset rows: the still, and a hidden video. The still's `livePhotoVideoId` points at the video. The pair is matched by `livePhotoCID` within one library (`assetRepository.findLivePhotoMatch`, called from `server/src/services/metadata.service.ts`), so the two files can sit in different folders. The video is a real file under the library, so the import lists and moves it, including hidden assets, which the folder view does not show. The video takes the still's new name with its own extension (`getLivePhotoMotionFilename`), as the storage template job already does. A pair with one half outside the folder is open question 12.
+- **Live photo pairs.** A live photo is two asset rows: the still, and a hidden video. The still's `livePhotoVideoId` points at the video. The pair is matched by `livePhotoCID` within one library (`assetRepository.findLivePhotoMatch`, called from `server/src/services/metadata.service.ts`), so the two files can sit in different folders. The video is a real file under the library, so the import lists and moves it, including hidden assets, which the folder view does not show. The video takes the still's new name with its own extension (`getLivePhotoMotionFilename`), as the storage template job already does. A partner outside the folder moves with its still (decision 12).
 - **Android embedded motion video.** The video is cut out of the still's bytes and written to the media location (`getMotionVideoPath`), as a hidden asset. It is not a file under the folder. The import does not move it, and the still moves alone.
 - **Preview is a dry run.** It reads asset rows and does existence checks through `isTemplateDestinationTaken` (disk and S3). It hashes no content and writes nothing. The run uses the template in force when it runs (best effort, question 10). Each name that differs from the preview is reported in the job result.
-- **Resumable, one file at a time.** Each file is its own unit with its own commit. A rerun plans only the assets still external under the folder. A crash between the rename (step 4) and the commit leaves a file at the planned name while the row still points at the source. A rerun would then template that file to `+1`, a second copy. The job state therefore journals the planned path before the rename, so the next run removes the orphan (open question 2 and decision 5).
+- **Resumable, one file at a time.** Each file is its own unit with its own commit, except a live photo pair, which is one unit (decision 12). A rerun plans only the assets still external under the folder. A crash between the rename (step 4) and the commit leaves a file at the planned name while the row still points at the source. A rerun would then template that file to `+1`, a second copy. The job state therefore journals the planned path before the rename, so the next run removes the orphan (open question 2 and decision 5).
 - **Failures.** One file's failure does not stop the job. The job result lists each failed or skipped file with its reason. Feedback follows decision 8: the progress panel while it runs, a success toast with the moved and skipped counts, and a failure toast plus a drawer entry when any file failed.
 - **Locks and watcher.** The job takes `DatabaseLock.StorageTemplateMigration`, which `moveAsset` also takes per asset, so the per-asset template job cannot run on the same file. It also takes the shared lock of decision 10 (per job or per file, open question 7). The watcher pauses for the source import path (decision 5, step 2), and does not import the in-flight copy at the target.
 - **Authorization.** The owner of the external library is the owner of the asset and of the target library. Moves stay within one owner, so an admin who is not the owner is refused (questions 3 and 9). The matrix in decision 7 covers actor (owner, admin who is not the owner, other user), template on and off, S3 gate pending and clear, write backend disk and S3, and the preview and run operations.
 - **API.** Two new fork endpoints under the gallery controller: a paged preview and an import job. Both are additive (`AGENTS.md`, rule 6). An older app never calls them.
 - **Undo.** Not automatic. A file can go back out to an external library through the external move from the user library (decision 2, moves from upload-managed storage).
 - **Upstream files.** `storage-template.service.ts` gains the optional root argument if the preferred option is taken. Nothing else in upstream code changes.
+
+### 12. Live photo pairs move as one unit
+
+A live photo is a still and a hidden video, linked by `livePhotoVideoId` (decision 11, live photo pairs). Moving either half moves the whole pair. This holds for a single-file move (decision 2) and for a folder import (decision 11).
+
+- A partner outside the selected folder comes too. The import dialog lists it with its current path and its new name, and marks it as outside the folder.
+- Both halves are copied, verified and committed in one transaction, then both sources are removed. A failed copy of either half leaves both in place. In the import journal the pair is one unit (decision 11, resumable).
+- The video takes the still's new name with its own extension (`getLivePhotoMotionFilename`), as the storage template job does.
+- A folder move (decision 6) that takes one half of a pair is open question 15.
 
 ## API and client constraints
 
@@ -212,7 +221,8 @@ Implementation findings, from reading the code:
 - Medium, import: the template off, or `StorageTemplateS3State` pending, refuses with a reason and no change.
 - Medium, import: a file whose content an upload already holds is refused, its source stays, and the other files proceed.
 - Medium, import: a file without metadata is listed as skipped and is not moved.
-- Medium, import: a live photo pair inside the folder moves as one unit, the video under the still's new name. A pair with its partner outside the folder: both files are listed and skipped, and neither moves.
+- Medium, import: a live photo pair moves as one unit, the video under the still's new name. A partner outside the folder moves with its still and is listed in the dialog. A failed copy of either half leaves both in place.
+- Medium, move: a single-file external move of one half of a live photo moves both halves and updates both rows.
 - Medium, import: an admin who is not the owner is refused with no change.
 - Medium, import: a forced failure at the rename or the commit leaves the source and the row as they were, with the temporary file removed.
 - Medium, import: an interrupted job, rerun, does not create a `+1` copy of a file that already moved.
@@ -236,6 +246,7 @@ Implementation findings, from reading the code:
 9. Decided: an admin who is not the owner cannot import into that owner's library. Moves stay within one owner, and a move from an external library to a user library needs both owned by the same owner.
 10. Decided: best effort. The run uses the template in force when it runs, and the job result reports each name that differs from the preview.
 11. Decided: list and skip. A file without metadata stays in place and the dialog lists it.
-12. Open. Proposed: a live photo pair with one half outside the folder is listed and skipped, with both files left in place. The alternative is moving the partner too, which changes files outside the folder.
+12. Decided: the partner moves too, whichever half was picked (decision 12).
 13. Decided: refuse on an S3 install while `StorageTemplateS3State` is pending, until Storage Template Migration is done.
 14. Decided: refuse the file and keep the source in place. The job result reports it. Linking to the existing asset would lose the external asset's albums and faces, so it is not done.
+15. Open. A folder move (decision 6) whose folder holds one half of a live photo pair and not the other. Proposed: refuse the move and name the partner, because the partner would be left behind outside the folder.
