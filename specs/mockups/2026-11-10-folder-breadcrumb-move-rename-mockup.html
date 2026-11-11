@@ -598,7 +598,7 @@
     <header class="intro">
       <h1>Folder breadcrumb: move and rename</h1>
       <p>
-        A menu on the right of the folder breadcrumb bar offers Rename folder and Move folder for the folder you are in. Tiles and
+        A menu on the right of the folder breadcrumb bar offers Rename folder, Move folder and Move into your library for the folder you are in. Tiles and
         sidebar items have no actions in this version; open the folder to rename or move it.
       </p>
     </header>
@@ -608,10 +608,11 @@
       <button class="tab" role="tab" data-s="2">2 · Rename and move menu</button>
       <button class="tab" role="tab" data-s="3">3 · Rename dialog</button>
       <button class="tab" role="tab" data-s="4">4 · Move dialog</button>
-      <button class="tab" role="tab" data-s="5">5 · Destination read-only</button>
-      <button class="tab" role="tab" data-s="6">6 · Move in progress</button>
-      <button class="tab" role="tab" data-s="7">7 · Move succeeded</button>
-      <button class="tab" role="tab" data-s="8">8 · Move failed</button>
+      <button class="tab" role="tab" data-s="5">5 · Import into library</button>
+      <button class="tab" role="tab" data-s="6">6 · Destination read-only</button>
+      <button class="tab" role="tab" data-s="7">7 · Move in progress</button>
+      <button class="tab" role="tab" data-s="8">8 · Move succeeded</button>
+      <button class="tab" role="tab" data-s="9">9 · Move failed</button>
     </div>
 
     <main>
@@ -651,6 +652,7 @@
                 <div class="menu" role="menu">
                   <div class="menu-item hovered" role="menuitem"><span class="ico">&#9998;</span>Rename folder</div>
                   <div class="menu-item" role="menuitem"><span class="ico">&#8680;</span>Move folder&hellip;</div>
+                  <div class="menu-item" role="menuitem"><span class="ico">&#8615;</span>Move into your library&hellip;</div>
                 </div>
               </div>
               <div class="grid-area">
@@ -710,6 +712,13 @@
                     <span class="ico">&#8680;</span>
                     <span>
                       Move folder&hellip;
+                      <span class="why">Library is read-only</span>
+                    </span>
+                  </div>
+                  <div class="menu-item disabled" role="menuitem" aria-disabled="true">
+                    <span class="ico">&#8615;</span>
+                    <span>
+                      Move into your library&hellip;
                       <span class="why">Library is read-only</span>
                     </span>
                   </div>
@@ -843,7 +852,7 @@
                     <div class="prow sub2 parent open"><span>Unsorted</span></div>
                     <div class="prow sub3"><span>old-phone-dump</span></div>
                   </div>
-                  <p class="hint">Moves can go to any external library owned by Tamara. The user library and libraries owned by others are not listed.</p>
+                  <p class="hint">Moves can go to any external library owned by Tamara. The user library and libraries owned by others are not listed. To move into the user library, use Move into your library from the menu.</p>
                   <div class="actions">
                     <button class="btn">Cancel</button>
                     <button class="btn primary">Move here</button>
@@ -855,6 +864,79 @@
         </div>
       </section>
       <section class="screen" id="s5" hidden>
+        <div class="frame stage-frame">
+          <div class="page">
+            <header class="topbar">
+              <div class="logo"><i></i>Gallery</div>
+              <div class="topsearch">Search your photos</div>
+              <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+              <div class="avatar">P</div>
+            </header>
+            <aside class="sidebar">
+              <div class="row">/</div>
+              <div class="row">&nbsp;&nbsp;tank</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;backup/tamara-4/...</div>
+              <div class="row active">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2006</div>
+              <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Asiel 2007</div>
+            </aside>
+            <div class="content">
+              <div class="controlbar">
+                <button class="icon-btn" aria-label="To parent">&#8598;</button>
+                <nav class="crumbs">
+                  <a href="#">Folders</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">/</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">tank</a>
+                  <span class="sep">&rsaquo;</span>
+                  <a href="#">backup/tamara-4/Tamara Asiel/Asielfotos</a>
+                  <span class="sep">&rsaquo;</span>
+                  <span class="current">Asiel 2006</span>
+                </nav>
+              </div>
+              <div class="grid-area">
+                <div class="tiles">
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - April</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Augustus</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - December</div>
+                  <div class="tile"><div class="folder">&#128193;</div>Asiel 2006 - Februari</div>
+                </div>
+              </div>
+              <div class="scrim">
+                <div class="dialog wide" role="dialog" aria-label="Move into your library">
+                  <h2>Move into your library</h2>
+                  <p class="hint">
+                    Everything under &quot;Asiel 2006&quot; moves into your user library. Each file is renamed by the storage template
+                    set up for this instance, shown here as <b>{{y}}/{{MM}}/{{filename}}</b>.
+                  </p>
+                  <p class="hint">The files leave the external library. Each asset keeps its id, albums, faces and edits.</p>
+                  <label>3,812 files</label>
+                  <div class="picker">
+                    <div class="prow"><span>Current path, relative to Asiel 2006</span><small>New name in your library</small></div>
+                    <div class="prow"><span>Asiel 2006 - April/IMG_0412.jpg</span><small>&rarr; 2006/04/IMG_0412.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - April/IMG_0413.jpg</span><small>&rarr; 2006/04/IMG_0413.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - Augustus/IMG_0007.jpg</span><small>&rarr; 2006/08/IMG_0007.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - Augustus/IMG_0102.jpeg</span><small>&rarr; 2006/08/IMG_0102.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - December/IMG_0007.jpg</span><small>&rarr; 2006/08/IMG_0007+1.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - Februari/IMG_0102.jpeg</span><small>&rarr; 2006/02/IMG_0102.jpg</small></div>
+                    <div class="prow"><span>Asiel 2006 - Februari/clip.mov</span><small>&rarr; 2006/02/clip.mov</small></div>
+                    <div class="prow dim"><span>&hellip; and 3,805 more</span></div>
+                  </div>
+                  <p class="hint warn">
+                    Moving back out to an external library is possible later, but the files are not copied back automatically.
+                  </p>
+                  <div class="actions">
+                    <button class="btn">Cancel</button>
+                    <button class="btn primary">Move 3,812 files</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s6" hidden>
         <div class="frame stage-frame">
           <div class="page">
             <header class="topbar">
@@ -931,7 +1013,7 @@
         </div>
       </section>
 
-      <section class="screen" id="s6" hidden>
+      <section class="screen" id="s7" hidden>
         <div class="frame stage-frame">
           <div class="page">
             <header class="topbar">
@@ -982,7 +1064,7 @@
           </div>
         </div>
       </section>
-      <section class="screen" id="s7" hidden>
+      <section class="screen" id="s8" hidden>
         <div class="frame stage-frame">
           <div class="page">
             <header class="topbar">
@@ -1032,7 +1114,7 @@
           </div>
         </div>
       </section>
-      <section class="screen" id="s8" hidden>
+      <section class="screen" id="s9" hidden>
         <div class="frame stage-frame">
           <div class="page">
             <header class="topbar">
@@ -1101,8 +1183,9 @@
       <div><b>Scope.</b> Actions apply to the folder shown in the bar (the last crumb). Tiles and sidebar items have no menu in this version.</div>
       <div><b>Library roots.</b> The menu is hidden on an external library or user library root, because moving it would be a library-level change.</div>
       <div><b>Read-only.</b> Items stay visible but disabled, with a reason. The server repeats the check at action time.</div>
-      <div><b>States.</b> Read-only destination: the picker shows the reason and Move here is disabled (stage 5). In progress: a progress panel, not a notification, so it stays out of the drawer (stage 6). Succeeded: a toast that dismisses itself (stage 7). Failed: a toast that stays until dismissed, plus one drawer entry (stage 8).</div>
-      <div><b>Top bar.</b> Shown in every stage. The bell opens the notification drawer. It shows an unread dot only while a notification is unread, which is the failed move (stage 8, drawer open).</div>
+      <div><b>Import into library.</b> The menu item opens a confirmation (stage 5) before anything moves. It lists every file under the folder with its path relative to the folder and the name the storage template gives it in your user library; a name taken by an earlier file in the same batch gets the +N suffix. Confirming starts the same background job as a move (stages 7 to 9). The external move picker (stage 4) still lists external libraries only.</div>
+      <div><b>States.</b> Read-only destination: the picker shows the reason and Move here is disabled (stage 6). In progress: a progress panel, not a notification, so it stays out of the drawer (stage 7). Succeeded: a toast that dismisses itself (stage 8). Failed: a toast that stays until dismissed, plus one drawer entry (stage 9).</div>
+      <div><b>Top bar.</b> Shown in every stage. The bell opens the notification drawer. It shows an unread dot only while a notification is unread, which is the failed move (stage 9, drawer open).</div>
     </section>
     <script>
       const tabs = document.querySelectorAll('.tab');
