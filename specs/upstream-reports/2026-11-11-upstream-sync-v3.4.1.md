@@ -127,3 +127,22 @@ locally) and checked by hand: both cover subqueries carry the #1018 tether and t
 | Revert-to-Immich                 | not run       | needs an RC image of this branch               |
 
 No CI-only breaks and no flakes this cycle.
+
+## Personal instance
+
+`rolling-v34-rc15` (server only, from `befc7698f55`; run `43099024277`, whose first attempt died on a GHCR
+`toomanyrequests` pull and passed on rerun), pinned in infra-gitops `72b14e8`, replacing `v5.10.0-rc.1` (v3.3.5 base).
+ML stays the shared `gallery-ml:main-3360746c-rc2`: `machine-learning.repository.ts` is unchanged from v3.3.5 to
+v3.4.1, and the v2 model revision is an ML-side setting the server does not send.
+
+- Migrations: the three v3.4 upstream ones (`AddPasskeyTable`, `AddUpdateIdIndexes`, `AddAssetOwnerIdUpdateIdIndex`)
+  plus three fork migrations already on `main` that `v5.10.0-rc.1` predates (`ScopeJitOffToDatabase`,
+  `AddAssetDataSaverVideoTable`, `AddAssetFaceVideoFrameTable`). `No schema drift detected` on both workers.
+- Each new pod's first start hit `ECONNREFUSED` on `gallery-postgres-rw` and restarted once; Postgres itself did not
+  restart (up since 2026-10-24). The second start connected and migrated.
+- `/server/version` is 3.4.1 for a stock client and 5.10.0-rc.1 for a Gallery client; ArgoCD `Synced / Healthy`.
+- First boot of upstream's FUTO backups generated a state key for `/data/backups/yucca` (on the uploads PVC).
+- Pre-deploy dump `~/gallery-backups/personal-pre-rolling-v34-rc15-2026-11-11.dump` (541 MB, sha256 `92c574d6…`, matched
+  the in-pod copy). The CNPG pod's `/tmp` is read-only (dump to the data volume), and `kubectl exec cat` truncated the
+  copy even in 50 MB chunks; 8 MB `dd` chunks with size checks worked. Rollback: restore that dump and
+  `git revert 72b14e8` in infra-gitops (a v3.3.5-based build refuses the three v3.4 rows).
