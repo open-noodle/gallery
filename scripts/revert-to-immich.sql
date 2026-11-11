@@ -1079,9 +1079,10 @@ BEGIN
   END IF;
 END $$;
 
--- Post-tag upstream migrations this branch carries: none. `upstream.version` is 3.4.0, which
+-- Post-tag upstream migrations this branch carries: none. `upstream.version` is 3.4.1, which
 -- ships every upstream migration in this tree.
 --
+-- The 3.4.0 -> 3.4.1 bump removed nothing: 3.4.1 adds no migrations.
 -- The 3.4.0-rc.3 -> 3.4.0 bump removed nothing: 3.4.0 adds no migrations.
 -- The 3.4.0-rc.2 -> 3.4.0-rc.3 bump removed nothing: rc.3 adds no migrations.
 -- The 3.4.0-rc.1 -> 3.4.0-rc.2 bump removed nothing: rc.2 adds no migrations.
