@@ -518,6 +518,28 @@ jobs:
             fi
           } > /tmp/prerelease-notes.md
 
+          # Credit the authors of the Gallery PRs in this RC, the same way the server release does
+          # (gallery-release-server-only.yml): diff the upstream bases ("chore: version v" commits) so a
+          # rebase does not re-list fork commits that already shipped in prev_tag, keep only lines with
+          # our own PR number (1-4 digits), and let the helper look up the authors. It prints nothing on
+          # any lookup problem, and `|| true` backs that up: thanks are not worth a failed pre-release.
+          if [[ -n "$prev_tag" ]]; then
+            base_new=$(git log --format=%H --grep='^chore: version v' -1 "$SHA" || true)
+            base_old=$(git log --format=%H --grep='^chore: version v' -1 "$prev_tag" || true)
+            if [[ -n "$base_new" && -n "$base_old" ]]; then
+              shipped=$(mktemp)
+              git log --pretty=format:'%s' "${base_old}..${prev_tag}" > "$shipped"
+              gallery_all=$(git log --pretty=format:'%s' "${base_new}..${SHA}" \
+                | { if [[ -s "$shipped" ]]; then grep -Fxv -f "$shipped"; else cat; fi; } \
+                | awk '{ if (match($0, /\(#[0-9]+\)$/)) { n = substr($0, RSTART+2, RLENGTH-3) + 0; if (n < 10000) print } }' || true)
+              rm -f "$shipped"
+              contributors=$(printf '%s\n' "$gallery_all" | node .github/scripts/release-contributors.mjs || true)
+              if [[ -n "$contributors" ]]; then
+                printf '\n%s\n' "$contributors" >> /tmp/prerelease-notes.md
+              fi
+            fi
+          fi
+
           # Idempotent on re-runs: edit the existing release, else create it.
           # --prerelease (never --latest) keeps it off the "Latest" badge and
           # out of the version-check path.
