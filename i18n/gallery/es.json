@@ -1227,6 +1227,8 @@
   "show_faces_from_photo": "Mostrar las caras de esta foto",
   "show_more": "Mostrar más",
   "show_profile_faces": "Mostrar las caras de perfil",
+  "show_space_badges": "Mostrar los iconos de Space en las fotos",
+  "show_space_badges_description": "Marca con el icono del Space las fotos de tu línea de tiempo que están en uno de tus Spaces.",
   "sidebar_mode": "Barra lateral",
   "sidebar_mode_auto": "Automático",
   "sidebar_mode_description": "Elige si la barra lateral muestra etiquetas, se contrae a iconos o se adapta al tamaño de tu pantalla.",

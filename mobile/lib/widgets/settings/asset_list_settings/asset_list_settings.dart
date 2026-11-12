@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/space_badge_setting.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/app_settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
@@ -38,6 +39,7 @@ class AssetListSettings extends HookConsumerWidget {
           ref.invalidate(settingsProvider);
         },
       ),
+      const SpaceBadgeSettingTile(),
       const LayoutSettings(),
       const GroupSettings(),
     ];

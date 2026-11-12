@@ -1228,6 +1228,8 @@
   "show_faces_from_photo": "Afficher les visages de cette photo",
   "show_more": "Afficher plus",
   "show_profile_faces": "Afficher les visages de profil",
+  "show_space_badges": "Afficher les icônes d'espace sur les photos",
+  "show_space_badges_description": "Signale par l'icône de l'espace les photos de votre chronologie qui se trouvent dans l'un de vos espaces.",
   "sidebar_mode": "Barre latérale",
   "sidebar_mode_auto": "Automatique",
   "sidebar_mode_description": "Choisissez si la barre latérale affiche les libellés, se réduit à des icônes ou s'adapte à la taille de votre écran.",

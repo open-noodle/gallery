@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/gallery/space_badge.provider.dart';
+import 'package:immich_mobile/gallery/space_badge_setting.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/widgets/spaces/space_collage.dart';
 import 'package:openapi/api.dart' show UserAvatarColor;
@@ -27,7 +28,9 @@ class SpaceBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assetId = asset.remoteId;
-    if (assetId == null || _hiddenOn.contains(ref.watch(timelineServiceProvider.select((service) => service.origin)))) {
+    if (assetId == null ||
+        !ref.watch(showSpaceBadgesProvider) ||
+        _hiddenOn.contains(ref.watch(timelineServiceProvider.select((service) => service.origin)))) {
       return const SizedBox.shrink();
     }
     final spaces = ref.watch(assetSpacesProvider(assetId)).valueOrNull ?? noAssetSpaces;

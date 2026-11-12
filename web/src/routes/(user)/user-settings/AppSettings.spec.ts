@@ -1,4 +1,4 @@
-import { cropFacesFromAsset } from '#lib/gallery/stores/preferences.store.ts';
+import { cropFacesFromAsset, showSpaceBadges } from '#lib/gallery/stores/preferences.store.ts';
 import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { get } from 'svelte/store';
 import { expect } from 'vitest';
@@ -31,5 +31,24 @@ describe('AppSettings — crop faces switch', () => {
     cropFacesFromAsset.set(false);
     await renderWithTooltips(AppSettings, {});
     await expect.element(page.getByRole('switch', { name: 'crop_faces_from_photo' })).not.toBeChecked();
+  });
+});
+
+describe('AppSettings — space icons switch', () => {
+  beforeEach(() => {
+    showSpaceBadges.set(true);
+  });
+
+  it('is on by default', async () => {
+    await renderWithTooltips(AppSettings, {});
+    await expect.element(page.getByRole('switch', { name: 'show_space_badges' })).toBeChecked();
+  });
+
+  it('writes false to the store when switched off', async () => {
+    await renderWithTooltips(AppSettings, {});
+
+    await userEvent.click(page.getByRole('switch', { name: 'show_space_badges' }));
+
+    await expect.poll(() => get(showSpaceBadges)).toBe(false);
   });
 });

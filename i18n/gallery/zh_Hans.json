@@ -1244,6 +1244,8 @@
   "show_faces_from_photo": "显示此照片中的人脸",
   "show_more": "显示更多",
   "show_profile_faces": "显示个人资料人脸",
+  "show_space_badges": "在照片上显示 Space 图标",
+  "show_space_badges_description": "用 Space 图标标记时间线中位于您某个 Space 里的照片。",
   "sidebar_mode": "侧边栏",
   "sidebar_mode_auto": "自动",
   "sidebar_mode_description": "选择侧边栏是显示文字标签、收起为图标，还是根据屏幕尺寸自动调整。",
