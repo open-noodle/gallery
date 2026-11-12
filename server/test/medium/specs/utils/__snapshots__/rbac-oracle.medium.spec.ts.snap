@@ -12999,6 +12999,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasFavorites": true,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
@@ -13065,6 +13067,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": false,
         "hasFavorites": true,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
@@ -13125,6 +13129,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasFavorites": true,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
@@ -13189,6 +13195,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasFavorites": true,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
@@ -13249,6 +13257,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasFavorites": true,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
@@ -13292,6 +13302,8 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": false,
         "hasFavorites": false,
+        "hasNoGpsAssets": false,
+        "hasNoPlaceNameAssets": false,
         "hasUnnamedPeople": false,
         "mediaTypes": [
           "IMAGE",
