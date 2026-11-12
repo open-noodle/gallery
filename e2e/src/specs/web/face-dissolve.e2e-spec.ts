@@ -1,15 +1,15 @@
 /**
- * Dissolve a metadata-contaminated person, end to end — the one test on this branch that exercises the
- * whole seam in a single run: discovery (Face health tab -> GET /admin/face-repair/people), the modal
- * (POST .../dissolve/preview then .../dissolve), and the database (the asset_face rows are gone AND the
- * recognition watermark that makes this a *repair* rather than just a delete is cleared).
- *
- * Drives the DISCOVERY path a real admin takes — Face health tab -> click the contaminated person -> land on
- * the manual-review page -> Dissolve — rather than the guided page's own launcher. That is the path Task 9's
- * fix (0a78672afd3) made work: the health listing links to `/admin/face-cleanup/people/[personId]`, not the
- * guided `/admin/face-cleanup/[personId]`, and a person made entirely of EXIF faces is exactly the case no
- * scan can ever flag, so this is the only page discovery actually lands on.
- */
+Dissolve a metadata-contaminated person, end to end — the one test on this branch that exercises the
+whole seam in a single run: discovery (Face health tab -> GET /admin/face-repair/people), the modal
+(POST .../dissolve/preview then .../dissolve), and the database (the asset_face rows are gone AND the
+recognition watermark that makes this a *repair* rather than just a delete is cleared).
+
+Drives the DISCOVERY path a real admin takes — Face health tab -> click the contaminated person -> land on
+the manual-review page -> Dissolve — rather than the guided page's own launcher. That is the path Task 9's
+fix (0a78672afd3) made work: the health listing links to `/admin/face-cleanup/people/[personId]`, not the
+guided `/admin/face-cleanup/[personId]`, and a person made entirely of EXIF faces is exactly the case no
+scan can ever flag, so this is the only page discovery actually lands on.
+*/
 import { type LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
