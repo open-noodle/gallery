@@ -24,10 +24,9 @@ async function _init(fetch: Fetch) {
   if (!serverConfig.maintenanceMode) {
     await Promise.all([queryClient.query(getPublicConfigQuery()), featureFlagsManager.init()]);
 
-    // Gallery-fork: family relationships. Only probed once the caller is authenticated: the
-    // underlying `GET /family/me` call requires a session, and running it on e.g. the login page
-    // would just be a guaranteed 401 for no benefit.
-    if (authManager.authenticated) {
+    // Gallery-fork: family relationships. Only probed when the server has the feature on, and once the
+    // caller is authenticated: `GET /family/me` requires a session, and answers 403 to a viewer without access.
+    if (authManager.authenticated && featureFlagsManager.value.familyTree) {
       await familyAccessManager.init();
     }
   }

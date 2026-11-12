@@ -4146,6 +4146,8 @@ export type ServerFeaturesDto = {
     email: boolean;
     /** Whether facial recognition is enabled */
     facialRecognition: boolean;
+    /** Whether family relationships are enabled. Absent on older servers, which a client reads as off. */
+    familyTree?: boolean;
     /** Whether face import is enabled */
     importFaces: boolean;
     /** Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end. */

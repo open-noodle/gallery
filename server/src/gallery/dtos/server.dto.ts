@@ -39,6 +39,10 @@ export const GalleryServerFeaturesExtension = {
     .describe(
       'Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.',
     ),
+  familyTree: z
+    .boolean()
+    .optional()
+    .describe('Whether family relationships are enabled. Absent on older servers, which a client reads as off.'),
   ...SpatialSceneServerFeatures,
   ...DataSaverVideoServerFeatures,
 };

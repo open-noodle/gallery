@@ -43727,6 +43727,10 @@
             "description": "Whether facial recognition is enabled",
             "type": "boolean"
           },
+          "familyTree": {
+            "description": "Whether family relationships are enabled. Absent on older servers, which a client reads as off.",
+            "type": "boolean"
+          },
           "importFaces": {
             "description": "Whether face import is enabled",
             "type": "boolean"

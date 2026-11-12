@@ -2,15 +2,7 @@ import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core.js';
 import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import {
-  AssetFileType,
-  AssetMetadataKey,
-  AssetStatus,
-  AssetVisibility,
-  JobName,
-  SharedLinkType,
-  SystemMetadataKey,
-} from 'src/enum.js';
+import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -44,7 +36,7 @@ let defaultDatabase: Kysely<DB>;
 
 // eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
-  const { sut, ctx } = newMediumService(AssetService, {
+  const result = newMediumService(AssetService, {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
@@ -53,7 +45,6 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
-      ConfigRepository,
       DuplicateRepository,
       GalleryDuplicateRepository,
       PersonRepository,
@@ -73,23 +64,11 @@ const setup = (db?: Kysely<DB>) => {
       OcrRepository,
       MapRepository,
       WebsocketRepository,
-      SystemMetadataRepository,
     ],
   });
   // immich-31777 pushes on_asset_update when updateAll writes no metadata (a visibility-only change).
-  ctx.getMock(WebsocketRepository).clientSend.mockReturnValue();
-
-  // Gallery-fork: `AssetService.get` attaches `familyRelationLabel` to the people it embeds, and
-  // that path calls `getConfig()` before anything else — so the config plumbing has to be present
-  // even though every test here leaves the feature off. A bare `{}` yields all defaults, which
-  // means `familyTree.enabled === false` and `resolveFamilyAccessLevel` short-circuits to `none`
-  // without ever touching `familyRepository`/`faceIdentityRepository`. Enabling the feature in a
-  // test here would need those two added to `real` as well. Same shape as `person.service.spec.ts`.
-  ctx
-    .getMock(SystemMetadataRepository)
-    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
-
-  return { sut, ctx };
+  result.ctx.getMock(WebsocketRepository).clientSend.mockReturnValue();
+  return result;
 };
 
 beforeAll(async () => {
