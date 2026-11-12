@@ -49,5 +49,19 @@ void main() {
       expect(a, b);
       expect(a.hashCode, b.hashCode);
     });
+
+    test('filters differing only by locationPresence are unequal', () {
+      final a = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
+      final b = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noPlaceName'));
+
+      expect(a == b, false);
+      expect(a.hashCode == b.hashCode, false);
+    });
+
+    test('copyWith keeps locationPresence when changing another location field', () {
+      const original = SearchLocationFilter(locationPresence: 'noGps');
+
+      expect(original.copyWith(country: 'France').locationPresence, 'noGps');
+    });
   });
 }

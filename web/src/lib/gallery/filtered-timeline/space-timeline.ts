@@ -32,7 +32,7 @@ export const createSpaceTimeline = ({
     scope,
     timelineOptions: (filters) => buildSpaceTimelineOptions(getSpace().id, filters),
     // Same scoped suggestions as the map inside a space; people keyed by their space id.
-    browseConfig: () => buildMapFilterConfig(getSpace().id),
+    browseConfig: () => buildMapFilterConfig(getSpace().id, { offerLocationPresence: true }),
     removeFilter: handleSpaceRemoveFilter,
     // An owner chip inside a space is always a member, already in scope: no lookup needed.
     ownerNameSeed: () => getMembers().map(({ userId, name }) => ({ id: userId, name })),

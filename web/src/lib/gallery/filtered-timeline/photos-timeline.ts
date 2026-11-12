@@ -13,7 +13,7 @@ import { FilteredTimelineController, type FilteredTimelineConfig } from './filte
 
 const scope = { withSharedSpaces: true };
 // The map's panel config is the same suggestion scope: every section, own + partners + shown spaces.
-const browseConfig = buildMapFilterConfig();
+const browseConfig = buildMapFilterConfig(undefined, { offerLocationPresence: true });
 
 /** `/photos`: my timeline plus partners and the spaces I show on it, narrowed to the library view. */
 export const photosTimelineConfig = (

@@ -29,6 +29,12 @@ describe('handleRemoveFilter', () => {
     expect(result.country).toBeUndefined();
   });
 
+  it('clears locationPresence with the location group', () => {
+    const next = handleRemoveFilter({ ...createFilterState(), locationPresence: 'noGps' }, 'location');
+
+    expect(next.locationPresence).toBeUndefined();
+  });
+
   it('clears make and model together for the camera chip, but keeps lensModel — it has its own chip', () => {
     const filters = {
       ...createFilterState(),
