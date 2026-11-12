@@ -11,6 +11,7 @@
   },
   "response": {
     "body": {
+      "assetVersions": false,
       "backups": false,
       "configFile": false,
       "dataSaverVideo": false,

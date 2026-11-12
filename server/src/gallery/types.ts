@@ -155,6 +155,12 @@ export type GalleryJobItem =
   | { name: JobName.SpatialSceneQueueAll; data: IBaseJob }
   | { name: JobName.SpatialScene; data: IEntityJob }
 
+  // Asset versions
+  | { name: JobName.AssetVersionDetectQueueAll; data: IBaseJob }
+  | { name: JobName.AssetVersionDetect; data: IAssetVersionDetectJob }
+  | { name: JobName.AssetVersionCleanup; data: IBaseJob }
+  | { name: JobName.AssetVersionUndo; data: IBaseJob }
+
   // Data Saver video
   | { name: JobName.AssetEncodeDataSaverVideoQueueAll; data: IBaseJob }
   | { name: JobName.AssetEncodeDataSaverVideo; data: IEntityJob }
@@ -216,4 +222,13 @@ export interface GallerySystemMetadata extends Record<SystemMetadataKey, Record<
   [SystemMetadataKey.PersonSuggestionScanJobCleanupState]: { cleanedAt?: string };
   [SystemMetadataKey.SharedSpaceFaceJobCleanupState]: { cleanedAt?: string };
   [SystemMetadataKey.StorageTemplateS3State]: { pending: boolean; decidedAt: string; clearedAt?: string };
+}
+
+/** The Versions job for one file. */
+export interface IAssetVersionDetectJob extends IEntityJob {
+  /**
+  When the "All" run that queued it started (ISO). With `force`, the file is read again unless its kept read is from
+  this run already: another file's job found it and read it since.
+  */
+  runStartedAt?: string;
 }

@@ -64,8 +64,8 @@ export class ImageAdjustRepository {
   }
 
   /**
-  Removes the adjustment. The asset stays edited while asset_edit (crop, rotate, mirror) or a video trim still
-  applies to it; returns whether there was an adjustment to remove.
+  Removes the adjustment. The asset stays edited while asset_edit (crop, rotate, mirror), a video trim or the picture
+  of its newest edit (asset versions) still applies to it; returns whether there was an adjustment to remove.
   */
   @GenerateSql({ params: [DummyValue.UUID] })
   async delete(assetId: string): Promise<boolean> {
@@ -98,6 +98,15 @@ export class ImageAdjustRepository {
                   .selectFrom('asset_video_trim')
                   .select('asset_video_trim.assetId')
                   .whereRef('asset_video_trim.assetId', '=', 'asset.id'),
+              ),
+              // a photo that shows its newest edit (asset versions) is edited for that reason too
+              eb.exists(
+                eb
+                  .selectFrom('asset_version')
+                  .select('asset_version.versionAssetId')
+                  .whereRef('asset_version.versionAssetId', '=', 'asset.id')
+                  .where('asset_version.role', '=', 'base_photo')
+                  .where('asset_version.lookUpdatedAt', 'is not', null),
               ),
             ]),
           ),

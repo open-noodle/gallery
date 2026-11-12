@@ -4,6 +4,7 @@ import {
   mdiCloudSyncOutline,
   mdiCubeOutline,
   mdiImageFilterCenterFocusWeak,
+  mdiLayersTripleOutline,
   mdiPaw,
   mdiPawOutline,
   mdiTagFaces,
@@ -68,7 +69,8 @@ type GalleryQueueName =
   | QueueName.StorageBackendMigration
   | QueueName.Classification
   | QueueName.QualityAnalysis
-  | QueueName.SpatialScene;
+  | QueueName.SpatialScene
+  | QueueName.AssetVersions;
 
 /** Fork queues, spread into upstream's `asQueueItem` map. */
 export const galleryQueueItems = (
@@ -107,5 +109,10 @@ export const galleryQueueItems = (
     icon: mdiCubeOutline,
     title: $t('admin.machine_learning_spatial_scene'),
     subtitle: $t('admin.spatial_scene_job_description'),
+  },
+  [QueueName.AssetVersions]: {
+    icon: mdiLayersTripleOutline,
+    title: $t('admin.asset_versions_settings'),
+    subtitle: $t('admin.asset_versions_job_description'),
   },
 });

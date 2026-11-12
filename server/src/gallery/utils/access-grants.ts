@@ -43,13 +43,64 @@ export const galleryAccessGrants: Partial<Record<Permission, Grant>> = {
   [Permission.SharedSpaceRead]: (access, userId, ids) => access.sharedSpace.checkMemberAccess(userId, ids),
 };
 
+/**
+The permissions on assets (and on their files) by id, each with the permission the version's photo is checked with:
+a version behind a photo, and a file of one, has them only when its photo has them too.
+*/
+const PHOTO_PERMISSION: Partial<Record<Permission, Permission>> = {
+  [Permission.AssetRead]: Permission.AssetRead,
+  [Permission.AssetShare]: Permission.AssetShare,
+  [Permission.AssetView]: Permission.AssetView,
+  [Permission.AssetDownload]: Permission.AssetDownload,
+  [Permission.AssetUpdate]: Permission.AssetUpdate,
+  [Permission.AssetDelete]: Permission.AssetDelete,
+  [Permission.AssetCopy]: Permission.AssetCopy,
+  [Permission.AssetEditGet]: Permission.AssetEditGet,
+  [Permission.AssetEditCreate]: Permission.AssetEditCreate,
+  [Permission.AssetEditDelete]: Permission.AssetEditDelete,
+  [Permission.AssetFileRead]: Permission.AssetRead,
+  [Permission.AssetFileDownload]: Permission.AssetDownload,
+  [Permission.AssetFileDelete]: Permission.AssetDelete,
+};
+const FILE_PERMISSIONS = new Set([Permission.AssetFileRead, Permission.AssetFileDownload, Permission.AssetFileDelete]);
+
+/**
+Asset versions (specs/2026-11-07-asset-versions-design.md, "Who sees what"): a version is a hidden asset, and Immich
+lets its owner and partners reach a hidden asset by its id (as for a live photo's video), and a shared link one it
+holds. A version is the same shot as its photo, so it is reachable only as its photo is, for users and shared links
+alike: not once the photo is locked (without the PIN), archived (for a partner), out of the link, and so on; and
+not at all once its photo is gone (the cleanup then deletes it). This only takes away.
+*/
+export const versionsFollowTheirPhoto = async (
+  access: AccessRepository,
+  { auth, permission }: { auth: AuthDto; permission: Permission },
+  granted: Set<string>,
+): Promise<Set<string>> => {
+  const photoPermission = PHOTO_PERMISSION[permission];
+  if (!photoPermission || granted.size === 0) {
+    return granted;
+  }
+  const ids = [...granted];
+  const versions = FILE_PERMISSIONS.has(permission)
+    ? await access.assetVersion.getBasePhotosOfFiles(ids)
+    : await access.assetVersion.getBasePhotos(ids);
+  if (versions.length === 0) {
+    return granted;
+  }
+  const photoIds = new Set(versions.map(({ photoId }) => photoId).filter((photoId) => photoId !== null));
+  const photos = await checkAccess(access, { auth, permission: photoPermission, ids: photoIds });
+  const denied = versions.filter(({ photoId }) => !photoId || !photos.has(photoId)).map(({ id }) => id);
+  return granted.difference(new Set(denied));
+};
+
 export const withGalleryGrants = async (
   access: AccessRepository,
   { auth, permission, ids }: { auth: AuthDto; permission: Permission; ids: Set<string> },
   granted: Set<string>,
 ): Promise<Set<string>> => {
   const grant = galleryAccessGrants[permission];
-  return grant ? granted.union(await grant(access, auth.user.id, ids.difference(granted))) : granted;
+  const all = grant ? granted.union(await grant(access, auth.user.id, ids.difference(granted))) : granted;
+  return versionsFollowTheirPhoto(access, { auth, permission }, all);
 };
 
 /**

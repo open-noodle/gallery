@@ -115,5 +115,11 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
       checkMemberAccess: vitest.fn().mockResolvedValue(new Set()),
       checkTagAccess: vitest.fn().mockResolvedValue(new Set()),
     },
+
+    // no asset is a version unless a test says so
+    assetVersion: {
+      getBasePhotos: vitest.fn().mockResolvedValue([]),
+      getBasePhotosOfFiles: vitest.fn().mockResolvedValue([]),
+    },
   };
 };

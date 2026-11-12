@@ -41,6 +41,7 @@ import {
 import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-overlay.js';
 import { afterAssetUpdate, beforeAssetUpdate, beforeAssetUpdateAll } from 'src/gallery/utils/asset-update-hooks.js';
+import { requireOwnPicture } from 'src/gallery/utils/asset-version-look.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobItem, JobOf } from 'src/types.js';
@@ -716,6 +717,9 @@ export class AssetService extends BaseService {
         throw new BadRequestException('Crop parameters are out of bounds');
       }
     }
+
+    // Gallery: not on a photo that shows an edit made elsewhere (src/gallery/utils/asset-version-look.ts)
+    await requireOwnPicture(this.assetVersionRepository, id);
 
     const newEdits = await this.assetEditRepository.replaceAll(id, edits);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });

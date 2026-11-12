@@ -22,4 +22,12 @@ export class AssetJobStatusGalleryTable {
   // has no faces, so turning the feature on again does not rescan it.
   @Column({ type: 'timestamp with time zone', nullable: true })
   videoFacesSampledAt!: Timestamp | null;
+
+  // Asset versions (specs/2026-11-07-asset-versions-design.md): when the file was last read for them, and with which
+  // parser. The Versions job's "Missing" run takes the files never read, or read by an older parser.
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  versionsReadAt!: Timestamp | null;
+
+  @Column({ type: 'integer', nullable: true })
+  versionsParserVersion!: number | null;
 }

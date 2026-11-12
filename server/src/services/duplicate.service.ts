@@ -5,6 +5,7 @@ import { MapAsset, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { DuplicateResolveDto, DuplicateResolveGroupDto, DuplicateResponseDto } from 'src/dtos/duplicate.dto.js';
 import { AssetStatus, AssetVisibility, DatabaseLock, JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
+import { withoutEditedShots } from 'src/gallery/utils/asset-version-duplicates.js';
 import { afterDuplicateGroupResolve, beforeDuplicateGroupResolve } from 'src/gallery/utils/duplicate-resolve.js';
 import { AssetDuplicateResult } from 'src/repositories/search.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -368,13 +369,15 @@ export class DuplicateService extends BaseService {
         return JobStatus.Failed;
       }
 
-      const duplicateAssets = await this.duplicateRepository.search({
+      const found = await this.duplicateRepository.search({
         assetId: asset.id,
         embedding: asset.embedding,
         maxDistance: machineLearning.duplicateDetection.maxDistance,
         type: asset.type,
         userIds: [asset.ownerId],
       });
+      // Gallery: a photo with an edit among its versions is no duplicate (src/gallery/utils/asset-version-duplicates.ts)
+      const duplicateAssets = await withoutEditedShots(this.assetVersionRepository, asset.id, found);
 
       let assetIds = [asset.id];
       if (duplicateAssets.length > 0) {

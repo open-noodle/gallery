@@ -140,6 +140,7 @@ const NON_DECL = new Set([
   'ELSE',
   'END',
   'SET',
+  'EXISTS',
 ]);
 
 const enclosingFn = (lines: string[], i: number): string => {
@@ -298,6 +299,11 @@ const VIS_BENIGN_LINE = [
 // Space reads that legitimately have no nearby visibility gate. Keyed by
 // `<file>::<function>`. Every entry states WHY (not "enforced downstream" waves).
 const VIS_ALLOWLIST: Record<string, string> = {
+  // Asset versions: when a file goes behind its photo, its own Space links are compared with the photo's
+  // (attachmentsOf: keys only) and, being duplicates, removed (VERSION_ENTRY_TABLES). Both sit after `pair` in the
+  // file and are membership rows of assets the owner holds; no asset rows are served to a viewer.
+  'asset-version.repository.ts::pair':
+    'compares and removes one owned asset’s own shared_space_asset rows when it goes behind its photo; no asset content served',
   // — Membership / link-metadata lookups: return a spaceId, library id, album id, or
   //   metadata row — never asset rows. No asset content is served, so no gate applies.
   'shared-space.repository.ts::findSpaceForAssetAndUser':

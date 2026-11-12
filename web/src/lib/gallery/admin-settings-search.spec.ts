@@ -5,6 +5,7 @@ const server = { key: 'server', title: 'Server Settings', subtitle: 'Manage serv
 const english: Record<string, string> = {
   'admin.server_merge_people_across_owners': 'Allow merging people across owners',
   'admin.server_space_editors_can_add_members': 'Let space editors add members',
+  'admin.asset_versions_detect_edits': 'Edits',
 };
 const translate = (key: Translations) => english[key as string] ?? (key as string);
 
@@ -32,6 +33,11 @@ describe('adminSettingsSearch (#1112)', () => {
   it('matches the server section by a setting rendered in a fork component', async () => {
     adminSettingsSearch.matches(server, 'space editors', translate);
     await vi.waitFor(() => expect(adminSettingsSearch.matches(server, 'space editors', translate)).toBe(true));
+  });
+
+  it('matches the server section by an asset versions setting', async () => {
+    adminSettingsSearch.matches(server, 'edits', translate);
+    await vi.waitFor(() => expect(adminSettingsSearch.matches(server, 'edits', translate)).toBe(true));
   });
 
   it('does not match an unrelated query', async () => {

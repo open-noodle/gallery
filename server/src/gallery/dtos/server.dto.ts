@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
+import { AssetVersionsServerFeatures } from 'src/gallery/dtos/asset-version.dto.js';
 import { DataSaverVideoServerFeatures } from 'src/gallery/dtos/data-saver-video.dto.js';
 import { SpatialSceneServerFeatures } from 'src/gallery/dtos/spatial-scene.dto.js';
 
@@ -41,6 +42,7 @@ export const GalleryServerFeaturesExtension = {
     ),
   ...SpatialSceneServerFeatures,
   ...DataSaverVideoServerFeatures,
+  ...AssetVersionsServerFeatures,
 };
 
 const ServerMlHealthResponseSchema = z

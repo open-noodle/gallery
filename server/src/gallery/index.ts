@@ -6,6 +6,7 @@ import { LibraryManifestController } from 'src/controllers/library-manifest.cont
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
+import { AssetVersionController } from 'src/gallery/controllers/asset-version.controller.js';
 import { CleanupController } from 'src/gallery/controllers/cleanup.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
@@ -15,6 +16,7 @@ import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { GalleryServerController } from 'src/gallery/controllers/gallery-server.controller.js';
 import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
+import { AssetVersionRepository } from 'src/gallery/repositories/asset-version.repository.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -35,6 +37,7 @@ import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.r
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
+import { AssetVersionService } from 'src/gallery/services/asset-version.service.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
@@ -79,6 +82,7 @@ import { UserGroupService } from 'src/services/user-group.service.js';
 // segment wins over an upstream `:id` route on the same prefix. Services are spread first so fork event handlers
 // keep running before same-priority upstream ones, e.g. before SystemConfigService's ConfigUpdate clears the cache.
 export const galleryControllers = [
+  AssetVersionController,
   ClassificationController,
   CleanupController,
   FaceRepairAdminController,
@@ -124,6 +128,7 @@ export const galleryRepositories = [
   ImageAdjustRepository,
   CleanupRepository,
   SpatialSceneRepository,
+  AssetVersionRepository,
   StorageUsageRepository,
   GalleryDuplicateRepository,
   GalleryAssetRepository,
@@ -138,6 +143,7 @@ export const galleryServices = [
   AppMetricsService,
   // not a service of its own: a provider DatabaseBackupService injects to learn where a backup goes
   BackupStoreResolver,
+  AssetVersionService,
   AssetVisibilityTransitionService,
   ClassificationService,
   CleanupService,

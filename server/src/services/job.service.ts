@@ -83,6 +83,10 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
       return { name: JobName.SharedSpacePersonMetadataBackfill, data: {} };
     }
 
+    case ManualJobName.AssetVersionUndo: {
+      return { name: JobName.AssetVersionUndo, data: {} };
+    }
+
     default: {
       throw new BadRequestException('Invalid job name');
     }

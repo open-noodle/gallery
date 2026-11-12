@@ -3,6 +3,7 @@
   import SettingSwitch from '#lib/components/shared-components/settings/SettingSwitch.svelte';
   import SettingButtonsRow from '#lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import { SettingInputFieldType } from '#lib/constants.ts';
+  import AssetVersionsSettings from '#lib/gallery/admin/AssetVersionsSettings.svelte';
   import SpaceMemberManagementSettings from '#lib/gallery/components/admin/space-member-management-settings.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
@@ -53,6 +54,7 @@
         />
 
         <SpaceMemberManagementSettings bind:server={configToEdit.server} {disabled} />
+        <AssetVersionsSettings bind:server={configToEdit.server} {disabled} />
         <div class="ms-4">
           <SettingButtonsRow bind:configToEdit keys={['server']} {disabled} />
         </div>

@@ -1,0 +1,230 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AssetVersionService > a version is reachable only as its photo is (access matrix) > follows the photo for every actor, photo state and permission on assets 1`] = `
+{
+  "archive adminNonMember": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "archive albumViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "archive outsider": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "archive owner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "archive ownerWithPin": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "archive partner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "archive spaceViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked adminNonMember": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked albumViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked outsider": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked owner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked ownerWithPin": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y - y y y y y y y y",
+  },
+  "locked partner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "locked spaceViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "timeline adminNonMember": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "timeline albumViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "timeline outsider": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "timeline owner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "timeline ownerWithPin": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "timeline partner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y - - - - - -",
+  },
+  "timeline spaceViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "trash adminNonMember": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "trash albumViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "trash outsider": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "trash owner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "trash ownerWithPin": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "y y y y y y y y y y",
+  },
+  "trash partner": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+  "trash spaceViewer": {
+    "asset.read asset.share asset.view asset.download asset.update asset.delete asset.copy asset.edit.get asset.edit.create asset.edit.delete": "- - - - - - - - - -",
+  },
+}
+`;
+
+exports[`AssetVersionService > role matrix > gates every operation as the truth table says (versions enabled: false) 1`] = `
+{
+  "adminNonMember": {
+    "list": "deny",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "albumEditor": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "albumOwner": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "albumViewer": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "outsider": {
+    "list": "deny",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "owner": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "partner": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "sharedLink": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "sharedLinkNoDownload": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "sharedLinkNoMetadata": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "spaceEditor": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "spaceOwner": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "spaceViewer": {
+    "list": "nothing listed",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+}
+`;
+
+exports[`AssetVersionService > role matrix > gates every operation as the truth table says (versions enabled: true) 1`] = `
+{
+  "adminNonMember": {
+    "list": "deny",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "albumEditor": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "albumOwner": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "albumViewer": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "outsider": {
+    "list": "deny",
+    "original": "deny",
+    "thumbnail": "deny",
+  },
+  "owner": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "partner": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "sharedLink": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "sharedLinkNoDownload": {
+    "list": "allow",
+    "original": "deny",
+    "thumbnail": "allow",
+  },
+  "sharedLinkNoMetadata": {
+    "list": "nothing listed",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "spaceEditor": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "spaceOwner": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+  "spaceViewer": {
+    "list": "allow",
+    "original": "allow",
+    "thumbnail": "allow",
+  },
+}
+`;

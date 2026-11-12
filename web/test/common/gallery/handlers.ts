@@ -23,6 +23,8 @@ export const galleryHandlers = (data: MockData): Handlers => ({
   getAllSpaces: () => ({ json: [] }),
   // Every mounted thumbnail asks which spaces hold its asset (the space badge); none here.
   getAssetSpaces: () => ({ json: { assets: [] } }),
+  // The details of every photo ask for its versions (asset versions); none here.
+  getAssetVersions: ({ params }) => ({ json: { assetId: params.id, versions: [] } }),
   getFilterSuggestions: () => ({
     json: {
       cameraMakes: [],

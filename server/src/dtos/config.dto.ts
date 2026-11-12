@@ -235,6 +235,7 @@ const AdminConfigSchemaWithVisibility = z
         classification: AdminConfigJobSettingsSchema,
         qualityAnalysis: AdminConfigJobSettingsSchema,
         spatialScene: AdminConfigJobSettingsSchema,
+        assetVersions: AdminConfigJobSettingsSchema,
       })
       .meta({ id: 'AdminConfigJobDto' }),
     logging: z

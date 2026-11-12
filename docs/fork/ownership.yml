@@ -188,6 +188,7 @@ features:
       - storage-usage-accounting
       - database-backups-to-s3
       - data-saver-video
+      - asset-versions
     risk: high
     domains: [server, web, database, ci, e2e, mobile]
     owned_paths:
@@ -202,6 +203,20 @@ features:
       - server/src/gallery/utils/data-saver-video*.ts
       - server/src/gallery/dtos/data-saver-video.dto.ts
       - server/src/schema/tables/asset-data-saver-video.table.ts
+      - server/src/gallery/controllers/asset-version.controller.ts
+      - server/src/gallery/services/asset-version.service.ts
+      - server/src/gallery/repositories/asset-version.repository.ts
+      - server/src/gallery/dtos/asset-version.dto.ts
+      - server/src/gallery/utils/asset-version-*.ts
+      - server/src/schema/tables/asset-version.table.ts
+      - server/src/queries/asset.version.repository.sql
+      - server/test/medium/specs/gallery/asset-version.service.spec.ts
+      - server/test/medium/specs/gallery/asset-version-instructions.spec.ts
+      - web/src/lib/gallery/versions/**
+      - web/src/lib/gallery/admin/AssetVersionsSettings.svelte
+      - web/src/lib/gallery/admin/AssetVersionsSettings.spec.ts
+      - docs/docs/features/asset-versions.md
+      - specs/2026-11-07-asset-versions-design.md
       - server/test/medium/specs/repositories/data-saver-video.repository.spec.ts
       - web/src/lib/gallery/components/admin/data-saver-video-settings*
       - mobile/lib/gallery/video/data_saver_video.dart
@@ -270,6 +285,28 @@ features:
       # their specs set the backends on the registry
       - server/src/services/metadata.service.spec.ts
       - server/test/medium/specs/services/asset-media.service.spec.ts
+      # asset versions: one registration or one call each, and the specs and docs that list them
+      # (specs/2026-11-07-asset-versions-design.md, "Upstream footprint"); media, job and server service are above
+      - server/src/enum.ts
+      - server/src/dtos/config.dto.ts
+      - server/src/dtos/queue-legacy.dto.ts
+      - server/src/services/asset.service.ts
+      - server/src/services/duplicate.service.ts
+      - server/src/services/queue.service.ts
+      - server/src/utils/access.ts
+      - server/src/repositories/access.repository.ts
+      - server/test/repositories/access.repository.mock.ts
+      - server/src/services/queue.service.spec.ts
+      - server/src/services/system-config.service.spec.ts
+      - server/src/controllers/index.spec.ts
+      - web/src/lib/components/asset-viewer/DetailPanel.svelte
+      - web/src/lib/constants.ts
+      - web/src/routes/admin/queues/QueuePanel.svelte
+      - web/src/routes/admin/system-settings/JobSettings.svelte
+      - web/src/routes/admin/system-settings/ServerSettings.svelte
+      - e2e/src/specs/server/api/server.e2e-spec.ts
+      - docs/docs/administration/jobs-workers.md
+      - docs/docs/install/config-file.md
     expected_symbols:
       server/src/services/job.service.ts:
         - isSkippedOnS3
@@ -293,8 +330,9 @@ features:
       - server/src/backends/**
       - server/test/medium/specs/repositories/storage-migration*.spec.ts
     database:
-      tables: [storage_migration_log, asset_duplicate_checksums, asset_data_saver_video]
+      tables: [storage_migration_log, asset_duplicate_checksums, asset_data_saver_video, asset_version]
       migration_globs:
+        - server/src/schema/migrations-gallery/*AssetVersion*.ts
         - server/src/schema/migrations-gallery/*Storage*.ts
         - server/src/schema/migrations-gallery/*DataSaver*.ts
         - server/src/schema/migrations-gallery/*DuplicateChecksum*.ts

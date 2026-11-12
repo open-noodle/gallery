@@ -531,6 +531,7 @@ export enum ManualJobName {
   FaceIdentityBackfill = 'face-identity-backfill',
   FaceSuggestionMaintenance = 'face-suggestion-maintenance',
   SharedSpacePersonMetadataBackfill = 'shared-space-person-metadata-backfill',
+  AssetVersionUndo = 'asset-version-undo',
 }
 
 export const ManualJobNameSchema = z.enum(ManualJobName).describe('Manual job name').meta({ id: 'ManualJobName' });
@@ -922,6 +923,7 @@ export enum QueueName {
   Classification = 'classification',
   QualityAnalysis = 'qualityAnalysis',
   SpatialScene = 'spatialScene',
+  AssetVersions = 'assetVersions',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -1036,6 +1038,12 @@ export enum JobName {
   // Spatial Scene
   SpatialSceneQueueAll = 'SpatialSceneQueueAll',
   SpatialScene = 'SpatialScene',
+
+  // Asset versions
+  AssetVersionDetectQueueAll = 'AssetVersionDetectQueueAll',
+  AssetVersionDetect = 'AssetVersionDetect',
+  AssetVersionCleanup = 'AssetVersionCleanup',
+  AssetVersionUndo = 'AssetVersionUndo',
 
   // Data Saver video
   AssetEncodeDataSaverVideoQueueAll = 'AssetEncodeDataSaverVideoQueueAll',

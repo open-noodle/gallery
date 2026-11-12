@@ -45,6 +45,7 @@ const QueuesResponseLegacySchema = z
     [QueueName.Classification]: QueueResponseLegacySchema,
     [QueueName.QualityAnalysis]: QueueResponseLegacySchema,
     [QueueName.SpatialScene]: QueueResponseLegacySchema,
+    [QueueName.AssetVersions]: QueueResponseLegacySchema,
   })
   .meta({ id: 'QueuesResponseLegacyDto' });
 

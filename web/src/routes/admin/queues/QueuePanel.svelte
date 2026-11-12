@@ -100,6 +100,10 @@
       allText: $t('all'),
       missingText: $t('missing'),
     },
+    [QueueName.AssetVersions]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),
