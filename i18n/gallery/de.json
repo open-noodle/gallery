@@ -1229,6 +1229,8 @@
   "show_faces_from_photo": "Gesichter aus diesem Foto anzeigen",
   "show_more": "Mehr anzeigen",
   "show_profile_faces": "Profilgesichter anzeigen",
+  "show_space_badges": "Space-Symbole auf Fotos anzeigen",
+  "show_space_badges_description": "Markiert Fotos in deiner Zeitleiste, die in einem deiner Spaces sind, mit dem Space-Symbol.",
   "sidebar_mode": "Seitenleiste",
   "sidebar_mode_auto": "Automatisch",
   "sidebar_mode_description": "Lege fest, ob die Seitenleiste Beschriftungen anzeigt, auf Symbole reduziert wird oder sich an deine Bildschirmgröße anpasst.",

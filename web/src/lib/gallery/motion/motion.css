@@ -186,6 +186,9 @@
  * shrinks back (400ms, SETTLE_MS), so it settles into place smoothly instead of being clipped and buried
  * the moment the cursor leaves. */
 [data-thumbnail-focus-container] > div {
+  /* Each photo's layer is its own stacking context at rest, so its icons (z-2 inside it) stay with it. Without
+   * this they compete with the lifted photo (z-index 2) directly, and a later neighbour's badge paints over it. */
+  z-index: 0;
   /* Set by thumbnail-lift.ts on entering: photos at the scroll area's edge grow only toward the open side. */
   transform-origin: var(--gallery-lift-origin, center);
   transition:

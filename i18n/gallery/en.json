@@ -1232,6 +1232,8 @@
   "show_faces_from_photo": "Show faces from this photo",
   "show_more": "Show more",
   "show_profile_faces": "Show profile faces",
+  "show_space_badges": "Show space icons on photos",
+  "show_space_badges_description": "Mark photos in your timeline that are in one of your spaces with the space icon.",
   "sidebar_mode": "Sidebar",
   "sidebar_mode_auto": "Automatic",
   "sidebar_mode_description": "Choose whether the sidebar shows labels, collapses to icons, or adapts to your screen size.",

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showSpaceBadges } from '#lib/gallery/stores/preferences.store.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { UserAvatarColor } from '@immich/sdk';
   import { Icon } from '@immich/ui';
@@ -43,6 +44,7 @@
 
   const active = $derived(
     enabled &&
+      $showSpaceBadges &&
       routesWithout.every((route) => !page.route?.id?.startsWith(route)) &&
       !page.url?.searchParams.has('spaceId'),
   );

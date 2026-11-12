@@ -1240,6 +1240,8 @@
   "show_faces_from_photo": "顯示此照片中的臉孔",
   "show_more": "顯示更多",
   "show_profile_faces": "顯示個人資料臉孔",
+  "show_space_badges": "在照片上顯示 Space 圖示",
+  "show_space_badges_description": "以 Space 圖示標記時間軸中位於您某個 Space 裡的照片。",
   "sidebar_mode": "側邊欄",
   "sidebar_mode_auto": "自動",
   "sidebar_mode_description": "選擇側邊欄要顯示文字標籤、收合為圖示，還是根據螢幕尺寸自動調整。",

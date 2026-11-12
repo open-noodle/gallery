@@ -18,6 +18,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/gallery/space_badge.provider.dart';
 import 'package:immich_mobile/gallery/space_badge.widget.dart';
+import 'package:immich_mobile/gallery/space_badge_setting.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/widgets/spaces/space_collage.dart';
 import 'package:openapi/api.dart' show UserAvatarColor;
@@ -185,10 +186,12 @@ void main() {
       TimelineOrigin origin = TimelineOrigin.main,
       double size = 120,
       bool hidden = false,
+      bool shown = true,
     }) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            showSpaceBadgesProvider.overrideWith(() => _FixedPreference(shown)),
             assetSpacesProvider.overrideWith(
               (ref, _) => spaces ?? Stream.value((count: 1, color: UserAvatarColor.green)),
             ),
@@ -286,9 +289,23 @@ void main() {
       }
     });
 
+    testWidgets('stays off when the user turned space icons off', (tester) async {
+      await pump(tester, shown: false);
+      expect(badge, findsNothing);
+    });
+
     testWidgets('fades out while hidden', (tester) async {
       await pump(tester, hidden: true);
       expect(opacity(tester), 0);
     });
   });
+}
+
+class _FixedPreference extends ShowSpaceBadgesPreference {
+  _FixedPreference(this._value);
+
+  final bool _value;
+
+  @override
+  bool build() => _value;
 }

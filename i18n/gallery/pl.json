@@ -1230,6 +1230,8 @@
   "show_faces_from_photo": "Pokaż twarze z tego zdjęcia",
   "show_more": "Pokaż więcej",
   "show_profile_faces": "Pokaż twarze z profilu",
+  "show_space_badges": "Pokazuj ikony Space na zdjęciach",
+  "show_space_badges_description": "Oznacza ikoną Space zdjęcia z twojej osi czasu, które są w jednym z twoich Space.",
   "sidebar_mode": "Panel boczny",
   "sidebar_mode_auto": "Automatycznie",
   "sidebar_mode_description": "Wybierz, czy panel boczny ma pokazywać etykiety, zwijać się do ikon, czy dopasowywać się do rozmiaru ekranu.",

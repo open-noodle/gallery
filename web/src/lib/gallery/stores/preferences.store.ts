@@ -38,6 +38,9 @@ for a viewer with no reachable profile face — see resolvePersonAvatar in $lib/
 */
 export const cropFacesFromAsset = persisted<boolean>('crop-faces-from-asset', true, {});
 
+/** Whether timeline thumbnails mark photos that are in one of the user's spaces (SpaceBadge). On by default. */
+export const showSpaceBadges = persisted<boolean>('show-space-badges', true, {});
+
 export const recentSpacesDropdown = persisted<boolean>('recent-spaces-open', true, {});
 
 export const recentSpaceAlbumsExpanded = persisted<Record<string, boolean>>('recent-space-albums-open', {}, {});

@@ -2,6 +2,7 @@
   import type { ComboBoxOption } from '#lib/components/shared-components/Combobox.svelte';
   import SettingsLanguageSelector from '#lib/components/shared-components/settings/SettingsLanguageSelector.svelte';
   import { fallbackLocale, locales } from '#lib/constants.ts';
+  import SpaceBadgeSetting from '#lib/gallery/space-badge/SpaceBadgeSetting.svelte';
   import { cropFacesFromAsset } from '#lib/gallery/stores/preferences.store.ts';
   import {
     alwaysLoadOriginalFile,
@@ -100,6 +101,8 @@
       <Field label={$t('crop_faces_from_photo')} description={$t('crop_faces_from_photo_description')}>
         <Switch bind:checked={$cropFacesFromAsset} />
       </Field>
+
+      <SpaceBadgeSetting />
 
       <Field label={$t('video_hover_setting')} description={$t('video_hover_setting_description')}>
         <Switch bind:checked={$playVideoThumbnailOnHover} />

@@ -17,7 +17,7 @@ Gallery checks the caller's role on every endpoint. The three roles (Owner, Edit
 - **Shared face recognition.** People detected across the space are browsable by all members.
 - **Activity log.** A feed of everything that happened in the space: photos added or removed, members joining or leaving, settings changes.
 - **New since last visit.** See what changed since you last opened a space, with badges and timeline dividers.
-- **A badge on photos in a space.** A thumbnail shows when its photo is in one of your spaces: the Spaces icon in the space's color, or with a count when it is in several. See [Seeing Which Photos Are in a Space](#seeing-which-photos-are-in-a-space).
+- **A badge on photos in a space.** A thumbnail shows when its photo is in one of your spaces: the Spaces icon in the space's color, or with a count when it is in several. You can turn it off. See [Seeing Which Photos Are in a Space](#seeing-which-photos-are-in-a-space).
 - **Map view.** Browse a space's geotagged photos on an interactive map.
 - **Search within a space.** Smart search scoped to a single space's assets.
 - **Connected libraries.** Admins can link external libraries to spaces, which pulls in every photo the library holds.
@@ -276,6 +276,15 @@ Every way into a space counts: added directly, in a linked album, or in a connec
 The badge does not appear inside a space (its photos, people, map and search), in the trash, the locked folder or shared links. When you select a photo, or point at it on the web, the selection checkmark takes the corner.
 
 The badges follow the changes you make, including a new space color. On the web, other members' changes show when you move to another page; the mobile app follows them as it syncs.
+
+### Turning the Badges Off
+
+The badges are on by default. If you prefer thumbnails without them, turn off **Show space icons on photos**:
+
+- **Web:** [`Account Settings > App Settings`](https://my.immich.app/user-settings?isOpen=app-settings).
+- **Mobile app:** **Settings > Photo Grid**.
+
+The setting is remembered on each device: turning it off in one browser or app leaves the badges on your other devices. It changes only what you see; your photos stay in their spaces.
 
 ## Renaming and Editing Space Details
 
