@@ -40,7 +40,9 @@ class UploadCallbacks {
   const UploadCallbacks({this.onProgress, this.onSuccess, this.onError, this.onICloudProgress});
 }
 
-final foregroundUploadServiceProvider = Provider((ref) {
+// Typed explicitly: through sharedSpaceApiRepositoryProvider -> backgroundSyncProvider -> backupProvider this provider
+// depends on itself, and Dart cannot infer a type across that cycle.
+final foregroundUploadServiceProvider = Provider<ForegroundUploadService>((ref) {
   // ignore: dispose-provided-instances
   return ForegroundUploadService(
     ref.watch(uploadRepositoryProvider),
