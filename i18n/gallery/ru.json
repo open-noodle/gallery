@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Выберите значение фильтра",
   "cmdk_typed_search_issues_heading": "Фильтры поиска",
   "cmdk_unnamed_person": "Безымянный человек",
+  "confirm_delete_unassigned_face": "Вы уверены, что хотите удалить это неназначенное лицо из этого объекта?",
   "confirm_keep_this_delete_others_in_album": "{count, plural, one {# другой объект в группе будет удалён} few {# других объекта в группе будут удалены} many {# других объектов в группе будут удалены} other {# другого объекта в группе будут удалены}} из вашей библиотеки, а не только из этого альбома. Продолжить?",
   "create_group": "Создать группу",
   "create_space": "Создать общий Space",

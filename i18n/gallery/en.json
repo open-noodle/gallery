@@ -807,6 +807,7 @@
   "cmdk_typed_search_choices_heading": "Choose filter value",
   "cmdk_typed_search_issues_heading": "Search filters",
   "cmdk_unnamed_person": "Unnamed person",
+  "confirm_delete_unassigned_face": "Are you sure you want to delete this unassigned face from the asset?",
   "confirm_keep_this_delete_others_in_album": "The other {count, plural, one {# asset} other {# assets}} in this stack will be deleted from your library, not just removed from this album. Are you sure you want to continue?",
   "create_group": "Create group",
   "create_space": "Create shared space",

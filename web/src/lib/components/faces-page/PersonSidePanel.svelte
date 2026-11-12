@@ -146,13 +146,10 @@
   };
 
   const deleteAssetFace = async (face: AssetFaceResponseDto) => {
-    const person = face.person;
-    if (!person) {
-      return;
-    }
-
     const isConfirmed = await modalManager.showDialog({
-      prompt: $t('confirm_delete_face', { values: { name: person.name } }),
+      prompt: face.person
+        ? $t('confirm_delete_face', { values: { name: face.person.name } })
+        : $t('confirm_delete_unassigned_face'),
     });
     if (!isConfirmed) {
       return;
@@ -160,7 +157,10 @@
 
     await executeMutation(deleteFaceMutation, [{ id: face.id, assetFaceDeleteDto: { force: false } }], {
       onSuccess: () => {
-        eventManager.emit('PersonAssetDelete', { id: person.id, assetId });
+        if (face.person) {
+          eventManager.emit('PersonAssetDelete', { id: face.person.id, assetId });
+        }
+        handleReset(face.id);
         void assetViewerManager.setAssetId(assetId);
       },
     });
@@ -327,16 +327,14 @@
                     onclick={() => handleFacePicker(face)}
                   />
                 {/if}
-                {#if face.person !== null}
-                  <IconButton
-                    shape="round"
-                    color="danger"
-                    icon={mdiTrashCan}
-                    aria-label={$t('delete_face')}
-                    size="small"
-                    onclick={() => deleteAssetFace(face)}
-                  />
-                {/if}
+                <IconButton
+                  shape="round"
+                  color="danger"
+                  icon={mdiTrashCan}
+                  aria-label={$t('delete_face')}
+                  size="small"
+                  onclick={() => deleteAssetFace(face)}
+                />
               </div>
               {#if !Object.hasOwn(selectedPersonToCreate, face.id) && !Object.hasOwn(selectedPersonToReassign, face.id) && !face.person}
                 <div class="absolute inset-e-7 -top-2.25 rounded-full bg-muted p-1">

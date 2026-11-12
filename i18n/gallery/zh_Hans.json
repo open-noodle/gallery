@@ -811,6 +811,7 @@
   "cmdk_typed_search_choices_heading": "选择筛选值",
   "cmdk_typed_search_issues_heading": "搜索筛选条件",
   "cmdk_unnamed_person": "未命名人物",
+  "confirm_delete_unassigned_face": "确定要从此文件中删除这张未分配的面部信息吗？",
   "confirm_keep_this_delete_others_in_album": "堆叠中的其他 {count} 个项目将从您的资源库中删除，而不仅仅是从此相册中移除。确定要继续吗？",
   "create_group": "创建群组",
   "create_space": "创建共享 Space",
