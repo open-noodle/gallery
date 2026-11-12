@@ -1,7 +1,6 @@
 import { FORK_LOCALES } from '#lib/i18n/fork-locales.ts';
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { commands } from 'vitest/browser';
 
 // Why this exists, and why fork-string-parity.spec.ts next door does not already cover it:
 //
@@ -21,7 +20,7 @@ import path from 'node:path';
 // with no "at least one" escape hatch. A key present only in en.json fails here, on day one,
 // rather than waiting for someone else to translate it into one locale first.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
+const I18N_DIR = '../i18n/gallery/merged';
 
 type Messages = Record<string, string>;
 
@@ -37,10 +36,10 @@ const flatten = (value: Record<string, unknown>, prefix = '', out: Messages = {}
   return out;
 };
 
-const read = (file: string): Messages =>
-  flatten(JSON.parse(fs.readFileSync(path.join(I18N_DIR, file), 'utf8')) as Record<string, unknown>);
+const read = async (file: string): Promise<Messages> =>
+  flatten(JSON.parse(await commands.readFile(`${I18N_DIR}/${file}`, 'utf8')) as Record<string, unknown>);
 
-const en = read('en.json');
+const en = await read('en.json');
 
 // Every family-relationships key in en.json: top-level `family_*` keys (e.g. `family_canvas_title`)
 // and keys nested under `admin.*` whose dotted path contains "family" (e.g.
@@ -64,8 +63,8 @@ describe('family relationships i18n completeness', () => {
     expect(familyKeys.length).toBe(topLevelFamilyKeys.length + nestedAdminFamilyKeys.length);
   });
 
-  it.each(FORK_LOCALES)('%s carries every family_* key, top-level and nested under admin.*', (code) => {
-    const messages = read(`${code}.json`);
+  it.each(FORK_LOCALES)('%s carries every family_* key, top-level and nested under admin.*', async (code) => {
+    const messages = await read(`${code}.json`);
     const missing = familyKeys.filter((key) => !Object.hasOwn(messages, key));
 
     expect(missing, `${code}.json is missing ${missing.length} family key(s):\n  ${missing.join('\n  ')}`).toEqual([]);

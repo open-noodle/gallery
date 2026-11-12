@@ -21,6 +21,8 @@ export const galleryReadOperations: OperationId[] = [
 export const galleryHandlers = (data: MockData): Handlers => ({
   ...galleryTimeBucketHandlers(data),
   getAllSpaces: () => ({ json: [] }),
+  // App init probes family access once signed in (lib/utils/client.ts); the feature is off by default, so no access.
+  getMyRoot: () => ({ status: 403, json: { message: 'Forbidden', statusCode: 403 } }),
   // Every mounted thumbnail asks which spaces hold its asset (the space badge); none here.
   getAssetSpaces: () => ({ json: { assets: [] } }),
   getFilterSuggestions: () => ({

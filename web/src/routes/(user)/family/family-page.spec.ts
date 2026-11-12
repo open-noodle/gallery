@@ -6,7 +6,10 @@ import { page, userEvent } from 'vitest/browser';
 import FamilyPage from './+page.svelte';
 
 const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn() }));
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: gotoMock,
+}));
 
 vi.mock('#lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('#lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');

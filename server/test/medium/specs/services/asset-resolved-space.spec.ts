@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { AssetVisibility, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
@@ -41,7 +41,6 @@ const setup = () => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
-      ConfigRepository,
       // The owner branch overlays identity-resolved person metadata.
       FaceIdentityRepository,
       SharedLinkAssetRepository,
@@ -53,20 +52,8 @@ const setup = () => {
       ConfigRepository,
       SystemMetadataRepository,
     ],
-    mock: [
-      EventRepository,
-      LoggingRepository,
-      JobRepository,
-      StorageRepository,
-      OcrRepository,
-      SystemMetadataRepository,
-    ],
+    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository],
   });
-  // Gallery-fork: `AssetService.get` attaches `familyRelationLabel` to the people it embeds, which reads the config
-  // first. A bare `{}` yields the defaults, so the family tree stays off.
-  ctx
-    .getMock(SystemMetadataRepository)
-    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
   const { sut: timelineService } = newMediumService(TimelineService, {
     database: defaultDatabase,
     real: [AssetRepository, AccessRepository, FaceIdentityRepository, PartnerRepository, SharedSpaceRepository],
