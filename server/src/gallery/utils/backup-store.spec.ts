@@ -45,8 +45,8 @@ describe('BackupStoreResolver', () => {
 
   const withS3Config = (s3: { enabled?: boolean }) =>
     mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { s3 } } });
-  const withDestination = (destination: 'local' | 'cloud' | 'both', s3?: { enabled?: boolean }) =>
-    mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { destination, s3: s3 ?? { enabled: false } } } });
+  const withDestination = (destination: 'local' | 'cloud' | 'both') =>
+    mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { destination, s3: { enabled: false } } } });
 
   const onS3 = (bucket = 'media') =>
     mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3: { bucket } as never } }));

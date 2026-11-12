@@ -66,9 +66,9 @@ export const foldLegacyFaceSuggestionConfig = (partial: unknown): unknown => {
 };
 
 /**
- * Preserves the old S3-backup setting when the destination selector is introduced. Existing settings keep
- * their previous remote-only behavior until an administrator explicitly chooses a new destination.
- */
+Preserves the old S3-backup setting when the destination selector is introduced. Existing settings keep
+their previous remote-only behavior until an administrator explicitly chooses a new destination.
+*/
 export const migrateLegacyDatabaseBackupDestination = (partial: unknown): unknown => {
   const legacyEnabled = isObject(partial) && get(partial, LEGACY_BACKUP_S3_PATH);
   if (
