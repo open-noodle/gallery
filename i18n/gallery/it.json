@@ -1226,6 +1226,8 @@
   "show_faces_from_photo": "Mostra i volti di questa foto",
   "show_more": "Mostra di più",
   "show_profile_faces": "Mostra i volti del profilo",
+  "show_space_badges": "Mostra le icone degli Space sulle foto",
+  "show_space_badges_description": "Contrassegna con l'icona dello Space le foto della tua timeline che si trovano in uno dei tuoi Space.",
   "sidebar_mode": "Barra laterale",
   "sidebar_mode_auto": "Automatico",
   "sidebar_mode_description": "Scegli se la barra laterale mostra le etichette, si riduce a icone o si adatta alle dimensioni dello schermo.",

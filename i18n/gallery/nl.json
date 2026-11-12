@@ -1226,6 +1226,8 @@
   "show_faces_from_photo": "Gezichten uit deze foto tonen",
   "show_more": "Meer tonen",
   "show_profile_faces": "Profielgezichten tonen",
+  "show_space_badges": "Space-pictogrammen op foto's tonen",
+  "show_space_badges_description": "Markeert foto's in je tijdlijn die in een van je Spaces staan met het Space-pictogram.",
   "sidebar_mode": "Zijbalk",
   "sidebar_mode_auto": "Automatisch",
   "sidebar_mode_description": "Kies of de zijbalk labels toont, inklapt tot pictogrammen of zich aanpast aan je schermgrootte.",

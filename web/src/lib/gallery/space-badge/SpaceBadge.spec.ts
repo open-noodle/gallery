@@ -1,3 +1,4 @@
+import { showSpaceBadges } from '#lib/gallery/stores/preferences.store.ts';
 import { factory } from '#test/unit/factories.ts';
 import { UserAvatarColor } from '@immich/sdk';
 import { render } from 'vitest-browser-svelte';
@@ -22,6 +23,7 @@ describe('SpaceBadge', () => {
     mockPage.route.id = '/(user)/photos/[[assetId=id]]';
     badges.request.mockReset();
     badges.spacesOf.mockReset().mockReturnValue([family]);
+    showSpaceBadges.set(true);
   });
 
   it('shows the space icon in the colour of the one space, and asks about the asset', async () => {
@@ -47,6 +49,14 @@ describe('SpaceBadge', () => {
       const { container } = await render(SpaceBadge, { assetId: 'a' });
       expect(badge(container)).toBeNull();
     }
+  });
+
+  it('stays off, without asking, when the user turned space icons off', async () => {
+    showSpaceBadges.set(false);
+    const { container } = await render(SpaceBadge, { assetId: 'a' });
+
+    expect(badge(container)).toBeNull();
+    expect(badges.request).not.toHaveBeenCalled();
   });
 
   it('gives its corner to the selection check', async () => {
