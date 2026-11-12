@@ -1,8 +1,8 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
-import { testAssetDir, utils } from 'src/utils';
+import { thumbnailUtils } from 'src/gallery-timeline.js';
+import { testAssetDir, utils } from 'src/utils.js';
 
 /**
 `noGps` / `noPlaceName` are mutually exclusive members of the ONE location filter (alongside
