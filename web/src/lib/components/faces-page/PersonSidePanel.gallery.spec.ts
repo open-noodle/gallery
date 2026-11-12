@@ -1,9 +1,11 @@
+import QueryTestWrapper from '#lib/gallery/components/query-test-wrapper.svelte';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import { queryClient } from '#lib/queries/client.ts';
 import { AssetTypeEnum, type AssetFaceResponseDto } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { renderWithTooltips } from '$tests/helpers';
+import type { Component, ComponentProps } from 'svelte';
+import { expect } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import PersonSidePanel from './PersonSidePanel.svelte';
 
 const { getFacesMock, deleteFaceMock, showDialogMock, setAssetIdMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
@@ -31,12 +33,12 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 
-vi.mock('$lib/utils/people-utils', async (importOriginal) => {
+vi.mock('#lib/utils/people-utils.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, zoomImageToBase64: zoomImageToBase64Mock };
 });
 
-vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
+vi.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
     imgRef: undefined,
     highlightedFaces: [],
@@ -59,16 +61,27 @@ const face = (overrides: Partial<AssetFaceResponseDto> = {}): AssetFaceResponseD
     ...overrides,
   }) as AssetFaceResponseDto;
 
+// The panel reads its faces through a query, so it renders inside the app's query client.
 const renderPanel = () =>
-  renderWithTooltips(PersonSidePanel, {
-    assetId: 'asset-1',
-    assetType: AssetTypeEnum.Image,
-    onClose: vi.fn(),
-    onRefresh: vi.fn(),
-  });
+  render(
+    QueryTestWrapper as Component<{
+      component: typeof PersonSidePanel;
+      componentProps: ComponentProps<typeof PersonSidePanel>;
+    }>,
+    {
+      component: PersonSidePanel,
+      componentProps: {
+        assetId: 'asset-1',
+        assetType: AssetTypeEnum.Image,
+        onClose: vi.fn(),
+        onRefresh: vi.fn(),
+      },
+    },
+  );
 
 describe('PersonSidePanel', () => {
   beforeEach(() => {
+    queryClient.clear();
     getFacesMock.mockReset();
     deleteFaceMock.mockReset();
     showDialogMock.mockReset();
@@ -82,9 +95,9 @@ describe('PersonSidePanel', () => {
   it('offers the delete control on an unassigned face', async () => {
     getFacesMock.mockResolvedValue([face({ id: 'face-1', person: null })]);
 
-    renderPanel();
+    await renderPanel();
 
-    expect(await screen.findByRole('button', { name: 'delete_face' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'delete_face' })).toBeInTheDocument();
   });
 
   it('deletes an unassigned face after confirmation, without emitting a person event', async () => {
@@ -92,17 +105,17 @@ describe('PersonSidePanel', () => {
     showDialogMock.mockResolvedValue(true);
     const emitSpy = vi.spyOn(eventManager, 'emit');
 
-    renderPanel();
+    await renderPanel();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'delete_face' }));
+    await userEvent.click(page.getByRole('button', { name: 'delete_face' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(deleteFaceMock).toHaveBeenCalledWith({ id: 'face-1', assetFaceDeleteDto: { force: false } }),
     );
     expect(showDialogMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'confirm_delete_unassigned_face' }));
     expect(emitSpy).not.toHaveBeenCalledWith('PersonAssetDelete', expect.anything());
     expect(setAssetIdMock).toHaveBeenCalledWith('asset-1');
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'delete_face' })).not.toBeInTheDocument());
+    await expect.element(page.getByRole('button', { name: 'delete_face' })).not.toBeInTheDocument();
     emitSpy.mockRestore();
   });
 
@@ -112,11 +125,11 @@ describe('PersonSidePanel', () => {
     showDialogMock.mockResolvedValue(true);
     const emitSpy = vi.spyOn(eventManager, 'emit');
 
-    renderPanel();
+    await renderPanel();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'delete_face' }));
+    await userEvent.click(page.getByRole('button', { name: 'delete_face' }));
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(deleteFaceMock).toHaveBeenCalledWith({ id: 'face-1', assetFaceDeleteDto: { force: false } }),
     );
     expect(emitSpy).toHaveBeenCalledWith('PersonAssetDelete', { id: 'person-1', assetId: 'asset-1' });
@@ -127,11 +140,11 @@ describe('PersonSidePanel', () => {
     getFacesMock.mockResolvedValue([face({ id: 'face-1', person: null })]);
     showDialogMock.mockResolvedValue(false);
 
-    renderPanel();
+    await renderPanel();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'delete_face' }));
+    await userEvent.click(page.getByRole('button', { name: 'delete_face' }));
 
-    await waitFor(() => expect(showDialogMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(showDialogMock).toHaveBeenCalled());
     expect(deleteFaceMock).not.toHaveBeenCalled();
   });
 });
