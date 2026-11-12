@@ -1,23 +1,23 @@
 <script lang="ts">
-  import VideoFaceSightings from '$lib/gallery/asset-viewer/VideoFaceSightings.svelte';
-  import { videoPersonSightings } from '$lib/gallery/asset-viewer/video-person-sightings.svelte';
-  import { faceManager } from '$lib/stores/face.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import VideoFaceSightings from '#lib/gallery/asset-viewer/VideoFaceSightings.svelte';
+  import { videoPersonSightings } from '#lib/gallery/asset-viewer/video-person-sightings.svelte.ts';
+  import { faceManager } from '#lib/stores/face.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { mergeVideoFaces, type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text, toastManager } from '@immich/ui';
   import { mdiClose, mdiSetMerge } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   /**
-   * The moments of the person picked with the film button on their People tile, under the People grid: the assign
-   * picker's sighting strip, one click from the info panel (specs/2026-10-31-video-face-frames-design.md, Phase 2).
-   */
+  The moments of the person picked with the film button on their People tile, under the People grid: the assign
+  picker's sighting strip, one click from the info panel (specs/2026-10-31-video-face-frames-design.md, Phase 2).
+  */
   interface Props {
     asset: AssetResponseDto;
     /**
-     * The asset's owner, who holds face delete: each moment gets a menu to move it or take it out of the face, and a
-     * person with several faces in the video can have them combined into one.
-     */
+    The asset's owner, who holds face delete: each moment gets a menu to move it or take it out of the face, and a
+    person with several faces in the video can have them combined into one.
+    */
     canEdit?: boolean;
   }
 

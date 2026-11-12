@@ -1,21 +1,30 @@
-import '@testing-library/jest-dom';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { createRawSnippet } from 'svelte';
-import { renderWithTooltips } from '$tests/helpers';
+import { addMessages } from 'svelte-i18n';
+import { expect } from 'vitest';
+import { cleanup, render } from 'vitest-browser-svelte';
+import { page, userEvent, type Locator } from 'vitest/browser';
 import VideoFaceSightings from './VideoFaceSightings.svelte';
 import { videoFaceBox } from './video-face-box.svelte';
 
+const findOne = async (locator: Locator) => {
+  await expect.element(locator).toBeInTheDocument();
+  return locator.element() as HTMLElement;
+};
+
+const findAll = async (locator: Locator) => {
+  await vi.waitFor(() => expect(locator.elements().length).toBeGreaterThan(0));
+  return locator.elements() as HTMLElement[];
+};
+
 const box = { x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.5 };
 
-vi.mock('svelte-i18n', () => ({
-  t: {
-    subscribe: (run: (f: (k: string, o?: { values?: Record<string, unknown> }) => string) => void) => (
-      run((k, o) => (o?.values ? `${k} ${JSON.stringify(o.values)}` : k)),
-      () => {}
-    ),
-  },
-}));
+// Browser mode loads the real svelte-i18n in the test setup, before a spec-level mock could apply, and its `dev`
+// locale renders bare keys. The two interpolated messages are registered so the values they carry can be asserted.
+addMessages('dev', {
+  video_face_sightings_count: 'video_face_sightings_count count={count}',
+  video_face_sighting_moved_person: 'video_face_sighting_moved_person name={name}',
+});
 
 const sdk = vi.hoisted(() => ({
   getAssetFaceSightings: vi.fn(),
@@ -44,13 +53,13 @@ vi.mock('@immich/ui', async (importOriginal) => ({
   toastManager: { primary: toastPrimary },
   modalManager: { show: showModal, showDialog },
 }));
-vi.mock('$lib/utils/handle-error', () => ({ handleError }));
+vi.mock('#lib/utils/handle-error.ts', () => ({ handleError }));
 const faceManagerMock = vi.hoisted(() => ({ facesByPersonId: new Map<string, { id: string }[]>() }));
-vi.mock('$lib/stores/face.svelte', () => ({ faceManager: faceManagerMock }));
+vi.mock('#lib/stores/face.svelte.ts', () => ({ faceManager: faceManagerMock }));
 
 const seekViewerVideo = vi.hoisted(() => vi.fn());
-vi.mock('$lib/gallery/asset-viewer/video-seek', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('$lib/gallery/asset-viewer/video-seek')>()),
+vi.mock('#lib/gallery/asset-viewer/video-seek.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/gallery/asset-viewer/video-seek.ts')>()),
   seekViewerVideo,
 }));
 
@@ -62,18 +71,18 @@ describe('VideoFaceSightings', () => {
 
   it('shows nothing for a face without sightings', async () => {
     getAssetFaceSightings.mockResolvedValue({ sightings: [] });
-    render(VideoFaceSightings, { faceIds: ['face-1'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1'] });
 
-    await waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
-    expect(screen.queryByTestId('video-face-sightings')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
+    expect(page.getByTestId('video-face-sightings').query()).not.toBeInTheDocument();
   });
 
   it('shows nothing when the server has no such route or fails', async () => {
     getAssetFaceSightings.mockRejectedValue(new Error('404'));
-    render(VideoFaceSightings, { faceIds: ['face-1'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1'] });
 
-    await waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
-    expect(screen.queryByTestId('video-face-sightings')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(getAssetFaceSightings).toHaveBeenCalled());
+    expect(page.getByTestId('video-face-sightings').query()).not.toBeInTheDocument();
   });
 
   it('shows every sighting in time order, with the best one starred and lazy crops keyed by time', async () => {
@@ -84,20 +93,22 @@ describe('VideoFaceSightings', () => {
         { time: 3725, score: 0.7, isBest: false, box },
       ],
     });
-    render(VideoFaceSightings, { faceIds: ['face-1'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1'] });
 
-    const buttons = await screen.findAllByRole('button');
+    const buttons = await findAll(page.getByRole('button'));
     expect(getAssetFaceSightings).toHaveBeenCalledWith({ id: 'face-1' }, expect.anything());
     expect(buttons.map((button) => button.textContent?.trim())).toEqual(['0:02', '0:42', '1:02:05']);
-    expect(screen.getByText(/video_face_sightings_count/)).toHaveTextContent('{"count":3}');
+    expect(page.getByText(/video_face_sightings_count/).element()).toHaveTextContent(
+      'video_face_sightings_count count=3',
+    );
 
-    const images = screen.getAllByRole('presentation', { hidden: true });
+    const images = page.getByRole('presentation', { includeHidden: true }).elements();
     expect(images).toHaveLength(3);
     expect(images[1]).toHaveAttribute('loading', 'lazy');
     expect(images[1].getAttribute('src')).toMatch(/\/faces\/face-1\/sightings\/thumbnail\?.*time=42/);
 
-    expect(screen.getAllByTestId('best')).toHaveLength(1);
-    expect(buttons[1]).toContainElement(screen.getByTestId('best'));
+    expect(page.getByTestId('best').elements()).toHaveLength(1);
+    expect(buttons[1]).toContainElement(page.getByTestId('best').element());
   });
 
   it('seeks the video to a sighting with its face box when it is clicked, and marks it', async () => {
@@ -108,9 +119,9 @@ describe('VideoFaceSightings', () => {
       ],
     });
     seekViewerVideo.mockReturnValue(true);
-    render(VideoFaceSightings, { faceIds: ['face-1'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1'] });
 
-    const [first, second] = await screen.findAllByRole('button');
+    const [first, second] = await findAll(page.getByRole('button'));
     await userEvent.click(second);
 
     expect(seekViewerVideo).toHaveBeenCalledWith(42, box);
@@ -120,11 +131,11 @@ describe('VideoFaceSightings', () => {
 
   it('takes the face box away when the strip closes', async () => {
     getAssetFaceSightings.mockResolvedValue({ sightings: [{ time: 42, score: 0.95, isBest: true, box }] });
-    const { unmount } = render(VideoFaceSightings, { faceIds: ['face-1'] });
-    await screen.findByRole('button');
+    const { unmount } = await render(VideoFaceSightings, { faceIds: ['face-1'] });
+    await findOne(page.getByRole('button'));
     videoFaceBox.show(box, 42);
 
-    unmount();
+    await unmount();
     expect(videoFaceBox.current).toBeUndefined();
   });
 
@@ -140,11 +151,14 @@ describe('VideoFaceSightings', () => {
             : [{ time: 31.5, score: 0.9, isBest: true, box }],
       }),
     );
-    render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
 
-    const buttons = await screen.findAllByRole('button');
+    const buttons = await findAll(page.getByRole('button'));
     expect(buttons.map((button) => button.textContent?.trim())).toEqual(['0:08', '0:31', '0:33']);
-    const sources = screen.getAllByRole('presentation', { hidden: true }).map((image) => image.getAttribute('src'));
+    const sources = page
+      .getByRole('presentation', { includeHidden: true })
+      .elements()
+      .map((image) => image.getAttribute('src'));
     expect(sources[0]).toMatch(/\/faces\/face-1\//);
     expect(sources[1]).toMatch(/\/faces\/face-2\//);
     expect(sources[2]).toMatch(/\/faces\/face-1\//);
@@ -162,11 +176,11 @@ describe('VideoFaceSightings', () => {
               ],
       }),
     );
-    render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
 
-    await waitFor(() => expect(screen.getAllByRole('button')).toHaveLength(3));
-    expect(screen.getAllByTestId('best')).toHaveLength(1);
-    expect(screen.getByTestId('best').closest('button')).toHaveTextContent('0:31');
+    await vi.waitFor(() => expect(page.getByRole('button').elements()).toHaveLength(3));
+    expect(page.getByTestId('best').elements()).toHaveLength(1);
+    expect(page.getByTestId('best').element().closest('button')).toHaveTextContent('0:31');
   });
 
   it('still lists one face when another fails', async () => {
@@ -175,20 +189,20 @@ describe('VideoFaceSightings', () => {
         ? Promise.reject(new Error('404'))
         : Promise.resolve({ sightings: [{ time: 31.5, score: 0.9, isBest: true, box }] }),
     );
-    render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
+    await render(VideoFaceSightings, { faceIds: ['face-1', 'face-2'] });
 
-    expect(await screen.findAllByRole('button')).toHaveLength(1);
+    expect(await findAll(page.getByRole('button'))).toHaveLength(1);
   });
 
   it('shows what it is given for nothing found, but only once it has looked', async () => {
     let answer = (_: { sightings: [] }) => {};
     getAssetFaceSightings.mockReturnValue(new Promise((resolve) => (answer = resolve)));
     const empty = createRawSnippet(() => ({ render: () => '<p>nothing here</p>' }));
-    render(VideoFaceSightings, { faceIds: ['face-1'], empty });
+    await render(VideoFaceSightings, { faceIds: ['face-1'], empty });
 
-    expect(screen.queryByText('nothing here')).not.toBeInTheDocument();
+    expect(page.getByText('nothing here').query()).not.toBeInTheDocument();
     answer({ sightings: [] });
-    expect(await screen.findByText('nothing here')).toBeInTheDocument();
+    expect(await findOne(page.getByText('nothing here'))).toBeInTheDocument();
   });
 
   describe('editing a moment', () => {
@@ -196,14 +210,17 @@ describe('VideoFaceSightings', () => {
     const late = { time: 31.5, score: 0.8, isBest: false, box };
 
     const tilesShown = () =>
-      screen.getAllByRole('button', { name: /^video_face_sightings_show_at/ }).map((b) => b.textContent?.trim());
+      page
+        .getByRole('button', { name: /^video_face_sightings_show_at/ })
+        .elements()
+        .map((b) => b.textContent?.trim());
 
     /** Opens the menu of the moment at `index` and picks the item whose text starts with `item`. */
     const choose = async (index: number, item: string) => {
-      const menus = await screen.findAllByTestId('sighting-menu');
+      const menus = await findAll(page.getByTestId('sighting-menu'));
       const menu = menus[index];
-      await userEvent.click(within(menu).getByRole('button', { name: 'video_face_sighting_options' }));
-      await userEvent.click(await within(menu).findByRole('menuitem', { name: new RegExp(`^${item}`) }));
+      await userEvent.click(page.elementLocator(menu).getByRole('button', { name: 'video_face_sighting_options' }));
+      await userEvent.click(page.elementLocator(menu).getByRole('menuitem', { name: new RegExp(`^${item}`) }));
     };
 
     const lastToast = () => {
@@ -217,20 +234,20 @@ describe('VideoFaceSightings', () => {
 
     it('offers no menu without permission', async () => {
       getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
-      renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'] });
+      await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'] });
 
-      await screen.findAllByRole('button');
-      expect(screen.queryByTestId('sighting-menu')).not.toBeInTheDocument();
+      await findAll(page.getByRole('button'));
+      expect(page.getByTestId('sighting-menu').query()).not.toBeInTheDocument();
     });
 
     it("offers it on each moment of a face with more than one, and in the picker leaves a face's last moment alone", async () => {
       getAssetFaceSightings.mockImplementation(({ id }: { id: string }) =>
         Promise.resolve({ sightings: id === 'face-1' ? [early, late] : [{ ...late, time: 40 }] }),
       );
-      renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1', 'face-2'], canEdit: true });
+      await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1', 'face-2'], canEdit: true });
 
-      await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31', '0:40']));
-      expect(screen.getAllByTestId('sighting-menu')).toHaveLength(2);
+      await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31', '0:40']));
+      expect(page.getByTestId('sighting-menu').elements()).toHaveLength(2);
     });
 
     describe('removing', () => {
@@ -238,14 +255,14 @@ describe('VideoFaceSightings', () => {
         getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
         removeAssetFaceSighting.mockResolvedValue({ sightings: [{ ...late, isBest: true }] });
         restoreAssetFaceSighting.mockResolvedValue({ sightings: [early, late] });
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(0, 'video_face_sighting_remove');
 
         expect(removeAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 8.5 });
-        await waitFor(() => expect(tilesShown()).toEqual(['0:31']));
-        expect(screen.getByTestId('best').closest('button')).toHaveTextContent('0:31');
-        expect(screen.queryByTestId('sighting-menu')).not.toBeInTheDocument();
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:31']));
+        expect(page.getByTestId('best').element().closest('button')).toHaveTextContent('0:31');
+        expect(page.getByTestId('sighting-menu').query()).not.toBeInTheDocument();
 
         const toast = lastToast();
         expect(toast.description).toBe('video_face_sighting_removed');
@@ -253,31 +270,31 @@ describe('VideoFaceSightings', () => {
         await toast.button.onclick();
 
         expect(restoreAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 8.5 });
-        await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
       });
 
       it('takes the face box away with the moment it was drawn for', async () => {
         getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
         removeAssetFaceSighting.mockResolvedValue({ sightings: [{ ...late, isBest: true }] });
         seekViewerVideo.mockReturnValue(true);
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
-        const [shownTile] = await screen.findAllByRole('button', { name: /^video_face_sightings_show_at/ });
+        const [shownTile] = await findAll(page.getByRole('button', { name: /^video_face_sightings_show_at/ }));
         await userEvent.click(shownTile);
         videoFaceBox.show(box, 8.5);
         await choose(0, 'video_face_sighting_remove');
 
-        await waitFor(() => expect(videoFaceBox.current).toBeUndefined());
+        await vi.waitFor(() => expect(videoFaceBox.current).toBeUndefined());
       });
 
       it('reports a failure and keeps the moment, with nothing to undo', async () => {
         getAssetFaceSightings.mockResolvedValue({ sightings: [early, late] });
         removeAssetFaceSighting.mockRejectedValue(new Error('500'));
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(0, 'video_face_sighting_remove');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(handleError).toHaveBeenCalledWith(expect.any(Error), 'video_face_sighting_remove_failed'),
         );
         expect(tilesShown()).toEqual(['0:08', '0:31']);
@@ -287,9 +304,11 @@ describe('VideoFaceSightings', () => {
 
     describe("a face's only moment", () => {
       const only = { time: 40, score: 0.7, isBest: true, box };
-      const menuItems = (menu: HTMLElement) =>
-        within(menu)
-          .getAllByRole('menuitem', { hidden: true })
+      const menuItems = (menu: Element) =>
+        page
+          .elementLocator(menu)
+          .getByRole('menuitem', { includeHidden: true })
+          .elements()
           .map((item) => item.textContent?.trim());
 
       beforeEach(() => {
@@ -310,10 +329,10 @@ describe('VideoFaceSightings', () => {
         });
 
       it('gets a menu for the whole face: move it, or delete it, but not split it off', async () => {
-        renderStrip();
+        await renderStrip();
 
-        await waitFor(() => expect(screen.getAllByTestId('sighting-menu')).toHaveLength(3));
-        const [splittable, , wholeFace] = screen.getAllByTestId('sighting-menu');
+        await vi.waitFor(() => expect(page.getByTestId('sighting-menu').elements()).toHaveLength(3));
+        const [splittable, , wholeFace] = page.getByTestId('sighting-menu').elements();
         expect(menuItems(wholeFace)).toEqual([
           'video_face_sighting_move_person',
           'video_face_sighting_move_new',
@@ -325,30 +344,30 @@ describe('VideoFaceSightings', () => {
       it('moves the whole face to a picked person, and gives it back on undo', async () => {
         showModal.mockResolvedValue([{ id: 'person-bob', name: 'Bob' }]);
         const onFacesChanged = vi.fn();
-        renderStrip(onFacesChanged);
+        await renderStrip(onFacesChanged);
 
         await choose(2, 'video_face_sighting_move_person');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-bob', faceDto: { id: 'face-2' } }),
         );
         expect(sdk.splitAssetFaceSighting).not.toHaveBeenCalled();
         expect(tilesShown()).toEqual(['0:08', '0:31']);
         expect(onFacesChanged).toHaveBeenCalled();
-        expect(lastToast().description).toBe('video_face_sighting_moved_person {"name":"Bob"}');
+        expect(lastToast().description).toBe('video_face_sighting_moved_person name=Bob');
 
         await lastToast().button.onclick();
 
         expect(sdk.reassignFacesById).toHaveBeenLastCalledWith({ id: 'person-alice', faceDto: { id: 'face-2' } });
-        await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31', '0:40']));
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31', '0:40']));
       });
 
       it('moves the whole face to a new person', async () => {
-        renderStrip();
+        await renderStrip();
 
         await choose(2, 'video_face_sighting_move_new');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-new', faceDto: { id: 'face-2' } }),
         );
         expect(lastToast().description).toBe('video_face_sighting_moved_new');
@@ -356,16 +375,16 @@ describe('VideoFaceSightings', () => {
 
       it('deletes the face once confirmed, as the face editor does, and not otherwise', async () => {
         showDialog.mockResolvedValueOnce(false);
-        renderStrip();
+        await renderStrip();
 
         await choose(2, 'video_face_sighting_delete_face');
-        await waitFor(() => expect(showDialog).toHaveBeenCalled());
+        await vi.waitFor(() => expect(showDialog).toHaveBeenCalled());
         expect(sdk.deleteFace).not.toHaveBeenCalled();
 
         showDialog.mockResolvedValueOnce(true);
         await choose(2, 'video_face_sighting_delete_face');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.deleteFace).toHaveBeenCalledWith({ id: 'face-2', assetFaceDeleteDto: { force: false } }),
         );
         expect(tilesShown()).toEqual(['0:08', '0:31']);
@@ -389,7 +408,7 @@ describe('VideoFaceSightings', () => {
 
       it('joins that face instead of making one, and moves it back on undo', async () => {
         const onFacesChanged = vi.fn();
-        renderWithTooltips(VideoFaceSightings, {
+        await renderWithTooltips(VideoFaceSightings, {
           faceIds: ['face-1'],
           canEdit: true,
           personId: 'person-alice',
@@ -398,20 +417,20 @@ describe('VideoFaceSightings', () => {
 
         await choose(1, 'video_face_sighting_move_person');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.moveAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 31.5, toFaceId: 'face-bob' }),
         );
         expect(sdk.splitAssetFaceSighting).not.toHaveBeenCalled();
         expect(sdk.reassignFacesById).not.toHaveBeenCalled();
         expect(tilesShown()).toEqual(['0:08']);
         expect(onFacesChanged).toHaveBeenCalled();
-        expect(lastToast().description).toBe('video_face_sighting_moved_person {"name":"Bob"}');
+        expect(lastToast().description).toBe('video_face_sighting_moved_person name=Bob');
 
         sdk.moveAssetFaceSighting.mockResolvedValue({ sightings: [], targetSightings: [early, late] });
         await lastToast().button.onclick();
 
         expect(sdk.moveAssetFaceSighting).toHaveBeenLastCalledWith({ id: 'face-bob', time: 31.5, toFaceId: 'face-1' });
-        await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
       });
 
       it("joins it with a face's only moment too, and on undo splits the moment out back to the strip's person", async () => {
@@ -419,7 +438,7 @@ describe('VideoFaceSightings', () => {
           Promise.resolve({ sightings: id === 'face-1' ? [early, late] : [{ ...late, time: 40 }] }),
         );
         sdk.moveAssetFaceSighting.mockResolvedValue({ sightings: [], targetSightings: [{ ...late, time: 40 }] });
-        renderWithTooltips(VideoFaceSightings, {
+        await renderWithTooltips(VideoFaceSightings, {
           faceIds: ['face-1', 'face-2'],
           canEdit: true,
           personId: 'person-alice',
@@ -427,11 +446,11 @@ describe('VideoFaceSightings', () => {
 
         await choose(2, 'video_face_sighting_move_person');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.moveAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-2', time: 40, toFaceId: 'face-bob' }),
         );
         expect(sdk.reassignFacesById).not.toHaveBeenCalled();
-        await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
 
         await lastToast().button.onclick();
 
@@ -441,11 +460,11 @@ describe('VideoFaceSightings', () => {
 
       it('falls back to a face of its own when the server refuses that face', async () => {
         sdk.moveAssetFaceSighting.mockRejectedValue(Object.assign(new Error('400'), { status: 400 }));
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true, personId: 'person-alice' });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true, personId: 'person-alice' });
 
         await choose(1, 'video_face_sighting_move_person');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-bob', faceDto: { id: 'new-face' } }),
         );
         expect(sdk.splitAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 31.5 });
@@ -466,7 +485,7 @@ describe('VideoFaceSightings', () => {
       it('moves the moment to a person picked from the others, then refreshes the faces', async () => {
         showModal.mockResolvedValue([{ id: 'person-bob', name: 'Bob' }]);
         const onFacesChanged = vi.fn();
-        renderWithTooltips(VideoFaceSightings, {
+        await renderWithTooltips(VideoFaceSightings, {
           faceIds: ['face-1'],
           canEdit: true,
           personId: 'person-alice',
@@ -476,32 +495,32 @@ describe('VideoFaceSightings', () => {
         await choose(1, 'video_face_sighting_move_person');
 
         expect(showModal).toHaveBeenCalledWith(expect.anything(), { excludedIds: ['person-alice'] });
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-bob', faceDto: { id: 'new-face' } }),
         );
         expect(sdk.splitAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 31.5 });
         expect(tilesShown()).toEqual(['0:08']);
         expect(onFacesChanged).toHaveBeenCalled();
-        expect(lastToast().description).toBe('video_face_sighting_moved_person {"name":"Bob"}');
+        expect(lastToast().description).toBe('video_face_sighting_moved_person name=Bob');
       });
 
       it('moves nothing when the picker is closed without a choice', async () => {
         showModal.mockResolvedValue(undefined);
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(1, 'video_face_sighting_move_person');
 
-        await waitFor(() => expect(showModal).toHaveBeenCalled());
+        await vi.waitFor(() => expect(showModal).toHaveBeenCalled());
         expect(sdk.splitAssetFaceSighting).not.toHaveBeenCalled();
         expect(tilesShown()).toEqual(['0:08', '0:31']);
       });
 
       it('moves the moment to a new person', async () => {
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(1, 'video_face_sighting_move_new');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-new', faceDto: { id: 'new-face' } }),
         );
         expect(sdk.createPerson).toHaveBeenCalledWith({ personCreateDto: {} });
@@ -509,11 +528,11 @@ describe('VideoFaceSightings', () => {
       });
 
       it('moves the moment to unassigned: a face of its own, given to nobody', async () => {
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(1, 'video_face_sighting_move_unassigned');
 
-        await waitFor(() => expect(lastToast().description).toBe('video_face_sighting_moved_unassigned'));
+        await vi.waitFor(() => expect(lastToast().description).toBe('video_face_sighting_moved_unassigned'));
         expect(sdk.splitAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 31.5 });
         expect(sdk.reassignFacesById).not.toHaveBeenCalled();
         expect(sdk.createPerson).not.toHaveBeenCalled();
@@ -521,37 +540,37 @@ describe('VideoFaceSightings', () => {
 
       it('undoes a move by deleting the new face and bringing the moment back', async () => {
         const onFacesChanged = vi.fn();
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true, onFacesChanged });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true, onFacesChanged });
         await choose(1, 'video_face_sighting_move_unassigned');
-        await waitFor(() => expect(toastPrimary).toHaveBeenCalled());
+        await vi.waitFor(() => expect(toastPrimary).toHaveBeenCalled());
         onFacesChanged.mockClear();
 
         await lastToast().button.onclick();
 
         expect(sdk.deleteFace).toHaveBeenCalledWith({ id: 'new-face', assetFaceDeleteDto: { force: true } });
         expect(restoreAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 31.5 });
-        await waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
+        await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
         expect(onFacesChanged).toHaveBeenCalled();
       });
 
       it('leaves the moment moved but unassigned when giving it to the person fails, still with an undo', async () => {
         showModal.mockResolvedValue([{ id: 'person-bob', name: 'Bob' }]);
         sdk.reassignFacesById.mockRejectedValue(new Error('500'));
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(1, 'video_face_sighting_move_person');
 
-        await waitFor(() => expect(lastToast().description).toBe('video_face_sighting_moved_unassigned'));
+        await vi.waitFor(() => expect(lastToast().description).toBe('video_face_sighting_moved_unassigned'));
         expect(handleError).toHaveBeenCalledWith(expect.any(Error), 'video_face_sighting_move_failed');
       });
 
       it('reports a failed split and moves nothing', async () => {
         sdk.splitAssetFaceSighting.mockRejectedValue(new Error('500'));
-        renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
+        await renderWithTooltips(VideoFaceSightings, { faceIds: ['face-1'], canEdit: true });
 
         await choose(1, 'video_face_sighting_move_unassigned');
 
-        await waitFor(() =>
+        await vi.waitFor(() =>
           expect(handleError).toHaveBeenCalledWith(expect.any(Error), 'video_face_sighting_move_failed'),
         );
         expect(tilesShown()).toEqual(['0:08', '0:31']);

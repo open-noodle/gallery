@@ -1,8 +1,8 @@
 /**
- * The person whose moments in a video the info panel lists, picked with the film button on their People tile
- * (specs/2026-10-31-video-face-frames-design.md, Phase 2). Held with the asset it was picked on, so another asset
- * never shows it.
- */
+The person whose moments in a video the info panel lists, picked with the film button on their People tile
+(specs/2026-10-31-video-face-frames-design.md, Phase 2). Held with the asset it was picked on, so another asset
+never shows it.
+*/
 export type VideoPersonSelection = { assetId: string; personId: string; name: string; faceIds: string[] };
 
 class VideoPersonSightings {

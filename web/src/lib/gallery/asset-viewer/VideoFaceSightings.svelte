@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { videoFaceBox } from '$lib/gallery/asset-viewer/video-face-box.svelte';
-  import { formatSightingTime, seekViewerVideo } from '$lib/gallery/asset-viewer/video-seek';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { createUrl } from '$lib/utils';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import PeoplePickerModal from '$lib/modals/PeoplePickerModal.svelte';
-  import { faceManager } from '$lib/stores/face.svelte';
-  import { handleError } from '$lib/utils/handle-error';
+  import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
+  import { videoFaceBox } from '#lib/gallery/asset-viewer/video-face-box.svelte.ts';
+  import { formatSightingTime, seekViewerVideo } from '#lib/gallery/asset-viewer/video-seek.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import PeoplePickerModal from '#lib/modals/PeoplePickerModal.svelte';
+  import { faceManager } from '#lib/stores/face.svelte.ts';
+  import { createUrl } from '#lib/utils.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     createPerson,
     deleteFace,
@@ -31,28 +31,28 @@
     mdiTrashCanOutline,
   } from '@mdi/js';
   import type { Snippet } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
+  import { SvelteMap } from 'svelte/reactivity';
 
   /**
-   * Every moment a video face's person was seen, as crops in time order; a click pauses the viewer's video there, with
-   * a box around the face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Given several faces (one person
-   * tracked more than once in the video), it lists all their moments together. Renders nothing, or `empty` once loaded,
-   * for faces with no sightings, on any error, and against a server without the route, so the picker looks as it did
-   * before. With `canEdit` (the asset's owner), each moment of a face that has more than one gets a menu that moves it
-   * to another person, a new person or unassigned (a face of its own), or takes it out of the face, each with a few
-   * seconds to undo it; taking out the best view makes the next best one it. A face's only moment is the whole face:
-   * given `personId`, its menu moves the face to another or a new person (undone by giving it back) or deletes it. A
-   * move to a person who already has a face in this video joins that face.
-   */
+  Every moment a video face's person was seen, as crops in time order; a click pauses the viewer's video there, with
+  a box around the face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Given several faces (one person
+  tracked more than once in the video), it lists all their moments together. Renders nothing, or `empty` once loaded,
+  for faces with no sightings, on any error, and against a server without the route, so the picker looks as it did
+  before. With `canEdit` (the asset's owner), each moment of a face that has more than one gets a menu that moves it
+  to another person, a new person or unassigned (a face of its own), or takes it out of the face, each with a few
+  seconds to undo it; taking out the best view makes the next best one it. A face's only moment is the whole face:
+  given `personId`, its menu moves the face to another or a new person (undone by giving it back) or deletes it. A
+  move to a person who already has a face in this video joins that face.
+  */
   interface Props {
     faceIds: string[];
     empty?: Snippet;
     canEdit?: boolean;
     /**
-     * The person the faces belong to: left out of the people a moment can move to, and where a whole face goes back to
-     * on undo. Without it a face's only moment has no menu (the picker, which is already naming that face).
-     */
+    The person the faces belong to: left out of the people a moment can move to, and where a whole face goes back to
+    on undo. Without it a face's only moment has no menu (the picker, which is already naming that face).
+    */
     personId?: string;
     /** After a move or its undo, which add and remove faces on the asset. */
     onFacesChanged?: () => void;
@@ -147,10 +147,10 @@
   type MoveTarget = { kind: 'person'; id: string; name: string } | { kind: 'new' } | { kind: 'unassigned' };
 
   /**
-   * Splits the moment off into a face of its own (unassigned), then gives that face to the target through the same
-   * reassign the face editor uses. When the reassign fails the moment stays moved, unassigned, and the Undo still
-   * puts it back.
-   */
+  Splits the moment off into a face of its own (unassigned), then gives that face to the target through the same
+  reassign the face editor uses. When the reassign fails the moment stays moved, unassigned, and the Undo still
+  puts it back.
+  */
   const move = async ({ faceId, time, key }: Sighting, target: MoveTarget) => {
     let newFaceId: string;
     try {
@@ -264,11 +264,11 @@
   };
 
   /**
-   * Moves the moment into a face the person already has in this video, so they keep one face here instead of gaining
-   * one per move. When it was the source face's last moment, that face goes, and the undo splits the moment out again
-   * and gives it back to the strip's person. Undefined when the server refuses the target (a face not sampled from
-   * the video), for the caller to fall back to a face of the moment's own.
-   */
+  Moves the moment into a face the person already has in this video, so they keep one face here instead of gaining
+  one per move. When it was the source face's last moment, that face goes, and the undo splits the moment out again
+  and gives it back to the strip's person. Undefined when the server refuses the target (a face not sampled from
+  the video), for the caller to fall back to a face of the moment's own.
+  */
   const joinFace = async (
     { faceId, time, key }: Sighting,
     toFaceId: string,
@@ -369,8 +369,8 @@
     </p>
     <div class="flex gap-2 overflow-x-auto pb-2">
       {#each sightings as sighting (sighting.key)}
-        {@const label = formatSightingTime(sighting.time)}
-        {@const wholeFace = (sightingsPerFace.get(sighting.faceId) ?? 0) <= 1}
+        {const label = $derived(formatSightingTime(sighting.time))}
+        {const wholeFace = $derived((sightingsPerFace.get(sighting.faceId) ?? 0) <= 1)}
         <div class="relative shrink-0">
           <button
             type="button"

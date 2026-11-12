@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { videoFaceBox } from '$lib/gallery/asset-viewer/video-face-box.svelte';
-  import { mapNormalizedRectToContent } from '$lib/utils/container-utils';
-  import { computeImageContentMetrics } from '$lib/utils/face-box-drag';
+  import { videoFaceBox } from '#lib/gallery/asset-viewer/video-face-box.svelte.ts';
+  import { mapNormalizedRectToContent } from '#lib/utils/container-utils.ts';
+  import { computeImageContentMetrics } from '#lib/utils/face-box-drag.ts';
 
   /**
-   * A white box around the face at the moment the sighting strip paused the video on, with the rest of the picture
-   * dimmed, as a photo marks a highlighted face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Placed with
-   * the face editor's geometry: the video is scaled to fit its container and centred in it.
-   */
+  A white box around the face at the moment the sighting strip paused the video on, with the rest of the picture
+  dimmed, as a photo marks a highlighted face (specs/2026-10-31-video-face-frames-design.md, Phase 2). Placed with
+  the face editor's geometry: the video is scaled to fit its container and centred in it.
+  */
   interface Props {
     video: HTMLVideoElement | undefined;
     containerWidth: number;
@@ -49,7 +49,7 @@
 </script>
 
 {#if placement}
-  {@const { picture, face } = placement}
+  {const { picture, face } = $derived(placement)}
   <div
     class="pointer-events-none absolute z-5 overflow-hidden"
     style:left={picture.left}

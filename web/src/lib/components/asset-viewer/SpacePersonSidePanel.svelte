@@ -10,13 +10,13 @@
   import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import {
+    AssetTypeEnum,
     attachSpacePersonFace,
     createSpacePerson,
     deleteSpaceAssetFace,
     detachSpacePersonFace,
     getSpaceAssetFaces,
     getSpacePeople,
-    AssetTypeEnum,
     type SharedSpacePersonResponseDto,
     type SpaceAssetFaceResponseDto,
   } from '@immich/sdk';

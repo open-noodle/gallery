@@ -178,17 +178,17 @@ describe('AssignFaceSidePanel', () => {
   });
 
   it("shows where a video face's person was seen", async () => {
-    renderPanel({ assetType: AssetTypeEnum.Video });
+    await renderPanel({ assetType: AssetTypeEnum.Video });
 
-    expect(await screen.findByTestId('video-face-sightings')).toBeInTheDocument();
+    await expect.element(page.getByTestId('video-face-sightings')).toBeInTheDocument();
     expect(getAssetFaceSightingsMock).toHaveBeenCalledWith({ id: 'face-1' }, expect.anything());
   });
 
   it('asks for no sightings on a photo', async () => {
-    renderPanel();
+    await renderPanel();
 
-    await screen.findByTestId('person-picker-panel');
+    await expect.element(page.getByTestId('person-picker-panel')).toBeInTheDocument();
     expect(getAssetFaceSightingsMock).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('video-face-sightings')).not.toBeInTheDocument();
+    expect(page.getByTestId('video-face-sightings').query()).not.toBeInTheDocument();
   });
 });

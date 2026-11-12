@@ -1,5 +1,5 @@
+import { videoViewerVolume } from '#lib/gallery/stores/preferences.store.ts';
 import { get } from 'svelte/store';
-import { videoViewerVolume } from '$lib/gallery/stores/preferences.store';
 import { seekViewerVideo } from './video-seek';
 import { galleryViewerVideo } from './viewer-video';
 
