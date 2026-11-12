@@ -883,9 +883,9 @@ export class FilterSuggestionRepository {
   }
 
   /**
-   * One probe per class. The class condition goes inside the filtered-id query, so each probe stops at its first match
-   * and can use asset_aspectClass_idx; `asset where id in (<filtered ids>)` can force the whole subquery first.
-   */
+  One probe per class. The class condition goes inside the filtered-id query, so each probe stops at its first match
+  and can use asset_aspectClass_idx; `asset where id in (<filtered ids>)` can force the whole subquery first.
+  */
   private async getFilteredAspectClasses(
     userIds: string[],
     options: FilterSuggestionsOptions,
