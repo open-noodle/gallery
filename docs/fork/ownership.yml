@@ -696,6 +696,10 @@ features:
         - server/src/schema/migrations-gallery/1799800000000-ScopeJitOffToDatabase.ts
         - server/src/schema/migrations-gallery/1799900000000-AddAssetDataSaverVideoTable.ts
         - server/src/schema/migrations-gallery/1800000000000-AddAssetFaceVideoFrameTable.ts
+        - server/src/schema/migrations-gallery/1800300000000-AddPhotoGuessingGame.ts
+        - server/src/schema/migrations-gallery/1800400000000-AddDailyGameChallenge.ts
+        - server/src/schema/migrations-gallery/1800500000000-AddSpaceDailyChallengeEnabled.ts
+        - server/src/schema/migrations-gallery/1800600000000-AddSoloGameChallenge.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:

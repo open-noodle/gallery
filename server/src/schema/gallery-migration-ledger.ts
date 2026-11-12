@@ -31,6 +31,11 @@ const renamedGalleryMigrations: Record<string, string | null> = {
   // Shipped in the pr-1195 RC images, then renumbered above the fork migrations main had shipped meanwhile, so a
   // rollback reverts it first on fresh installs too.
   '1799400000000-ScopeJitOffToDatabase': '1799800000000-ScopeJitOffToDatabase',
+  // The photo guessing game's release candidates, renumbered past main's 1800000000000 fork migrations.
+  '1799100000000-AddPhotoGuessingGame': '1800300000000-AddPhotoGuessingGame',
+  '1799200000000-AddDailyGameChallenge': '1800400000000-AddDailyGameChallenge',
+  '1799300000000-AddSpaceDailyChallengeEnabled': '1800500000000-AddSpaceDailyChallengeEnabled',
+  '1799400000000-AddSoloGameChallenge': '1800600000000-AddSoloGameChallenge',
 };
 
 const createGalleryMigrator = (db: Kysely<any>) =>

@@ -198,7 +198,10 @@ export type GalleryJobItem =
   | { name: JobName.MemoryRuleGenerate; data?: IBaseJob }
 
   // Video trim
-  | { name: JobName.AssetVideoTrimGenerate; data: IEntityJob };
+  | { name: JobName.AssetVideoTrimGenerate; data: IEntityJob }
+
+  // Games
+  | { name: JobName.GameChallengeCleanup; data?: IBaseJob };
 
 export type RuleMemoryData = {
   ruleId: string;

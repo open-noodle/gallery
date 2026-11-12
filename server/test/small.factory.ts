@@ -409,6 +409,7 @@ const sharedSpaceFactory = (data: Partial<SharedSpaceRow> = {}): SharedSpaceRow 
   thumbnailCropY: null,
   faceRecognitionEnabled: true,
   petsEnabled: true,
+  dailyChallengeEnabled: null,
   editorsCanAddMembers: null,
   editorsCanChangeRoles: null,
   lastActivityAt: null,

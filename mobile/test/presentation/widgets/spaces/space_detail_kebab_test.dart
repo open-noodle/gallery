@@ -24,6 +24,7 @@ void main() {
         onToggleTimeline: () => events.add('timeline'),
         onPeople: () => events.add('people'),
         onMembers: () => events.add('members'),
+        onChallenges: () => events.add('challenges'),
         onEdit: () => events.add('edit'),
         onDelete: () => events.add('delete'),
       ),
@@ -141,7 +142,36 @@ void main() {
     });
   });
 
+  group('Challenges item', () {
+    testWidgets('the Challenges item is offered to viewers as well as editors', (tester) async {
+      for (final canEdit in [true, false]) {
+        // Force a full teardown between iterations: a same-shape rebuild via pumpKebab alone
+        // reuses the previous element tree, so the popup route opened by the prior iteration's
+        // openMenu() would otherwise linger and block the next tap.
+        await tester.pumpWidget(const SizedBox.shrink());
+        await pumpKebab(tester, canEdit: canEdit);
+        await openMenu(tester);
+
+        expect(
+          find.byKey(const Key('space-detail-kebab-challenges')),
+          findsOneWidget,
+          reason: 'Playing needs membership, not the editor role',
+        );
+      }
+    });
+  });
+
   group('selection routes to exactly one callback', () {
+    testWidgets('selecting Challenges invokes onChallenges only', (tester) async {
+      final result = await pumpKebab(tester);
+      await openMenu(tester);
+
+      await tester.tap(find.byKey(const Key('space-detail-kebab-challenges')));
+      await tester.pumpAndSettle();
+
+      expect(result.events, ['challenges']);
+    });
+
     testWidgets('selecting People invokes onPeople only', (tester) async {
       final result = await pumpKebab(tester);
       await openMenu(tester);

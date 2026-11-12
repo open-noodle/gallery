@@ -36,6 +36,7 @@
 --   * Library Cleanup progress: keep decisions (cleanup_decision), reviewed
 --     dates (cleanup_day_review) and quality-analysis scores (asset_quality,
 --     asset_job_status_gallery.qualityAnalyzedAt)
+--   * Photo-guessing-game challenges, rounds and guesses
 --
 -- Assets you uploaded through Gallery are preserved as long as they are stored
 -- in Immich-native rows (asset, asset_exif, asset_face, etc.). If an asset
@@ -579,7 +580,8 @@ UPDATE "api_key" k
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
                 'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
-                'cleanup.read', 'cleanup.update'
+                'cleanup.read', 'cleanup.update',
+                'game.create', 'game.read', 'game.delete'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -701,6 +703,12 @@ DROP TABLE IF EXISTS "shared_space_album_folder_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_folder" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member" CASCADE;
 DROP TABLE IF EXISTS "shared_space" CASCADE;
+
+-- Photo guessing game (child tables first so the FKs unwind, though CASCADE
+-- makes the order non-load-bearing, same as everywhere else in this section)
+DROP TABLE IF EXISTS "game_guess" CASCADE;
+DROP TABLE IF EXISTS "game_round" CASCADE;
+DROP TABLE IF EXISTS "game_challenge" CASCADE;
 
 -- Face identities
 DROP TABLE IF EXISTS "person_identity" CASCADE;
@@ -927,6 +935,8 @@ DELETE FROM "migration_overrides"
    'index_face_person_verdict_identityId_assetFaceId_idx',
    'index_face_repair_scan_in_flight_uq',
    'index_pet_index',
+   'index_game_challenge_daily_uq',
+   'index_game_challenge_owner_daily_uq',
    'index_person_ownerId_identityId_key',
    'index_shared_space_person_identityId_spaceId_idx',
    'index_shared_space_person_space_name_idx',
@@ -976,7 +986,8 @@ DELETE FROM "migration_overrides"
    'trigger_asset_favorite_delete_audit',
    'trigger_asset_favorite_after_insert',
    'trigger_asset_favorite_after_delete',
-   'trigger_asset_is_favorite_after_write'
+   'trigger_asset_is_favorite_after_write',
+   'trigger_game_challenge_updatedAt'
  );
 
 -- -----------------------------------------------------------------------------
@@ -1240,6 +1251,20 @@ DELETE FROM "kysely_migrations"
   '1799800000000-ScopeJitOffToDatabase',
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
+  '1800300000000-AddPhotoGuessingGame',
+  '1800400000000-AddDailyGameChallenge',
+  '1800500000000-AddSpaceDailyChallengeEnabled',
+  '1800600000000-AddSoloGameChallenge',
+  -- The photo guessing game's earlier names, recorded by its release candidates: before the v3.3.3 rebase
+  -- renumbered them past main's 1798 migrations, and before the v3.4.1 rebase renumbered them past 1800.
+  '1799100000000-AddPhotoGuessingGame',
+  '1799200000000-AddDailyGameChallenge',
+  '1799300000000-AddSpaceDailyChallengeEnabled',
+  '1799400000000-AddSoloGameChallenge',
+  '1798000000000-AddPhotoGuessingGame',
+  '1798100000000-AddDailyGameChallenge',
+  '1798200000000-AddSpaceDailyChallengeEnabled',
+  '1798300000000-AddSoloGameChallenge',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1315,7 +1340,11 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
       OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
-      OR "name" LIKE '%AssetFavoriteTables%';
+      OR "name" LIKE '%AssetFavoriteTables%'
+      OR "name" LIKE '%AddPhotoGuessingGame%'
+      OR "name" LIKE '%AddDailyGameChallenge%'
+      OR "name" LIKE '%AddSpaceDailyChallengeEnabled%'
+      OR "name" LIKE '%AddSoloGameChallenge%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -1357,6 +1386,7 @@ BEGIN
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',
        'cleanup_decision', 'cleanup_day_review', 'asset_quality',
+       'game_challenge', 'game_round', 'game_guess',
        'gallery_migrations', 'gallery_migrations_lock'
      );
   IF fork_tables_left > 0 THEN
