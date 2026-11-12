@@ -2,10 +2,10 @@ import { Column, CreateDateColumn, ForeignKeyColumn, Table, type Generated, type
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 
 /**
- * One sampled sighting of a video face: `t` in the original's timeline, box in the best frame's pixel space. `removed`
- * marks one the user took out of the face (kept so Undo can bring it back), and `wasBest` one that was the best view
- * when it was removed.
- */
+One sampled sighting of a video face: `t` in the original's timeline, box in the best frame's pixel space. `removed`
+marks one the user took out of the face (kept so Undo can bring it back), and `wasBest` one that was the best view
+when it was removed.
+*/
 export type VideoFaceSighting = {
   t: number;
   x1: number;

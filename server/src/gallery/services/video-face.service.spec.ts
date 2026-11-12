@@ -1,20 +1,20 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { writeFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
+import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
-// Sightings in a 1000 x 500 frame, for removing and restoring.
-const fraction = (x1: number, y1: number, x2: number, y2: number) => ({
+// Sightings in a 1000 x 500 frame, for removing and restoring: a box from x1 to x2, 100 to 200 px down.
+const fraction = (x1: number, x2: number) => ({
   x1: x1 / 1000,
-  y1: y1 / 500,
+  y1: 100 / 500,
   x2: x2 / 1000,
-  y2: y2 / 500,
+  y2: 200 / 500,
 });
 
 const storedWith = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
@@ -35,8 +35,8 @@ const faceA = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
   framePath: 'thumbs/owner/fa/ce/face-a.jpeg',
 });
 
-const faceB = (sightings: VideoFaceSighting[], timeSeconds = 9) => ({
-  ...storedWith(sightings, timeSeconds),
+const faceB = (sightings: VideoFaceSighting[]) => ({
+  ...storedWith(sightings, 9),
   framePath: 'thumbs/owner/fa/ce/face-b.jpeg',
 });
 
@@ -316,8 +316,8 @@ describe(VideoFaceService.name, () => {
 
       await expect(sut.removeSighting(auth, 'face-1', 6)).resolves.toEqual({
         sightings: [
-          { time: 4, score: 0.9, isBest: true, box: fraction(100, 100, 200, 200) },
-          { time: 9, score: 0.8, isBest: false, box: fraction(500, 100, 600, 200) },
+          { time: 4, score: 0.9, isBest: true, box: fraction(100, 200) },
+          { time: 9, score: 0.8, isBest: false, box: fraction(500, 600) },
         ],
       });
       expect(mocks.videoFace.setSightings).toHaveBeenCalledWith(

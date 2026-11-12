@@ -426,9 +426,9 @@ export class BackendMediaServer {
   }
 
   /**
-   * `widen` says the source is a sampled video frame; left out, that is the case when it is the face's stored best
-   * frame. A sighting's frame, extracted for one request, passes it explicitly.
-   */
+  `widen` says the source is a sampled video frame; left out, that is the case when it is the face's stored best
+  frame. A sighting's frame, extracted for one request, passes it explicitly.
+  */
   async generateFaceThumbnailResponse(
     face: AssetFace,
     sourcePath: string,
