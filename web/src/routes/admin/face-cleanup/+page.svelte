@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
   import { triggerScan } from '@immich/sdk';
   import { Button, Icon, toastManager } from '@immich/ui';
   import { mdiAccountSearch, mdiArrowRight, mdiRadar, mdiRefresh, mdiSwapHorizontal } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
   import { faceCleanupBreadcrumbs } from './breadcrumbs';
 
