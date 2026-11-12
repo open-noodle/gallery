@@ -1,11 +1,11 @@
+import { videoFaceBox } from '#lib/gallery/asset-viewer/video-face-box.svelte.ts';
 import type { VideoFaceSightingBoxDto } from '@immich/sdk';
 import type { Attachment } from 'svelte/attachments';
-import { videoFaceBox } from '$lib/gallery/asset-viewer/video-face-box.svelte';
 
 /**
- * The asset viewer's video, for panels beside it that have no reference to the player: the assign picker's sighting
- * strip seeks to the moment a face was seen (specs/2026-10-31-video-face-frames-design.md, Phase 2).
- */
+The asset viewer's video, for panels beside it that have no reference to the player: the assign picker's sighting
+strip seeks to the moment a face was seen (specs/2026-10-31-video-face-frames-design.md, Phase 2).
+*/
 let current: HTMLVideoElement | undefined;
 
 /** A seek this close (in seconds) to the shown moment is still that moment. */
@@ -44,11 +44,11 @@ let target: { video: HTMLVideoElement; time: number; box?: VideoFaceSightingBoxD
 let waking: HTMLVideoElement | undefined;
 
 /**
- * Safari stops drawing a paused video's seeks once the window is resized: the clock and the face box move, the
- * picture stays on the old frame until the video plays again. So each seek starts with a muted play and pause, which
- * keeps it drawing; other browsers only see a moment of silent playback. Seeks asked for meanwhile wait for the same
- * play, so the mute state read here is always the viewer's own.
- */
+Safari stops drawing a paused video's seeks once the window is resized: the clock and the face box move, the
+picture stays on the old frame until the video plays again. So each seek starts with a muted play and pause, which
+keeps it drawing; other browsers only see a moment of silent playback. Seeks asked for meanwhile wait for the same
+play, so the mute state read here is always the viewer's own.
+*/
 const wakeAndSeek = async (video: HTMLVideoElement) => {
   waking = video;
   const muted = video.muted;
@@ -75,9 +75,9 @@ const wakeAndSeek = async (video: HTMLVideoElement) => {
 };
 
 /**
- * Pauses the viewer's video at `time`, in seconds on its own timeline, so the frame stays on screen, with `box` drawn
- * around the face when given. Returns whether a video was there to seek; the seek itself lands a moment later.
- */
+Pauses the viewer's video at `time`, in seconds on its own timeline, so the frame stays on screen, with `box` drawn
+around the face when given. Returns whether a video was there to seek; the seek itself lands a moment later.
+*/
 export const seekViewerVideo = (time: number, box?: VideoFaceSightingBoxDto): boolean => {
   if (!current) {
     return false;

@@ -47,10 +47,10 @@
     /** Rendered beside the search field (the space picker's "create person" with the typed name). */
     searchActions?: Snippet;
     /**
-     * The face being named, when it is on a video: the panel then shows every moment that person was seen, each one
-     * seeking the player there, to tell people apart who look alike in a single crop. `canEdit` (the asset's owner, who
-     * holds face delete) adds a menu to move a moment to another person or take it out of the face.
-     */
+    The face being named, when it is on a video: the panel then shows every moment that person was seen, each one
+    seeking the player there, to tell people apart who look alike in a single crop. `canEdit` (the asset's owner, who
+    holds face delete) adds a menu to move a moment to another person or take it out of the face.
+    */
     videoFace?: { id: string; canEdit: boolean };
   };
 
