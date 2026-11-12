@@ -13,72 +13,46 @@ AssetOrder? _order(SearchFilter filter) => switch (filter.sort) {
 };
 
 extension GallerySmartSearchDto on SmartSearchDto {
-  SmartSearchDto withGallery(
-    SearchFilter filter, {
-    required bool localTakenRange,
-  }) {
+  SmartSearchDto withGallery(SearchFilter filter, {required bool localTakenRange}) {
     if (filter.date.takenAfter != null) {
-      takenAfter = Optional.present(
-        filter.date.takenAfterParam(localTakenRange: localTakenRange),
-      );
+      takenAfter = Optional.present(filter.date.takenAfterParam(localTakenRange: localTakenRange));
     }
     if (filter.date.takenBefore != null) {
-      takenBefore = Optional.present(
-        filter.date.takenBeforeParam(localTakenRange: localTakenRange),
-      );
+      takenBefore = Optional.present(filter.date.takenBeforeParam(localTakenRange: localTakenRange));
     }
     tagIds = Optional.present(filter.tagIds ?? const <String>[]);
     if (filter.location.locationPresence != null) {
       locationPresence = Optional.present(
-        SmartSearchDtoLocationPresenceEnum.fromJson(
-          filter.location.locationPresence,
-        ),
+        SmartSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence),
       );
     }
-    order = _order(filter) == null
-        ? const Optional.absent()
-        : Optional.present(_order(filter));
+    order = _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter));
     // Include shared-space assets so a viewer's selected facet returns results (and a
     // space-person token resolves). #763: favorites are per-user, so the server composes
     // shared-space visibility with the favorite filter (slice 4) — no need to suppress it here.
     withSharedSpaces = const Optional.present(true);
-    return filter.display.isUntagged
-        ? _ExplicitNullTagIdsSmartSearchDto(this)
-        : this;
+    return filter.display.isUntagged ? _ExplicitNullTagIdsSmartSearchDto(this) : this;
   }
 }
 
 extension GalleryMetadataSearchDto on MetadataSearchDto {
-  MetadataSearchDto withGallery(
-    SearchFilter filter, {
-    required bool localTakenRange,
-  }) {
+  MetadataSearchDto withGallery(SearchFilter filter, {required bool localTakenRange}) {
     if (filter.date.takenAfter != null) {
-      takenAfter = Optional.present(
-        filter.date.takenAfterParam(localTakenRange: localTakenRange),
-      );
+      takenAfter = Optional.present(filter.date.takenAfterParam(localTakenRange: localTakenRange));
     }
     if (filter.date.takenBefore != null) {
-      takenBefore = Optional.present(
-        filter.date.takenBeforeParam(localTakenRange: localTakenRange),
-      );
+      takenBefore = Optional.present(filter.date.takenBeforeParam(localTakenRange: localTakenRange));
     }
     tagIds = Optional.present(filter.tagIds ?? const <String>[]);
     if (filter.location.locationPresence != null) {
       locationPresence = Optional.present(
-        MetadataSearchDtoLocationPresenceEnum.fromJson(
-          filter.location.locationPresence,
-        ),
+        MetadataSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence),
       );
     }
-    order = _order(filter) == null
-        ? const Optional.absent()
-        : Optional.present(_order(filter));
+    order = _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter));
     // See GallerySmartSearchDto.withGallery.
     withSharedSpaces = const Optional.present(true);
-    return filter.display.isUntagged
-        ? _ExplicitNullTagIdsMetadataSearchDto(this)
-        : this;
+    return filter.display.isUntagged ? _ExplicitNullTagIdsMetadataSearchDto(this) : this;
   }
 }
 
