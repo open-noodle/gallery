@@ -540,10 +540,10 @@ const toFrameFraction = (value: number, size: number) =>
   Math.min(1, Math.max(0, Math.round((value / size) * 1e4) / 1e4));
 
 /**
- * A face's sightings on the player's timeline, in time order (Phase 2). A trimmed video plays its trimmed encode, whose
- * zero is the trim start, so each time is shifted by it, and sightings outside the trim are left out. The trim is the
- * current one, not the one the video was sampled under.
- */
+A face's sightings on the player's timeline, in time order (Phase 2). A trimmed video plays its trimmed encode, whose
+zero is the trim start, so each time is shifted by it, and sightings outside the trim are left out. The trim is the
+current one, not the one the video was sampled under.
+*/
 export const sightingsForPlayer = ({
   sightings,
   timeSeconds,
@@ -578,10 +578,10 @@ export const sightingsForPlayer = ({
 };
 
 /**
- * The stored sighting at `time` on the player's timeline, as sightingsForPlayer reported it, or undefined when no
- * sighting is at that moment (a re-scan or a new trim moved them). Looked up by time rather than by position, so a
- * cached URL can never show another moment's face.
- */
+The stored sighting at `time` on the player's timeline, as sightingsForPlayer reported it, or undefined when no
+sighting is at that moment (a re-scan or a new trim moved them). Looked up by time rather than by position, so a
+cached URL can never show another moment's face.
+*/
 export const findSightingAt = (stored: StoredSightings, time: number): VideoFaceSighting | undefined => {
   const start = stored.trimStart ?? 0;
   const playable = new Set(sightingsForPlayer(stored).map((sighting) => sighting.time));
@@ -608,11 +608,11 @@ const isBestView = (stored: StoredSightings, sighting: VideoFaceSighting) =>
   Math.abs(sighting.t - stored.timeSeconds) < SIGHTING_TIME_TOLERANCE;
 
 /**
- * Takes the sighting at `time` out of the face (Phase 2), keeping it with `removed` so `restoreSightingAt` can bring
- * it back. Removing the best view moves it to the remaining sighting with the highest score, preferring one inside the
- * trim, and marks the removed one `wasBest`. Undefined when no sighting is shown at `time`; `last` when it is the
- * face's only one left, which stays: a face needs a frame to be cut from.
- */
+Takes the sighting at `time` out of the face (Phase 2), keeping it with `removed` so `restoreSightingAt` can bring
+it back. Removing the best view moves it to the remaining sighting with the highest score, preferring one inside the
+trim, and marks the removed one `wasBest`. Undefined when no sighting is shown at `time`; `last` when it is the
+face's only one left, which stays: a face needs a frame to be cut from.
+*/
 export const removeSightingAt = (stored: StoredSightings, time: number): SightingChange | 'last' | undefined => {
   const target = storedAt(stored, time);
   if (!target || target.removed) {
@@ -641,9 +641,9 @@ export const removeSightingAt = (stored: StoredSightings, time: number): Sightin
 };
 
 /**
- * Brings back the removed sighting at `time`, as the best view again when it was the best when removed. Undefined when
- * no removed sighting is at `time`.
- */
+Brings back the removed sighting at `time`, as the best view again when it was the best when removed. Undefined when
+no removed sighting is at `time`.
+*/
 export const restoreSightingAt = (stored: StoredSightings, time: number): SightingChange | undefined => {
   const target = storedAt(stored, time);
   if (!target?.removed) {
@@ -666,9 +666,9 @@ export const restoreSightingAt = (stored: StoredSightings, time: number): Sighti
 export type SightingSplit = SightingChange & { moved: VideoFaceSighting };
 
 /**
- * Moves the sighting at `time` out of the face, to become a face of its own: the face loses it as `removeSightingAt`
- * takes it out (best view promoted, `removed` kept so it can come back), and `moved` is the sighting as it was found.
- */
+Moves the sighting at `time` out of the face, to become a face of its own: the face loses it as `removeSightingAt`
+takes it out (best view promoted, `removed` kept so it can come back), and `moved` is the sighting as it was found.
+*/
 export const splitSightingAt = (stored: StoredSightings, time: number): SightingSplit | 'last' | undefined => {
   const change = removeSightingAt(stored, time);
   if (!change || change === 'last') {
@@ -701,9 +701,9 @@ export const detectionAt = <T extends { boundingBox: BoundingBox }>(detections: 
 const asFound = ({ t, x1, y1, x2, y2, score }: VideoFaceSighting): VideoFaceSighting => ({ t, x1, y1, x2, y2, score });
 
 /**
- * Takes the sighting at `time` out of a face to move it into another face of the same video: as `removeSightingAt` does,
- * but the face's last sighting may go too, which leaves no `change` (the face goes). `moved` is the sighting as found.
- */
+Takes the sighting at `time` out of a face to move it into another face of the same video: as `removeSightingAt` does,
+but the face's last sighting may go too, which leaves no `change` (the face goes). `moved` is the sighting as found.
+*/
 export const takeSightingAt = (
   stored: StoredSightings,
   time: number,
@@ -718,10 +718,10 @@ export const takeSightingAt = (
 };
 
 /**
- * Adds sightings moved in from other faces of the same video. One the face already stored at that moment and had moved
- * away (marked removed) comes back in place, as the best view again if it was that; one it shows already stays as is;
- * any other is appended. The face's best view otherwise stays.
- */
+Adds sightings moved in from other faces of the same video. One the face already stored at that moment and had moved
+away (marked removed) comes back in place, as the best view again if it was that; one it shows already stays as is;
+any other is appended. The face's best view otherwise stays.
+*/
 export const addSightings = (stored: StoredSightings, added: VideoFaceSighting[]): SightingChange => {
   const sightings = [...stored.sightings];
   let best: VideoFaceSighting | undefined;

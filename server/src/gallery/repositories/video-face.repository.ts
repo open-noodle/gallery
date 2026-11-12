@@ -150,9 +150,9 @@ export class VideoFaceRepository {
   }
 
   /**
-   * Everything one face's sightings need: the stored sightings and best time, the video's current trim, and its
-   * original. Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
-   */
+  Everything one face's sightings need: the stored sightings and best time, the video's current trim, and its
+  original. Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
+  */
   @GenerateSql({ params: [DummyValue.UUID] })
   getSightings(faceId: string) {
     return this.db
@@ -177,18 +177,18 @@ export class VideoFaceRepository {
   }
 
   /**
-   * Writes a face's sightings after one was removed or restored, and with `best`, moves the face's box and best time
-   * to that sighting (its frame already written to the face's frame path), in one transaction.
-   */
+  Writes a face's sightings after one was removed or restored, and with `best`, moves the face's box and best time
+  to that sighting (its frame already written to the face's frame path), in one transaction.
+  */
   async setSightings(faceId: string, sightings: VideoFaceSighting[], best?: SightingBest): Promise<void> {
     await this.db.transaction().execute((trx) => writeSightings(trx, faceId, sightings, best));
   }
 
   /**
-   * Moves a sighting out of a face into a new face of its own, in one transaction: the old face's sightings (and best
-   * view, when that moved) as `setSightings` writes them, and the new face, made by hand as the user chose it, with its
-   * frame and, when the detector found it again, its embedding. Unassigned until the user names it.
-   */
+  Moves a sighting out of a face into a new face of its own, in one transaction: the old face's sightings (and best
+  view, when that moved) as `setSightings` writes them, and the new face, made by hand as the user chose it, with its
+  frame and, when the detector found it again, its embedding. Unassigned until the user names it.
+  */
   async splitSighting({
     faceId,
     sightings,
@@ -218,11 +218,11 @@ export class VideoFaceRepository {
   }
 
   /**
-   * Moves sightings between faces of one video, in one transaction: writes each face's sightings (and best view when
-   * that moved), points a person whose representative face is going at `faceId` instead, and deletes the faces left
-   * with nothing (`deleteFaceIds`; their frame rows and embeddings go with them). Returns the repointed people, whose
-   * thumbnails are now cut from another face.
-   */
+  Moves sightings between faces of one video, in one transaction: writes each face's sightings (and best view when
+  that moved), points a person whose representative face is going at `faceId` instead, and deletes the faces left
+  with nothing (`deleteFaceIds`; their frame rows and embeddings go with them). Returns the repointed people, whose
+  thumbnails are now cut from another face.
+  */
   async moveSightings({
     faces,
     faceId,

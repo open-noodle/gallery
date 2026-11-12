@@ -61,11 +61,11 @@ const assertSameFrames = ([first, ...others]: StoredFaceSightings[]) => {
 };
 
 /**
- * Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,
- * the face-keyed crop the asset viewer shows, and each face's sightings for the assign picker (Phase 2). Detection
- * itself runs inside upstream's face detection job, through VideoFaceDetector. The owner can take a sighting out of a
- * face, bring it back, or move it to a face of its own (Phase 2).
- */
+Video faces sampled across the whole video (specs/2026-10-31-video-face-frames-design.md): frame cleanup on delete,
+the face-keyed crop the asset viewer shows, and each face's sightings for the assign picker (Phase 2). Detection
+itself runs inside upstream's face detection job, through VideoFaceDetector. The owner can take a sighting out of a
+face, bring it back, or move it to a face of its own (Phase 2).
+*/
 @Injectable()
 export class VideoFaceService extends BaseService {
   private frames = new VideoFrameReader();
@@ -131,10 +131,10 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * Takes the sighting at `time` out of the face. When it was the best view, the next best becomes it: its frame
-   * replaces the face's best frame, the face's box moves to it, and a person shown by this face gets a new thumbnail.
-   * The face's only remaining sighting stays.
-   */
+  Takes the sighting at `time` out of the face. When it was the best view, the next best becomes it: its frame
+  replaces the face's best frame, the face's box moves to it, and a person shown by this face gets a new thumbnail.
+  The face's only remaining sighting stays.
+  */
   async removeSighting(auth: AuthDto, id: string, time: number): Promise<VideoFaceSightingsResponseDto> {
     await this.requireAccess({ auth, permission: Permission.FaceDelete, ids: [id] });
     const stored = await this.videoFaceRepository.getSightings(id);
@@ -162,12 +162,12 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * Moves the sighting at `time` out of the face into a new, unassigned face of its own: a face made by hand, so
-   * recognition and re-detection leave it to the user. Its frame is cut from the original at that moment, and its
-   * embedding comes from detecting faces in that frame again, when the detector finds the face there. The old face
-   * loses the sighting as `removeSighting` takes it out. The face's only remaining sighting stays: moving all of a
-   * face is reassigning it.
-   */
+  Moves the sighting at `time` out of the face into a new, unassigned face of its own: a face made by hand, so
+  recognition and re-detection leave it to the user. Its frame is cut from the original at that moment, and its
+  embedding comes from detecting faces in that frame again, when the detector finds the face there. The old face
+  loses the sighting as `removeSighting` takes it out. The face's only remaining sighting stays: moving all of a
+  face is reassigning it.
+  */
   async splitSighting(auth: AuthDto, id: string, time: number): Promise<VideoFaceSightingSplitResponseDto> {
     await this.requireAccess({ auth, permission: Permission.FaceDelete, ids: [id] });
     const stored = await this.videoFaceRepository.getSightings(id);
@@ -229,11 +229,11 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * Moves the sighting at `time` into another face of the same video, such as the face of the person it really is. A
-   * sighting the target had moved away earlier comes back in place, so moving a moment back undoes the move. The
-   * source's last sighting may go too, and the source face with it (`sightings` empty): the person's cover moves to the
-   * target. Both faces need face delete access, a sampled frame row, and the same frame size.
-   */
+  Moves the sighting at `time` into another face of the same video, such as the face of the person it really is. A
+  sighting the target had moved away earlier comes back in place, so moving a moment back undoes the move. The
+  source's last sighting may go too, and the source face with it (`sightings` empty): the person's cover moves to the
+  target. Both faces need face delete access, a sampled frame row, and the same frame size.
+  */
   async moveSighting(
     auth: AuthDto,
     id: string,
@@ -289,10 +289,10 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * Combines faces of one video into one: the face with the most sightings keeps its id and best view and takes every
-   * sighting of the others, which are deleted (a person whose cover was one of them moves to the kept face). Faces
-   * without a sampled frame row are left as they are. Every face needs face delete access.
-   */
+  Combines faces of one video into one: the face with the most sightings keeps its id and best view and takes every
+  sighting of the others, which are deleted (a person whose cover was one of them moves to the kept face). Faces
+  without a sampled frame row are left as they are. Every face needs face delete access.
+  */
   async mergeFaces(auth: AuthDto, faceIds: string[]): Promise<VideoFaceMergeResponseDto> {
     const ids = [...new Set(faceIds)];
     await this.requireAccess({ auth, permission: Permission.FaceDelete, ids });
@@ -368,9 +368,9 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * Cuts the new best view's frame from the original over the face's frame path. Written before the box moves, so the
-   * box never points into another moment's frame for longer than the request.
-   */
+  Cuts the new best view's frame from the original over the face's frame path. Written before the box moves, so the
+  box never points into another moment's frame for longer than the request.
+  */
   private async writeBestFrame(stored: StoredFaceSightings, best: VideoFaceSighting) {
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-best-'));
     try {
@@ -392,10 +392,10 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * The embedding of the face at the sighting's box in a frame, from detecting faces in it again; undefined when
-   * recognition is off, the service fails, or the detector does not find that face (a small one sampling found in a
-   * tile). The new face then has no embedding: it can still be named, but face search does not find it.
-   */
+  The embedding of the face at the sighting's box in a frame, from detecting faces in it again; undefined when
+  recognition is off, the service fails, or the detector does not find that face (a small one sampling found in a
+  tile). The new face then has no embedding: it can still be named, but face search does not find it.
+  */
   private async embeddingAt(framePath: string, sighting: VideoFaceSighting): Promise<string | undefined> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
@@ -415,9 +415,9 @@ export class VideoFaceService extends BaseService {
   }
 
   /**
-   * One frame of the original at `t`, the way sampling extracted it, so a sighting's box fits it. The original is read
-   * in place (a presigned URL on S3, which ffmpeg reads with range requests), never staged: this runs in a request.
-   */
+  One frame of the original at `t`, the way sampling extracted it, so a sighting's box fits it. The original is read
+  in place (a presigned URL on S3, which ffmpeg reads with range requests), never staged: this runs in a request.
+  */
   private async extractFrame(originalPath: string, t: number, framePath: string) {
     const { ffmpeg } = await this.getConfig({ withCache: true });
     const input = await this.backendMedia.getProbeInput(originalPath);
