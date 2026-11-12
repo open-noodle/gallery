@@ -41,8 +41,8 @@ class UploadCallbacks {
 }
 
 // Typed explicitly: through sharedSpaceApiRepositoryProvider -> backgroundSyncProvider -> backupProvider this provider
-// depends on itself, and Dart cannot infer a type across that cycle.
-final foregroundUploadServiceProvider = Provider<ForegroundUploadService>((ref) {
+// depends on itself, and Dart cannot infer a variable type across that cycle, so the variable is declared.
+final Provider<ForegroundUploadService> foregroundUploadServiceProvider = Provider((ref) {
   // ignore: dispose-provided-instances
   return ForegroundUploadService(
     ref.watch(uploadRepositoryProvider),
