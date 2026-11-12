@@ -5,19 +5,19 @@ import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
 import { testAssetDir, utils } from 'src/utils';
 
 /**
- * `noGps` / `noPlaceName` are mutually exclusive members of the ONE location filter (alongside
- * city/state/country) — selecting either replaces the whole group and renders a single chip. This
- * suite covers the `noGps` member end to end (design spec 2026-08-14-no-location-filter, Task 12):
- * selecting it narrows the timeline, a reload keeps it applied, and removing its chip restores
- * every asset.
- *
- * Seeding needs one asset WITH gps and one WITHOUT, or "only the un-geotagged asset remains" would
- * pass vacuously. `thompson-springs.jpg` is the real GPS-tagged fixture the rest of the suite
- * already relies on for reverse-geocoding coverage (see `contextual-filters.e2e-spec.ts` and
- * `utils.cmdkSeedAllSectionTypes`); a bare `utils.createAsset` upload (a generated PNG) carries no
- * EXIF at all, so it has no `asset_exif` row — which is exactly what the server's `noGps` predicate
- * (`NOT EXISTS asset_exif WHERE latitude IS NOT NULL`, see `server/src/utils/database.ts`) matches.
- */
+`noGps` / `noPlaceName` are mutually exclusive members of the ONE location filter (alongside
+city/state/country) — selecting either replaces the whole group and renders a single chip. This
+suite covers the `noGps` member end to end (design spec 2026-08-14-no-location-filter, Task 12):
+selecting it narrows the timeline, a reload keeps it applied, and removing its chip restores
+every asset.
+
+Seeding needs one asset WITH gps and one WITHOUT, or "only the un-geotagged asset remains" would
+pass vacuously. `thompson-springs.jpg` is the real GPS-tagged fixture the rest of the suite
+already relies on for reverse-geocoding coverage (see `contextual-filters.e2e-spec.ts` and
+`utils.cmdkSeedAllSectionTypes`); a bare `utils.createAsset` upload (a generated PNG) carries no
+EXIF at all, so it has no `asset_exif` row — which is exactly what the server's `noGps` predicate
+(`NOT EXISTS asset_exif WHERE latitude IS NOT NULL`, see `server/src/utils/database.ts`) matches.
+*/
 const GPS_FIXTURE = 'metadata/gps-position/thompson-springs.jpg';
 
 async function waitForFilterPanel(page: Page) {
