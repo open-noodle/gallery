@@ -40,6 +40,16 @@ export type Dep = (typeof BASE_SERVICE_DEPENDENCIES)[number] | (typeof GALLERY_R
 // `instances[i]` belongs to `deps[i]`; a repository listed in both dependency lists resolves to one instance.
 export const withGalleryRepositories = (deps: Dep[], instances: unknown[]) => {
   const byDep = new Map<Dep, unknown>(deps.map((dep) => [dep, instances[deps.indexOf(dep)]]));
+  // Every identity merge repoints family data (IdentityMergePropagationService.executePlanInTransaction calls
+  // repointIdentities unconditionally), so a spec that never listed FamilyRepository still needs a stand-in, not
+  // `undefined`. A non-strict automock resolves quietly: those specs never configure repointIdentities, and its
+  // `Promise<void>` result is exactly what an unconfigured mock returns.
+  if (byDep.get(FamilyRepository) === undefined) {
+    byDep.set(
+      FamilyRepository,
+      automock(FamilyRepository, { args: [undefined, { setContext: () => {} }], strict: false }),
+    );
+  }
   const galleryRepositories = GALLERY_REPOSITORY_DEPENDENCIES.map((dep) => byDep.get(dep));
   byDep.set(
     GalleryRepositories,
