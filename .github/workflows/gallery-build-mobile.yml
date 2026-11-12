@@ -254,6 +254,33 @@ jobs:
           name: app-release-aab
           path: mobile/build/app/outputs/bundle/release/app-release.aab
 
+      # Guard: Google Play rejects an update whose 64-bit native libraries are
+      # not 16 KB page-aligned ("does not support 16 KB memory page sizes").
+      # Runs after the artifact upload so a failing bundle can still be inspected.
+      - name: Verify 64-bit native libraries support 16 KB pages
+        working-directory: ./mobile
+        run: |
+          python3 - build/app/outputs/bundle/release/app-release.aab <<'EOF'
+          import struct, sys, zipfile
+          bad = []
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              for name in sorted(z.namelist()):
+                  if not name.endswith('.so') or not any(f'/lib/{abi}/' in f'/{name}' for abi in ('arm64-v8a', 'x86_64')):
+                      continue
+                  b = z.read(name)
+                  phoff = struct.unpack_from('<Q', b, 0x20)[0]
+                  phentsize, phnum = struct.unpack_from('<HH', b, 0x36)
+                  aligns = [struct.unpack_from('<Q', b, phoff + i * phentsize + 48)[0]
+                            for i in range(phnum) if struct.unpack_from('<I', b, phoff + i * phentsize)[0] == 1]
+                  align = min(aligns)
+                  print(f"{'OK ' if align >= 16384 else 'BAD'} {align:>6} {name}")
+                  if align < 16384:
+                      bad.append(name)
+          if bad:
+              print(f"::error::{len(bad)} native libraries are not 16 KB page-aligned: {', '.join(bad)}")
+              sys.exit(1)
+          EOF
+
       - name: Build signed Android APK
         if: inputs.version != ''
         working-directory: ./mobile
