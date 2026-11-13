@@ -516,6 +516,17 @@ edit people dialog then lists one face for them. After any move, undo or combine
 faces as the asset now has them. Added after the third test: a moment moved to B and back left A with three
 one-moment faces, three rows in the edit people dialog.
 
+The button sat behind the film button, where testers did not find it. Naming a second face of someone in the same
+video is when it helps, so the edit people dialog now offers it (`src/lib/gallery/asset-viewer/video-face-combine-offer.ts`,
+one call from upstream's `PersonSidePanel`): after a save on a video, each person the save gave a face to who now has
+more than one face in it gets a toast, "Carol has 2 faces in this video" (`video_person_faces_combine_offer`,
+`_offer_unnamed` for a person with no name), with "Combine into one face" for 10 seconds. It only combines when
+clicked, since combining deletes the emptied faces and has no undo, and only people the save touched are offered, so
+a split the owner chose to keep is not raised again. A new person cannot have a second face yet, so creating one is
+never offered. After combining, the person's open strip moves to the kept face and the asset's people are re-read.
+The offer and the moment strip's Undo toasts close when their button is clicked: left open, a second Combine sent
+faces that no longer existed, and a second Undo sent the restore again. Added after the fourth test.
+
 A strip over several faces (the info panel's, for a person tracked more than once, or given moments one move at a
 time, each its own face) stars one moment: the best view the detector was surest of, not each face's. Found in the
 second test, where two moments moved to one new person both showed a star.
@@ -712,7 +723,11 @@ browser cache.
   joining it (moved back on undo), a face's only moment joining it (split back out to the strip's person on undo),
   falling back to a face of its own when the server refuses. `DetailPanelPeople.gallery.spec.ts` also: a person's
   moments closing once their only face has gone to someone else; "Combine into one face" for the owner only, with
-  more than one face, the strip following the faces left.
+  more than one face, the strip following the faces left. `video-face-combine-offer.spec.ts`: no offer on a photo, for
+  an edit that touched no existing person, or for a split the edit did not touch; the offer for a person with two faces
+  now, combining only on click, closing its toast, moving the open strip to the kept face and re-reading the people;
+  quiet when the faces cannot be read; a failed combine reported, the people still re-read. The Undo toast closing
+  on click is checked in `VideoFaceSightings.spec.ts`.
 - Unit (`video-faces.spec.ts`) also: `takeSightingAt` including the last sighting, `addSightings` appending, restoring
   a moved-away moment in place (as best when it was), `liveSightings`. `video-face.service.spec.ts`: a move between
   faces keeping both best views; the source deleted with its last sighting, identity unlinked, frame deleted, person

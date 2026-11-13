@@ -118,9 +118,13 @@ puts it back where it was.
   or deletes the face after asking.
 - **Several faces for one person can be combined.** If a person still has more than one face in a video, for example
   after a head turn split them in two, click the combine button beside their name in the row. All their moments end
-  up in one face, and the **Edit people** list shows them once.
+  up in one face, and the **Edit people** list shows them once. Combining can't be undone.
+- **Gallery offers to combine when you name a face.** If you name a face in **Edit people** after someone who already
+  has a face in this video, a message says how many faces they now have here, with **Combine into one face**. It stays
+  for 10 seconds and changes nothing unless you click it.
 - **Running face detection on the video again undoes corrections.** It follows everyone through the video afresh, so
-  removed moments come back, and moved ones are added back to the face they came from.
+  removed moments come back, moved ones are added back to the face they came from, and combined faces can split
+  again. A moment moved to a new person keeps that face, so it then shows twice.
 
 Only the video's owner can change moments, on the web. Anyone who can see the video can view them, in the browser or
 the app.
