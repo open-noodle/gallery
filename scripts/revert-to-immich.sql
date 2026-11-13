@@ -848,6 +848,7 @@ UPDATE "system_metadata"
    SET "value" = "value"
      #- '{classification}'
      #- '{memories}'
+     #- '{storage}'
      #- '{storageUsage}'
      #- '{backup,database,s3}'
      #- '{ffmpeg,dataSaver}'
