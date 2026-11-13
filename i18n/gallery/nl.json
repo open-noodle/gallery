@@ -1571,6 +1571,8 @@
   "video_face_sightings_show_at": "Tonen op {time}",
   "video_person_faces_combine": "Samenvoegen tot één gezicht",
   "video_person_faces_combine_failed": "Kan de gezichten niet samenvoegen",
+  "video_person_faces_combine_offer": "{name} heeft {count} gezichten in deze video",
+  "video_person_faces_combine_offer_unnamed": "Deze persoon heeft {count} gezichten in deze video",
   "video_person_faces_combined": "Gezichten samengevoegd",
   "video_person_sightings_none": "Geen momenten vastgelegd in deze video",
   "video_person_sightings_show": "Momenten in deze video tonen",

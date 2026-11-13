@@ -1571,6 +1571,8 @@
   "video_face_sightings_show_at": "Mostra a {time}",
   "video_person_faces_combine": "Unisci in un solo volto",
   "video_person_faces_combine_failed": "Impossibile unire i volti",
+  "video_person_faces_combine_offer": "{name} ha {count} volti in questo video",
+  "video_person_faces_combine_offer_unnamed": "Questa persona ha {count} volti in questo video",
   "video_person_faces_combined": "Volti uniti",
   "video_person_sightings_none": "Nessun momento registrato in questo video",
   "video_person_sightings_show": "Mostra i momenti in questo video",

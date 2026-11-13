@@ -1585,6 +1585,8 @@
   "video_face_sightings_show_at": "跳至 {time}",
   "video_person_faces_combine": "合併為一張人臉",
   "video_person_faces_combine_failed": "無法合併這些人臉",
+  "video_person_faces_combine_offer": "{name} 在此影片中有 {count} 張人臉",
+  "video_person_faces_combine_offer_unnamed": "此人在此影片中有 {count} 張人臉",
   "video_person_faces_combined": "已合併人臉",
   "video_person_sightings_none": "此影片中沒有記錄的時刻",
   "video_person_sightings_show": "顯示此影片中出現的時刻",

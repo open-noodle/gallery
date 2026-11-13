@@ -1577,6 +1577,8 @@
   "video_face_sightings_show_at": "Show at {time}",
   "video_person_faces_combine": "Combine into one face",
   "video_person_faces_combine_failed": "Could not combine the faces",
+  "video_person_faces_combine_offer": "{name} has {count} faces in this video",
+  "video_person_faces_combine_offer_unnamed": "This person has {count} faces in this video",
   "video_person_faces_combined": "Faces combined",
   "video_person_sightings_none": "No moments recorded in this video",
   "video_person_sightings_show": "Show moments in this video",

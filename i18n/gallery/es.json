@@ -1572,6 +1572,8 @@
   "video_face_sightings_show_at": "Mostrar en {time}",
   "video_person_faces_combine": "Combinar en una sola cara",
   "video_person_faces_combine_failed": "No se pudieron combinar las caras",
+  "video_person_faces_combine_offer": "{name} tiene {count} caras en este vídeo",
+  "video_person_faces_combine_offer_unnamed": "Esta persona tiene {count} caras en este vídeo",
   "video_person_faces_combined": "Caras combinadas",
   "video_person_sightings_none": "No hay momentos registrados en este vídeo",
   "video_person_sightings_show": "Mostrar momentos en este vídeo",

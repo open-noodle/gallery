@@ -1589,6 +1589,8 @@
   "video_face_sightings_show_at": "跳转到 {time}",
   "video_person_faces_combine": "合并为一张人脸",
   "video_person_faces_combine_failed": "无法合并这些人脸",
+  "video_person_faces_combine_offer": "{name} 在此视频中有 {count} 张人脸",
+  "video_person_faces_combine_offer_unnamed": "此人在此视频中有 {count} 张人脸",
   "video_person_faces_combined": "已合并人脸",
   "video_person_sightings_none": "此视频中没有记录的时刻",
   "video_person_sightings_show": "显示此视频中出现的时刻",

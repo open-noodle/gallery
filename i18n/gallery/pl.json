@@ -1575,6 +1575,8 @@
   "video_face_sightings_show_at": "Pokaż w {time}",
   "video_person_faces_combine": "Połącz w jedną twarz",
   "video_person_faces_combine_failed": "Nie można połączyć twarzy",
+  "video_person_faces_combine_offer": "{name}: {count, plural, one {# twarz} few {# twarze} many {# twarzy} other {# twarzy}} w tym filmie",
+  "video_person_faces_combine_offer_unnamed": "Ta osoba ma w tym filmie {count, plural, one {# twarz} few {# twarze} many {# twarzy} other {# twarzy}}",
   "video_person_faces_combined": "Połączono twarze",
   "video_person_sightings_none": "Brak zapisanych momentów w tym wideo",
   "video_person_sightings_show": "Pokaż momenty w tym wideo",

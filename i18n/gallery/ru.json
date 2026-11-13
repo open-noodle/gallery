@@ -1572,6 +1572,8 @@
   "video_face_sightings_show_at": "Показать на {time}",
   "video_person_faces_combine": "Объединить в одно лицо",
   "video_person_faces_combine_failed": "Не удалось объединить лица",
+  "video_person_faces_combine_offer": "{name}: {count, plural, one {# лицо} few {# лица} many {# лиц} other {# лица}} в этом видео",
+  "video_person_faces_combine_offer_unnamed": "У этого человека {count, plural, one {# лицо} few {# лица} many {# лиц} other {# лица}} в этом видео",
   "video_person_faces_combined": "Лица объединены",
   "video_person_sightings_none": "В этом видео нет записанных моментов",
   "video_person_sightings_show": "Показать моменты в этом видео",

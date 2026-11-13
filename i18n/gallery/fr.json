@@ -1573,6 +1573,8 @@
   "video_face_sightings_show_at": "Afficher à {time}",
   "video_person_faces_combine": "Fusionner en un seul visage",
   "video_person_faces_combine_failed": "Impossible de fusionner les visages",
+  "video_person_faces_combine_offer": "{name} a {count} visages dans cette vidéo",
+  "video_person_faces_combine_offer_unnamed": "Cette personne a {count} visages dans cette vidéo",
   "video_person_faces_combined": "Visages fusionnés",
   "video_person_sightings_none": "Aucun moment enregistré dans cette vidéo",
   "video_person_sightings_show": "Afficher les moments dans cette vidéo",
