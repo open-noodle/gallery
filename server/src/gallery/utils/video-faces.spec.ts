@@ -2,16 +2,25 @@ import { describe, expect, it } from 'vitest';
 import {
   FaceTracker,
   acceptTrack,
+  addSightings,
+  detectionAt,
   findAgain,
+  findSightingAt,
   isSharpenTimeFor,
+  liveSightings,
   matchExistingFaces,
   mergeDetections,
   normalize,
   planSampleTimes,
   planSharpenTimes,
   planTiles,
+  removeSightingAt,
+  restoreSightingAt,
   sampleIntervalFor,
   sightingQuality,
+  sightingsForPlayer,
+  splitSightingAt,
+  takeSightingAt,
   trackEmbedding,
   widenSmallFace,
   withSighting,
@@ -419,5 +428,193 @@ describe('widenSmallFace', () => {
   it('stays inside the frame', () => {
     expect(widenSmallFace({ x1: 0, y1: 0, x2: 20, y2: 20 }, frame)).toMatchObject({ x1: 0, y1: 0 });
     expect(widenSmallFace({ x1: 1900, y1: 1060, x2: 1920, y2: 1080 }, frame)).toMatchObject({ x2: 1920, y2: 1080 });
+  });
+});
+
+describe('sightings on the player timeline', () => {
+  const box = { x1: 10, y1: 10, x2: 50, y2: 50 };
+  const fraction = { x1: 0.0391, y1: 0.0694, x2: 0.1953, y2: 0.3472 };
+  const stored = {
+    sightings: [
+      { t: 12.5, score: 0.9, ...box },
+      { t: 2.25, score: 0.8, ...box },
+      { t: 30, score: 0.7, ...box },
+    ],
+    timeSeconds: 12.5,
+    imageWidth: 256,
+    imageHeight: 144,
+    trimStart: null,
+    trimEnd: null,
+  };
+
+  it('lists every sighting in time order, with the best view marked', () => {
+    expect(sightingsForPlayer(stored)).toEqual([
+      { time: 2.25, score: 0.8, isBest: false, box: fraction },
+      { time: 12.5, score: 0.9, isBest: true, box: fraction },
+      { time: 30, score: 0.7, isBest: false, box: fraction },
+    ]);
+  });
+
+  it('shifts times by the trim start and leaves out sightings outside the trim', () => {
+    expect(sightingsForPlayer({ ...stored, trimStart: 2.5, trimEnd: 20 })).toEqual([
+      { time: 10, score: 0.9, isBest: true, box: fraction },
+    ]);
+  });
+
+  it('gives each box as fractions of the frame, kept inside it', () => {
+    const [sighting] = sightingsForPlayer({
+      ...stored,
+      sightings: [{ t: 1, score: 1, x1: -8, y1: 36, x2: 128, y2: 150 }],
+    });
+    expect(sighting.box).toEqual({ x1: 0, y1: 0.25, x2: 0.5, y2: 1 });
+  });
+
+  it('lists nothing when the frame size is unknown, since no box could be placed', () => {
+    expect(sightingsForPlayer({ ...stored, imageWidth: 0 })).toEqual([]);
+    expect(findSightingAt({ ...stored, imageHeight: 0 }, 12.5)).toBeUndefined();
+  });
+
+  it('rounds times to the millisecond', () => {
+    const [sighting] = sightingsForPlayer({ ...stored, sightings: [{ t: 1.23456, score: 1, ...box }], trimStart: 0.1 });
+    expect(sighting.time).toBe(1.135);
+  });
+
+  it('finds a sighting by the time it was listed at', () => {
+    expect(findSightingAt(stored, 30)).toMatchObject({ t: 30 });
+    expect(findSightingAt({ ...stored, trimStart: 2.5, trimEnd: 20 }, 10)).toMatchObject({ t: 12.5 });
+  });
+
+  it('finds nothing at a time no sighting is listed at', () => {
+    expect(findSightingAt(stored, 13)).toBeUndefined();
+    // Under a trim from 5 s, the sighting at 2.25 s is not listed, so its old time finds nothing.
+    expect(findSightingAt({ ...stored, trimStart: 5 }, 2.25)).toBeUndefined();
+    expect(findSightingAt({ ...stored, trimStart: 5 }, 0)).toBeUndefined();
+  });
+
+  it('leaves out removed sightings, and finds nothing at their time', () => {
+    const withRemoved = { ...stored, sightings: [stored.sightings[0], { ...stored.sightings[1], removed: true }] };
+    expect(sightingsForPlayer(withRemoved).map(({ time }) => time)).toEqual([12.5]);
+    expect(findSightingAt(withRemoved, 2.25)).toBeUndefined();
+  });
+});
+
+describe('removing and restoring a sighting', () => {
+  const box = { x1: 10, y1: 10, x2: 50, y2: 50 };
+  const best = { t: 12.5, score: 0.7, ...box };
+  const early = { t: 2.25, score: 0.95, ...box };
+  const late = { t: 30, score: 0.8, ...box };
+  const stored = {
+    sightings: [best, early, late],
+    timeSeconds: 12.5,
+    imageWidth: 256,
+    imageHeight: 144,
+    trimStart: null,
+    trimEnd: null,
+  };
+
+  it('marks a sighting removed and keeps the best view', () => {
+    expect(removeSightingAt(stored, 30)).toEqual({ sightings: [best, early, { ...late, removed: true }] });
+  });
+
+  it('moves the best view to the highest score left when the best one goes', () => {
+    expect(removeSightingAt(stored, 12.5)).toEqual({
+      sightings: [{ ...best, removed: true, wasBest: true }, early, late],
+      best: early,
+    });
+  });
+
+  it('prefers a sighting inside the trim for the new best view', () => {
+    // Under a trim from 5 s the best (12.5 s) is at 7.5 s on the player, and the higher-scoring 2.25 s is cut.
+    expect(removeSightingAt({ ...stored, trimStart: 5 }, 7.5)).toMatchObject({ best: late });
+  });
+
+  it("keeps a face's last sighting", () => {
+    const lastOne = { ...stored, sightings: [best, { ...early, removed: true }, { ...late, removed: true }] };
+    expect(removeSightingAt(lastOne, 12.5)).toBe('last');
+  });
+
+  it('finds nothing to remove at a time with no sighting shown', () => {
+    expect(removeSightingAt(stored, 13)).toBeUndefined();
+    expect(removeSightingAt({ ...stored, sightings: [best, { ...late, removed: true }] }, 30)).toBeUndefined();
+    expect(removeSightingAt({ ...stored, trimEnd: 20 }, 30)).toBeUndefined();
+  });
+
+  it('brings a removed sighting back as it was', () => {
+    const removed = removeSightingAt(stored, 30) as { sightings: typeof stored.sightings };
+    expect(restoreSightingAt({ ...stored, sightings: removed.sightings }, 30)).toEqual({
+      sightings: [best, early, late],
+    });
+  });
+
+  it('brings a removed best view back as the best view', () => {
+    const { sightings } = removeSightingAt(stored, 12.5) as { sightings: typeof stored.sightings };
+    expect(restoreSightingAt({ ...stored, sightings, timeSeconds: 2.25 }, 12.5)).toEqual({
+      sightings: [best, early, late],
+      best,
+    });
+  });
+
+  it('moves a sighting out as removing would, handing over the sighting as it was found', () => {
+    expect(splitSightingAt(stored, 30)).toEqual({ sightings: [best, early, { ...late, removed: true }], moved: late });
+    expect(splitSightingAt(stored, 12.5)).toEqual({
+      sightings: [{ ...best, removed: true, wasBest: true }, early, late],
+      best: early,
+      moved: best,
+    });
+  });
+
+  it("does not move a face's last sighting, or one that is not shown", () => {
+    expect(splitSightingAt({ ...stored, sightings: [best] }, 12.5)).toBe('last');
+    expect(splitSightingAt(stored, 13)).toBeUndefined();
+  });
+
+  it('takes a sighting to move into another face, the last one included', () => {
+    expect(takeSightingAt(stored, 30)).toEqual({
+      moved: late,
+      change: { sightings: [best, early, { ...late, removed: true }] },
+    });
+    expect(takeSightingAt({ ...stored, sightings: [best] }, 12.5)).toEqual({ moved: best });
+    expect(takeSightingAt(stored, 13)).toBeUndefined();
+  });
+
+  it('adds sightings moved in, appending new moments and keeping the best view', () => {
+    const moved = { t: 40, score: 0.99, ...box };
+    expect(addSightings(stored, [moved, { ...early, removed: true, wasBest: true }])).toEqual({
+      sightings: [best, early, late, moved],
+    });
+  });
+
+  it('brings back in place a moment it had moved away, as the best view again if it was that', () => {
+    const away = {
+      ...stored,
+      sightings: [{ ...best, removed: true, wasBest: true }, early, { ...late, removed: true }],
+    };
+    expect(addSightings(away, [late])).toEqual({ sightings: [{ ...best, removed: true, wasBest: true }, early, late] });
+    expect(addSightings(away, [best])).toEqual({ sightings: [best, early, { ...late, removed: true }], best });
+  });
+
+  it('lists the sightings a face shows, for merging it into another', () => {
+    expect(liveSightings({ ...stored, sightings: [best, { ...late, removed: true }] })).toEqual([best]);
+  });
+
+  it('finds nothing to restore at a sighting that was not removed', () => {
+    expect(restoreSightingAt(stored, 30)).toBeUndefined();
+    expect(restoreSightingAt(stored, 13)).toBeUndefined();
+  });
+});
+
+describe('detectionAt', () => {
+  const sightingBox = { x1: 100, y1: 100, x2: 200, y2: 200 };
+
+  it('picks the detection overlapping the box most', () => {
+    const near = { boundingBox: { x1: 120, y1: 110, x2: 220, y2: 210 }, id: 'near' };
+    const nearest = { boundingBox: { x1: 102, y1: 98, x2: 198, y2: 202 }, id: 'nearest' };
+    const elsewhere = { boundingBox: { x1: 600, y1: 100, x2: 700, y2: 200 }, id: 'elsewhere' };
+    expect(detectionAt([near, elsewhere, nearest], sightingBox)?.id).toBe('nearest');
+  });
+
+  it('finds nothing when no detection overlaps the box enough', () => {
+    expect(detectionAt([{ boundingBox: { x1: 180, y1: 180, x2: 280, y2: 280 } }], sightingBox)).toBeUndefined();
+    expect(detectionAt([], sightingBox)).toBeUndefined();
   });
 });

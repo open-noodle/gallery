@@ -58,9 +58,76 @@ people found to 24. It takes about five times as long per frame, so leave it off
   it is seen clearly enough across several frames.
 - **A head turn can split one person in two.** If someone turns from facing the camera to side-on between frames,
   Gallery may not be sure it is the same person and keep both views. Give both the same name.
+- **You can see every moment a person appears,** and jump the video to each one. See
+  [Seeing where someone appears](#seeing-where-someone-appears).
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no
 frame will show them clearly.
+
+## Seeing where someone appears
+
+Gallery remembers every moment it saw each person, not just the clearest one. To see them, open a video, open the
+info panel, and click the film button on a person's picture under **People**. A row of their face at each moment opens
+under the pictures, in time order, with the clearest view starred.
+
+Click a moment to jump the video there. The video pauses on that frame with a white box around the person's face and
+the rest of the picture dimmed, the way a photo highlights a face. The box goes away when you play the video, drag the
+timeline elsewhere, or pick another moment.
+
+<img src={require('./img/video-faces-moments.webp').default} alt='The info panel lists Alex’s moments as a row of face crops; the 8:38 crop is selected, and the video is paused at 8:38 with a white box around Alex’s face' title='A person’s moments in the info panel, with the video paused on one of them' />
+
+The same row appears when you name a face in a video: click the pencil next to **People**, then the pencil on a face.
+It helps when one crop is not enough to tell who someone is, such as two people who look alike or a small face in a
+crowd.
+
+<img src={require('./img/video-faces-picker.webp').default} alt='The Select face panel for an unnamed face shows its 50 moments above the people search; the video is paused at 2:11 with a white box around the face' title='Naming a face, with its moments above the people to choose from' />
+
+### In the mobile app
+
+Open a video and swipe up to its details. Under **People**, each person who appears in the video has a small film
+badge on the top-left of their picture. Tapping the picture still opens the person, as before. Tap the badge to open
+a row of their moments under the pictures, then tap a moment: the video above pauses there with the same white box
+around their face. Tap the badge again, or the close button, to close the row.
+
+<img src={require('./img/video-faces-mobile-badge.webp').default} width="45%" alt='The People row in a video’s details, with a small film badge on the top-left of each person’s picture' title='The film badge on each person who appears in the video' />
+<img src={require('./img/video-faces-mobile-moments.webp').default} width="45%" alt='Alex’s badge is on and his 48 moments are listed under People; the 0:29 moment is selected, and the video above is paused there with a white box around his face' title='A person’s moments, with the video paused on one of them' />
+
+The app shows moments but doesn't change them: to correct a moment, use the web. People shown through a shared space
+don't get the badge in the app yet.
+
+## Correcting a face
+
+Sometimes a moment shows someone else: two people standing in the same spot a moment apart can be followed as one
+person. The video's owner can fix that from the same row. Each moment has a menu in its corner:
+
+<img src={require('./img/video-faces-moment-menu.webp').default} width="60%" alt='The menu on a moment: Move to another person, Move to a new person, Move to unassigned, and Remove the moment' title='The menu on a moment' />
+
+| Option                  | What it does                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Move to another person… | Gives the moment to someone you pick. If they already appear in this video, it joins their face there. |
+| Move to a new person    | Starts a new, unnamed person with this moment. Name them from the **People** list.                     |
+| Move to unassigned      | Takes the moment out of this person and leaves it unnamed.                                             |
+| Remove the moment       | Takes the moment out of this person entirely.                                                          |
+
+Each change shows a message with **Undo** for a few seconds. Moving a moment back to the person it came from also
+puts it back where it was.
+
+- **The starred moment can move too.** The next clearest moment then becomes the face's picture, and the person's
+  thumbnail is updated if it came from this face.
+- **A person's only moment stands for their whole face.** Its menu moves the face to another person or a new person,
+  or deletes the face after asking.
+- **Several faces for one person can be combined.** If a person still has more than one face in a video, for example
+  after a head turn split them in two, click the combine button beside their name in the row. All their moments end
+  up in one face, and the **Edit people** list shows them once. Combining can't be undone.
+- **Gallery offers to combine when you name a face.** If you name a face in **Edit people** after someone who already
+  has a face in this video, a message says how many faces they now have here, with **Combine into one face**. It stays
+  for 10 seconds and changes nothing unless you click it.
+- **Running face detection on the video again undoes corrections.** It follows everyone through the video afresh, so
+  removed moments come back, moved ones are added back to the face they came from, and combined faces can split
+  again. A moment moved to a new person keeps that face, so it then shows twice.
+
+Only the video's owner can change moments, on the web. Anyone who can see the video can view them, in the browser or
+the app.
 
 ## How long it takes
 

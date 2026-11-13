@@ -425,11 +425,19 @@ export class BackendMediaServer {
     return { previewPath: framePath, ...widenSmallFace({ x1, y1, x2, y2 }, { width: oldWidth, height: oldHeight }) };
   }
 
-  async generateFaceThumbnailResponse(face: AssetFace, sourcePath: string): Promise<ImmichMediaResponse> {
+  /**
+  `widen` says the source is a sampled video frame; left out, that is the case when it is the face's stored best
+  frame. A sighting's frame, extracted for one request, passes it explicitly.
+  */
+  async generateFaceThumbnailResponse(
+    face: AssetFace,
+    sourcePath: string,
+    { widen }: { widen?: boolean } = {},
+  ): Promise<ImmichMediaResponse> {
     const { image } = await this.deps.getConfig({ withCache: true });
     const faceBox = { x1: face.boundingBoxX1, y1: face.boundingBoxY1, x2: face.boundingBoxX2, y2: face.boundingBoxY2 };
-    // A video face cut from its best frame is widened when small, as its person thumbnail is.
-    const isVideoFrame = sourcePath === (await this.deps.videoFaceRepository.getFramePath(face.id));
+    // A video face cut from a sampled frame is widened when small, as its person thumbnail is.
+    const isVideoFrame = widen ?? sourcePath === (await this.deps.videoFaceRepository.getFramePath(face.id));
     const cropBox = isVideoFrame
       ? widenSmallFace(faceBox, { width: face.imageWidth, height: face.imageHeight })
       : faceBox;

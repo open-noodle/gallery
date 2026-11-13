@@ -239,6 +239,189 @@ describe(VideoFaceRepository.name, () => {
     });
   });
 
+  describe('getSightings', () => {
+    it("returns a face's sightings with the video's current trim and original", async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const sightings = [
+        { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 },
+        { t: 7.5, x1: 300, y1: 200, x2: 360, y2: 270, score: 0.6 },
+      ];
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings })],
+      });
+
+      await expect(sut.getSightings(faceId)).resolves.toEqual({
+        sightings,
+        timeSeconds: 3.25,
+        framePath: `thumbs/owner/aa/bb/asset_faces/${faceId}.jpeg`,
+        assetId: asset.id,
+        imageWidth: 1920,
+        imageHeight: 1080,
+        originalPath: asset.originalPath,
+        trimStart: null,
+        trimEnd: null,
+      });
+
+      await defaultDatabase
+        .insertInto('asset_video_trim')
+        .values({ assetId: asset.id, startTime: 2, endTime: 9, duration: 7 })
+        .execute();
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ trimStart: 2, trimEnd: 9 });
+    });
+
+    it('returns nothing for a face without a frame, an unknown face, or one on a trashed video', async () => {
+      const { ctx, user, asset, sut } = await setup();
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const { asset: trashed } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video, deletedAt: new Date() });
+      const trashedFaceId = newUuid();
+      await sut.apply({
+        insert: [{ id: trashedFaceId, assetId: trashed.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(trashedFaceId)],
+      });
+
+      await expect(sut.getSightings(assetFace.id)).resolves.toBeUndefined();
+      await expect(sut.getSightings(newUuid())).resolves.toBeUndefined();
+      await expect(sut.getSightings(trashedFaceId)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('setSightings', () => {
+    it("writes the sightings, and with a new best view moves the face's box and best time in one go", async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const kept = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const next = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings: [kept, next] })],
+      });
+
+      await sut.setSightings(faceId, [{ ...kept, removed: true }, next]);
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({
+        sightings: [{ ...kept, removed: true }, next],
+        timeSeconds: 3.25,
+      });
+
+      await sut.setSightings(faceId, [{ ...kept, removed: true, wasBest: true }, next], {
+        timeSeconds: 7.5,
+        box: { boundingBoxX1: 300, boundingBoxY1: 220, boundingBoxX2: 360, boundingBoxY2: 290 },
+      });
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ timeSeconds: 7.5 });
+      const face = await defaultDatabase
+        .selectFrom('asset_face')
+        .select(['boundingBoxX1', 'boundingBoxY1', 'boundingBoxX2', 'boundingBoxY2', 'imageWidth'])
+        .where('id', '=', faceId)
+        .executeTakeFirstOrThrow();
+      expect(face).toEqual({
+        boundingBoxX1: 300,
+        boundingBoxY1: 220,
+        boundingBoxX2: 360,
+        boundingBoxY2: 290,
+        imageWidth: 1920,
+      });
+    });
+  });
+
+  describe('splitSighting', () => {
+    it('moves a sighting into a new unassigned face made by hand, with its frame and embedding', async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const newFaceId = newUuid();
+      const kept = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const moved = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings: [kept, moved] })],
+      });
+
+      await sut.splitSighting({
+        faceId,
+        sightings: [kept, { ...moved, removed: true }],
+        face: {
+          id: newFaceId,
+          assetId: asset.id,
+          imageWidth: 1920,
+          imageHeight: 1080,
+          boundingBoxX1: 300,
+          boundingBoxY1: 220,
+          boundingBoxX2: 360,
+          boundingBoxY2: 290,
+        },
+        frame: frame(newFaceId, { timeSeconds: 7.5, quality: 0, sightings: [moved] }),
+        embedding: `[${Array.from({ length: 512 }, () => 0.01).join(',')}]`,
+      });
+
+      await expect(sut.getSightings(faceId)).resolves.toMatchObject({ sightings: [kept, { ...moved, removed: true }] });
+      await expect(sut.getSightings(newFaceId)).resolves.toMatchObject({ sightings: [moved], timeSeconds: 7.5 });
+      const face = await defaultDatabase
+        .selectFrom('asset_face')
+        .leftJoin('face_search', 'face_search.faceId', 'asset_face.id')
+        .select([
+          'asset_face.sourceType',
+          'asset_face.personGroupId',
+          'asset_face.boundingBoxX1',
+          'face_search.faceId as searchFaceId',
+        ])
+        .where('asset_face.id', '=', newFaceId)
+        .executeTakeFirstOrThrow();
+      expect(face).toEqual({ sourceType: 'manual', personGroupId: null, boundingBoxX1: 300, searchFaceId: newFaceId });
+    });
+  });
+
+  describe('moveSightings', () => {
+    it('writes both faces, repoints a person shown by a deleted face, and deletes it with its frame row', async () => {
+      const { ctx, user, asset, sut } = await setup();
+      const kept = newUuid();
+      const gone = newUuid();
+      const a = { t: 3.25, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.81 };
+      const b = { t: 7.5, x1: 300, y1: 220, x2: 360, y2: 290, score: 0.6 };
+      await sut.apply({
+        insert: [
+          { id: kept, assetId: asset.id, ...box },
+          { id: gone, assetId: asset.id, ...box, boundingBoxX1: 300, boundingBoxX2: 360 },
+        ],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(kept, { sightings: [a] }), frame(gone, { timeSeconds: 7.5, sightings: [b] })],
+      });
+      const { person } = await ctx.newPerson({ ownerId: user.id, faceAssetId: gone });
+
+      const repointed = await sut.moveSightings({
+        faces: [{ faceId: kept, sightings: [a, b] }],
+        faceId: kept,
+        deleteFaceIds: [gone],
+      });
+
+      expect(repointed).toEqual([{ ownerId: user.id, personGroupId: person.personGroupId }]);
+      await expect(sut.getSightings(kept)).resolves.toMatchObject({ sightings: [a, b] });
+      await expect(sut.getSightings(gone)).resolves.toBeUndefined();
+      const cover = await defaultDatabase
+        .selectFrom('person')
+        .select('faceAssetId')
+        .where('ownerId', '=', user.id)
+        .where('personGroupId', '=', person.personGroupId)
+        .executeTakeFirstOrThrow();
+      expect(cover.faceAssetId).toBe(kept);
+      const left = await defaultDatabase.selectFrom('asset_face').select('id').where('id', '=', gone).execute();
+      expect(left).toEqual([]);
+    });
+  });
+
   describe('storage migration', () => {
     it('streams, counts and re-points best frames with the person thumbnails', async () => {
       const { asset, sut } = await setup();
