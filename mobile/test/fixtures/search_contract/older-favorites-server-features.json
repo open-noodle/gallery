@@ -17,6 +17,7 @@
       "duplicateDetection": false,
       "email": false,
       "facialRecognition": false,
+      "familyTree": false,
       "importFaces": false,
       "localTakenRange": true,
       "map": true,

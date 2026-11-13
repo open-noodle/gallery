@@ -18,7 +18,11 @@
   import { t } from 'svelte-i18n';
   import { page } from '$app/state';
 
-  type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
+  // `familyRelationLabel` is not (yet) part of the generated `PersonResponseDto`; no data source
+  // populates it today, so the relation line stays inert until something wires it in. When present, it is
+  // ALREADY the fully-derived, viewer-specific string ("your niece") computed server-side; this
+  // component only ever renders it, never derives it (see the family-relationships design's D4).
+  type AssetPerson = NonNullable<AssetResponseDto['people']>[number] & { familyRelationLabel?: string | null };
 
   /** One person in the detail panel's People row: a filter chip, or the person-page link when there is no filter to offer. */
   type Props = {
@@ -142,6 +146,23 @@
       </div>
     {/if}
     <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
+    {#if person.familyRelationLabel}
+      <!--
+        A3: an ADDED line, not a replacement: the age line below stays regardless. Rows
+        will differ in height depending on who has a birthdate and who has a known
+        relation; CSS grid equalises within a row, so that reads as normal variation, not
+        breakage. `truncate` (not a reserved second line) is what keeps a long relation
+        from wrapping and blowing out row height at the crowded grid-cols-4 breakpoint.
+      -->
+      <p
+        class="truncate font-light {compact ? 'text-xs' : ''}"
+        title={person.familyRelationLabel}
+        aria-label={$t('family_strip_relation_label', { values: { relation: person.familyRelationLabel } })}
+        data-testid="detail-panel-person-relation"
+      >
+        {person.familyRelationLabel}
+      </p>
+    {/if}
     {#if person.birthDate && person.formattedAge}
       <p class="font-light {compact ? 'text-xs' : ''}" title={person.formattedBirthDate!}>
         {person.formattedAge}

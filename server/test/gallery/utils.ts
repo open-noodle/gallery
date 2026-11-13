@@ -26,6 +26,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
@@ -68,6 +69,7 @@ export type GalleryServiceOverrides = {
   spatialScene: SpatialSceneRepository;
   dataSaverVideo: DataSaverVideoRepository;
   videoFace: VideoFaceRepository;
+  family: FamilyRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -103,6 +105,8 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
     spatialScene: automock(SpatialSceneRepository, { strict: false }),
     dataSaverVideo: automock(DataSaverVideoRepository, { strict: false }),
     videoFace: automock(VideoFaceRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    family: automock(FamilyRepository, { args: [, loggerMock], strict: false }),
   };
 
   mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
@@ -149,4 +153,5 @@ export const newGalleryRepositories = (
     overrides.spatialScene || (mocks.spatialScene as As<SpatialSceneRepository>),
     overrides.dataSaverVideo || (mocks.dataSaverVideo as As<DataSaverVideoRepository>),
     overrides.videoFace || (mocks.videoFace as As<VideoFaceRepository>),
+    overrides.family || (mocks.family as As<FamilyRepository>),
   );
