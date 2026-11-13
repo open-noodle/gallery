@@ -82,11 +82,11 @@ without reprocessing anything.
 Three models are available. All three produce depth maps the same way, so the choice is about
 quality against the time each photo takes.
 
-| Model                                 | Download (CPU / GPU) | Best for                                           |
-| ------------------------------------- | -------------------- | -------------------------------------------------- |
-| `depth-anything-v2-small` _(default)_ | 29 MB / 101 MB       | Almost everyone. Runs on any CPU.                  |
-| `distill-any-depth-small`             | 29 MB / 101 MB       | The same cost as the default, from a newer method. |
-| `distill-any-depth-large`             | 1.3 GB / 1.3 GB      | Servers with a GPU. Sharper on fine detail.        |
+| Model                                 | Download (CPU / GPU) | Best for                                              |
+| ------------------------------------- | -------------------- | ----------------------------------------------------- |
+| `depth-anything-v2-small` _(default)_ | 29 MB / 101 MB       | Almost everyone. Runs on any CPU.                     |
+| `distill-any-depth-small`             | 29 MB / 101 MB       | The same cost as the default, from a newer method.    |
+| `distill-any-depth-large`             | 1.3 GB / 1.3 GB      | Servers with a dedicated GPU. Sharper on fine detail. |
 
 The model downloads on first use and is cached afterwards. For the two small models, a server
 without [hardware acceleration](/features/ml-hardware-acceleration) downloads a smaller copy that
@@ -118,8 +118,26 @@ background and can be paused from **Administration** > **Jobs**.
 On a processor with spare cores, more threads per model help: raise
 `MACHINE_LEARNING_MODEL_INTRA_OP_THREADS` (see [Environment Variables](/install/environment-variables)).
 With four to eight threads the default model took 0.5 to 0.65 seconds a photo on an Apple M2. Choose
-`distill-any-depth-large` only if the machine learning service runs on a GPU (see
+`distill-any-depth-large` only if the machine learning service runs on a dedicated GPU (see
 [Machine Learning Hardware Acceleration](/features/ml-hardware-acceleration)).
+
+### Integrated GPUs
+
+An integrated GPU, such as the Intel graphics built into many desktop, laptop and mini PC
+processors, has no memory of its own and borrows the server's. There, the depth model needs far
+more memory than it does on the processor. On an Intel HD Graphics 630 (the GPU in a Core
+i7-7700K), the default model took 2 to 6 GB while a photo was processed, depending on its shape,
+against about 1.5 GB on the processor. Gallery keeps only one photo shape ready at a time, so
+allow the machine learning service at least 8 GB if Spatial Scene runs on an integrated GPU.
+Moving between shapes, for example from a landscape photo to a portrait one, adds a second or two.
+
+On an older integrated GPU like that one, the processor is just as fast. To run Spatial Scene on
+the processor while smart search, face recognition and OCR keep the GPU, set
+`MACHINE_LEARNING_DEPTH_CPU=true` on the machine learning container. A small model then also
+downloads its smaller copy.
+
+`distill-any-depth-large` does not fit on an integrated GPU: preparing it for a single photo shape
+needed more than 12 GB.
 
 ## Limitations
 
