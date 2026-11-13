@@ -40,12 +40,17 @@ const face = (id: string, person?: { id: string; name: string }) =>
 const carol = { id: 'person-c', name: 'Carol' };
 const dan = { id: 'person-d', name: 'Dan' };
 
-type OfferToast = { description: string; button: { label: string; onclick: () => Promise<void> } };
+type OfferButton = { label: string; onclick: () => Promise<void> };
+type OfferToast = { description: string; button: (close: () => void) => OfferButton };
+/** The offers shown, each with its button built against a close spy, as the toast panel builds it. */
 const offers = () =>
   vi
     .mocked(toastManager.primary)
     .mock.calls.filter(([toast]) => typeof toast === 'object' && 'button' in toast)
-    .map(([toast, options]) => ({ toast: toast as OfferToast, options }));
+    .map(([toast, options]) => {
+      const close = vi.fn();
+      return { button: (toast as OfferToast).button(close), close, options };
+    });
 
 describe('facesToCombine', () => {
   it('lists only the given people who have more than one face', () => {
@@ -83,8 +88,9 @@ describe('offerVideoFaceCombine', () => {
     expect(offer.options).toEqual({ timeout: OFFER_TIMEOUT });
     expect(mergeVideoFacesMock).not.toHaveBeenCalled();
 
-    await offer.toast.button.onclick();
+    await offer.button.onclick();
 
+    expect(offer.close).toHaveBeenCalledOnce();
     expect(mergeVideoFacesMock).toHaveBeenCalledWith({ videoFaceMergeDto: { faceIds: ['f1', 'f2'] } });
     expect(refreshAssetPeopleMock).toHaveBeenCalledWith('a1');
     expect(videoPersonSightings.current?.faceIds).toEqual(['f2']);
@@ -112,7 +118,7 @@ describe('offerVideoFaceCombine', () => {
     mergeVideoFacesMock.mockRejectedValue(new Error('nope'));
 
     await offerVideoFaceCombine({ assetId: 'a1', assetType: AssetTypeEnum.Video, personIds: ['person-c'] });
-    await offers()[0].toast.button.onclick();
+    await offers()[0].button.onclick();
 
     expect(handleErrorMock).toHaveBeenCalledOnce();
     expect(refreshAssetPeopleMock).toHaveBeenCalledWith('a1');

@@ -78,11 +78,15 @@ export const offerVideoFaceCombine = async ({
         description: name
           ? $t('video_person_faces_combine_offer', { values: { name, count: faceIds.length } })
           : $t('video_person_faces_combine_offer_unnamed', { values: { count: faceIds.length } }),
-        button: {
+        // The toast closes on click: its faces are gone once combined, so a second click could only fail.
+        button: (close) => ({
           label: $t('video_person_faces_combine'),
           color: 'secondary',
-          onclick: () => combine(assetId, personId, faceIds),
-        },
+          onclick: () => {
+            close();
+            return combine(assetId, personId, faceIds);
+          },
+        }),
       },
       { timeout: OFFER_TIMEOUT },
     );

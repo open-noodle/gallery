@@ -223,12 +223,17 @@ describe('VideoFaceSightings', () => {
       await userEvent.click(page.elementLocator(menu).getByRole('menuitem', { name: new RegExp(`^${item}`) }));
     };
 
+    type ToastButton = { onclick: () => Promise<void> };
     const lastToast = () => {
       const [toast, options] = toastPrimary.mock.calls.at(-1)!;
-      return { ...toast, options } as {
+      // The button is built with the toast's close, so clicking Undo also closes it.
+      const close = vi.fn();
+      const { button } = toast as { button: ToastButton | ((close: () => void) => ToastButton) };
+      return { ...toast, options, close, button: typeof button === 'function' ? button(close) : button } as {
         description: string;
         options: { timeout: number };
-        button: { onclick: () => Promise<void> };
+        close: ReturnType<typeof vi.fn>;
+        button: ToastButton;
       };
     };
 
@@ -269,6 +274,7 @@ describe('VideoFaceSightings', () => {
         expect(toast.options).toEqual({ timeout: 5000 });
         await toast.button.onclick();
 
+        expect(toast.close).toHaveBeenCalledOnce();
         expect(restoreAssetFaceSighting).toHaveBeenCalledWith({ id: 'face-1', time: 8.5 });
         await vi.waitFor(() => expect(tilesShown()).toEqual(['0:08', '0:31']));
       });
