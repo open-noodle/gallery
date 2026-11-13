@@ -29,6 +29,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { albumStackBadge } from 'src/gallery/utils/album-stack-collapse.js';
+import { externalAssetOfflineUpdate } from 'src/gallery/utils/library-offline.js';
 import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { stackHasSeveralLiveAssets } from 'src/gallery/utils/stack-badge.js';
@@ -1291,7 +1292,6 @@ export class AssetRepository {
         return rows;
       };
 
-      const deletedAt = new Date();
       let count = 0;
       for (let rows = await fetchBatch(); rows.length > 0; rows = await fetchBatch()) {
         const ids = rows.filter(({ originalPath }) => !isInLibrary(originalPath)).map(({ id }) => id);
@@ -1302,7 +1302,7 @@ export class AssetRepository {
         // a concurrent check of the same library may have offlined these rows after the cursor was declared
         const { numUpdatedRows } = await trx
           .updateTable('asset')
-          .set({ isOffline: true, deletedAt })
+          .set(externalAssetOfflineUpdate)
           .where('id', '=', anyUuid(ids))
           .where('isOffline', '=', false)
           .executeTakeFirst();
