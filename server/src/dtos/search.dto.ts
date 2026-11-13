@@ -442,6 +442,7 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+    aspectClasses: GallerySmartSearchExtension.aspectClasses,
   })
   .meta({ id: 'SmartSearchFacetsDto' });
 
