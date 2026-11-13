@@ -8,7 +8,7 @@ Currently an external library can only belong to a single user which is selected
 
 External libraries track assets stored in the filesystem outside of Gallery. When the external library is scanned, Gallery will load videos and photos from disk and create the corresponding assets. These assets will then be shown in the main timeline, and they will look and behave like any other asset, including viewing on the map, adding to albums, etc. Later, if a file is modified outside of Gallery, you need to scan the library for the changes to show up.
 
-If an external asset is deleted from disk, Gallery will move it to trash on rescan. To restore the asset, you need to restore the original file. After 30 days the file will be removed from trash, and any changes to metadata within Gallery will be lost.
+If an external asset disappears or becomes unreadable, a rescan marks it offline without moving it to trash. Gallery preserves its database record, thumbnails, and metadata. Restore access to the original at the same path and rescan to bring the same asset online again. Offline status alone does not authorize automatic permanent deletion; explicitly trashed assets still follow the configured trash retention policy.
 
 :::caution
 
@@ -26,7 +26,7 @@ Due to aggressive caching it can take some time for a refreshed asset to appear 
 
 External libraries use import paths to determine which files to scan. Each library can have multiple import paths so that files from different locations can be added to the same library. Import paths are scanned recursively, and if a file is in multiple import paths, it will only be added once. Each import file must be a readable directory that exists on the filesystem; the import path dialog will alert you of any paths that are not accessible.
 
-If the import paths are edited in a way that an external file is no longer in any import path, it will be removed from the library in the same way a deleted file would. If the file is moved back to an import path, it will be added again as if it was a new file.
+If import paths or exclusion patterns change so that an existing file is no longer included, it is marked offline. Include the original path again and rescan to bring the same asset online, preserving its metadata.
 
 ### Troubleshooting
 
@@ -35,6 +35,7 @@ Sometimes, an external library will not scan correctly. This can happen if Galle
 - In the docker-compose file, are the volumes mounted correctly?
 - Are the volumes also mounted to any worker containers?
 - Are the import paths set correctly, and do they match the path set in docker-compose file?
+- After reconnecting a drive, verify that the files are readable inside the running container; stale bind mounts may require restarting the server container before rescanning.
 - Make sure you don't use symlinks in your import libraries, and that you aren't linking across docker mounts.
 - Are the permissions set correctly?
 - Make sure you are using forward slashes (`/`) and not backward slashes.

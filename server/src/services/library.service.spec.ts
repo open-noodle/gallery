@@ -421,7 +421,6 @@ describe(LibraryService.name, () => {
 
       expect(mocks.asset.updateAll).toHaveBeenCalledWith([asset.id], {
         isOffline: true,
-        deletedAt: expect.anything(),
       });
     });
 
@@ -443,7 +442,6 @@ describe(LibraryService.name, () => {
 
       expect(mocks.asset.updateAll).toHaveBeenCalledWith([asset.id], {
         isOffline: true,
-        deletedAt: expect.anything(),
       });
     });
 
@@ -1255,52 +1253,6 @@ describe(LibraryService.name, () => {
       mocks.library.streamAssetIds.mockReturnValue(makeStream([AssetFactory.create()]));
 
       await expect(sut.handleDeleteLibrary({ id: library.id })).resolves.toBe(JobStatus.Success);
-    });
-  });
-
-  describe('handleAssetRemoval', () => {
-    it('should remove an asset by path when found', async () => {
-      const library = factory.library();
-      const asset = AssetFactory.create({ libraryId: library.id, isExternal: true });
-
-      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue(asset);
-
-      await expect(sut.handleAssetRemoval({ libraryId: library.id, paths: [asset.originalPath] })).resolves.toBe(
-        JobStatus.Success,
-      );
-
-      expect(mocks.asset.getByLibraryIdAndOriginalPath).toHaveBeenCalledWith(library.id, asset.originalPath);
-      expect(mocks.asset.remove).toHaveBeenCalledWith(asset);
-    });
-
-    it('should handle when asset is not found for a path', async () => {
-      const library = factory.library();
-
-      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue(undefined);
-
-      await expect(sut.handleAssetRemoval({ libraryId: library.id, paths: ['/data/missing.jpg'] })).resolves.toBe(
-        JobStatus.Success,
-      );
-
-      expect(mocks.asset.getByLibraryIdAndOriginalPath).toHaveBeenCalledWith(library.id, '/data/missing.jpg');
-      expect(mocks.asset.remove).not.toHaveBeenCalled();
-    });
-
-    it('should handle multiple paths', async () => {
-      const library = factory.library();
-      const asset1 = AssetFactory.create({ libraryId: library.id });
-      const asset2 = AssetFactory.create({ libraryId: library.id });
-
-      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValueOnce(asset1).mockResolvedValueOnce(asset2);
-
-      await expect(
-        sut.handleAssetRemoval({
-          libraryId: library.id,
-          paths: [asset1.originalPath, asset2.originalPath],
-        }),
-      ).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.asset.remove).toHaveBeenCalledTimes(2);
     });
   });
 

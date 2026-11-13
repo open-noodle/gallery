@@ -5,6 +5,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetStatus, AssetType, AssetVisibility } from 'src/enum.js';
+import { withExplicitAssetDeletion } from 'src/gallery/repositories/asset-job.repository.js';
 import { DB } from 'src/schema/index.js';
 import {
   anyUuid,
@@ -443,7 +444,12 @@ export class AssetJobRepository {
 
   @GenerateSql({ params: [DummyValue.DATE], stream: true })
   streamForDeletedJob(trashedBefore: Date) {
-    return this.db.selectFrom('asset').select(['id']).where('asset.deletedAt', '<=', trashedBefore).stream();
+    return this.db
+      .selectFrom('asset')
+      .select(['id'])
+      .where('asset.deletedAt', '<=', trashedBefore)
+      .$call(withExplicitAssetDeletion)
+      .stream();
   }
 
   @GenerateSql({ params: [], stream: true })
