@@ -6,7 +6,7 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
-import { AssetType, JobName, JobStatus, SourceType, StorageFolder } from 'src/enum.js';
+import { AssetType, JobName, JobStatus, LogLevel, SourceType, StorageFolder } from 'src/enum.js';
 import type { VideoFaceChanges, VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import type { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
@@ -14,6 +14,7 @@ import {
   FaceTracker,
   VIDEO_FACE_LOW_SCORE,
   VIDEO_FACE_SAMPLER_VERSION,
+  absorbedFaces,
   acceptTrack,
   findAgain,
   isSharpenTimeFor,
@@ -30,6 +31,7 @@ import {
   withSighting,
   type Detection,
   type ExistingVideoFace,
+  type UnmergedPair,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
@@ -72,10 +74,15 @@ only their start and finish, so a library of phone clips does not flood the log.
 const PROGRESS_MIN_FRAMES = 100;
 const PROGRESS_STEP_PERCENT = 10;
 
+/** Near-miss face pairs logged per video at debug level; a crowd scene could otherwise log hundreds. */
+const UNMERGED_LOG_LIMIT = 20;
+
 const humanDuration = (ms: number) =>
   Duration.fromMillis(Math.max(1000, Math.round(ms / 1000) * 1000))
     .rescale()
     .toHuman({ unitDisplay: 'narrow' });
+
+const roundDistance = (value: number) => Math.round(value * 1000) / 1000;
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
@@ -117,6 +124,19 @@ export class VideoFaceDetector {
       jobs = [];
     }
     await this.deps.jobRepository.queueAll(jobs);
+  }
+
+  /**
+  Whether recognition may start a new person from this face (PersonService.handleRecognizeFaces). With the
+  `createPeople` setting off, a video face is not "core" evidence: it joins a person already found elsewhere, and
+  otherwise stays unassigned, as a face on a hidden asset does.
+  */
+  async mayStartPerson(faceId: string, machineLearning: SystemConfig['machineLearning']): Promise<boolean> {
+    const options = machineLearning.facialRecognition.video;
+    if (!options?.enabled || options.createPeople) {
+      return true;
+    }
+    return !(await this.deps.videoFaceRepository.isVideoFace(faceId));
   }
 
   async detect(
@@ -171,10 +191,13 @@ export class VideoFaceDetector {
       minScore: Math.min(facialRecognition.minScore, VIDEO_FACE_LOW_SCORE),
     };
     const startedAt = Date.now();
+    // How alike two views in this video must be to be one person. Its own setting, so recognition can stay strict
+    // without splitting people inside a video (issue 1306).
+    const sameFaceDistance = options.maxDistance;
 
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-video-faces-'));
     try {
-      const tracker = new FaceTracker(facialRecognition.maxDistance);
+      const tracker = new FaceTracker(sameFaceDistance, facialRecognition.minScore);
       const framePaths = new Map<number, string>();
       let frameSize: { width: number; height: number } | undefined;
 
@@ -253,8 +276,17 @@ export class VideoFaceDetector {
         return;
       }
 
-      const candidates = tracker.finish();
-      const tracks = candidates.filter((track) => acceptTrack(track, facialRecognition.minScore));
+      const unmerged: UnmergedPair[] = [];
+      const candidates = tracker.finish((pair) => {
+        unmerged.push(pair);
+      });
+      this.logUnmerged(id, unmerged);
+      const tracks = candidates.filter((track) =>
+        acceptTrack(track, facialRecognition.minScore, {
+          minFaceSize: options.minFaceSize,
+          minSightings: options.minSightings,
+        }),
+      );
 
       // A few frames around each kept person's best sample, for a sharper view than the once-a-second samples caught.
       // The person is found again by where they were and how they look, so this picks a better view of someone already
@@ -274,7 +306,7 @@ export class VideoFaceDetector {
           if (!isSharpenTimeFor(t, bestTimes[trackIndex])) {
             continue;
           }
-          const found = findAgain(track, detections, facialRecognition.maxDistance);
+          const found = findAgain(track, detections, sameFaceDistance);
           if (!found || found.quality <= track.best.quality) {
             continue;
           }
@@ -285,7 +317,7 @@ export class VideoFaceDetector {
       }
 
       const { added, kept, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
-        maxDistance: facialRecognition.maxDistance,
+        maxDistance: sameFaceDistance,
         start,
         force,
       });
@@ -340,6 +372,32 @@ export class VideoFaceDetector {
     return mergeDetections(found);
   }
 
+  /**
+  Debug log of the face pairs the final merge left apart near its threshold, and why: the evidence for tuning
+  `maxDistance`, or for finding one person split in two (issue 1306).
+  */
+  private logUnmerged(id: string, pairs: UnmergedPair[]) {
+    if (pairs.length === 0 || !this.deps.logger.isLevelEnabled(LogLevel.Debug)) {
+      return;
+    }
+    const shown = pairs.slice(0, UNMERGED_LOG_LIMIT);
+    for (const { a, b, centroidDistance, embeddingDistance, continuous, seenTogether } of shown) {
+      this.deps.logger.debug(
+        `Video ${id}: faces best seen at ${roundDistance(a.best.t)}s and ${roundDistance(b.best.t)}s kept apart ` +
+          `(centroids ${roundDistance(centroidDistance)}, ` +
+          `best views ${Number.isFinite(embeddingDistance) ? roundDistance(embeddingDistance) : 'not confident'}` +
+          `${continuous ? ', in consecutive samples' : ''}, ` +
+          `${plural(a.sightings.length, 'sighting')} and ${b.sightings.length}, ` +
+          (seenTogether > 0 ? `seen together in ${plural(seenTogether, 'frame')})` : 'too far apart)'),
+      );
+    }
+    if (pairs.length > shown.length) {
+      this.deps.logger.debug(
+        `Video ${id}: ${pairs.length - shown.length} more face pairs kept apart near the threshold`,
+      );
+    }
+  }
+
   private async applyTracks(
     asset: NonNullable<Awaited<ReturnType<VideoFaceRepository['getForDetect']>>>,
     tracks: ReturnType<FaceTracker['finish']>,
@@ -356,8 +414,11 @@ export class VideoFaceDetector {
       imageWidth: face.imageWidth,
       imageHeight: face.imageHeight,
       box: { x1: face.boundingBoxX1, y1: face.boundingBoxY1, x2: face.boundingBoxX2, y2: face.boundingBoxY2 },
+      personGroupId: face.personGroupId,
     }));
-    const matches = matchExistingFaces(existing, tracks, { maxDistance, frame: frameSize, start });
+    const matchOptions = { maxDistance, frame: frameSize, start };
+    const matches = matchExistingFaces(existing, tracks, matchOptions);
+    const absorbed = absorbedFaces(existing, tracks, matches, matchOptions);
 
     const { StorageService } = await import('../../services/storage.service.js');
     const backend = StorageService.getWriteBackend();
@@ -407,10 +468,13 @@ export class VideoFaceDetector {
       });
     }
 
-    // An unmatched face nobody named goes, as upstream drops faces below the detection threshold. A named one stays:
-    // losing a name the user gave is worse than a duplicate face, which face cleanup can resolve.
+    // An unmatched face nobody named goes, as upstream drops faces below the detection threshold. A named one stays,
+    // as losing a name the user gave is worse than a duplicate face, unless it was merged into a face with the same
+    // person: then the name is kept on that face.
     const matched = new Set(matchedIds);
-    const removed = replaceable.filter((face) => !matched.has(face.id) && !face.personGroupId);
+    const removed = replaceable.filter(
+      (face) => !matched.has(face.id) && (!face.personGroupId || absorbed.has(face.id)),
+    );
     changes.deleteIds = removed.map((face) => face.id);
 
     await this.deps.videoFaceRepository.apply(changes);

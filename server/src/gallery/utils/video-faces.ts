@@ -4,7 +4,7 @@ import type { BoundingBox } from 'src/repositories/machine-learning.repository.j
 // detections are the same person, which view of them is best, and which existing face a new one replaces.
 
 /** Bumped when sampling or tracking changes enough that videos should be rescanned. */
-export const VIDEO_FACE_SAMPLER_VERSION = 2;
+export const VIDEO_FACE_SAMPLER_VERSION = 3;
 
 /**
 Relaxation of the distance threshold for a detection where the track was in the previous sample: its centre within
@@ -48,7 +48,8 @@ const CONSISTENT_MIN_FACE = 32;
 
 /**
 A person whose largest face is narrower than this (short side, frame px) is dropped however confident the detector
-was: no crop of it, even widened, shows who it is, so it would only add a person nobody can name.
+was: no crop of it, even widened, shows who it is, so it would only add a person nobody can name. The admin setting
+`minFaceSize` overrides it.
 */
 const MIN_FACE = 20;
 
@@ -60,6 +61,8 @@ const CONTEXT_MAX_FACTOR = 2.5;
 const TILE_MIN_LONG_EDGE = 960;
 const TILE_OVERLAP = 0.15;
 const TILE_MERGE_IOU = 0.4;
+/** A find mostly inside another is that face cut by a quarter's edge, whatever their IoU. */
+const TILE_CONTAINED = 0.8;
 
 /** The sampling interval for a span: at least once a second for a short clip, else the configured one. */
 export const sampleIntervalFor = (span: number, interval: number) =>
@@ -164,6 +167,37 @@ export type FaceTrack = {
 
 type MutableTrack = FaceTrack & { sum: number[]; last: Sighting };
 
+/** What the final merge knows about two tracks (`comparePair`). */
+type PairEvidence = {
+  centroidDistance: number;
+  /**
+  Between their stored embeddings, the normalised mean of each one's best few confident sightings; Infinity when
+  either has none.
+  */
+  embeddingDistance: number;
+  /** The nearer of the two above: what pairs are ranked by. */
+  distance: number;
+  /** Seen in consecutive samples in the same place, confidently both times. */
+  continuous: boolean;
+  /** Frames both are seen in: each one is proof they are two people. */
+  seenTogether: number;
+  mergeable: boolean;
+};
+
+/** A pair of tracks the final merge left apart, reported for the debug log. */
+export type UnmergedPair = { a: FaceTrack; b: FaceTrack } & Omit<PairEvidence, 'mergeable' | 'distance'>;
+
+/** Pairs left apart this close to the merge threshold are reported, as the ones a threshold change would decide. */
+const NEAR_MISS = 0.1;
+
+/**
+Detector score from which a sighting is a confident view of a face, and only then evidence for merging two tracks on
+their best views or on continuity: the configured `minScore`, upstream's default here. Backs and sides of heads score
+lower, and their embeddings look alike from one person to the next (issue 1306: three audience members seen from
+behind, 0.29 apart, merged into one face).
+*/
+const CONFIDENT_SCORE = 0.7;
+
 /**
 Groups detections into one track per person, frame by frame in time order. A detection joins the nearest track
 by embedding (its centroid or its latest sighting), with a looser threshold when it is where that track was in the
@@ -172,7 +206,10 @@ previous sample. Each frame is matched one-to-one, so two faces in one frame are
 export class FaceTracker {
   private tracks: MutableTrack[] = [];
 
-  constructor(private maxDistance: number) {}
+  constructor(
+    private maxDistance: number,
+    private confidentScore = CONFIDENT_SCORE,
+  ) {}
 
   /** Adds one frame's detections. Returns, per detection, the index of the track it joined. */
   addFrame(t: number, frameIndex: number, detections: Detection[]): number[] {
@@ -231,26 +268,80 @@ export class FaceTracker {
     return assigned;
   }
 
-  /** The tracks, after merging pairs that are the same person seen apart (never in the same frame). */
-  finish(): FaceTrack[] {
-    let merged = true;
-    while (merged) {
-      merged = false;
-      outer: for (let i = 0; i < this.tracks.length; i++) {
-        for (let j = i + 1; j < this.tracks.length; j++) {
-          const a = this.tracks[i];
-          const b = this.tracks[j];
-          if (cosineDistance(a.centroid, b.centroid) >= this.maxDistance || coOccur(a, b)) {
-            continue;
+  /**
+  The tracks, after merging pairs that are the same person seen apart, closest pair first. Tracks seen together in a
+  frame are two people and never merge. Any other pair merges on either kind of evidence (`comparePair`):
+
+  - looks: the nearer of their centroids and their best few confident sightings (the embedding a face is stored
+    with) is under `maxDistance`, so a track whose centroid sideways or blurred views dragged off still meets its
+    other half;
+  - continuity: one was seen in the sample right after the other, in the same place and confidently both times,
+    within the relaxed threshold the tracker itself applies from one sample to the next: a person who turned their
+    head between two samples.
+
+  `report` hears about every pair left apart near the threshold, and why, for the debug log.
+  */
+  finish(report?: (pair: UnmergedPair) => void): FaceTrack[] {
+    const tracks = this.tracks;
+    const summarize = (track: FaceTrack) => summarizeTrack(track, this.confidentScore);
+    let summaries = tracks.map((track) => summarize(track));
+    const compare = (i: number, j: number) => comparePair(summaries[i], summaries[j], this.maxDistance);
+    const pairs: PairEvidence[][] = tracks.map(() => []);
+    for (let i = 0; i < tracks.length; i++) {
+      for (let j = i + 1; j < tracks.length; j++) {
+        pairs[i][j] = compare(i, j);
+      }
+    }
+    const pairAt = (i: number, j: number) => (i < j ? pairs[i][j] : pairs[j][i]);
+
+    for (;;) {
+      let next: { i: number; j: number; distance: number } | undefined;
+      for (let i = 0; i < tracks.length; i++) {
+        for (let j = i + 1; j < tracks.length; j++) {
+          const pair = pairs[i][j];
+          if (pair.mergeable && (!next || pair.distance < next.distance)) {
+            next = { i, j, distance: pair.distance };
           }
-          this.tracks[i] = mergeTracks(a, b);
-          this.tracks.splice(j, 1);
-          merged = true;
-          break outer;
+        }
+      }
+      if (!next) {
+        break;
+      }
+
+      const { i, j } = next;
+      tracks[i] = mergeTracks(tracks[i], tracks[j]);
+      tracks.splice(j, 1);
+      summaries = [...summaries.slice(0, j), ...summaries.slice(j + 1)];
+      summaries[i] = summarize(tracks[i]);
+      pairs.splice(j, 1);
+      for (const row of pairs) {
+        row.splice(j, 1);
+      }
+      for (let k = 0; k < tracks.length; k++) {
+        if (k === i) {
+          continue;
+        }
+        const pair = compare(Math.min(i, k), Math.max(i, k));
+        if (k < i) {
+          pairs[k][i] = pair;
+        } else {
+          pairs[i][k] = pair;
         }
       }
     }
-    return this.tracks.map(({ sightings, best, centroid }) => ({ sightings, best, centroid }));
+
+    if (report) {
+      for (let i = 0; i < tracks.length; i++) {
+        for (let j = i + 1; j < tracks.length; j++) {
+          const pair = pairAt(i, j);
+          if (pair.distance < this.maxDistance + NEAR_MISS) {
+            report({ a: tracks[i], b: tracks[j], ...pair });
+          }
+        }
+      }
+    }
+
+    return tracks.map(({ sightings, best, centroid }) => ({ sightings, best, centroid }));
   }
 
   /** People found so far, before the final merge: what progress reports. */
@@ -272,11 +363,65 @@ const nearby = (a: BoundingBox, b: BoundingBox) => {
   return drift <= larger && larger <= Math.min(sizeA, sizeB) * CONTINUITY_MAX_SIZE_RATIO;
 };
 
-const coOccur = (a: FaceTrack, b: FaceTrack) => {
-  const frames = new Set(a.sightings.map((sighting) => sighting.frameIndex));
-  return b.sightings.some((sighting) => frames.has(sighting.frameIndex));
+/** How much of the smaller box the two boxes share: 1 when one holds the other. */
+const overlapOfSmaller = (a: BoundingBox, b: BoundingBox) => {
+  const width = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1));
+  const height = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const smaller = Math.min((a.x2 - a.x1) * (a.y2 - a.y1), (b.x2 - b.x1) * (b.y2 - b.y1));
+  return smaller > 0 ? (width * height) / smaller : 0;
 };
 
+type TrackSummary = {
+  track: FaceTrack;
+  /** The stored embedding over confident sightings only, when the track has any. */
+  embedding?: number[];
+  byFrame: Map<number, Sighting>;
+  confidentScore: number;
+};
+
+const summarizeTrack = (track: FaceTrack, confidentScore: number): TrackSummary => {
+  const confident = track.sightings.filter((sighting) => sighting.score >= confidentScore);
+  return {
+    track,
+    embedding: confident.length > 0 ? trackEmbedding({ ...track, sightings: confident }) : undefined,
+    byFrame: new Map(track.sightings.map((sighting) => [sighting.frameIndex, sighting])),
+    confidentScore,
+  };
+};
+
+const comparePair = (a: TrackSummary, b: TrackSummary, maxDistance: number): PairEvidence => {
+  const centroidDistance = cosineDistance(a.track.centroid, b.track.centroid);
+  const embeddingDistance = a.embedding && b.embedding ? cosineDistance(a.embedding, b.embedding) : Infinity;
+  const distance = Math.min(centroidDistance, embeddingDistance);
+  const confident = (sighting: Sighting) => sighting.score >= a.confidentScore;
+
+  let seenTogether = 0;
+  let continuous = false;
+  for (const sighting of b.track.sightings) {
+    if (a.byFrame.has(sighting.frameIndex)) {
+      seenTogether++;
+      continue;
+    }
+    for (const step of [-1, 1]) {
+      const neighbour = a.byFrame.get(sighting.frameIndex + step);
+      if (
+        neighbour &&
+        !b.byFrame.has(neighbour.frameIndex) &&
+        confident(neighbour) &&
+        confident(sighting) &&
+        nearby(neighbour.box, sighting.box)
+      ) {
+        continuous = true;
+      }
+    }
+  }
+
+  const mergeable =
+    seenTogether === 0 && (distance < maxDistance || (continuous && distance < maxDistance + CONTINUITY_RELAXATION));
+  return { centroidDistance, embeddingDistance, distance, continuous, seenTogether, mergeable };
+};
+
+/** One track from two never seen together. */
 const mergeTracks = (a: MutableTrack, b: MutableTrack): MutableTrack => {
   const sightings = [...a.sightings, ...b.sightings].sort((x, y) => x.t - y.t);
   const sum = a.sum.map((value, i) => value + b.sum[i]);
@@ -369,51 +514,64 @@ export type ExistingVideoFace = {
   imageWidth: number;
   imageHeight: number;
   box: BoundingBox;
+  /** The face's person, when it has one. */
+  personGroupId?: string | null;
+};
+
+type MatchOptions = { maxDistance: number; frame: { width: number; height: number }; start: number };
+
+/**
+How well an existing face matches a track: its distance to the nearest sighting, under `maxDistance`, or, for a
+single-frame face, `maxDistance` itself when it overlaps a sighting from the first few seconds after `start`, where
+the poster it was found in comes from. Infinity when it does not match.
+*/
+const matchCost = (face: ExistingVideoFace, track: FaceTrack, { maxDistance, frame, start }: MatchOptions) => {
+  let cost = Infinity;
+  if (face.embedding) {
+    for (const sighting of track.sightings) {
+      cost = Math.min(cost, cosineDistance(face.embedding, sighting.embedding));
+    }
+  }
+  if (cost >= maxDistance) {
+    cost = Infinity;
+  }
+
+  if (!face.hasFrame && face.imageWidth > 0 && face.imageHeight > 0) {
+    const scaled = scaleBox(face.box, face, frame);
+    const nearPoster = track.sightings.some(
+      (sighting) => sighting.t <= start + POSTER_WINDOW_SECONDS && iou(scaled, sighting.box) > POSTER_IOU,
+    );
+    if (nearPoster) {
+      // Position is weaker evidence than appearance, so it only wins when no embedding match is closer.
+      cost = Math.min(cost, maxDistance);
+    }
+  }
+  return cost;
 };
 
 /**
-Pairs existing faces with new tracks, one-to-one, best first, so a re-scan keeps face ids and with them people.
-A face matches by embedding (its distance to the nearest sighting), or, for a single-frame face, by overlapping a
-sighting from the first few seconds after `start`, where the poster it was found in comes from.
+Pairs existing faces with new tracks, one-to-one, so a re-scan keeps face ids and with them people. A face with a
+person is matched before one without, so a track several old faces match keeps the name or the recognition result;
+within each group the closest pairs go first.
 */
 export const matchExistingFaces = (
   existing: ExistingVideoFace[],
   tracks: FaceTrack[],
-  { maxDistance, frame, start }: { maxDistance: number; frame: { width: number; height: number }; start: number },
+  options: MatchOptions,
 ): Map<number, string> => {
-  const pairs: { face: string; track: number; cost: number }[] = [];
+  const pairs: { face: string; track: number; cost: number; hasPerson: boolean }[] = [];
   for (const face of existing) {
     for (const [trackIndex, track] of tracks.entries()) {
-      let cost = Infinity;
-      if (face.embedding) {
-        for (const sighting of track.sightings) {
-          cost = Math.min(cost, cosineDistance(face.embedding, sighting.embedding));
-        }
-      }
-      if (cost >= maxDistance) {
-        cost = Infinity;
-      }
-
-      if (!face.hasFrame && face.imageWidth > 0 && face.imageHeight > 0) {
-        const scaled = scaleBox(face.box, face, frame);
-        const nearPoster = track.sightings.some(
-          (sighting) => sighting.t <= start + POSTER_WINDOW_SECONDS && iou(scaled, sighting.box) > POSTER_IOU,
-        );
-        if (nearPoster) {
-          // Position is weaker evidence than appearance, so it only wins when no embedding match is closer.
-          cost = Math.min(cost, maxDistance);
-        }
-      }
-
+      const cost = matchCost(face, track, options);
       if (Number.isFinite(cost)) {
-        pairs.push({ face: face.id, track: trackIndex, cost });
+        pairs.push({ face: face.id, track: trackIndex, cost, hasPerson: !!face.personGroupId });
       }
     }
   }
 
   const matches = new Map<number, string>();
   const takenFaces = new Set<string>();
-  for (const pair of pairs.sort((a, b) => a.cost - b.cost)) {
+  for (const pair of pairs.sort((a, b) => Number(b.hasPerson) - Number(a.hasPerson) || a.cost - b.cost)) {
     if (takenFaces.has(pair.face) || matches.has(pair.track)) {
       continue;
     }
@@ -421,6 +579,35 @@ export const matchExistingFaces = (
     takenFaces.add(pair.face);
   }
   return matches;
+};
+
+/**
+Old faces a re-scan merged into another one: unmatched, but matching a track whose kept face has the same person.
+Usually one person an older tracker split in two, both halves since recognised as them (issue 1306). Deleting such
+a face loses nothing, as the kept face carries the person; an unmatched face whose person differs is left alone.
+*/
+export const absorbedFaces = (
+  existing: ExistingVideoFace[],
+  tracks: FaceTrack[],
+  matches: Map<number, string>,
+  options: MatchOptions,
+): Set<string> => {
+  const matched = new Set(matches.values());
+  const byId = new Map(existing.map((face) => [face.id, face]));
+  const absorbed = new Set<string>();
+  for (const face of existing) {
+    if (matched.has(face.id) || !face.personGroupId) {
+      continue;
+    }
+    for (const [trackIndex, track] of tracks.entries()) {
+      const kept = byId.get(matches.get(trackIndex) ?? '');
+      if (kept?.personGroupId === face.personGroupId && Number.isFinite(matchCost(face, track, options))) {
+        absorbed.add(face.id);
+        break;
+      }
+    }
+  }
+  return absorbed;
 };
 
 const scaleBox = (
@@ -440,12 +627,19 @@ const median = (values: number[]) => {
 };
 
 /**
-Whether a track is a person worth keeping: large enough to recognise (MIN_FACE), and confident once or consistent
-across frames (see VIDEO_FACE_LOW_SCORE).
+Whether a track is a person worth keeping: seen in at least `minSightings` frames, large enough to recognise
+(`minFaceSize`, MIN_FACE by default), and confident once or consistent across frames (see VIDEO_FACE_LOW_SCORE).
 */
-export const acceptTrack = (track: FaceTrack, minScore: number): boolean => {
+export const acceptTrack = (
+  track: FaceTrack,
+  minScore: number,
+  { minFaceSize = MIN_FACE, minSightings = 1 }: { minFaceSize?: number; minSightings?: number } = {},
+): boolean => {
+  if (track.sightings.length < minSightings) {
+    return false;
+  }
   const sizes = track.sightings.map(({ box }) => Math.min(box.x2 - box.x1, box.y2 - box.y1));
-  if (Math.max(...sizes) < MIN_FACE) {
+  if (Math.max(...sizes) < minFaceSize) {
     return false;
   }
   const scores = track.sightings.map((sighting) => sighting.score);
@@ -487,7 +681,10 @@ same face found twice, and the more confident one is kept.
 export const mergeDetections = <T extends { boundingBox: BoundingBox; score: number }>(detections: T[]): T[] => {
   const kept: T[] = [];
   for (const detection of [...detections].sort((a, b) => b.score - a.score)) {
-    if (kept.every((other) => iou(other.boundingBox, detection.boundingBox) <= TILE_MERGE_IOU)) {
+    const isSameFace = (other: T) =>
+      iou(other.boundingBox, detection.boundingBox) > TILE_MERGE_IOU ||
+      overlapOfSmaller(other.boundingBox, detection.boundingBox) > TILE_CONTAINED;
+    if (kept.every((other) => !isSameFace(other))) {
       kept.push(detection);
     }
   }

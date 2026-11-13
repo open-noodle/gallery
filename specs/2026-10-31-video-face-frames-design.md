@@ -96,8 +96,8 @@ Each detection is a box, a detector score and a 512-d embedding. Detections are 
 in time order:
 
 - A detection joins the track whose centroid (the normalised mean of its embeddings) or latest sighting is nearest by
-  cosine distance, if that distance is under `facialRecognition.maxDistance` (default 0.5, the threshold recognition
-  already uses to tie faces to a person).
+  cosine distance, if that distance is under the video's own `maxDistance` setting (default 0.5, the value recognition
+  uses by default; separate since issue 1306, so recognition can be stricter without splitting people in videos).
 - If the track was also seen in the previous sample and the face is still where it was (its centre within one face of
   the old centre, at no more than twice or half the size), the threshold is relaxed by 0.1. An overlap test (IoU > 0.3)
   came first, and split a 10 px face in a 320 x 240 clip into three people: a second's drift of half its width left the
@@ -106,8 +106,39 @@ in time order:
 - Two detections in one frame never join the same track: each frame is matched one-to-one, best pairs first.
 - A detection that matches no track starts a new one.
 
-A final pass merges two tracks whose centroids are within `maxDistance` and which never appear in the same frame. This
-catches a person first seen in profile and later frontally.
+A final pass merges tracks that are the same person seen apart, closest pair first. Two tracks seen in the same frame
+are two people and never merge. Any other pair merges on either kind of evidence:
+
+- **looks**: the nearer of their centroids and their *stored* embeddings (the mean of each one's best three confident
+  sightings, the embedding the face is saved with) is under `maxDistance`. Comparing centroids alone, as the first
+  version did, missed pairs whose stored embeddings were 0.19 apart (issue 1306): sideways and blurred views drag a
+  centroid off.
+- **continuity**: one track was seen in the sample right after the other, in the same place, and the pair is within the
+  relaxed threshold the tracker applies from one sample to the next. A person who turned their head between two
+  samples otherwise stays split, because the online tracker compares the new view with the track as it was then.
+
+Both kinds of evidence count only between **confident** sightings: a detector score of at least `minScore` (default
+0.7). This came from replaying recorded detections of four clips through the old and new tracker and checking every
+merge by eye (issue 1306). Backs and sides of heads score around 0.5, and their embeddings look alike from one person
+to the next: three audience members seen from behind, 0.29 apart, were merged into one face, as were two back-of-head
+tracks of different people in a second panel video. Every correct merge was between detections scoring 0.78 to 0.89:
+panelists drinking, pointing, covering their face, or in profile. A track never seen confidently is compared on its
+centroid alone, as before.
+
+Two other rules were tried and dropped. A link on the single closest pair of sightings (under 0.3) never fired on any
+clip. Treating a shared frame where both boxes overlap as one face found twice merged two audience members sitting one
+behind the other; the detector's own suppression already removes real duplicates, and `mergeDetections` removes the
+ones tiling creates (a find mostly inside another counts as the same face, whatever their IoU).
+
+Results on the four clips, at the defaults (old tracker → new): a one-hour panel 41 → 37 faces, a 9-minute Q&A panel
+64 → 60, Tears of Steel 14 → 14, a crowd clip 12 → 12. Every merge was checked by eye; one is wrong, between two
+audience members only ever seen from behind (the old tracker happened to join one man's two halves instead), which no
+ordering can tell apart.
+
+Most splits that remain are views of one person more than 0.6 apart: a face from the front and from behind, or looking
+down. Merging on looks that far apart would also merge different people, so those faces stay separate and recognition
+or the user ties them to the same person. The debug log lists each pair of faces left apart near the threshold and why
+(distance, or seen together), as evidence for tuning.
 
 ### Per-person confidence
 
@@ -230,10 +261,16 @@ its person. If it is some person's representative face, that person's thumbnail 
 
 An unmatched track becomes a new face and is queued for recognition, as upstream does for a new face.
 
+Old faces with a person are matched before those without, closest first within each group, so a track several old
+faces match keeps the name or the recognition result.
+
 An unmatched old face is deleted if it was **unassigned**, as upstream drops faces that fall below the detection
 threshold. An unmatched old face that **is assigned to a person is kept** unchanged: its box still refers to the
 poster, which is still where the crop route looks for a face without a frame row. Losing a name the user gave is worse
-than a duplicate face, which the face-cleanup console can already resolve.
+than a duplicate face, which the face-cleanup console can already resolve. The exception (`absorbedFaces`, issue 1306)
+is an unmatched face that matches a track whose kept face has the **same person**: one person an older tracker split
+in two, both halves since recognised as them. It is deleted, as the kept face carries the person. One whose person
+differs is left for the user.
 
 ### Re-scanning existing videos
 
@@ -244,7 +281,7 @@ Detection job's existing buttons:
 
 | Button      | What it does with this feature on                                                                          |
 | ----------- | ---------------------------------------------------------------------------------------------------------- |
-| **Missing** | Upstream's never-detected assets, **plus every video not yet sampled across the whole video**. Names kept. |
+| **Missing** | Upstream's never-detected assets, **plus every video not yet sampled across the whole video**, or with a face from an older `VIDEO_FACE_SAMPLER_VERSION`. Names kept. |
 | **Refresh** | Every asset, photos included, without deleting anything first. Videos are matched as above; names kept.    |
 | **Reset**   | Upstream's reset: deletes every machine-learning face in the library and its names, then detects all.      |
 
@@ -301,7 +338,18 @@ request fails (an older server without the route, or no access), it falls back t
 the person side panels (own and shared space), the detail panel's people row and the "use as feature photo" action in
 the assign panel. Photos keep their in-browser crop from the full image already on screen.
 
-## Config
+## Recognition of video faces
+
+Recognition runs per face, as upstream's does, with one fork filter (`excludeOtherFacesOfVideo` on
+`SearchRepository.searchFaces`, built by `src/gallery/utils/video-face-search.ts`): for a video face, the other faces of
+the same video are left out of both searches, the `minFaces` count and the nearest named face. The face itself still
+counts, so upstream's "the matches include the face itself" logic is unchanged, and photos are untouched.
+
+Without it (issue 1306), the faces the tracker kept apart vouched for each other. Three faces of one person split in one
+video reached `minFaces: 3` on their own and founded a person nobody else matched: 188 of 339 new people in the
+reporter's library came from exactly one video. And a face could take the person of another face it had been kept
+apart from because both were on screen together, which is proof they are two people.
+
 
 `machineLearning.facialRecognition.video`, beside the fork's `suggestions` (both spread from
 `GalleryFacialRecognitionExtension`, so upstream's schema costs one line, not one per field):
@@ -313,6 +361,16 @@ the assign panel. Photos keep their in-browser crop from the full image already 
 | `sceneDetection` | `true`  |             | Also sample just after every scene cut                   |
 | `maxFrames`      | `1800`  | 10 to 10000 | Frame budget per video; the interval stretches to fit it |
 | `tiledDetection` | `false` |             | Also search large frames as four overlapping quarters    |
+| `maxDistance`    | `0.5`   | 0.1 to 1    | Same-person distance within a video (tracking, re-scan)  |
+| `minFaceSize`    | `20`    | 0 to 500 px | A person whose largest face is narrower is not kept      |
+| `minSightings`   | `1`     | 1 to 100    | Sampled frames a person must be seen in to be kept       |
+| `createPeople`   | `true`  |             | Off: a video face only joins an existing person          |
+
+The last four came with issue 1306. `maxDistance` is the video's own, so an admin who keeps recognition strict (the
+reporter used 0.4) does not split people inside videos with it. `minFaceSize` and `minSightings` cut background faces
+and passers-by. `createPeople` off makes a video face non-core evidence in recognition (`VideoFaceDetector.mayStartPerson`,
+one call in `handleRecognizeFaces`): it joins a person found elsewhere, and otherwise stays unassigned, as a face on a
+hidden asset does.
 
 Off by default, like the fork's other heavier ML jobs (pet detection, Spatial Scene), so a fresh install behaves as
 upstream until an admin opts in. Admin-only. The admin UI is `web/src/lib/gallery/components/admin/video-face-settings.svelte`,
@@ -438,7 +496,9 @@ needs no change to the stored data.
   the face is at least 20 px. If that proves noisy, require two sightings for videos longer than a few intervals.
 - A head turn can split one person in two: on the 320 x 240 clip, one man's two views a second apart in the same place
   were 0.76 apart, as far as two different people usually are. Merging on position alone would also merge one person
-  stepping out and another stepping into the same spot, which hides a person under another's name. The split costs
-  the user one extra assignment, so it stays until real libraries show it is common.
+  stepping out and another stepping into the same spot, which hides a person under another's name. Since issue 1306
+  the final pass merges on continuity between confident views within the relaxed threshold; anything further apart
+  stays split. A face moved to another person still leaves that person's other faces in the same video behind;
+  moving them together is a UI change for later.
 - A dedicated queue would keep a long video from holding a face-detection slot for minutes. That costs upstream queue
   registrations, so it waits until it is needed.

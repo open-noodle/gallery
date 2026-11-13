@@ -117,6 +117,16 @@ describe('VideoFaceDetector', () => {
     });
   };
 
+  /** Video face settings over the defaults, and recognition settings beside them. */
+  const withVideo = (video: Record<string, unknown>, recognition: Record<string, unknown> = {}) =>
+    mocks.systemMetadata.get.mockResolvedValue({
+      machineLearning: {
+        facialRecognition: {
+          ...recognition,
+          video: { ...videoConfig.machineLearning.facialRecognition.video, ...video },
+        },
+      },
+    });
   /** ML responses for the first sampled frames, in order (66 s at a 2 s interval samples 1, 3, 5, ... 65). */
   const framesShow = (...frames: ReturnType<typeof face>[][]) => {
     for (const faces of frames) {
@@ -320,6 +330,30 @@ describe('VideoFaceDetector', () => {
       ]);
     });
 
+    it('deletes the half of a split person that the re-scan merged into a face with the same person', async () => {
+      const half = normalize([0.9, 0.3, 0, 0]);
+      mocks.videoFace.getForDetect.mockResolvedValue(
+        video({
+          faces: [
+            existingFace({ id: 'alice-face', personGroupId: 'alice-person', embedding: serializeEmbedding(alice) }),
+            existingFace({ id: 'alice-half', personGroupId: 'alice-person', embedding: serializeEmbedding(half) }),
+            existingFace({ id: 'bob-face', personGroupId: 'bob-person', embedding: serializeEmbedding(half) }),
+          ],
+        }) as any,
+      );
+      framesShow([face(alice, 100)], [face(half, 104)], []);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      // Either of alice's faces may keep the track (both match exactly); the other is deleted. Bob's face matched
+      // alice's track too, but has its own person, so it stays for the user to resolve.
+      const changes = mocks.videoFace.apply.mock.calls[0][0];
+      const kept = changes.update.map(({ id }) => id);
+      expect(kept).toHaveLength(1);
+      expect(['alice-face', 'alice-half']).toContain(kept[0]);
+      expect(changes.deleteIds).toEqual(['alice-face', 'alice-half'].filter((id) => id !== kept[0]));
+    });
+
     it('matches an old poster face by position, and re-recognises it when it was unnamed', async () => {
       mocks.videoFace.getForDetect.mockResolvedValue(
         video({
@@ -428,6 +462,47 @@ describe('VideoFaceDetector', () => {
       await sut.handleDetectFaces({ id: 'asset-id' });
 
       expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([]);
+    });
+  });
+
+  describe('admin settings', () => {
+    // 0.4 from alice: the same person at the default 0.5, two people at recognition's stricter 0.3.
+    const aliceTurned = normalize([0.6, 0.8, 0, 0]);
+
+    it('tells people in a video apart by its own distance, not recognition’s (issue 1306)', async () => {
+      withVideo({ maxDistance: 0.5 }, { maxDistance: 0.3 });
+      framesShow([face(alice, 100)], [face(aliceTurned, 900)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toHaveLength(1);
+    });
+
+    it('splits the same views when the video distance is the stricter one', async () => {
+      withVideo({ maxDistance: 0.3 });
+      framesShow([face(alice, 100)], [face(aliceTurned, 900)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toHaveLength(2);
+    });
+
+    it('drops a person seen in fewer sampled frames than the minimum', async () => {
+      withVideo({ minSightings: 2 });
+      framesShow([face(alice, 100), face(bob, 900)], [face(alice, 104)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([expect.objectContaining({ boundingBoxX1: 100 })]);
+    });
+
+    it('drops a person whose largest face is under the minimum size', async () => {
+      withVideo({ minFaceSize: 100 });
+      framesShow([face(alice, 100, 80), face(bob, 900, 120)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      expect(mocks.videoFace.apply.mock.calls[0][0].insert).toEqual([expect.objectContaining({ boundingBoxX1: 900 })]);
     });
   });
 
