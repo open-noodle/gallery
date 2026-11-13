@@ -127,7 +127,18 @@
 
   const showUndo = (description: string, undo: () => Promise<void>) =>
     toastManager.primary(
-      { description, button: { label: $t('undo'), color: 'secondary', onclick: undo } },
+      {
+        description,
+        // Closes on click, so an undo cannot be sent twice.
+        button: (close) => ({
+          label: $t('undo'),
+          color: 'secondary',
+          onclick: () => {
+            close();
+            return undo();
+          },
+        }),
+      },
       { timeout: 5000 },
     );
 
