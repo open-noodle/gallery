@@ -4,20 +4,21 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import BackupSettings from './BackupSettings.svelte';
 
-const makeConfig = (s3: { enabled: boolean }) =>
+const makeConfig = (destination: 'local' | 'cloud' | 'both' = 'local', legacyS3 = false) =>
   ({
     backup: {
       database: {
         enabled: true,
         cronExpression: '0 02 * * *',
         keepLastAmount: 14,
-        s3,
+        destination,
+        s3: { enabled: legacyS3 },
       },
     },
   }) as AdminConfigDto;
 
 const mocks = vi.hoisted(() => ({
-  featureFlags: { configFile: false, s3Storage: false },
+  featureFlags: { configFile: false },
   systemConfig: {} as AdminConfigDto,
   defaultSystemConfig: {} as AdminConfigDto,
   saveConfig: vi.fn(),
@@ -57,88 +58,119 @@ describe('BackupSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.featureFlags.configFile = false;
-    mocks.featureFlags.s3Storage = false;
-    mocks.systemConfig = makeConfig({ enabled: false });
-    mocks.defaultSystemConfig = makeConfig({ enabled: false });
+    mocks.systemConfig = makeConfig();
+    mocks.defaultSystemConfig = makeConfig();
   });
 
-  // The gate: the feature reuses the media backend's bucket and credentials, so it cannot apply at all on a
-  // disk-backed server. The group is absent rather than disabled.
-  describe('when the server is not on the S3 storage backend', () => {
-    it('renders no S3 options at all', async () => {
-      await render(BackupSettings);
+  it('shows the destination selector regardless of the media backend', async () => {
+    await render(BackupSettings);
 
-      expect(
-        page.getByRole('switch', { name: 'admin.backup_s3_enabled', exact: true }).query(),
-      ).not.toBeInTheDocument();
-      expect(page.getByText('admin.backup_s3_credentials_hint', { exact: true }).query()).not.toBeInTheDocument();
-    });
-
-    it('still renders the upstream backup options', async () => {
-      const { container } = await render(BackupSettings);
-
-      expect(
-        page.getByRole('switch', { name: 'admin.backup_database_enable_description', exact: true }).element(),
-      ).toBeInTheDocument();
-      expect(field(container, 'admin.backup_keep_last_amount')).toBeInTheDocument();
-    });
+    expect(page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }).element()).toHaveValue('local');
   });
 
-  describe('when the server is on the S3 storage backend', () => {
-    beforeEach(() => {
-      mocks.featureFlags.s3Storage = true;
-    });
+  it('shows the cloud configuration hint only for cloud destinations', async () => {
+    await render(BackupSettings);
 
-    it('renders the toggle and the credentials hint', async () => {
-      await render(BackupSettings);
+    expect(page.getByText('admin.backup_destination_cloud_hint', { exact: true }).query()).not.toBeInTheDocument();
+    await userEvent.selectOptions(
+      page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }),
+      'cloud',
+    );
+    expect(page.getByText('admin.backup_destination_cloud_hint', { exact: true }).element()).toBeInTheDocument();
+  });
 
-      expect(page.getByRole('switch', { name: 'admin.backup_s3_enabled', exact: true }).element()).not.toBeChecked();
-      expect(page.getByText('admin.backup_s3_credentials_hint', { exact: true }).element()).toBeInTheDocument();
-    });
+  it('still renders the upstream backup options', async () => {
+    const { container } = await render(BackupSettings);
 
-    // Nothing about the destination is configurable: the bucket comes from the media backend and the key
-    // prefix is fixed at `backups/`, so the switch is the whole feature.
-    it('offers no bucket or prefix field', async () => {
-      const { container } = await render(BackupSettings);
+    expect(
+      page.getByRole('switch', { name: 'admin.backup_database_enable_description', exact: true }).element(),
+    ).toBeInTheDocument();
+    expect(field(container, 'admin.backup_keep_last_amount')).toBeInTheDocument();
+  });
 
-      expect(field(container, 'admin.backup_s3_bucket')).toBeNull();
-      expect(field(container, 'admin.backup_s3_prefix')).toBeNull();
-    });
+  it('saves the selected destination with the rest of the backup section', async () => {
+    await render(BackupSettings);
 
-    it('saves the flag with the rest of the backup section', async () => {
-      await render(BackupSettings);
+    await userEvent.selectOptions(
+      page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }),
+      'cloud',
+    );
+    await userEvent.click(page.getByRole('button', { name: 'save', exact: true }));
 
-      await userEvent.click(page.getByRole('switch', { name: 'admin.backup_s3_enabled', exact: true }));
-      await userEvent.click(page.getByRole('button', { name: 'save', exact: true }));
-
-      expect(mocks.saveConfig).toHaveBeenCalledWith({
-        backup: {
-          database: {
-            enabled: true,
-            cronExpression: '0 02 * * *',
-            keepLastAmount: 14,
-            s3: { enabled: true },
-          },
+    expect(mocks.saveConfig).toHaveBeenCalledWith({
+      backup: {
+        database: {
+          enabled: true,
+          cronExpression: '0 02 * * *',
+          keepLastAmount: 14,
+          destination: 'cloud',
+          s3: { enabled: false },
         },
-      });
+      },
     });
+  });
 
-    it('reflects a config that already has it on', async () => {
-      mocks.systemConfig = makeConfig({ enabled: true });
+  it('clears the deprecated S3 flag when selecting a new destination', async () => {
+    mocks.systemConfig = makeConfig('cloud', true);
+    await render(BackupSettings);
 
-      await render(BackupSettings);
+    await userEvent.selectOptions(
+      page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }),
+      'both',
+    );
+    await userEvent.click(page.getByRole('button', { name: 'save', exact: true }));
 
-      expect(page.getByRole('switch', { name: 'admin.backup_s3_enabled', exact: true }).element()).toBeChecked();
-    });
+    expect(mocks.saveConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backup: {
+          database: expect.objectContaining({ destination: 'both', s3: { enabled: false } }),
+        },
+      }),
+    );
+  });
 
-    // Config-file mode makes the whole section read-only upstream; the new control must follow.
-    it('keeps the toggle disabled in config-file mode', async () => {
-      mocks.featureFlags.configFile = true;
-      mocks.systemConfig = makeConfig({ enabled: true });
+  it('can switch a legacy cloud destination to the independent cloud target directly', async () => {
+    mocks.systemConfig = makeConfig('cloud', true);
+    await render(BackupSettings);
 
-      await render(BackupSettings);
+    expect(page.getByText('admin.backup_destination_legacy_hint', { exact: true }).element()).toBeInTheDocument();
+    await userEvent.click(
+      page.getByRole('button', { name: 'admin.backup_destination_use_independent', exact: true }),
+    );
+    await userEvent.click(page.getByRole('button', { name: 'save', exact: true }));
 
-      expect(page.getByRole('switch', { name: 'admin.backup_s3_enabled', exact: true }).element()).toBeDisabled();
-    });
+    expect(mocks.saveConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backup: {
+          database: expect.objectContaining({ destination: 'cloud', s3: { enabled: false } }),
+        },
+      }),
+    );
+  });
+
+  it('keeps the selector disabled in config-file mode', async () => {
+    mocks.featureFlags.configFile = true;
+
+    await render(BackupSettings);
+
+    expect(page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }).element()).toBeDisabled();
+  });
+
+  it('fails closed when the server does not return the destination field', async () => {
+    mocks.systemConfig = {
+      backup: {
+        database: {
+          enabled: true,
+          cronExpression: '0 02 * * *',
+          keepLastAmount: 14,
+          s3: { enabled: false },
+        },
+      },
+    } as AdminConfigDto;
+
+    await render(BackupSettings);
+
+    expect(page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }).element()).toBeDisabled();
+    expect(page.getByText('admin.backup_destination_cloud_hint', { exact: true }).query()).not.toBeInTheDocument();
   });
 });

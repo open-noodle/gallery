@@ -125,7 +125,8 @@ describe('fork config survives schema composition', () => {
     expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 });
   });
 
-  it('keeps the fork database-backup S3 block', () => {
+  it('keeps the fork database-backup destination and legacy S3 block', () => {
+    expect(parsed.backup.database.destination).toBe('local');
     expect(parsed.backup.database.s3).toEqual({ enabled: false });
   });
 
