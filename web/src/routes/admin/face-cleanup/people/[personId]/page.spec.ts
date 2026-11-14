@@ -1,5 +1,6 @@
 import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
 import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+import PersonDissolveModal from '#lib/modals/PersonDissolveModal.svelte';
 import { Route } from '#lib/route.ts';
 import {
   getFaceRepairClusterFaces,
@@ -1305,6 +1306,66 @@ describe('+page.svelte (manual face-review page)', () => {
       ]) {
         expect(getAll(page.getByTestId(id))).toHaveLength(1);
       }
+    });
+  });
+
+  // ==== Dissolve entry point ====
+  // The Face health tab links a contaminated person HERE (people/+page.svelte -> viewFaceCleanupManualPerson),
+  // and an EXIF-contaminated person is invisible to every scan, so this page — not the guided one — is where
+  // discovery lands. The modal's own behaviour is covered by PersonDissolveModal.spec.ts; this only proves the
+  // page mounts a launcher and hands it the person's SERVER name, which is what the modal gates the
+  // irreversible delete on.
+  describe('dissolve entry point', () => {
+    it('opens PersonDissolveModal with the person id and the server-sourced name', async () => {
+      vi.mocked(getFaceRepairPersonMetadata).mockResolvedValue(makeMetadata({ name: 'Oma Krüger' }));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('face-tile').elements()).toHaveLength(3));
+
+      await userEvent.click(page.getByTestId('manual-review-dissolve').element());
+
+      expect(showModal).toHaveBeenCalledWith(PersonDissolveModal, {
+        personId: PERSON_ID,
+        personName: 'Oma Krüger',
+      });
+    });
+
+    it('falls back to the unnamed label for a person with no name, so the gate is not permanently shut', async () => {
+      vi.mocked(getFaceRepairPersonMetadata).mockResolvedValue(makeMetadata({ name: '' }));
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('face-tile').elements()).toHaveLength(3));
+
+      await userEvent.click(page.getByTestId('manual-review-dissolve').element());
+
+      expect(showModal).toHaveBeenCalledWith(PersonDissolveModal, {
+        personId: PERSON_ID,
+        personName: 'admin.face_cleanup_unnamed',
+      });
+    });
+
+    it('refreshes the page after a dissolve, and leaves when the emptied person is gone', async () => {
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('face-tile').elements()).toHaveLength(3));
+      vi.mocked(getFaceRepairPersonMetadata).mockRejectedValue(Object.assign(new Error('gone'), { status: 404 }));
+      showModal.mockResolvedValueOnce(true);
+
+      await userEvent.click(page.getByTestId('manual-review-dissolve').element());
+
+      await vi.waitFor(() => expect(goto).toHaveBeenCalledWith(Route.faceCleanupPeople()));
+      // The 404 is the expected shape of "the emptied cluster was deleted", not a load failure.
+      expect(page.getByTestId('manual-review-load-error').query()).not.toBeInTheDocument();
+    });
+
+    it('does not touch the page when the dialog is dismissed', async () => {
+      await render(Page, { props: { data: makePageData() } });
+      await vi.waitFor(() => expect(page.getByTestId('face-tile').elements()).toHaveLength(3));
+      vi.mocked(getFaceRepairPersonMetadata).mockClear();
+      showModal.mockResolvedValueOnce(undefined);
+
+      await userEvent.click(page.getByTestId('manual-review-dissolve').element());
+
+      await vi.waitFor(() => expect(showModal).toHaveBeenCalled());
+      expect(getFaceRepairPersonMetadata).not.toHaveBeenCalled();
+      expect(goto).not.toHaveBeenCalled();
     });
   });
 

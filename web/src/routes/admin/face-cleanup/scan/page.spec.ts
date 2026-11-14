@@ -203,6 +203,14 @@ describe('+page.svelte (face cleanup)', () => {
 
   // ---- empty states ----
 
+  it('links to the Dissolved page next to the resolutions', async () => {
+    vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
+    await render(Page, { props: { data: makePageData() } });
+
+    const link = await find(page.getByText('admin.face_cleanup_view_dissolved'));
+    expect(link.closest('a')).toHaveAttribute('href', '/admin/face-cleanup/dissolved');
+  });
+
   it('shows "no scan" empty state when no scan has run', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
     await render(Page, { props: { data: makePageData() } });
