@@ -18,6 +18,7 @@ import {
   JobStatus,
   SourceType,
   StorageFolder,
+  SystemMetadataKey,
 } from 'src/enum.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
@@ -113,6 +114,7 @@ describe(MetadataService.name, () => {
     ({ sut, mocks } = newTestService(MetadataService));
 
     mockReadTags();
+    mocks.metadata.writeTags.mockResolvedValue(true);
 
     mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
     mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
@@ -175,23 +177,71 @@ describe(MetadataService.name, () => {
   });
 
   describe('onConfigInit', () => {
-    it('should update metadata processing concurrency', () => {
-      sut.onConfigInit({ newConfig: defaults });
+    it('should update metadata processing concurrency', async () => {
+      await sut.onConfigInit({ newConfig: defaults });
 
       expect(mocks.metadata.setMaxConcurrency).toHaveBeenCalledWith(defaults.job.metadataExtraction.concurrency);
       expect(mocks.metadata.setMaxConcurrency).toHaveBeenCalledTimes(1);
     });
+
+    it('should backfill sidecar writes once when face export is enabled and not yet backfilled', async () => {
+      const newConfig = structuredClone(defaults);
+      newConfig.metadata.faces.export = true;
+      mocks.systemMetadata.get.mockResolvedValue({ mountChecks: {} });
+      mocks.person.getAssetIdsWithNamedFaces.mockResolvedValue(['asset-1', 'asset-2']);
+
+      await sut.onConfigInit({ newConfig });
+
+      expect(mocks.person.getAssetIdsWithNamedFaces).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SidecarWrite, data: { id: 'asset-1' } },
+        { name: JobName.SidecarWrite, data: { id: 'asset-2' } },
+      ]);
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemFlags, {
+        mountChecks: {},
+        faceSidecarExportBackfilled: true,
+      });
+    });
+
+    it('should skip backfill when face export was already backfilled', async () => {
+      const newConfig = structuredClone(defaults);
+      newConfig.metadata.faces.export = true;
+      mocks.systemMetadata.get.mockResolvedValue({ faceSidecarExportBackfilled: true });
+
+      await sut.onConfigInit({ newConfig });
+
+      expect(mocks.person.getAssetIdsWithNamedFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
   });
 
   describe('onConfigUpdate', () => {
-    it('should update metadata processing concurrency', () => {
+    it('should update metadata processing concurrency', async () => {
       const newConfig = structuredClone(defaults);
       newConfig.job.metadataExtraction.concurrency = 10;
 
-      sut.onConfigUpdate({ oldConfig: defaults, newConfig });
+      await sut.onConfigUpdate({ oldConfig: defaults, newConfig });
 
       expect(mocks.metadata.setMaxConcurrency).toHaveBeenCalledWith(newConfig.job.metadataExtraction.concurrency);
       expect(mocks.metadata.setMaxConcurrency).toHaveBeenCalledTimes(1);
+    });
+
+    it('should queue sidecar writes for all assets with named faces when face export is toggled on', async () => {
+      const oldConfig = structuredClone(defaults);
+      oldConfig.metadata.faces.export = false;
+      const newConfig = structuredClone(defaults);
+      newConfig.metadata.faces.export = true;
+
+      mocks.systemMetadata.get.mockResolvedValue({});
+      mocks.person.getAssetIdsWithNamedFaces.mockResolvedValue(['asset-1']);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig });
+
+      expect(mocks.person.getAssetIdsWithNamedFaces).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: 'asset-1' } }]);
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemFlags, {
+        faceSidecarExportBackfilled: true,
+      });
     });
   });
 
@@ -2466,6 +2516,41 @@ describe(MetadataService.name, () => {
           ]);
         },
       );
+
+      it('should skip face import when extraction is triggered by sidecar-write and face export is enabled', async () => {
+        const asset = AssetFactory.create();
+        const person = PersonFactory.create();
+
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true, export: true } } });
+        mockReadTags(makeFaceTags({ Name: person.name }));
+
+        await sut.handleMetadataExtraction({ id: asset.id, source: 'sidecar-write' });
+
+        expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+      });
+
+      it('should not create a duplicate Exif face when a non-Exif face already exists for that person on the asset', async () => {
+        const person = PersonFactory.create({ name: 'Alice' });
+        const asset = AssetFactory.create();
+        const extractionAsset = getForMetadataExtraction(asset);
+        extractionAsset.faces = [
+          {
+            id: 'ml-face-id',
+            sourceType: SourceType.MachineLearning,
+            personGroupId: person.personGroupId,
+          } as any,
+        ];
+
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(extractionAsset);
+        mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true, export: false } } });
+        mockReadTags(makeFaceTags({ Name: 'Alice' }));
+        mocks.person.getDistinctNames.mockResolvedValue([{ personGroupId: person.personGroupId, name: 'Alice' }]);
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+      });
     });
 
     it('should convert per-pixel bit depth to per-channel for bitsPerSample', async () => {
@@ -2865,6 +2950,18 @@ describe(MetadataService.name, () => {
 
       expect(mocks.assetJob.streamForSidecar).toHaveBeenCalledWith(false);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarCheck, data: { id: asset.id } }]);
+    });
+
+    it('should also queue SidecarWrite for assets with named faces when force is true and face export is enabled', async () => {
+      const asset = AssetFactory.create();
+      mocks.assetJob.streamForSidecar.mockReturnValue(makeStream([asset]));
+      mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: false, export: true } } });
+      mocks.person.getAssetIdsWithNamedFaces.mockResolvedValue(['face-asset-1']);
+
+      await sut.handleQueueSidecar({ force: true });
+
+      expect(mocks.person.getAssetIdsWithNamedFaces).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: 'face-asset-1' } }]);
     });
   });
 
@@ -3300,6 +3397,21 @@ describe(MetadataService.name, () => {
 
       expect(mocks.person.getFacesForSidecar).not.toHaveBeenCalled();
       expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { Rating: 5 });
+    });
+
+    it('should fail and not upsert sidecar file or unlock properties when writeTags fails', async () => {
+      const asset = factory.jobAssets.sidecarWrite();
+      asset.files = [];
+      asset.exifInfo.rating = 4;
+
+      mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
+      mocks.metadata.writeTags.mockResolvedValue(false);
+
+      await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Failed);
+
+      expect(mocks.asset.upsertFile).not.toHaveBeenCalled();
+      expect(mocks.asset.unlockProperties).not.toHaveBeenCalled();
     });
   });
 

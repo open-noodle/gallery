@@ -1142,4 +1142,57 @@ export class PersonRepository {
       .orderBy('asset_face.boundingBoxX1', 'asc')
       .execute();
   }
+
+  async getAssetIdsByPersonGroupIds(personGroupIds: string[]): Promise<string[]> {
+    if (personGroupIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .select('asset_face.assetId')
+      .distinct()
+      .where('asset_face.personGroupId', 'in', personGroupIds)
+      .where('asset_face.deletedAt', 'is', null)
+      .execute();
+
+    return rows.map((row) => row.assetId);
+  }
+
+  async getAssetIdsByFaceIds(faceIds: string[]): Promise<string[]> {
+    if (faceIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .select('asset_face.assetId')
+      .distinct()
+      .where('asset_face.id', 'in', faceIds)
+      .execute();
+
+    return rows.map((row) => row.assetId);
+  }
+
+  async getAssetIdsWithNamedFaces(): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.personGroupId', '=', 'asset_face.personGroupId')
+          .onRef('person.ownerId', '=', 'asset.ownerId'),
+      )
+      .select('asset_face.assetId')
+      .distinct()
+      .where('asset.deletedAt', 'is', null)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('person.name', 'is not', null)
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .execute();
+
+    return rows.map((row) => row.assetId);
+  }
 }
