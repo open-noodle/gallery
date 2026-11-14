@@ -20,6 +20,7 @@ import {
   isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
+  mergeSeenApart,
   parseEmbedding,
   planSampleTimes,
   planSharpenTimes,
@@ -28,9 +29,11 @@ import {
   serializeEmbedding,
   sightingQuality,
   trackEmbedding,
+  unmergedPairs,
   withSighting,
   type Detection,
   type ExistingVideoFace,
+  type FaceTrack,
   type UnmergedPair,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
@@ -276,12 +279,8 @@ export class VideoFaceDetector {
         return;
       }
 
-      const unmerged: UnmergedPair[] = [];
-      const candidates = tracker.finish((pair) => {
-        unmerged.push(pair);
-      });
-      this.logUnmerged(id, unmerged);
-      const tracks = candidates.filter((track) =>
+      const candidates = tracker.finish();
+      const kept = candidates.filter((track) =>
         acceptTrack(track, facialRecognition.minScore, {
           minFaceSize: options.minFaceSize,
           minSightings: options.minSightings,
@@ -291,6 +290,7 @@ export class VideoFaceDetector {
       // A few frames around each kept person's best sample, for a sharper view than the once-a-second samples caught.
       // The person is found again by where they were and how they look, so this picks a better view of someone already
       // found and never adds or merges anyone.
+      const tracks = [...kept];
       const sharpenTimes = planSharpenTimes(tracks, { start, end, sampled: times });
       const bestTimes = tracks.map((track) => track.best.t);
       const sharpened = new Set<number>();
@@ -316,16 +316,27 @@ export class VideoFaceDetector {
         }
       }
 
-      const { added, kept, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
+      // The same merge again, now with the sharper views: one can be a face's first confident view, and so the first
+      // evidence that it is the same person as another face (issue 1306). Without new views it changes nothing.
+      const mergeOptions = {
+        maxDistance: sameFaceDistance,
+        confidentScore: facialRecognition.minScore,
+        sampledFrames: times.length,
+      };
+      const faces = sharpened.size > 0 ? mergeSeenApart(tracks, mergeOptions) : tracks;
+
+      const { added, updated, removed, faceIds } = await this.applyTracks(asset, faces, framePaths, frameSize, {
         maxDistance: sameFaceDistance,
         start,
         force,
       });
+      this.logUnmerged(id, unmergedPairs(faces, mergeOptions), faceIds, facialRecognition.minScore);
       this.deps.logger.log(
-        `Found ${plural(tracks.length, 'face')} in ${times.length} frames of video ${id} in ` +
-          `${humanDuration(Date.now() - startedAt)}: ${added} added, ${kept} updated, ${removed} deleted, ` +
-          `${candidates.length - tracks.length} dropped as too small or unsure, ` +
+        `Found ${plural(faces.length, 'face')} in ${times.length} frames of video ${id} in ` +
+          `${humanDuration(Date.now() - startedAt)}: ${added} added, ${updated} updated, ${removed} deleted, ` +
+          `${candidates.length - kept.length} dropped as too small or unsure, ` +
           `${plural(sharpened.size, 'sharper view')} from ${plural(sharpenTimes.length, 'extra frame')}` +
+          (faces.length < tracks.length ? `, ${tracks.length - faces.length} merged after sharper views` : '') +
           (unreadable > 0 ? `, ${plural(unreadable, 'frame')} unreadable` : ''),
       );
     } finally {
@@ -373,22 +384,32 @@ export class VideoFaceDetector {
   }
 
   /**
-  Debug log of the face pairs the final merge left apart near its threshold, and why: the evidence for tuning
-  `maxDistance`, or for finding one person split in two (issue 1306).
+  Debug log of the face pairs left apart near the merge threshold, closest first, and why: the evidence for tuning
+  `maxDistance`, or for finding one person split in two (issue 1306). Faces are named by id, so a line can be matched
+  with a query on asset_face; `stored` is the distance such a query sees.
   */
-  private logUnmerged(id: string, pairs: UnmergedPair[]) {
+  private logUnmerged(id: string, pairs: UnmergedPair[], faceIds: Map<FaceTrack, string>, minScore: number) {
     if (pairs.length === 0 || !this.deps.logger.isLevelEnabled(LogLevel.Debug)) {
       return;
     }
+    const confident = (track: FaceTrack) => track.sightings.filter((sighting) => sighting.score >= minScore).length;
     const shown = pairs.slice(0, UNMERGED_LOG_LIMIT);
-    for (const { a, b, centroidDistance, embeddingDistance, continuous, seenTogether } of shown) {
+    for (const pair of shown) {
+      const { a, b, centroidDistance, embeddingDistance, storedDistance, continuous, seenTogether, sameSpot } = pair;
+      const why =
+        seenTogether > 0
+          ? `seen together in ${plural(seenTogether, 'frame')}${sameSpot > 0 ? `, ${sameSpot} at the same spot` : ''}`
+          : Number.isFinite(embeddingDistance)
+            ? 'too far apart'
+            : 'too far apart, best views not confident';
       this.deps.logger.debug(
-        `Video ${id}: faces best seen at ${roundDistance(a.best.t)}s and ${roundDistance(b.best.t)}s kept apart ` +
+        `Video ${id}: faces ${faceIds.get(a)} and ${faceIds.get(b)} ` +
+          `(best seen at ${roundDistance(a.best.t)}s and ${roundDistance(b.best.t)}s) kept apart: ${why} ` +
           `(centroids ${roundDistance(centroidDistance)}, ` +
-          `best views ${Number.isFinite(embeddingDistance) ? roundDistance(embeddingDistance) : 'not confident'}` +
-          `${continuous ? ', in consecutive samples' : ''}, ` +
+          `best views ${Number.isFinite(embeddingDistance) ? roundDistance(embeddingDistance) : 'not confident'}, ` +
+          `stored ${roundDistance(storedDistance)}${continuous ? ', in consecutive samples' : ''}, ` +
           `${plural(a.sightings.length, 'sighting')} and ${b.sightings.length}, ` +
-          (seenTogether > 0 ? `seen together in ${plural(seenTogether, 'frame')})` : 'too far apart)'),
+          `${confident(a)} and ${confident(b)} confident)`,
       );
     }
     if (pairs.length > shown.length) {
@@ -400,7 +421,7 @@ export class VideoFaceDetector {
 
   private async applyTracks(
     asset: NonNullable<Awaited<ReturnType<VideoFaceRepository['getForDetect']>>>,
-    tracks: ReturnType<FaceTracker['finish']>,
+    tracks: FaceTrack[],
     framePaths: Map<number, string>,
     frameSize: { width: number; height: number },
     { maxDistance, start, force }: { maxDistance: number; start: number; force?: boolean },
@@ -427,9 +448,11 @@ export class VideoFaceDetector {
     const changes: VideoFaceChanges = { insert: [], update: [], deleteIds: [], embeddings: [], frames: [] };
     const toRecognize: string[] = [];
     const matchedIds: string[] = [];
+    const faceIds = new Map<FaceTrack, string>();
     for (const [index, track] of tracks.entries()) {
       const matchedId = matches.get(index);
       const faceId = matchedId ?? this.deps.cryptoRepository.randomUUID();
+      faceIds.set(track, faceId);
       const { x1, y1, x2, y2 } = roundBox(track.best.box);
       const box = {
         imageWidth: frameSize.width,
@@ -513,6 +536,11 @@ export class VideoFaceDetector {
     await this.deps.videoFaceRepository.markSampled(asset.id);
     await this.deps.assetRepository.upsertJobStatus({ assetId: asset.id, facesRecognizedAt: new Date() });
 
-    return { added: changes.insert.length, kept: changes.update.length, removed: changes.deleteIds.length };
+    return {
+      added: changes.insert.length,
+      updated: changes.update.length,
+      removed: changes.deleteIds.length,
+      faceIds,
+    };
   }
 }

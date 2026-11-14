@@ -606,6 +606,20 @@ describe('VideoFaceDetector', () => {
       expect(progress.at(-1)).toMatch(/^Video faces 90% done \(180 of 200 frames/);
     });
 
+    it('logs the faces it kept apart near the threshold at debug level, by face id, and why (issue 1306)', async () => {
+      mocks.logger.isLevelEnabled.mockReturnValue(true);
+      const lookalike = normalize([0.8, 0.6, 0, 0]);
+      framesShow([face(alice, 100), face(lookalike, 900)], [face(alice, 100), face(lookalike, 900)], [face(bob, 500)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const debug = mocks.logger.debug.mock.calls.map(([message]) => message).filter((m) => m.includes('kept apart'));
+      expect(debug).toEqual([
+        'Video asset-id: faces new-face-1 and new-face-2 (best seen at 1s and 1s) kept apart: seen together in 2 ' +
+          'frames (centroids 0.2, best views 0.2, stored 0.2, 2 sightings and 2, 2 and 2 confident)',
+      ]);
+    });
+
     it('counts frames that could not be read in the finish line', async () => {
       vi.mocked(VideoFrameReader.prototype.extractFrame).mockImplementation(async (_input, output, t) => {
         if (t === 3) {
@@ -657,6 +671,32 @@ describe('VideoFaceDetector', () => {
       await sut.handleDetectFaces({ id: 'asset-id' });
 
       expect(mocks.videoFace.apply.mock.calls[0][0].frames[0].timeSeconds).toBe(1);
+    });
+
+    it('merges two faces once sharper views show them confidently as one person (issue 1306)', async () => {
+      // Every sample unsure, and the two halves' centroids 0.55 apart: too far to merge on the samples alone. A
+      // confident view of each beside its best sample is the evidence that they are one person.
+      const left = normalize([1, -0.5, 0, 0]);
+      const right = normalize([1, 0.75, 0, 0]);
+      framesAt({
+        1: [face(left, 100, 60, 0.6)],
+        3: [face(left, 100, 60, 0.6)],
+        5: [face(left, 100, 60, 0.6)],
+        31: [face(right, 900, 60, 0.6)],
+        33: [face(right, 900, 60, 0.6)],
+        35: [face(right, 900, 60, 0.6)],
+        1.25: [face(alice, 104, 110)],
+        31.25: [face(alice, 904, 110)],
+      });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const { insert, frames } = mocks.videoFace.apply.mock.calls[0][0];
+      expect(insert).toHaveLength(1);
+      expect(frames[0].sightings?.map(({ t }) => t)).toEqual([1, 1.25, 3, 5, 31, 31.25, 33, 35]);
+      expect(loggedMessages(mocks)).toContainEqual(
+        expect.stringMatching(/, 2 sharper views from 8 extra frames, 1 merged after sharper views$/),
+      );
     });
 
     it('looks once at the frames around a moment several people are best seen in', async () => {

@@ -137,8 +137,17 @@ ordering can tell apart.
 
 Most splits that remain are views of one person more than 0.6 apart: a face from the front and from behind, or looking
 down. Merging on looks that far apart would also merge different people, so those faces stay separate and recognition
-or the user ties them to the same person. The debug log lists each pair of faces left apart near the threshold and why
-(distance, or seen together), as evidence for tuning.
+or the user ties them to the same person.
+
+The debug log lists the pairs of faces left apart near the threshold, closest first (20 per video, then a count), so
+a split face can be traced to why it was not merged. Each line names both faces by id, so it can be matched with a
+query on `asset_face`, and gives the reason (seen together, and in how many of those frames the boxes overlap as one
+face found twice would; or too far apart, and whether the best views were confident), the centroid, best-view and
+stored-embedding distances, and each face's sightings and how many were confident. The stored distance is what
+recognition and a query on `face_search` see: it averages the best three views whatever their score, so it can be
+well under the threshold for a pair the merge saw apart on centroids (issue 1306: two faces of one person in a phone
+video, 0.237 apart stored, never merged and never logged, since the old log took the first 20 pairs in track order and
+only pairs near the threshold on the merge's own distances). A pair counts as near on either distance.
 
 ### Per-person confidence
 
@@ -186,7 +195,15 @@ Each extra frame is searched like a sample (tiled too when tiled detection is on
 tracker's continuity rule (`findAgain`): where their best view was, and within the relaxed distance of their looks,
 the closest in looks when several qualify. A find of higher quality becomes their best view and is added to their
 sightings (`withSighting`), so it can also join the averaged embedding. The pass picks a better view of someone already
-found. It never adds a person, drops one or merges two, because only tracks that were already kept are looked for.
+found. It never adds a person or drops one, because only tracks that were already kept are looked for.
+
+The final merge then runs again over the kept faces, with the same rules (`mergeSeenApart`). A sharper view can be a
+face's first confident one, and so the first evidence on best views that two faces are one person; phone videos
+often score every sample below `minScore` (issue 1306: 0.55 to 0.60) and the view a quarter of a second away above
+it. Two faces found in the same extra frame are seen together and never merge. Extra frames do not count for
+continuity, as their indexes follow each other without being consecutive samples, and they stay out of the centroid,
+which remains the mean of the regular samples. Without a sharper view the second run is skipped, as it would change
+nothing. The finish line counts its merges.
 
 ## What is stored
 

@@ -100,5 +100,9 @@ Found 7 faces in 23 frames of video <id> in 27s: 0 added, 7 updated, 0 deleted, 
 
 Videos sampled from 100 frames or more also log their progress every 10%, with an estimate of the time left.
 
+At the `debug` log level, each video also lists the pairs of faces it kept apart although they look alike, closest
+first and by face id, with the reason: seen on screen together, or too far apart. If one person keeps showing up as
+several faces in a video, these lines show why.
+
 Each face found this way stores one frame, about 200 to 400 KB, next to the video's thumbnails. Deleting the video
 deletes its frames.
