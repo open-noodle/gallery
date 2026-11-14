@@ -57,7 +57,13 @@ import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { isHttpException } from 'src/utils/logger.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
-import { batched, findOrFail, isFaceSuggestionEnabled, isFacialRecognitionEnabled } from 'src/utils/misc.js';
+import {
+  batched,
+  findOrFail,
+  isFaceExportEnabled,
+  isFaceSuggestionEnabled,
+  isFacialRecognitionEnabled,
+} from 'src/utils/misc.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
@@ -174,6 +180,7 @@ export class PersonService extends BaseService {
     const result: PersonResponseDto[] = [];
     const changeFeaturePhoto = new Map<string, PersonId>();
     const faceIds: string[] = [];
+    const assetIds: string[] = [];
     for (const data of dto.data) {
       const faces = await this.personRepository.getFacesByIds(
         [{ personGroupId: data.personId, assetId: data.assetId }],
@@ -195,6 +202,7 @@ export class PersonService extends BaseService {
         }
 
         faceIds.push(face.id);
+        assetIds.push(data.assetId);
       }
 
       result.push(mapPerson(person));
@@ -203,6 +211,7 @@ export class PersonService extends BaseService {
     if (changeFeaturePhoto.size > 0) {
       await this.createNewFeaturePhoto(changeFeaturePhoto.values().toArray());
     }
+    await this.queueSidecarWriteForAssets(assetIds);
     return result;
   }
 
@@ -223,6 +232,7 @@ export class PersonService extends BaseService {
     if (face.person && face.person.faceAssetId === face.id) {
       await this.createNewFeaturePhoto([face.person]);
     }
+    await this.queueSidecarWriteForAssets([face.assetId]);
 
     return mapPerson(await this.findOrFail(auth, personGroupId));
   }
@@ -415,6 +425,10 @@ export class PersonService extends BaseService {
       await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id: personGroupId } });
     }
 
+    if (name !== undefined || isHidden !== undefined) {
+      await this.queueSidecarWriteForPeople([personGroupId]);
+    }
+
     return mapPerson(person);
   }
 
@@ -449,10 +463,13 @@ export class PersonService extends BaseService {
   async deleteAll(auth: AuthDto, { ids, userId }: PeopleDeleteDto): Promise<void> {
     assertOwnRecord(auth, userId);
     await this.requireAccess({ auth, permission: Permission.PersonDelete, ids });
+    const { metadata } = await this.getConfig({ withCache: true });
+    const assetIds = isFaceExportEnabled(metadata) ? await this.personRepository.getAssetIdsByPersonGroupIds(ids) : [];
     await this.removeAllPersonGroups(ids, auth.user.id);
     if (ids.length > 0) {
       await this.faceIdentity.queueSpacePersonMetadataBackfill();
     }
+    await this.queueSidecarWriteForAssets(assetIds);
   }
 
   @Chunked()
@@ -915,6 +932,9 @@ export class PersonService extends BaseService {
           sourceIdentityId,
           match: personCreated ? accessibleIdentityMatch : undefined,
         });
+        if (person?.name && !person.isHidden) {
+          await this.queueSidecarWriteForFaces([id]);
+        }
       }
 
       if (!personGroupId) {
@@ -1004,12 +1024,14 @@ export class PersonService extends BaseService {
     // Same cross-owner policy as every other merge path (#733): a merge of your own two people can still
     // reach into someone else's library through a shared identity, and if it would combine two of THEIR
     // people it needs the instance toggle and an explicit acknowledgement. Re-pointing is free.
-    return this.identityMergePropagationService.mergePersonalPeople(
+    const result = await this.identityMergePropagationService.mergePersonalPeople(
       auth,
       id,
       dto.ids,
       await this.crossOwnerMergeAuthorizer(dto),
     );
+    await this.queueSidecarWriteForPeople([id]);
+    return result;
   }
 
   // Upstream looks the person up owner-scoped (`getByGroupId({ ownerId, personGroupId })`) because it has
@@ -1064,13 +1086,63 @@ export class PersonService extends BaseService {
     if (!person.faceAssetId) {
       await this.createNewFeaturePhoto([person]);
     }
+    await this.queueSidecarWriteForAssets([dto.assetId]);
   }
 
   async deleteFace(auth: AuthDto, id: string, dto: AssetFaceDeleteDto): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.FaceDelete, ids: [id] });
+    const { metadata } = await this.getConfig({ withCache: true });
+    const assetIds = isFaceExportEnabled(metadata) ? await this.personRepository.getAssetIdsByFaceIds([id]) : [];
 
     await (dto.force ? this.personRepository.deleteAssetFace(id) : this.personRepository.softDeleteAssetFaces(id));
     await this.faceIdentityRepository.unlinkFaces([id]);
+    await this.queueSidecarWriteForAssets(assetIds);
+  }
+
+  private async queueSidecarWriteForAssets(assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    const { metadata } = await this.getConfig({ withCache: true });
+    if (!isFaceExportEnabled(metadata)) {
+      return;
+    }
+
+    const uniqueIds = [...new Set(assetIds)];
+    await this.jobRepository.queueAll(uniqueIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
+  }
+
+  private async queueSidecarWriteForPeople(personGroupIds: string[]) {
+    if (personGroupIds.length === 0) {
+      return;
+    }
+
+    const { metadata } = await this.getConfig({ withCache: true });
+    if (!isFaceExportEnabled(metadata)) {
+      return;
+    }
+
+    const assetIds = await this.personRepository.getAssetIdsByPersonGroupIds(personGroupIds);
+    if (assetIds.length > 0) {
+      await this.jobRepository.queueAll(assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
+    }
+  }
+
+  private async queueSidecarWriteForFaces(faceIds: string[]) {
+    if (faceIds.length === 0) {
+      return;
+    }
+
+    const { metadata } = await this.getConfig({ withCache: true });
+    if (!isFaceExportEnabled(metadata)) {
+      return;
+    }
+
+    const assetIds = await this.personRepository.getAssetIdsByFaceIds(faceIds);
+    if (assetIds.length > 0) {
+      await this.jobRepository.queueAll(assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
+    }
   }
 
   getUsersForPeople(_auth: AuthDto, _dto: PersonUsersSearchDto): Promise<PersonUsersResponseDto> {

@@ -227,10 +227,9 @@ export class BackendMediaServer {
   then uploaded. An existing S3 sidecar is downloaded first so its contents are kept; otherwise `write` creates a
   fresh XMP at the temp path.
   */
-  async writeSidecar(sidecarPath: string, write: (localPath: string) => Promise<unknown>): Promise<void> {
+  async writeSidecar(sidecarPath: string, write: (localPath: string) => Promise<unknown>): Promise<boolean> {
     if (isDiskPath(sidecarPath)) {
-      await write(sidecarPath);
-      return;
+      return (await write(sidecarPath)) !== false;
     }
 
     const { storageRepository } = this.deps;
@@ -253,9 +252,12 @@ export class BackendMediaServer {
       };
     }
     try {
-      await write(localSidecar.localPath);
+      if ((await write(localSidecar.localPath)) === false) {
+        return false;
+      }
       const stream = storageRepository.createPlainReadStream(localSidecar.localPath);
       await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
+      return true;
     } finally {
       await localSidecar.cleanup();
     }
