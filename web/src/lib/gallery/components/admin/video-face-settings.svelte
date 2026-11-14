@@ -72,4 +72,56 @@
     bind:checked={configToEdit.machineLearning.facialRecognition.video.tiledDetection}
     disabled={off}
   />
+
+  <!-- Each of these is hidden against an older server that does not send it (issue 1306 added them). -->
+  {#if video.maxDistance !== undefined}
+    <SettingInputField
+      inputType={SettingInputFieldType.NUMBER}
+      label={$t('admin.machine_learning_video_faces_max_distance')}
+      description={$t('admin.machine_learning_video_faces_max_distance_description')}
+      bind:value={configToEdit.machineLearning.facialRecognition.video.maxDistance}
+      step="0.05"
+      min={0.1}
+      max={1}
+      disabled={off}
+      isEdited={video.maxDistance !== saved?.maxDistance}
+    />
+  {/if}
+
+  {#if video.minFaceSize !== undefined}
+    <SettingInputField
+      inputType={SettingInputFieldType.NUMBER}
+      label={$t('admin.machine_learning_video_faces_min_face_size')}
+      description={$t('admin.machine_learning_video_faces_min_face_size_description')}
+      bind:value={configToEdit.machineLearning.facialRecognition.video.minFaceSize}
+      step="1"
+      min={0}
+      max={500}
+      disabled={off}
+      isEdited={video.minFaceSize !== saved?.minFaceSize}
+    />
+  {/if}
+
+  {#if video.minSightings !== undefined}
+    <SettingInputField
+      inputType={SettingInputFieldType.NUMBER}
+      label={$t('admin.machine_learning_video_faces_min_sightings')}
+      description={$t('admin.machine_learning_video_faces_min_sightings_description')}
+      bind:value={configToEdit.machineLearning.facialRecognition.video.minSightings}
+      step="1"
+      min={1}
+      max={100}
+      disabled={off}
+      isEdited={video.minSightings !== saved?.minSightings}
+    />
+  {/if}
+
+  {#if video.createPeople !== undefined}
+    <SettingSwitch
+      title={$t('admin.machine_learning_video_faces_create_people')}
+      subtitle={$t('admin.machine_learning_video_faces_create_people_description')}
+      bind:checked={configToEdit.machineLearning.facialRecognition.video.createPeople}
+      disabled={off}
+    />
+  {/if}
 {/if}

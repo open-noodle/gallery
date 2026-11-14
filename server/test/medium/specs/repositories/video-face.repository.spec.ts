@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetType, AssetVisibility } from 'src/enum.js';
 import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
+import { VIDEO_FACE_SAMPLER_VERSION } from 'src/gallery/utils/video-faces.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -304,6 +305,32 @@ describe(VideoFaceRepository.name, () => {
       await expect(unsampled(sut)).resolves.not.toContain(asset.id);
     });
 
+    it('lists a sampled video again while any of its faces comes from an older sampler (issue 1306)', async () => {
+      const { ctx, asset, sut } = await setup();
+      await ctx.newJobStatus({ assetId: asset.id });
+      const faceId = newUuid();
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [{ faceId, embedding: newEmbedding() }],
+        frames: [frame(faceId, { version: VIDEO_FACE_SAMPLER_VERSION - 1 })],
+      });
+      await sut.markSampled(asset.id);
+
+      await expect(unsampled(sut)).resolves.toContain(asset.id);
+
+      await sut.apply({
+        insert: [],
+        update: [{ id: faceId, ...box }],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { version: VIDEO_FACE_SAMPLER_VERSION })],
+      });
+
+      await expect(unsampled(sut)).resolves.not.toContain(asset.id);
+    });
+
     it('keeps the other columns of the gallery job status row when marking a video sampled', async () => {
       const { asset, sut } = await setup();
       const petsDetectedAt = new Date('2026-01-01T00:00:00Z');
@@ -321,6 +348,19 @@ describe(VideoFaceRepository.name, () => {
         .executeTakeFirstOrThrow();
       expect(row.petsDetectedAt).toEqual(petsDetectedAt);
       expect(row.videoFacesSampledAt).not.toBeNull();
+    });
+  });
+
+  describe('isVideoFace', () => {
+    it('tells a video face from a photo face', async () => {
+      const { ctx, user, asset, sut } = await setup();
+      const { asset: photo } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+      const { assetFace: videoFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const { assetFace: photoFace } = await ctx.newAssetFace({ assetId: photo.id });
+
+      await expect(sut.isVideoFace(videoFace.id)).resolves.toBe(true);
+      await expect(sut.isVideoFace(photoFace.id)).resolves.toBe(false);
+      await expect(sut.isVideoFace(newUuid())).resolves.toBe(false);
     });
   });
 });

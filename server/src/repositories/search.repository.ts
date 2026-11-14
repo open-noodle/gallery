@@ -19,6 +19,7 @@ import { SearchFilter, SearchOrder } from 'src/dtos/search.dto.js';
 import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
 import type { LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { buildSearchSmartQueries } from 'src/gallery/utils/smart-search.js';
+import { notOtherFaceOfSameVideo } from 'src/gallery/utils/video-face-search.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -264,6 +265,8 @@ export interface FaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 'userI
   numResults: number;
   maxDistance: number;
   minBirthDate?: Date | null;
+  /** Gallery: leave out the other faces of this face's video (src/gallery/utils/video-face-search.ts). */
+  excludeOtherFacesOfVideo?: string;
 }
 
 export interface FaceSearchResult {
@@ -488,7 +491,15 @@ export class SearchRepository {
       },
     ],
   })
-  searchFaces({ clusterGroupId, embedding, numResults, maxDistance, hasPerson, minBirthDate }: FaceEmbeddingSearch) {
+  searchFaces({
+    clusterGroupId,
+    embedding,
+    numResults,
+    maxDistance,
+    hasPerson,
+    minBirthDate,
+    excludeOtherFacesOfVideo,
+  }: FaceEmbeddingSearch) {
     if (!z.int().min(1).max(1000).safeParse(numResults).success) {
       throw new Error(`Invalid value for 'numResults': ${numResults}`);
     }
@@ -512,6 +523,9 @@ export class SearchRepository {
             .where('asset.deletedAt', 'is', null)
             .where('asset_face.deletedAt', 'is', null) // Gallery: a soft-deleted face keeps its face_search row
             .$if(!!hasPerson, (qb) => qb.where('asset_face.personGroupId', 'is not', null))
+            .$if(!!excludeOtherFacesOfVideo, (qb) =>
+              qb.where((eb) => notOtherFaceOfSameVideo(eb, excludeOtherFacesOfVideo!)),
+            )
             .$if(!!minBirthDate, (qb) =>
               qb.where((eb) =>
                 eb.not(

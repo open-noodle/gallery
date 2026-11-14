@@ -20,6 +20,10 @@ const makeConfig = (
             sceneDetection: true,
             maxFrames: 1800,
             tiledDetection: false,
+            maxDistance: 0.5,
+            minFaceSize: 20,
+            minSightings: 1,
+            createPeople: true,
             ...video,
           },
         }),
@@ -68,6 +72,40 @@ describe('VideoFaceSettings', () => {
     await expect
       .element(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_setting' }))
       .toBeDisabled();
+  });
+
+  it('shows the same-person and filtering settings, enabled with the feature', async () => {
+    await render(VideoFaceSettings, {
+      configToEdit: makeConfig({ enabled: true }),
+      config: makeConfig({}),
+      disabled: false,
+    });
+
+    await expect.element(numberField('admin.machine_learning_video_faces_max_distance')).toBeEnabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_min_face_size')).toBeEnabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_min_sightings')).toBeEnabled();
+    await expect
+      .element(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_create_people' }))
+      .toBeEnabled();
+  });
+
+  it('hides the settings an older server does not send', async () => {
+    const older = () => {
+      const config = makeConfig({});
+      const video = config.machineLearning.facialRecognition.video as Partial<
+        AdminConfigDto['machineLearning']['facialRecognition']['video']
+      >;
+      delete video.maxDistance;
+      delete video.minFaceSize;
+      delete video.minSightings;
+      delete video.createPeople;
+      return config;
+    };
+    await render(VideoFaceSettings, { configToEdit: older(), config: older(), disabled: false });
+
+    await expect.element(numberField('admin.machine_learning_video_faces_interval')).toBeInTheDocument();
+    expect(document.querySelector('label[for="admin.machine_learning_video_faces_max_distance"]')).toBeNull();
+    expect(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_create_people' }).query()).toBeNull();
   });
 
   it('renders nothing against an older server that sends no video block', async () => {
