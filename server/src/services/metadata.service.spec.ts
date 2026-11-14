@@ -3199,7 +3199,7 @@ describe(MetadataService.name, () => {
 
       await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
-            expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { TagsList: ['tag1', 'tag2'] });
+      expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { TagsList: ['tag1', 'tag2'] });
     });
 
     it('should export faces to sidecar when face export is enabled', async () => {

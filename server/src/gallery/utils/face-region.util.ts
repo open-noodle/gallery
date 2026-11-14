@@ -1,5 +1,5 @@
-import type { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { ExifOrientation } from 'src/enum.js';
+import type { ImmichTags } from 'src/repositories/metadata.repository.js';
 
 export interface FaceBoundingBoxInput {
   boundingBoxX1: number;

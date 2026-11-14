@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ExifOrientation } from 'src/enum.js';
 import {
-  type FaceBoundingBoxInput,
   isOrientationSidewards,
   toMwgExifToolArgs,
   toMwgRegionInfo,
+  type FaceBoundingBoxInput,
 } from 'src/gallery/utils/face-region.util.js';
 
 describe('face-region.util', () => {
