@@ -20,6 +20,7 @@ import {
   QueueName,
   SourceType,
 } from 'src/enum.js';
+import { toMwgExifToolArgs, toMwgRegionInfo } from 'src/gallery/utils/face-region.util.js';
 import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
 import { isExtractedMotionPath } from 'src/gallery/utils/motion-path.js';
 import { getMotionVideoPath } from 'src/gallery/utils/storage-keys.js';
@@ -35,7 +36,6 @@ import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { mergeTimeZone } from 'src/utils/date.js';
 import { parseDurationToSeconds } from 'src/utils/duration.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
-import { toMwgExifToolArgs, toMwgRegionInfo } from 'src/gallery/utils/face-region.util.js';
 import { batched, isFaceExportEnabled, isFaceImportEnabled } from 'src/utils/misc.js';
 import { upsertTags } from 'src/utils/tag.js';
 import { Tasks } from 'src/utils/tasks.js';
@@ -584,7 +584,9 @@ export class MetadataService extends BaseService {
     }
 
     await this.backendMedia.writeSidecar(sidecarPath, (path) =>
-      writeArgs ? this.metadataRepository.writeTags(path, exif, writeArgs) : this.metadataRepository.writeTags(path, exif),
+      writeArgs
+        ? this.metadataRepository.writeTags(path, exif, writeArgs)
+        : this.metadataRepository.writeTags(path, exif),
     );
 
     if (asset.files.length === 0) {
