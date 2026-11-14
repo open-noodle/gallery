@@ -20,7 +20,7 @@ import {
   QueueName,
   SourceType,
 } from 'src/enum.js';
-import { toMwgExifToolArgs, toMwgRegionInfo } from 'src/gallery/utils/face-region.util.js';
+import { clearMwgRegionsExifToolArgs, toMwgExifToolArgs, toMwgRegionInfo } from 'src/gallery/utils/face-region.util.js';
 import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
 import { isExtractedMotionPath } from 'src/gallery/utils/motion-path.js';
 import { getMotionVideoPath } from 'src/gallery/utils/storage-keys.js';
@@ -557,7 +557,9 @@ export class MetadataService extends BaseService {
 
     if (isFaceExportEnabled(metadata)) {
       const faces = await this.personRepository.getFacesForSidecar(id);
-      if (faces.length > 0) {
+      if (faces.length === 0 && sidecarFile) {
+        writeArgs = clearMwgRegionsExifToolArgs();
+      } else if (faces.length > 0) {
         const orientation = asset.exifInfo.orientation ? Number(asset.exifInfo.orientation) : undefined;
         const dimensions =
           asset.exifInfo.exifImageWidth && asset.exifInfo.exifImageHeight
