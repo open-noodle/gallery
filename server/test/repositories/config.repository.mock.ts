@@ -99,6 +99,15 @@ export const envData: EnvData = {
     },
   },
 
+  backupS3: {
+    bucket: undefined,
+    region: 'us-east-1',
+    endpoint: undefined,
+    accessKeyId: undefined,
+    secretAccessKey: undefined,
+    prefix: undefined,
+  },
+
   telemetry: {
     apiPort: 8081,
     microservicesPort: 8082,

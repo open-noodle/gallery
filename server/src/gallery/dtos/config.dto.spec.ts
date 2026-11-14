@@ -137,7 +137,8 @@ describe('fork config survives schema composition', () => {
     });
   });
 
-  it('keeps the fork database-backup S3 block', () => {
+  it('keeps the fork database-backup destination and legacy S3 block', () => {
+    expect(parsed.backup.database.destination).toBe('local');
     expect(parsed.backup.database.s3).toEqual({ enabled: false });
   });
 
