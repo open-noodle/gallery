@@ -23,6 +23,35 @@ Recomputing from the markers (rather than from the bbox alone, server-side) also
 client-side smart-search intersection: `mapMarkers` is already narrowed by the `q` loop on the map
 page, and the panel's own query knows nothing about `q`.
 */
+/**
+The bounding box of a clicked cluster, spanned by its members' MARKER coordinates.
+
+`clusterMarkerIdsInBBox` compares the markers' exact coordinates against the selected bbox, so the
+bbox has to come from those same numbers. The one `Map.svelte` hands over is spanned by the leaves
+`getClusterLeaves` returns, and MapLibre's GeoJSON index gives those back reprojected: a leaf's
+lon/lat can differ from its marker's in the last bits. When a leaf lands a hair inside its marker,
+the marker on that edge falls outside the box and drops out of the panel, so a cluster labelled 15
+listed 10 assets (four photos sharing the west edge, one on the east edge).
+
+Looking the clicked ids up in the markers keeps the box and the comparison on the same numbers.
+Returns `undefined` when none of the ids has a marker, so the caller keeps the leaf bbox.
+See `specs/2026-11-15-map-cluster-edge-markers-design.md`.
+*/
+export function clusterSelectionBBox(ids: string[], markers: ClusterMarker[]): SelectionBBox | undefined {
+  const clicked = new Set(ids);
+  const members = markers.filter((marker) => clicked.has(marker.id));
+  if (members.length === 0) {
+    return undefined;
+  }
+
+  return {
+    west: Math.min(...members.map((marker) => marker.lon)),
+    south: Math.min(...members.map((marker) => marker.lat)),
+    east: Math.max(...members.map((marker) => marker.lon)),
+    north: Math.max(...members.map((marker) => marker.lat)),
+  };
+}
+
 export function clusterMarkerIdsInBBox(markers: ClusterMarker[], bbox: SelectionBBox | undefined): Set<string> {
   if (!bbox) {
     return new Set<string>();
