@@ -80,6 +80,11 @@ people found to 24. It takes about five times as long per frame, so leave it off
 - **One video doesn't create a person on its own.** Recognition doesn't count other faces from the same video as
   evidence, so someone who appears in only one video needs to be found in other photos or videos too, as many as the
   facial recognition setting **Minimum recognized faces** asks for, before they get their own entry in People.
+- **Two people on screen together are never the same person.** When recognition would give two faces seen in the
+  same frame to one person, only the first keeps that person, and the other is matched to its next closest person or
+  stays unnamed. This stops small or blurry faces in a group, such as a choir or a car's interior camera, from all
+  landing on one person. In a collage video, where one person can be in two photos at once, the second copy stays
+  unnamed.
 
 Low-resolution and very blurry videos have limits. If a person is only ever a few pixels wide, or never in focus, no
 frame will show them clearly.

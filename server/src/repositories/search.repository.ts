@@ -265,7 +265,7 @@ export interface FaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 'userI
   numResults: number;
   maxDistance: number;
   minBirthDate?: Date | null;
-  /** Gallery: leave out the other faces of this face's video (src/gallery/utils/video-face-search.ts). */
+  /** Gallery: a video face's recognition rules (src/gallery/utils/video-face-search.ts). */
   excludeOtherFacesOfVideo?: string;
 }
 

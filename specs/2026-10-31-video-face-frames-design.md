@@ -369,6 +369,20 @@ video reached `minFaces: 3` on their own and founded a person nobody else matche
 reporter's library came from exactly one video. And a face could take the person of another face it had been kept
 apart from because both were on screen together, which is proof they are two people.
 
+The same filter has a second rule: a person who already has a face seen together with this one (a stored sighting at
+the same time, the tracker's own evidence) is left out entirely, with all of that person's faces, so the face matches
+its next nearest person or none. Leaving out the other face alone was not enough: that person's photos still matched.
+On a copy of the maintainer's library, small and blurry faces, whose embeddings crowd together, went to whoever was
+nearest. Four singers of a choir landed on one unnamed person, 0.07 to 0.22 apart. A driver and a passenger in two
+dashcam videos landed on one named person, as did two children at a belt ceremony and two guests at a dim cake cutting.
+Simulated on that copy, faces without such a conflict keep the person they had. The rule leaves photos alone, since a
+photo face has no video frame row.
+
+Two costs are accepted. In collage videos one person can really be in two photos on screen at once; the second copy
+then keeps no person, which loses nothing the first copy does not show. And the first face recognised keeps the
+person: if the passenger's face is processed before the driver's, the driver's face is the one that moves on.
+Recognition runs in track order, without comparing which of the two is closer to the person.
+
 
 `machineLearning.facialRecognition.video`, beside the fork's `suggestions` (both spread from
 `GalleryFacialRecognitionExtension`, so upstream's schema costs one line, not one per field):

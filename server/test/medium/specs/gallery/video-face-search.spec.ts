@@ -58,6 +58,56 @@ describe('SearchRepository.searchFaces excludeOtherFacesOfVideo', () => {
     await expect(search(self)).resolves.toEqual([self, elsewhere, inPhoto].toSorted());
   });
 
+  it('leaves out every face of a person that a face seen together with this one already has', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { asset: video } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+    const { asset: photo } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+    const { person: together } = await ctx.newPerson({ ownerId: user.id });
+    const { person: apart } = await ctx.newPerson({ ownerId: user.id });
+    const { person: unrelated } = await ctx.newPerson({ ownerId: user.id });
+    const embedding = newEmbedding();
+    const faceIn = async (assetId: string, personGroupId: string | null, sightingTimes?: number[]) => {
+      const { assetFace } = await ctx.newAssetFace({ assetId, personGroupId });
+      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
+      if (sightingTimes) {
+        await ctx.database
+          .insertInto('asset_face_video_frame')
+          .values({
+            faceId: assetFace.id,
+            path: `thumbs/${assetFace.id}.jpeg`,
+            timeSeconds: sightingTimes[0],
+            quality: 0.5,
+            sightings: sightingTimes.map((t) => ({ t, x1: 0, y1: 0, x2: 10, y2: 10, score: 0.8 })),
+            version: 3,
+          })
+          .execute();
+      }
+      return assetFace.id;
+    };
+    const self = await faceIn(video.id, null, [1, 2, 3]);
+    // In the same video: one face shares the frame at 2 s with it, one is only ever on screen at other times.
+    await faceIn(video.id, together.personGroupId, [2, 4]);
+    await faceIn(video.id, apart.personGroupId, [5, 6]);
+    const togetherElsewhere = await faceIn(photo.id, together.personGroupId);
+    const apartElsewhere = await faceIn(photo.id, apart.personGroupId);
+    const unrelatedElsewhere = await faceIn(photo.id, unrelated.personGroupId);
+    const unassigned = await faceIn(photo.id, null);
+
+    const matches = await sut.searchFaces({
+      clusterGroupId: user.clusterGroupId,
+      embedding,
+      numResults: 10,
+      maxDistance: 2,
+      excludeOtherFacesOfVideo: self,
+    });
+
+    expect(matches.map(({ id }) => id).toSorted()).toEqual(
+      [self, apartElsewhere, unrelatedElsewhere, unassigned].toSorted(),
+    );
+    expect(matches.map(({ id }) => id)).not.toContain(togetherElsewhere);
+  });
+
   it('changes nothing for a photo face, whose other faces upstream already counts', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
