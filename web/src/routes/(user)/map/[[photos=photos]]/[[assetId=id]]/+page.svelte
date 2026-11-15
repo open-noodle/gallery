@@ -14,7 +14,7 @@
   import { handlePromiseError } from '#lib/utils.ts';
   import { delay } from '#lib/utils/asset-utils.ts';
   import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
-  import { clusterMarkerIdsInBBox } from '#lib/utils/map-cluster-selection.ts';
+  import { clusterMarkerIdsInBBox, clusterSelectionBBox } from '#lib/utils/map-cluster-selection.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { LoadingSpinner } from '@immich/ui';
   import { onDestroy } from 'svelte';
@@ -65,10 +65,10 @@
 
   // The clicked cluster's leaf ids are deliberately NOT stored: they are a snapshot of the markers as
   // they stood under the filters at click time, and any filter change re-fetches the markers. The
-  // bbox — the tight bounding box of those leaves — is the cluster's durable identity, and
+  // bbox — the tight bounding box of those leaves' markers — is the cluster's durable identity, and
   // `selectedClusterIds` above is re-derived from the current markers inside it.
-  function onClusterSelect(_: string[], bbox: SelectionBBox) {
-    selectedClusterBBox = bbox;
+  function onClusterSelect(assetIds: string[], bbox: SelectionBBox) {
+    selectedClusterBBox = clusterSelectionBBox(assetIds, map.mapMarkers) ?? bbox;
     isTimelinePanelVisible = true;
     assetViewerManager.showAssetViewer(false);
     handlePromiseError(navigate({ targetRoute: 'current', assetId: null }));
