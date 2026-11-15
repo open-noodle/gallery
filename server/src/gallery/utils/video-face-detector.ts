@@ -330,7 +330,10 @@ export class VideoFaceDetector {
         start,
         force,
       });
-      this.logUnmerged(id, unmergedPairs(faces, mergeOptions), faceIds, facialRecognition.minScore);
+      this.logUnmerged(id, unmergedPairs(faces, mergeOptions), faceIds, {
+        maxDistance: sameFaceDistance,
+        minScore: facialRecognition.minScore,
+      });
       this.deps.logger.log(
         `Found ${plural(faces.length, 'face')} in ${times.length} frames of video ${id} in ` +
           `${humanDuration(Date.now() - startedAt)}: ${added} added, ${updated} updated, ${removed} deleted, ` +
@@ -386,30 +389,51 @@ export class VideoFaceDetector {
   /**
   Debug log of the face pairs left apart near the merge threshold, closest first, and why: the evidence for tuning
   `maxDistance`, or for finding one person split in two (issue 1306). Faces are named by id, so a line can be matched
-  with a query on asset_face; `stored` is the distance such a query sees.
+  with a query on asset_face; `stored` is the distance such a query sees. Every reason that applies is given: a pair
+  seen together is often also too far apart to merge.
   */
-  private logUnmerged(id: string, pairs: UnmergedPair[], faceIds: Map<FaceTrack, string>, minScore: number) {
+  private logUnmerged(
+    id: string,
+    pairs: UnmergedPair[],
+    faceIds: Map<FaceTrack, string>,
+    { maxDistance, minScore }: { maxDistance: number; minScore: number },
+  ) {
     if (pairs.length === 0 || !this.deps.logger.isLevelEnabled(LogLevel.Debug)) {
       return;
     }
-    const confident = (track: FaceTrack) => track.sightings.filter((sighting) => sighting.score >= minScore).length;
+    const describe = (track: FaceTrack) => {
+      const confident = track.sightings.filter((sighting) => sighting.score >= minScore).length;
+      return `best seen at ${roundDistance(track.best.t)}s, in ${plural(track.sightings.length, 'frame')}, ${confident} confident`;
+    };
     const shown = pairs.slice(0, UNMERGED_LOG_LIMIT);
     for (const pair of shown) {
-      const { a, b, centroidDistance, embeddingDistance, storedDistance, continuous, seenTogether, sameSpot } = pair;
-      const why =
-        seenTogether > 0
-          ? `seen together in ${plural(seenTogether, 'frame')}${sameSpot > 0 ? `, ${sameSpot} at the same spot` : ''}`
-          : Number.isFinite(embeddingDistance)
-            ? 'too far apart'
-            : 'too far apart, best views not confident';
+      const {
+        a,
+        b,
+        centroidDistance,
+        embeddingDistance,
+        storedDistance,
+        distance,
+        continuous,
+        seenTogether,
+        sameSpot,
+      } = pair;
+      const reasons: string[] = [];
+      if (seenTogether > 0) {
+        reasons.push(
+          `seen together in ${plural(seenTogether, 'frame')}${sameSpot > 0 ? `, ${sameSpot} at the same spot` : ''}`,
+        );
+      }
+      if (!(distance < maxDistance)) {
+        reasons.push(Number.isFinite(embeddingDistance) ? 'too far apart' : 'too far apart, best views not confident');
+      }
       this.deps.logger.debug(
-        `Video ${id}: faces ${faceIds.get(a)} and ${faceIds.get(b)} ` +
-          `(best seen at ${roundDistance(a.best.t)}s and ${roundDistance(b.best.t)}s) kept apart: ${why} ` +
-          `(centroids ${roundDistance(centroidDistance)}, ` +
+        `Video ${id}: faces ${faceIds.get(a)} and ${faceIds.get(b)} kept apart: ${reasons.join(', and ')}. ` +
+          `Distances: centroids ${roundDistance(centroidDistance)}, ` +
           `best views ${Number.isFinite(embeddingDistance) ? roundDistance(embeddingDistance) : 'not confident'}, ` +
-          `stored ${roundDistance(storedDistance)}${continuous ? ', in consecutive samples' : ''}, ` +
-          `${plural(a.sightings.length, 'sighting')} and ${b.sightings.length}, ` +
-          `${confident(a)} and ${confident(b)} confident)`,
+          `stored ${roundDistance(storedDistance)}.` +
+          (continuous ? ' Seen in consecutive samples at the same spot.' : '') +
+          ` First face ${describe(a)}; second face ${describe(b)}.`,
       );
     }
     if (pairs.length > shown.length) {

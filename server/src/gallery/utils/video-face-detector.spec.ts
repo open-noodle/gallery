@@ -615,9 +615,23 @@ describe('VideoFaceDetector', () => {
 
       const debug = mocks.logger.debug.mock.calls.map(([message]) => message).filter((m) => m.includes('kept apart'));
       expect(debug).toEqual([
-        'Video asset-id: faces new-face-1 and new-face-2 (best seen at 1s and 1s) kept apart: seen together in 2 ' +
-          'frames (centroids 0.2, best views 0.2, stored 0.2, 2 sightings and 2, 2 and 2 confident)',
+        'Video asset-id: faces new-face-1 and new-face-2 kept apart: seen together in 2 frames. ' +
+          'Distances: centroids 0.2, best views 0.2, stored 0.2. ' +
+          'First face best seen at 1s, in 2 frames, 2 confident; second face best seen at 1s, in 2 frames, 2 confident.',
       ]);
+    });
+
+    it('gives every reason that applies: seen together, and too far apart (issue 1306)', async () => {
+      mocks.logger.isLevelEnabled.mockReturnValue(true);
+      // 0.55 apart: over the 0.5 threshold, inside the band the log reports.
+      const apart = normalize([0.45, 0.893, 0, 0]);
+      framesShow([face(alice, 100), face(apart, 900)], [face(alice, 100), face(apart, 900)]);
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const debug = mocks.logger.debug.mock.calls.map(([message]) => message).filter((m) => m.includes('kept apart'));
+      expect(debug).toHaveLength(1);
+      expect(debug[0]).toContain('kept apart: seen together in 2 frames, and too far apart.');
     });
 
     it('counts frames that could not be read in the finish line', async () => {

@@ -141,9 +141,11 @@ or the user ties them to the same person.
 
 The debug log lists the pairs of faces left apart near the threshold, closest first (20 per video, then a count), so
 a split face can be traced to why it was not merged. Each line names both faces by id, so it can be matched with a
-query on `asset_face`, and gives the reason (seen together, and in how many of those frames the boxes overlap as one
-face found twice would; or too far apart, and whether the best views were confident), the centroid, best-view and
-stored-embedding distances, and each face's sightings and how many were confident. The stored distance is what
+query on `asset_face`, and gives every reason that applies: seen together, with how many of those frames have the boxes
+overlapping as one face found twice would; and too far apart, with whether the best views were confident. A pair
+seen together is often also too far apart, and naming only the first reason read as if the shared frame alone had
+kept two lookalikes apart. Then come the centroid, best-view and stored-embedding distances, and for each face its
+best time, the frames it was seen in, and how many of those views were confident. The stored distance is what
 recognition and a query on `face_search` see: it averages the best three views whatever their score, so it can be
 well under the threshold for a pair the merge saw apart on centroids (issue 1306: two faces of one person in a phone
 video, 0.237 apart stored, never merged and never logged, since the old log took the first 20 pairs in track order and
