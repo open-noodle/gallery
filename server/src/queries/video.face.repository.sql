@@ -34,12 +34,33 @@ select
   "asset_face"."imageHeight",
   "asset"."originalPath",
   "asset_video_trim"."startTime" as "trimStart",
-  "asset_video_trim"."endTime" as "trimEnd"
+  "asset_video_trim"."endTime" as "trimEnd",
+  (
+    exists (
+      select
+        1 as "one"
+      from
+        "pet_search"
+      where
+        "pet_search"."faceId" = "asset_face"."id"
+    )
+    or exists (
+      select
+        1 as "one"
+      from
+        "person"
+        inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+      where
+        "person"."personGroupId" = "asset_face"."personGroupId"
+    )
+  ) as "isPet",
+  "pet_search"."species" as "petSpecies"
 from
   "asset_face_video_frame"
   inner join "asset_face" on "asset_face"."id" = "asset_face_video_frame"."faceId"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
   left join "asset_video_trim" on "asset_video_trim"."assetId" = "asset"."id"
+  left join "pet_search" on "pet_search"."faceId" = "asset_face"."id"
 where
   "asset_face_video_frame"."faceId" = $1::uuid
   and "asset"."deletedAt" is null
@@ -86,6 +107,25 @@ where
         "asset_face"."assetId" = "asset"."id"
         and "asset_face"."deletedAt" is null
         and "asset_face_video_frame"."version" < 3
+        and not (
+          exists (
+            select
+              1 as "one"
+            from
+              "pet_search"
+            where
+              "pet_search"."faceId" = "asset_face"."id"
+          )
+          or exists (
+            select
+              1 as "one"
+            from
+              "person"
+              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+            where
+              "person"."personGroupId" = "asset_face"."personGroupId"
+          )
+        )
     )
   )
 

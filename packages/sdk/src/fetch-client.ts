@@ -313,6 +313,20 @@ export type AdminConfigOcrDto = {
     /** Name of the model to use */
     modelName: string;
 };
+export type AdminConfigVideoPetsDto = {
+    /** Detect pets in frames sampled across the whole video */
+    enabled?: boolean;
+    /** Largest pet embedding distance at which two views of a pet in one video count as the same pet */
+    maxDistance: number;
+    /** Frame budget per video. Past it the interval is stretched, so the whole video is still covered. */
+    maxFrames: number;
+    /** Sampled frames a pet must be seen in to be kept */
+    minSightings: number;
+    /** Seconds between sampled frames */
+    sampleInterval: number;
+    /** Also sample a frame just after every scene cut */
+    sceneDetection?: boolean;
+};
 export type AdminConfigPetDetectionDto = {
     /** Whether the task is enabled */
     enabled: boolean;
@@ -320,6 +334,7 @@ export type AdminConfigPetDetectionDto = {
     minScore: number;
     /** Name of the model to use */
     modelName: string;
+    video: AdminConfigVideoPetsDto;
 };
 export type AdminConfigPetRecognitionDto = {
     /** Whether the task is enabled */

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { PET_RECOGNITION_MODEL_NAMES } from 'src/constants.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum.js';
@@ -131,6 +132,25 @@ describe(PetRecognitionService.name, () => {
         modelName: 'pet-recognition-large',
       });
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    });
+
+    it('deletes the frame files of the sampled video pets a model switch purges, read before the purge', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ modelName: 'pet-recognition-base' });
+      mocks.petFace.purgePetRecognitionArtifacts.mockResolvedValue();
+      mocks.petFace.getPetFramePaths.mockResolvedValue(['thumbs/owner/as/se/asset_faces/rex.jpeg']);
+      const remove = vi.fn().mockResolvedValue(undefined);
+      vi.spyOn((sut as any).backendMedia, 'backendFor').mockResolvedValue({ delete: remove });
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-base' }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large' }),
+      });
+
+      expect(mocks.petFace.getPetFramePaths).toHaveBeenCalledWith({ embeddedOnly: true });
+      expect(mocks.petFace.getPetFramePaths.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.petFace.purgePetRecognitionArtifacts.mock.invocationCallOrder[0],
+      );
+      expect(remove).toHaveBeenCalledWith('thumbs/owner/as/se/asset_faces/rex.jpeg');
     });
 
     it('R5.3 config change without a model change: no purge, no requeue', async () => {

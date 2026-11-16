@@ -35,6 +35,7 @@ const sdk = vi.hoisted(() => ({
   isHttpError: vi.fn((error: unknown) => typeof (error as { status?: unknown })?.status === 'number'),
   reassignFacesById: vi.fn(),
   createPerson: vi.fn(),
+  updatePerson: vi.fn(),
   deleteFace: vi.fn(),
 }));
 const { getAssetFaceSightings, removeAssetFaceSighting, restoreAssetFaceSighting } = sdk;
@@ -530,7 +531,28 @@ describe('VideoFaceSightings', () => {
           expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-new', faceDto: { id: 'new-face' } }),
         );
         expect(sdk.createPerson).toHaveBeenCalledWith({ personCreateDto: {} });
+        expect(sdk.updatePerson).not.toHaveBeenCalled();
         expect(lastToast().description).toBe('video_face_sighting_moved_new');
+      });
+
+      it("starts a pet, not a person, when a pet's moment moves to a new person", async () => {
+        sdk.updatePerson.mockResolvedValue({ id: 'person-new' });
+        await renderWithTooltips(VideoFaceSightings, {
+          faceIds: ['face-1'],
+          canEdit: true,
+          personId: 'person-rex',
+          isPet: true,
+        });
+
+        await choose(1, 'video_face_sighting_move_new');
+
+        await vi.waitFor(() =>
+          expect(sdk.reassignFacesById).toHaveBeenCalledWith({ id: 'person-new', faceDto: { id: 'new-face' } }),
+        );
+        expect(sdk.updatePerson).toHaveBeenCalledWith({ id: 'person-new', personUpdateDto: { type: 'pet' } });
+        expect(sdk.updatePerson.mock.invocationCallOrder[0]).toBeLessThan(
+          sdk.reassignFacesById.mock.invocationCallOrder[0],
+        );
       });
 
       it('moves the moment to unassigned: a face of its own, given to nobody', async () => {
