@@ -142,6 +142,22 @@ export class VideoFaceDetector {
     return !(await this.deps.videoFaceRepository.isVideoFace(faceId));
   }
 
+  /**
+  Whether recognition may look at this face at all (PersonService.handleRecognizeFaces). A video face whose best
+  detection score is under `minRecognitionScore` is left unassigned: the video detector keeps faces down to a 0.45
+  score, and those small, blurry faces get embeddings close to each other whoever they belong to, so recognition chains
+  them into people who do not exist. Photo faces, and faces with no scored sighting, are unaffected.
+  */
+  async mayRecognize(faceId: string, machineLearning: SystemConfig['machineLearning']): Promise<boolean> {
+    const options = machineLearning.facialRecognition.video;
+    const minScore = options?.minRecognitionScore ?? 0;
+    if (!options?.enabled || minScore <= 0) {
+      return true;
+    }
+    const score = await this.deps.videoFaceRepository.getBestSightingScore(faceId);
+    return score === undefined || score >= minScore;
+  }
+
   async detect(
     id: string,
     machineLearning: SystemConfig['machineLearning'],

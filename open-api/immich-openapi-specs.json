@@ -30977,6 +30977,13 @@
             "minimum": 0,
             "type": "integer"
           },
+          "minRecognitionScore": {
+            "description": "A video face whose best detection score in the video is below this neither joins nor starts a person, and stays unassigned for naming by hand. 0 turns the check off.",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
           "minSightings": {
             "description": "Sampled frames a person must be seen in to be kept",
             "maximum": 100,
@@ -31003,6 +31010,7 @@
           "maxDistance",
           "maxFrames",
           "minFaceSize",
+          "minRecognitionScore",
           "minSightings",
           "sampleInterval"
         ],

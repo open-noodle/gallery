@@ -534,6 +534,35 @@ describe(VideoFaceRepository.name, () => {
     });
   });
 
+  describe('getBestSightingScore', () => {
+    it('returns the best score among sightings that are not removed', async () => {
+      const { asset, sut } = await setup();
+      const faceId = newUuid();
+      const weak = { t: 1, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.62 };
+      const strong = { t: 2, x1: 100, y1: 200, x2: 160, y2: 270, score: 0.9 };
+      await sut.apply({
+        insert: [{ id: faceId, assetId: asset.id, ...box }],
+        update: [],
+        deleteIds: [],
+        embeddings: [],
+        frames: [frame(faceId, { sightings: [weak, { ...strong, removed: true }] })],
+      });
+
+      await expect(sut.getBestSightingScore(faceId)).resolves.toBeCloseTo(0.62);
+      await sut.setSightings(faceId, [weak, strong]);
+      await expect(sut.getBestSightingScore(faceId)).resolves.toBeCloseTo(0.9);
+    });
+
+    it('is undefined for a face without video sightings', async () => {
+      const { ctx, user, sut } = await setup();
+      const { asset: photo } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+      const { assetFace } = await ctx.newAssetFace({ assetId: photo.id });
+
+      await expect(sut.getBestSightingScore(assetFace.id)).resolves.toBeUndefined();
+      await expect(sut.getBestSightingScore(newUuid())).resolves.toBeUndefined();
+    });
+  });
+
   describe('isVideoFace', () => {
     it('tells a video face from a photo face', async () => {
       const { ctx, user, asset, sut } = await setup();

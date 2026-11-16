@@ -276,6 +276,8 @@ export type AdminConfigVideoFacesDto = {
     maxFrames: number;
     /** A person whose largest face in the video is narrower than this, in pixels of the sampled frame, is not kept */
     minFaceSize: number;
+    /** A video face whose best detection score in the video is below this neither joins nor starts a person, and stays unassigned for naming by hand. 0 turns the check off. */
+    minRecognitionScore: number;
     /** Sampled frames a person must be seen in to be kept */
     minSightings: number;
     /** Seconds between sampled frames */
