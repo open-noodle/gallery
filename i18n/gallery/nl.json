@@ -350,6 +350,8 @@
     "machine_learning_video_faces_max_frames_description": "Het maximale aantal beelden uit één video. Langere video's worden met een groter interval bemonsterd, zodat ze toch van begin tot eind worden gedekt.",
     "machine_learning_video_faces_min_face_size": "Minimale gezichtsgrootte",
     "machine_learning_video_faces_min_face_size_description": "Personen van wie het gezicht in de video nooit breder is dan dit aantal pixels worden overgeslagen. Verhoog dit om kleine gezichten op de achtergrond of in een menigte weg te laten.",
+    "machine_learning_video_faces_min_recognition_score": "Minimale detectiezekerheid",
+    "machine_learning_video_faces_min_recognition_score_description": "Een gezicht uit een video waarvan het duidelijkste beeld onder deze detectiezekerheid scoort, wordt aan geen persoon gekoppeld en start geen nieuwe persoon, maar blijft niet toegewezen zodat je het zelf een naam kunt geven. Zo stapelen kleine of wazige gezichten zich niet op bij de verkeerde persoon. 0 schakelt de controle uit.",
     "machine_learning_video_faces_min_sightings": "Minimaal aantal beelden per persoon",
     "machine_learning_video_faces_min_sightings_description": "Personen die in minder bemonsterde beelden te zien zijn worden overgeslagen. Verhoog dit om voorbijgangers weg te laten die maar kort in beeld zijn.",
     "machine_learning_video_faces_scene_detection": "Beelden nemen na scènewissels",
