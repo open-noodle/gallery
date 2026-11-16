@@ -350,6 +350,8 @@
     "machine_learning_video_faces_max_frames_description": "El máximo de fotogramas que se toman de un vídeo. Los vídeos más largos se muestrean con un intervalo mayor, para cubrirlos igualmente de principio a fin.",
     "machine_learning_video_faces_min_face_size": "Tamaño mínimo de cara",
     "machine_learning_video_faces_min_face_size_description": "Se omiten las personas cuya cara nunca supera este ancho en píxeles en el vídeo. Súbelo para dejar fuera las caras pequeñas del fondo o de una multitud.",
+    "machine_learning_video_faces_min_recognition_score": "Confianza mínima de detección",
+    "machine_learning_video_faces_min_recognition_score_description": "Una cara de un vídeo cuya vista más nítida tiene una confianza de detección inferior a este valor no se une a ninguna persona ni crea una nueva, y queda sin asignar para que puedas nombrarla tú. Así las caras pequeñas o borrosas no se acumulan en la persona equivocada. 0 desactiva la comprobación.",
     "machine_learning_video_faces_min_sightings": "Fotogramas mínimos por persona",
     "machine_learning_video_faces_min_sightings_description": "Se omiten las personas que aparecen en menos fotogramas tomados que este número. Súbelo para dejar fuera a los transeúntes que salen solo un momento.",
     "machine_learning_video_faces_scene_detection": "Muestrear tras los cortes de escena",

@@ -1,3 +1,4 @@
+import { JobStatus } from 'src/enum.js';
 import { PersonService } from 'src/services/person.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -34,6 +35,26 @@ describe(PersonService.name, () => {
     await sut.handleRecognizeFaces({ id: face.id, deferred: true });
   };
 
+  /** Recognises one video face whose best sighting has `score`, with `minRecognitionScore` as given. */
+  const recogniseScored = async ({ score, minRecognitionScore }: { score?: number; minRecognitionScore?: number }) => {
+    const asset = AssetFactory.create();
+    const face = AssetFaceFactory.create({ assetId: asset.id });
+    const group = PersonGroupFactory.create();
+    mocks.systemMetadata.get.mockResolvedValue({
+      machineLearning: {
+        facialRecognition: { minFaces: 1, video: { enabled: true, createPeople: true, minRecognitionScore } },
+      },
+    });
+    mocks.person.getFaceForFacialRecognitionJob.mockResolvedValue(getForFacialRecognitionJob(face, asset));
+    mocks.search.searchFaces.mockResolvedValueOnce([getForFaceSearch(face, 0)]).mockResolvedValueOnce([]);
+    mocks.videoFace.isVideoFace.mockResolvedValue(true);
+    mocks.videoFace.getBestSightingScore.mockResolvedValue(score);
+    mocks.person.createGroup.mockResolvedValue(group);
+    mocks.person.create.mockResolvedValue(PersonFactory.create({ personGroupId: group.id }));
+
+    return sut.handleRecognizeFaces({ id: face.id, deferred: true });
+  };
+
   describe('handleRecognizeFaces', () => {
     it('leaves the other faces of the same video out of both recognition searches (issue 1306)', async () => {
       const asset = AssetFactory.create();
@@ -56,6 +77,36 @@ describe(PersonService.name, () => {
         2,
         expect.objectContaining({ hasPerson: true, excludeOtherFacesOfVideo: face.id }),
       );
+    });
+
+    describe('minRecognitionScore', () => {
+      it('leaves a video face below the score unassigned, without searching (default 0.75)', async () => {
+        await expect(recogniseScored({ score: 0.74 })).resolves.toBe(JobStatus.Skipped);
+
+        expect(mocks.search.searchFaces).not.toHaveBeenCalled();
+        expect(mocks.person.createGroup).not.toHaveBeenCalled();
+        expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+      });
+
+      it('recognises a video face at or above the score', async () => {
+        await recogniseScored({ score: 0.75 });
+
+        expect(mocks.search.searchFaces).toHaveBeenCalled();
+        expect(mocks.person.createGroup).toHaveBeenCalled();
+      });
+
+      it('recognises every video face when set to 0', async () => {
+        await recogniseScored({ score: 0.2, minRecognitionScore: 0 });
+
+        expect(mocks.videoFace.getBestSightingScore).not.toHaveBeenCalled();
+        expect(mocks.person.createGroup).toHaveBeenCalled();
+      });
+
+      it('recognises photo faces and unscored faces as before', async () => {
+        await recogniseScored({ score: undefined });
+
+        expect(mocks.person.createGroup).toHaveBeenCalled();
+      });
     });
 
     describe('createPeople', () => {

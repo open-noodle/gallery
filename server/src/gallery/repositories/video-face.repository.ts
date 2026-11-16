@@ -319,6 +319,26 @@ export class VideoFaceRepository {
     return row?.type === AssetType.Video;
   }
 
+  /**
+  The best detection score among a video face's sightings that are not removed, for the `minRecognitionScore` setting.
+  Undefined for a face that is not a video face, or that has no scored sighting.
+  */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getBestSightingScore(faceId: string): Promise<number | undefined> {
+    const row = await this.db
+      .selectFrom('asset_face_video_frame')
+      .select(
+        sql<
+          number | null
+        >`(select max((s->>'score')::float8) from jsonb_array_elements("asset_face_video_frame"."sightings") s where coalesce((s->>'removed')::boolean, false) = false)`.as(
+          'score',
+        ),
+      )
+      .where('asset_face_video_frame.faceId', '=', asUuid(faceId))
+      .executeTakeFirst();
+    return row?.score ?? undefined;
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async markSampled(assetId: string): Promise<void> {
     await this.db
