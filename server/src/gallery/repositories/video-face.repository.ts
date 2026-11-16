@@ -3,6 +3,7 @@ import { Insertable, Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetType, AssetVisibility } from 'src/enum.js';
+import { VIDEO_FACE_SAMPLER_VERSION } from 'src/gallery/utils/video-faces.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceVideoFrameTable } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
@@ -151,7 +152,11 @@ export class VideoFaceRepository {
       .execute();
   }
 
-  /** Visible videos face detection has already been through, but not this sampler: what its Missing job adds. */
+  /**
+  Visible videos face detection has already been through, but not this sampler: what its Missing job adds. That is a
+  video never sampled across its length, or one with a face from an older `VIDEO_FACE_SAMPLER_VERSION`, whose
+  tracking has since changed enough to be worth a rescan.
+  */
   @GenerateSql({ params: [], stream: true })
   streamUnsampled() {
     return this.db
@@ -163,8 +168,32 @@ export class VideoFaceRepository {
       .where('asset.deletedAt', 'is', null)
       .where('asset.visibility', '!=', sql.lit(AssetVisibility.Hidden))
       .where('asset_job_status.facesRecognizedAt', 'is not', null)
-      .where('asset_job_status_gallery.videoFacesSampledAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb('asset_job_status_gallery.videoFacesSampledAt', 'is', null),
+          eb.exists(
+            eb
+              .selectFrom('asset_face')
+              .innerJoin('asset_face_video_frame', 'asset_face_video_frame.faceId', 'asset_face.id')
+              .whereRef('asset_face.assetId', '=', 'asset.id')
+              .where('asset_face.deletedAt', 'is', null)
+              .where('asset_face_video_frame.version', '<', sql.lit(VIDEO_FACE_SAMPLER_VERSION)),
+          ),
+        ]),
+      )
       .stream();
+  }
+
+  /** Whether a face belongs to a video, for the `createPeople` setting. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async isVideoFace(faceId: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select('asset.type')
+      .where('asset_face.id', '=', asUuid(faceId))
+      .executeTakeFirst();
+    return row?.type === AssetType.Video;
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

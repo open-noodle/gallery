@@ -55,7 +55,28 @@ where
   and "asset"."deletedAt" is null
   and "asset"."visibility" != 'hidden'
   and "asset_job_status"."facesRecognizedAt" is not null
-  and "asset_job_status_gallery"."videoFacesSampledAt" is null
+  and (
+    "asset_job_status_gallery"."videoFacesSampledAt" is null
+    or exists (
+      select
+      from
+        "asset_face"
+        inner join "asset_face_video_frame" on "asset_face_video_frame"."faceId" = "asset_face"."id"
+      where
+        "asset_face"."assetId" = "asset"."id"
+        and "asset_face"."deletedAt" is null
+        and "asset_face_video_frame"."version" < 3
+    )
+  )
+
+-- VideoFaceRepository.isVideoFace
+select
+  "asset"."type"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset_face"."id" = $1::uuid
 
 -- VideoFaceRepository.markSampled
 insert into

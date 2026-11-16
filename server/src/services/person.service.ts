@@ -829,6 +829,7 @@ export class PersonService extends BaseService {
         maxDistance: machineLearning.facialRecognition.maxDistance,
         numResults: machineLearning.facialRecognition.minFaces,
         minBirthDate: new Date(face.asset.fileCreatedAt),
+        excludeOtherFacesOfVideo: face.id,
       });
 
       this.logger.debug(`Face ${id} has ${matches.length} matches`);
@@ -852,7 +853,8 @@ export class PersonService extends BaseService {
 
       const isCore =
         (matches.length >= machineLearning.facialRecognition.minFaces || !!accessibleIdentityMatch) &&
-        face.asset.visibility === AssetVisibility.Timeline;
+        face.asset.visibility === AssetVisibility.Timeline &&
+        (await this.videoFaces.mayStartPerson(face.id, machineLearning));
       if (!isCore && !deferred) {
         this.logger.debug(`Deferring non-core face ${id} for later processing`);
         await this.jobRepository.queue({
@@ -879,6 +881,7 @@ export class PersonService extends BaseService {
           numResults: 1,
           hasPerson: true,
           minBirthDate: new Date(face.asset.fileCreatedAt),
+          excludeOtherFacesOfVideo: face.id,
         });
 
         personGroupId = matchWithPerson?.personGroupId ?? undefined;
