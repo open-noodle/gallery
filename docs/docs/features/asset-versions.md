@@ -29,9 +29,9 @@ when those leave no doubt, and otherwise leaves them as they are.
   folder, so they cannot be two shots. A capture time still says no when both files have one and they are more than
   ten seconds apart (a camera's counter that came round again), and so does anything else that tells two cameras or
   shots apart. A JPEG or HEIC is the photo, with the RAW or TIFF behind it; files of one kind only (a RAW and its
-  DNG) are combined too. Only the name a file is stored under counts: an upload kept under its own id, as Immich
-  does by default, is not combined this way; with the storage template on, the uploads of one day stored by name in
-  that day's folder are.
+  DNG) are combined too. Only the name a file is stored under counts: an upload kept under its own id, which is the
+  default, is not combined this way; with the storage template on, the uploads of one day stored by name in that
+  day's folder are.
 
 Gallery would rather leave two files apart than combine two different shots:
 
