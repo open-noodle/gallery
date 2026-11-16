@@ -2,7 +2,8 @@
   import VideoRemoteViewer from '#lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import FaceEditorPanel from '#lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import { assetViewerFadeDuration } from '#lib/constants.ts';
-  import { persistVideoVolume } from '#lib/gallery/asset-viewer/video-volume.ts';
+  import VideoFaceBox from '#lib/gallery/asset-viewer/VideoFaceBox.svelte';
+  import { galleryViewerVideo } from '#lib/gallery/asset-viewer/viewer-video.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { castManager } from '#lib/managers/cast-manager.svelte.ts';
@@ -412,7 +413,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            {@attach persistVideoVolume}
+            {@attach galleryViewerVideo}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></hls-video>
         {:else}
@@ -440,7 +441,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            {@attach persistVideoVolume}
+            {@attach galleryViewerVideo}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></video>
         {/if}
@@ -521,6 +522,7 @@
           {asset}
         />
       {/if}
+      <VideoFaceBox video={hasLoadedMetadata ? videoPlayer : undefined} {containerWidth} {containerHeight} />
     {/if}
   </div>
 {/if}

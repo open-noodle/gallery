@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
 import 'package:immich_mobile/gallery/video/data_saver_video.dart';
+import 'package:immich_mobile/gallery/video_faces/video_moments.widgets.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/is_motion_video_playing.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/video_player_provider.dart';
@@ -339,6 +340,7 @@ class NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widge
               visible: _isVideoReady,
               child: NativeVideoPlayerView(onViewReady: _initController),
             ),
+            VideoFaceBoxOverlay(assetId: widget.asset.id),
             Center(
               child: AnimatedOpacity(
                 opacity: status == VideoPlaybackStatus.buffering ? 1.0 : 0.0,

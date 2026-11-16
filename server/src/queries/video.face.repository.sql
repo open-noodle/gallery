@@ -24,6 +24,26 @@ from
 where
   "faceId" = $1::uuid
 
+-- VideoFaceRepository.getSightings
+select
+  "asset_face_video_frame"."sightings",
+  "asset_face_video_frame"."timeSeconds",
+  "asset_face_video_frame"."path" as "framePath",
+  "asset_face"."assetId",
+  "asset_face"."imageWidth",
+  "asset_face"."imageHeight",
+  "asset"."originalPath",
+  "asset_video_trim"."startTime" as "trimStart",
+  "asset_video_trim"."endTime" as "trimEnd"
+from
+  "asset_face_video_frame"
+  inner join "asset_face" on "asset_face"."id" = "asset_face_video_frame"."faceId"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+  left join "asset_video_trim" on "asset_video_trim"."assetId" = "asset"."id"
+where
+  "asset_face_video_frame"."faceId" = $1::uuid
+  and "asset"."deletedAt" is null
+
 -- VideoFaceRepository.getRepresentativeFramePath
 select
   "asset_face_video_frame"."path"

@@ -170,6 +170,7 @@
   emptyLabel={$t('no_people_found')}
   onSelect={handleSelectCandidate}
   {onClose}
+  videoFace={assetType === AssetTypeEnum.Video ? { id: editedFace.id, canEdit: true } : undefined}
   bind:query={searchName}
   onQueryChange={(query) => handlePromiseError(runSearch(query))}
 >
