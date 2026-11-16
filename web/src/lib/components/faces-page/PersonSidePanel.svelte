@@ -2,6 +2,7 @@
   import { shortcut } from '#lib/actions/shortcut.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import { timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
+  import { offerVideoFaceCombine } from '#lib/gallery/asset-viewer/video-face-combine-offer.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import { languageManager } from '#lib/managers/language-manager.svelte.ts';
@@ -114,6 +115,11 @@
 
       if (!failed) {
         toastManager.primary($t('people_edits_count', { values: { count: numberOfChanges } }));
+        void offerVideoFaceCombine({
+          assetId,
+          assetType,
+          personIds: Object.values(selectedPersonToReassign).map(({ id }) => id),
+        });
       }
     }
 

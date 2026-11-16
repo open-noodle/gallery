@@ -4,8 +4,9 @@ import { expect } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import AssignFaceSidePanel from './AssignFaceSidePanel.svelte';
 
-const { getAllPeopleMock, searchPersonMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
+const { getAllPeopleMock, getAssetFaceSightingsMock, searchPersonMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
   getAllPeopleMock: vi.fn(),
+  getAssetFaceSightingsMock: vi.fn(),
   searchPersonMock: vi.fn(),
   zoomImageToBase64Mock: vi.fn(),
 }));
@@ -15,6 +16,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   return {
     ...actual,
     getAllPeople: (...args: unknown[]) => getAllPeopleMock(...args),
+    getAssetFaceSightings: (...args: unknown[]) => getAssetFaceSightingsMock(...args),
     searchPerson: (...args: unknown[]) => searchPersonMock(...args),
   };
 });
@@ -55,11 +57,11 @@ const editedFace = {
   sourceType: 'machine-learning',
 } as AssetFaceResponseDto;
 
-const renderPanel = (props: { onReassign?: (person: PersonResponseDto) => void } = {}) =>
+const renderPanel = (props: { onReassign?: (person: PersonResponseDto) => void; assetType?: AssetTypeEnum } = {}) =>
   renderWithTooltips(AssignFaceSidePanel, {
     editedFace,
     assetId: 'asset-1',
-    assetType: AssetTypeEnum.Image,
+    assetType: props.assetType ?? AssetTypeEnum.Image,
     onClose: vi.fn(),
     onCreatePerson: vi.fn(),
     onReassign: props.onReassign ?? vi.fn(),
@@ -83,6 +85,8 @@ describe('AssignFaceSidePanel', () => {
 
     getAllPeopleMock.mockResolvedValue({ people: [] });
     searchPersonMock.mockResolvedValue([]);
+    getAssetFaceSightingsMock.mockReset();
+    getAssetFaceSightingsMock.mockResolvedValue({ sightings: [{ time: 4, score: 0.9, isBest: true }] });
   });
 
   // Field report against pr-992-rc.8: the list "doesn't seem to follow any clear sort order,
@@ -171,5 +175,20 @@ describe('AssignFaceSidePanel', () => {
     await userEvent.click(page.getByRole('button', { name: /Bob/ }));
 
     expect(onReassign).toHaveBeenCalledWith(expect.objectContaining({ id: 'p-2', name: 'Bob' }));
+  });
+
+  it("shows where a video face's person was seen", async () => {
+    await renderPanel({ assetType: AssetTypeEnum.Video });
+
+    await expect.element(page.getByTestId('video-face-sightings')).toBeInTheDocument();
+    expect(getAssetFaceSightingsMock).toHaveBeenCalledWith({ id: 'face-1' }, expect.anything());
+  });
+
+  it('asks for no sightings on a photo', async () => {
+    await renderPanel();
+
+    await expect.element(page.getByTestId('person-picker-panel')).toBeInTheDocument();
+    expect(getAssetFaceSightingsMock).not.toHaveBeenCalled();
+    expect(page.getByTestId('video-face-sightings').query()).not.toBeInTheDocument();
   });
 });

@@ -10,13 +10,13 @@
   import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import {
+    AssetTypeEnum,
     attachSpacePersonFace,
     createSpacePerson,
     deleteSpaceAssetFace,
     detachSpacePersonFace,
     getSpaceAssetFaces,
     getSpacePeople,
-    type AssetTypeEnum,
     type SharedSpacePersonResponseDto,
     type SpaceAssetFaceResponseDto,
   } from '@immich/sdk';
@@ -324,6 +324,7 @@
       onSelect={(candidate) => attachToPerson(activeFace, candidate)}
       onClose={closePicker}
       bind:query={personQuery}
+      videoFace={assetType === AssetTypeEnum.Video ? { id: activeFace.id, canEdit: false } : undefined}
     >
       {#snippet searchActions()}
         <Button
