@@ -266,10 +266,18 @@ export type AdminConfigFaceSuggestionDto = {
     maxDistance: number;
 };
 export type AdminConfigVideoFacesDto = {
+    /** Let video faces start new people. When off, a video face only joins a person already found elsewhere. */
+    createPeople?: boolean;
     /** Detect video faces in frames sampled across the whole video */
     enabled?: boolean;
+    /** Largest embedding distance at which two views of a face in one video count as the same person. Separate from recognition, so recognition can stay strict without splitting people inside a video. */
+    maxDistance: number;
     /** Frame budget per video. Past it the interval is stretched, so the whole video is still covered. */
     maxFrames: number;
+    /** A person whose largest face in the video is narrower than this, in pixels of the sampled frame, is not kept */
+    minFaceSize: number;
+    /** Sampled frames a person must be seen in to be kept */
+    minSightings: number;
     /** Seconds between sampled frames */
     sampleInterval: number;
     /** Also sample a frame just after every scene cut */

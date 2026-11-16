@@ -208,6 +208,25 @@ export const GalleryVideoFacesSchema = z
     tiledDetection: galleryConfigBool.describe(
       'Also search each high-resolution frame as four overlapping quarters, to find small faces such as a crowd. Costs about five times the detection work.',
     ),
+    maxDistance: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0.1)
+      .max(1)
+      .describe(
+        'Largest embedding distance at which two views of a face in one video count as the same person. Separate from recognition, so recognition can stay strict without splitting people inside a video.',
+      ),
+    minFaceSize: z
+      .int()
+      .min(0)
+      .max(500)
+      .describe(
+        'A person whose largest face in the video is narrower than this, in pixels of the sampled frame, is not kept',
+      ),
+    minSightings: z.int().min(1).max(100).describe('Sampled frames a person must be seen in to be kept'),
+    createPeople: galleryConfigBool.describe(
+      'Let video faces start new people. When off, a video face only joins a person already found elsewhere.',
+    ),
   })
   .meta({ id: 'AdminConfigVideoFacesDto' });
 
@@ -250,7 +269,17 @@ export const galleryJobDefaults = {
 export const galleryMachineLearningDefaults = {
   clipMaxDistance: 0,
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
-  videoFaces: { enabled: false, sampleInterval: 2, sceneDetection: true, maxFrames: 1800, tiledDetection: false },
+  videoFaces: {
+    enabled: false,
+    sampleInterval: 2,
+    sceneDetection: true,
+    maxFrames: 1800,
+    tiledDetection: false,
+    maxDistance: 0.5,
+    minFaceSize: 20,
+    minSightings: 1,
+    createPeople: true,
+  },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   spatialScene: {

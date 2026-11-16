@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import { stat } from 'node:fs/promises';
 import sharp from 'sharp';
 import type { ConfigFFmpegDto } from 'src/dtos/config.dto.js';
 import type { VideoStreamInfo } from 'src/types.js';
@@ -76,7 +77,14 @@ export class VideoFrameReader {
         ])
         .output(output)
         .on('error', (error) => reject(error))
-        .on('end', () => resolve())
+        // Past the start of the last frame ffmpeg encodes nothing and still exits 0. The sample and sharpen times are
+        // planned within the duration, which ends later: by the last frame's own length, and in a phone video of
+        // issue 1306 by 0.13 s of audio after it.
+        .on('end', () => {
+          stat(output)
+            .then(({ size }) => (size > 0 ? resolve() : reject(new Error(`No frame at ${timeSeconds}s`))))
+            .catch(() => reject(new Error(`No frame at ${timeSeconds}s, past the end of the video stream`)));
+        })
         .run();
     });
   }

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   FaceTracker,
+  absorbedFaces,
   acceptTrack,
   findAgain,
   isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
+  mergeSeenApart,
   normalize,
   planSampleTimes,
   planSharpenTimes,
@@ -13,6 +15,7 @@ import {
   sampleIntervalFor,
   sightingQuality,
   trackEmbedding,
+  unmergedPairs,
   widenSmallFace,
   withSighting,
   type Detection,
@@ -31,6 +34,27 @@ const detection = (embedding: number[], at = box(100), quality = 0.5): Detection
   embedding,
   quality,
 });
+
+type View = { embedding: number[]; frameIndex: number; at?: ReturnType<typeof box>; quality?: number };
+
+/** A track built by hand: one sighting per view, at its frame index as its time, all at one detector score. */
+const handTrack = (views: View[], score = 0.5) => {
+  const sightings = views.map(({ embedding, frameIndex, at = box(100), quality = 0.5 }) => ({
+    ...detection(embedding, at, quality),
+    score,
+    t: frameIndex,
+    frameIndex,
+  }));
+  let best = sightings[0];
+  const sum = best.embedding.map(() => 0);
+  for (const sighting of sightings) {
+    best = sighting.quality > best.quality ? sighting : best;
+    for (const [i, value] of sighting.embedding.entries()) {
+      sum[i] += value;
+    }
+  }
+  return { sightings, best, centroid: normalize(sum) };
+};
 
 describe('planSampleTimes', () => {
   it('samples every interval, starting half an interval in', () => {
@@ -173,6 +197,77 @@ describe('FaceTracker', () => {
     expect(together.finish()).toHaveLength(2);
   });
 
+  it('merges on the best views when sideways ones dragged a track’s centroid away (issue 1306)', () => {
+    // Three sharp frontal views, then the person turns away: blurred sideways views, each joining by the last one,
+    // pull the centroid 0.6 from the same person's frontal views later on. Their best views are 0.03 apart.
+    const turning = [normalize([0.75, 0.66, 0, 0]), normalize([0.3, 0.95, 0, 0])];
+    const away = normalize([0, 1, 0.1, 0]);
+    const frontal = normalize([0.97, 0, 0.24, 0]);
+
+    const tracker = new FaceTracker(0.5);
+    let frame = 0;
+    for (const embedding of [alice, alice, alice]) {
+      tracker.addFrame(frame + 1, frame++, [detection(embedding, box(100), 0.9)]);
+    }
+    for (const embedding of [...turning, ...Array.from({ length: 8 }, () => away)]) {
+      tracker.addFrame(frame + 1, frame++, [detection(embedding, box(100), 0.05)]);
+    }
+    frame += 10;
+    for (let i = 0; i < 3; i++) {
+      tracker.addFrame(frame + 1, frame++, [detection(frontal, box(900), 0.9)]);
+    }
+    expect(tracker.peopleSoFar()).toBe(2);
+
+    const tracks = tracker.finish();
+
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].sightings).toHaveLength(16);
+  });
+
+  it('merges a head turn between two samples by continuity, but only between confident views (issue 1306)', () => {
+    // The first view after the turn is 0.7 from alice, too far even for the tracker's relaxation, so it starts a
+    // second track; the views after it settle 0.55 away. The two tracks end up 0.59 apart, in consecutive samples.
+    const turned = normalize([0.3, 0.954, 0, 0]);
+    const settled = normalize([0.45, 0.893, 0, 0]);
+    const run = (score: number) => {
+      const tracker = new FaceTracker(0.5);
+      for (let frame = 0; frame < 3; frame++) {
+        tracker.addFrame(frame + 1, frame, [{ ...detection(alice, box(100)), score }]);
+      }
+      tracker.addFrame(4, 3, [{ ...detection(turned, box(104)), score }]);
+      for (let frame = 4; frame < 7; frame++) {
+        tracker.addFrame(frame + 1, frame, [{ ...detection(settled, box(104)), score }]);
+      }
+      expect(tracker.peopleSoFar()).toBe(2);
+      return tracker.finish();
+    };
+
+    expect(run(0.9)).toHaveLength(1);
+    // Backs and sides of heads score low, and look alike from one person to the next.
+    expect(run(0.5)).toHaveLength(2);
+  });
+
+  it('compares best views only over confident sightings', () => {
+    // Sharp but unconfident views (the back of a head) cannot pull two tracks together on their best views.
+    const turning = [normalize([0.75, 0.66, 0, 0]), normalize([0.3, 0.95, 0, 0])];
+    const away = normalize([0, 1, 0.1, 0]);
+    const frontal = normalize([0.97, 0, 0.24, 0]);
+    const tracker = new FaceTracker(0.5);
+    let frame = 0;
+    for (let i = 0; i < 3; i++) {
+      tracker.addFrame(frame + 1, frame++, [{ ...detection(alice, box(100), 0.9), score: 0.5 }]);
+    }
+    for (const embedding of [...turning, ...Array.from({ length: 8 }, () => away)]) {
+      tracker.addFrame(frame + 1, frame++, [detection(embedding, box(100), 0.05)]);
+    }
+    frame += 10;
+    for (let i = 0; i < 3; i++) {
+      tracker.addFrame(frame + 1, frame++, [detection(frontal, box(900), 0.9)]);
+    }
+
+    expect(tracker.finish()).toHaveLength(2);
+  });
+
   it('reports which frames are somebody’s best view, so the others can be deleted early', () => {
     const tracker = new FaceTracker(0.5);
     tracker.addFrame(1, 0, [detection(alice, box(100), 0.2)]);
@@ -180,6 +275,113 @@ describe('FaceTracker', () => {
     tracker.addFrame(5, 2, []);
 
     expect(tracker.bestFrameIndexes()).toEqual(new Set([1]));
+  });
+});
+
+describe('mergeSeenApart', () => {
+  // Two tracks of one person, every sampled view unconfident (score 0.5): their centroids are 0.6 apart, too far.
+  const left = normalize([1, 0.2, 0, 0]);
+  const right = normalize([0.3, 1, 0, 0]);
+  const sampled = () => {
+    const tracker = new FaceTracker(0.5);
+    tracker.addFrame(1, 0, [{ ...detection(left, box(100), 0.3), score: 0.5 }]);
+    tracker.addFrame(30, 1, [{ ...detection(right, box(900), 0.3), score: 0.5 }]);
+    return tracker.finish();
+  };
+
+  it('merges two kept faces once a sharper view gives them confident best views that match (issue 1306)', () => {
+    const tracks = sampled();
+    expect(tracks).toHaveLength(2);
+    const sharper = (track: (typeof tracks)[number], t: number, frameIndex: number) =>
+      withSighting(track, { ...detection(alice, track.best.box, 0.9), t, frameIndex });
+
+    const merged = mergeSeenApart([sharper(tracks[0], 1.25, 2), sharper(tracks[1], 30.25, 3)], {
+      maxDistance: 0.5,
+      sampledFrames: 2,
+    });
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].sightings.map(({ t }) => t)).toEqual([1, 1.25, 30, 30.25]);
+    // The centroid stays the mean of the regular samples, as the tracker keeps it.
+    const mean = normalize(left.map((value, i) => value + right[i]));
+    for (const [i, value] of merged[0].centroid.entries()) {
+      expect(value).toBeCloseTo(mean[i]);
+    }
+  });
+
+  it('changes nothing without new views', () => {
+    expect(mergeSeenApart(sampled(), { maxDistance: 0.5, sampledFrames: 2 })).toHaveLength(2);
+  });
+
+  it('never merges two faces a sharper frame shows together', () => {
+    const [first, second] = sampled();
+    const sharperFirst = withSighting(first, { ...detection(alice, box(100), 0.9), t: 15, frameIndex: 2 });
+    const sharperSecond = withSighting(second, { ...detection(alice, box(900), 0.9), t: 15, frameIndex: 2 });
+
+    expect(mergeSeenApart([sharperFirst, sharperSecond], { maxDistance: 0.5, sampledFrames: 2 })).toHaveLength(2);
+  });
+
+  it('does not take two extra frames for consecutive samples', () => {
+    // Two confident views in the same place, 0.55 apart: continuity would merge them in consecutive samples, but extra
+    // frames 2 and 3 are around different moments.
+    const drifted = normalize([0.45, 0.893, 0, 0]);
+    expect(
+      mergeSeenApart(
+        [
+          handTrack([{ embedding: alice, frameIndex: 2 }], 0.9),
+          handTrack([{ embedding: drifted, frameIndex: 3 }], 0.9),
+        ],
+        { maxDistance: 0.5, sampledFrames: 2 },
+      ),
+    ).toHaveLength(2);
+    expect(
+      mergeSeenApart(
+        [
+          handTrack([{ embedding: alice, frameIndex: 0 }], 0.9),
+          handTrack([{ embedding: drifted, frameIndex: 1 }], 0.9),
+        ],
+        { maxDistance: 0.5, sampledFrames: 2 },
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+describe('unmergedPairs', () => {
+  it('reports the pairs left apart near the threshold, closest first, and why', () => {
+    const lookalike = normalize([0.8, 0.6, 0, 0]);
+    const first = handTrack([{ embedding: alice, frameIndex: 0, at: box(100) }]);
+    const sameSpot = handTrack([{ embedding: aliceTurned, frameIndex: 0, at: box(110) }]);
+    const elsewhere = handTrack([{ embedding: lookalike, frameIndex: 0, at: box(900) }]);
+    const far = handTrack([{ embedding: bob, frameIndex: 1 }]);
+
+    const pairs = unmergedPairs([first, sameSpot, elsewhere, far], { maxDistance: 0.5 });
+
+    const ranks = pairs.map(({ distance, storedDistance }) => Math.min(distance, storedDistance));
+    expect(ranks).toEqual([...ranks].sort((x, y) => x - y));
+    expect(pairs).toHaveLength(3);
+    expect(pairs.some(({ a, b }) => a === far || b === far)).toBe(false);
+    expect(pairs.find(({ a, b }) => a === first && b === sameSpot)).toMatchObject({ seenTogether: 1, sameSpot: 1 });
+    expect(pairs.find(({ a, b }) => a === first && b === elsewhere)).toMatchObject({ seenTogether: 1, sameSpot: 0 });
+  });
+
+  it('reports a pair whose stored embeddings are close although the merge saw them apart', () => {
+    // Unconfident views, so the merge compares centroids, which three blurred stray views drag 0.47 away. The face is
+    // stored with its best three views, 0.15 from the other face: what recognition and a query on face_search see.
+    const stray = normalize([0, 0, 0, 1]);
+    const dragged = handTrack([
+      { embedding: alice, frameIndex: 0, quality: 0.6 },
+      { embedding: alice, frameIndex: 1, quality: 0.6 },
+      ...[2, 3, 4].map((frameIndex) => ({ embedding: stray, frameIndex, quality: 0.05 })),
+    ]);
+    const other = handTrack([{ embedding: aliceTurned, frameIndex: 30, at: box(900) }]);
+
+    const pairs = unmergedPairs([dragged, other], { maxDistance: 0.2 });
+
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].embeddingDistance).toBe(Infinity);
+    expect(pairs[0].distance).toBeGreaterThan(0.4);
+    expect(pairs[0].storedDistance).toBeLessThan(0.2);
+    expect(mergeSeenApart([dragged, other], { maxDistance: 0.2 })).toHaveLength(2);
   });
 });
 
@@ -206,6 +408,16 @@ const tracksOf = (...people: number[][]) => {
   return tracker.finish();
 };
 
+/** An old face whose embedding matches alice's track, with the given person. */
+const oldAliceFace = (id: string, personGroupId: string | null) => ({
+  id,
+  embedding: aliceTurned,
+  hasFrame: true,
+  imageWidth: 1920,
+  imageHeight: 1080,
+  box: box(0),
+  personGroupId,
+});
 describe('matchExistingFaces', () => {
   const frame = { width: 1920, height: 1080 };
 
@@ -222,6 +434,38 @@ describe('matchExistingFaces', () => {
     expect(matches.get(0)).toBe('face-alice-2');
     expect(matches.get(1)).toBe('face-bob');
     expect(matches.size).toBe(2);
+  });
+
+  it('keeps the face with a person when several old faces match one track (issue 1306)', () => {
+    const tracks = tracksOf(alice);
+    const existing = [
+      { id: 'unnamed', embedding: alice, hasFrame: true, imageWidth: 1920, imageHeight: 1080, box: box(0) },
+      {
+        id: 'named',
+        embedding: aliceTurned,
+        hasFrame: true,
+        imageWidth: 1920,
+        imageHeight: 1080,
+        box: box(0),
+        personGroupId: 'alice-person',
+      },
+    ];
+
+    expect(matchExistingFaces(existing, tracks, { maxDistance: 0.5, frame, start: 0 }).get(0)).toBe('named');
+  });
+
+  it('finds the old faces a re-scan merged into a face with the same person, and leaves other people alone', () => {
+    const tracks = tracksOf(alice);
+    const existing = [
+      oldAliceFace('kept', 'alice-person'),
+      oldAliceFace('half', 'alice-person'),
+      oldAliceFace('other', 'bob-person'),
+    ];
+    const options = { maxDistance: 0.5, frame, start: 0 };
+    const matches = matchExistingFaces(existing, tracks, options);
+
+    expect(matches.get(0)).toBe('kept');
+    expect(absorbedFaces(existing, tracks, matches, options)).toEqual(new Set(['half']));
   });
 
   it('matches an old poster face by position when its embedding is too blurred to match', () => {
@@ -311,6 +555,24 @@ describe('acceptTrack', () => {
     expect(acceptTrack(trackOf({ score: 0.73, size: 12 }, { score: 0.6, size: 20 }), 0.7)).toBe(true);
   });
 
+  it('drops a person seen in fewer frames than the admin’s minimum, however confident', () => {
+    const tracker = new FaceTracker(0.5);
+    tracker.addFrame(1, 0, [detection(alice)]);
+    const [track] = tracker.finish();
+
+    expect(acceptTrack(track, 0.7)).toBe(true);
+    expect(acceptTrack(track, 0.7, { minSightings: 2 })).toBe(false);
+  });
+
+  it('uses the admin’s minimum face size in place of the built-in one', () => {
+    const tracker = new FaceTracker(0.5);
+    tracker.addFrame(1, 0, [detection(alice, box(100, 100, 40))]);
+    const [track] = tracker.finish();
+
+    expect(acceptTrack(track, 0.7)).toBe(true);
+    expect(acceptTrack(track, 0.7, { minFaceSize: 50 })).toBe(false);
+  });
+
   it('never asks more of a consistent face than an admin who lowered the photo threshold', () => {
     expect(acceptTrack(trackOf({ score: 0.42 }, { score: 0.42 }, { score: 0.42 }), 0.4)).toBe(true);
   });
@@ -390,6 +652,18 @@ describe('mergeDetections', () => {
       { boundingBox: box(104), score: 0.8 },
       { boundingBox: box(600), score: 0.5 },
     ]);
+  });
+
+  it('treats a face cut by a quarter’s edge as the same face, however little of it the quarter shows', () => {
+    // The quarter shows a third of the face: an IoU of 0.33, under the merge threshold, but wholly inside it.
+    const cut = { x1: 100, y1: 100, x2: 140, y2: 220 };
+
+    expect(
+      mergeDetections([
+        { boundingBox: box(100), score: 0.8 },
+        { boundingBox: cut, score: 0.7 },
+      ]),
+    ).toEqual([{ boundingBox: box(100), score: 0.8 }]);
   });
 });
 
