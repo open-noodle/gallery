@@ -98,6 +98,21 @@ from
 where
   "asset_face"."id" = $1::uuid
 
+-- VideoFaceRepository.getBestSightingScore
+select
+  (
+    select
+      max((s ->> 'score')::float8)
+    from
+      jsonb_array_elements("asset_face_video_frame"."sightings") s
+    where
+      coalesce((s ->> 'removed')::boolean, false) = false
+  ) as "score"
+from
+  "asset_face_video_frame"
+where
+  "asset_face_video_frame"."faceId" = $1::uuid
+
 -- VideoFaceRepository.markSampled
 insert into
   "asset_job_status_gallery" ("assetId", "videoFacesSampledAt")

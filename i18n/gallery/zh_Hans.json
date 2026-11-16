@@ -351,6 +351,8 @@
     "machine_learning_video_faces_max_frames_description": "每个视频最多抽取的帧数。较长的视频会以更大的间隔抽帧，从而仍然覆盖从头到尾。",
     "machine_learning_video_faces_min_face_size": "最小人脸尺寸",
     "machine_learning_video_faces_min_face_size_description": "在视频中人脸宽度始终不超过此像素数的人物会被跳过。调高此值可排除背景或人群中的小人脸。",
+    "machine_learning_video_faces_min_recognition_score": "最低检测置信度",
+    "machine_learning_video_faces_min_recognition_score_description": "如果视频中某张人脸最清晰的画面检测置信度仍低于此值，它不会归入任何人物，也不会创建新人物，而是保持未分配，供你手动命名。这样可以避免小而模糊的人脸堆积到错误的人物上。设为 0 则关闭此检查。",
     "machine_learning_video_faces_min_sightings": "每人最少帧数",
     "machine_learning_video_faces_min_sightings_description": "出现在少于此数量的抽取帧中的人物会被跳过。调高此值可排除只短暂出现的路人。",
     "machine_learning_video_faces_scene_detection": "在场景切换后抽帧",

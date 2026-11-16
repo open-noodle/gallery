@@ -350,6 +350,8 @@
     "machine_learning_video_faces_max_frames_description": "Nombre maximal d’images prélevées dans une vidéo. Les vidéos plus longues sont échantillonnées à un intervalle plus large, afin d’être couvertes du début à la fin.",
     "machine_learning_video_faces_min_face_size": "Taille minimale du visage",
     "machine_learning_video_faces_min_face_size_description": "Les personnes dont le visage ne dépasse jamais cette largeur en pixels dans la vidéo sont ignorées. Augmentez-la pour écarter les petits visages à l'arrière-plan ou dans une foule.",
+    "machine_learning_video_faces_min_recognition_score": "Confiance minimale de détection",
+    "machine_learning_video_faces_min_recognition_score_description": "Un visage de vidéo dont la vue la plus nette dans la vidéo a une confiance de détection inférieure à cette valeur n'est associé à aucune personne et n'en crée pas de nouvelle ; il reste non attribué pour que vous puissiez le nommer vous-même. Cela évite que des visages petits ou flous s'accumulent sur la mauvaise personne. 0 désactive la vérification.",
     "machine_learning_video_faces_min_sightings": "Nombre minimal d'images par personne",
     "machine_learning_video_faces_min_sightings_description": "Les personnes visibles dans moins d'images prélevées que ce nombre sont ignorées. Augmentez-le pour écarter les passants qui n'apparaissent que brièvement.",
     "machine_learning_video_faces_scene_detection": "Prélever après les changements de plan",

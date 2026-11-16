@@ -353,6 +353,8 @@
     "machine_learning_video_faces_max_frames_description": "每部影片最多擷取的畫格數。較長的影片會以更大的間隔擷取，仍然涵蓋從頭到尾。",
     "machine_learning_video_faces_min_face_size": "最小臉孔尺寸",
     "machine_learning_video_faces_min_face_size_description": "在影片中臉孔寬度始終不超過此像素數的人物會被略過。調高此值可排除背景或人群中的小臉孔。",
+    "machine_learning_video_faces_min_recognition_score": "最低偵測信賴度",
+    "machine_learning_video_faces_min_recognition_score_description": "如果影片中某張臉孔最清晰的畫面偵測信賴度仍低於此值，它不會歸入任何人物，也不會建立新人物，而是保持未指派，供你手動命名。這樣可以避免小而模糊的臉孔堆積到錯誤的人物上。設為 0 則關閉此檢查。",
     "machine_learning_video_faces_min_sightings": "每人最少畫格數",
     "machine_learning_video_faces_min_sightings_description": "出現在少於此數量的擷取畫格中的人物會被略過。調高此值可排除只短暫出現的路人。",
     "machine_learning_video_faces_scene_detection": "在場景切換後擷取畫格",

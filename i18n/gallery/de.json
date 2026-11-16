@@ -350,6 +350,8 @@
     "machine_learning_video_faces_max_frames_description": "Die maximale Anzahl Bilder pro Video. Längere Videos werden in größeren Abständen abgetastet, damit sie trotzdem vom Anfang bis zum Ende abgedeckt sind.",
     "machine_learning_video_faces_min_face_size": "Mindestgröße eines Gesichts",
     "machine_learning_video_faces_min_face_size_description": "Personen, deren Gesicht im Video nie breiter als so viele Pixel ist, werden übersprungen. Erhöhe den Wert, um kleine Gesichter im Hintergrund oder in einer Menschenmenge auszulassen.",
+    "machine_learning_video_faces_min_recognition_score": "Mindestsicherheit der Erkennung",
+    "machine_learning_video_faces_min_recognition_score_description": "Ein Gesicht aus einem Video, dessen deutlichste Ansicht unter dieser Erkennungssicherheit liegt, wird keiner Person zugeordnet und startet keine neue, sondern bleibt ohne Zuordnung, damit du es selbst benennen kannst. So sammeln sich kleine oder unscharfe Gesichter nicht bei der falschen Person. 0 schaltet die Prüfung aus.",
     "machine_learning_video_faces_min_sightings": "Mindestanzahl Bilder pro Person",
     "machine_learning_video_faces_min_sightings_description": "Personen, die in weniger entnommenen Bildern zu sehen sind, werden übersprungen. Erhöhe den Wert, um Passanten auszulassen, die nur kurz zu sehen sind.",
     "machine_learning_video_faces_scene_detection": "Nach Szenenwechseln abtasten",

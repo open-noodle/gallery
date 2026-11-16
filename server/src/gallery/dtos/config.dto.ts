@@ -227,6 +227,14 @@ export const GalleryVideoFacesSchema = z
     createPeople: galleryConfigBool.describe(
       'Let video faces start new people. When off, a video face only joins a person already found elsewhere.',
     ),
+    minRecognitionScore: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1)
+      .describe(
+        'A video face whose best detection score in the video is below this neither joins nor starts a person, and stays unassigned for naming by hand. 0 turns the check off.',
+      ),
   })
   .meta({ id: 'AdminConfigVideoFacesDto' });
 
@@ -279,6 +287,9 @@ export const galleryMachineLearningDefaults = {
     minFaceSize: 20,
     minSightings: 1,
     createPeople: true,
+    // Small, blurry faces get similar embeddings whoever they belong to, so below this they chain into "people" who
+    // do not exist (specs/2026-10-31-video-face-frames-design.md, "Recognition of weak video faces").
+    minRecognitionScore: 0.75,
   },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },

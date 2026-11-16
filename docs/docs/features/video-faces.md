@@ -44,6 +44,7 @@ it to rescan your videos: use **Missing**.
 | Minimum face size            | 20      | People whose face is never wider than this many pixels are skipped.                                |
 | Minimum frames per person    | 1       | People seen in fewer sampled frames are skipped.                                                   |
 | Start new people from videos | On      | When off, a face found in a video only joins a person who already exists.                          |
+| Minimum detection confidence | 0.75    | A video face whose clearest view scores lower stays unassigned. See below.                         |
 
 Changes to these settings apply to videos scanned afterwards. To apply them to videos already scanned, run **Face
 Detection** with **Refresh**, or choose **Refresh faces** on one video.
@@ -58,6 +59,14 @@ but can mix up two people who look alike.
 **Minimum face size** and **Minimum frames per person** keep background faces and passers-by out of your People list.
 **Start new people from videos** off goes further: video faces are then only matched to people found elsewhere, for
 example in your photos, and a stranger who appears only in videos is left unassigned instead of becoming a new person.
+
+**Minimum detection confidence** keeps small, blurry or half-hidden faces out of recognition. Faces like these look
+more alike to recognition than they really are, so without the check they pile up on a few people who are not one
+real person, often an unnamed person started from a background face in an old photo. A video face whose clearest view
+in the whole video scores below this value stays unassigned: it doesn't join a person and doesn't start one, and you
+can still name it yourself. On one library this cut the faces going to such mixed-up people by three quarters, while
+named people kept 95% of their video faces. Lower it if too many faces of people you know stay unassigned, or set it to
+0 to turn the check off. Faces in photos are not affected.
 
 **Find small faces** helps most with wide shots of groups and crowds. In testing, a 9-second crowd clip went from 7
 people found to 24. It takes about five times as long per frame, so leave it off unless your videos need it.

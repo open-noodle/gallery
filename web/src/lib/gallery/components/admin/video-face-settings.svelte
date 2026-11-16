@@ -116,6 +116,20 @@
     />
   {/if}
 
+  {#if video.minRecognitionScore !== undefined}
+    <SettingInputField
+      inputType={SettingInputFieldType.NUMBER}
+      label={$t('admin.machine_learning_video_faces_min_recognition_score')}
+      description={$t('admin.machine_learning_video_faces_min_recognition_score_description')}
+      bind:value={configToEdit.machineLearning.facialRecognition.video.minRecognitionScore}
+      step="0.05"
+      min={0}
+      max={1}
+      disabled={off}
+      isEdited={video.minRecognitionScore !== saved?.minRecognitionScore}
+    />
+  {/if}
+
   {#if video.createPeople !== undefined}
     <SettingSwitch
       title={$t('admin.machine_learning_video_faces_create_people')}

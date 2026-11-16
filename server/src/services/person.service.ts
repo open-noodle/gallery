@@ -822,6 +822,11 @@ export class PersonService extends BaseService {
         return JobStatus.Skipped;
       }
 
+      if (!(await this.videoFaces.mayRecognize(face.id, machineLearning))) {
+        this.logger.debug(`Skipping face ${id}: a video face below the minimum recognition score`);
+        return JobStatus.Skipped;
+      }
+
       const { ownerId, clusterGroupId } = face.asset;
       const matches = await this.searchRepository.searchFaces({
         clusterGroupId,

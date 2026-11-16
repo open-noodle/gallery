@@ -24,6 +24,7 @@ const makeConfig = (
             minFaceSize: 20,
             minSightings: 1,
             createPeople: true,
+            minRecognitionScore: 0.75,
             ...video,
           },
         }),
@@ -84,6 +85,7 @@ describe('VideoFaceSettings', () => {
     await expect.element(numberField('admin.machine_learning_video_faces_max_distance')).toBeEnabled();
     await expect.element(numberField('admin.machine_learning_video_faces_min_face_size')).toBeEnabled();
     await expect.element(numberField('admin.machine_learning_video_faces_min_sightings')).toBeEnabled();
+    await expect.element(numberField('admin.machine_learning_video_faces_min_recognition_score')).toBeEnabled();
     await expect
       .element(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_create_people' }))
       .toBeEnabled();
@@ -99,12 +101,14 @@ describe('VideoFaceSettings', () => {
       delete video.minFaceSize;
       delete video.minSightings;
       delete video.createPeople;
+      delete video.minRecognitionScore;
       return config;
     };
     await render(VideoFaceSettings, { configToEdit: older(), config: older(), disabled: false });
 
     await expect.element(numberField('admin.machine_learning_video_faces_interval')).toBeInTheDocument();
     expect(document.querySelector('label[for="admin.machine_learning_video_faces_max_distance"]')).toBeNull();
+    expect(document.querySelector('label[for="admin.machine_learning_video_faces_min_recognition_score"]')).toBeNull();
     expect(page.getByRole('switch', { name: 'admin.machine_learning_video_faces_create_people' }).query()).toBeNull();
   });
 

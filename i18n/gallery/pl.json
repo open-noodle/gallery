@@ -350,6 +350,8 @@
     "machine_learning_video_faces_max_frames_description": "Największa liczba klatek pobieranych z jednego filmu. Dłuższe filmy są próbkowane w większych odstępach, więc i tak są pokryte od początku do końca.",
     "machine_learning_video_faces_min_face_size": "Minimalny rozmiar twarzy",
     "machine_learning_video_faces_min_face_size_description": "Osoby, których twarz w filmie nigdy nie jest szersza niż tyle pikseli, są pomijane. Zwiększ tę wartość, aby pominąć małe twarze w tle lub w tłumie.",
+    "machine_learning_video_faces_min_recognition_score": "Minimalna pewność wykrycia",
+    "machine_learning_video_faces_min_recognition_score_description": "Twarz z wideo, której najwyraźniejsze ujęcie ma pewność wykrycia poniżej tej wartości, nie zostaje przypisana do żadnej osoby ani nie tworzy nowej, tylko pozostaje nieprzypisana, aby można było nazwać ją ręcznie. Dzięki temu małe lub rozmyte twarze nie gromadzą się przy niewłaściwej osobie. 0 wyłącza to sprawdzanie.",
     "machine_learning_video_faces_min_sightings": "Minimalna liczba klatek na osobę",
     "machine_learning_video_faces_min_sightings_description": "Osoby widoczne w mniejszej liczbie pobranych klatek są pomijane. Zwiększ tę wartość, aby pominąć przechodniów, którzy pojawiają się tylko na chwilę.",
     "machine_learning_video_faces_scene_detection": "Pobieraj klatki po cięciach",

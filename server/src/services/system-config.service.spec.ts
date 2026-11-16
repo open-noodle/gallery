@@ -179,6 +179,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
         minFaceSize: 20,
         minSightings: 1,
         createPeople: true,
+        minRecognitionScore: 0.75,
       },
     },
     ocr: {

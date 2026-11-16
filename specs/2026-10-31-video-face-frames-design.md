@@ -399,12 +399,30 @@ Recognition runs in track order, without comparing which of the two is closer to
 | `minFaceSize`    | `20`    | 0 to 500 px | A person whose largest face is narrower is not kept      |
 | `minSightings`   | `1`     | 1 to 100    | Sampled frames a person must be seen in to be kept       |
 | `createPeople`   | `true`  |             | Off: a video face only joins an existing person          |
+| `minRecognitionScore` | `0.75` | 0 to 1 | A video face whose best sighting scores below this is left out of recognition |
 
 The last four came with issue 1306. `maxDistance` is the video's own, so an admin who keeps recognition strict (the
 reporter used 0.4) does not split people inside videos with it. `minFaceSize` and `minSightings` cut background faces
 and passers-by. `createPeople` off makes a video face non-core evidence in recognition (`VideoFaceDetector.mayStartPerson`,
 one call in `handleRecognizeFaces`): it joins a person found elsewhere, and otherwise stays unassigned, as a face on a
 hidden asset does.
+
+`minRecognitionScore` came after the issue 1306 retests. On the reporter's library a few unnamed people, all started
+by the initial photo import from small background faces (about 58 px wide in 1440 px images), collected hundreds of
+video faces each. Low-quality embeddings collapse together: random small, low-score faces from different videos sat at
+a median distance of 0.76 from each other, against 0.99 for large sharp ones, and 13.6% of those pairs fell under the
+0.5 recognition threshold. Recognition joins a face to the person of any of its top matches, so these faces chained
+onto whoever had collected weak faces first. The setting leaves a video face out of recognition entirely
+(`VideoFaceDetector.mayRecognize`, one call at the top of `handleRecognizeFaces`) when its best sighting's detection
+score, the maximum of `asset_face_video_frame.sightings[].score` over sightings not removed, is below it; the face
+stays unassigned and can be named by hand. Photo faces and video faces with no scored sightings are not checked. The
+detector keeps finding faces from `minScore` 0.45, so the strip and manual naming still see them. Measured on that
+library (3,901 videos, restored database, same build with and without the check): faces going to the eight mixed
+people fell from 939 to 224, low-score faces given to anyone from 1,112 to 31, one person split across several faces
+in one video from 289 to 173, and named people kept 1,478 of 1,558 video faces, none losing all of them. Two of the
+eight kept their faces, which scored high and came from a few weeks each, so they may be real unnamed people. People
+started from a single face rose from 43 to 61; weak faces still count as neighbours when recognition decides whether
+a face has enough company to start a person, which a later change could stop.
 
 Off by default, like the fork's other heavier ML jobs (pet detection, Spatial Scene), so a fresh install behaves as
 upstream until an admin opts in. Admin-only. The admin UI is `web/src/lib/gallery/components/admin/video-face-settings.svelte`,
