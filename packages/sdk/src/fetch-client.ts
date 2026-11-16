@@ -387,6 +387,8 @@ export type AdminConfigMemoriesDto = {
     };
 };
 export type AdminConfigFacesDto = {
+    /** Export face regions to MWG-rs compliant XMP sidecars */
+    "export"?: boolean;
     /** Import */
     "import": boolean;
 };
