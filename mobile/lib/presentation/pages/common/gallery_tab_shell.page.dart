@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_fold.dart';
 import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/transitions.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
@@ -47,6 +48,8 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
     }
     _lastTab = tab;
     ref.read(galleryTabProvider.notifier).state = tab;
+    // A new tab starts with the whole dock showing.
+    ref.read(galleryDockFoldedProvider.notifier).state = false;
   }
 
   /// Keeps the user on the SLOT they were standing on when the routes list
@@ -146,7 +149,8 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
                       Expanded(child: child),
                     ],
                   )
-                : child,
+                // The active tab's scrolling folds and unfolds the dock.
+                : GalleryDockScrollListener(child: child),
             bottomNavigationBar: isLandscape ? null : GalleryBottomNav(tabsRouter: tabsRouter),
           ),
         );
