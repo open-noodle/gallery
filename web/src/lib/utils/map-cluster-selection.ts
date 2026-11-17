@@ -15,14 +15,29 @@ started matching. Its header, driven by `selectedClusterIds.size`, kept the clic
 forever ("50 assets" over five pins).
 
 The cluster's durable identity is its GEOGRAPHY, not its member ids: the bbox is the tight
-bounding box of the leaves (`Map.svelte` `handleClusterClick`). So the selection is recomputed
-from the CURRENT markers on every marker refetch — which is exactly what a filter change triggers
-— and the panel then narrows AND widens with the filters.
+bounding box of the clicked leaves' markers (`clusterSelectionBBox` below). So the selection is
+recomputed from the CURRENT markers on every marker refetch — which is exactly what a filter change
+triggers — and the panel then narrows AND widens with the filters.
 
 Recomputing from the markers (rather than from the bbox alone, server-side) also keeps the
 client-side smart-search intersection: `mapMarkers` is already narrowed by the `q` loop on the map
 page, and the panel's own query knows nothing about `q`.
 */
+export function clusterMarkerIdsInBBox(markers: ClusterMarker[], bbox: SelectionBBox | undefined): Set<string> {
+  if (!bbox) {
+    return new Set<string>();
+  }
+
+  const ids = markers
+    .filter(
+      (marker) =>
+        marker.lon >= bbox.west && marker.lon <= bbox.east && marker.lat >= bbox.south && marker.lat <= bbox.north,
+    )
+    .map((marker) => marker.id);
+
+  return new Set(ids);
+}
+
 /**
 The bounding box of a clicked cluster, spanned by its members' MARKER coordinates.
 
@@ -50,19 +65,4 @@ export function clusterSelectionBBox(ids: string[], markers: ClusterMarker[]): S
     east: Math.max(...members.map((marker) => marker.lon)),
     north: Math.max(...members.map((marker) => marker.lat)),
   };
-}
-
-export function clusterMarkerIdsInBBox(markers: ClusterMarker[], bbox: SelectionBBox | undefined): Set<string> {
-  if (!bbox) {
-    return new Set<string>();
-  }
-
-  const ids = markers
-    .filter(
-      (marker) =>
-        marker.lon >= bbox.west && marker.lon <= bbox.east && marker.lat >= bbox.south && marker.lat <= bbox.north,
-    )
-    .map((marker) => marker.id);
-
-  return new Set(ids);
 }
