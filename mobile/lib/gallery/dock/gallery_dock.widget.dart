@@ -357,6 +357,7 @@ class _TabBar extends StatelessWidget {
     ];
 
     return GalleryPressable(
+      key: const Key('gallery-dock-tabs'),
       enabled: !unfolded,
       pressedScale: 0.92,
       child: _Glass(

@@ -17,8 +17,6 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/pages/library/spaces/spaces.page.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/widgets/spaces/space_card.dart';
@@ -401,8 +399,8 @@ void main() {
     expect(find.byKey(const Key('spaces-create-button')), findsOneWidget);
 
     final navRects = {
-      'nav pill': tester.getRect(find.byType(GalleryNavPill)),
-      'search blob': tester.getRect(find.byType(GallerySearchBlob)),
+      'tab bar': tester.getRect(find.byKey(const Key('gallery-dock-tabs'))),
+      'search slot': tester.getRect(find.byKey(const Key('gallery-dock-search'))),
     };
 
     // Everything the page floats over its body has to clear the nav cluster.
@@ -435,7 +433,7 @@ void main() {
 
     final cta = tester.getRect(find.byKey(const Key('spaces-empty-create-button')));
 
-    expect(cta.overlaps(tester.getRect(find.byType(GalleryNavPill))), isFalse);
-    expect(cta.overlaps(tester.getRect(find.byType(GallerySearchBlob))), isFalse);
+    expect(cta.overlaps(tester.getRect(find.byKey(const Key('gallery-dock-tabs')))), isFalse);
+    expect(cta.overlaps(tester.getRect(find.byKey(const Key('gallery-dock-search')))), isFalse);
   });
 }

@@ -131,7 +131,7 @@ void main() {
     await pumpPhotosWithRouter(tester, container, router);
     await sync(tester, server);
 
-    // The search button (GallerySearchBlob → openGallerySearch), already on Photos.
+    // The search button (the GalleryDock search slot → openGallerySearch), already on Photos.
     await openGallerySearch(FakeTabsRouter(initialIndex: kGalleryPhotosIndex), container.read);
     await sync(tester, server);
     expect(find.byType(SearchHeader), findsOneWidget);

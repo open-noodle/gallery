@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
 import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
@@ -17,7 +18,6 @@ import 'package:immich_mobile/gallery/search/search_timeline.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
@@ -116,7 +116,7 @@ void main() {
       await disposePhotosPage(tester, container);
     });
 
-    testWidgets('the search button always enters search mode and the bottom nav hides (no preview switch)', (
+    testWidgets('the search button always enters search mode and the dock stays as the tab circle and grouping row', (
       tester,
     ) async {
       final navContainer = ProviderContainer(
@@ -144,12 +144,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(GallerySearchBlob));
+      await tester.tap(find.byKey(const Key('gallery-dock-search')));
       await tester.pumpAndSettle();
 
       expect(navContainer.read(searchModeProvider), isTrue);
       final opacity = tester.widget<AnimatedOpacity>(find.byKey(const Key('gallery-bottom-nav-opacity')));
-      expect(opacity.opacity, 0, reason: 'search mode hides the bottom nav');
+      expect(opacity.opacity, 1, reason: 'search mode keeps the dock');
+      expect(tester.widget<GalleryDock>(find.byType(GalleryDock)).mode, GalleryDockMode.search);
       await tester.pumpWidget(const SizedBox.shrink());
       navContainer.dispose();
     });
@@ -774,37 +775,31 @@ void main() {
     await disposePhotosPage(tester, container);
   });
 
-  testWidgets(
-    'the memory lane hides while a filter is active; the grouping pill stays and Years zoom works on results',
-    (tester) async {
-      await pump(tester, timelineAssets: 5, memories: true);
-      expect(find.byType(MemoryLane), findsOneWidget);
-      expect(
-        find.byType(TimelineGroupingBottomPill),
-        findsNothing,
-        reason: 'Photos keeps its app-bar chip outside search',
-      );
+  testWidgets('the memory lane hides while a filter is active, and Years zoom works on results', (tester) async {
+    await pump(tester, timelineAssets: 5, memories: true);
+    expect(find.byType(MemoryLane), findsOneWidget);
+    expect(find.byType(TimelineGroupingBottomPill), findsNothing);
 
-      await enterSearchMode(tester, container);
-      expect(find.byType(TimelineGroupingBottomPill), findsOneWidget);
+    await enterSearchMode(tester, container);
+    // The page adds no pill of its own: the shell's dock carries the grouping row in search mode.
+    expect(find.byType(TimelineGroupingBottomPill), findsNothing);
 
-      container
-          .read(searchStateProvider.notifier)
-          .togglePerson(const SearchPersonRef(filterId: 'person:anna', name: 'Anna', profileId: 'anna'));
-      await settleFrames(tester);
-      expect(find.byType(MemoryLane), findsNothing);
+    container
+        .read(searchStateProvider.notifier)
+        .togglePerson(const SearchPersonRef(filterId: 'person:anna', name: 'Anna', profileId: 'anna'));
+    await settleFrames(tester);
+    expect(find.byType(MemoryLane), findsNothing);
 
-      final timeline = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
-      await timeline.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years);
-      await settleFrames(tester);
-      // Anna's results: two in 2024, one in 2023.
-      expect(find.bySemanticsLabel(RegExp(r'^2024, 2 photos')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp(r'^2023, 1 photo')), findsOneWidget);
+    final timeline = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await timeline.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years);
+    await settleFrames(tester);
+    // Anna's results: two in 2024, one in 2023.
+    expect(find.bySemanticsLabel(RegExp(r'^2024, 2 photos')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^2023, 1 photo')), findsOneWidget);
 
-      await timeline.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all);
-      await disposePhotosPage(tester, container);
-    },
-  );
+    await timeline.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all);
+    await disposePhotosPage(tester, container);
+  });
 }
 
 /// The chip's dimming: a greyed chip fades to less than full opacity.

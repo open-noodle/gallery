@@ -68,7 +68,7 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
 class PhotosTimelineAppBar extends StatelessWidget {
   const PhotosTimelineAppBar({super.key});
 
-  // Search (and its sort) is reached from the bottom-nav search button (GallerySearchBlob), so the app bar keeps only
+  // Search (and its sort) is reached from the dock's search button (GalleryDock), so the app bar keeps only
   // the display menu (library view, grouping). Every widget here is permanent and 40-50 px wide, which is what keeps
   // the title slot (and therefore the logo) the same width in every state (#1030).
   static const actions = <Widget>[PhotosViewMenuButton()];

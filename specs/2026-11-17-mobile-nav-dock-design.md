@@ -25,15 +25,15 @@ The owner wants the shell's bottom chrome modelled on the iOS 26 tab bar with it
 
 | State | Row 1 (top) | Row 2 (bottom) |
 | --- | --- | --- |
-| **Unfolded** (default, at the top, after scrolling up) | Grouping row: `Years · Months · All` segmented control plus a display-options button. **Photos tab only.** | Tab bar: the three nav slots (`galleryNavSlotsProvider`) and Search, in one glass pill with a sliding selection highlight. |
-| **Folded** (after scrolling down) | none | A circle holding the active tab's icon on the left, the grouping control in the middle (display-options button hidden), and a search circle on the right. On the other tabs the middle stays empty. |
+| **Unfolded** (default, at the top, after scrolling up) | Grouping row: the `Years · Months · All` control (`TimelineGroupingSelector`, as on the detail-page pill). **Photos tab only.** | Tab bar: the three nav slots (`galleryNavSlotsProvider`) and Search, in one glass pill with a sliding selection highlight. |
+| **Folded** (after scrolling down) | none | A circle holding the active tab's icon on the left, the grouping control in the middle, and a search circle on the right. On the other tabs the middle stays empty. |
 | **Search** (Photos search mode) | none | Tab circle on the left and the grouping row filling the rest. The field and chips stay in the top header. |
 
 What morphs into what, with all geometry on one spring:
 
 - The tab pill shrinks into the left circle. Inactive tabs scale down and fade, labels fade and blur, and the active icon slides to the circle's centre.
 - The search slot detaches from the tab pill and becomes its own glass circle on the right.
-- The grouping row drops into the gap between the two circles and narrows. Its display-options button collapses to zero width.
+- The grouping row drops into the gap between the two circles and narrows.
 
 ### Interactions
 
@@ -47,13 +47,13 @@ What morphs into what, with all geometry on one spring:
 - **Tap a tab while unfolded:** as today. Re-tapping Photos scrolls to the top (`ScrollToTopEvent`), and every tap runs the existing refresh side effects in `_onTabTap`.
 - **Tap search:** `openGallerySearch`, as today.
 - **In search, tap the circle:** leave search mode, the same as the header's ←.
-- **Display options:** the button opens the existing library-view menu (`_PhotosViewMenu`: Everything / Personal / Spaces). The grouping control in the row replaces the grouping section of that menu, so the menu keeps only the library view.
+- **Display options** stay in the Photos app bar (`PhotosViewMenuButton`) for now, grouping section included. The mockup's display-options button in the grouping row is a follow-up: the menu is anchored below its button and needs an upward variant first.
 
 ### Unchanged behaviour carried over
 
 - Hidden while multi-select is on, and while the keyboard is up (`viewInsets.bottom > 80`). The same 200 ms slide and fade as today.
 - In read-only mode the collection and library slots are disabled.
-- Landscape keeps the `NavigationRail`; the dock is portrait only. In landscape the grouping stays in the Photos app bar, as today.
+- Landscape keeps the `NavigationRail`; the dock is portrait only.
 - Labels that don't fit shrink the tabs rather than pushing search off-screen (#909). Search keeps its full slot.
 - RTL mirrors the geometry: the tab circle sits on the right.
 - Reduced motion (`GalleryMotion.reduced`): no spring and no overshoot, a 150 ms ease.
@@ -77,7 +77,7 @@ The owner reported the grouping pill showing in the middle of the screen during 
 
 - `PhotosSearchFrame` stops adding its own `TimelineGroupingBottomPill`.
 - `GalleryBottomNav` no longer hides when `searchModeProvider` is on. It switches the dock to its search state instead.
-- The reserved bottom padding `PhotosSearchFrame` adds in search mode becomes the dock's single-row height.
+- `PhotosSearchFrame` stops adding the pill's height to the bottom padding: the dock stays in search mode and the scaffold already reserves its height (`extendBody`).
 - The chip sheets (People, Places, Dates, Filters) open over the dock as they open over the pill today.
 
 ## Layering
@@ -86,9 +86,8 @@ Everything new is in `mobile/lib/gallery/dock/`:
 
 | File | Holds |
 | --- | --- |
-| `gallery_dock.widget.dart` | The dock: geometry for the three states, spring, glass surface |
-| `gallery_dock_fold.dart` | The fold state notifier, and the scroll-direction listener the shell wraps around its child |
-| `gallery_dock_accessory.dart` | The grouping row, wrapping `TimelineGroupingSelector(bare: true)` and the display-options button |
+| `gallery_dock.widget.dart` | The dock: geometry for the three states, the spring (`GallerySpringCurve`, stiffness 240, damping 21), the glass surface, the grouping row wrapping `TimelineGroupingSelector(bare: true)` |
+| `gallery_dock_fold.dart` | The fold state provider, and the scroll-direction listener the shell wraps around its child |
 
 `TimelineGroupingSelector` reads only `timelineOverviewModeProvider`. Photos uses `sharedGrouping: true`, so that provider is not overridden there, and the shell's dock drives the Photos grouping directly.
 
@@ -97,11 +96,10 @@ Fork files that change:
 - `gallery_bottom_nav.widget.dart` renders the dock instead of the pill and blob.
 - `gallery_tab_shell.page.dart` wraps `child` in the scroll listener.
 - `search_frame.widget.dart` changes as described under Search mode.
-- `photos_view_menu.widget.dart`: the menu loses its grouping section, and the button moves into the dock.
 
-`gallery_nav_pill.widget.dart` and `gallery_search_blob.widget.dart` are deleted once nothing uses them.
+`gallery_nav_pill`, `gallery_search_blob`, `gallery_nav_segment` and `animated_nav_icon` are deleted with their tests; nothing else used them.
 
-Upstream files: `main_timeline.page.dart` keeps the `PhotosViewMenuButton` hunk only for landscape, or loses it if landscape gets the menu elsewhere. Either way its diff against `refs/upstream/v3.4.1` does not grow. No other upstream file is touched.
+Upstream files: one comment inside the existing fork hunk of `main_timeline.page.dart` renames the search button it points at. Its diff against `refs/upstream/v3.4.1` does not grow, and no other upstream file is touched.
 
 No new i18n keys: the tab labels, `display_options`, and the grouping labels (`timeline_grouping_*`) already exist.
 
@@ -119,7 +117,7 @@ Widget tests in `mobile/test/gallery/dock/`:
 - **Reserved height.** It equals the unfolded height on Photos and on the other tabs, and it does not change when the dock folds.
 - **Carried over** from `gallery_bottom_nav_test.dart`: multi-select hide, keyboard hide, read-only disabled slots, #909 narrow-screen labels, landscape rail, reduced motion.
 
-Existing tests that reference the old widgets or keys get updated: `gallery_tab_shell_test`, `gallery_bottom_nav_test`, `photos_view_menu_test`, `photos_search_mode_test`, `main_timeline_page_test`. The detail-page and pill tests (`timeline_grouping_bottom_pill_test`, `timeline_with_grouping_pill_test`, `scoped_search_test`, `map_bottom_sheet_timeline_test`, the page tests) must pass unchanged.
+Existing tests that referenced the old widgets or keys are updated: `gallery_bottom_nav_test`, `photos_search_mode_test`, `spaces_page_test`. The detail-page and pill tests (`timeline_grouping_bottom_pill_test`, `timeline_with_grouping_pill_test`, `scoped_search_test`, `map_bottom_sheet_timeline_test`, the page tests) must pass unchanged.
 
 On device, iOS and Android:
 
