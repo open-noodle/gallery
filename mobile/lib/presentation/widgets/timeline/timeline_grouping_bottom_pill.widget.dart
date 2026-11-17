@@ -10,7 +10,7 @@ import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 ///
 /// Always visible on detail timelines (the scrolls-away top header it replaces was the bug);
 /// hides only for multiselect (the selection bottom sheet takes the bottom edge) and while
-/// the keyboard is up. Visual language mirrors [GalleryNavPill]'s blur-surface pill.
+/// the keyboard is up. Visual language mirrors the shell's [GalleryDock].
 class TimelineGroupingBottomPill extends ConsumerWidget {
   const TimelineGroupingBottomPill({super.key});
 
@@ -66,7 +66,7 @@ class TimelineGroupingBottomPill extends ConsumerWidget {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                      // Mirrors GalleryNavPill's surface treatment (dark: translucent elevated
+                      // Mirrors the GalleryDock surface treatment (dark: translucent elevated
                       // surface; light: high-alpha surface slab over the blur).
                       color: theme.brightness == Brightness.dark
                           ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
