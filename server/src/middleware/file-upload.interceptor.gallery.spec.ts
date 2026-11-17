@@ -43,7 +43,8 @@ describe(`${FileUploadInterceptor.name} upload guard`, () => {
   });
 
   it('accepts a JPEG with and without a matching checksum, returning its hash', async () => {
-    for (const headers of [{ 'x-immich-checksum': sha1(jpeg) }, {}]) {
+    const cases: Record<string, string>[] = [{ 'x-immich-checksum': sha1(jpeg) }, {}];
+    for (const headers of cases) {
       const { error, info } = await upload([jpeg], headers);
       expect(error).toBeNull();
       expect(info?.size).toBe(jpeg.length);
