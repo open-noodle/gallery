@@ -127,6 +127,18 @@ describe('PetVideoTracker', () => {
     expect(tracker.petsSoFar()).toBe(2);
   });
 
+  it('drops a pet never seen at a confident score, however often it was seen', () => {
+    const tracker = new PetVideoTracker(0.55, 0.3);
+    for (const [index, t] of [1, 3, 5, 7].entries()) {
+      tracker.addFrame(t, index, [
+        pet('dog', 100, { embedding: rex, score: 0.45 }),
+        pet('cat', 900, { embedding: tom, score: index === 2 ? 0.5 : 0.35 }),
+      ]);
+    }
+
+    expect(tracked(tracker)).toEqual([{ label: 'cat', embeddable: true, times: [1, 3, 5, 7] }]);
+  });
+
   it('drops pets seen in fewer than minSightings frames', () => {
     const tracker = new PetVideoTracker(0.55, 0.3);
     tracker.addFrame(1, 0, [pet('dog', 100, { embedding: rex }), pet('cat', 600, { embedding: tom })]);

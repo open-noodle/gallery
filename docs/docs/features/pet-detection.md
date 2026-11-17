@@ -143,10 +143,13 @@ already found on the video keeps its name and moves to the new, clearer frame.
 | Sample after scene cuts | On      | Also looks at the start of each new shot in edited videos, so a short shot is not missed.          |
 | Frame budget per video  | 900     | The most frames sampled from one video. A longer video is sampled at a wider interval instead.     |
 | Same pet within a video | 0.55    | How alike two views of a dog or cat in one video must be to count as the same pet.                 |
-| Minimum frames per pet  | 2       | Pets seen in fewer sampled frames are skipped. A clip with fewer frames keeps a pet seen in all.  |
+| Minimum frames per pet  | 2       | Pets seen in fewer sampled frames are skipped. A clip with fewer frames keeps a pet seen in all.   |
 
 **Same pet within a video** only applies with [Pet Recognition](/features/pet-recognition) on, which is what tells two
 dogs apart. Without it, every dog in a video is recorded as one entry, as on photos, and so is every cat.
+
+A pet is only kept if the detector was confident about it at least once in the video, so a blurry shape that looks a
+little like a cat in a few frames does not become a pet.
 
 Raise **Minimum frames per pet** if you see pets that are not there: a detection that turns up in a single frame of a
 long video is more often a cushion than a cat.

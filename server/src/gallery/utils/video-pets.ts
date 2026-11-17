@@ -18,6 +18,14 @@ are never rewritten by face detection, so they must not be compared with VIDEO_F
 */
 export const VIDEO_PET_SAMPLER_VERSION = 1;
 
+/**
+A pet is kept only when at least one of its sightings reaches this detector score. Detection runs at the photo
+`minScore` (0.3 by default), and across hundreds of frames that lets through small, unsure boxes: on the owner's library
+copy, every pet found in a random sample of 60 videos with no pet on their poster was one (best scores 0.35 to 0.53, 75
+to 86 px), and pet recognition matched three of them to named pets. A real pet in a video is seen clearly at least once.
+*/
+export const VIDEO_PET_CONFIDENT_SCORE = 0.5;
+
 export type PetDetection = Omit<Detection, 'embedding'> & {
   label: string;
   /** Unit-length embedding; present only for a species pet recognition identifies, with recognition on. */
@@ -138,7 +146,10 @@ export class PetVideoTracker {
     return indexes;
   }
 
-  /** The pets seen in at least `minSightings` sampled frames, after merging the tracks seen apart. */
+  /**
+  The pets seen in at least `minSightings` sampled frames and confidently at least once (VIDEO_PET_CONFIDENT_SCORE),
+  after merging the tracks seen apart.
+  */
   finish(minSightings: number): PetTrack[] {
     const tracks: PetTrack[] = Array.from(this.tracker.finish(), (track) => ({
       label: majorityLabel(track.sightings, 'pet'),
@@ -148,7 +159,11 @@ export class PetVideoTracker {
     for (const [label, { sightings, best }] of this.buckets) {
       tracks.push({ label, embeddable: false, track: { sightings, best, centroid: [] } });
     }
-    return tracks.filter(({ track }) => track.sightings.length >= minSightings);
+    return tracks.filter(
+      ({ track }) =>
+        track.sightings.length >= minSightings &&
+        track.sightings.some(({ score }) => score >= VIDEO_PET_CONFIDENT_SCORE),
+    );
   }
 }
 

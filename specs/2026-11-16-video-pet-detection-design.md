@@ -3,7 +3,7 @@
 **Date:** 2026-11-16
 **Status:** Implemented on `feat/video-pet-detection` (server, admin settings, moments guards, docs); unit tested.
 Medium tests written, not yet run (no local database). Not yet replayed on real pet clips: `maxDistance` 0.55 is pet
-recognition's default. Replayed on five public clips (see Replays); the library-copy run is pending.
+recognition's default. Replayed on five public clips and run on a copy of the owner's library (see Replays).
 
 ## Summary
 
@@ -89,7 +89,10 @@ tracks from ever merging. The rest split two ways, as on photos:
 
 `acceptTrack`'s confidence rule is not used: detection already runs at `minScore`. A track is kept when it was seen in
 at least `minSightings` frames (default 2), or in every frame read when the clip has fewer, so a one-second clip keeps
-its pet as a photo would. Quality is `sightingQuality` (score × size × sharpness), as for faces.
+its pet as a photo would, and seen at least once at a detector score of `VIDEO_PET_CONFIDENT_SCORE` (0.5). Detection
+runs at the photo `minScore` (0.3 by default); across hundreds of frames that lets through small, unsure boxes, which
+recognition then matches to whichever pet they happen to resemble. Quality is `sightingQuality` (score × size ×
+sharpness), as for faces.
 
 ## What is stored
 
@@ -166,7 +169,21 @@ replayed through the tracker offline.
   fragments, which `minSightings` 2 drops. The poodles stay two dogs plus one short track, and the laser cat one cat.
 - `maxDistance` between 0.5 and 0.6 changes little once the splits above are fixed; 0.55 stays.
 
-Pets in the library copy (the owner's own videos) are judged by eye and reported in the PR without names or images.
+Library copy (the owner's own videos, `rfdetr-small` and `pet-recognition-large`, pet recognition on): the 53 videos
+with a pet face from the poster (62 faces, all assigned, 11 pets) and 60 random videos up to two minutes without one,
+97 of the 113 scanned when the numbers were taken.
+
+- Every pet face kept its person; none ended unassigned. 49 poster-pet videos now hold 72 pet faces with sightings
+  (median 6, up to 70); 55 on named pets, 17 on unnamed ones. Unmatched poster faces with a person stay beside them.
+- A pet named twice in one video is mostly two animals seen together that pet recognition gives the same pet: two cats
+  lying side by side (boxes overlapping 15 %, in 61 of 62 frames), two animals far apart, a scene with many dogs. The
+  poster already had the same doubles (5 videos). Faces seen together are not kept from sharing a pet, as #1310 does for
+  people; that is a pet recognition change, left for a follow-up.
+- In the random videos, 3 of 48 got a pet, all small or unsure detections (best scores 0.35 to 0.53, 75 to 86 px), and
+  recognition matched three to named pets. `VIDEO_PET_CONFIDENT_SCORE` came from this: at 0.5 it drops two of them and
+  five weak tracks in the poster-pet videos (three fragments in the many-dogs scene, two weak tracks of named pets, whose
+  poster faces stay).
+- No video failed once the ML service could write its model cache. A failed ML request now fails only that video's job.
 
 ## Cost
 
