@@ -1,5 +1,6 @@
 import {
   FaceTracker,
+  isSameBox,
   matchExistingFaces,
   type Detection,
   type ExistingVideoFace,
@@ -29,32 +30,74 @@ species person, as on photos, and have empty embeddings.
 */
 export type PetTrack = { label: string; embeddable: boolean; track: FaceTrack };
 
-/**
-Groups a video's pet detections, frame by frame in time order:
+/** A sighting that remembers the label the detector gave it in that frame. */
+type LabelledSighting = Sighting & { label?: string };
 
-- with an embedding: one FaceTracker per species, so a dog and a cat are never one pet, and two pets of a species
-  seen in one frame are two pets;
+/**
+The label most of a track's sightings carry, weighted by score. The detector's label for one animal flips from frame to
+frame (a cat called a dog in a third of the frames of a public clip), so a pet's species is a vote, not a frame.
+*/
+const majorityLabel = (sightings: LabelledSighting[], fallback: string) => {
+  const votes = new Map<string, number>();
+  for (const { label, score } of sightings) {
+    if (label) {
+      votes.set(label, (votes.get(label) ?? 0) + score);
+    }
+  }
+  let best = fallback;
+  let bestVotes = -1;
+  for (const [label, total] of votes) {
+    if (!(total > bestVotes)) {
+      continue;
+    }
+
+    best = label;
+    bestVotes = total;
+  }
+  return best;
+};
+
+/**
+One frame's detections with the duplicates dropped: boxes where one animal found twice would be (`isSameBox`), whatever
+their labels, keep only the most confident. RF-DETR has no non-maximum suppression and puts a second box, sometimes
+under the other species, on one animal; left in, the pair reads as two pets seen together and keeps that animal's
+tracks from ever merging.
+*/
+export const dedupePetDetections = <T extends Pick<PetDetection, 'box' | 'score'>>(detections: T[]): T[] => {
+  const kept: T[] = [];
+  for (const detection of [...detections].sort((a, b) => b.score - a.score)) {
+    if (kept.every((other) => !isSameBox(other.box, detection.box))) {
+      kept.push(detection);
+    }
+  }
+  return kept;
+};
+
+/**
+Groups a video's pet detections, frame by frame in time order, after dropping duplicate boxes:
+
+- with an embedding: one FaceTracker for every species together, so an animal whose label flips stays one pet, and two
+  pets seen in one frame are two pets. Each pet's species is the label most of its sightings carry;
 - without one: one track per species, holding that species' most confident box in each frame. Nothing tells two such
   animals apart, and on photos they all go to the same species person anyway.
 */
 export class PetVideoTracker {
-  private trackers = new Map<string, FaceTracker>();
+  private tracker: FaceTracker;
   private buckets = new Map<string, { sightings: Sighting[]; best: Sighting }>();
 
-  constructor(
-    private maxDistance: number,
-    private minScore: number,
-  ) {}
+  constructor(maxDistance: number, minScore: number) {
+    // Detection already ran at minScore, so every sighting counts as a confident view.
+    this.tracker = new FaceTracker(maxDistance, minScore);
+  }
 
   addFrame(t: number, frameIndex: number, detections: PetDetection[]): void {
-    const embeddable = new Map<string, Detection[]>();
+    const embeddable: (Detection & { label: string })[] = [];
     const bucketed = new Map<string, PetDetection>();
-    for (const detection of detections) {
+    for (const detection of dedupePetDetections(detections)) {
       const { label, embedding } = detection;
       if (embedding) {
-        const list = embeddable.get(label) ?? [];
-        list.push({ ...detection, embedding });
-        embeddable.set(label, list);
+        // The label rides along on the sighting the tracker makes from it (the detection is spread into it).
+        embeddable.push({ ...detection, embedding, label });
         continue;
       }
       const current = bucketed.get(label);
@@ -63,14 +106,8 @@ export class PetVideoTracker {
       }
     }
 
-    for (const [label, list] of embeddable) {
-      let tracker = this.trackers.get(label);
-      if (!tracker) {
-        // Detection already ran at minScore, so every sighting counts as a confident view.
-        tracker = new FaceTracker(this.maxDistance, this.minScore);
-        this.trackers.set(label, tracker);
-      }
-      tracker.addFrame(t, frameIndex, list);
+    if (embeddable.length > 0) {
+      this.tracker.addFrame(t, frameIndex, embeddable);
     }
 
     for (const [label, { box, score, quality }] of bucketed) {
@@ -89,35 +126,25 @@ export class PetVideoTracker {
 
   /** Pets found so far, before the final merge: what progress reports. */
   petsSoFar(): number {
-    let count = this.buckets.size;
-    for (const tracker of this.trackers.values()) {
-      count += tracker.peopleSoFar();
-    }
-    return count;
+    return this.tracker.peopleSoFar() + this.buckets.size;
   }
 
   /** Every track's current best sighting, so a frame that is nobody's best can be deleted early. */
   bestFrameIndexes(): Set<number> {
-    const indexes = new Set<number>();
-    for (const tracker of this.trackers.values()) {
-      for (const index of tracker.bestFrameIndexes()) {
-        indexes.add(index);
-      }
-    }
+    const indexes = this.tracker.bestFrameIndexes();
     for (const { best } of this.buckets.values()) {
       indexes.add(best.frameIndex);
     }
     return indexes;
   }
 
-  /** The pets seen in at least `minSightings` sampled frames, after merging each species' tracks seen apart. */
+  /** The pets seen in at least `minSightings` sampled frames, after merging the tracks seen apart. */
   finish(minSightings: number): PetTrack[] {
-    const tracks: PetTrack[] = [];
-    for (const [label, tracker] of this.trackers) {
-      for (const track of tracker.finish()) {
-        tracks.push({ label, embeddable: true, track });
-      }
-    }
+    const tracks: PetTrack[] = Array.from(this.tracker.finish(), (track) => ({
+      label: majorityLabel(track.sightings, 'pet'),
+      embeddable: true,
+      track,
+    }));
     for (const [label, { sightings, best }] of this.buckets) {
       tracks.push({ label, embeddable: false, track: { sightings, best, centroid: [] } });
     }
@@ -138,8 +165,8 @@ type PetMatchOptions = { maxDistance: number; frame: { width: number; height: nu
 Pairs this video's existing pet faces with the new tracks, so a rescan keeps face ids and with them pets' names.
 Returns, per index into `tracks`, the id of the face it replaces.
 
-- An embedded face matches an embeddable track of its species as an existing video face does (`matchExistingFaces`:
-  embedding distance, or position for an old poster face).
+- An embedded face matches an embeddable track as an existing video face does (`matchExistingFaces`: embedding
+  distance, or position for an old poster face), whatever species either was given.
 - A bucket face of a species gives its id to that species' bucket track: the person is the same either way. The
   first face with a frame is preferred, so a rescan updates the earlier scan's face rather than an old poster face.
 */
@@ -149,21 +176,19 @@ export const matchExistingPets = (
   options: PetMatchOptions,
 ): Map<number, string> => {
   const matches = new Map<number, string>();
-  const labels = new Set(tracks.map(({ label }) => label));
-  for (const label of labels) {
-    const indexes = tracks
-      .keys()
-      .filter((index) => tracks[index].label === label && tracks[index].embeddable)
-      .toArray();
-    const faces = existing.filter((face) => face.embedded && face.species === label);
-    const speciesMatches = matchExistingFaces(
-      faces,
-      indexes.map((index) => tracks[index].track),
-      options,
-    );
-    for (const [position, faceId] of speciesMatches) {
-      matches.set(indexes[position], faceId);
-    }
+  // Every species together, as the tracker groups them: a pet's species is a vote that can come out differently from
+  // one scan to the next.
+  const indexes = tracks
+    .keys()
+    .filter((index) => tracks[index].embeddable)
+    .toArray();
+  const embeddedMatches = matchExistingFaces(
+    existing.filter((face) => face.embedded),
+    indexes.map((index) => tracks[index].track),
+    options,
+  );
+  for (const [position, faceId] of embeddedMatches) {
+    matches.set(indexes[position], faceId);
   }
 
   for (const [index, { label, embeddable }] of tracks.entries()) {

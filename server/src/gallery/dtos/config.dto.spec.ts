@@ -132,7 +132,7 @@ describe('fork config survives schema composition', () => {
         sceneDetection: true,
         maxFrames: 900,
         maxDistance: 0.55,
-        minSightings: 1,
+        minSightings: 2,
       },
     });
   });

@@ -322,13 +322,15 @@ export const galleryMachineLearningDefaults = {
     minScore: 0.3,
     // Half the video face budget: the pet queue runs one job at a time, and a pet stays in frame for longer than a
     // face stays turned to the camera.
+    // minSightings 2: a pet found in one sampled frame is most often a fragment of one found in others, or a misfire
+    // (specs/2026-11-16-video-pet-detection-design.md, "Replays").
     video: {
       enabled: false,
       sampleInterval: 2,
       sceneDetection: true,
       maxFrames: 900,
       maxDistance: 0.55,
-      minSightings: 1,
+      minSightings: 2,
     },
   },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },

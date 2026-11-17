@@ -3,6 +3,7 @@ import { normalize } from 'src/gallery/utils/video-faces.js';
 import {
   PetVideoTracker,
   absorbedPets,
+  dedupePetDetections,
   matchExistingPets,
   type ExistingVideoPet,
   type PetDetection,
@@ -37,10 +38,10 @@ describe('PetVideoTracker', () => {
     expect(tracked(tracker)).toEqual([{ label: 'dog', embeddable: true, times: [1, 3, 5] }]);
   });
 
-  it('keeps two dogs seen in one frame apart, and a cat in its own track whatever its embedding', () => {
+  it('keeps two dogs, and a dog and a cat, seen in one frame apart', () => {
     const tracker = new PetVideoTracker(0.55, 0.3);
     tracker.addFrame(1, 0, [pet('dog', 100, { embedding: rex }), pet('dog', 600, { embedding: fido })]);
-    // A cat that looks, to the embedding, exactly like Rex is still not Rex.
+    // A cat that looks, to the embedding, exactly like Rex is still not Rex while both are in the frame.
     tracker.addFrame(3, 1, [pet('dog', 120, { embedding: rex }), pet('cat', 900, { embedding: rex })]);
 
     expect(tracked(tracker)).toEqual(
@@ -51,6 +52,43 @@ describe('PetVideoTracker', () => {
       ]),
     );
     expect(tracked(tracker)).toHaveLength(3);
+  });
+
+  it('keeps one animal whose label flips between frames as one pet, labelled by its sightings', () => {
+    const tracker = new PetVideoTracker(0.55, 0.3);
+    tracker.addFrame(1, 0, [pet('cat', 100, { embedding: tom, score: 0.9 })]);
+    tracker.addFrame(3, 1, [pet('dog', 110, { embedding: tom, score: 0.5 })]);
+    tracker.addFrame(5, 2, [pet('cat', 120, { embedding: tom, score: 0.8 })]);
+
+    expect(tracked(tracker)).toEqual([{ label: 'cat', embeddable: true, times: [1, 3, 5] }]);
+  });
+
+  it('drops a second box on the same animal, whatever its label, keeping the more confident one', () => {
+    const tracker = new PetVideoTracker(0.55, 0.3);
+    tracker.addFrame(1, 0, [
+      pet('cat', 100, { embedding: tom, score: 0.6 }),
+      { ...pet('dog', 110, { embedding: fido, score: 0.4 }) },
+    ]);
+    tracker.addFrame(3, 1, [pet('cat', 100, { embedding: tom, score: 0.7 })]);
+
+    const [only, ...others] = tracker.finish(1);
+    expect(others).toEqual([]);
+    expect(only).toMatchObject({ label: 'cat', embeddable: true });
+    expect(only.track.sightings.map(({ score }) => score)).toEqual([0.6, 0.7]);
+  });
+
+  it('drops duplicate boxes of the same species too, so they never keep one pet in two tracks', () => {
+    const tracker = new PetVideoTracker(0.55, 0.3);
+    tracker.addFrame(1, 0, [
+      pet('dog', 100, { embedding: rex, score: 0.9 }),
+      pet('dog', 105, { embedding: fido, score: 0.3 }),
+    ]);
+    tracker.addFrame(3, 1, [pet('dog', 100, { embedding: fido, score: 0.8 })]);
+
+    expect(tracked(tracker)).toHaveLength(2);
+    expect(
+      dedupePetDetections([pet('dog', 100, { score: 0.9 }), pet('cat', 105, { score: 0.3 }), pet('dog', 900)]),
+    ).toEqual([pet('dog', 100, { score: 0.9 }), pet('dog', 900)]);
   });
 
   it('puts every animal of a species without an embedding in one track, with its most confident box per frame', () => {
@@ -133,10 +171,10 @@ describe('matchExistingPets', () => {
     expect(matches).toEqual(new Map([[1, 'rex-face']]));
   });
 
-  it('never matches an individual face to a track of another species', () => {
+  it('matches an individual face to a track whatever species either was given, as the species is a vote', () => {
     const faces = [existing({ id: 'rex-face', embedding: rex, species: 'dog' })];
 
-    expect(matchExistingPets(faces, [trackOf('cat', true, rex)], matchOptions)).toEqual(new Map());
+    expect(matchExistingPets(faces, [trackOf('cat', true, rex)], matchOptions)).toEqual(new Map([[0, 'rex-face']]));
   });
 
   it('gives a species bucket track the id of an earlier sampled bucket face before a poster one', () => {

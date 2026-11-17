@@ -19,7 +19,7 @@ const makeConfig = (video?: Partial<AdminConfigDto['machineLearning']['petDetect
             sceneDetection: true,
             maxFrames: 900,
             maxDistance: 0.55,
-            minSightings: 1,
+            minSightings: 2,
             ...video,
           },
         }),

@@ -3,7 +3,7 @@
 **Date:** 2026-11-16
 **Status:** Implemented on `feat/video-pet-detection` (server, admin settings, moments guards, docs); unit tested.
 Medium tests written, not yet run (no local database). Not yet replayed on real pet clips: `maxDistance` 0.55 is pet
-recognition's default, unverified against frame-to-frame pet embeddings.
+recognition's default. Replayed on five public clips (see Replays); the library-copy run is pending.
 
 ## Summary
 
@@ -53,7 +53,7 @@ Non-goals:
 | `sceneDetection` | true    | Also sample just after every scene cut                                           |
 | `maxFrames`      | 900     | Frame budget per video; past it the interval stretches to cover the whole video  |
 | `maxDistance`    | 0.55    | Largest pet-embedding distance at which two views in one video are the same pet  |
-| `minSightings`   | 1       | Sampled frames a pet must be seen in to be kept                                  |
+| `minSightings`   | 2       | Sampled frames a pet must be seen in to be kept (capped at the frames read)      |
 
 The defaults follow video faces, except `maxFrames` (half: pet detection runs on a queue of concurrency 1, and a pet
 is in frame for longer than a face is turned to the camera) and `maxDistance` (pet recognition's default).
@@ -72,17 +72,24 @@ runs. A video with no readable stream or no readable frame falls back to the pos
 `videoPetsSampledAt` first so Missing does not queue it again.
 
 For each sampled frame (the plan from `planSampleTimes`, extracted by `VideoFrameReader`), it calls `detectPets` on the
-frame with recognition when recognition is on, at the configured `minScore`. Detections split two ways, as on photos:
+frame with recognition when recognition is on, at the configured `minScore`. Duplicate boxes are dropped first
+(`dedupePetDetections`): boxes where one animal found twice would be (`isSameBox`, as tiled face detection uses),
+whatever their labels, keep only the most confident. RF-DETR has no non-maximum suppression and sometimes puts a second
+box, under the other species, on one animal; left in, the pair reads as two pets seen together and keeps that animal's
+tracks from ever merging. The rest split two ways, as on photos:
 
-- **Embeddable** (a recognizable species with an embedding): one `FaceTracker` per species at
+- **Embeddable** (a recognizable species with an embedding): one `FaceTracker` for dogs and cats together at
   `petDetection.video.maxDistance`, with `minScore` as the confident score, so every detection counts as confident.
-  The final merge (`mergeSeenApart`) runs as for faces: two tracks seen in one frame are two pets.
+  The final merge (`mergeSeenApart`) runs as for faces: two tracks seen in one frame are two pets. A pet's species is
+  the label most of its sightings carry, weighted by score: the detector's label for one animal flips between frames
+  (a cat called a dog in a third of the frames of one clip), so tracking per species split one animal in two.
 - **Bucketed** (every other species, or recognition off): there is no embedding to tell two animals apart, and on
   photos they all go to one species person anyway. One face per species per video, with one sighting per frame: the
   highest-scoring box of that species in that frame. Its best view is the best quality sighting.
 
 `acceptTrack`'s confidence rule is not used: detection already runs at `minScore`. A track is kept when it was seen in
-at least `minSightings` frames. Quality is `sightingQuality` (score × size × sharpness), as for faces.
+at least `minSightings` frames (default 2), or in every frame read when the clip has fewer, so a one-second clip keeps
+its pet as a photo would. Quality is `sightingQuality` (score × size × sharpness), as for faces.
 
 ## What is stored
 
@@ -100,7 +107,8 @@ nightly recognition skip) keeps working.
 A rescan replaces this job's earlier pet faces on the video, keeping names:
 
 - Embeddable: existing embedded pet faces are matched to tracks with `matchExistingFaces` (embedding distance, plus
-  the poster window for an old poster face), exactly as video faces keep their ids. A matched face keeps its id and
+  the poster window for an old poster face), exactly as video faces keep their ids, whatever species either was
+  given: the species is a vote that can come out differently from one scan to the next. A matched face keeps its id and
   person; an unmatched unassigned face is deleted; an unmatched face with a person stays, unless `absorbedFaces` says
   a matched face of the same person took its place.
 - Bucketed: the video's existing bucket faces of a species give their first id (one with a frame first) to the new
@@ -142,6 +150,23 @@ faces it is about to delete (`getPetFramePaths`, embedded faces only for the mod
 those files afterwards, as `VideoFaceDetector` does for faces a rescan drops. `videoPetsSampledAt` is left as it is:
 the requeued run is forced and goes through every asset, and a video stamped but left without pets by a purge with
 detection off behaves as a photo does after such a purge (Missing skips it until the next Reset).
+
+## Replays
+
+Five freely licensed clips from Wikimedia Commons (a cat with a laser pointer, two poodles, a dog fetching from a river,
+two cats play-fighting, and a dog with a cat in archive footage), sampled as the job samples them, with both model sets
+(`rfdetr-nano` + `pet-recognition-base`, and `rfdetr-small` + `pet-recognition-large`). Detections were dumped once and
+replayed through the tracker offline.
+
+- One animal's embedding moves a lot between samples: consecutive sightings of one track are a median 0.25 to 0.55
+  apart. Two pets of one breed seen together can be as close as 0.07 between centroids (the poodles), so the tracker
+  tells them apart by being seen together, not by looks.
+- Per-species tracking without dedupe, the first version: the two-cats clip gave 8 or 9 pets and the dog-and-cat clip
+  11 or 12. With dedupe and one tracker for both species: 3 to 4 and 5 to 7, with the extra tracks mostly one-frame
+  fragments, which `minSightings` 2 drops. The poodles stay two dogs plus one short track, and the laser cat one cat.
+- `maxDistance` between 0.5 and 0.6 changes little once the splits above are fixed; 0.55 stays.
+
+Pets in the library copy (the owner's own videos) are judged by eye and reported in the PR without names or images.
 
 ## Cost
 

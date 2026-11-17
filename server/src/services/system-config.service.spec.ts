@@ -199,7 +199,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
         sceneDetection: true,
         maxFrames: 900,
         maxDistance: 0.55,
-        minSightings: 1,
+        minSightings: 2,
       },
     },
     petRecognition: {

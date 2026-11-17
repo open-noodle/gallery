@@ -265,6 +265,20 @@ describe('VideoPetDetector', () => {
     expect(applied().frames[0].sightings).toHaveLength(2);
   });
 
+  it('keeps a pet seen in every frame of a clip shorter than minSightings', async () => {
+    mocks.systemMetadata.get.mockResolvedValue(config({ video: { minSightings: 2 } }));
+    mocks.media.probe.mockResolvedValue({
+      format: { duration: 1, bitrate: 0 },
+      videoStreams: [{ index: 0, width: 1920, height: 1080 } as any],
+      audioStreams: [],
+    });
+    framesAt({ 0.5: [dog(100)] });
+
+    await sut.handlePetDetection({ id: 'asset-id' });
+
+    expect(applied().insert).toHaveLength(1);
+  });
+
   it('keeps a named pet face id on a rescan, and deletes an unassigned pet face it no longer finds', async () => {
     mocks.petFace.getForVideoPetDetect.mockResolvedValue(
       video({
@@ -326,6 +340,25 @@ describe('VideoPetDetector', () => {
     expect(mocks.petFace.markVideoPetsSampled).toHaveBeenCalledWith('asset-id');
     expect(mocks.machineLearning.detectPets.mock.calls[0][0]).toBe('/data/thumbs/preview.jpeg');
     expect(mocks.petFace.applyVideoPets).not.toHaveBeenCalled();
+  });
+
+  it('fails the job, logged and unstamped, when the ML service fails, after the frame being extracted settles', async () => {
+    let extractions = 0;
+    let settled = 0;
+    vi.mocked(VideoFrameReader.prototype.extractFrame).mockImplementation(async (_input, output, t) => {
+      extractions++;
+      await writeFile(output, `frame at ${t}`);
+      settled++;
+    });
+    mocks.machineLearning.detectPets.mockRejectedValue(new Error('failed for all URLs'));
+
+    await expect(sut.handlePetDetection({ id: 'asset-id' })).resolves.toBe(JobStatus.Failed);
+
+    expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('failed for all URLs'));
+    expect(settled).toBe(extractions);
+    expect(mocks.petFace.applyVideoPets).not.toHaveBeenCalled();
+    expect(mocks.petFace.markVideoPetsSampled).not.toHaveBeenCalled();
+    expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
   });
 
   it('skips a hidden video', async () => {

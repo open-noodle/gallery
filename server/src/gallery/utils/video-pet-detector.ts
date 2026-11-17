@@ -155,6 +155,8 @@ export class VideoPetDetector {
       : undefined;
     const startedAt = Date.now();
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-video-pets-'));
+    // The frame being extracted ahead; settled before the folder goes, so ffmpeg never writes into a deleted one.
+    let next: Promise<string | undefined> | undefined;
     try {
       const tracker = new PetVideoTracker(options.maxDistance, petDetection.minScore);
       const framePaths = new Map<number, string>();
@@ -205,7 +207,7 @@ export class VideoPetDetector {
       };
 
       // The next frame is extracted while the ML service works on this one.
-      let next = times.length > 0 ? extract(0, times[0]) : undefined;
+      next = times.length > 0 ? extract(0, times[0]) : undefined;
       for (const [index, t] of times.entries()) {
         reportProgress(index);
         const path = await next;
@@ -246,7 +248,8 @@ export class VideoPetDetector {
         }
       }
 
-      const tracks = tracker.finish(options.minSightings);
+      // A clip shorter than the minimum keeps a pet seen in every frame it has, as a photo keeps one seen once.
+      const tracks = tracker.finish(Math.min(options.minSightings, times.length - unreadable));
       const { added, updated, removed } = await this.applyTracks(asset, tracks, framePaths, frameSize, {
         maxDistance: options.maxDistance,
         start,
@@ -256,6 +259,13 @@ export class VideoPetDetector {
           `${humanDuration(Date.now() - startedAt)}: ${added} added, ${updated} updated, ${removed} deleted` +
           (unreadable > 0 ? `, ${plural(unreadable, 'frame')} unreadable` : ''),
       );
+    } catch (error) {
+      // As on photos (PetDetectionService.handlePetDetection): an ML failure fails this video's job, logged, and leaves
+      // it unstamped, so the next Missing run tries it again.
+      await next;
+      const message = error instanceof Error ? error.message : String(error);
+      this.deps.logger.error(`Pet detection failed for video ${id}: ${message}`);
+      return JobStatus.Failed;
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
