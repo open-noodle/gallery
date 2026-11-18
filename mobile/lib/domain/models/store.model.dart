@@ -39,7 +39,7 @@ enum StoreKey<T> {
   // `cameraBubbleSessions` is a JSON list of {targetIds, from, to} windows — a photo is routed by
   // which window its capture time falls in, not by whatever is selected when it finishes uploading.
   cameraBubbleSelection<String>._(90011),
-  cameraBubbleSessions<String>._(90010),
+  cameraBubbleSessions<String>._(90012),
 
   syncMigrationStatus<String>._(1013),
 
