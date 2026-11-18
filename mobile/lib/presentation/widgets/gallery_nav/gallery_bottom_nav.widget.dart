@@ -82,7 +82,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     final searching = ref.watch(searchModeProvider);
     final folded = ref.watch(galleryDockFoldedProvider);
     final hiding = _hiddenForMultiSelect || keyboardUp;
-    final bottomInset = GalleryDockStyle.bottomInset(mq);
+    final bottomInset = GalleryDockStyle.bottomInset(context);
     // The clamp cannot fire in a settled tree: the shell builds its `routes:` from this same
     // `galleryNavSlotsProvider`, so `routes.length == slots.length` and every router index is a valid slot index. It
     // only covers the one frame between a slots change and auto_route rebuilding the tab stack.

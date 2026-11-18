@@ -12,9 +12,16 @@ abstract final class GalleryDockStyle {
   /// Space on each side: a little wider than a plain margin, so the pills follow the screen's rounded corners.
   static const double sideInset = 20;
 
-  /// Distance from the screen's bottom edge. On a phone with a home indicator the dock sits down inside that area, as
-  /// iOS's own tab bar does; without one it floats 26 up.
-  static double bottomInset(MediaQueryData mq) => mq.padding.bottom >= 20 ? math.max(16, mq.padding.bottom - 14) : 26;
+  /// Distance from the screen's bottom edge. On an iPhone with a home indicator the dock sits down inside that area, as
+  /// iOS's own tab bar does. Android keeps it above the safe area (at least 26 up): a swipe up from its bottom edge is
+  /// the system's home gesture, so a control inside that zone would fight it.
+  static double bottomInset(BuildContext context) {
+    final safe = MediaQuery.paddingOf(context).bottom;
+    if (Theme.of(context).platform == TargetPlatform.iOS && safe >= 20) {
+      return math.max(16, safe - 14);
+    }
+    return math.max(26, safe);
+  }
 
   /// The prototype's "springy" motion: a small overshoot that settles in about 0.6 s.
   static final GallerySpringCurve spring = GallerySpringCurve(

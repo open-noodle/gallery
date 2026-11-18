@@ -49,10 +49,17 @@ void main() {
   });
 
   /// Host the pill the way Timeline will in Slice 2: an overlay child of a Stack.
-  Widget host({EdgeInsets viewInsets = EdgeInsets.zero, EdgeInsets padding = EdgeInsets.zero}) {
+  Widget host({
+    EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets padding = EdgeInsets.zero,
+    TargetPlatform platform = TargetPlatform.android,
+  }) {
     return MediaQuery(
       data: MediaQueryData(viewInsets: viewInsets, padding: padding),
-      child: const Stack(children: [SizedBox.expand(), TimelineGroupingBottomPill()]),
+      child: Theme(
+        data: ThemeData(platform: platform),
+        child: const Stack(children: [SizedBox.expand(), TimelineGroupingBottomPill()]),
+      ),
     );
   }
 
@@ -143,7 +150,9 @@ void main() {
       expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('timeline-grouping-bottom-pill-opacity'))).opacity, 1);
     });
 
-    testWidgets('floats where the dock does: 26 up without a home indicator, inside it with one', (tester) async {
+    testWidgets('floats where the dock does: inside the iPhone home indicator, above the safe area on Android', (
+      tester,
+    ) async {
       EdgeInsets pillOuterPadding() {
         // The pill's own outer Padding (the one carrying the bottom float); nearest ancestor.
         final padding = tester.widget<Padding>(
@@ -159,8 +168,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(pillOuterPadding().bottom, 26);
 
-      // Home indicator (34): 14 inside it, as the dock sits.
+      // Android gesture area (34): above it, clear of the home gesture.
       await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 34)));
+      await tester.pumpAndSettle();
+      expect(pillOuterPadding().bottom, 34);
+
+      // iPhone home indicator (34): 14 inside it, as the dock sits.
+      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 34), platform: TargetPlatform.iOS));
       await tester.pumpAndSettle();
       expect(pillOuterPadding().bottom, 20);
     });
