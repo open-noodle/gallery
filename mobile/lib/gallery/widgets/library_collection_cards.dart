@@ -5,12 +5,27 @@ import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
+import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 
 // Gallery's Spaces and Albums cards on the Library tab, mounted by library.page.dart's _CollectionCards.
+
+/// Where the Spaces and Albums cards sit on the Library tab: `lead` before People, `trail` after On this device. The
+/// one the nav does not hold leads, so it is the first card on the tab rather than fifth. Without Spaces on the
+/// server there is no lead and Albums trails, as before.
+final libraryCollectionOrderProvider = Provider.autoDispose<({GalleryTabEnum? lead, GalleryTabEnum trail})>((ref) {
+  if (ref.watch(galleryNavSlotsProvider).contains(GalleryTabEnum.spaces)) {
+    return (lead: GalleryTabEnum.albums, trail: GalleryTabEnum.spaces);
+  }
+  return (lead: ref.watch(serverSupportsSpacesProvider) ? GalleryTabEnum.spaces : null, trail: GalleryTabEnum.albums);
+});
+
+/// The Library card for [tab]: Spaces or Albums.
+Widget libraryCollectionCard(GalleryTabEnum tab) =>
+    tab == GalleryTabEnum.spaces ? const SpacesCollectionCard() : const AlbumsCollectionCard();
 
 class SpacesCollectionCard extends ConsumerWidget {
   const SpacesCollectionCard({super.key});
