@@ -255,7 +255,7 @@ void main() {
 
   // iOS: 34 safe area less 14, down inside the home-indicator area as iOS's own tab bar sits. Android: above the safe
   // area, out of the zone where a swipe up is the system's home gesture.
-  for (final (platform, float) in [(TargetPlatform.iOS, 20.0), (TargetPlatform.android, 34.0)])
+  for (final (platform, float) in [(TargetPlatform.iOS, 20.0), (TargetPlatform.android, 34.0)]) {
     testWidgets('${platform.name}: the dock floats $float above the bottom with a 34 safe area', (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(430, 932);
@@ -298,6 +298,7 @@ void main() {
       expect(container.read(bottomNavHeightProvider), float + GalleryDock.reservedHeight(showGrouping: true));
       expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - float);
     });
+  }
 
   testWidgets('narrow phone: the whole cluster stays inside the screen (#909)', (tester) async {
     tester.view.devicePixelRatio = 1;
