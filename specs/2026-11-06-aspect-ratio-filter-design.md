@@ -174,7 +174,7 @@ qualified form and the five values in table order.
 
 ### Migration
 
-File `server/src/schema/migrations-gallery/1800100000000-AddAssetAspectClassIndex.ts`. `1799900000000` and
+File `server/src/schema/migrations-gallery/1800800000000-AddAssetAspectClassIndex.ts`. `1799900000000` and
 `1800000000000` are taken (`AddAssetDataSaverVideoTable`, `AddAssetFaceVideoFrameTable`); the newest upstream migration is
 `1792213725597`.
 
