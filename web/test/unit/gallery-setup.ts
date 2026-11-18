@@ -12,6 +12,12 @@ hoisted vi.mock calls take effect, so a static import here would load e.g. handl
 the real @immich/ui and silently bypass the spec's toast mocks.
 */
 
+// The locale store is persisted to localStorage, which every spec iframe in one browser session
+// shares, so a spec that ends on another locale (timeline-util.spec.ts ends on 'es') would leave
+// the next file on that worker starting in it. Start each file without a persisted locale, as a
+// fresh browser would. This runs before the spec's own imports create the store.
+localStorage.removeItem('locale');
+
 beforeEach(async () => {
   // A spec on upstream's page fixtures (#test/unit/fixtures.ts) has already loaded the config from its mock data
   // (Mock.setup runs before this hook); clearing the cache here would replace that data with the defaults.
