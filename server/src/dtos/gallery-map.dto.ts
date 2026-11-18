@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
+import { aspectClassesQuery } from 'src/gallery/dtos/aspect-class.dto.js';
 import { boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
 export enum MapMediaType {
@@ -27,6 +28,7 @@ const FilteredMapMarkerSchema = z
   .object({
     personIds: scopedPersonTokenArrayQuery.describe('Filter by person IDs'),
     tagIds: uuidArrayQuery.describe('Filter by tag IDs'),
+    aspectClasses: aspectClassesQuery,
     spaceId: z.uuidv4().optional().describe('Scope to a shared space'),
     make: z.string().optional().describe('Camera make'),
     model: z.string().optional().describe('Camera model'),

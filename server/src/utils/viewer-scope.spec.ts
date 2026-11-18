@@ -1,7 +1,13 @@
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AssetVisibility } from 'src/enum.js';
 import { TimelineHiddenScope } from 'src/utils/shared-space-album-scope.js';
-import { ViewerScope, ViewerScopeRequest, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
+import {
+  ViewerScope,
+  ViewerScopeRequest,
+  ViewerSurface,
+  resolveViewerScope,
+  structuredSearchViewerRequest,
+} from 'src/utils/viewer-scope.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { newUuid } from 'test/small.factory.js';
 
@@ -430,5 +436,17 @@ describe('resolveViewerScope', () => {
     await expect(resolveViewerScope(repos, stock, 'timeline', { userId })).resolves.not.toHaveProperty(
       'upstreamTakenRange',
     );
+  });
+});
+
+describe('structuredSearchViewerRequest', () => {
+  it('rejects aspectClasses next to a structured filter, which would otherwise answer with a wider set', () => {
+    expect(() => structuredSearchViewerRequest({ filter: {}, aspectClasses: ['square'] }, [])).toThrow(
+      'aspectClasses and libraryView need the flat search fields',
+    );
+  });
+
+  it('treats an empty aspectClasses list as no filter', () => {
+    expect(() => structuredSearchViewerRequest({ filter: {}, aspectClasses: [] }, [])).not.toThrow();
   });
 });

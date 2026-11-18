@@ -414,6 +414,9 @@ class GallerySearchRepository {
   Future<SearchResponseDto?> smart(SearchParams p, {required int page, required SearchSort sort, int size = 100}) =>
       _search.searchSmart(
         SmartSearchDto(
+          // The Dart generator (openapi-generator 7.25.0, AbstractDartCodegen.toDefaultValue) defaults every optional
+          // list to Optional.present(const []), and mobile has no aspect ratio filter.
+          aspectClasses: const Optional.absent(),
           albumIds: _list(p.albumId == null ? null : [p.albumId!]),
           personIds: _list(p.personIds),
           spacePersonIds: _list(p.spacePersonIds),
@@ -448,6 +451,8 @@ class GallerySearchRepository {
   Future<SearchResponseDto?> metadata(SearchParams p, {required int page, required SearchSort sort, int size = 100}) =>
       _search.searchAssets(
         MetadataSearchDto(
+          // See the SmartSearchDto above.
+          aspectClasses: const Optional.absent(),
           albumIds: _list(p.albumId == null ? null : [p.albumId!]),
           personIds: _list(p.personIds),
           spacePersonIds: _list(p.spacePersonIds),

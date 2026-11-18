@@ -15,6 +15,7 @@ import {
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
+import { ASPECT_CLASS_SQL } from 'src/gallery/utils/aspect-class-sql.js';
 import { CLEANUP_MONTH_DAY_INDEX_WHERE, MONTH_DAY_SQL } from 'src/gallery/utils/cleanup-sql.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
 import {
@@ -112,6 +113,7 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
   columns: ['ownerId', 'localDateTime', 'id'],
   where: CLEANUP_MONTH_DAY_INDEX_WHERE,
 })
+@Index({ name: 'asset_aspectClass_idx', expression: ASPECT_CLASS_SQL })
 // For all assets, each originalpath must be unique per user and library
 export class AssetTable {
   @PrimaryGeneratedColumn()

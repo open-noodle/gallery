@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aspect ratio filter mockup</title>
+    <!--
+      Static mockup for specs/2026-11-06-aspect-ratio-filter-design.md. Styles copy the real components:
+      filter-section.svelte, albums-filter.svelte, active-filters-bar.svelte. Colours come from web/src/app.css.
+      The i18n table at the end lists the planned keys with their en and de strings.
+      Placeholder tiles only, no real photos.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+        --primary: rgb(66 80 175);
+        --primary-10: rgb(66 80 175 / 10%);
+        --bg: #f4f5f7;
+        --panel: #ffffff;
+        --text: #1f2430;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --chip-bg: #f3f4f6;
+        --chip-border: rgb(229 231 235 / 70%);
+        --chip-text: #374151;
+        --hairline: rgb(229 231 235 / 60%);
+        --subtle: #f3f4f6;
+        --tile: #dfe3ea;
+        --tile-2: #cfd5df;
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+        --primary: rgb(172 203 250);
+        --primary-10: rgb(172 203 250 / 20%);
+        --bg: #0d0e12;
+        --panel: #16181d;
+        --text: #e8eaef;
+        --muted: #9ca3af;
+        --border: #374151;
+        --chip-bg: rgb(255 255 255 / 6%);
+        --chip-border: rgb(255 255 255 / 10%);
+        --chip-text: #e5e7eb;
+        --hairline: rgb(255 255 255 / 10%);
+        --subtle: rgb(255 255 255 / 6%);
+        --tile: #262a33;
+        --tile-2: #2f343f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+      }
+      header.page {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      h2 {
+        margin: 32px 0 4px;
+        font-size: 15px;
+      }
+      p.lead {
+        margin: 0 0 12px;
+        max-width: 70ch;
+        color: var(--muted);
+      }
+      .toggle {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 6px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      /* App frame */
+      .app {
+        display: flex;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      .panel {
+        flex: 0 0 248px;
+        padding: 8px 0;
+        border-inline-end: 1px solid var(--hairline);
+      }
+      .main {
+        flex: 1;
+        min-width: 0;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+        gap: 4px;
+        padding: 12px 16px;
+      }
+      .tile {
+        height: 118px;
+        border-radius: 4px;
+        background: var(--tile);
+      }
+      .tile:nth-child(3n) {
+        background: var(--tile-2);
+      }
+
+      /* filter-section.svelte */
+      .section {
+        margin: 0 6px 2px;
+      }
+      .section-head {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        border: 0;
+        border-radius: 12px;
+        background: none;
+        color: inherit;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: start;
+      }
+      .section-head:not(:disabled):hover {
+        background: var(--subtle);
+      }
+      .section-head:disabled {
+        opacity: 0.5;
+      }
+      .section-head svg {
+        width: 16px;
+        height: 16px;
+        fill: var(--muted);
+      }
+      .section-head.closed svg {
+        transform: rotate(-90deg);
+      }
+      .section-body {
+        padding: 8px 12px 14px;
+      }
+
+      /* Rows: albums-filter.svelte */
+      .rows {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .row {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: none;
+        color: var(--muted);
+        padding: 6px 10px;
+        font: inherit;
+        font-size: 12px;
+        text-align: start;
+        cursor: pointer;
+      }
+      .row svg {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+      .row[aria-pressed='true'] {
+        border-color: var(--primary);
+        background: var(--primary-10);
+        color: var(--primary);
+      }
+      .row:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .row.orphan {
+        opacity: 0.5;
+      }
+
+      /* active-filters-bar.svelte */
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--hairline);
+        padding: 10px 16px;
+      }
+      .count {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--muted);
+        opacity: 0.6;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--chip-border);
+        border-radius: 999px;
+        background: var(--chip-bg);
+        color: var(--chip-text);
+        padding: 4px 4px 4px 10px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .chip svg {
+        width: 14px;
+        height: 14px;
+        fill: var(--muted);
+      }
+      .chip button {
+        display: flex;
+        width: 18px;
+        height: 18px;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 50%;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      .chip button svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* State cards */
+      .states {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--panel);
+        padding: 8px 0 12px;
+      }
+      .card h3 {
+        margin: 4px 18px 2px;
+        font-size: 13px;
+      }
+      .note {
+        margin: 0 18px 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .hidden-slot {
+        margin: 8px 18px;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        color: var(--muted);
+        padding: 12px;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      /* i18n table */
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        font-size: 13px;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        text-align: start;
+      }
+      code {
+        font-size: 12px;
+      }
+
+      /* Phone width: the panel stacks above the grid */
+      .phone {
+        width: 360px;
+        max-width: 100%;
+      }
+      .phone .app {
+        flex-direction: column;
+      }
+      .phone .panel {
+        flex: none;
+        border-inline-end: 0;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .phone .bar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+      }
+      .phone .chip {
+        flex: none;
+      }
+      @media (max-width: 720px) {
+        .app {
+          flex-direction: column;
+        }
+        .panel {
+          flex: none;
+          border-inline-end: 0;
+          border-bottom: 1px solid var(--hairline);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-all" viewBox="0 0 24 24">
+          <path
+            d="M21,17H7V3H21M21,1H7A2,2 0 0,0 5,3V17A2,2 0 0,0 7,19H21A2,2 0 0,0 23,17V3A2,2 0 0,0 21,1M3,5H1V21A2,2 0 0,0 3,23H19V21H3M15.96,10.29L13.21,13.83L11.25,11.47L8.5,15H19.5L15.96,10.29Z"
+          />
+        </symbol>
+        <symbol id="i-landscape" viewBox="0 0 24 24">
+          <path d="M19,17H5V7H19M19,5H5A2,2 0 0,0 3,7V17A2,2 0 0,0 5,19H19A2,2 0 0,0 21,17V7C21,5.89 20.1,5 19,5Z" />
+        </symbol>
+        <symbol id="i-square" viewBox="0 0 24 24">
+          <path d="M18,18H6V6H18M18,4H6A2,2 0 0,0 4,6V18A2,2 0 0,0 6,20H18A2,2 0 0,0 20,18V6C20,4.89 19.1,4 18,4Z" />
+        </symbol>
+        <symbol id="i-portrait" viewBox="0 0 24 24">
+          <path d="M17,19H7V5H17M17,3H7A2,2 0 0,0 5,5V19A2,2 0 0,0 7,21H17A2,2 0 0,0 19,19V5C19,3.89 18.1,3 17,3Z" />
+        </symbol>
+        <symbol id="i-pano" viewBox="0 0 24 24">
+          <path
+            d="M21.43,4C21.33,4 21.23,4 21.12,4.06C18.18,5.16 15.09,5.7 12,5.7C8.91,5.7 5.82,5.15 2.88,4.06C2.77,4 2.66,4 2.57,4C2.23,4 2,4.23 2,4.63V19.38C2,19.77 2.23,20 2.57,20C2.67,20 2.77,20 2.88,19.94C5.82,18.84 8.91,18.3 12,18.3C15.09,18.3 18.18,18.85 21.12,19.94C21.23,20 21.33,20 21.43,20C21.76,20 22,19.77 22,19.37V4.63C22,4.23 21.76,4 21.43,4M20,6.54V17.45C17.4,16.68 14.72,16.29 12,16.29C9.28,16.29 6.6,16.68 4,17.45V6.54C6.6,7.31 9.28,7.7 12,7.7C14.72,7.71 17.4,7.32 20,6.54Z"
+          />
+        </symbol>
+        <symbol id="i-pano-tall" viewBox="0 0 24 24">
+          <path
+            d="M6.54,20C7.31,17.4 7.7,14.72 7.7,12C7.7,9.28 7.31,6.6 6.54,4H17.45C16.68,6.6 16.29,9.28 16.29,12C16.29,14.72 16.68,17.4 17.45,20M19.94,21.12C18.84,18.18 18.3,15.09 18.3,12C18.3,8.91 18.85,5.82 19.94,2.88C20,2.77 20,2.66 20,2.57C20,2.23 19.77,2 19.37,2H4.63C4.23,2 4,2.23 4,2.57C4,2.67 4,2.77 4.06,2.88C5.16,5.82 5.71,8.91 5.71,12C5.71,15.09 5.16,18.18 4.07,21.12C4,21.23 4,21.34 4,21.43C4,21.76 4.23,22 4.63,22H19.38C19.77,22 20,21.76 20,21.43C20,21.33 20,21.23 19.94,21.12Z"
+          />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path
+            d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <div class="wrap">
+      <header class="page">
+        <h1>Aspect ratio filter</h1>
+        <button class="toggle" type="button" id="theme">Light / Dark</button>
+      </header>
+      <p class="lead">
+        Static mockup for specs/2026-11-06-aspect-ratio-filter-design.md. Section between Albums and Text, with one
+        selected class, one greyed absent class and one selected but absent class.
+      </p>
+
+      <h2>Panel with the new section and the chip</h2>
+      <p class="lead">
+        Portrait is selected. Tall panorama is absent from the current set. Panorama is selected but absent (orphan style).
+      </p>
+      <div class="app">
+        <aside class="panel" aria-label="Filters">
+          <div class="section"><button class="section-head closed" type="button">Media type<svg><use href="#i-chevron" /></svg></button></div>
+          <div class="section"><button class="section-head closed" type="button">Favorites<svg><use href="#i-chevron" /></svg></button></div>
+          <div class="section"><button class="section-head closed" type="button">Albums<svg><use href="#i-chevron" /></svg></button></div>
+          <div class="section" data-testid="filter-section-aspect">
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
+            <div class="section-body">
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
+                <button class="row orphan" type="button" aria-pressed="true"><svg><use href="#i-pano" /></svg>Panorama</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
+              </div>
+            </div>
+          </div>
+          <div class="section"><button class="section-head closed" type="button">Text<svg><use href="#i-chevron" /></svg></button></div>
+        </aside>
+        <main class="main">
+          <div class="bar" data-testid="active-filters-bar">
+            <span class="count">128 results</span>
+            <span class="dot" aria-hidden="true"></span>
+            <span class="chip" data-testid="active-chip">
+              <svg><use href="#i-portrait" /></svg><span>Aspect ratio: Portrait</span>
+              <button type="button" aria-label="Remove Aspect ratio: Portrait"><svg><use href="#i-close" /></svg></button>
+            </span>
+            <span class="chip" data-testid="active-chip">
+              <svg><use href="#i-pano" /></svg><span>Aspect ratio: Panorama</span>
+              <button type="button" aria-label="Remove Aspect ratio: Panorama"><svg><use href="#i-close" /></svg></button>
+            </span>
+          </div>
+          <div class="tiles">
+            <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+            <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+            <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+          </div>
+        </main>
+      </div>
+
+      <h2>Every state from the availability table</h2>
+      <div class="states">
+        <section class="card">
+          <h3>Nothing selected</h3>
+          <p class="note">All is outlined and is never greyed.</p>
+          <div class="section">
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
+            <div class="section-body">
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="true"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-portrait" /></svg>Portrait</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano" /></svg>Panorama</button>
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Greyed section (0)</h3>
+          <p class="note">
+            The scope has two or more classes, the current filters leave fewer than two, and nothing is selected here. The same
+            when the baseline is not known.
+          </p>
+          <div class="section">
+            <button class="section-head" type="button" disabled>Aspect ratio (0)</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Hidden section</h3>
+          <p class="note">The scope has fewer than two classes, or the server sends no aspectClasses.</p>
+          <div class="hidden-slot">Not rendered, and no toggle icon</div>
+        </section>
+
+        <section class="card">
+          <h3>Selection stays reachable</h3>
+          <p class="note">A section with a selection is never greyed or hidden, even if the classes are all absent.</p>
+          <div class="section">
+            <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
+            <div class="section-body">
+              <div class="rows" role="group" aria-label="Aspect ratio">
+                <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-landscape" /></svg>Landscape</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-square" /></svg>Square</button>
+                <button class="row orphan" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano" /></svg>Panorama</button>
+                <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <h2>Phone width</h2>
+      <div class="phone">
+        <div class="app">
+          <div class="bar">
+            <span class="count">128 results</span>
+            <span class="chip">
+              <svg><use href="#i-portrait" /></svg><span>Aspect ratio: Portrait</span>
+              <button type="button" aria-label="Remove Aspect ratio: Portrait"><svg><use href="#i-close" /></svg></button>
+            </span>
+          </div>
+          <div class="panel">
+            <div class="section">
+              <button class="section-head" type="button">Aspect ratio<svg><use href="#i-chevron" /></svg></button>
+              <div class="section-body">
+                <div class="rows" role="group" aria-label="Aspect ratio">
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-all" /></svg>All</button>
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-landscape" /></svg>Landscape</button>
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-square" /></svg>Square</button>
+                  <button class="row" type="button" aria-pressed="true"><svg><use href="#i-portrait" /></svg>Portrait</button>
+                  <button class="row" type="button" aria-pressed="false"><svg><use href="#i-pano" /></svg>Panorama</button>
+                  <button class="row" type="button" aria-pressed="false" disabled><svg><use href="#i-pano-tall" /></svg>Tall panorama</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2>Planned i18n keys</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Key</th><th>en</th><th>de</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>filter_aspect_ratio</code></td><td>Aspect ratio</td><td>Seitenverhältnis</td></tr>
+            <tr><td><code>all</code> (existing)</td><td>All</td><td>Alle</td></tr>
+            <tr><td><code>filter_aspect_landscape</code></td><td>Landscape</td><td>Quer</td></tr>
+            <tr><td><code>filter_aspect_square</code></td><td>Square</td><td>Quadratisch</td></tr>
+            <tr><td><code>filter_aspect_portrait</code></td><td>Portrait</td><td>Hoch</td></tr>
+            <tr><td><code>filter_aspect_panorama_wide</code></td><td>Panorama</td><td>Panorama</td></tr>
+            <tr><td><code>filter_aspect_panorama_tall</code></td><td>Tall panorama</td><td>Panorama hoch</td></tr>
+            <tr><td><code>filter_chip_aspect_ratio</code></td><td>Aspect ratio: {value}</td><td>Seitenverhältnis: {value}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const stored = (() => {
+        try {
+          return localStorage.getItem('mockup-theme');
+        } catch {
+          return null;
+        }
+      })();
+      const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = stored ?? (prefersDark ? 'dark' : 'light');
+      document.getElementById('theme').addEventListener('click', () => {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        try {
+          localStorage.setItem('mockup-theme', root.dataset.theme);
+        } catch {}
+      });
+    </script>
+  </body>
+</html>
