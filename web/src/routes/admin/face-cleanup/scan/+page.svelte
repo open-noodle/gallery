@@ -392,6 +392,9 @@
           <Button color="secondary" variant="ghost" size="small" href={Route.faceCleanupResolutions()}>
             {$t('admin.face_cleanup_view_resolutions')}
           </Button>
+          <Button color="secondary" variant="ghost" size="small" href={Route.faceCleanupDissolved()}>
+            {$t('admin.face_cleanup_view_dissolved')}
+          </Button>
           <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
           <!-- Before the first scan the tuning knobs are recessed to `ghost`: the defaults are what run one
                wants, and an admin who has never seen a scan's output has no basis for changing maxDistance or

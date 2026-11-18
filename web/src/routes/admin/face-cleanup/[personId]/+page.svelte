@@ -6,12 +6,14 @@
   import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
   import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import PersonDissolveModal from '#lib/modals/PersonDissolveModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     getFaceRepairClusterFaces,
     getFaceRepairPersonFaces,
+    getFaceRepairPersonMetadata,
     getLatestScan,
     getPeopleThumbnailPath,
     isHttpError,
@@ -557,6 +559,25 @@
     }
     await commitResolve(buildApplyRequest());
   };
+
+  // Dissolve is deliberately reachable even when no scan has ever run: a person made entirely of faces
+  // imported from file metadata is exactly the case a scan can never flag, so `scanPerson` is null for the
+  // people who need this most. That is also why the name comes from the person endpoint rather than the scan
+  // row — the modal gates an irreversible delete on the admin typing it, so it has to be the real name.
+  const handleDissolve = async () => {
+    try {
+      const person = await getFaceRepairPersonMetadata({ personId });
+      const dissolved = await modalManager.show(PersonDissolveModal, {
+        personId,
+        personName: person.name.trim() || $t('admin.face_cleanup_review_unnamed'),
+      });
+      if (dissolved) {
+        await loadPersonData();
+      }
+    } catch (error) {
+      handleError(error, $t('admin.face_cleanup_review_load_error'));
+    }
+  };
 </script>
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, guidedCrumb($t), { title: personName })}>
@@ -595,6 +616,12 @@
           </div>
         {/if}
       </div>
+      {#if !loading}
+        <div class="flex-1"></div>
+        <Button color="danger" variant="outline" size="small" onclick={handleDissolve} data-testid="dissolve-btn">
+          {$t('admin.face_cleanup_dissolve')}
+        </Button>
+      {/if}
     </div>
 
     {#if loading}

@@ -17,6 +17,7 @@ import { GalleryServerController } from 'src/gallery/controllers/gallery-server.
 import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
+import { FaceDissolveRepository } from 'src/gallery/repositories/face-dissolve.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
@@ -38,6 +39,7 @@ import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.reposit
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
+import { FaceDissolveService } from 'src/gallery/services/face-dissolve.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -132,6 +134,7 @@ export const galleryRepositories = [
   GalleryMachineLearningRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  FaceDissolveRepository,
 ];
 
 export const galleryServices = [
@@ -141,6 +144,7 @@ export const galleryServices = [
   AssetVisibilityTransitionService,
   ClassificationService,
   CleanupService,
+  FaceDissolveService,
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,

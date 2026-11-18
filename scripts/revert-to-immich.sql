@@ -708,6 +708,8 @@ DROP TABLE IF EXISTS "person_pet" CASCADE;
 DROP TABLE IF EXISTS "person_group_split" CASCADE;
 DROP TABLE IF EXISTS "person_group_split_share" CASCADE;
 DROP TABLE IF EXISTS "person_group_split_person" CASCADE;
+DROP TABLE IF EXISTS "face_dissolve_face" CASCADE;
+DROP TABLE IF EXISTS "face_dissolve" CASCADE;
 DROP TABLE IF EXISTS "face_repair_scan_flagged_face" CASCADE;
 DROP TABLE IF EXISTS "face_repair_decline" CASCADE;
 DROP TABLE IF EXISTS "face_repair_lock" CASCADE;
@@ -1241,6 +1243,8 @@ DELETE FROM "kysely_migrations"
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
   '1800100000000-AddVideoPetsSampledAt',
+  '1800000000000-AddFaceDissolveTables',
+  '1800200000000-AddFaceDissolveTables',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1345,6 +1349,7 @@ BEGIN
        'classification_prompt_embedding', 'classification_category',
        'storage_migration_log', 'asset_duplicate_checksum',
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
+       'face_dissolve', 'face_dissolve_face',
        'face_repair_scan_flagged_face', 'face_repair_lock',
        'pet_search',
        'asset_favorite_audit', 'asset_favorite',
