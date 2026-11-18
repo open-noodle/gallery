@@ -40,10 +40,22 @@ void main() {
     late ProviderContainer container;
     final enabled = StateProvider<bool>((ref) => true);
 
-    void assetSays(String id, Optional<bool?> spatialScene) {
+    void assetSays(
+      String id,
+      Optional<bool?> spatialScene, {
+      Optional<DateTime?> depthMapCreatedAt = const Optional.absent(),
+    }) {
       final asset = _MockAsset();
       when(() => asset.spatialScene).thenReturn(spatialScene);
+      when(() => asset.spatialSceneDepthMapCreatedAt).thenReturn(depthMapCreatedAt);
       when(() => assets.getAssetInfo(id)).thenAnswer((_) async => asset);
+    }
+
+    Future<String?> depthMapVersion(String id) async {
+      final subscription = container.listen(spatialSceneDepthMapVersionProvider(id), (_, _) {});
+      addTearDown(subscription.close);
+      await container.read(spatialSceneAssetInfoProvider(id).future);
+      return container.read(spatialSceneDepthMapVersionProvider(id));
     }
 
     Future<bool> offered(String id) async {
@@ -88,6 +100,18 @@ void main() {
 
       container.read(enabled.notifier).state = true;
       expect(await container.read(spatialSceneOfferedProvider('a').future), isTrue);
+    });
+
+    test('reads when the depth map was made, for its URL, from the same request', () async {
+      assetSays('a', const Optional.present(true), depthMapCreatedAt: Optional.present(DateTime.utc(2026, 11, 17, 10)));
+      expect(await offered('a'), isTrue);
+      expect(await depthMapVersion('a'), '2026-11-17T10:00:00.000Z');
+      verify(() => assets.getAssetInfo('a')).called(1);
+    });
+
+    test('has no depth map version from a server that does not report it', () async {
+      assetSays('a', const Optional.present(true));
+      expect(await depthMapVersion('a'), isNull);
     });
 
     test('does not offer it when the photo cannot be read', () async {

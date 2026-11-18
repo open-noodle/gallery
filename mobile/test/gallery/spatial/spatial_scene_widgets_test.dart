@@ -31,6 +31,7 @@ void main() {
       ),
       overrides: [
         spatialSceneOfferedProvider.overrideWith((ref, id) async => offered),
+        spatialSceneDepthMapVersionProvider.overrideWith((ref, id) => null),
         spatialSceneTexturesProvider.overrideWith(
           (ref, key) => textures?.call() ?? Completer<SpatialSceneTextures>().future,
         ),

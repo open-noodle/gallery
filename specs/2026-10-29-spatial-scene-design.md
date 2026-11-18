@@ -340,7 +340,11 @@ them.
 
 - **`GET /assets/{id}/depth`** in `GalleryAssetController`: streams the PNG through `this.backendMedia`, with the same
   access check as the preview thumbnail (`Permission.AssetView`, so shared links and space members work). 404 when there
-  is no map.
+  is no map. Served with `private_with_cache` (a day, then stale-while-revalidate for 30), so the clients key the URL
+  on the photo (`c`, its thumbhash) and on the map (`v`, `spatialSceneDepthMapCreatedAt` from `GET /assets/{id}`, the
+  row's `createdAt`, which every upsert resets). A map made again by a refresh, a model switch or the job therefore
+  gets a new URL. Before `v`, a recomputed map could be shown from the browser or app cache for up to a day, and
+  while revalidating after that.
 - **Availability on the asset.** `applyAssetResponseOverlay` sets `spatialScene: boolean` on `GET /assets/{id}`: true when
   a map exists and the offer mode allows it. The face rule reads the largest face box from the `faces` the overlay
   already receives, so it needs no extra query. The field is declared once, as an extension of `AssetResponseDto` in a fork
@@ -425,6 +429,10 @@ resolution would not do justice to an original anyway.
 
 ### Placement
 
+- **Depth map URL.** `spatialSceneAssetInfoProvider` makes the one `GET /assets/{id}` read per photo and holds both
+  `spatialScene` and `spatialSceneDepthMapCreatedAt`; `spatialSceneOfferedProvider` and
+  `spatialSceneDepthMapVersionProvider` read from it, and the overlay puts the version in the textures key, so the
+  depth map URL carries the same `c` and `v` as the web's.
 - **Flag.** The app's local database is filled by sync, which carries no `spatialScene`. So the viewer reads
   `spatialScene` from `GET /server/features` as the app's server info already holds it (`ServerFeatures.spatialScene`,
   read by `spatialSceneEnabledProvider`). The app loads those features at sign-in and reloads them whenever the socket

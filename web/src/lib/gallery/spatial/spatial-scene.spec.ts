@@ -1,4 +1,8 @@
-import { getSpatialSceneActions, spatialSceneState } from '#lib/gallery/spatial/spatial-scene.svelte.ts';
+import {
+  getDepthMapUrl,
+  getSpatialSceneActions,
+  spatialSceneState,
+} from '#lib/gallery/spatial/spatial-scene.svelte.ts';
 import { AssetTypeEnum, type AssetResponseDto } from '@immich/sdk';
 import type { ActionEvent, ActionItem } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
@@ -65,5 +69,27 @@ describe('Spatial Scene actions', () => {
 
     expect(requestPermission).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('getDepthMapUrl', () => {
+  it('changes with the photo and with the depth map, so a map made again is not served from the cache', () => {
+    const first = getDepthMapUrl({
+      id: 'asset-1',
+      thumbhash: 'abc',
+      spatialSceneDepthMapCreatedAt: '2026-11-17T10:00:00.000Z',
+    });
+    const remade = getDepthMapUrl({
+      id: 'asset-1',
+      thumbhash: 'abc',
+      spatialSceneDepthMapCreatedAt: '2026-11-18T10:00:00.000Z',
+    });
+    expect(first).toContain('/assets/asset-1/depth');
+    expect(first).toContain('c=abc');
+    expect(first).not.toBe(remade);
+  });
+
+  it('leaves the version out for a server that does not report it', () => {
+    expect(getDepthMapUrl({ id: 'asset-1', thumbhash: 'abc' })).not.toContain('v=');
   });
 });

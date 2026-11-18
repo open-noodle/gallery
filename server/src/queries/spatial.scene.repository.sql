@@ -55,6 +55,7 @@ select
   "asset_spatial_scene"."foregroundRatio",
   "asset_spatial_scene"."focus",
   "asset_spatial_scene"."modelName",
+  "asset_spatial_scene"."createdAt",
   "asset_spatial_scene_offer"."offered"
 from
   "asset_spatial_scene"

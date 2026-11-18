@@ -23,19 +23,46 @@ final spatialSceneEnabledProvider = Provider<bool>(
   (ref) => ref.watch(serverInfoProvider.select((info) => info.serverFeatures.spatialScene)),
 );
 
-/// Whether the viewer offers Spatial Scene for the remote asset [assetId]: `spatialScene` on `GET /assets/{id}`,
-/// which the server sets only for a photo with a depth map that the admin's offer setting allows.
-final spatialSceneOfferedProvider = FutureProvider.autoDispose.family<bool, String>((ref, assetId) async {
+/// What `GET /assets/{id}` says about Spatial Scene for a photo: whether the viewer offers it, and when its depth
+/// map was made (null from a server that does not report it).
+typedef SpatialSceneAssetInfo = ({bool offered, String? depthMapCreatedAt});
+
+const SpatialSceneAssetInfo _notOffered = (offered: false, depthMapCreatedAt: null);
+
+/// One read of the remote asset [assetId] for both [spatialSceneOfferedProvider] and
+/// [spatialSceneDepthMapVersionProvider]. The server sets `spatialScene` only for a photo with a depth map that the
+/// admin's offer setting, or a choice made for the photo, allows.
+final spatialSceneAssetInfoProvider = FutureProvider.autoDispose.family<SpatialSceneAssetInfo, String>((
+  ref,
+  assetId,
+) async {
   if (!ref.watch(spatialSceneEnabledProvider)) {
-    return false;
+    return _notOffered;
   }
   try {
     final asset = await ref.watch(apiServiceProvider).assetsApi.getAssetInfo(assetId);
-    return asset?.spatialScene.orElse(null) == true;
+    if (asset == null) {
+      return _notOffered;
+    }
+    return (
+      offered: asset.spatialScene.orElse(null) == true,
+      depthMapCreatedAt: asset.spatialSceneDepthMapCreatedAt.orElse(null)?.toUtc().toIso8601String(),
+    );
   } catch (_) {
-    return false;
+    return _notOffered;
   }
 });
+
+/// Whether the viewer offers Spatial Scene for the remote asset [assetId].
+final spatialSceneOfferedProvider = FutureProvider.autoDispose.family<bool, String>(
+  (ref, assetId) async => (await ref.watch(spatialSceneAssetInfoProvider(assetId).future)).offered,
+);
+
+/// When the depth map of [assetId] was made, once known. Part of the depth map URL, so a map made again (a refresh,
+/// another model) is not served from the image cache.
+final spatialSceneDepthMapVersionProvider = Provider.autoDispose.family<String?, String>(
+  (ref, assetId) => ref.watch(spatialSceneAssetInfoProvider(assetId)).valueOrNull?.depthMapCreatedAt,
+);
 
 /// The remote asset id the Spatial view is on, or null. Keyed by id rather than a plain flag, so swiping to another
 /// photo leaves it without anything having to reset it (the web viewer's `spatialSceneState`).
@@ -61,8 +88,12 @@ class SpatialSceneTextures {
 const _dilateRadius = 3;
 
 final spatialSceneTexturesProvider = FutureProvider.autoDispose
-    .family<SpatialSceneTextures, ({String id, String? thumbHash})>((ref, asset) async {
-      final cacheKey = asset.thumbHash == null ? '' : '?c=${Uri.encodeComponent(asset.thumbHash!)}';
+    .family<SpatialSceneTextures, ({String id, String? thumbHash, String? depthMapVersion})>((ref, asset) async {
+      final query = [
+        if (asset.thumbHash != null) 'c=${Uri.encodeComponent(asset.thumbHash!)}',
+        if (asset.depthMapVersion != null) 'v=${Uri.encodeComponent(asset.depthMapVersion!)}',
+      ];
+      final cacheKey = query.isEmpty ? '' : '?${query.join('&')}';
       final ui.Image image;
       final ui.Image depthImage;
       try {

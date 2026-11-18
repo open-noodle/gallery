@@ -81,6 +81,7 @@ export class SpatialSceneRepository {
         'asset_spatial_scene.foregroundRatio',
         'asset_spatial_scene.focus',
         'asset_spatial_scene.modelName',
+        'asset_spatial_scene.createdAt',
         'asset_spatial_scene_offer.offered',
       ])
       .where('asset_spatial_scene.assetId', '=', asUuid(assetId))

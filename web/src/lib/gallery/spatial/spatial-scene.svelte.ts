@@ -52,8 +52,16 @@ export const supportsWebGL2 = () => {
   return webgl2;
 };
 
-export const getDepthMapUrl = (asset: Pick<AssetResponseDto, 'id' | 'thumbhash'>) =>
-  createUrl(`/assets/${asset.id}/depth`, { ...authManager.params, c: asset.thumbhash });
+/**
+The browser keeps a depth map for a day. Its URL changes with the photo (thumbhash) and with the map itself
+(`spatialSceneDepthMapCreatedAt`), so a map made again by a refresh, a model switch or the job is fetched anew.
+*/
+export const getDepthMapUrl = (asset: Pick<AssetResponseDto, 'id' | 'thumbhash' | 'spatialSceneDepthMapCreatedAt'>) =>
+  createUrl(`/assets/${asset.id}/depth`, {
+    ...authManager.params,
+    c: asset.thumbhash,
+    v: asset.spatialSceneDepthMapCreatedAt,
+  });
 
 type DeviceOrientationWithPermission = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<'granted' | 'denied'>;

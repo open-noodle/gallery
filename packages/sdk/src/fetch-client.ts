@@ -1649,6 +1649,8 @@ export type AssetResponseDto = {
     spatialScene?: boolean;
     /** The per-photo choice behind spatialScene: true offered and false not offered whatever the automatic choice says, null for the automatic choice. Present only on single-asset reads while Spatial Scene is enabled. */
     spatialSceneChoice?: boolean | null;
+    /** When the depth map was made. A client adds it to the depth map URL, so a map made again (another model, a refresh) is not served from its cache. Present only on single-asset reads of a photo with a depth map while Spatial Scene is enabled. */
+    spatialSceneDepthMapCreatedAt?: string;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */

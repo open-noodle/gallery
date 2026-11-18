@@ -53,6 +53,12 @@ describe('applyAssetResponseOverlay, Spatial Scene', () => {
     });
   });
 
+  it('reports when the depth map was made, for the depth map URL', async () => {
+    const createdAt = new Date('2026-11-17T10:00:00.000Z');
+    const { data } = await resolve({ scene: { ...sharp, offered: null, createdAt } });
+    expect(data.spatialSceneDepthMapCreatedAt).toBe('2026-11-17T10:00:00.000Z');
+  });
+
   it('follows the choice and reports it', async () => {
     await expect(resolve({ scene: { ...flat, offered: true } })).resolves.toMatchObject({
       data: { spatialScene: true, spatialSceneChoice: true },
@@ -65,5 +71,6 @@ describe('applyAssetResponseOverlay, Spatial Scene', () => {
   it('reports a choice made before the depth map, without the button', async () => {
     const { data } = await resolve({ scene: undefined, offer: true });
     expect(data).toMatchObject({ spatialScene: false, spatialSceneChoice: true });
+    expect(data.spatialSceneDepthMapCreatedAt).toBeUndefined();
   });
 });

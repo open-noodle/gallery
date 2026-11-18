@@ -16,6 +16,13 @@ export const SpatialSceneAssetResponseExtension = {
     .describe(
       'The per-photo choice behind spatialScene: true offered and false not offered whatever the automatic choice says, null for the automatic choice. Present only on single-asset reads while Spatial Scene is enabled.',
     ),
+  spatialSceneDepthMapCreatedAt: z
+    .string()
+    .meta({ format: 'date-time' })
+    .optional()
+    .describe(
+      'When the depth map was made. A client adds it to the depth map URL, so a map made again (another model, a refresh) is not served from its cache. Present only on single-asset reads of a photo with a depth map while Spatial Scene is enabled.',
+    ),
 };
 
 // Spread into ServerFeaturesSchema. Optional: absent on servers that predate it, which a client reads as off.

@@ -110,7 +110,7 @@ const resolveSpatialScene = async (
   deps: AssetResponseOverlayDependencies,
   id: string,
   faces: ShallowDehydrateObject<AssetFace>[],
-): Promise<{ spatialScene: boolean; spatialSceneChoice?: boolean | null }> => {
+): Promise<Pick<AssetResponseDto, 'spatialScene' | 'spatialSceneChoice' | 'spatialSceneDepthMapCreatedAt'>> => {
   const { machineLearning } = await deps.getConfig();
   if (!isSpatialSceneEnabled(machineLearning)) {
     return { spatialScene: false };
@@ -123,6 +123,7 @@ const resolveSpatialScene = async (
   return {
     spatialScene: isSpatialSceneOffered(scene, machineLearning.spatialScene, faces),
     spatialSceneChoice: scene.offered,
+    spatialSceneDepthMapCreatedAt: asDateTimeString(scene.createdAt),
   };
 };
 
