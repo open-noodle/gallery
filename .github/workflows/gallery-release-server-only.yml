@@ -22,6 +22,10 @@ on:
         description: 'Commit SHA to release up to (default: HEAD of the triggering branch). Pass the SHA the mobile run recorded to ship a matching server build.'
         required: false
         type: string
+      ml_openvino_from:
+        description: 'Reuse the OpenVINO ML image of this earlier tag (e.g. v5.11.0-rc.1) instead of building it. Only when machine-learning/ is unchanged since that tag, for example while the onnxruntime source cannot be cloned.'
+        required: false
+        type: string
       build_ml_rocm:
         description: 'Build & publish the ROCm ML image (gallery-ml:*-rocm) on the self-hosted `gallery-rocm` runner. Uncheck to skip (e.g. runner offline) — the core release is never blocked by it.'
         required: false
@@ -275,8 +279,29 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: echo "platform-pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
 
+      # The OpenVINO image compiles onnxruntime from source. With ml_openvino_from set, this leg passes on the
+      # platform digest of that tag's image instead, and merge-ml tags it like a fresh build.
+      - name: Reuse an earlier OpenVINO image
+        id: reuse
+        if: matrix.device == 'openvino' && inputs.ml_openvino_from != ''
+        env:
+          FROM: ${{ inputs.ml_openvino_from }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          ref="ghcr.io/open-noodle/gallery-ml:${FROM}-openvino"
+          digest=$(docker buildx imagetools inspect --raw "$ref" |
+            jq -r --arg os "${PLATFORM%/*}" --arg arch "${PLATFORM#*/}" \
+              '.manifests[] | select(.platform.os == $os and .platform.architecture == $arch) | .digest')
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::No ${PLATFORM} image in ${ref}" >&2
+            exit 1
+          fi
+          echo "Reusing ${ref} (${digest}) for ${PLATFORM}"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push by digest
         id: build
+        if: steps.reuse.outcome == 'skipped'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: machine-learning
@@ -291,7 +316,7 @@ jobs:
       - name: Export digest
         run: | # zizmor: ignore[template-injection]
           mkdir -p "${{ runner.temp }}/digests"
-          digest="${{ steps.build.outputs.digest }}"
+          digest="${{ steps.build.outputs.digest || steps.reuse.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
