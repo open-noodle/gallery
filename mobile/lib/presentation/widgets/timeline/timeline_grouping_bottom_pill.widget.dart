@@ -31,7 +31,7 @@ class TimelineGroupingBottomPill extends ConsumerWidget {
     // The search entry on screens with a search (lib/gallery/search).
     final searchable = TimelinePillSearchButton.visible(ref);
     final duration = mq.disableAnimations ? Duration.zero : _hideAnimation;
-    final bottomInset = GalleryDockStyle.bottomInset(mq);
+    final bottomInset = GalleryDockStyle.bottomInset(context);
 
     return TweenAnimationBuilder<double>(
       key: const Key('timeline-grouping-bottom-pill-slide'),

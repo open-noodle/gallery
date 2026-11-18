@@ -37,11 +37,12 @@ What morphs into what, with all geometry on one spring:
 
 ### Interactions
 
-- **Fold and unfold.** The shell wraps its tab `child` in a listener for vertical `UserScrollNotification`s; they bubble up from whichever tab is showing:
+- **Fold and unfold.** The shell wraps its tab `child` in `GalleryDockScrollListener`, which reads the vertical scroll notifications bubbling up from whichever tab is showing:
   - `ScrollDirection.reverse` (content moving up) after about 24 px of travel folds the dock.
   - `forward`, or reaching the top (offset under 30 px), unfolds it.
   - Rubber-banding at the end of the scroll is ignored.
-  - Horizontal scrollables (the memory lane) are ignored, and so are scrollables nested inside a scrollable (`notification.depth > 0`).
+  - A list that lands at the top without scrolling (Years / Months / All swapping the timeline, a tab page rebuilt by the nav setting) unfolds the dock through its new scroll metrics, and so does a drag that starts at the top, where a clamped list does not move.
+  - Horizontal scrollables (the memory lane) are ignored.
   - Switching tab unfolds the dock.
 - **Tap the circle while folded:** unfold.
 - **Tap a tab while unfolded:** as today. Re-tapping Photos scrolls to the top (`ScrollToTopEvent`), and every tap runs the existing refresh side effects in `_onTabTap`.
@@ -60,7 +61,7 @@ What morphs into what, with all geometry on one spring:
 
 ### Sizes
 
-The tab bar is 64 high, the grouping row 46, with a 10 gap between rows. Each folded circle is 56. The dock sits 20 from the sides, a little in from a plain margin so the pills follow the screen's rounded corners. On a phone with a home indicator (safe-area bottom of 20 or more) it sits `max(16, safe-area bottom - 14)` from the bottom, down inside that area as iOS's own tab bar does; without one it floats 26 up. `GalleryDockStyle` holds the side and bottom insets, and the detail pages' pill uses the same ones.
+The tab bar is 64 high, the grouping row 46, with a 10 gap between rows. Each folded circle is 56. The dock sits 20 from the sides, a little in from a plain margin so the pills follow the screen's rounded corners. On an iPhone with a home indicator (safe-area bottom of 20 or more) it sits `max(16, safe-area bottom - 14)` from the bottom, down inside that area as iOS's own tab bar does. Android keeps `max(26, safe-area bottom)`: a swipe up from its bottom edge is the system's home gesture, so a control inside that zone would fight it. `GalleryDockStyle` holds the side and bottom insets, and the detail pages' pill uses the same ones.
 
 `bottomNavHeightProvider` publishes the **unfolded** height for the active tab. That is tab bar plus grouping row on Photos, and the tab bar alone elsewhere. Folding never changes it, so content never jumps: the last row of photos clears the dock at rest, and folding only reveals more photos behind the glass.
 

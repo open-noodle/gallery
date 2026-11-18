@@ -253,48 +253,51 @@ void main() {
     expect(container.read(bottomNavHeightProvider), greaterThan(0));
   });
 
-  testWidgets('iPhone: the dock sits down inside the home-indicator area', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(430, 932);
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    });
+  // iOS: 34 safe area less 14, down inside the home-indicator area as iOS's own tab bar sits. Android: above the safe
+  // area, out of the zone where a swipe up is the system's home gesture.
+  for (final (platform, float) in [(TargetPlatform.iOS, 20.0), (TargetPlatform.android, 34.0)])
+    testWidgets('${platform.name}: the dock floats $float above the bottom with a 34 safe area', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
 
-    final router = FakeTabsRouter();
-    final container = ProviderContainer(
-      overrides: [
-        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
-        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
-        ..._navOverrides(showSpaces: false),
-      ],
-    );
-    addTearDown(container.dispose);
+      final router = FakeTabsRouter();
+      final container = ProviderContainer(
+        overrides: [
+          readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+          hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+          ..._navOverrides(showSpaces: false),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      localizedForTest(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            home: MediaQuery(
-              data: const MediaQueryData(
-                size: Size(430, 932),
-                padding: EdgeInsets.only(bottom: 34),
-                textScaler: TextScaler.linear(0.45),
+      await tester.pumpWidget(
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: ThemeData(platform: platform),
+              home: MediaQuery(
+                data: const MediaQueryData(
+                  size: Size(430, 932),
+                  padding: EdgeInsets.only(bottom: 34),
+                  textScaler: TextScaler.linear(0.45),
+                ),
+                child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
               ),
-              child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    // Photos: 34 safe area less 14, as iOS's own tab bar sits, plus the dock's unfolded height (tab bar, gap,
-    // grouping row).
-    expect(container.read(bottomNavHeightProvider), 20 + GalleryDock.reservedHeight(showGrouping: true));
-    expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - 20);
-  });
+      // Photos: the float plus the dock's unfolded height (tab bar, gap, grouping row).
+      expect(container.read(bottomNavHeightProvider), float + GalleryDock.reservedHeight(showGrouping: true));
+      expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - float);
+    });
 
   testWidgets('narrow phone: the whole cluster stays inside the screen (#909)', (tester) async {
     tester.view.devicePixelRatio = 1;
