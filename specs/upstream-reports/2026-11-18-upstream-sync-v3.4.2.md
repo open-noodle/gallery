@@ -133,7 +133,29 @@ No `schemaVersion` or snapshot change upstream; nothing to renumber.
 
 ## Remote CI Verification
 
-Pending: to be filled after the dispatch.
+- **Test branch**: `rebase/upstream-rolling-v3.4.2`
+- **Commits validated**: `63b9cdd054b` (all workflows), `64ab7fad8d2` (`test.yml` re-run after the web test fix; nothing else changed)
+
+| Workflow                                  | Status | Run         | Notes                                                                                                       |
+| ----------------------------------------- | ------ | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 44406320528 | on `64ab7fad8d2`; first run 44399191648 red, see below                                                      |
+| `docker.yml`                              | GREEN  | 44399467758 |                                                                                                             |
+| `static_analysis.yml`                     | GREEN  | 44399257530 |                                                                                                             |
+| `gallery-build-mobile.yml`                | GREEN  | 44399322510 | Android green on attempt 1; iOS green on attempt 2 (attempt 1 got no macOS runner): validates `8d20a6888ab` |
+| `gallery-mobile-smoke.yml`                | GREEN  | 44399387456 |                                                                                                             |
+| `gallery-rebase-smoke.yml`                | GREEN  | 44399452043 |                                                                                                             |
+| `storage-migration-tests.yml`             | GREEN  | 44399612323 |                                                                                                             |
+| `storage-migration-e2e.yml`               | GREEN  | 44399749512 |                                                                                                             |
+| `gallery-ml-smoke.yml`                    | GREEN  | 44399886199 |                                                                                                             |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 44405440562 | `gallery_image=gallery-server:rolling-v342-rc1`, `upstream_image=immich-server:v3.4.2`                      |
+| `gallery-rc-build.yml`                    | GREEN  | 44399123596 | `rolling-v342-rc1`, server only (ML unchanged but for its version)                                          |
+
+- **Failures fixed**: Test Web, `date-time.spec.ts` got `enero de 2022`. The `locale` store is persisted to localStorage, shared by every spec iframe in one browser session; upstream's `timeline-util.spec.ts` ends on `es`, and the new spec files reshuffled which files share a worker. Fixed in the Gallery unit setup (`web/test/unit/gallery-setup.ts` clears the key before a spec's imports), reproduced red and proved green by forcing both files onto one worker (`64ab7fad8d2`).
+- **Confirmed infrastructure**: OpenAPI Clients on the first run died downloading the generator jar (Maven Central 429) before any check; green on the re-run.
+
+### Staging
+
+`rolling-v342-rc1` deployed to staging (infra-gitops `35a255b`; ML stays `rolling-v34-rc14`). Live-DB parity: 0 orphans, one pending fork migration (`1800100000000-AddVideoPetsSampledAt`, from #1316), which ran; no schema drift on either worker; no restarts. `/server/version` reports `3.4.2` to a stock client and `5.11.0-rc.1` to a Gallery client. Pre-deploy dump `~/gallery-backups/staging-pre-rolling-v342-rc1-2026-11-18.dump` (sha256 `c7148785…`); rollback = re-pin `rolling-v34-rc15` and restore it.
 
 ## Post-Rebase Verification
 
