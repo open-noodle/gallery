@@ -10,6 +10,8 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
+import 'package:immich_mobile/gallery/motion/spring_curve.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
@@ -280,20 +282,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final reducedDurations = tester
-          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
-          .map((w) => w.duration);
-      expect(reducedDurations, isNotEmpty);
-      expect(reducedDurations, everyElement(Duration.zero));
+      TweenAnimationBuilder<double> highlight() =>
+          tester.widget<TweenAnimationBuilder<double>>(find.byKey(const Key('timeline-grouping-highlight')));
+
+      // Reduced motion: a short ease with no overshoot instead of the dock's spring.
+      expect(highlight().curve, isNot(isA<GallerySpringCurve>()));
+      expect(highlight().duration, lessThanOrEqualTo(const Duration(milliseconds: 150)));
 
       await tester.pumpConsumerWidget(const TimelineGroupingSelector());
       await tester.pumpAndSettle();
 
-      final normalDurations = tester
-          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
-          .map((w) => w.duration);
-      expect(normalDurations, isNotEmpty);
-      expect(normalDurations, everyElement(isNot(Duration.zero)));
+      expect(highlight().curve, same(GalleryDockStyle.spring));
+      expect(highlight().duration, GalleryDockStyle.springDuration);
     });
 
     testWidgets('rtl layout preserves tap behavior and directional visual order', (tester) async {

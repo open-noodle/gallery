@@ -10,6 +10,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
@@ -65,9 +66,10 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
-      // The pill surface hugs the selector (218 self-cap + 2×8 padding) instead of
-      // spanning the screen — keeps the scrubber's right-edge margin clear.
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill'))).width, lessThanOrEqualTo(234));
+      // Like the Photos dock's grouping row: the full width less 14 on each side, at the dock row's height.
+      final pill = tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill')));
+      expect(pill.width, tester.view.physicalSize.width / tester.view.devicePixelRatio - 28);
+      expect(pill.height, GalleryDock.groupingHeight);
     });
 
     testWidgets('selector inside the pill draws no surface of its own (single pill border)', (tester) async {
