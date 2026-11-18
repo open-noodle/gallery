@@ -45,6 +45,12 @@ export const GalleryTimeBucketQueryExtension = {
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by camera lens model'),
   state: z.string().optional().describe('Filter by state/province name'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   ownerId: z
     .uuidv4()
     .optional()

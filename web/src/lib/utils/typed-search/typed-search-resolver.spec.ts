@@ -30,6 +30,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue([]);
   });
@@ -47,6 +49,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('beach person:anna tag:travel camera:nikon'), {});
@@ -128,6 +132,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue(['Munich']);
 
@@ -242,6 +248,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     const result = await resolveTypedSearchFilters(
@@ -280,6 +288,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('tag:trav'), {});
@@ -314,6 +324,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna'), { spaceId: 'space-1' });
@@ -338,6 +350,8 @@ describe('resolveTypedSearchFilters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon']);
 

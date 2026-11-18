@@ -3,8 +3,8 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
 
 // Gallery's search fields on top of upstream's SmartSearchDto / MetadataSearchDto literals in
-// search_api.repository.dart: wall-clock taken ranges, sort order, untagged search and
-// shared-space assets.
+// search_api.repository.dart: wall-clock taken ranges, sort order, untagged search, the
+// no-location filter and shared-space assets.
 
 AssetOrder? _order(SearchFilter filter) => switch (filter.sort) {
   SearchSortOrder.relevance => null,
@@ -21,6 +21,11 @@ extension GallerySmartSearchDto on SmartSearchDto {
       takenBefore = Optional.present(filter.date.takenBeforeParam(localTakenRange: localTakenRange));
     }
     tagIds = Optional.present(filter.tagIds ?? const <String>[]);
+    if (filter.location.locationPresence != null) {
+      locationPresence = Optional.present(
+        SmartSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence),
+      );
+    }
     order = _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter));
     // Include shared-space assets so a viewer's selected facet returns results (and a
     // space-person token resolves). #763: favorites are per-user, so the server composes
@@ -39,6 +44,11 @@ extension GalleryMetadataSearchDto on MetadataSearchDto {
       takenBefore = Optional.present(filter.date.takenBeforeParam(localTakenRange: localTakenRange));
     }
     tagIds = Optional.present(filter.tagIds ?? const <String>[]);
+    if (filter.location.locationPresence != null) {
+      locationPresence = Optional.present(
+        MetadataSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence),
+      );
+    }
     order = _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter));
     // See GallerySmartSearchDto.withGallery.
     withSharedSpaces = const Optional.present(true);

@@ -1,6 +1,6 @@
 import { Expression, Kysely, SelectQueryBuilder, SqlBool, expressionBuilder } from 'kysely';
 import { withLibraryView } from 'src/gallery/utils/library-view.js';
-import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
+import type { AssetSearchBuilderOptions, LocationPresence } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
@@ -18,6 +18,10 @@ scope (owner / space / visibility) is NOT part of it; each caller keeps its own.
   the day after the last one (web filter-panel.ts, mobile search_api.repository.dart).
 - place/camera: `null` means "has no value" (IS NULL), `undefined` and `''` mean "no filter".
 - rating: a minimum (`>=`); `null` means unrated.
+- locationPresence: absence of location, a member of the location group (mutually exclusive with
+  country/state/city). `noGps` is a NOT EXISTS, never a join: an asset whose metadata has not been
+  extracted has no asset_exif row at all, and is exactly the kind of asset "no GPS" must find.
+  `noPlaceName` needs a row with coordinates but no reverse-geocoded city.
 
 `searchAssetBuilderLegacy` itself is upstream and untouched (fileCreatedAt, inclusive bound, exact
 rating unless `ratingIsMinimum`); see specs/2026-07-23-search-v3-coexistence-design.md.
@@ -32,6 +36,7 @@ export interface AssetFilter {
   model?: string | null;
   lensModel?: string | null;
   rating?: number | null;
+  locationPresence?: LocationPresence;
 }
 
 export const assetFilterKeys = [
@@ -44,6 +49,7 @@ export const assetFilterKeys = [
   'model',
   'lensModel',
   'rating',
+  'locationPresence',
 ] as const satisfies (keyof AssetFilter)[];
 
 const exifColumns = ['country', 'state', 'city', 'make', 'model', 'lensModel'] as const;
@@ -76,6 +82,29 @@ export function assetFilterConditions(
               ...(f.rating === undefined ? [] : [eb('asset_exif.rating', f.rating === null ? 'is' : '>=', f.rating)]),
             ]),
           ),
+      ),
+    );
+  }
+
+  if (f.locationPresence === 'noGps') {
+    conditions.push(
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('asset_exif')
+            .whereRef('asset_exif.assetId', '=', 'asset.id')
+            .where('asset_exif.latitude', 'is not', null),
+        ),
+      ),
+    );
+  } else if (f.locationPresence === 'noPlaceName') {
+    conditions.push(
+      eb.exists(
+        eb
+          .selectFrom('asset_exif')
+          .whereRef('asset_exif.assetId', '=', 'asset.id')
+          .where('asset_exif.latitude', 'is not', null)
+          .where('asset_exif.city', 'is', null),
       ),
     );
   }
