@@ -101,7 +101,7 @@ describe(SpatialSceneRepository.name, () => {
 
       await sut.upsert(scene(asset.id));
       const { assetId: _, ...stored } = scene(asset.id);
-      await expect(sut.get(asset.id)).resolves.toEqual(stored);
+      await expect(sut.get(asset.id)).resolves.toEqual({ ...stored, createdAt: expect.any(Date), offered: null });
 
       await sut.upsert(scene(asset.id, { path: 'thumbs/depth.png', modelName: 'distill-any-depth-large' }));
       await expect(sut.get(asset.id)).resolves.toMatchObject({
@@ -118,6 +118,62 @@ describe(SpatialSceneRepository.name, () => {
       await ctx.database.deleteFrom('asset').where('id', '=', asset.id).execute();
 
       await expect(sut.get(asset.id)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('per-photo choice', () => {
+    it('reads null without a choice, and the choice once made, kept across a new depth map', async () => {
+      const { ctx, user, sut } = await setup();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsert(scene(asset.id));
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: null });
+
+      await sut.setOffer(asset.id, true);
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: true });
+      await sut.setOffer(asset.id, false);
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: false });
+
+      await sut.upsert(scene(asset.id, { modelName: 'distill-any-depth-small' }));
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: false, modelName: 'distill-any-depth-small' });
+
+      await sut.setOffer(asset.id, null);
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: null });
+    });
+
+    it('counts and clears every choice, leaving the depth maps', async () => {
+      const { ctx, user, sut } = await setup();
+      const { asset: offered } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: refused } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsert(scene(offered.id));
+      await sut.setOffer(offered.id, true);
+      await sut.setOffer(refused.id, false);
+      const before = await sut.countOffers();
+      expect(before).toBeGreaterThanOrEqual(2);
+
+      await expect(sut.deleteOffers()).resolves.toBe(before);
+      await expect(sut.countOffers()).resolves.toBe(0);
+      await expect(sut.getOffer(refused.id)).resolves.toBeNull();
+      await expect(sut.get(offered.id)).resolves.toMatchObject({ offered: null, path: scene(offered.id).path });
+    });
+
+    it('keeps a choice made before the depth map exists, and cascades with the asset', async () => {
+      const { ctx, user, sut } = await setup();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await expect(sut.getOffer(asset.id)).resolves.toBeNull();
+      await sut.setOffer(asset.id, true);
+      await expect(sut.get(asset.id)).resolves.toBeUndefined();
+      await expect(sut.getOffer(asset.id)).resolves.toBe(true);
+
+      await sut.upsert(scene(asset.id));
+      await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: true });
+
+      await ctx.database.deleteFrom('asset').where('id', '=', asset.id).execute();
+      const rows = await ctx.database
+        .selectFrom('asset_spatial_scene_offer')
+        .selectAll()
+        .where('assetId', '=', asset.id)
+        .execute();
+      expect(rows).toEqual([]);
     });
   });
 

@@ -24,8 +24,9 @@ type AssetResponseOverlayDependencies = {
 /**
 Fork overlay on GET /assets/:id (AssetService.get), applied after upstream maps the asset: space-scoped people
 (named in `spaceId`, or the space the server finds for the viewer), the owner's identity-resolved names and
-birthdays, hidden-people filtering for album and partner viewers, `canEdit`, and `spatialScene`. Shared-link sessions
-get only `spatialScene`; the rest is left as upstream returns them.
+birthdays, hidden-people filtering for album and partner viewers, `canEdit`, and `spatialScene` with
+`spatialSceneChoice`. Shared-link sessions get only the two Spatial Scene fields; the rest is left as upstream
+returns them.
 */
 export const applyAssetResponseOverlay = async (
   deps: AssetResponseOverlayDependencies,
@@ -44,7 +45,7 @@ export const applyAssetResponseOverlay = async (
   },
 ): Promise<void> => {
   // Before the shared-link return: a link viewer may open the depth map like any other view of the photo.
-  data.spatialScene = await resolveSpatialScene(deps, id, faces);
+  Object.assign(data, await resolveSpatialScene(deps, id, faces));
 
   if (auth.sharedLink) {
     return;
@@ -109,13 +110,21 @@ const resolveSpatialScene = async (
   deps: AssetResponseOverlayDependencies,
   id: string,
   faces: ShallowDehydrateObject<AssetFace>[],
-): Promise<boolean> => {
+): Promise<Pick<AssetResponseDto, 'spatialScene' | 'spatialSceneChoice' | 'spatialSceneDepthMapCreatedAt'>> => {
   const { machineLearning } = await deps.getConfig();
   if (!isSpatialSceneEnabled(machineLearning)) {
-    return false;
+    return { spatialScene: false };
   }
   const scene = await deps.spatialScene.get(id);
-  return !!scene && isSpatialSceneOffered(scene, machineLearning.spatialScene, faces);
+  if (!scene) {
+    // A choice can come before the map: offering it on a photo without one queues the map.
+    return { spatialScene: false, spatialSceneChoice: await deps.spatialScene.getOffer(id) };
+  }
+  return {
+    spatialScene: isSpatialSceneOffered(scene, machineLearning.spatialScene, faces),
+    spatialSceneChoice: scene.offered,
+    spatialSceneDepthMapCreatedAt: asDateTimeString(scene.createdAt),
+  };
 };
 
 const applyResolvedPersonMetadata = async (

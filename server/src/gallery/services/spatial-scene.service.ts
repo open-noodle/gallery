@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
@@ -12,6 +12,8 @@ import {
   Permission,
   QueueName,
 } from 'src/enum.js';
+import type { SpatialSceneChoicesResponseDto, SpatialSceneOfferDto } from 'src/gallery/dtos/spatial-scene.dto.js';
+import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { depthMapPath, isSpatialSceneEnabled } from 'src/gallery/utils/spatial-scene.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -96,12 +98,7 @@ export class SpatialSceneService extends BaseService {
 
     // Queued without re-reading the asset, so one deleted since is skipped, not failed.
     const asset = await this.spatialSceneRepository.getForJob(id);
-    if (
-      !asset ||
-      asset.type !== AssetType.Image ||
-      asset.visibility === AssetVisibility.Hidden ||
-      isPanorama({ projectionType: asset.projectionType, originalFileName: asset.originalPath })
-    ) {
+    if (!asset || !isProcessable(asset)) {
       return JobStatus.Skipped;
     }
     if (!asset.previewPath) {
@@ -144,6 +141,50 @@ export class SpatialSceneService extends BaseService {
     }
   }
 
+  // The two per-photo actions in the viewer (specs/2026-10-29-spatial-scene-design.md, "Per-photo actions"). Both
+  // need the edit access of the viewer's other job actions (Refresh faces and the like): the owner, or an Owner or
+  // Editor of a space the photo is in. The choice changes the photo for everyone who can see it.
+
+  /** Queues a new depth map for one photo, as an upload or an edit does. */
+  async refreshDepthMap(auth: AuthDto, id: string): Promise<void> {
+    await this.requireActionable(auth, id);
+    await this.jobRepository.queue({ name: JobName.SpatialScene, data: { id } });
+  }
+
+  /** Offers Spatial Scene on one photo or stops offering it; a photo without a depth map gets one queued. */
+  async setOffer(auth: AuthDto, id: string, { offered }: SpatialSceneOfferDto): Promise<void> {
+    await this.requireActionable(auth, id);
+    await this.spatialSceneRepository.setOffer(id, offered);
+    if (offered && !(await this.spatialSceneRepository.get(id))) {
+      await this.jobRepository.queue({ name: JobName.SpatialScene, data: { id } });
+    }
+  }
+
+  // The admin's view of the choices (specs/2026-10-29-spatial-scene-design.md, "Per-photo actions"). Admin-only by the
+  // route guard, and allowed while Spatial Scene is off: clearing them is housekeeping, not a use of the feature.
+
+  async getChoices(): Promise<SpatialSceneChoicesResponseDto> {
+    return { count: await this.spatialSceneRepository.countOffers() };
+  }
+
+  async clearChoices(auth: AuthDto): Promise<SpatialSceneChoicesResponseDto> {
+    const count = await this.spatialSceneRepository.deleteOffers();
+    this.logger.log(`User ${auth.user.id} cleared ${count} Spatial Scene per-photo choices`);
+    return { count };
+  }
+
+  private async requireActionable(auth: AuthDto, id: string) {
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    if (!isSpatialSceneEnabled(machineLearning)) {
+      throw new BadRequestException('Spatial Scene is disabled');
+    }
+    const asset = await this.spatialSceneRepository.getForJob(id);
+    if (!asset || !isProcessable(asset)) {
+      throw new BadRequestException('Spatial Scene is not available for this asset');
+    }
+  }
+
   /** The depth map, readable by anyone who can view the photo, shared links included. */
   async getDepthMap(auth: AuthDto, id: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
@@ -154,3 +195,14 @@ export class SpatialSceneService extends BaseService {
     return this.backendMedia.serveFromBackend(scene.path, 'image/png', CacheControl.PrivateWithCache);
   }
 }
+
+/** What the depth job processes: photos, not hidden, not panoramas. */
+const isProcessable = (asset: {
+  type: AssetType;
+  visibility: AssetVisibility;
+  projectionType: string | null;
+  originalPath: string;
+}) =>
+  asset.type === AssetType.Image &&
+  asset.visibility !== AssetVisibility.Hidden &&
+  !isPanorama({ projectionType: asset.projectionType, originalFileName: asset.originalPath });
