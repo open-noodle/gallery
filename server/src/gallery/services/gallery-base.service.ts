@@ -73,6 +73,7 @@ export abstract class GalleryBaseService {
   declare protected spatialSceneRepository: GalleryRepositories['spatialSceneRepository'];
   declare protected dataSaverVideoRepository: GalleryRepositories['dataSaverVideoRepository'];
   declare protected videoFaceRepository: GalleryRepositories['videoFaceRepository'];
+  declare protected faceDissolveRepository: GalleryRepositories['faceDissolveRepository'];
 
   declare protected identityMergePropagationService: IdentityMergePropagationService;
   declare protected faceAssignmentService: FaceAssignmentService;
