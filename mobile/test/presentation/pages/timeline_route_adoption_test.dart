@@ -13,7 +13,6 @@ import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/gallery/photos_view_menu.widget.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
@@ -130,9 +129,8 @@ void main() {
   });
 
   group('adopted timeline route contracts', () {
-    test('Main Photos keeps the app bar display menu', () {
-      // The Photos app bar's display menu holds the grouping (#625) with the library view (#1038).
-      expect(PhotosTimelineAppBar.actions.first, isA<PhotosViewMenuButton>());
+    test('Main Photos adds no app-bar actions: grouping (#625) and the library view (#1038) are in the dock', () {
+      expect(PhotosTimelineAppBar.actions, isEmpty);
     });
 
     test('composed pages expose extra-sliver heights', () {

@@ -47,7 +47,7 @@ What morphs into what, with all geometry on one spring:
 - **Tap a tab while unfolded:** as today. Re-tapping Photos scrolls to the top (`ScrollToTopEvent`), and every tap runs the existing refresh side effects in `_onTabTap`.
 - **Tap search:** `openGallerySearch`, as today.
 - **In search, tap the circle:** leave search mode, the same as the header's ←.
-- **Display options:** a round button at the end of the grouping row, shown while the dock is unfolded and once one of the user's spaces is on their timeline (`libraryViewVisibleProvider`). It opens the library view menu (Both / Personal / Spaces) upwards, and tints like the selected grouping while a view narrows the timeline. The Photos app bar's `PhotosViewMenuButton` stays for now: in landscape there is no dock.
+- **Display options:** a round button at the end of the grouping row, shown while the dock is unfolded and once one of the user's spaces is on their timeline (`libraryViewVisibleProvider`). It opens a menu upwards headed "Assets shown" (videos are in the timeline too) with Everything / Only my photos / Only spaces, each with its icon, and tints like the selected grouping while a view narrows the timeline. The Photos app bar's `PhotosViewMenuButton` is gone (owner, 2026-11-18): the dock holds grouping and the library view, and the app bar adds no actions. In landscape, where there is no dock, neither control is shown.
 
 ### Unchanged behaviour carried over
 
@@ -60,7 +60,7 @@ What morphs into what, with all geometry on one spring:
 
 ### Sizes
 
-The tab bar is 64 high, the grouping row 52, with a 10 gap between rows. Each folded circle is 56. The dock sits 14 from the sides and floats `max(26, safe-area bottom)` from the bottom.
+The tab bar is 64 high, the grouping row 46, with a 10 gap between rows. Each folded circle is 56. The dock sits 20 from the sides, a little in from a plain margin so the pills follow the screen's rounded corners. On a phone with a home indicator (safe-area bottom of 20 or more) it sits `max(16, safe-area bottom - 14)` from the bottom, down inside that area as iOS's own tab bar does; without one it floats 26 up. `GalleryDockStyle` holds the side and bottom insets, and the detail pages' pill uses the same ones.
 
 `bottomNavHeightProvider` publishes the **unfolded** height for the active tab. That is tab bar plus grouping row on Photos, and the tab bar alone elsewhere. Folding never changes it, so content never jumps: the last row of photos clears the dock at rest, and folding only reveals more photos behind the glass.
 
@@ -73,7 +73,7 @@ The pill is built from the dock's own pieces, so there is one Years / Months / A
 - `TimelineGroupingSelector` fills its row, with a highlight that slides on the dock's spring in the tab bar's colours. The dock and the pill both render it.
 - `GalleryGroupingRow` puts the selector and an optional round end button (`GalleryDockRowButton`) on the dock's `GalleryGlass`. The dock's end button is display options; the pill's is search.
 - `GalleryDockStyle` (`gallery_dock_style.dart`) holds the spring, the highlight and the label colours. The tab bar reads them too.
-- The pill spans the width less 14 a side, at the dock row's 52 height. `pillHeight` follows `GalleryDock.groupingHeight`.
+- The pill spans the width less the dock's side insets, at the dock row's 46 height. `pillHeight` follows `GalleryDock.groupingHeight`.
 
 The highlight's spring runs on the selected slot's index, not on pixels: the row narrows while the dock folds, and a pixel target would restart every frame and leave the highlight trailing.
 

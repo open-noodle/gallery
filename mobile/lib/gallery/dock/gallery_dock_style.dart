@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,13 @@ import 'package:immich_mobile/gallery/motion/spring_curve.dart';
 /// The look and motion shared by the dock and every bottom control styled like it (the detail pages' grouping pill),
 /// so they cannot drift apart.
 abstract final class GalleryDockStyle {
+  /// Space on each side: a little wider than a plain margin, so the pills follow the screen's rounded corners.
+  static const double sideInset = 20;
+
+  /// Distance from the screen's bottom edge. On a phone with a home indicator the dock sits down inside that area, as
+  /// iOS's own tab bar does; without one it floats 26 up.
+  static double bottomInset(MediaQueryData mq) => mq.padding.bottom >= 20 ? math.max(16, mq.padding.bottom - 14) : 26;
+
   /// The prototype's "springy" motion: a small overshoot that settles in about 0.6 s.
   static final GallerySpringCurve spring = GallerySpringCurve(
     const SpringDescription(mass: 1, stiffness: 240, damping: 21),
@@ -117,7 +125,7 @@ class GalleryDockRowButton extends StatelessWidget {
     this.active = false,
   });
 
-  static const double size = 40;
+  static const double size = 38;
 
   @override
   Widget build(BuildContext context) {
