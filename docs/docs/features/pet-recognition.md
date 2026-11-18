@@ -53,6 +53,12 @@ Recognized pets appear on the **People** page with a paw badge, exactly like rec
 
 Pets propagate into shared spaces the same way people do, so a space's People page shows the pets in that space's photos.
 
+Pets found in videos are recognized the same way. With [Detect pets across the whole video](/features/pet-detection#pets-in-videos) on, a pet in a video is matched from its clearest frame, and its moments in the video show on the pet's page as they do for people.
+
+:::note Look-alike pets in the same photo or video
+Recognition does not yet check whether two animals appear at the same time. Several dogs of the same breed and colour in one photo or video, such as a litter of puppies, can all be matched to one pet. Lower [Maximum recognition distance](#maximum-recognition-distance), or move the wrong moments to another pet from the video's moments row.
+:::
+
 ## Model options
 
 Three models are available. All produce the same 512-dimension embedding, so you can switch between them without a schema change. Larger models are more accurate and slower, and the download is not small.

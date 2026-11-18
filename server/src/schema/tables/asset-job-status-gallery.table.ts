@@ -22,4 +22,8 @@ export class AssetJobStatusGalleryTable {
   // has no faces, so turning the feature on again does not rescan it.
   @Column({ type: 'timestamp with time zone', nullable: true })
   videoFacesSampledAt!: Timestamp | null;
+
+  // Video pets sampled across the whole video (specs/2026-11-16-video-pet-detection-design.md), as above for pets.
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  videoPetsSampledAt!: Timestamp | null;
 }

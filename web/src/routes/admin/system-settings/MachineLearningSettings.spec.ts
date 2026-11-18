@@ -116,6 +116,16 @@ vi.mock('@immich/ui', async (original) => {
 const getSuggestionMaxDistanceInput = () =>
   document.querySelector('[id="admin.machine_learning_suggestion_max_distance"]') as HTMLInputElement;
 
+/** Video pet sampling off, as the server's defaults send it (specs/2026-11-16-video-pet-detection-design.md). */
+const petVideo = {
+  enabled: false,
+  sampleInterval: 2,
+  sceneDetection: true,
+  maxFrames: 900,
+  maxDistance: 0.55,
+  minSightings: 2,
+};
+
 describe('MachineLearningSettings face suggestions auto-fill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -282,7 +292,7 @@ describe('MachineLearningSettings pet recognition', () => {
     it('shows a hint when pet detection is disabled', async () => {
       mocks.systemConfig = makeMachineLearningConfig(
         {},
-        { petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.5 } },
+        { petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.5, video: petVideo } },
       );
 
       await render(MachineLearningSettings);
@@ -293,7 +303,7 @@ describe('MachineLearningSettings pet recognition', () => {
     it('hides the hint when pet detection is enabled', async () => {
       mocks.systemConfig = makeMachineLearningConfig(
         {},
-        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
+        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5, video: petVideo } },
       );
 
       await render(MachineLearningSettings);
@@ -309,7 +319,7 @@ describe('MachineLearningSettings pet recognition', () => {
       mocks.openAccordions = ['facial-recognition', 'pet-recognition', 'pet-detection'];
       mocks.systemConfig = makeMachineLearningConfig(
         {},
-        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
+        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5, video: petVideo } },
       );
 
       await render(MachineLearningSettings);

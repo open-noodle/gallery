@@ -122,7 +122,19 @@ describe('fork config survives schema composition', () => {
   it('keeps the fork machine-learning fields', () => {
     expect(parsed.machineLearning.clip.maxDistance).toBe(0);
     expect(parsed.machineLearning.facialRecognition.suggestions).toEqual({ enabled: true, maxDistance: 0.7 });
-    expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 });
+    expect(parsed.machineLearning.petDetection).toEqual({
+      enabled: false,
+      modelName: 'rfdetr-nano',
+      minScore: 0.3,
+      video: {
+        enabled: false,
+        sampleInterval: 2,
+        sceneDetection: true,
+        maxFrames: 900,
+        maxDistance: 0.55,
+        minSightings: 2,
+      },
+    });
   });
 
   it('keeps the fork database-backup S3 block', () => {

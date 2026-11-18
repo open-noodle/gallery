@@ -111,6 +111,8 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
   mocks.spatialScene.getPathsByPaths.mockResolvedValue([]);
   mocks.dataSaverVideo.getPathsByPaths.mockResolvedValue([]);
   mocks.videoFace.getPathsByPaths.mockResolvedValue([]);
+  // Every pet purge reads the frame files it is about to orphan (specs/2026-11-16-video-pet-detection-design.md).
+  mocks.petFace.getPetFramePaths.mockResolvedValue([]);
 
   return mocks;
 };

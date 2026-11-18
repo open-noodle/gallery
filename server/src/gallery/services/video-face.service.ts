@@ -28,12 +28,13 @@ import {
   type SightingChange,
 } from 'src/gallery/utils/video-faces.js';
 import { VideoFrameReader } from 'src/gallery/utils/video-frames.js';
+import { VIDEO_PET_SAMPLER_VERSION } from 'src/gallery/utils/video-pets.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import type { ImmichMediaResponse } from 'src/utils/file.js';
-import { isFacialRecognitionEnabled } from 'src/utils/misc.js';
+import { isFacialRecognitionEnabled, isPetRecognitionEnabled } from 'src/utils/misc.js';
 
 type StoredFaceSightings = NonNullable<Awaited<ReturnType<VideoFaceRepository['getSightings']>>>;
 
@@ -47,9 +48,16 @@ const toBestView = ({ t, x1, y1, x2, y2 }: VideoFaceSighting) => ({
 const playerSightings = (stored: StoredFaceSightings, { sightings, best }: SightingChange) =>
   sightingsForPlayer({ ...stored, sightings, timeSeconds: best ? best.t : stored.timeSeconds });
 
-/** Sightings move only between faces of one video sampled at one frame size, where their boxes mean the same. */
+/**
+Sightings move only between faces of one video sampled at one frame size, where their boxes mean the same, and only
+between pets or only between people: a pet's face and a person's are found by different jobs and embedded by different
+models (specs/2026-11-16-video-pet-detection-design.md).
+*/
 const assertSameFrames = ([first, ...others]: StoredFaceSightings[]) => {
   for (const other of others) {
+    if (!!other.isPet !== !!first.isPet) {
+      throw new BadRequestException('Sightings move only between pets, or only between people');
+    }
     if (
       other.assetId !== first.assetId ||
       other.imageWidth !== first.imageWidth ||
@@ -179,15 +187,26 @@ export class VideoFaceService extends BaseService {
       throw new BadRequestException('A face keeps at least one sighting');
     }
 
+    // A pet in its species group has no embedding to give the new face, which would then be neither a pet nor a
+    // person; its moments all belong to the species group anyway.
+    if (stored.isPet && !stored.petSpecies) {
+      throw new BadRequestException('A pet grouped by species cannot be split');
+    }
+
     const { sightings, best, moved } = split;
     const faceId = this.cryptoRepository.randomUUID();
     const framePath = join(dirname(stored.framePath), `${faceId}.jpeg`);
     const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-split-'));
     let embedding: string | undefined;
+    let petEmbedding: { embedding: string; species: string } | undefined;
     try {
       const localFrame = join(tempDir, 'frame.jpeg');
       await this.extractFrame(stored.originalPath, moved.t, localFrame);
-      embedding = await this.embeddingAt(localFrame, moved);
+      if (stored.petSpecies) {
+        petEmbedding = await this.petEmbeddingAt(localFrame, moved, stored.petSpecies);
+      } else {
+        embedding = await this.embeddingAt(localFrame, moved);
+      }
       const backend = await this.backendMedia.backendFor(stored.framePath);
       await backend.put(framePath, await readFile(localFrame), { contentType: 'image/jpeg' });
     } finally {
@@ -214,9 +233,10 @@ export class VideoFaceService extends BaseService {
         timeSeconds: moved.t,
         quality: 0,
         sightings: [moved],
-        version: VIDEO_FACE_SAMPLER_VERSION,
+        version: stored.isPet ? VIDEO_PET_SAMPLER_VERSION : VIDEO_FACE_SAMPLER_VERSION,
       },
       embedding,
+      petEmbedding,
     });
     if (best) {
       await this.queuePersonThumbnails(id);
@@ -412,6 +432,36 @@ export class VideoFaceService extends BaseService {
       this.logger.warn(`Could not detect the face moved out at ${sighting.t}s: ${error}`);
       return;
     }
+  }
+
+  /**
+  The pet embedding at the sighting's box in a frame, from detecting pets in it again with recognition, so the new face
+  stays an individual pet. A pet recognition cannot embed there (recognition off, the service fails, or the pet is not
+  found again) fails the split before anything is written: without an embedding the face would be neither a pet nor a
+  person.
+  */
+  private async petEmbeddingAt(framePath: string, sighting: VideoFaceSighting, species: string) {
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    let found: string | undefined;
+    if (isPetRecognitionEnabled(machineLearning)) {
+      try {
+        const { pets } = await this.galleryMachineLearningRepository.detectPets(
+          framePath,
+          machineLearning.petDetection,
+          { modelName: machineLearning.petRecognition.modelName },
+        );
+        found = detectionAt(
+          pets.filter((pet) => pet.label === species),
+          sighting,
+        )?.embedding;
+      } catch (error) {
+        this.logger.warn(`Could not detect the pet moved out at ${sighting.t}s: ${error}`);
+      }
+    }
+    if (!found) {
+      throw new BadRequestException('The pet could not be found again in that frame');
+    }
+    return { embedding: found, species };
   }
 
   /**

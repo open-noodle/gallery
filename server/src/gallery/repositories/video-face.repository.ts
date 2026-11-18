@@ -151,8 +151,8 @@ export class VideoFaceRepository {
   }
 
   /**
-  Everything one face's sightings need: the stored sightings and best time, the video's current trim, and its
-  original. Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
+  Everything one face's sightings need: the stored sightings and best time, the video's current trim, its original,
+  and whether the face is a pet (with its embedded species, for a pet recognition identifies). Undefined for a face with no frame row (a photo face, a poster face, a manual face) or on a trashed video.
   */
   @GenerateSql({ params: [DummyValue.UUID] })
   getSightings(faceId: string) {
@@ -161,7 +161,8 @@ export class VideoFaceRepository {
       .innerJoin('asset_face', 'asset_face.id', 'asset_face_video_frame.faceId')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('asset_video_trim', 'asset_video_trim.assetId', 'asset.id')
-      .select([
+      .leftJoin('pet_search', 'pet_search.faceId', 'asset_face.id')
+      .select((eb) => [
         'asset_face_video_frame.sightings',
         'asset_face_video_frame.timeSeconds',
         'asset_face_video_frame.path as framePath',
@@ -171,6 +172,10 @@ export class VideoFaceRepository {
         'asset.originalPath',
         'asset_video_trim.startTime as trimStart',
         'asset_video_trim.endTime as trimEnd',
+        // A pet's moments move only between pets, and a split pet sighting keeps a pet embedding
+        // (specs/2026-11-16-video-pet-detection-design.md).
+        petFacePredicate(eb).as('isPet'),
+        'pet_search.species as petSpecies',
       ])
       .where('asset_face_video_frame.faceId', '=', asUuid(faceId))
       .where('asset.deletedAt', 'is', null)
@@ -197,6 +202,7 @@ export class VideoFaceRepository {
     face,
     frame,
     embedding,
+    petEmbedding,
   }: {
     faceId: string;
     sightings: VideoFaceSighting[];
@@ -204,6 +210,8 @@ export class VideoFaceRepository {
     face: { id: string; assetId: string } & VideoFaceBox;
     frame: Insertable<AssetFaceVideoFrameTable>;
     embedding?: string;
+    /** For a pet: its embedding goes to pet_search with this species, not to face_search. */
+    petEmbedding?: { embedding: string; species: string };
   }): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       await writeSightings(trx, faceId, sightings, best);
@@ -213,6 +221,12 @@ export class VideoFaceRepository {
         .execute();
       if (embedding) {
         await trx.insertInto('face_search').values({ faceId: face.id, embedding }).execute();
+      }
+      if (petEmbedding) {
+        await trx
+          .insertInto('pet_search')
+          .values({ faceId: face.id, ...petEmbedding })
+          .execute();
       }
       await trx.insertInto('asset_face_video_frame').values(frame).execute();
     });
@@ -277,7 +291,7 @@ export class VideoFaceRepository {
 
   /**
   Visible videos face detection has already been through, but not this sampler: what its Missing job adds. That is a
-  video never sampled across its length, or one with a face from an older `VIDEO_FACE_SAMPLER_VERSION`, whose
+  video never sampled across its length, or one with a person's face from an older `VIDEO_FACE_SAMPLER_VERSION`, whose
   tracking has since changed enough to be worth a rescan.
   */
   @GenerateSql({ params: [], stream: true })
@@ -300,7 +314,10 @@ export class VideoFaceRepository {
               .innerJoin('asset_face_video_frame', 'asset_face_video_frame.faceId', 'asset_face.id')
               .whereRef('asset_face.assetId', '=', 'asset.id')
               .where('asset_face.deletedAt', 'is', null)
-              .where('asset_face_video_frame.version', '<', sql.lit(VIDEO_FACE_SAMPLER_VERSION)),
+              .where('asset_face_video_frame.version', '<', sql.lit(VIDEO_FACE_SAMPLER_VERSION))
+              // Pet frame rows carry pet detection's own version and are never rewritten here
+              // (specs/2026-11-16-video-pet-detection-design.md).
+              .where((inner) => inner.not(petFacePredicate(inner))),
           ),
         ]),
       )

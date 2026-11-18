@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { writeFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
+import { VIDEO_PET_SAMPLER_VERSION } from 'src/gallery/utils/video-pets.js';
 import type { VideoFaceSighting } from 'src/schema/tables/asset-face-video-frame.table.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStreamResponse } from 'src/utils/file.js';
@@ -27,6 +28,8 @@ const storedWith = (sightings: VideoFaceSighting[], timeSeconds = 4) => ({
   framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
   trimStart: null,
   trimEnd: null,
+  isPet: false,
+  petSpecies: null as string | null,
 });
 
 // Two faces of one video, for moving sightings between them.
@@ -170,6 +173,8 @@ describe(VideoFaceService.name, () => {
         framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
         trimStart: 2,
         trimEnd: null,
+        isPet: false,
+        petSpecies: null,
       });
 
       const fraction = { x1: 0.1, y1: 0.05, x2: 0.5, y2: 0.25 };
@@ -227,6 +232,8 @@ describe(VideoFaceService.name, () => {
       framePath: 'thumbs/owner/fa/ce/face-1.jpeg',
       trimStart: 1.5,
       trimEnd: null,
+      isPet: false,
+      petSpecies: null,
     };
     let extractFrame: ReturnType<typeof vi.fn>;
 
@@ -422,6 +429,11 @@ describe(VideoFaceService.name, () => {
     const best = { t: 4, score: 0.9, x1: 100, y1: 100, x2: 200, y2: 200 };
     const other = { t: 6, score: 0.5, x1: 300, y1: 100, x2: 400, y2: 200 };
     const nextBest = { t: 9, score: 0.8, x1: 500, y1: 100, x2: 600, y2: 200 };
+    const petStored = (petSpecies: string | null) => ({
+      ...storedWith([best, other, nextBest]),
+      isPet: true,
+      petSpecies,
+    });
     let extractFrame: ReturnType<typeof vi.fn>;
     let put: ReturnType<typeof vi.fn>;
 
@@ -525,6 +537,64 @@ describe(VideoFaceService.name, () => {
       mocks.machineLearning.detectFaces.mockRejectedValue(new Error('ML down'));
       await sut.splitSighting(auth, 'face-1', 6);
       expect(mocks.videoFace.splitSighting).toHaveBeenLastCalledWith(expect.objectContaining({ embedding: undefined }));
+    });
+
+    describe('of a pet', () => {
+      const petsInFrame = {
+        imageWidth: 1000,
+        imageHeight: 500,
+        pets: [
+          { boundingBox: { x1: 302, y1: 98, x2: 398, y2: 202 }, score: 0.8, label: 'cat', embedding: '[9,9]' },
+          { boundingBox: { x1: 298, y1: 101, x2: 401, y2: 199 }, score: 0.8, label: 'dog', embedding: '[2,2]' },
+        ],
+      };
+
+      beforeEach(() => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          machineLearning: {
+            petDetection: { enabled: true },
+            petRecognition: { enabled: true, modelName: 'pet-recognition-base' },
+          },
+        });
+        mocks.machineLearning.detectPets.mockResolvedValue(petsInFrame);
+      });
+
+      it('gives the new face a pet embedding of its species found there, never a face embedding', async () => {
+        mocks.videoFace.getSightings.mockResolvedValue(petStored('dog'));
+
+        await sut.splitSighting(auth, 'face-1', 6);
+
+        expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalled();
+        expect(mocks.machineLearning.detectPets.mock.calls[0][2]).toEqual({ modelName: 'pet-recognition-base' });
+        expect(mocks.videoFace.splitSighting).toHaveBeenCalledWith(
+          expect.objectContaining({
+            embedding: undefined,
+            petEmbedding: { embedding: '[2,2]', species: 'dog' },
+            frame: expect.objectContaining({ version: VIDEO_PET_SAMPLER_VERSION }),
+          }),
+        );
+      });
+
+      it('refuses, writing nothing, when the pet is not found again or recognition is off', async () => {
+        mocks.videoFace.getSightings.mockResolvedValue(petStored('dog'));
+        mocks.machineLearning.detectPets.mockResolvedValue({ ...petsInFrame, pets: [petsInFrame.pets[0]] });
+        await expect(sut.splitSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(BadRequestException);
+
+        mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { petRecognition: { enabled: false } } });
+        await expect(sut.splitSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(put).not.toHaveBeenCalled();
+        expect(mocks.videoFace.splitSighting).not.toHaveBeenCalled();
+      });
+
+      it('refuses to split a pet grouped by species, before extracting anything', async () => {
+        mocks.videoFace.getSightings.mockResolvedValue(petStored(null));
+
+        await expect(sut.splitSighting(auth, 'face-1', 6)).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(extractFrame).not.toHaveBeenCalled();
+        expect(mocks.videoFace.splitSighting).not.toHaveBeenCalled();
+      });
     });
 
     it("keeps a face's last sighting, and is not found at a time with no sighting shown", async () => {
@@ -667,6 +737,27 @@ describe(VideoFaceService.name, () => {
         BadRequestException,
       );
       expect(mocks.videoFace.moveSightings).not.toHaveBeenCalled();
+    });
+
+    it("never moves or combines a pet's moments with a person's", async () => {
+      storedBy({ 'face-a': faceA([a1, a2]), 'face-b': { ...faceB([b1]), isPet: true, petSpecies: 'dog' } });
+
+      await expect(sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(sut.mergeFaces(auth, ['face-a', 'face-b'])).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.videoFace.moveSightings).not.toHaveBeenCalled();
+    });
+
+    it("moves a pet's moment to another pet of the video", async () => {
+      storedBy({
+        'face-a': { ...faceA([a1, a2]), isPet: true, petSpecies: 'dog' },
+        'face-b': { ...faceB([b1]), isPet: true, petSpecies: null },
+      });
+
+      await sut.moveSighting(auth, 'face-a', { time: 6, toFaceId: 'face-b' });
+
+      expect(mocks.videoFace.moveSightings).toHaveBeenCalled();
     });
 
     it('combines faces into the one with the most sightings, deleting the others', async () => {

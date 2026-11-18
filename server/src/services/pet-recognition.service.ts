@@ -3,6 +3,7 @@ import { JOBS_ASSET_PAGINATION_SIZE, PET_RECOGNITION_MODEL_NAMES } from 'src/con
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum.js';
+import { deletePetFrameFiles } from 'src/gallery/utils/video-pet-detector.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { JobItem, type JobOf } from 'src/types.js';
@@ -53,9 +54,12 @@ export class PetRecognitionService extends BaseService {
       // pet_search truncate is a belt-and-braces guarantee independent of that delete order.
       // Deliberately a FULL purge (buckets included, rebuilt by the requeue) — broader than a
       // model switch's scoped purge, because the admin Reset button promises exactly that.
+      // Read before the purge: the cascade removes the frame rows of sampled video pets, not their files.
+      const framePaths = await this.petFaceRepository.getPetFramePaths({ embeddedOnly: false });
       await this.petFaceRepository.deleteAllPets();
       await this.sharedSpaceRepository.deleteAllPets();
       await this.petFaceRepository.deleteAllPetSearch();
+      await deletePetFrameFiles(this.backendMedia, framePaths);
       // Requeued unconditionally, for the same reason the purge is: the rebuild is what stops a
       // reset from leaving the library permanently empty of pets. PetDetectionQueueAll gates itself
       // on pet detection being enabled (and rebuilds species buckets rather than individuals when
@@ -294,7 +298,9 @@ export class PetRecognitionService extends BaseService {
       // empty() drains waiting/delayed jobs; it does NOT kill an ACTIVE one. An in-flight
       // recognition job can still create a person after this purge — it ends up face-less, and
       // generic person cleanup collects it (see R2.6).
+      const framePaths = await this.petFaceRepository.getPetFramePaths({ embeddedOnly: true });
       await this.petFaceRepository.purgePetRecognitionArtifacts();
+      await deletePetFrameFiles(this.backendMedia, framePaths);
 
       // Stamp state BEFORE any requeue — this is what makes the idempotency re-read above sound.
       const pendingReprocess = recognitionEnabled && !detectionEnabled;

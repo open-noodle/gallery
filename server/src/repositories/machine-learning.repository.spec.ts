@@ -60,6 +60,14 @@ describe(MachineLearningRepository.name, () => {
       enabled: false,
       modelName: 'rfdetr-nano',
       minScore: 0.6,
+      video: {
+        enabled: false,
+        sampleInterval: 2,
+        sceneDetection: true,
+        maxFrames: 900,
+        maxDistance: 0.55,
+        minSightings: 2,
+      },
     },
     petRecognition: {
       enabled: false,
