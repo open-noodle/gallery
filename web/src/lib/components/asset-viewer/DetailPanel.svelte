@@ -184,7 +184,7 @@
       <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
 
-        <div>
+        <div class="w-full">
           <div class="flex place-items-start justify-between gap-2 break-all whitespace-pre-wrap">
             <FilterValue
               label={$t('filter_by_filename')}
@@ -197,7 +197,7 @@
               <IconButton
                 icon={mdiInformationOutline}
                 aria-label={$t('show_file_location')}
-                class="shrink-0"
+                class="-my-1 shrink-0"
                 size="small"
                 shape="round"
                 color="secondary"
