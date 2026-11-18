@@ -45,6 +45,93 @@ values
   ($1, $2)
 rollback
 
+-- PetFaceRepository.getForVideoPetDetect
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."type",
+  "asset"."visibility",
+  "asset"."originalPath",
+  "asset_video_trim"."startTime" as "trimStart",
+  "asset_video_trim"."endTime" as "trimEnd"
+from
+  "asset"
+  left join "asset_video_trim" on "asset_video_trim"."assetId" = "asset"."id"
+where
+  "asset"."id" = $1::uuid
+  and "asset"."deletedAt" is null
+
+-- PetFaceRepository.streamVideosForPetSampling
+select
+  "asset"."id"
+from
+  "asset"
+  inner join "asset_job_status_gallery" on "asset_job_status_gallery"."assetId" = "asset"."id"
+where
+  "asset"."type" = 'VIDEO'
+  and "asset"."deletedAt" is null
+  and "asset"."visibility" != 'hidden'
+  and "asset_job_status_gallery"."petsDetectedAt" is not null
+  and (
+    "asset_job_status_gallery"."videoPetsSampledAt" is null
+    or exists (
+      select
+      from
+        "asset_face"
+        inner join "asset_face_video_frame" on "asset_face_video_frame"."faceId" = "asset_face"."id"
+      where
+        "asset_face"."assetId" = "asset"."id"
+        and "asset_face"."deletedAt" is null
+        and "asset_face_video_frame"."version" < 1
+        and (
+          exists (
+            select
+              1 as "one"
+            from
+              "pet_search"
+            where
+              "pet_search"."faceId" = "asset_face"."id"
+          )
+          or exists (
+            select
+              1 as "one"
+            from
+              "person"
+              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+            where
+              "person"."personGroupId" = "asset_face"."personGroupId"
+          )
+        )
+    )
+  )
+
+-- PetFaceRepository.getPetFramePaths
+select
+  "asset_face_video_frame"."path"
+from
+  "asset_face_video_frame"
+  inner join "asset_face" on "asset_face"."id" = "asset_face_video_frame"."faceId"
+where
+  (
+    exists (
+      select
+        1 as "one"
+      from
+        "pet_search"
+      where
+        "pet_search"."faceId" = "asset_face"."id"
+    )
+    or exists (
+      select
+        1 as "one"
+      from
+        "person"
+        inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
+      where
+        "person"."personGroupId" = "asset_face"."personGroupId"
+    )
+  )
+
 -- PetFaceRepository.getForPetDetection
 select
   "asset"."ownerId",

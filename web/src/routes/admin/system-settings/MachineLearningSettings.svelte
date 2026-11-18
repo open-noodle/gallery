@@ -7,6 +7,7 @@
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import SpatialSceneSettings from '#lib/gallery/admin/SpatialSceneSettings.svelte';
   import VideoFaceSettings from '#lib/gallery/components/admin/video-face-settings.svelte';
+  import VideoPetSettings from '#lib/gallery/components/admin/video-pet-settings.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
@@ -466,6 +467,8 @@
             isEdited={configToEdit.machineLearning.petDetection.minScore !==
               config.machineLearning.petDetection.minScore}
           />
+
+          <VideoPetSettings bind:configToEdit {config} {disabled} />
         </div>
       </SettingAccordion>
 

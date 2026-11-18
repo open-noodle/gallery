@@ -9,6 +9,9 @@ person from frame to frame, usually keeps one face per person, and shows each pe
 
 This setting is off by default.
 
+Pets have their own setting, **Detect pets across the whole video**, under Pet Detection. See
+[Pets in videos](/features/pet-detection#pets-in-videos).
+
 ## Turning it on
 
 Go to **Administration > Settings > Machine Learning Settings > Facial Recognition** and turn on **Detect faces across

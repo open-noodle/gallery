@@ -95,6 +95,7 @@
       personId: person.id,
       name: person.name,
       faceIds: personFaces.map((face) => face.id),
+      isPet: person.type === 'pet',
     });
   const personPageHref = $derived(getPersonPageHref());
 </script>

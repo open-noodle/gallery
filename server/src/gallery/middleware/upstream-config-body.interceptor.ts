@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Request } from 'express';
-import { galleryConfigPaths } from 'src/gallery/dtos/config.dto.js';
+import { galleryConfigPaths, galleryNestedConfigPaths } from 'src/gallery/dtos/config.dto.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 
 type ConfigNode = Record<string, unknown>;
@@ -8,11 +8,13 @@ type ConfigNode = Record<string, unknown>;
 const isNode = (value: unknown): value is ConfigNode => !!value && typeof value === 'object' && !Array.isArray(value);
 
 /**
-Fills every Gallery setting an upstream-shaped config body leaves out with its stored value, in place. A setting
-the body sends is kept as sent, and a path whose parent is missing is left alone for validation to report.
+Fills every Gallery setting an upstream-shaped config body leaves out with its stored value, in place, and every
+newer setting an older Gallery body leaves out of a Gallery section (`galleryNestedConfigPaths`). A setting the body
+sends is kept as sent, and a path whose parent is missing is left alone for validation to report.
 */
 export const withStoredGallerySettings = (body: unknown, stored: unknown) => {
-  for (const path of galleryConfigPaths) {
+  // Whole sections first, so a nested path finds the section an upstream-shaped body was just given.
+  for (const path of [...galleryConfigPaths, ...galleryNestedConfigPaths]) {
     const keys = path.split('.');
     const key = keys.pop()!;
     let target: unknown = body;

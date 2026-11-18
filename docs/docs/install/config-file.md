@@ -174,7 +174,15 @@ The default configuration looks like this:
     "petDetection": {
       "enabled": false,
       "minScore": 0.3,
-      "modelName": "rfdetr-nano"
+      "modelName": "rfdetr-nano",
+      "video": {
+        "enabled": false,
+        "maxDistance": 0.55,
+        "maxFrames": 900,
+        "minSightings": 2,
+        "sampleInterval": 2,
+        "sceneDetection": true
+      }
     },
     "petRecognition": {
       "enabled": false,

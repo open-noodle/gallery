@@ -113,6 +113,56 @@ The deletion happens even when pet detection is disabled. That is deliberate, so
 **Missing** is the safe option, and the one you want here: it only processes assets that have never been through pet detection.
 :::
 
+## Pets in videos
+
+By default, pet detection looks at one frame of a video: its poster, which is usually from the first second or two. A
+pet that walks into the shot later is missed, and a pet that is found is cut from that small thumbnail.
+
+With **Detect pets across the whole video** on, Gallery samples frames throughout each video instead, the same way
+[Faces in Videos](/features/video-faces) does for people. It follows each pet from frame to frame, keeps one face per
+pet per video, and shows each pet from the clearest frame it found. Each pet's moments in the video appear in the same
+row of moments people get, and open the video at that point.
+
+This setting is off by default, and it needs Pet Detection on.
+
+### Turning it on
+
+Go to **Administration > Settings > Machine Learning Settings > Pet Detection** and turn on **Detect pets across the
+whole video**.
+
+New videos are scanned this way as they are uploaded. Videos already processed are not rescanned automatically: go to
+**Administration > Jobs** and run **Pet Detection** with **Missing**. That queues the videos not yet scanned this way,
+along with anything pet detection has not seen at all. Pets you have named keep their names: a pet that matches one
+already found on the video keeps its name and moves to the new, clearer frame.
+
+### Settings
+
+| Setting                 | Default | What it does                                                                                       |
+| ----------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| Seconds between frames  | 2       | How often a frame is sampled. Videos of a minute or less are always sampled at least every second. |
+| Sample after scene cuts | On      | Also looks at the start of each new shot in edited videos, so a short shot is not missed.          |
+| Frame budget per video  | 900     | The most frames sampled from one video. A longer video is sampled at a wider interval instead.     |
+| Same pet within a video | 0.55    | How alike two views of a dog or cat in one video must be to count as the same pet.                 |
+| Minimum frames per pet  | 2       | Pets seen in fewer sampled frames are skipped. A clip with fewer frames keeps a pet seen in all.   |
+
+**Same pet within a video** only applies with [Pet Recognition](/features/pet-recognition) on, which is what tells two
+dogs apart. Without it, every dog in a video is recorded as one entry, as on photos, and so is every cat.
+
+A pet is only kept if the detector was confident about it at least once in the video, so a blurry shape that looks a
+little like a cat in a few frames does not become a pet.
+
+Raise **Minimum frames per pet** if you see pets that are not there: a detection that turns up in a single frame of a
+long video is more often a cushion than a cat.
+
+### Correcting a pet's moments
+
+Moments can be removed, moved to another pet in the same video, or moved to a new pet, as for people. A pet's moment
+cannot move to a person, or a person's to a pet. Moving a moment to a new pet needs Pet Recognition on, because the new
+pet needs its own recognition data.
+
+Pets are scanned by the Pet Detection job, separately from faces. Running Face Detection on a video leaves its pets
+alone, and running Pet Detection leaves its faces alone. When both are on, each video is decoded once for each.
+
 ## Upgrading from YOLO11
 
 Earlier versions of Gallery used YOLO11 (`yolo11n`, `yolo11s`, `yolo11m`). If you had pet
@@ -242,4 +292,7 @@ Pet detection runs as a dedicated BullMQ queue (`petDetection`) with concurrency
    streams all unprocessed assets and queues individual jobs.
 3. **Per-asset job.** Each job calls the ML service with the asset's preview file, creates or
    reuses person entries per species, records `asset_face` bounding boxes, and queues thumbnail
-   generation for new pet persons.
+   generation for new pet persons. With **Detect pets across the whole video** on, a video is
+   sampled across its length instead: each pet keeps its best frame and its sightings in
+   `asset_face_video_frame`, as a video face does, and `asset_job_status_gallery.videoPetsSampledAt`
+   marks the video as scanned this way.

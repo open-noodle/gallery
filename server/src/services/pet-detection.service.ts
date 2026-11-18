@@ -3,6 +3,8 @@ import { Insertable } from 'kysely';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { coverPersonIfMissing, speciesPersonFor } from 'src/gallery/utils/pet-buckets.js';
+import { VideoPetDetector, deletePetFrameFiles } from 'src/gallery/utils/video-pet-detector.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { DetectedPet } from 'src/repositories/machine-learning.repository.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
@@ -12,6 +14,30 @@ import { isPetDetectionEnabled, isPetRecognitionEnabled, isRecognizablePetSpecie
 
 @Injectable()
 export class PetDetectionService extends BaseService {
+  // Built on first use, after BaseService has set the repositories (specs/2026-11-16-video-pet-detection-design.md).
+  private videoPetDetector?: VideoPetDetector;
+
+  private get petBuckets() {
+    return { petFaceRepository: this.petFaceRepository, personRepository: this.personRepository };
+  }
+
+  private get videoPets(): VideoPetDetector {
+    this.videoPetDetector ??= new VideoPetDetector({
+      cryptoRepository: this.cryptoRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      galleryMachineLearningRepository: this.galleryMachineLearningRepository,
+      jobRepository: this.jobRepository,
+      mediaRepository: this.mediaRepository,
+      personRepository: this.personRepository,
+      petFaceRepository: this.petFaceRepository,
+      videoFaceRepository: this.videoFaceRepository,
+      backendMedia: this.backendMedia,
+      logger: this.logger,
+      getConfig: (options) => this.getConfig(options),
+    });
+    return this.videoPetDetector;
+  }
+
   // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched.
   // Mirrors onDone's gate: only a Success/Skipped thumbnail run for an upload or a notify request.
   @OnEvent({ name: 'JobSuccess' })
@@ -30,6 +56,8 @@ export class PetDetectionService extends BaseService {
     const { machineLearning } = await this.getConfig({ withCache: false });
 
     if (force) {
+      // Read before the purge: the cascade removes the frame rows of sampled video pets, not their files.
+      const framePaths = await this.petFaceRepository.getPetFramePaths({ embeddedOnly: false });
       // A reset must clear existing pet people/faces so stale labels disappear immediately,
       // rather than lingering throughout the reprocessing window (and duplicating on re-detect).
       //
@@ -41,6 +69,7 @@ export class PetDetectionService extends BaseService {
       // Pets also propagate into shared spaces as their own person rows, so clear those copies
       // too — otherwise the pets linger in every space's People view after a reset.
       await this.sharedSpaceRepository.deleteAllPets();
+      await deletePetFrameFiles(this.backendMedia, framePaths);
     }
 
     if (!isPetDetectionEnabled(machineLearning)) {
@@ -62,6 +91,14 @@ export class PetDetectionService extends BaseService {
     }
 
     await this.jobRepository.queueAll(jobs);
+
+    // Videos detected from their poster only, while video pets are on; Reset (force) has queued every asset already.
+    if (!force) {
+      const videoJobs = await this.videoPets.queueMissing(machineLearning);
+      for (let index = 0; index < videoJobs.length; index += JOBS_ASSET_PAGINATION_SIZE) {
+        await this.jobRepository.queueAll(videoJobs.slice(index, index + JOBS_ASSET_PAGINATION_SIZE));
+      }
+    }
     return JobStatus.Success;
   }
 
@@ -77,6 +114,13 @@ export class PetDetectionService extends BaseService {
     if (!asset) {
       return JobStatus.Skipped;
     }
+    // A video is sampled across its whole length when video pets are on; undefined means it was not, and its poster is
+    // detected as before.
+    const videoStatus = await this.videoPets.detect(id, machineLearning);
+    if (videoStatus !== undefined) {
+      return videoStatus;
+    }
+
     if (!asset.previewFile) {
       return JobStatus.Failed;
     }
@@ -189,23 +233,7 @@ export class PetDetectionService extends BaseService {
     const speciesCache = new Map<string, string>();
 
     for (const pet of pets) {
-      let personId = speciesCache.get(pet.label);
-
-      if (!personId) {
-        const existing = await this.petFaceRepository.getByOwnerAndSpecies(ownerId, pet.label);
-        if (existing) {
-          personId = existing.personGroupId;
-        } else {
-          const person = await this.personRepository.createWithGroup({
-            ownerId,
-            name: pet.label,
-            type: 'pet',
-            species: pet.label,
-          });
-          personId = person.personGroupId;
-        }
-        speciesCache.set(pet.label, personId);
-      }
+      const personId = await speciesPersonFor(this.petBuckets, ownerId, pet.label, speciesCache);
 
       const faceId = await this.personRepository.createAssetFace({
         assetId,
@@ -218,16 +246,10 @@ export class PetDetectionService extends BaseService {
         boundingBoxY2: pet.boundingBox.y2,
       });
 
-      const person = await this.personRepository.getByGroupIdOnly(personId);
-      if (!person || person.faceAssetId) {
-        continue;
+      const thumbnailJob = await coverPersonIfMissing(this.petBuckets, personId, faceId);
+      if (thumbnailJob) {
+        thumbnailJobs.push(thumbnailJob);
       }
-
-      await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
-      thumbnailJobs.push({
-        name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: person.ownerId, personGroupId: personId },
-      });
     }
 
     await this.jobRepository.queueAll(thumbnailJobs);

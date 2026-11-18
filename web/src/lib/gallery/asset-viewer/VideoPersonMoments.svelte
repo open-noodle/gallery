@@ -95,6 +95,7 @@
       faceIds={selection.faceIds}
       {canEdit}
       personId={selection.personId}
+      isPet={selection.isPet}
       onFacesChanged={() => void reloadFaces()}
     >
       {#snippet empty()}

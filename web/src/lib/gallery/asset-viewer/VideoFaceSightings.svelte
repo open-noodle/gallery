@@ -9,6 +9,7 @@
   import { createUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import {
+    PersonType,
     createPerson,
     deleteFace,
     getAssetFaceSightings,
@@ -18,6 +19,7 @@
     removeAssetFaceSighting,
     restoreAssetFaceSighting,
     splitAssetFaceSighting,
+    updatePerson,
     type VideoFaceSightingDto,
     type VideoFaceSightingMoveResponseDto,
   } from '@immich/sdk';
@@ -54,11 +56,25 @@
     on undo. Without it a face's only moment has no menu (the picker, which is already naming that face).
     */
     personId?: string;
+    /**
+    Whether that person is a pet: a moment moved to a new person then starts a pet, not a person
+    (specs/2026-11-16-video-pet-detection-design.md).
+    */
+    isPet?: boolean;
     /** After a move or its undo, which add and remove faces on the asset. */
     onFacesChanged?: () => void;
   }
 
-  let { faceIds, empty, canEdit = false, personId, onFacesChanged }: Props = $props();
+  let { faceIds, empty, canEdit = false, personId, isPet = false, onFacesChanged }: Props = $props();
+
+  /** A new, unnamed person for a moved moment: a pet when the moment is a pet's. */
+  const createTargetPerson = async () => {
+    const person = await createPerson({ personCreateDto: {} });
+    if (isPet) {
+      await updatePerson({ id: person.id, personUpdateDto: { type: PersonType.Pet } });
+    }
+    return person;
+  };
 
   type Sighting = VideoFaceSightingDto & { faceId: string; key: string };
 
@@ -179,7 +195,7 @@
       if (target.kind === 'person') {
         await reassignFacesById({ id: target.id, faceDto: { id: newFaceId } });
       } else if (target.kind === 'new') {
-        const person = await createPerson({ personCreateDto: {} });
+        const person = await createTargetPerson();
         await reassignFacesById({ id: person.id, faceDto: { id: newFaceId } });
       }
     } catch (error) {
@@ -225,7 +241,7 @@
     try {
       let id = target.kind === 'person' ? target.id : undefined;
       if (!id) {
-        const person = await createPerson({ personCreateDto: {} });
+        const person = await createTargetPerson();
         id = person.id;
       }
       await reassignFacesById({ id, faceDto: { id: faceId } });

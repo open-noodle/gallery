@@ -322,7 +322,7 @@ const nearby = (a: BoundingBox, b: BoundingBox) => {
 };
 
 /** Whether two boxes in one frame are where one face found twice would be: overlapping, or one mostly inside the other. */
-const isSameBox = (a: BoundingBox, b: BoundingBox) =>
+export const isSameBox = (a: BoundingBox, b: BoundingBox) =>
   iou(a, b) > TILE_MERGE_IOU || overlapOfSmaller(a, b) > TILE_CONTAINED;
 
 /** How much of the smaller box the two boxes share: 1 when one holds the other. */

@@ -52,6 +52,14 @@ describe('/pet-detection', () => {
         enabled: false,
         modelName: 'rfdetr-nano',
         minScore: 0.3,
+        video: {
+          enabled: false,
+          sampleInterval: 2,
+          sceneDetection: true,
+          maxFrames: 900,
+          maxDistance: 0.55,
+          minSightings: 2,
+        },
       });
     });
 
@@ -161,6 +169,14 @@ describe('/pet-detection', () => {
         enabled: false,
         modelName: 'rfdetr-nano',
         minScore: 0.3,
+        video: {
+          enabled: false,
+          sampleInterval: 2,
+          sceneDetection: true,
+          maxFrames: 900,
+          maxDistance: 0.55,
+          minSightings: 2,
+        },
       });
     });
   });

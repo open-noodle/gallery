@@ -1,6 +1,6 @@
 import { cloneDeep } from 'lodash-es';
 import { defaults } from 'src/dtos/config.dto.js';
-import { galleryConfigPaths } from 'src/gallery/dtos/config.dto.js';
+import { galleryConfigPaths, galleryNestedConfigPaths } from 'src/gallery/dtos/config.dto.js';
 import { withStoredGallerySettings } from 'src/gallery/middleware/upstream-config-body.interceptor.js';
 
 const read = (node: unknown, path: string) => {
@@ -39,6 +39,28 @@ describe(withStoredGallerySettings.name, () => {
     withStoredGallerySettings(body, stored);
 
     expect(body).toEqual(stored);
+  });
+
+  it('should name every nested Gallery setting by a path the stored config has', () => {
+    for (const path of galleryNestedConfigPaths) {
+      expect(read(defaults, path), path).toBeDefined();
+    }
+  });
+
+  it('should keep the stored video pet settings when an older Gallery saves pet detection without them', () => {
+    const withVideo = cloneDeep(stored);
+    withVideo.machineLearning.petDetection.video = { ...withVideo.machineLearning.petDetection.video, enabled: true };
+    const body = cloneDeep(withVideo);
+    body.machineLearning.petDetection = { enabled: false, modelName: 'rfdetr-nano', minScore: 0.4 };
+
+    withStoredGallerySettings(body, withVideo);
+
+    expect(body.machineLearning.petDetection).toEqual({
+      enabled: false,
+      modelName: 'rfdetr-nano',
+      minScore: 0.4,
+      video: withVideo.machineLearning.petDetection.video,
+    });
   });
 
   it('should keep a Gallery setting the body sends', () => {

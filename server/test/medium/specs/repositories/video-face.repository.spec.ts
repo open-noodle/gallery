@@ -263,7 +263,9 @@ describe(VideoFaceRepository.name, () => {
         assetId: asset.id,
         imageWidth: 1920,
         imageHeight: 1080,
+        isPet: false,
         originalPath: asset.originalPath,
+        petSpecies: null,
         trimStart: null,
         trimEnd: null,
       });

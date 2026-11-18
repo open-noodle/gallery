@@ -30624,12 +30624,16 @@
             "description": "Name of the model to use",
             "minLength": 1,
             "type": "string"
+          },
+          "video": {
+            "$ref": "#/components/schemas/AdminConfigVideoPetsDto"
           }
         },
         "required": [
           "enabled",
           "minScore",
-          "modelName"
+          "modelName",
+          "video"
         ],
         "type": "object"
       },
@@ -31011,6 +31015,51 @@
           "maxFrames",
           "minFaceSize",
           "minRecognitionScore",
+          "minSightings",
+          "sampleInterval"
+        ],
+        "type": "object"
+      },
+      "AdminConfigVideoPetsDto": {
+        "properties": {
+          "enabled": {
+            "description": "Detect pets in frames sampled across the whole video",
+            "type": "boolean"
+          },
+          "maxDistance": {
+            "description": "Largest pet embedding distance at which two views of a pet in one video count as the same pet",
+            "format": "double",
+            "maximum": 2,
+            "minimum": 0.1,
+            "type": "number"
+          },
+          "maxFrames": {
+            "description": "Frame budget per video. Past it the interval is stretched, so the whole video is still covered.",
+            "maximum": 10000,
+            "minimum": 10,
+            "type": "integer"
+          },
+          "minSightings": {
+            "description": "Sampled frames a pet must be seen in to be kept",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sampleInterval": {
+            "description": "Seconds between sampled frames",
+            "format": "double",
+            "maximum": 60,
+            "minimum": 0.5,
+            "type": "number"
+          },
+          "sceneDetection": {
+            "description": "Also sample a frame just after every scene cut",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxDistance",
+          "maxFrames",
           "minSightings",
           "sampleInterval"
         ],
