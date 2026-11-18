@@ -62,8 +62,34 @@ class _GalleryDockScrollListenerState extends ConsumerState<GalleryDockScrollLis
     return false;
   }
 
+  bool _nearTop(ScrollMetrics metrics) =>
+      metrics.axis == Axis.vertical && metrics.pixels - metrics.minScrollExtent < GalleryDockScrollListener.nearTop;
+
+  /// A list that lands at the top without scrolling (Years / Months / All swapping the timeline, a tab page rebuilt)
+  /// sends no scroll update, only new metrics; and pulling down at the top of a clamped list moves nothing, so only
+  /// the drag's start is seen. Both unfold, so the dock never stays folded over the top of a page.
+  bool _onAtTop(Notification notification) {
+    final metrics = switch (notification) {
+      ScrollMetricsNotification(:final metrics) => metrics,
+      ScrollStartNotification(:final metrics) => metrics,
+      OverscrollNotification(:final metrics, :final overscroll) when overscroll < 0 => metrics,
+      _ => null,
+    };
+    if (metrics != null && _nearTop(metrics)) {
+      _run = 0;
+      _fold(false);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return NotificationListener<ScrollUpdateNotification>(onNotification: _onScroll, child: widget.child);
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: _onAtTop,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) => n is ScrollUpdateNotification ? _onScroll(n) : _onAtTop(n),
+        child: widget.child,
+      ),
+    );
   }
 }
