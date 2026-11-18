@@ -566,7 +566,9 @@ svg { display: block; }
     if (ppl.length && !scopeOf(route()).fixedPerson) h += `<h5>People</h5>` + ppl.map((p) => `<button data-sug="person:${p.id}"><span class="ic" style="${hueBg(p.hue)}">${p.name[0]}</span>${p.name}</button>`).join('');
     if (tgs.length) h += `<h5>Tags</h5>` + tgs.map((x) => `<button data-sug="tag:${x}"><span class="ic">${ICON.tag}</span>#${x}</button>`).join('');
     if (pls.length) h += `<h5>Places</h5>` + pls.map((p) => `<button data-sug="place:${p}"><span class="ic">${ICON.place}</span>${p}</button>`).join('');
-    h += `<h5>Photos</h5><button data-sug="text:${q.value.trim()}"><span class="ic">${ICON.image}</span><span>Photos of “${q.value.trim()}”<small>Smart search</small></span></button>`;
+    // The typed text is escaped: it lands in innerHTML and a data attribute.
+    const typed = q.value.trim().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    h += `<h5>Photos</h5><button data-sug="text:${typed}"><span class="ic">${ICON.image}</span><span>Photos of “${typed}”<small>Smart search</small></span></button>`;
     drop.innerHTML = h; drop.hidden = false;
   }
   function submitText(text) {
