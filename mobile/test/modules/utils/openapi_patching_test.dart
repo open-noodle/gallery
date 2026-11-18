@@ -26,6 +26,15 @@ void main() {
       expect(value['download']['includeEmbeddedVideos'], false);
     });
 
+    test('defaults the backup destination for older servers', () {
+      final dynamic value = jsonDecode('{"enabled": true}');
+
+      upgradeDto(value, 'AdminConfigDatabaseBackupDto');
+
+      expect(value['destination'], 'local');
+      expect(value['s3'], {'enabled': false});
+    });
+
     // Payloads below carry only the keys a stock Immich v3.3.1 server sends; fromJson must
     // fill the fork-only required ones through upgradeDto instead of throwing.
     test('parses stock Immich /server/features', () {
