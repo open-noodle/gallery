@@ -49,6 +49,31 @@ describe('isSpatialSceneOffered', () => {
   });
 });
 
+describe('isSpatialSceneOffered with a per-photo choice', () => {
+  const sharp = { boundarySharpness: 0.09, edgeDensity: 0.013, foregroundRatio: 0.3 };
+
+  it('offers a photo chosen for it, though it fails every test', () => {
+    expect(isSpatialSceneOffered({ ...flat, offered: true }, config, [])).toBe(true);
+  });
+
+  it('does not offer a photo chosen against it, though it passes the depth test', () => {
+    expect(isSpatialSceneOffered({ ...sharp, offered: false }, config, [])).toBe(false);
+  });
+
+  it('does not offer a photo chosen against it, though it passes the face test', () => {
+    expect(isSpatialSceneOffered({ ...flat, offered: false }, config, [face(500)])).toBe(false);
+  });
+
+  it('does not offer a photo chosen against it in "all" mode', () => {
+    expect(isSpatialSceneOffered({ ...sharp, offered: false }, { ...config, offer: 'all' }, [])).toBe(false);
+  });
+
+  it('decides automatically without a choice', () => {
+    expect(isSpatialSceneOffered({ ...sharp, offered: null }, config, [])).toBe(true);
+    expect(isSpatialSceneOffered({ ...flat, offered: null }, config, [])).toBe(false);
+  });
+});
+
 describe('isSpatialSceneEnabled', () => {
   it('needs both machine learning and Spatial Scene on', () => {
     expect(isSpatialSceneEnabled({ enabled: true, spatialScene: { enabled: true } })).toBe(true);

@@ -751,6 +751,8 @@ DROP TABLE IF EXISTS "asset_quality" CASCADE;
 -- Spatial Scene depth maps. Immich has no equivalent; the <assetId>_depth.png
 -- files stay in the thumbnails folder, where Immich never reads them.
 DROP TABLE IF EXISTS "asset_spatial_scene" CASCADE;
+-- Spatial Scene per-photo choices, which only mean anything beside the depth maps.
+DROP TABLE IF EXISTS "asset_spatial_scene_offer" CASCADE;
 -- Data Saver video copies. Immich has no equivalent; the <assetId>_ds.mp4
 -- files stay in the encoded-video folder, where Immich never reads them.
 DROP TABLE IF EXISTS "asset_data_saver_video" CASCADE;
@@ -1240,6 +1242,7 @@ DELETE FROM "kysely_migrations"
   '1799800000000-ScopeJitOffToDatabase',
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
+  '1800100000000-AddAssetSpatialSceneOfferTable',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1350,7 +1353,7 @@ BEGIN
        'asset_job_status_gallery',
        'asset_video_trim',
        'asset_image_adjust',
-       'asset_spatial_scene',
+       'asset_spatial_scene', 'asset_spatial_scene_offer',
        'asset_data_saver_video',
        'asset_face_video_frame',
        'person_identity',

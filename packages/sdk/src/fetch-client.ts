@@ -2022,6 +2022,10 @@ export type AssetOcrResponseDto = {
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
 };
+export type SpatialSceneOfferDto = {
+    /** true offers Spatial Scene on this photo and false stops offering it, whatever the automatic choice says; null returns the photo to the automatic choice */
+    offered: boolean | null;
+};
 export type AssetVideoTrimResponseDto = {
     /** End of the kept part, in seconds from the start of the original video */
     endTime: number;
@@ -7202,6 +7206,17 @@ export function viewAssetDepth({ id, key, slug }: {
     }));
 }
 /**
+ * Refresh the depth map of a photo
+ */
+export function refreshAssetDepth({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/depth`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Remove edits from an existing asset
  */
 export function removeAssetEdits({ id }: {
@@ -7330,6 +7345,19 @@ export function downloadAsset({ download, edited, id, key, slug }: {
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Choose whether Spatial Scene is offered on a photo
+ */
+export function updateAssetSpatialScene({ id, spatialSceneOfferDto }: {
+    id: string;
+    spatialSceneOfferDto: SpatialSceneOfferDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/spatial-scene`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: spatialSceneOfferDto
+    })));
 }
 /**
  * View asset thumbnail

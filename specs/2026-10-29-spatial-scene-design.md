@@ -211,7 +211,54 @@ The admin setting `offer` takes:
 - **`suitable`** (default): the toggle appears only on photos that pass the thresholds, as in Apple Photos.
 - **`all`**: the toggle appears on every photo with a depth map.
 
-Whether users should also be able to override this for themselves is an open question (below).
+A person who may edit a photo can override either mode for that one photo (see Per-photo actions).
+
+### Per-photo actions
+
+Added 2026-11-17. The viewer's ⋮ menu, beside Refresh faces and Refresh metadata, gains:
+
+- **Refresh depth map** queues the depth job for the photo, as an upload or edit does. Needed for a photo with no map
+  (uploaded before the feature was turned on, before the backfill ran, or whose job failed) or a stale one. It does
+  not change the automatic choice on a photo that already has a map: the same model on the same preview gives the same
+  metrics.
+- **Offer Spatial Scene** on a photo the viewer shows no button for, and **Stop offering Spatial Scene** on one it
+  does. Each records a choice for the photo that wins over the offer mode, the thresholds and the face rule. Offering
+  it on a photo without a map also queues the job. The API also takes `null`, which returns the photo to the automatic
+  choice; the viewer offers no item for it.
+
+**Who.** The same edit access as the viewer's other job actions (`requireAssetEditAccess`): the photo's owner, or an
+Owner or Editor of a space the photo is in whose owner is a member. Not a partner, an album editor, a space Viewer, a
+shared link or a server admin who has none of these. The choice changes the photo for everyone who can see it, shared
+links included, as the edits those people can already make do. Refused while Spatial Scene is off, and for what the
+job skips (videos, hidden assets, panoramas) and trashed photos. Access is checked first, so a refused caller learns
+nothing about the setting.
+
+| Actor | Spatial Scene off | Spatial Scene on |
+| ----- | ----------------- | ---------------- |
+| Photo owner | refused (disabled) | allowed |
+| Space Owner or Editor, not the photo's owner | refused (disabled) | allowed |
+| Space Viewer, partner, album editor, shared link, non-member, non-member admin | refused (no access) | refused (no access) |
+
+This holds for all four operations (refresh, offer, stop offering, back to automatic). Without edit access the caller
+gets `Not found or no asset.update access`; with it but the feature off, `Spatial Scene is disabled`. A refused call
+writes no choice and queues no job. `server/test/medium/specs/gallery/spatial-scene-photo-actions-matrix.spec.ts`
+enumerates this table and snapshots the grid.
+
+This widens nobody's rights beyond what they already hold, so it ships without an opt-in: whoever may run Refresh
+faces on a photo, or edit it, may now also choose whether it gets the Spatial button.
+
+**Storage.** `asset_spatial_scene_offer (assetId, offered)`, one row per photo with a choice, no row for the automatic
+one. It sits apart from `asset_spatial_scene` because that row is derived data, rewritten by every depth run, while this
+is a person's choice, which can be made before the map exists. `SpatialSceneRepository.get` left-joins it, and
+`isSpatialSceneOffered` returns `offered` when it is not null, before anything else.
+
+**Feedback.** Both actions toast at once. The viewer re-reads the photo (`GET /assets/{id}`, in the space it was read
+in) after a choice and passes it on as an `AssetUpdate`, so the button appears or goes at once, and Stop offering
+closes the Spatial view if it is open on that photo. When a depth job had to be queued, the viewer re-reads the photo
+every 3 seconds for up to 2 minutes and passes it on once it is offered. The job may sit behind a library backfill
+(the queue runs one job at a time), and then the button shows the next time the photo is opened. No websocket event is
+sent: `on_asset_update` carries upstream's mapping without the overlay, so the viewer would lose `spatialScene` and the
+space-resolved people.
 
 ## Server
 
@@ -289,6 +336,9 @@ them.
   already receives, so it needs no extra query. The field is declared once, as an extension of `AssetResponseDto` in a fork
   DTO. Stock clients ignore unknown fields, and the timeline's bulk responses stay unchanged, so the cost is one join on
   a call the viewer already makes.
+- **`POST /assets/{id}/depth`** (Refresh depth map) and **`PUT /assets/{id}/spatial-scene`** with
+  `{ offered: boolean | null }` (the per-photo choice), both in `GalleryAssetController`, both 204. API-key scopes:
+  `job.create` for the first, like `POST /assets/jobs`, and `asset.update` for the second.
 - **`spatialScene` in `GET /server/features`**, optional, true when the feature is enabled (`isSpatialSceneEnabled`).
   Spread into `ServerFeaturesSchema` from the fork DTO and into `getFeatures` from `src/gallery/utils/spatial-scene.ts`.
   The mobile app reads it before asking for any asset's flag, because its viewer does not otherwise call
@@ -329,8 +379,13 @@ The admin ML settings page gains a Spatial Scene section beside Pet Detection.
 - **Admin.** `SpatialSceneSettings.svelte` (`web/src/lib/gallery/admin/`), included by one line in the upstream
   `MachineLearningSettings.svelte`: enable, model and offer mode. The thresholds are config-file only.
 
-Those are the upstream web hunks: one viewer arm, one template branch, two nav bar lines, one settings line, and the
-queue's entries in the four lists every queue appears in.
+- **Per-photo actions.** `getSpatialSceneActions` also returns `RefreshDepthMap`, `OfferSpatialScene` and
+  `StopOfferingSpatialScene`, shown when the server features flag is on, the photo is an image that is not a panorama
+  or in the trash, and `canEditAsset` allows it, never on a shared link. Three `ActionMenuItem` lines in
+  `AssetViewerNavBar`, after Transcode video.
+
+Those are the upstream web hunks: one viewer arm, one template branch, two nav bar buttons and three menu lines, one
+settings line, and the queue's entries in the four lists every queue appears in.
 
 ### Rendering
 
@@ -401,15 +456,20 @@ app's HTTP client, auth headers and client certificates; the map is filtered in 
 | With the toggle | Stock Immich                   | No button and no extra requests                                          |
 | Without it      | Any                            | Unchanged: the new features field is optional and ignored                |
 
+The per-photo actions are web only, and the web app is served by its own server. The mobile app gains no menu item,
+but it reads `spatialScene` from `GET /assets/{id}`, so a choice made on the web shows there too; an app of any version
+needs nothing new. Stock Immich clients never call the two endpoints, and a stock Immich server on a reverted database
+has neither the endpoints nor the table.
+
 ## Layering compliance
 
 | Rule                                 | How this design meets it                                                                                     |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 1. Immich's tables keep their meaning | Fork table `asset_spatial_scene`; nothing added to `asset_file` or `asset_job_status`. FK listed in `gallery-upstream-fks.json` under `asset_pkey`. |
+| 1. Immich's tables keep their meaning | Fork tables `asset_spatial_scene` and `asset_spatial_scene_offer`; nothing added to `asset_file` or `asset_job_status`. Both FKs listed in `gallery-upstream-fks.json` under `asset_pkey`. |
 | 2. Stock Immich keeps working        | New endpoint and an ignored extra field only; no sync stream changes.                                         |
-| 3. Switching back stays safe         | `revert-to-immich.sql` drops the table; `down()` drops it too (derived data, regenerated by the backfill). Leftover `_depth.png` files are inert. |
+| 3. Switching back stays safe         | `revert-to-immich.sql` drops both tables. `AddAssetSpatialSceneTable.down()` drops the maps (derived data, regenerated by the backfill). `AddAssetSpatialSceneOfferTable.down()` drops the choices: an older Gallery has nowhere to keep them, and its photos go back to the automatic choice, which is what it can show. Leftover `_depth.png` files are inert. |
 | 4. Prefer Immich's code              | Reuses the ML `/predict` pipeline, the job queue, `backendMedia` and the thumbnail path scheme.              |
-| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension each for the asset and the server features. Mobile: one button line, one overlay line, one field on `ServerFeatures` (as `localTakenRange`), the shader and dependency in `pubspec.yaml`, the purpose string. |
+| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension each for the asset and the server features; three menu lines for the per-photo actions. Mobile: one button line, one overlay line, one field on `ServerFeatures` (as `localTakenRange`), the shader and dependency in `pubspec.yaml`, the purpose string. |
 
 ## i18n
 
@@ -424,11 +484,15 @@ into `i18n/gallery/en.json` and the nine maintained locales in the same commit.
 - **Server unit:** `SpatialSceneService` chains on the two `JobSuccess` cases only, skips videos, hidden assets and
   panoramas, writes the row and file, handles a hard-deleted asset as Skipped, and applies the model-switch guard. Offer
   mode, thresholds and the face rule (person and pet faces, the 3% height cut-off, `minFaceHeight: 0`) in the overlay.
-- **Medium:** repository stream and upsert; the access oracle snapshot for the new endpoint's permission check.
+- **Medium:** repository stream and upsert, and the per-photo choice (kept across a new map, made before a map exists,
+  cascading with the asset); the access oracle snapshot for the new endpoint's permission check; the per-photo actions
+  matrix above, which runs the real service for every actor, both settings and all four operations, and checks the
+  stored choice and the queued jobs after each.
 - **Guards:** `gallery-upstream-fks.spec.ts` (new FK), `revert-to-immich.spec.ts` (new table), and the revert workflow
   seeding a row.
 - **Web:** `SpatialSceneViewer` falls back cleanly without WebGL2; the button follows `asset.spatialScene`; the flag
-  clears on navigation.
+  clears on navigation. The per-photo actions show only where the server would accept them, re-read the photo after a
+  choice, wait for a queued map and give up after the last attempt, and report a refusal without touching the viewer.
 - **Mobile:** `depth_test.dart` mirrors `depth.spec.ts`; `tilt_test.dart` covers roll, pitch, the rest position and the
   clamp; the provider test covers each pairing above (feature off, flag absent, stock server, photo not marked, read
   failure); the widget test opens and closes the view from the button, keeps it off another photo, closes it on a load
@@ -454,6 +518,7 @@ into `i18n/gallery/en.json` and the nine maintained locales in the same commit.
    photo on NAS hardware, a default-on backfill of a large library takes days. Recommendation: ship with
    `enabled: false` in the first release, and turn it on by default once real installs have run it.
 2. **Per-user override of the offer mode?** For example, a user setting "Show Spatial on all photos". This is cheap to
-   add later, because eligibility is already decided at read time.
+   add later, because eligibility is already decided at read time. A per-photo choice exists since 2026-11-17 (Per-photo
+   actions); a per-user setting would sit below it.
 3. **Shared-link viewers** get the toggle: `spatialScene` is set before the overlay's shared-link return, and the depth
    endpoint uses `AssetView` with `sharedLink: true`, like the thumbnail. Revisit if owners object.

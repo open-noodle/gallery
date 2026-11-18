@@ -128,6 +128,46 @@ describe(GalleryAssetController.name, () => {
     });
   });
 
+  describe('POST /assets/:id/depth', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).post(`/assets/${factory.uuid()}/depth`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a valid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).post('/assets/not-a-uuid/depth');
+      expect(status).toBe(400);
+      expect(spatialScene.refreshDepthMap).not.toHaveBeenCalled();
+    });
+
+    it('should queue a new depth map', async () => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer()).post(`/assets/${id}/depth`);
+      expect(status).toBe(204);
+      expect(spatialScene.refreshDepthMap).toHaveBeenCalledWith(undefined, id);
+    });
+  });
+
+  describe('PUT /assets/:id/spatial-scene', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/spatial-scene`).send({ offered: true });
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require offered', async () => {
+      const { status } = await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/spatial-scene`).send({});
+      expect(status).toBe(400);
+      expect(spatialScene.setOffer).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false, null])('should pass offered: %s to the service', async (offered) => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer()).put(`/assets/${id}/spatial-scene`).send({ offered });
+      expect(status).toBe(204);
+      expect(spatialScene.setOffer).toHaveBeenCalledWith(undefined, id, { offered });
+    });
+  });
+
   describe('GET /assets/:id/video/data-saver', () => {
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/video/data-saver`);

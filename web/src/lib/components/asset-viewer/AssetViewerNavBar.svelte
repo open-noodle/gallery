@@ -196,6 +196,9 @@
           <ActionMenuItem action={Actions.RefreshMetadataJob} />
           <ActionMenuItem action={Actions.RegenerateThumbnailJob} />
           <ActionMenuItem action={Actions.TranscodeVideoJob} />
+          <ActionMenuItem action={SpatialActions.RefreshDepthMap} />
+          <ActionMenuItem action={SpatialActions.OfferSpatialScene} />
+          <ActionMenuItem action={SpatialActions.StopOfferingSpatialScene} />
         {/if}
       </ButtonContextMenu>
     {/if}

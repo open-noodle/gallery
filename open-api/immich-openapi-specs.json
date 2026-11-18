@@ -5991,6 +5991,54 @@
         ],
         "x-immich-permission": "asset.view",
         "x-immich-state": "Beta"
+      },
+      "post": {
+        "description": "Queues a new Spatial Scene depth map for a photo, replacing any earlier one. Needs edit access to the photo. Responds 400 when Spatial Scene is disabled or the asset is not a photo it processes.",
+        "operationId": "refreshAssetDepth",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Refresh the depth map of a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "job.create",
+        "x-immich-state": "Beta"
       }
     },
     "/assets/{id}/edits": {
@@ -6590,6 +6638,66 @@
         ],
         "x-immich-permission": "asset.download",
         "x-immich-state": "Stable"
+      }
+    },
+    "/assets/{id}/spatial-scene": {
+      "put": {
+        "description": "Offers Spatial Scene on a photo, or stops offering it, whatever the admin offer mode and thresholds decide; null returns the photo to that automatic choice. Applies to everyone who can view the photo. Offering it on a photo without a depth map queues one. Needs edit access to the photo.",
+        "operationId": "updateAssetSpatialScene",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpatialSceneOfferDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Choose whether Spatial Scene is offered on a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
       }
     },
     "/assets/{id}/thumbnail": {
@@ -46034,6 +46142,19 @@
           "all"
         ],
         "type": "string"
+      },
+      "SpatialSceneOfferDto": {
+        "properties": {
+          "offered": {
+            "description": "true offers Spatial Scene on this photo and false stops offering it, whatever the automatic choice says; null returns the photo to the automatic choice",
+            "nullable": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "offered"
+        ],
+        "type": "object"
       },
       "StackCreateDto": {
         "properties": {
