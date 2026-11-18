@@ -220,6 +220,10 @@ export enum Permission {
 
   FolderRead = 'folder.read',
 
+  GameCreate = 'game.create',
+  GameRead = 'game.read',
+  GameDelete = 'game.delete',
+
   JobCreate = 'job.create',
   JobRead = 'job.read',
 
@@ -1098,6 +1102,9 @@ export enum JobName {
 
   // Video trim encode, poster and thumbnails (or their removal), queued by trim writes
   AssetVideoTrimGenerate = 'AssetVideoTrimGenerate',
+
+  // Games
+  GameChallengeCleanup = 'GameChallengeCleanup',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
@@ -1512,6 +1519,7 @@ export enum ApiTag {
   Download = 'Download',
   Duplicates = 'Duplicates',
   Faces = 'Faces',
+  Games = 'Games',
   Integrity = 'Integrity (admin)',
   Jobs = 'Jobs',
   Libraries = 'Libraries',

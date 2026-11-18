@@ -41,6 +41,8 @@ const preferences = (overrides: Partial<UserPreferencesResponseDto> = {}): UserP
   // Gallery: the per-type memories map is a required Gallery field.
   memories: { enabled: true, duration: 5, sidebarWeb: false, types: {} },
   people: { enabled: true, sidebarWeb: false, updateStrategy: PersonUpdateStrategy.Everyone },
+  // Gallery: the photo guessing game's library sources.
+  photoGuesser: { includePartners: false, includeSpaces: false },
   purchase: { hideBuyButtonUntil: '2100-02-12T00:00:00.000Z', showSupportBadge: false },
   ratings: { enabled: false },
   sharedLinks: { enabled: true, sidebarWeb: false },
