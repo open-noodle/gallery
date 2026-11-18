@@ -260,6 +260,40 @@ void main() {
       expect(container.read(galleryDockFoldedProvider), isFalse);
     });
 
+    // On device: switching Years / Months / All, or a tab page rebuilt by the nav setting, puts a fresh list at the
+    // top without any scroll, which left the dock folded over the top of the page.
+    testWidgets('content swapped for a fresh list at the top unfolds the dock', (tester) async {
+      final container = await pumpList(tester);
+      await tester.drag(find.byKey(const Key('list')), const Offset(0, -400));
+      await tester.pump();
+      expect(container.read(galleryDockFoldedProvider), isTrue);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: GalleryDockScrollListener(
+              child: ListView(
+                key: const Key('fresh'),
+                children: [for (var i = 0; i < 100; i++) const SizedBox(height: 80)],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(container.read(galleryDockFoldedProvider), isFalse);
+    });
+
+    testWidgets('pulling down at the top unfolds the dock, though nothing scrolls', (tester) async {
+      final container = await pumpList(tester);
+      container.read(galleryDockFoldedProvider.notifier).state = true;
+
+      await tester.drag(find.byKey(const Key('list')), const Offset(0, 200));
+      await tester.pumpAndSettle();
+      expect(container.read(galleryDockFoldedProvider), isFalse);
+    });
+
     testWidgets('a horizontal row never folds the dock', (tester) async {
       final container = await pumpList(tester);
 
