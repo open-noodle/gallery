@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -18,9 +19,6 @@ Widget? searchAwareAppBar(WidgetRef ref, Widget? appBar) =>
 class TimelinePillSearchButton extends ConsumerWidget {
   const TimelinePillSearchButton({super.key});
 
-  /// The width the button adds to the pill.
-  static const double width = 44;
-
   static bool visible(WidgetRef ref) => ref.watch(timelineHasSearchProvider) && !ref.watch(searchModeProvider);
 
   @override
@@ -28,14 +26,12 @@ class TimelinePillSearchButton extends ConsumerWidget {
     if (!visible(ref)) {
       return const SizedBox.shrink();
     }
-    return SizedBox(
-      width: width,
-      child: IconButton(
-        key: const Key('timeline-pill-search'),
-        tooltip: context.t.search,
-        icon: const Icon(Icons.search_rounded),
-        onPressed: () => ref.read(searchModeProvider.notifier).enter(),
-      ),
+    // The dock's round row button, so the pill's end matches the Photos dock's display-options button.
+    return GalleryDockRowButton(
+      key: const Key('timeline-pill-search'),
+      icon: Icons.search_rounded,
+      label: context.t.search,
+      onTap: () => ref.read(searchModeProvider.notifier).enter(),
     );
   }
 }

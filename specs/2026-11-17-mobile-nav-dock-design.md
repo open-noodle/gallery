@@ -47,7 +47,7 @@ What morphs into what, with all geometry on one spring:
 - **Tap a tab while unfolded:** as today. Re-tapping Photos scrolls to the top (`ScrollToTopEvent`), and every tap runs the existing refresh side effects in `_onTabTap`.
 - **Tap search:** `openGallerySearch`, as today.
 - **In search, tap the circle:** leave search mode, the same as the header's ←.
-- **Display options** stay in the Photos app bar (`PhotosViewMenuButton`) for now, grouping section included. The mockup's display-options button in the grouping row is a follow-up: the menu is anchored below its button and needs an upward variant first.
+- **Display options:** a round button at the end of the grouping row, shown while the dock is unfolded and once one of the user's spaces is on their timeline (`libraryViewVisibleProvider`). It opens the library view menu (Both / Personal / Spaces) upwards, and tints like the selected grouping while a view narrows the timeline. The Photos app bar's `PhotosViewMenuButton` stays for now: in landscape there is no dock.
 
 ### Unchanged behaviour carried over
 
@@ -66,7 +66,20 @@ The tab bar is 64 high, the grouping row 52, with a 10 gap between rows. Each fo
 
 ## Detail pages
 
-Unchanged. Pages pushed over the shell cover the dock as they cover the nav today, and keep `TimelineGroupingBottomPill` from the existing `timeline.widget.dart` hunk. The same goes for the map's bottom-sheet timeline, the asset viewer, editors, slideshow and memories.
+Pages pushed over the shell cover the dock as they cover the nav today, and keep `TimelineGroupingBottomPill` from the existing `timeline.widget.dart` hunk. The same goes for the map's bottom-sheet timeline, the asset viewer, editors, slideshow and memories.
+
+The pill is built from the dock's own pieces, so there is one Years / Months / All control (owner, 2026-11-18):
+
+- `TimelineGroupingSelector` fills its row, with a highlight that slides on the dock's spring in the tab bar's colours. The dock and the pill both render it.
+- `GalleryGroupingRow` puts the selector and an optional round end button (`GalleryDockRowButton`) on the dock's `GalleryGlass`. The dock's end button is display options; the pill's is search.
+- `GalleryDockStyle` (`gallery_dock_style.dart`) holds the spring, the highlight and the label colours. The tab bar reads them too.
+- The pill spans the width less 14 a side, at the dock row's 52 height. `pillHeight` follows `GalleryDock.groupingHeight`.
+
+The highlight's spring runs on the selected slot's index, not on pixels: the row narrows while the dock folds, and a pixel target would restart every frame and leave the highlight trailing.
+
+## Library tab
+
+With Spaces in the middle nav slot, the Albums card leads the Library tab's collection cards and the Spaces card takes the fifth place Albums had (Albums, People, Places, On this device, Spaces, Memories). With Albums in the nav, Spaces leads and Albums is fifth, as before. `libraryCollectionOrderProvider` in `library_collection_cards.dart` decides; the library page's existing cards hunk reads it.
 
 The owner reported the grouping pill showing in the middle of the screen during search. The cause has not been found from reading the code (`resizeToAvoidBottomInset` is false on both the shell and the timeline scaffold). A screenshot is owed:
 

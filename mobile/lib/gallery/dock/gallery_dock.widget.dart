@@ -2,11 +2,11 @@ import 'dart:ui' as ui;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_grouping.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/gallery/motion/spring_curve.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 
@@ -62,20 +62,15 @@ class GalleryDock extends StatelessWidget {
   static double reservedHeight({required bool showGrouping}) =>
       showGrouping ? tabBarHeight + rowGap + groupingHeight : tabBarHeight;
 
-  /// The prototype's "springy" motion: a small overshoot that settles in about 0.6 s.
-  static final GallerySpringCurve spring = GallerySpringCurve(
-    const SpringDescription(mass: 1, stiffness: 240, damping: 21),
-  );
+  /// The dock's spring, shared with every control styled like it ([GalleryDockStyle]).
+  static GallerySpringCurve get spring => GalleryDockStyle.spring;
 
-  static Duration get springDuration => Duration(milliseconds: (spring.settleSeconds * 1000).round());
+  static Duration get springDuration => GalleryDockStyle.springDuration;
 
   @override
   Widget build(BuildContext context) {
-    final reduced = GalleryMotion.reduced(context);
-    final motion = _Motion(
-      duration: reduced ? const Duration(milliseconds: 150) : springDuration,
-      curve: reduced ? Curves.easeOut : spring,
-    );
+    final (duration, curve) = GalleryDockStyle.motion(context);
+    final motion = _Motion(duration: duration, curve: curve);
     final rtl = Directionality.of(context) == ui.TextDirection.rtl;
 
     return SizedBox(
@@ -102,12 +97,9 @@ class GalleryDock extends StatelessWidget {
                       duration: motion.duration,
                       curve: motion.curve,
                       offset: showGrouping ? Offset.zero : const Offset(0, 0.25),
-                      child: const _Glass(
-                        key: Key('gallery-dock-grouping'),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          child: Center(child: TimelineGroupingSelector(bare: true)),
-                        ),
+                      child: GalleryGlass(
+                        key: const Key('gallery-dock-grouping'),
+                        child: GalleryDockGrouping(showOptions: mode == GalleryDockMode.unfolded),
                       ),
                     ),
                   ),
@@ -201,77 +193,6 @@ class _DockGeometry {
   }
 }
 
-/// The frosted stadium every piece of the dock sits on, matching the nav's earlier pill surface.
-class _Glass extends StatelessWidget {
-  final Widget child;
-
-  /// The surface alone fades, so the search slot can sit bare inside the tab bar and grow its own circle when it
-  /// detaches.
-  final double surfaceOpacity;
-  final Duration fade;
-
-  const _Glass({super.key, required this.child, this.surfaceOpacity = 1, this.fade = Duration.zero});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    const shape = StadiumBorder();
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        AnimatedOpacity(
-          duration: fade,
-          opacity: surfaceOpacity,
-          child: DecoratedBox(
-            decoration: ShapeDecoration(
-              shape: shape,
-              shadows: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? 0.45 : 0.18),
-                  offset: const Offset(0, 10),
-                  blurRadius: 28,
-                  spreadRadius: -8,
-                ),
-              ],
-            ),
-            child: ClipPath(
-              clipper: const ShapeBorderClipper(shape: shape),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                child: DecoratedBox(
-                  decoration: ShapeDecoration(
-                    color: dark
-                        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.62)
-                        : theme.colorScheme.surface.withValues(alpha: 0.88),
-                    shape: StadiumBorder(
-                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55)),
-                    ),
-                  ),
-                  child: DecoratedBox(
-                    decoration: ShapeDecoration(
-                      shape: shape,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.center,
-                        colors: [theme.colorScheme.onSurface.withValues(alpha: 0.05), Colors.transparent],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        ClipPath(
-          clipper: const ShapeBorderClipper(shape: shape),
-          child: child,
-        ),
-      ],
-    );
-  }
-}
-
 class _TabBar extends StatelessWidget {
   final List<GalleryTabEnum> slots;
   final int activeSlot;
@@ -317,10 +238,7 @@ class _TabBar extends StatelessWidget {
           duration: motion.half,
           opacity: unfolded && activeSlot >= 0 ? 1 : 0,
           child: DecoratedBox(
-            decoration: ShapeDecoration(
-              shape: const StadiumBorder(),
-              color: theme.colorScheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? 0.16 : 0.2),
-            ),
+            decoration: ShapeDecoration(shape: const StadiumBorder(), color: GalleryDockStyle.highlight(theme)),
           ),
         ),
       ),
@@ -360,7 +278,7 @@ class _TabBar extends StatelessWidget {
       key: const Key('gallery-dock-tabs'),
       enabled: !unfolded,
       pressedScale: 0.92,
-      child: _Glass(
+      child: GalleryGlass(
         child: Stack(clipBehavior: Clip.none, children: children),
       ),
     );
@@ -391,7 +309,7 @@ class _TabItem extends StatelessWidget {
     final unfolded = mode == GalleryDockMode.unfolded;
     // Folded, only the active tab stays: the others shrink into the circle and fade.
     final visible = unfolded || active;
-    final color = active ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.72);
+    final color = active ? GalleryDockStyle.activeForeground(theme) : GalleryDockStyle.idleForeground(theme);
 
     return IgnorePointer(
       ignoring: !unfolded || disabled,
@@ -457,13 +375,19 @@ class _IconAndLabel extends StatelessWidget {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            AnimatedPositioned(
+            // The spring runs on a 0–1 factor and the centre is measured each frame: the slot's height changes while
+            // the dock folds, and a pixel target would restart on every frame of that and drift.
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: showLabel ? 1 : 0),
               duration: motion.duration,
               curve: motion.curve,
-              left: 0,
-              right: 0,
-              top: showLabel ? 9 : (height - _iconSize) / 2,
-              height: _iconSize,
+              builder: (context, f, child) => Positioned(
+                left: 0,
+                right: 0,
+                top: ui.lerpDouble((height - _iconSize) / 2, 9, f),
+                height: _iconSize,
+                child: child!,
+              ),
               child: Icon(icon, size: _iconSize, color: color),
             ),
             Positioned(
@@ -529,7 +453,7 @@ class _SearchSlot extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               onTap: onTap,
               // Inside the unfolded tab bar the slot is bare; it grows its own glass when it detaches.
-              child: _Glass(
+              child: GalleryGlass(
                 surfaceOpacity: unfolded ? 0 : 1,
                 fade: motion.half,
                 child: _IconAndLabel(
