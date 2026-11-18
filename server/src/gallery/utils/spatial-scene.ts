@@ -31,6 +31,8 @@ export type DepthMetrics = {
   boundarySharpness: number;
   edgeDensity: number;
   foregroundRatio: number;
+  /** A person's choice for this photo, which wins over the offer mode and the thresholds; null or absent for none. */
+  offered?: boolean | null;
 };
 
 export type FaceBox = {
@@ -45,9 +47,13 @@ export type FaceBox = {
 Whether a photo with a depth map gets the Spatial button. Decided when the photo is opened, so a threshold change or
 a face found later applies without reprocessing. Suitable means sharp depth edges around a subject (or many sharp
 edges), or a person or pet face of a reasonable size: depth edges alone miss groups and people in rooms, where the
-foreground split lands on the floor, and close portraits, which the foreground band rejects.
+foreground split lands on the floor, and close portraits, which the foreground band rejects. A per-photo choice
+(`offered`) overrides all of it.
 */
 export const isSpatialSceneOffered = (metrics: DepthMetrics, config: SpatialSceneConfig, faces: FaceBox[]) => {
+  if (metrics.offered !== null && metrics.offered !== undefined) {
+    return metrics.offered;
+  }
   if (config.offer === 'all') {
     return true;
   }

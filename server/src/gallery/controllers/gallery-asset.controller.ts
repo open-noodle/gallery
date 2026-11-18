@@ -7,6 +7,7 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { ApiTag, Permission, RouteKey } from 'src/enum.js';
 import { AssetSpacesDto, AssetSpacesResponseDto } from 'src/gallery/dtos/asset-spaces.dto.js';
 import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
+import { SpatialSceneOfferDto } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -44,6 +45,36 @@ export class GalleryAssetController {
     @Next() next: NextFunction,
   ) {
     await sendFile(res, next, () => this.spatialScene.getDepthMap(auth, id), this.logger);
+  }
+
+  @Post(':id/depth')
+  @Authenticated({ permission: Permission.JobCreate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Refresh the depth map of a photo',
+    description:
+      'Queues a new Spatial Scene depth map for a photo, replacing any earlier one. Needs edit access to the photo. Responds 400 when Spatial Scene is disabled or the asset is not a photo it processes.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  refreshAssetDepth(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
+    return this.spatialScene.refreshDepthMap(auth, id);
+  }
+
+  @Put(':id/spatial-scene')
+  @Authenticated({ permission: Permission.AssetUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Choose whether Spatial Scene is offered on a photo',
+    description:
+      'Offers Spatial Scene on a photo, or stops offering it, whatever the admin offer mode and thresholds decide; null returns the photo to that automatic choice. Applies to everyone who can view the photo. Offering it on a photo without a depth map queues one. Needs edit access to the photo.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateAssetSpatialScene(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SpatialSceneOfferDto,
+  ): Promise<void> {
+    return this.spatialScene.setOffer(auth, id, dto);
   }
 
   @Get(':id/video/data-saver')

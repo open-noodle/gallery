@@ -77,6 +77,31 @@ The decision is made each time a photo is opened, from the depth map and faces a
 changing this setting, or a face being found in a photo later, takes effect straight away,
 without reprocessing anything.
 
+### Choosing for one photo
+
+If you can edit a photo (you own it, or you are an owner or editor of a space it is in), its
+**⋮** menu in the web app has two more items, next to **Refresh faces**:
+
+- **Offer Spatial Scene** adds the **Spatial** button to a photo that does not have it, whatever
+  the automatic choice says. If the photo has no depth map yet, Gallery makes one first, and the
+  button appears when it is ready.
+- **Stop offering Spatial Scene** removes the button from a photo you do not want it on.
+- **Choose Spatial Scene automatically** appears on a photo you made a choice for. It removes your
+  choice, so the photo gets the button or not as described above.
+
+Your choice applies to everyone who can see the photo, in the web app and the mobile app. It stays
+when the depth map is recomputed, including when the **Spatial Scene** job is run for all photos
+or the model is changed, and when the administrator changes the settings.
+
+The same menu has **Refresh depth map**, which makes the photo's depth map again. Use it for a
+photo whose depth map was never made, for example one uploaded before Spatial Scene was turned on.
+Refreshing does not change whether the button is offered on a photo that already has a depth map:
+the same photo gives the same depth map.
+
+A depth map is made in the background, one photo at a time. While the **Spatial Scene** job is
+processing an existing library, a photo you choose waits behind it, and its button appears the
+next time you open it.
+
 ## Model Options
 
 Three models are available. All three produce depth maps the same way, so the choice is about
@@ -140,6 +165,10 @@ With four to eight threads the default model took 0.5 to 0.65 seconds a photo on
 1. Go to **Administration** > **Machine Learning Settings**.
 2. Under **Spatial Scene**, turn it on and choose a model.
 3. Choose **Offer it on**: **Suitable photos** (the default) or **All photos**.
+
+The same section shows how many photos have a [choice made for them](#choosing-for-one-photo).
+**Clear choices** removes every one of them, after asking you to confirm, so all photos follow
+**Offer it on** again. It works while Spatial Scene is turned off, and keeps the depth maps.
 
 Changing the model recomputes the depth map of every photo with the new model.
 

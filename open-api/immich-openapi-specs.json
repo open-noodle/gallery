@@ -2288,6 +2288,98 @@
         "x-immich-state": "Stable"
       }
     },
+    "/admin/spatial-scene/choices": {
+      "delete": {
+        "description": "Removes every per-photo choice of whether Spatial Scene is offered, so every photo follows the offer mode and thresholds again. Depth maps are kept. Returns how many choices were removed.",
+        "operationId": "clearSpatialSceneChoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpatialSceneChoicesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Clear Spatial Scene per-photo choices",
+        "tags": [
+          "System config"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "systemConfig.update",
+        "x-immich-state": "Beta"
+      },
+      "get": {
+        "description": "Returns how many photos have a per-photo choice of whether Spatial Scene is offered on them.",
+        "operationId": "getSpatialSceneChoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpatialSceneChoicesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Count Spatial Scene per-photo choices",
+        "tags": [
+          "System config"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "systemConfig.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/admin/users": {
       "get": {
         "description": "Search for users.",
@@ -5991,6 +6083,54 @@
         ],
         "x-immich-permission": "asset.view",
         "x-immich-state": "Beta"
+      },
+      "post": {
+        "description": "Queues a new Spatial Scene depth map for a photo, replacing any earlier one. Needs edit access to the photo. Responds 400 when Spatial Scene is disabled or the asset is not a photo it processes.",
+        "operationId": "refreshAssetDepth",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Refresh the depth map of a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "job.create",
+        "x-immich-state": "Beta"
       }
     },
     "/assets/{id}/edits": {
@@ -6590,6 +6730,66 @@
         ],
         "x-immich-permission": "asset.download",
         "x-immich-state": "Stable"
+      }
+    },
+    "/assets/{id}/spatial-scene": {
+      "put": {
+        "description": "Offers Spatial Scene on a photo, or stops offering it, whatever the admin offer mode and thresholds decide; null returns the photo to that automatic choice. Applies to everyone who can view the photo. Offering it on a photo without a depth map queues one. Needs edit access to the photo.",
+        "operationId": "updateAssetSpatialScene",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpatialSceneOfferDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Choose whether Spatial Scene is offered on a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
       }
     },
     "/assets/{id}/thumbnail": {
@@ -32959,6 +33159,16 @@
             "description": "Whether the viewer offers Spatial Scene for this photo: it has a depth map and the admin offers it on every photo, or the photo counts as suitable. Present only on single-asset reads.",
             "type": "boolean"
           },
+          "spatialSceneChoice": {
+            "description": "The per-photo choice behind spatialScene: true offered and false not offered whatever the automatic choice says, null for the automatic choice. Present only on single-asset reads while Spatial Scene is enabled.",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "spatialSceneDepthMapCreatedAt": {
+            "description": "When the depth map was made. A client adds it to the depth map URL, so a map made again (another model, a refresh) is not served from its cache. Present only on single-asset reads of a photo with a depth map while Spatial Scene is enabled.",
+            "format": "date-time",
+            "type": "string"
+          },
           "stack": {
             "allOf": [
               {
@@ -46076,6 +46286,20 @@
         ],
         "type": "object"
       },
+      "SpatialSceneChoicesResponseDto": {
+        "properties": {
+          "count": {
+            "description": "Number of photos with a per-photo choice (for DELETE, the number removed)",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "type": "object"
+      },
       "SpatialSceneOffer": {
         "description": "Offer Spatial Scene on suitable photos only, or on every photo with a depth map",
         "enum": [
@@ -46083,6 +46307,19 @@
           "all"
         ],
         "type": "string"
+      },
+      "SpatialSceneOfferDto": {
+        "properties": {
+          "offered": {
+            "description": "true offers Spatial Scene on this photo and false stops offering it, whatever the automatic choice says; null returns the photo to the automatic choice",
+            "nullable": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "offered"
+        ],
+        "type": "object"
       },
       "StackCreateDto": {
         "properties": {

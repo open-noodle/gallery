@@ -66,13 +66,66 @@ export class SpatialSceneRepository {
       .stream();
   }
 
+  /** The photo's depth map, with the per-photo choice (`offered`, null for the automatic one). */
   @GenerateSql({ params: [DummyValue.UUID] })
   get(assetId: string) {
     return this.db
       .selectFrom('asset_spatial_scene')
-      .select(['path', 'width', 'height', 'boundarySharpness', 'edgeDensity', 'foregroundRatio', 'focus', 'modelName'])
+      .leftJoin('asset_spatial_scene_offer', 'asset_spatial_scene_offer.assetId', 'asset_spatial_scene.assetId')
+      .select([
+        'asset_spatial_scene.path',
+        'asset_spatial_scene.width',
+        'asset_spatial_scene.height',
+        'asset_spatial_scene.boundarySharpness',
+        'asset_spatial_scene.edgeDensity',
+        'asset_spatial_scene.foregroundRatio',
+        'asset_spatial_scene.focus',
+        'asset_spatial_scene.modelName',
+        'asset_spatial_scene.createdAt',
+        'asset_spatial_scene_offer.offered',
+      ])
+      .where('asset_spatial_scene.assetId', '=', asUuid(assetId))
+      .executeTakeFirst();
+  }
+
+  /** The per-photo choice alone, which may be made before the photo has a depth map. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getOffer(assetId: string): Promise<boolean | null> {
+    const row = await this.db
+      .selectFrom('asset_spatial_scene_offer')
+      .select('offered')
       .where('assetId', '=', asUuid(assetId))
       .executeTakeFirst();
+    return row?.offered ?? null;
+  }
+
+  /** Records a per-photo choice; null removes it, so the automatic choice applies again. */
+  async setOffer(assetId: string, offered: boolean | null): Promise<void> {
+    if (offered === null) {
+      await this.db.deleteFrom('asset_spatial_scene_offer').where('assetId', '=', asUuid(assetId)).execute();
+      return;
+    }
+    await this.db
+      .insertInto('asset_spatial_scene_offer')
+      .values({ assetId, offered })
+      .onConflict((oc) => oc.column('assetId').doUpdateSet({ offered }))
+      .execute();
+  }
+
+  /** How many photos have a per-photo choice. */
+  @GenerateSql()
+  async countOffers(): Promise<number> {
+    const { count } = await this.db
+      .selectFrom('asset_spatial_scene_offer')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .executeTakeFirstOrThrow();
+    return Number(count);
+  }
+
+  /** Removes every per-photo choice, so every photo follows the automatic choice; returns how many there were. */
+  async deleteOffers(): Promise<number> {
+    const result = await this.db.deleteFrom('asset_spatial_scene_offer').executeTakeFirst();
+    return Number(result.numDeletedRows);
   }
 
   /** The depth maps among `paths`, for IntegrityService: they sit in the thumbnail folder the untracked-file scan walks. */

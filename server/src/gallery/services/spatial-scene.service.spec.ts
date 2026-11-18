@@ -260,4 +260,132 @@ describe(SpatialSceneService.name, () => {
       );
     });
   });
+
+  describe('per-photo actions', () => {
+    const auth = factory.auth({ user: { id: 'owner-1' } });
+
+    describe('refreshDepthMap', () => {
+      it('requires edit access to the photo', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        await expect(sut.refreshDepthMap(auth, 'asset-1')).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('lets a space Editor of the photo refresh it', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        await sut.refreshDepthMap(auth, 'asset-1');
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SpatialScene, data: { id: 'asset-1' } });
+      });
+
+      it('is refused while Spatial Scene is off', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(config(false, 'depth-anything-v2-small'));
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        await expect(sut.refreshDepthMap(auth, 'asset-1')).rejects.toThrow('Spatial Scene is disabled');
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['a video', { type: AssetType.Video }],
+        ['a hidden photo', { visibility: AssetVisibility.Hidden }],
+        ['an equirectangular panorama', { projectionType: 'EQUIRECTANGULAR' }],
+        ['an .insp panorama', { originalPath: '/data/library/owner-1/IMG_0001.insp' }],
+      ])('is refused for %s', async (_label, overrides) => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue({ ...photo, ...overrides } as any);
+        await expect(sut.refreshDepthMap(auth, 'asset-1')).rejects.toThrow('not available for this asset');
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('is refused for a trashed photo', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(undefined);
+        await expect(sut.refreshDepthMap(auth, 'asset-1')).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('queues a new depth map', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        await sut.refreshDepthMap(auth, 'asset-1');
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SpatialScene, data: { id: 'asset-1' } });
+      });
+    });
+
+    describe('setOffer', () => {
+      it('requires edit access to the photo, writing nothing', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        await expect(sut.setOffer(auth, 'asset-1', { offered: true })).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.spatialScene.setOffer).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('is refused while Spatial Scene is off, writing nothing', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(config(false, 'depth-anything-v2-small'));
+        await expect(sut.setOffer(auth, 'asset-1', { offered: true })).rejects.toThrow('Spatial Scene is disabled');
+        expect(mocks.spatialScene.setOffer).not.toHaveBeenCalled();
+      });
+
+      it('is refused for a video, writing nothing', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue({ ...photo, type: AssetType.Video });
+        await expect(sut.setOffer(auth, 'asset-1', { offered: true })).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.spatialScene.setOffer).not.toHaveBeenCalled();
+      });
+
+      it('offers it on a photo with a depth map, queuing nothing', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        mocks.spatialScene.get.mockResolvedValue({ path: 'thumbs/owner-1/as/se/asset-1_depth.png' } as any);
+        await sut.setOffer(auth, 'asset-1', { offered: true });
+        expect(mocks.spatialScene.setOffer).toHaveBeenCalledWith('asset-1', true);
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('queues a depth map when offering it on a photo without one', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        mocks.spatialScene.get.mockResolvedValue(undefined);
+        await sut.setOffer(auth, 'asset-1', { offered: true });
+        expect(mocks.spatialScene.setOffer).toHaveBeenCalledWith('asset-1', true);
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SpatialScene, data: { id: 'asset-1' } });
+      });
+
+      it.each([false, null])('records offered: %s without queuing a depth map', async (offered) => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+        mocks.systemMetadata.get.mockResolvedValue(enabled());
+        mocks.spatialScene.getForJob.mockResolvedValue(photo);
+        mocks.spatialScene.get.mockResolvedValue(undefined);
+        await sut.setOffer(auth, 'asset-1', { offered });
+        expect(mocks.spatialScene.setOffer).toHaveBeenCalledWith('asset-1', offered);
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('choices, for the admin', () => {
+    it('counts them', async () => {
+      mocks.spatialScene.countOffers.mockResolvedValue(4);
+      await expect(sut.getChoices()).resolves.toEqual({ count: 4 });
+    });
+
+    it('clears them, whether or not Spatial Scene is on, and says how many', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(config(false, 'depth-anything-v2-small'));
+      mocks.spatialScene.deleteOffers.mockResolvedValue(4);
+      await expect(sut.clearChoices(factory.auth({ user: { id: 'admin-1', isAdmin: true } }))).resolves.toEqual({
+        count: 4,
+      });
+      expect(mocks.spatialScene.deleteOffers).toHaveBeenCalledOnce();
+    });
+  });
 });
