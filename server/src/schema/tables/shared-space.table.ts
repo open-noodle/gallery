@@ -83,6 +83,12 @@ export class SharedSpaceTable {
   @Column({ type: 'boolean', nullable: true })
   editorsCanChangeRoles!: boolean | null;
 
+  // Tri-state on purpose: null = nobody has been asked yet, true = on, false = an editor declined.
+  // A `default` here would erase the distinction between "never asked" and "said no", which is the
+  // only thing that makes the first-visit prompt appear exactly once.
+  @Column({ type: 'boolean', nullable: true })
+  dailyChallengeEnabled!: boolean | null;
+
   @Column({ type: 'timestamp with time zone', nullable: true })
   lastActivityAt!: Timestamp | null;
 

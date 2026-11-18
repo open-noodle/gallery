@@ -110,6 +110,18 @@ describe('SpaceTabs', () => {
     expect(page.getByTestId('space-tab-activity').elements()).toHaveLength(2);
   });
 
+  it('renders a Games tab linking to the games route', async () => {
+    await render(SpaceTabs, base);
+    await expect.element(page.getByTestId('space-tab-games')).toHaveAttribute('href', '/spaces/s1/games');
+  });
+
+  it('marks the Games tab active on the games route', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/games');
+    await render(SpaceTabs, base);
+    await expect.element(page.getByTestId('space-tab-games')).toHaveAttribute('aria-current', 'page');
+    await expect.element(page.getByTestId('space-tab-activity')).not.toHaveAttribute('aria-current');
+  });
+
   it('hides the Libraries tab for a non-admin', async () => {
     await render(SpaceTabs, { ...base, isAdmin: false });
     expect(page.getByTestId('space-tab-libraries').query()).not.toBeInTheDocument();

@@ -44,6 +44,7 @@ class ApiService {
   late SharedSpacesApi sharedSpacesApi;
   late CleanupApi cleanupApi;
   late DuplicatesApi duplicatesApi;
+  late GamesApi gamesApi;
   late TimelineApi timelineApi;
   late PasskeysApi passkeysApi;
   late ConfigPublicApi configPublicApi;
@@ -88,6 +89,7 @@ class ApiService {
     sharedSpacesApi = SharedSpacesApi(_apiClient);
     cleanupApi = CleanupApi(_apiClient);
     duplicatesApi = DuplicatesApi(_apiClient);
+    gamesApi = GamesApi(_apiClient);
     timelineApi = TimelineApi(_apiClient);
     passkeysApi = PasskeysApi(_apiClient);
     configPublicApi = ConfigPublicApi(_apiClient);

@@ -243,6 +243,8 @@ export const endpointTags: Record<ApiTag, string> = {
   [ApiTag.Classification]:
     'Endpoints for managing auto-classification categories that automatically tag and archive photos based on CLIP similarity.',
   [ApiTag.Cleanup]: 'Endpoints for reviewing and clearing out space hogs, bursts, screenshots, and blurry photos.',
+  [ApiTag.Games]:
+    "A photo guessing game played on a shared space's own photos - guess where or when each round's photo was taken.",
 };
 
 export const AUDIO_ENCODER: Record<AudioCodec, string> = {

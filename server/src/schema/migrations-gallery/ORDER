@@ -86,3 +86,7 @@
 1799900000000-AddAssetDataSaverVideoTable
 1800000000000-AddAssetFaceVideoFrameTable
 1800100000000-AddVideoPetsSampledAt
+1800300000000-AddPhotoGuessingGame
+1800400000000-AddDailyGameChallenge
+1800500000000-AddSpaceDailyChallengeEnabled
+1800600000000-AddSoloGameChallenge

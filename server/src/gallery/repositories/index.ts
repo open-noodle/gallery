@@ -25,6 +25,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
@@ -62,6 +63,7 @@ export const GALLERY_REPOSITORY_DEPENDENCIES = [
   SpatialSceneRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  GameRepository,
 ] as const;
 
 // Every fork repository a service needs, injected into upstream's BaseService as one constructor parameter.
@@ -98,5 +100,6 @@ export class GalleryRepositories {
     public spatialSceneRepository: SpatialSceneRepository,
     public dataSaverVideoRepository: DataSaverVideoRepository,
     public videoFaceRepository: VideoFaceRepository,
+    public gameRepository: GameRepository,
   ) {}
 }
