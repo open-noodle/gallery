@@ -17,6 +17,7 @@ const galleryAdminConfigDefaults = {
     classification: { concurrency: 1 },
     qualityAnalysis: { concurrency: 2 },
     spatialScene: { concurrency: 1 },
+    assetVersions: { concurrency: 1 },
   },
   machineLearning: {
     clip: { maxDistance: 0 },
@@ -38,7 +39,12 @@ const galleryAdminConfigDefaults = {
     },
   },
   nightlyTasks: { clusterNewPets: true },
-  server: { mergePeopleAcrossOwners: false, spaceEditorsCanAddMembers: false, spaceEditorsCanChangeRoles: false },
+  server: {
+    mergePeopleAcrossOwners: false,
+    spaceEditorsCanAddMembers: false,
+    spaceEditorsCanChangeRoles: false,
+    assetVersions: { enabled: false, detectEdits: false },
+  },
   memories: {
     retentionDays: 365,
     birthday: true,
@@ -84,6 +90,7 @@ export const withGalleryAdminConfig =
 export const galleryServerConfig = { availableMemoryTypes: [] } satisfies Partial<ResponseOf<'getServerConfig'>>;
 
 export const galleryServerFeatures = {
+  assetVersions: false,
   peopleStatistics: false,
   s3Storage: false,
   smartSearchHasCutoff: false,

@@ -32,6 +32,7 @@ describe('gallery config fragments', () => {
         spaceEditorsCanAddMembers: 'true',
         spaceEditorsCanChangeRoles: 'false',
         mergePeopleAcrossOwners: 'false',
+        assetVersions: { enabled: 'false', detectEdits: 'false' },
       }),
     ).toMatchObject({ spaceEditorsCanAddMembers: true, spaceEditorsCanChangeRoles: false });
   });

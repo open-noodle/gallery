@@ -1,5 +1,5 @@
 import { type Kysely } from 'kysely';
-import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
+import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { withDefaultVisibility } from 'src/utils/database.js';
@@ -527,5 +527,44 @@ export class SharedSpaceAccess {
       .where((eb) => sharedWithViewer(eb, { scope: { memberUserId: userId }, albumTimelineGate: 'none' }))
       .execute()
       .then((rows) => new Set(rows.map((row) => row.tagId)));
+  }
+}
+
+/**
+Asset versions (specs/2026-11-07-asset-versions-design.md): a version is a hidden asset behind its base photo, and is
+reachable only as its photo is (`versionsFollowTheirPhoto` in access-grants.ts).
+*/
+export class AssetVersionAccess {
+  constructor(private db: Kysely<DB>) {}
+
+  /** Of these assets, the versions, each with its base photo (null when that photo is gone). */
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  getBasePhotos(assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .selectFrom('asset_version')
+      .select(['versionAssetId as id', 'assetId as photoId'])
+      .where('versionAssetId', 'in', assetIds)
+      .where('role', '=', 'version')
+      .execute();
+  }
+
+  /** Of these asset files, those of a version, each with its version's base photo (null when that photo is gone). */
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  getBasePhotosOfFiles(fileIds: string[]) {
+    if (fileIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .selectFrom('asset_file')
+      .innerJoin('asset_version as v', 'v.versionAssetId', 'asset_file.assetId')
+      .select(['asset_file.id as id', 'v.assetId as photoId'])
+      .where('asset_file.id', 'in', fileIds)
+      .where('v.role', '=', 'version')
+      .execute();
   }
 }

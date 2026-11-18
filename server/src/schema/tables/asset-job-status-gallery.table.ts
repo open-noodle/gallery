@@ -26,4 +26,12 @@ export class AssetJobStatusGalleryTable {
   // Video pets sampled across the whole video (specs/2026-11-16-video-pet-detection-design.md), as above for pets.
   @Column({ type: 'timestamp with time zone', nullable: true })
   videoPetsSampledAt!: Timestamp | null;
+
+  // Asset versions (specs/2026-11-07-asset-versions-design.md): when the file was last read for them, and with which
+  // parser. The Versions job's "Missing" run takes the files never read, or read by an older parser.
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  versionsReadAt!: Timestamp | null;
+
+  @Column({ type: 'integer', nullable: true })
+  versionsParserVersion!: number | null;
 }

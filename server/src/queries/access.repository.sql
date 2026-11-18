@@ -1025,3 +1025,24 @@ where
       )
     )
   )
+
+-- AccessRepository.assetVersion.getBasePhotos
+select
+  "versionAssetId" as "id",
+  "assetId" as "photoId"
+from
+  "asset_version"
+where
+  "versionAssetId" in ($1)
+  and "role" = $2
+
+-- AccessRepository.assetVersion.getBasePhotosOfFiles
+select
+  "asset_file"."id" as "id",
+  "v"."assetId" as "photoId"
+from
+  "asset_file"
+  inner join "asset_version" as "v" on "v"."versionAssetId" = "asset_file"."assetId"
+where
+  "asset_file"."id" in ($1)
+  and "v"."role" = $2

@@ -282,7 +282,11 @@ The default configuration looks like this:
     "externalDomain": "",
     "loginPageMessage": "",
     "publicUsers": true,
-    "mergePeopleAcrossOwners": false
+    "mergePeopleAcrossOwners": false,
+    "assetVersions": {
+      "enabled": false,
+      "detectEdits": false
+    }
   },
   "storageTemplate": {
     "enabled": false,

@@ -356,6 +356,7 @@ export const ADMIN_VISIBLE_QUEUES = [
   QueueName.Classification,
   QueueName.QualityAnalysis,
   QueueName.SpatialScene,
+  QueueName.AssetVersions,
   QueueName.VideoConversion,
   QueueName.StorageTemplateMigration,
   QueueName.Migration,

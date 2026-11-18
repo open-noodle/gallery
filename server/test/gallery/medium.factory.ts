@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { AssetVersionRepository } from 'src/gallery/repositories/asset-version.repository.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -25,6 +26,7 @@ import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-declin
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MetadataRepository } from 'src/repositories/metadata.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BASE_SERVICE_DEPENDENCIES } from 'src/services/base.service.js';
@@ -69,7 +71,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryPersonRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case AssetVersionRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -105,12 +108,18 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case CleanupRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case AssetVersionRepository: {
       return automock(key);
     }
 
     case QueueMaintenanceRepository: {
       return automock(QueueMaintenanceRepository, { args: [undefined, { setContext: () => {} }] });
+    }
+
+    // asset versions read capture signatures through it (src/gallery/services/asset-version.service.ts)
+    case MetadataRepository: {
+      return automock(MetadataRepository, { args: [{ setContext: () => {} }], strict: false });
     }
 
     default: {

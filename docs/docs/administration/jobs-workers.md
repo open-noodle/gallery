@@ -81,3 +81,5 @@ graph TD
 [Pet Detection](/features/pet-detection) and [Pet Recognition](/features/pet-recognition) are both disabled by default. With pet detection off, neither job does anything. Pet Recognition only runs for detections that carry an embedding, which means dogs and cats.
 
 [Spatial Scene](/features/spatial-scene) is also disabled by default. It computes a depth map for each photo, and runs again after a photo is cropped or rotated.
+
+[Versions](/features/asset-versions) are disabled by default too. Once enabled, the Versions job runs after metadata extraction of each new or re-read photo, and groups it with the other files of the same shot: its RAW, and its exported edits when those are switched on.

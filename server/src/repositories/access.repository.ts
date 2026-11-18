@@ -5,6 +5,7 @@ import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { AlbumUserRole, AssetVisibility } from 'src/enum.js';
 import {
+  AssetVersionAccess,
   GalleryPersonAccess,
   SharedSpaceAccess,
   SpaceAlbumAccess,
@@ -748,6 +749,7 @@ export class AccessRepository {
   spaceAsset: SpaceAssetAccess;
   galleryPerson: GalleryPersonAccess;
   sharedSpace: SharedSpaceAccess;
+  assetVersion: AssetVersionAccess;
 
   constructor(@InjectKysely() db: Kysely<DB>) {
     this.activity = new ActivityAccess(db);
@@ -772,5 +774,6 @@ export class AccessRepository {
     this.spaceAsset = new SpaceAssetAccess(db);
     this.galleryPerson = new GalleryPersonAccess(db);
     this.sharedSpace = new SharedSpaceAccess(db);
+    this.assetVersion = new AssetVersionAccess(db);
   }
 }

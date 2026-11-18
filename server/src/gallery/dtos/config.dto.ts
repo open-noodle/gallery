@@ -289,6 +289,16 @@ export const GalleryServerExtension = {
   spaceEditorsCanChangeRoles: galleryConfigBool.describe(
     'Let editors of a shared space switch members between viewer and editor. A space owner can override this per space.',
   ),
+  assetVersions: z
+    .object({
+      enabled: galleryConfigBool.describe(
+        "Find the files of one shot from their metadata and show them as one photo: a RAW is kept behind the camera's JPEG or HEIC of the same shot instead of beside it in the timeline.",
+      ),
+      detectEdits: galleryConfigBool.describe(
+        "Also group exported edits (Lightroom, darktable, ...) with the photo they were made from, and show the newest one as the photo's picture: the photo stays the same photo, and the edits are kept behind it. Needs enabled.",
+      ),
+    })
+    .meta({ id: 'AdminConfigAssetVersionsDto' }),
 };
 
 export const galleryJobDefaults = {
@@ -297,6 +307,7 @@ export const galleryJobDefaults = {
   [QueueName.Classification]: { concurrency: 1 },
   [QueueName.QualityAnalysis]: { concurrency: 2 },
   [QueueName.SpatialScene]: { concurrency: 1 },
+  [QueueName.AssetVersions]: { concurrency: 1 },
 };
 
 export const galleryMachineLearningDefaults = {
@@ -360,6 +371,9 @@ export const galleryServerDefaults = {
   mergePeopleAcrossOwners: false,
   spaceEditorsCanAddMembers: false,
   spaceEditorsCanChangeRoles: false,
+  // off out of the box: an admin opts in (specs/2026-11-07-asset-versions-design.md)
+  // edits are a second opt-in: they change what a photo looks like, which not everyone wants
+  assetVersions: { enabled: false, detectEdits: false },
 };
 
 export const galleryTopLevelDefaults = {

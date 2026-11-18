@@ -334,6 +334,14 @@ export class QueueMaintenanceRepository {
       case JobName.FacialRecognitionQueueAll: {
         return { jobId: JobName.FacialRecognitionQueueAll, removeOnComplete: true };
       }
+      // asset versions: one cleanup waiting at a time, however many deletions asked for it
+      case JobName.AssetVersionCleanup: {
+        return { jobId: 'asset-version-cleanup', removeOnComplete: true, removeOnFail: true };
+      }
+      // and one undo: a second press of the button while it waits or runs adds nothing
+      case JobName.AssetVersionUndo: {
+        return { jobId: 'asset-version-undo', removeOnComplete: true, removeOnFail: true };
+      }
       case JobName.FaceIdentityBackfill: {
         const data = item.data as { stage?: string; cursor?: string; continuationId?: string };
         if (data.cursor) {
