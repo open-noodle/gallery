@@ -101,7 +101,7 @@ describe(SpatialSceneRepository.name, () => {
 
       await sut.upsert(scene(asset.id));
       const { assetId: _, ...stored } = scene(asset.id);
-      await expect(sut.get(asset.id)).resolves.toEqual(stored);
+      await expect(sut.get(asset.id)).resolves.toEqual({ ...stored, createdAt: expect.any(Date), offered: null });
 
       await sut.upsert(scene(asset.id, { path: 'thumbs/depth.png', modelName: 'distill-any-depth-large' }));
       await expect(sut.get(asset.id)).resolves.toMatchObject({

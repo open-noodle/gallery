@@ -146,8 +146,8 @@ const setup = async () => {
   const { user: nonMember } = await ctx.newUser();
   const { user: admin } = await ctx.newUser({ isAdmin: true });
 
+  // No exif row: the job's lookup left-joins it, and a photo without a projection type is not a panorama.
   const { asset } = await ctx.newAsset({ ownerId: owner.id });
-  await ctx.newExif({ assetId: asset.id });
 
   const { space } = await ctx.newSharedSpace({ createdById: owner.id });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
