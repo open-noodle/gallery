@@ -135,6 +135,7 @@ export class ServerService extends BaseService {
       passwordLogin,
       notifications,
       ffmpeg,
+      familyTree,
     } = await this.getConfig({ withCache: true });
     const { configFile, peopleStatistics, storage } = this.configRepository.getEnv();
 
@@ -172,6 +173,7 @@ export class ServerService extends BaseService {
       searchFavoritesAcrossSpaces: true,
       ...spatialSceneServerFeatures(machineLearning),
       dataSaverVideo: ffmpeg.dataSaver.enabled,
+      familyTree: familyTree.enabled,
     };
   }
 

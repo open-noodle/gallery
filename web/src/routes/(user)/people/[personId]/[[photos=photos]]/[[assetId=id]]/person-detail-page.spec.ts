@@ -17,10 +17,15 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import type { Component } from 'svelte';
 import { addMessages } from 'svelte-i18n';
-import { expect } from 'vitest';
+import { expect, type Mock } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { page, userEvent } from 'vitest/browser';
+import { page, userEvent, type Locator } from 'vitest/browser';
 import PersonDetailPage from './+page.svelte';
+
+const findOne = async (locator: Locator) => {
+  await expect.element(locator).toBeInTheDocument();
+  return locator.element() as HTMLElement;
+};
 
 const { afterNavigateMock, featureFlagsMock, gotoMock, invalidateAllMock, mockAssetMultiSelectManager, mockPage } =
   vi.hoisted(() => {
@@ -217,6 +222,15 @@ describe('Person detail page', () => {
     sdkMock.getPerson.mockResolvedValue(makePerson());
     sdkMock.getPersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
     featureFlagsMock.value.peopleStatistics = true;
+    // Gallery-fork: family relationships, slice 8. `FamilyRelationsPanel`'s data source has no
+    // generated SDK function yet (see family-relations.ts), so every render of this page makes a
+    // real `fetch` call unless stubbed here — this suite isn't testing that panel, so refuse it
+    // quietly rather than let it hit the network.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({}) }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it.each([
@@ -731,6 +745,12 @@ describe('face suggestions', () => {
       'space-suggest-modal': SharedSpaceRole.Editor,
       'space-snooze-consistency': SharedSpaceRole.Editor,
     });
+    // See the note in the 'Person detail page' describe above.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({}) }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the banner when the API returns suggestions for a named owned person', async () => {
@@ -1113,5 +1133,66 @@ describe('face suggestions', () => {
       // What the space route's banner would check for the same profile: isSuggestionSnoozed(person.id, total).
       expect(isSuggestionSnoozed(PROFILE_ID, 3)).toBe(true);
     });
+  });
+});
+
+// Gallery-fork: family relationships, slice 8. `GET /family/people/{personId}/relations` has no
+// generated SDK function yet (see `family-relations.ts`), so the wiring calls raw `fetch` — these
+// tests stub `global.fetch` directly rather than `sdkMock`.
+describe('family relations panel wiring', () => {
+  let fetchMock: Mock;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    gotoMock.mockResolvedValue(undefined);
+    invalidateAllMock.mockResolvedValue(undefined);
+    mockAssetMultiSelectManager.selectionActive = false;
+    mockAssetMultiSelectManager.assets = [];
+    sdkMock.getPerson.mockResolvedValue(makePerson());
+    sdkMock.getPersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // E55 — pets are never part of the family graph; the wiring must not even ask.
+  it('never requests family relations for a pet, and renders no panel', async () => {
+    await renderPage({ person: makePerson({ type: 'pet', name: 'Mochi' }) });
+
+    await findOne(page.getByTestId('timeline-stub'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(page.getByTestId('family-relations-panel').query()).not.toBeInTheDocument();
+  });
+
+  // A12, paired with the positive control below on an otherwise identical render.
+  it('renders no family relations panel when the relations request is refused', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({}) });
+    await renderPage();
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/family/people/person-1/relations'),
+        expect.anything(),
+      ),
+    );
+    expect(page.getByTestId('family-relations-panel').query()).not.toBeInTheDocument();
+  });
+
+  it('renders the family relations panel when the relations request succeeds', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          relations: [{ person: makePerson({ id: 'anton', name: 'Anton' }), anonymousSlot: null, relation: 'parent' }],
+        }),
+    });
+    await renderPage();
+
+    expect(await findOne(page.getByTestId('family-relations-panel'))).toBeInTheDocument();
+    expect(page.getByText('Anton').element()).toBeInTheDocument();
   });
 });

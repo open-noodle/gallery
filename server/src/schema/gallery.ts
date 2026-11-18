@@ -19,6 +19,10 @@ import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.ta
 import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
+import { FamilyAccessTable } from 'src/schema/tables/family-access.table.js';
+import { FamilyUnionChildTable } from 'src/schema/tables/family-union-child.table.js';
+import { FamilyUnionPartnerTable } from 'src/schema/tables/family-union-partner.table.js';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
@@ -61,6 +65,10 @@ export const galleryTables = [
   CleanupDayReviewTable,
   CleanupDecisionTable,
   AssetQualityTable,
+  FamilyUnionTable,
+  FamilyUnionPartnerTable,
+  FamilyUnionChildTable,
+  FamilyAccessTable,
   AlbumSpaceAssetTable,
   AlbumSpaceAssetAuditTable,
   AssetDataSaverVideoTable,
@@ -121,6 +129,10 @@ export interface GalleryDB {
   cleanup_day_review: CleanupDayReviewTable;
   cleanup_decision: CleanupDecisionTable;
   asset_quality: AssetQualityTable;
+  family_union: FamilyUnionTable;
+  family_union_partner: FamilyUnionPartnerTable;
+  family_union_child: FamilyUnionChildTable;
+  family_access: FamilyAccessTable;
   album_space_asset: AlbumSpaceAssetTable;
   album_space_asset_audit: AlbumSpaceAssetAuditTable;
   asset_data_saver_video: AssetDataSaverVideoTable;

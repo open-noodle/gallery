@@ -1,4 +1,5 @@
 import { UserAdmin } from 'src/database.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import type { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hooks.js';
@@ -19,6 +20,7 @@ import type { StorageRepository } from 'src/repositories/storage.repository.js';
 import type { UserRepository } from 'src/repositories/user.repository.js';
 import { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
+import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph.js';
 import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
 
 /**
@@ -73,6 +75,7 @@ export abstract class GalleryBaseService {
   declare protected spatialSceneRepository: GalleryRepositories['spatialSceneRepository'];
   declare protected dataSaverVideoRepository: GalleryRepositories['dataSaverVideoRepository'];
   declare protected videoFaceRepository: GalleryRepositories['videoFaceRepository'];
+  declare protected familyRepository: GalleryRepositories['familyRepository'];
 
   declare protected identityMergePropagationService: IdentityMergePropagationService;
   declare protected faceAssignmentService: FaceAssignmentService;
@@ -85,6 +88,7 @@ export abstract class GalleryBaseService {
     this.identityMergePropagationService = new IdentityMergePropagationService({
       databaseRepository: this.databaseRepository,
       faceIdentityRepository: this.faceIdentityRepository,
+      familyRepository: this.familyRepository,
       jobRepository: this.jobRepository,
       logger: this.logger,
       personRepository: this.personRepository,
@@ -146,6 +150,20 @@ export abstract class GalleryBaseService {
       this.videoFaceRepository.getPathsByPaths(paths),
     ]);
     return [...depthMaps, ...videoFaceFrames];
+  }
+
+  // Family relationships. The single entry point every service uses to attach a `familyRelationLabel` to a person
+  // it is about to return: `PersonService` (getAll/getById) and `AssetService` (the embedded `people` on a returned
+  // asset) both call this rather than each re-deriving access/graph logic, so there is exactly one composition of
+  // `resolveFamilyAccessLevel`/`buildFamilyGraph`/`resolveFamilyRootId` (`src/utils/family-graph.ts`).
+  protected async getFamilyLabelSet(auth: AuthDto): Promise<FamilyLabelSet> {
+    const { familyTree } = await this.getConfig({ withCache: false });
+    const repos: FamilyLabelRepositories = {
+      familyRepository: this.familyRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      userRepository: this.userRepository,
+    };
+    return resolveFamilyLabelSet(repos, familyTree, auth.user.id);
   }
 
   /** Fork: what this viewer may see on a surface — see src/utils/viewer-scope.ts. */

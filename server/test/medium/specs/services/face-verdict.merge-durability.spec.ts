@@ -4,6 +4,7 @@ import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -35,6 +36,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     real: [
       DatabaseRepository,
       FaceIdentityRepository,
+      FamilyRepository,
       PersonRepository,
       SharedSpaceRepository,
       FacePersonVerdictRepository,
@@ -46,6 +48,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
+    familyRepository: ctx.get(FamilyRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
