@@ -50,7 +50,7 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { DB } from 'src/schema/index.js';
-import { down } from 'src/schema/migrations-gallery/1800100000000-AddAssetVersionTables.js';
+import { down } from 'src/schema/migrations-gallery/1800900000000-AddAssetVersionTables.js';
 import { checkAccess } from 'src/utils/access.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';

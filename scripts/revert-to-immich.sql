@@ -1332,7 +1332,7 @@ DELETE FROM "kysely_migrations"
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
   '1800100000000-AddVideoPetsSampledAt',
-  '1800100000000-AddAssetVersionTables',
+  '1800900000000-AddAssetVersionTables',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
