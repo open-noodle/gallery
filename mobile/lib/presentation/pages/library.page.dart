@@ -138,6 +138,7 @@ class _CollectionCards extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final order = ref.watch(libraryCollectionOrderProvider);
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverToBoxAdapter(
@@ -145,11 +146,11 @@ class _CollectionCards extends ConsumerWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (ref.watch(serverSupportsSpacesProvider)) const SpacesCollectionCard(),
+            if (order.lead != null) libraryCollectionCard(order.lead!),
             const _PeopleCollectionCard(),
             const _PlacesCollectionCard(),
             const _LocalAlbumsCollectionCard(),
-            const AlbumsCollectionCard(),
+            libraryCollectionCard(order.trail),
             const _MemoriesCollectionCard(),
           ],
         ),
