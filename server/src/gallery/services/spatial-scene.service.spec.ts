@@ -372,4 +372,20 @@ describe(SpatialSceneService.name, () => {
       });
     });
   });
+
+  describe('choices, for the admin', () => {
+    it('counts them', async () => {
+      mocks.spatialScene.countOffers.mockResolvedValue(4);
+      await expect(sut.getChoices()).resolves.toEqual({ count: 4 });
+    });
+
+    it('clears them, whether or not Spatial Scene is on, and says how many', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(config(false, 'depth-anything-v2-small'));
+      mocks.spatialScene.deleteOffers.mockResolvedValue(4);
+      await expect(sut.clearChoices(factory.auth({ user: { id: 'admin-1', isAdmin: true } }))).resolves.toEqual({
+        count: 4,
+      });
+      expect(mocks.spatialScene.deleteOffers).toHaveBeenCalledOnce();
+    });
+  });
 });

@@ -71,6 +71,12 @@ from
 where
   "assetId" = $1::uuid
 
+-- SpatialSceneRepository.countOffers
+select
+  count(*) as "count"
+from
+  "asset_spatial_scene_offer"
+
 -- SpatialSceneRepository.getPathsByPaths
 select
   "path"

@@ -140,6 +140,22 @@ describe(SpatialSceneRepository.name, () => {
       await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: null });
     });
 
+    it('counts and clears every choice, leaving the depth maps', async () => {
+      const { ctx, user, sut } = await setup();
+      const { asset: offered } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: refused } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsert(scene(offered.id));
+      await sut.setOffer(offered.id, true);
+      await sut.setOffer(refused.id, false);
+      const before = await sut.countOffers();
+      expect(before).toBeGreaterThanOrEqual(2);
+
+      await expect(sut.deleteOffers()).resolves.toBe(before);
+      await expect(sut.countOffers()).resolves.toBe(0);
+      await expect(sut.getOffer(refused.id)).resolves.toBeNull();
+      await expect(sut.get(offered.id)).resolves.toMatchObject({ offered: null, path: scene(offered.id).path });
+    });
+
     it('keeps a choice made before the depth map exists, and cascades with the asset', async () => {
       const { ctx, user, sut } = await setup();
       const { asset } = await ctx.newAsset({ ownerId: user.id });

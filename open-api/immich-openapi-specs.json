@@ -2288,6 +2288,98 @@
         "x-immich-state": "Stable"
       }
     },
+    "/admin/spatial-scene/choices": {
+      "delete": {
+        "description": "Removes every per-photo choice of whether Spatial Scene is offered, so every photo follows the offer mode and thresholds again. Depth maps are kept. Returns how many choices were removed.",
+        "operationId": "clearSpatialSceneChoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpatialSceneChoicesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Clear Spatial Scene per-photo choices",
+        "tags": [
+          "System config"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "systemConfig.update",
+        "x-immich-state": "Beta"
+      },
+      "get": {
+        "description": "Returns how many photos have a per-photo choice of whether Spatial Scene is offered on them.",
+        "operationId": "getSpatialSceneChoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpatialSceneChoicesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Count Spatial Scene per-photo choices",
+        "tags": [
+          "System config"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "systemConfig.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/admin/users": {
       "get": {
         "description": "Search for users.",
@@ -46142,6 +46234,20 @@
         },
         "required": [
           "assetFaceId"
+        ],
+        "type": "object"
+      },
+      "SpatialSceneChoicesResponseDto": {
+        "properties": {
+          "count": {
+            "description": "Number of photos with a per-photo choice (for DELETE, the number removed)",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
         ],
         "type": "object"
       },

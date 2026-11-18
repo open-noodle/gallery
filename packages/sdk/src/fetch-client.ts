@@ -955,6 +955,10 @@ export type TestEmailResponseDto = {
     /** Email message ID */
     messageId: string;
 };
+export type SpatialSceneChoicesResponseDto = {
+    /** Number of photos with a per-photo choice (for DELETE, the number removed) */
+    count: number;
+};
 export type UserLicense = {
     /** Activation date */
     activatedAt: string;
@@ -6355,6 +6359,29 @@ export function sendTestEmailAdmin({ adminConfigSmtpDto }: {
         method: "POST",
         body: adminConfigSmtpDto
     })));
+}
+/**
+ * Clear Spatial Scene per-photo choices
+ */
+export function clearSpatialSceneChoices(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SpatialSceneChoicesResponseDto;
+    }>("/admin/spatial-scene/choices", {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Count Spatial Scene per-photo choices
+ */
+export function getSpatialSceneChoices(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SpatialSceneChoicesResponseDto;
+    }>("/admin/spatial-scene/choices", {
+        ...opts
+    }));
 }
 /**
  * Search users

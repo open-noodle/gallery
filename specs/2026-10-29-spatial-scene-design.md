@@ -235,6 +235,14 @@ the forced run after a model switch touches a choice: a chosen photo keeps it, a
 afresh against the new metrics. Missing also picks up a photo whose choice was made but whose map failed. Photos
 chosen against Spatial Scene still get a map, so choosing automatically later needs no reprocessing.
 
+**Clearing them all.** The Spatial Scene section of the machine learning settings shows how many photos have a choice
+and a **Clear choices** button, with a confirmation, which removes every one (`GET` and `DELETE
+/admin/spatial-scene/choices`, `SpatialSceneAdminController`, admin-only by the route guard under `admin/`, API-key
+scopes `systemConfig.read` and `systemConfig.update`). It is a button, not a job: there is nothing to recompute, a
+choice is one row and the delete is one statement. It is allowed while the feature is off and while the config comes
+from a file, since it is data rather than config. It is admin-only because it undoes choices that owners and space
+editors made on their own photos; a per-user or per-selection reset would be a separate feature. Depth maps are kept.
+
 **Who.** The same edit access as the viewer's other job actions (`requireAssetEditAccess`): the photo's owner, or an
 Owner or Editor of a space the photo is in whose owner is a member. Not a partner, an album editor, a space Viewer, a
 shared link or a server admin who has none of these. The choice changes the photo for everyone who can see it, shared
@@ -391,7 +399,8 @@ The admin ML settings page gains a Spatial Scene section beside Pet Detection.
   `web/src/lib/gallery/spatial/SpatialSceneViewer.svelte`. If the map fails to load, it shows a toast and returns to the
   normal view.
 - **Admin.** `SpatialSceneSettings.svelte` (`web/src/lib/gallery/admin/`), included by one line in the upstream
-  `MachineLearningSettings.svelte`: enable, model and offer mode. The thresholds are config-file only.
+  `MachineLearningSettings.svelte`: enable, model and offer mode, and the per-photo choices count with Clear choices.
+  Indexed in `admin-settings-search.svelte.ts` under machine learning. The thresholds are config-file only.
 
 - **Per-photo actions.** `getSpatialSceneActions` also returns `RefreshDepthMap`, `OfferSpatialScene`,
   `StopOfferingSpatialScene` and `UseAutomaticSpatialScene`, shown when the server features flag is on, the photo is

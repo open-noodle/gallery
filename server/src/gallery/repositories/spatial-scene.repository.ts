@@ -112,6 +112,22 @@ export class SpatialSceneRepository {
       .execute();
   }
 
+  /** How many photos have a per-photo choice. */
+  @GenerateSql()
+  async countOffers(): Promise<number> {
+    const { count } = await this.db
+      .selectFrom('asset_spatial_scene_offer')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .executeTakeFirstOrThrow();
+    return Number(count);
+  }
+
+  /** Removes every per-photo choice, so every photo follows the automatic choice; returns how many there were. */
+  async deleteOffers(): Promise<number> {
+    const result = await this.db.deleteFrom('asset_spatial_scene_offer').executeTakeFirst();
+    return Number(result.numDeletedRows);
+  }
+
   /** The depth maps among `paths`, for IntegrityService: they sit in the thumbnail folder the untracked-file scan walks. */
   @GenerateSql({ params: [DummyValue.STRING] })
   getPathsByPaths(paths: string[]) {

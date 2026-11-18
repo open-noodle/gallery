@@ -12,7 +12,7 @@ import {
   Permission,
   QueueName,
 } from 'src/enum.js';
-import type { SpatialSceneOfferDto } from 'src/gallery/dtos/spatial-scene.dto.js';
+import type { SpatialSceneChoicesResponseDto, SpatialSceneOfferDto } from 'src/gallery/dtos/spatial-scene.dto.js';
 import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { depthMapPath, isSpatialSceneEnabled } from 'src/gallery/utils/spatial-scene.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
@@ -158,6 +158,19 @@ export class SpatialSceneService extends BaseService {
     if (offered && !(await this.spatialSceneRepository.get(id))) {
       await this.jobRepository.queue({ name: JobName.SpatialScene, data: { id } });
     }
+  }
+
+  // The admin's view of the choices (specs/2026-10-29-spatial-scene-design.md, "Per-photo actions"). Admin-only by the
+  // route guard, and allowed while Spatial Scene is off: clearing them is housekeeping, not a use of the feature.
+
+  async getChoices(): Promise<SpatialSceneChoicesResponseDto> {
+    return { count: await this.spatialSceneRepository.countOffers() };
+  }
+
+  async clearChoices(auth: AuthDto): Promise<SpatialSceneChoicesResponseDto> {
+    const count = await this.spatialSceneRepository.deleteOffers();
+    this.logger.log(`User ${auth.user.id} cleared ${count} Spatial Scene per-photo choices`);
+    return { count };
   }
 
   private async requireActionable(auth: AuthDto, id: string) {

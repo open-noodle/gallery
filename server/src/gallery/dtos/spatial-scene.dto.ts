@@ -46,3 +46,12 @@ const SpatialSceneOfferSchema = z
   .meta({ id: 'SpatialSceneOfferDto' });
 
 export class SpatialSceneOfferDto extends createZodDto(SpatialSceneOfferSchema) {}
+
+// GET and DELETE /admin/spatial-scene/choices.
+const SpatialSceneChoicesResponseSchema = z
+  .object({
+    count: z.int().min(0).describe('Number of photos with a per-photo choice (for DELETE, the number removed)'),
+  })
+  .meta({ id: 'SpatialSceneChoicesResponseDto' });
+
+export class SpatialSceneChoicesResponseDto extends createZodDto(SpatialSceneChoicesResponseSchema) {}

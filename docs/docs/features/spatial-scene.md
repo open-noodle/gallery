@@ -166,6 +166,10 @@ With four to eight threads the default model took 0.5 to 0.65 seconds a photo on
 2. Under **Spatial Scene**, turn it on and choose a model.
 3. Choose **Offer it on**: **Suitable photos** (the default) or **All photos**.
 
+The same section shows how many photos have a [choice made for them](#choosing-for-one-photo).
+**Clear choices** removes every one of them, after asking you to confirm, so all photos follow
+**Offer it on** again. It works while Spatial Scene is turned off, and keeps the depth maps.
+
 Changing the model recomputes the depth map of every photo with the new model.
 
 ### Processing existing photos
