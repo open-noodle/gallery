@@ -1647,6 +1647,8 @@ export type AssetResponseDto = {
     resolvedSpaceId?: string;
     /** Whether the viewer offers Spatial Scene for this photo: it has a depth map and the admin offers it on every photo, or the photo counts as suitable. Present only on single-asset reads. */
     spatialScene?: boolean;
+    /** The per-photo choice behind spatialScene: true offered and false not offered whatever the automatic choice says, null for the automatic choice. Present only on single-asset reads while Spatial Scene is enabled. */
+    spatialSceneChoice?: boolean | null;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */

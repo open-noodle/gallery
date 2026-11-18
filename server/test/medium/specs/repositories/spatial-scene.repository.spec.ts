@@ -143,8 +143,10 @@ describe(SpatialSceneRepository.name, () => {
     it('keeps a choice made before the depth map exists, and cascades with the asset', async () => {
       const { ctx, user, sut } = await setup();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await expect(sut.getOffer(asset.id)).resolves.toBeNull();
       await sut.setOffer(asset.id, true);
       await expect(sut.get(asset.id)).resolves.toBeUndefined();
+      await expect(sut.getOffer(asset.id)).resolves.toBe(true);
 
       await sut.upsert(scene(asset.id));
       await expect(sut.get(asset.id)).resolves.toMatchObject({ offered: true });

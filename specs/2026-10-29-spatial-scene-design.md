@@ -223,8 +223,17 @@ Added 2026-11-17. The viewer's ⋮ menu, beside Refresh faces and Refresh metada
   metrics.
 - **Offer Spatial Scene** on a photo the viewer shows no button for, and **Stop offering Spatial Scene** on one it
   does. Each records a choice for the photo that wins over the offer mode, the thresholds and the face rule. Offering
-  it on a photo without a map also queues the job. The API also takes `null`, which returns the photo to the automatic
-  choice; the viewer offers no item for it.
+  it on a photo without a map also queues the job.
+- **Choose Spatial Scene automatically**, on a photo with a choice, removes it (`offered: null`), so the offer mode
+  and thresholds decide again. The viewer knows a photo has a choice from `spatialSceneChoice` on `GET /assets/{id}`
+  (true, false, or null for none; absent while the feature is off), set next to `spatialScene` by
+  `applyAssetResponseOverlay`. A choice made before the map exists is read on its own (`getOffer`), so the item shows
+  while the map is being made.
+
+**Reprocessing.** The depth job writes only `asset_spatial_scene`, so neither the Spatial Scene job (Missing or All) nor
+the forced run after a model switch touches a choice: a chosen photo keeps it, and photos without one are decided
+afresh against the new metrics. Missing also picks up a photo whose choice was made but whose map failed. Photos
+chosen against Spatial Scene still get a map, so choosing automatically later needs no reprocessing.
 
 **Who.** The same edit access as the viewer's other job actions (`requireAssetEditAccess`): the photo's owner, or an
 Owner or Editor of a space the photo is in whose owner is a member. Not a partner, an album editor, a space Viewer, a
@@ -239,7 +248,7 @@ nothing about the setting.
 | Space Owner or Editor, not the photo's owner | refused (disabled) | allowed |
 | Space Viewer, partner, album editor, shared link, non-member, non-member admin | refused (no access) | refused (no access) |
 
-This holds for all four operations (refresh, offer, stop offering, back to automatic). Without edit access the caller
+This holds for all four operations (refresh, offer, stop offering, choose automatically). Without edit access the caller
 gets `Not found or no asset.update access`; with it but the feature off, `Spatial Scene is disabled`. A refused call
 writes no choice and queues no job. `server/test/medium/specs/gallery/spatial-scene-photo-actions-matrix.spec.ts`
 enumerates this table and snapshots the grid.
@@ -254,7 +263,8 @@ is a person's choice, which can be made before the map exists. `SpatialSceneRepo
 
 **Feedback.** Both actions toast at once. The viewer re-reads the photo (`GET /assets/{id}`, in the space it was read
 in) after a choice and passes it on as an `AssetUpdate`, so the button appears or goes at once, and Stop offering
-closes the Spatial view if it is open on that photo. When a depth job had to be queued, the viewer re-reads the photo
+closes the Spatial view if it is open on that photo (as does Choose automatically, when the automatic choice does not
+offer it). When a depth job had to be queued, the viewer re-reads the photo
 every 3 seconds for up to 2 minutes and passes it on once it is offered. The job may sit behind a library backfill
 (the queue runs one job at a time), and then the button shows the next time the photo is opened. No websocket event is
 sent: `on_asset_update` carries upstream's mapping without the overlay, so the viewer would lose `spatialScene` and the
@@ -379,12 +389,12 @@ The admin ML settings page gains a Spatial Scene section beside Pet Detection.
 - **Admin.** `SpatialSceneSettings.svelte` (`web/src/lib/gallery/admin/`), included by one line in the upstream
   `MachineLearningSettings.svelte`: enable, model and offer mode. The thresholds are config-file only.
 
-- **Per-photo actions.** `getSpatialSceneActions` also returns `RefreshDepthMap`, `OfferSpatialScene` and
-  `StopOfferingSpatialScene`, shown when the server features flag is on, the photo is an image that is not a panorama
-  or in the trash, and `canEditAsset` allows it, never on a shared link. Three `ActionMenuItem` lines in
-  `AssetViewerNavBar`, after Transcode video.
+- **Per-photo actions.** `getSpatialSceneActions` also returns `RefreshDepthMap`, `OfferSpatialScene`,
+  `StopOfferingSpatialScene` and `UseAutomaticSpatialScene`, shown when the server features flag is on, the photo is
+  an image that is not a panorama or in the trash, and `canEditAsset` allows it, never on a shared link. Four
+  `ActionMenuItem` lines in `AssetViewerNavBar`, after Transcode video.
 
-Those are the upstream web hunks: one viewer arm, one template branch, two nav bar buttons and three menu lines, one
+Those are the upstream web hunks: one viewer arm, one template branch, two nav bar buttons and four menu lines, one
 settings line, and the queue's entries in the four lists every queue appears in.
 
 ### Rendering
@@ -458,7 +468,7 @@ app's HTTP client, auth headers and client certificates; the map is filtered in 
 
 The per-photo actions are web only, and the web app is served by its own server. The mobile app gains no menu item,
 but it reads `spatialScene` from `GET /assets/{id}`, so a choice made on the web shows there too; an app of any version
-needs nothing new. Stock Immich clients never call the two endpoints, and a stock Immich server on a reverted database
+needs nothing new, and ignores the optional `spatialSceneChoice`. Stock Immich clients never call the two endpoints, and a stock Immich server on a reverted database
 has neither the endpoints nor the table.
 
 ## Layering compliance
@@ -469,7 +479,7 @@ has neither the endpoints nor the table.
 | 2. Stock Immich keeps working        | New endpoint and an ignored extra field only; no sync stream changes.                                         |
 | 3. Switching back stays safe         | `revert-to-immich.sql` drops both tables. `AddAssetSpatialSceneTable.down()` drops the maps (derived data, regenerated by the backfill). `AddAssetSpatialSceneOfferTable.down()` drops the choices: an older Gallery has nowhere to keep them, and its photos go back to the automatic choice, which is what it can show. Leftover `_depth.png` files are inert. |
 | 4. Prefer Immich's code              | Reuses the ML `/predict` pipeline, the job queue, `backendMedia` and the thumbnail path scheme.              |
-| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension each for the asset and the server features; three menu lines for the per-photo actions. Mobile: one button line, one overlay line, one field on `ServerFeatures` (as `localTakenRange`), the shader and dependency in `pubspec.yaml`, the purpose string. |
+| 5. Hooks, not logic, in upstream files | Queue registration lines (as pet detection); one viewer arm, one branch, one nav button; one DTO extension each for the asset and the server features; four menu lines for the per-photo actions. Mobile: one button line, one overlay line, one field on `ServerFeatures` (as `localTakenRange`), the shader and dependency in `pubspec.yaml`, the purpose string. |
 
 ## i18n
 

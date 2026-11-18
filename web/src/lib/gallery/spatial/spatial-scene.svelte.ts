@@ -13,7 +13,7 @@ import {
   type AssetResponseDto,
 } from '@immich/sdk';
 import { toastManager, type ActionItem } from '@immich/ui';
-import { mdiCube, mdiCubeOffOutline, mdiCubeOutline, mdiCubeScan } from '@mdi/js';
+import { mdiCube, mdiCubeOffOutline, mdiCubeOutline, mdiCubeScan, mdiRestore } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 
 // Spatial Scene (specs/2026-10-29-spatial-scene-design.md): the viewer's Spatial toggle.
@@ -122,7 +122,22 @@ export const getSpatialSceneActions = ($t: MessageFormatter, asset: AssetRespons
     onAction: () => void handleSetOffered($t, asset, false),
   };
 
-  return { ShowSpatialScene, HideSpatialScene, RefreshDepthMap, OfferSpatialScene, StopOfferingSpatialScene };
+  // Only for a photo with a choice. A server without the field leaves it absent, which hides the item.
+  const UseAutomaticSpatialScene: ActionItem = {
+    title: $t('spatial_scene_use_automatic'),
+    icon: mdiRestore,
+    $if: () => actionable() && asset.spatialSceneChoice !== null && asset.spatialSceneChoice !== undefined,
+    onAction: () => void handleSetOffered($t, asset, null),
+  };
+
+  return {
+    ShowSpatialScene,
+    HideSpatialScene,
+    RefreshDepthMap,
+    OfferSpatialScene,
+    StopOfferingSpatialScene,
+    UseAutomaticSpatialScene,
+  };
 };
 
 /** The asset as the viewer reads it, in the same space, so the people and edit rights it carries stay right. */
@@ -162,7 +177,7 @@ const handleRefreshDepthMap = async ($t: MessageFormatter, asset: AssetResponseD
   }
 };
 
-const handleSetOffered = async ($t: MessageFormatter, asset: AssetResponseDto, offered: boolean) => {
+const handleSetOffered = async ($t: MessageFormatter, asset: AssetResponseDto, offered: boolean | null) => {
   let updated: AssetResponseDto;
   try {
     await updateAssetSpatialScene({ id: asset.id, spatialSceneOfferDto: { offered } });
@@ -173,10 +188,14 @@ const handleSetOffered = async ($t: MessageFormatter, asset: AssetResponseDto, o
   }
 
   eventManager.emit('AssetUpdate', updated);
+  if (!updated.spatialScene && spatialSceneState.assetId === asset.id) {
+    spatialSceneState.hide();
+  }
+  if (offered === null) {
+    toastManager.primary($t('spatial_scene_automatic_photo'));
+    return;
+  }
   if (!offered) {
-    if (spatialSceneState.assetId === asset.id) {
-      spatialSceneState.hide();
-    }
     toastManager.primary($t('spatial_scene_not_offered_photo'));
     return;
   }

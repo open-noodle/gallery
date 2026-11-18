@@ -199,6 +199,7 @@
           <ActionMenuItem action={SpatialActions.RefreshDepthMap} />
           <ActionMenuItem action={SpatialActions.OfferSpatialScene} />
           <ActionMenuItem action={SpatialActions.StopOfferingSpatialScene} />
+          <ActionMenuItem action={SpatialActions.UseAutomaticSpatialScene} />
         {/if}
       </ButtonContextMenu>
     {/if}

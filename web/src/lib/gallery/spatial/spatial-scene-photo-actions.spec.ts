@@ -51,11 +51,13 @@ const photo = (overrides: Partial<AssetResponseDto> = {}) =>
   }) as AssetResponseDto;
 
 const visible = (asset: AssetResponseDto) => {
-  const { RefreshDepthMap, OfferSpatialScene, StopOfferingSpatialScene } = getSpatialSceneActions($t, asset);
+  const { RefreshDepthMap, OfferSpatialScene, StopOfferingSpatialScene, UseAutomaticSpatialScene } =
+    getSpatialSceneActions($t, asset);
   return {
     refresh: RefreshDepthMap.$if?.() ?? true,
     offer: OfferSpatialScene.$if?.() ?? true,
     stop: StopOfferingSpatialScene.$if?.() ?? true,
+    automatic: UseAutomaticSpatialScene.$if?.() ?? true,
   };
 };
 
@@ -82,11 +84,29 @@ describe('Spatial Scene per-photo actions', () => {
 
   describe('which actions show', () => {
     it('offers Refresh and Offer on a photo the server does not offer it for', () => {
-      expect(visible(photo())).toEqual({ refresh: true, offer: true, stop: false });
+      expect(visible(photo())).toEqual({ refresh: true, offer: true, stop: false, automatic: false });
     });
 
     it('offers Refresh and Stop on a photo the server offers it for', () => {
-      expect(visible(photo({ spatialScene: true }))).toEqual({ refresh: true, offer: false, stop: true });
+      expect(visible(photo({ spatialScene: true }))).toEqual({
+        refresh: true,
+        offer: false,
+        stop: true,
+        automatic: false,
+      });
+    });
+
+    it.each([
+      ['offered', true, { spatialScene: true }],
+      ['not offered', false, { spatialScene: false }],
+      ['offered, waiting for its depth map', true, { spatialScene: false }],
+    ])('offers the automatic choice back on a photo chosen as %s', (_label, choice, overrides) => {
+      expect(visible(photo({ ...overrides, spatialSceneChoice: choice }))).toMatchObject({ automatic: true });
+    });
+
+    it('does not offer the automatic choice without a choice, or from a server without the field', () => {
+      expect(visible(photo({ spatialSceneChoice: null }))).toMatchObject({ automatic: false });
+      expect(visible(photo({ spatialSceneChoice: undefined }))).toMatchObject({ automatic: false });
     });
 
     it('follows the server edit right: a space Editor gets them, a viewer of a shared photo does not', () => {
@@ -103,7 +123,7 @@ describe('Spatial Scene per-photo actions', () => {
       ['signed out', () => (mocks.user.current = null)],
     ])('shows nothing when %s', (_label, arrange) => {
       arrange();
-      expect(visible(photo())).toEqual({ refresh: false, offer: false, stop: false });
+      expect(visible(photo())).toEqual({ refresh: false, offer: false, stop: false, automatic: false });
     });
 
     it.each([
@@ -115,7 +135,7 @@ describe('Spatial Scene per-photo actions', () => {
       ],
       ['an .insp panorama', photo({ originalPath: '/library/IMG_0001.INSP' })],
     ])('shows nothing on %s', (_label, asset) => {
-      expect(visible(asset)).toEqual({ refresh: false, offer: false, stop: false });
+      expect(visible(asset)).toEqual({ refresh: false, offer: false, stop: false, automatic: false });
     });
   });
 
@@ -183,6 +203,36 @@ describe('Spatial Scene per-photo actions', () => {
       });
       expect(emit).toHaveBeenCalledWith('AssetUpdate', updated);
       expect(spatialSceneState.isActive(asset)).toBe(false);
+    });
+  });
+
+  describe('Choose automatically', () => {
+    it('removes the choice and leaves the Spatial view when the automatic choice does not offer it', async () => {
+      const asset = photo({ spatialScene: true, spatialSceneChoice: true });
+      const updated = photo({ spatialScene: false, spatialSceneChoice: null });
+      mocks.sdk.getAssetInfo.mockResolvedValue(updated);
+      spatialSceneState.show('asset-1');
+
+      run(getSpatialSceneActions($t, asset).UseAutomaticSpatialScene);
+
+      await vi.waitFor(() => expect(mocks.toast.primary).toHaveBeenCalledWith('spatial_scene_automatic_photo'));
+      expect(mocks.sdk.updateAssetSpatialScene).toHaveBeenCalledWith({
+        id: 'asset-1',
+        spatialSceneOfferDto: { offered: null },
+      });
+      expect(emit).toHaveBeenCalledWith('AssetUpdate', updated);
+      expect(spatialSceneState.isActive(asset)).toBe(false);
+    });
+
+    it('keeps the Spatial view open when the automatic choice still offers it', async () => {
+      const asset = photo({ spatialScene: true, spatialSceneChoice: true });
+      mocks.sdk.getAssetInfo.mockResolvedValue(photo({ spatialScene: true, spatialSceneChoice: null }));
+      spatialSceneState.show('asset-1');
+
+      run(getSpatialSceneActions($t, asset).UseAutomaticSpatialScene);
+
+      await vi.waitFor(() => expect(mocks.toast.primary).toHaveBeenCalledWith('spatial_scene_automatic_photo'));
+      expect(spatialSceneState.isActive(asset)).toBe(true);
     });
   });
 

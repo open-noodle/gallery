@@ -87,6 +87,17 @@ export class SpatialSceneRepository {
       .executeTakeFirst();
   }
 
+  /** The per-photo choice alone, which may be made before the photo has a depth map. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getOffer(assetId: string): Promise<boolean | null> {
+    const row = await this.db
+      .selectFrom('asset_spatial_scene_offer')
+      .select('offered')
+      .where('assetId', '=', asUuid(assetId))
+      .executeTakeFirst();
+    return row?.offered ?? null;
+  }
+
   /** Records a per-photo choice; null removes it, so the automatic choice applies again. */
   async setOffer(assetId: string, offered: boolean | null): Promise<void> {
     if (offered === null) {

@@ -62,6 +62,14 @@ from
 where
   "asset_spatial_scene"."assetId" = $1::uuid
 
+-- SpatialSceneRepository.getOffer
+select
+  "offered"
+from
+  "asset_spatial_scene_offer"
+where
+  "assetId" = $1::uuid
+
 -- SpatialSceneRepository.getPathsByPaths
 select
   "path"
