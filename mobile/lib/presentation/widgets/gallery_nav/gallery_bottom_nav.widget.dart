@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
 import 'package:immich_mobile/gallery/dock/gallery_dock_fold.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart' show leaveSearchMode;
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
@@ -33,7 +34,6 @@ class GalleryBottomNav extends ConsumerStatefulWidget {
 class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   static const double _keyboardThreshold = 80;
   static const Duration _hideAnimation = Duration(milliseconds: 200);
-  static const double _bottomFloat = 26;
 
   bool _hiddenForMultiSelect = false;
   StreamSubscription? _multiSelectSub;
@@ -82,7 +82,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     final searching = ref.watch(searchModeProvider);
     final folded = ref.watch(galleryDockFoldedProvider);
     final hiding = _hiddenForMultiSelect || keyboardUp;
-    final bottomInset = mq.padding.bottom > _bottomFloat ? mq.padding.bottom : _bottomFloat;
+    final bottomInset = GalleryDockStyle.bottomInset(mq);
     // The clamp cannot fire in a settled tree: the shell builds its `routes:` from this same
     // `galleryNavSlotsProvider`, so `routes.length == slots.length` and every router index is a valid slot index. It
     // only covers the one frame between a slots change and auto_route rebuilding the tab stack.
@@ -112,7 +112,11 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         child: IgnorePointer(
           ignoring: hiding,
           child: Padding(
-            padding: EdgeInsets.only(left: 14, right: 14, bottom: bottomInset),
+            padding: EdgeInsets.only(
+              left: GalleryDockStyle.sideInset,
+              right: GalleryDockStyle.sideInset,
+              bottom: bottomInset,
+            ),
             child: GalleryDock(
               slots: slots,
               activeTab: activeTab,

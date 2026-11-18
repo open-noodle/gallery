@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
@@ -66,9 +67,12 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
-      // Like the Photos dock's grouping row: the full width less 14 on each side, at the dock row's height.
+      // Like the Photos dock's grouping row: the full width less the dock's side insets, at the dock row's height.
       final pill = tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill')));
-      expect(pill.width, tester.view.physicalSize.width / tester.view.devicePixelRatio - 28);
+      expect(
+        pill.width,
+        tester.view.physicalSize.width / tester.view.devicePixelRatio - 2 * GalleryDockStyle.sideInset,
+      );
       expect(pill.height, GalleryDock.groupingHeight);
     });
 
@@ -139,7 +143,7 @@ void main() {
       expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('timeline-grouping-bottom-pill-opacity'))).opacity, 1);
     });
 
-    testWidgets('floats max(safe-area, 26) above the bottom', (tester) async {
+    testWidgets('floats where the dock does: 26 up without a home indicator, inside it with one', (tester) async {
       EdgeInsets pillOuterPadding() {
         // The pill's own outer Padding (the one carrying the bottom float); nearest ancestor.
         final padding = tester.widget<Padding>(
@@ -155,10 +159,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(pillOuterPadding().bottom, 26);
 
-      // Large safe area → safe-area float.
-      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 50)));
+      // Home indicator (34): 14 inside it, as the dock sits.
+      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 34)));
       await tester.pumpAndSettle();
-      expect(pillOuterPadding().bottom, 50);
+      expect(pillOuterPadding().bottom, 20);
     });
 
     testWidgets('reduced motion applies hide state immediately (no animation)', (tester) async {

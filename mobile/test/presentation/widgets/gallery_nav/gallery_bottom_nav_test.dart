@@ -6,6 +6,7 @@ import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
@@ -252,7 +253,7 @@ void main() {
     expect(container.read(bottomNavHeightProvider), greaterThan(0));
   });
 
-  testWidgets('iPhone safe area uses one bottom inset instead of stacking float and safe area', (tester) async {
+  testWidgets('iPhone: the dock sits down inside the home-indicator area', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(430, 932);
     addTearDown(() {
@@ -289,9 +290,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Photos: the safe area plus the dock's unfolded height (tab bar, gap, grouping row).
-    expect(container.read(bottomNavHeightProvider), 34 + GalleryDock.reservedHeight(showGrouping: true));
-    expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - 34);
+    // Photos: 34 safe area less 14, as iOS's own tab bar sits, plus the dock's unfolded height (tab bar, gap,
+    // grouping row).
+    expect(container.read(bottomNavHeightProvider), 20 + GalleryDock.reservedHeight(showGrouping: true));
+    expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - 20);
   });
 
   testWidgets('narrow phone: the whole cluster stays inside the screen (#909)', (tester) async {
@@ -343,8 +345,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final tabs = tester.getRect(find.byKey(const Key('gallery-dock-tabs')));
-    expect(tabs.left, 14);
-    expect(tabs.right, 1024 - 14);
+    expect(tabs.left, GalleryDockStyle.sideInset);
+    expect(tabs.right, 1024 - GalleryDockStyle.sideInset);
   });
 
   testWidgets('Photos search keeps the dock: the tab circle and the grouping row on the bottom edge', (tester) async {

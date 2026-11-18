@@ -239,14 +239,14 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await pumpAppBar(tester, width: 390, actions: PhotosTimelineAppBar.actions);
-      final buttonWhenIdle = tester.getRect(find.byKey(const Key('photos-view-menu-button')));
+      final logoWhenIdle = tester.getRect(find.byType(SvgPicture));
 
       await pumpAppBar(tester, width: 390, actions: PhotosTimelineAppBar.actions, busy: true);
-      final buttonWhenSyncing = tester.getRect(find.byKey(const Key('photos-view-menu-button')));
+      final logoWhenSyncing = tester.getRect(find.byType(SvgPicture));
 
       expect(
-        buttonWhenSyncing,
-        buttonWhenIdle,
+        logoWhenSyncing,
+        logoWhenIdle,
         reason: 'a sync must not shift the actions row — that is what used to squeeze the logo',
       );
     });

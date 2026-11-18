@@ -20,7 +20,7 @@ class GalleryGroupingRow extends StatelessWidget {
 
   const GalleryGroupingRow({super.key, this.trailing, this.showTrailing = true});
 
-  static const double padding = 6;
+  static const double padding = 4;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +189,7 @@ class _DockViewMenu extends ConsumerWidget {
                           child: Semantics(
                             header: true,
                             child: Text(
-                              context.t.library_view.toUpperCase(),
+                              context.t.library_view_assets_shown.toUpperCase(),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
@@ -198,14 +198,19 @@ class _DockViewMenu extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        for (final (mode, label) in [
-                          (LibraryViewMode.both, context.t.library_view_both),
-                          (LibraryViewMode.personal, context.t.library_view_personal),
-                          (LibraryViewMode.spaces, context.t.library_view_spaces),
+                        for (final (mode, label, icon) in [
+                          (LibraryViewMode.both, context.t.library_view_show_everything, Icons.photo_library_outlined),
+                          (
+                            LibraryViewMode.personal,
+                            context.t.library_view_show_personal,
+                            Icons.person_outline_rounded,
+                          ),
+                          (LibraryViewMode.spaces, context.t.library_view_show_spaces, Icons.workspaces_outlined),
                         ])
                           _MenuChoice(
                             key: Key('gallery-dock-view-${mode.name}'),
                             label: label,
+                            icon: icon,
                             selected: view == mode,
                             onTap: () {
                               unawaited(HapticFeedback.selectionClick());
@@ -228,10 +233,11 @@ class _DockViewMenu extends ConsumerWidget {
 
 class _MenuChoice extends StatelessWidget {
   final String label;
+  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
-  const _MenuChoice({super.key, required this.label, required this.selected, required this.onTap});
+  const _MenuChoice({super.key, required this.label, required this.icon, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -247,6 +253,8 @@ class _MenuChoice extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
             children: [
+              Icon(icon, size: 20, color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 12),
               Expanded(child: Text(label, style: theme.textTheme.bodyLarge)),
               Opacity(
                 opacity: selected ? 1 : 0,

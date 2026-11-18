@@ -54,7 +54,7 @@ class GalleryDock extends StatelessWidget {
   });
 
   static const double tabBarHeight = 64;
-  static const double groupingHeight = 52;
+  static const double groupingHeight = 46;
   static const double rowGap = 10;
   static const double circle = 56;
 
