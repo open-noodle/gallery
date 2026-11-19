@@ -1,7 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/gallery/photos_view_menu.widget.dart';
 import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/presentation/widgets/feature_message/feature_message_dialog.widget.dart';
@@ -68,10 +67,9 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
 class PhotosTimelineAppBar extends StatelessWidget {
   const PhotosTimelineAppBar({super.key});
 
-  // Search (and its sort) is reached from the bottom-nav search button (GallerySearchBlob), so the app bar keeps only
-  // the display menu (library view, grouping). Every widget here is permanent and 40-50 px wide, which is what keeps
-  // the title slot (and therefore the logo) the same width in every state (#1030).
-  static const actions = <Widget>[PhotosViewMenuButton()];
+  // Search, grouping and display options all live in the dock (GalleryDock), so the app bar adds nothing of its own:
+  // an action that came and went would change the title slot's width and resize the logo (#1030).
+  static const actions = <Widget>[];
 
   @override
   Widget build(BuildContext context) {

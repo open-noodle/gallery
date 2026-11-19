@@ -1,0 +1,808 @@
+<title>Gallery Nav Dock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: phone frame on the left, notes and jump-to controls on the right; stacks on a phone. Committed dark look (Photos over glass). */
+:root {
+  --ink: #0a0a0c;
+  --panel: #141418;
+  --surface: #101014;
+  --field: #24242a;
+  --fg: #ececf1;
+  --muted: #9a9aa8;
+  --accent: #7fb2ff;
+  --accent-soft: rgba(127, 178, 255, 0.16);
+  --line: rgba(255, 255, 255, 0.09);
+  --glass: rgba(28, 28, 32, 0.52);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+  --spring: cubic-bezier(0.3, 1.25, 0.4, 1);
+  --dur: 620ms;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--ink); color: var(--fg); font-family: var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px; box-sizing: border-box;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { display: block; }
+
+.stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; min-height: 100%; }
+
+/* ---------- phone ---------- */
+.phone {
+  position: relative; width: 390px; max-width: 100%; height: min(844px, calc(100dvh - 32px)); min-height: 560px;
+  border-radius: 48px; overflow: hidden; background: #000; margin: 11px; isolation: isolate;
+  box-shadow: 0 0 0 10px #1b1b1f, 0 0 0 11px #2a2a30, 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.screen { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.status {
+  position: absolute; z-index: 9; inset: 0 0 auto; height: 50px; padding: 18px 30px 0;
+  display: flex; justify-content: space-between; font-weight: 600; font-size: 16px; pointer-events: none;
+  background: linear-gradient(#000 30%, rgba(0, 0, 0, 0));
+}
+.phone.searching .status { background: none; }
+.status .bat { width: 26px; height: 12px; border: 1.5px solid var(--fg); border-radius: 4px; position: relative; opacity: 0.9; }
+.status .bat::after { content: ""; position: absolute; inset: 1.5px; right: 6px; background: var(--fg); border-radius: 1.5px; }
+#page { padding-bottom: 200px; }
+.phone.searching #page { padding-top: 190px; }
+
+.apphead { padding: 60px 18px 10px; }
+.apphead .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.apphead h1 { margin: 0; font-size: 32px; letter-spacing: -0.02em; font-weight: 700; line-height: 1.1; text-wrap: balance; }
+.apphead .sub { color: var(--muted); font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.back { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 12px 0 6px; margin: 0 0 10px -4px; border-radius: 999px;
+  background: rgba(255,255,255,.09); box-shadow: inset 0 0 0 1px var(--line); font-size: 15px; font-weight: 500; }
+.back svg { width: 22px; height: 22px; }
+.avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 14px;
+  background: linear-gradient(135deg, #5b7cfa, #b06ab3); }
+.avatar.xl { width: 72px; height: 72px; font-size: 28px; margin-bottom: 12px; }
+.members { display: flex; margin-top: 12px; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.members .stack { display: flex; }
+.members .stack span { width: 28px; height: 28px; border-radius: 50%; margin-left: -8px; border: 2px solid #000; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.members .stack span:first-child { margin-left: 0; }
+
+.sec { margin: 22px 18px 10px; font-size: 17px; font-weight: 600; }
+.hrow { display: flex; gap: 12px; overflow-x: auto; padding: 0 18px; scrollbar-width: none; }
+.hrow::-webkit-scrollbar { display: none; }
+.person { flex: none; width: 76px; text-align: center; font-size: 13px; }
+.person .face { width: 76px; height: 76px; border-radius: 50%; margin-bottom: 6px; display: grid; place-items: center; font-size: 26px; font-weight: 600; }
+.albumthumb { flex: none; width: 132px; font-size: 13px; }
+.albumthumb .cv, .albums .cv { aspect-ratio: 1; border-radius: 16px; margin-bottom: 6px; }
+.albumthumb span, .albums span { color: var(--muted); font-size: 12px; display: block; }
+.albums { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 18px; font-size: 14px; }
+.list { margin: 18px 18px 0; border-radius: 18px; background: #16161a; border: 1px solid var(--line); overflow: hidden; }
+.list button, .list div { display: flex; justify-content: space-between; width: 100%; padding: 14px 16px; font-size: 15px; border-top: 1px solid var(--line); }
+.list > :first-child { border-top: 0; }
+.list span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.empty { padding: 60px 24px; text-align: center; color: var(--muted); font-size: 15px; }
+
+.grp-h { padding: 22px 18px 10px; display: flex; align-items: baseline; justify-content: space-between; }
+.grp-h b { font-size: 17px; font-weight: 600; }
+.grp-h.year b { font-size: 26px; letter-spacing: -0.02em; }
+.grp-h span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.grid.all { margin-top: 10px; }
+.tile { aspect-ratio: 1; position: relative; }
+.tile .dur { position: absolute; right: 5px; bottom: 4px; font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,.6); font-variant-numeric: tabular-nums; }
+
+.spaces { display: grid; gap: 14px; padding: 6px 16px; }
+.space-card { display: block; width: 100%; border-radius: 22px; overflow: hidden; background: #16161a; border: 1px solid var(--line); }
+.space-card .cover { height: 132px; }
+.space-card .meta { padding: 12px 14px 14px; }
+.space-card b { display: block; font-size: 16px; }
+.space-card span { color: var(--muted); font-size: 13px; }
+
+/* ---------- search header (as shipped: field, chips, total + sort) ---------- */
+.shead { position: absolute; z-index: 8; inset: 0 0 auto; padding-top: 50px; background: var(--surface);
+  transform: translateY(-100%); transition: transform 280ms cubic-bezier(.2,.8,.2,1); }
+.phone.searching .shead { transform: none; }
+.shead .frow { height: 56px; display: flex; align-items: center; padding-right: 12px; }
+.iconbtn { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; flex: none; }
+.iconbtn svg { width: 24px; height: 24px; }
+.field { flex: 1; min-width: 0; height: 44px; border-radius: 14px; background: var(--field); display: flex; align-items: center; gap: 4px; padding: 0 8px; position: relative; }
+.field > svg { width: 20px; height: 20px; color: var(--muted); flex: none; margin: 0 2px; }
+.field input { flex: 1; min-width: 0; background: none; border: 0; color: var(--fg); font: inherit; font-size: 16px; outline: none; }
+.field input::placeholder { color: var(--muted); }
+.field .clr { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
+.field .clr svg { width: 18px; height: 18px; }
+.token { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 6px 0 9px; border-radius: 9px; background: #2f3d57; color: #d6e4ff;
+  font-size: 14px; font-weight: 500; white-space: nowrap; max-width: 60%; flex: none; animation: pop 260ms cubic-bezier(.3,1.4,.5,1); }
+.token span { overflow: hidden; text-overflow: ellipsis; }
+.token svg { width: 14px; height: 14px; flex: none; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+.chiprow { height: 48px; display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 0 16px; scrollbar-width: none; }
+.chiprow::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 34px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 13px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.18); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.chip svg { width: 20px; height: 20px; color: var(--muted); }
+.chip.lead { padding: 0 13px 0 9px; }
+.chip.lead svg { width: 18px; height: 18px; }
+.chip.on { background: var(--accent-soft); border-color: transparent; color: #d6e4ff; }
+.chip.on svg { color: #d6e4ff; }
+.chip.plain { border-color: transparent; color: var(--accent); padding: 0 8px; }
+.badge { min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: #0a0f1c; font-size: 11px; font-weight: 700; display: grid; place-items: center; padding: 0 5px; }
+.rrow { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 13px; }
+.rrow b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sort { display: inline-flex; align-items: center; color: var(--muted); font-size: 13px; }
+.sort svg { width: 20px; height: 20px; }
+
+.drop { position: absolute; z-index: 9; top: 102px; left: 48px; right: 12px; border-radius: 16px; background: #1c1c22; border: 1px solid var(--line);
+  box-shadow: 0 16px 40px rgba(0,0,0,.5); padding: 6px; max-height: 360px; overflow-y: auto; }
+.drop h5 { margin: 8px 10px 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.drop button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 12px; font-size: 15px; }
+.drop button:hover { background: rgba(255,255,255,.05); }
+.drop .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); font-size: 13px; font-weight: 600; flex: none; }
+.drop .ic svg { width: 18px; height: 18px; }
+.drop small { display: block; color: var(--muted); font-size: 12px; }
+
+/* chip sheets */
+.sheet-scrim { position: absolute; inset: 0; z-index: 12; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
+.sheet { position: absolute; z-index: 13; left: 0; right: 0; bottom: 0; height: 64%; border-radius: 26px 26px 0 0; background: #1a1a1f;
+  transform: translateY(102%); transition: transform 380ms cubic-bezier(.2,.9,.25,1); display: flex; flex-direction: column; }
+.phone.sheet-open .sheet-scrim { opacity: 1; pointer-events: auto; }
+.phone.sheet-open .sheet { transform: none; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.25); margin: 8px auto 6px; flex: none; }
+.sheet h3 { margin: 6px 20px 10px; font-size: 18px; }
+.sheet .opts { overflow-y: auto; padding: 0 10px 30px; }
+.sheet .opts button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 13px 12px; border-radius: 14px; font-size: 16px; }
+.sheet .opts button:hover { background: rgba(255,255,255,.05); }
+.sheet .opts .ck { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); display: grid; place-items: center; }
+.sheet .opts button.on .ck { background: var(--accent); border-color: var(--accent); color: #0a0f1c; }
+.sheet .opts .ck svg { width: 14px; height: 14px; opacity: 0; }
+.sheet .opts button.on .ck svg { opacity: 1; }
+.sheet .opts .lead { display: flex; align-items: center; gap: 12px; }
+.sheet .opts .face { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; }
+.sheet .opts .n { color: var(--muted); font-size: 13px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+
+/* ---------- dock ---------- */
+.dock { position: absolute; z-index: 10; left: 14px; right: 14px; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); height: 0;
+  transition: opacity 200ms ease, transform 200ms ease; }
+.dock.kbd { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.pill {
+  position: absolute; overflow: hidden; touch-action: manipulation;
+  transition:
+    left var(--dur) var(--spring), bottom var(--dur) var(--spring),
+    width var(--dur) var(--spring), height var(--dur) var(--spring),
+    border-radius var(--dur) var(--spring),
+    opacity calc(var(--dur) * 0.45) ease, transform var(--dur) var(--spring), scale 160ms ease;
+}
+.pill:active { scale: 0.97; }
+.pill.gone { opacity: 0; transform: scale(0.85); pointer-events: none; }
+.glass {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--glass);
+  backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 rgba(255,255,255,.18), 0 10px 30px rgba(0,0,0,.35);
+  transition: opacity calc(var(--dur) * 0.5) ease;
+}
+.no-anim, .no-anim * { transition: none !important; }
+
+#tabs { z-index: 2; }
+.sel { position: absolute; border-radius: 999px; background: rgba(255,255,255,.11); box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+  transition: left var(--dur) var(--spring), top var(--dur) var(--spring), width var(--dur) var(--spring), height var(--dur) var(--spring), opacity 200ms ease; }
+.tab { position: absolute; top: 0; color: var(--fg);
+  transition: left var(--dur) var(--spring), width var(--dur) var(--spring), height var(--dur) var(--spring),
+    opacity calc(var(--dur) * 0.4) ease, transform var(--dur) var(--spring), color 200ms ease; }
+.tab.active { color: var(--accent); }
+.ico { position: absolute; left: calc(50% - 13px); top: 10px; width: 26px; height: 26px;
+  transition: top var(--dur) var(--spring), left var(--dur) var(--spring); }
+.ico svg { width: 100%; height: 100%; }
+.lbl { position: absolute; left: 0; right: 0; bottom: 9px; text-align: center; font-size: 11px; font-weight: 600; white-space: nowrap;
+  transition: opacity calc(var(--dur) * 0.35) ease, filter calc(var(--dur) * 0.35) ease, transform var(--dur) var(--spring); }
+.dock:not([data-state="expanded"]) .ico { top: calc(50% - 13px); }
+.dock:not([data-state="expanded"]) .lbl { opacity: 0; filter: blur(4px); transform: translateY(6px); }
+.dock:not([data-state="expanded"]) .tab:not(.active) { opacity: 0; transform: scale(0.5); }
+.dock:not([data-state="expanded"]) .sel { opacity: 0; }
+#search { z-index: 3; color: var(--fg); }
+
+#acc { z-index: 1; }
+#acc.hidden { opacity: 0; transform: translateY(14px) scale(0.92); pointer-events: none; }
+.acc-in { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding: 6px; }
+.seg { position: relative; flex: 1; min-width: 0; height: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
+.seg button { position: relative; z-index: 1; font-size: 14px; font-weight: 600; color: var(--muted); transition: color 200ms ease; white-space: nowrap; text-align: center; }
+.seg button.on { color: var(--fg); }
+.seg-thumb { position: absolute; top: 0; bottom: 0; width: calc(100% / 3); border-radius: 999px; background: rgba(255,255,255,.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15); transition: left var(--dur) var(--spring); }
+.optbtn { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08);
+  transition: flex-basis var(--dur) var(--spring), width var(--dur) var(--spring), opacity 200ms ease, margin var(--dur) var(--spring); overflow: hidden; }
+.optbtn svg { width: 22px; height: 22px; flex: none; }
+.optbtn.on { color: var(--accent); }
+.dock[data-state="collapsed"] .optbtn, .dock[data-state="search"] .optbtn, .dock[data-state="detailsearch"] .optbtn { flex-basis: 0; width: 0; opacity: 0; margin-left: -6px; }
+
+.pop { position: absolute; z-index: 11; right: 14px; width: 230px; border-radius: 24px; padding: 8px; overflow: hidden;
+  transform-origin: 85% 100%; transition: opacity 180ms ease, transform 380ms var(--spring); }
+.pop.closed { opacity: 0; transform: scale(0.85) translateY(10px); pointer-events: none; }
+.pop .glass { background: rgba(36, 36, 42, 0.78); }
+.pop h4 { position: relative; margin: 6px 10px; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.pop button { position: relative; display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 11px 12px; border-radius: 14px; font-size: 15px; }
+.pop button:hover { background: rgba(255,255,255,.06); }
+.pop button .ck { color: var(--accent); opacity: 0; }
+.pop button.on .ck { opacity: 1; }
+
+/* ---------- side panel ---------- */
+.panel { width: 330px; max-width: 100%; padding-top: 18px; }
+.panel h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.01em; }
+.panel p { color: var(--muted); line-height: 1.5; font-size: 14px; margin: 0 0 12px; }
+.panel ul { margin: 0 0 20px; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.panel ul b { color: var(--fg); font-weight: 600; }
+.ctl { border-top: 1px solid var(--line); padding: 14px 0; display: grid; gap: 8px; }
+.ctl .t { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.jumps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.jumps button { padding: 9px 6px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; text-align: center; }
+.jumps button:hover { border-color: rgba(127,178,255,.5); }
+.big { padding: 11px 14px; border-radius: 12px; background: var(--accent); color: #0a0f1c; font-weight: 600; font-size: 14px; text-align: center; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+@media (max-width: 720px) {
+  body { padding-block: 0 16px; }
+  .stage { gap: 16px; }
+  .phone { margin: 0 auto; width: 100%; border-radius: 0 0 28px 28px; box-shadow: none; height: calc(100dvh - 8px); }
+  .panel { width: 100%; padding-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { :root { --dur: 1ms; } }
+</style>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="status"><span>9:41</span><span class="bat" aria-hidden="true"></span></div>
+    <div class="screen" id="screen"><div id="page"></div></div>
+
+    <header class="shead" id="shead" aria-label="Search">
+      <div class="frow">
+        <button class="iconbtn" id="sBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+        <div class="field" id="field">
+          <span id="lead"></span>
+          <input id="q" type="text" enterkeyhint="search" autocomplete="off" aria-label="Search photos">
+          <button class="clr" id="qClear" aria-label="Clear" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+      </div>
+      <div class="chiprow" id="chiprow"></div>
+      <div class="rrow"><b id="total"></b><button class="sort" id="sort"><span id="sortLbl">Newest first</span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button></div>
+    </header>
+    <div class="drop" id="drop" hidden></div>
+
+    <div class="pop closed" id="pop" role="dialog" aria-label="Display options">
+      <div class="glass"></div>
+      <h4>Show</h4>
+      <button data-view="everything" class="on">Everything <span class="ck">✓</span></button>
+      <button data-view="personal">Only my photos <span class="ck">✓</span></button>
+      <button data-view="spaces">Only spaces <span class="ck">✓</span></button>
+    </div>
+
+    <nav class="dock" id="dock" data-state="expanded" aria-label="Main">
+      <div class="pill" id="acc">
+        <div class="glass"></div>
+        <div class="acc-in">
+          <div class="seg" id="seg" role="radiogroup" aria-label="Timeline grouping">
+            <div class="seg-thumb" id="segThumb"></div>
+            <button data-g="years" role="radio">Years</button>
+            <button data-g="months" role="radio" class="on">Months</button>
+            <button data-g="all" role="radio">All</button>
+          </div>
+          <button class="optbtn" id="optBtn" aria-label="Display options"></button>
+        </div>
+      </div>
+
+      <div class="pill" id="tabs">
+        <div class="glass"></div>
+        <div class="sel" id="sel"></div>
+        <button class="tab active" data-tab="photos" aria-label="Photos">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3.5"/><circle cx="9" cy="10" r="1.9"/><path d="M20.5 15.5l-4.5-4.5-9 8.5"/></svg></span>
+          <span class="lbl">Photos</span>
+        </button>
+        <button class="tab" data-tab="spaces" aria-label="Spaces">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.2"/><circle cx="17" cy="9.5" r="2.5"/><path d="M3 19.5c0-3.4 2.7-5.4 6-5.4s6 2 6 5.4"/><path d="M15.6 14.4c.5-.1 1-.2 1.5-.2 2.6 0 4 1.6 4 4.3"/></svg></span>
+          <span class="lbl">Spaces</span>
+        </button>
+        <button class="tab" data-tab="library" aria-label="Library">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="12.5" rx="3"/><path d="M6 5.2h12M8.5 2.6h7"/></svg></span>
+          <span class="lbl">Library</span>
+        </button>
+      </div>
+
+      <button class="pill" id="search" aria-label="Search">
+        <div class="glass"></div>
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M20 20l-4.4-4.4"/></svg></span>
+        <span class="lbl">Search</span>
+      </button>
+    </nav>
+
+    <div class="sheet-scrim" id="sheetScrim"></div>
+    <div class="sheet" id="sheet" role="dialog" aria-label="Filter"><div class="grab"></div><h3 id="sheetTitle"></h3><div class="opts" id="sheetOpts"></div></div>
+  </div>
+
+  <aside class="panel">
+    <h2>Nav dock prototype</h2>
+    <p>The tab shell gets a dock that folds as you scroll. Pages opened from it, and search, keep working as they do today.</p>
+    <ul>
+      <li><b>Photos:</b> the grouping row sits above the tabs. <b>Scroll down</b> to fold both into one row. <b>Scroll up</b> or tap the circle to unfold.</li>
+      <li><b>Spaces and Library</b> have no grouping row, so their dock folds to the circle and search.</li>
+      <li><b>Spaces, albums and people</b> open over the tabs with today's pill: grouping plus a search button, no tab bar.</li>
+      <li><b>Search</b> is the shipped header: field, People / When / Places / Tags / Filters chips, and the total with sort. On Photos the dock becomes the tab circle and the grouping row, pinned to the bottom. Tapping the field hides the dock, as the keyboard does in the app.</li>
+    </ul>
+    <div class="ctl">
+      <span class="t">Jump to</span>
+      <div class="jumps" id="jumps">
+        <button data-jump="photos">Photos</button>
+        <button data-jump="space">A space</button>
+        <button data-jump="album">An album</button>
+        <button data-jump="person">A person</button>
+        <button data-jump="search">Photos search</button>
+        <button data-jump="spacesearch">Search a space</button>
+      </div>
+    </div>
+    <div class="ctl"><button class="big" id="toggle">Fold into one row</button>
+      <label class="check" for="slow"><input type="checkbox" id="slow"> Slow motion (4×)</label>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const dock = $('#dock'), tabs = $('#tabs'), acc = $('#acc'), search = $('#search'), sel = $('#sel');
+  const screen = $('#screen'), page = $('#page'), phone = $('#phone'), pop = $('#pop'), q = $('#q'), drop = $('#drop');
+  const blankFilters = () => ({ text: '', people: [], when: null, place: null, tags: [], fav: false, video: false });
+  const S = { state: 'expanded', tab: 'photos', stack: [], grouping: 'months', slow: false, view: 'everything', f: blankFilters(), sort: 'newest', sheet: null };
+  const TABS = ['photos', 'spaces', 'library'];
+  const ICON = {
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M20 20l-4.4-4.4"/></svg>',
+    sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="9.5" cy="17" r="2.3"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+    caret: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>',
+    tune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M20 15l-4-4-8.5 8"/></svg>',
+    place: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4L7 20M17 4l-2 16M4 9h16M3 15h16"/></svg>',
+  };
+
+  /* ---------- spring easing as CSS linear() ---------- */
+  function spring(stiffness, damping) {
+    let x = 0, v = 0, t = 0; const dt = 1 / 1000, xs = [];
+    while (t < 3) {
+      v += (-stiffness * (x - 1) - damping * v) * dt; x += v * dt; t += dt; xs.push(x);
+      if (t > 0.15 && Math.abs(x - 1) < 0.0008 && Math.abs(v) < 0.02) break;
+    }
+    const N = 48, pts = [];
+    for (let i = 0; i <= N; i++) pts.push(i === 0 ? 0 : i === N ? 1 : +xs[Math.round((i / N) * (xs.length - 1))].toFixed(4));
+    return { easing: `linear(${pts.join(', ')})`, ms: Math.round(t * 1000) };
+  }
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function applyMotion() {
+    const sp = spring(240, 21);
+    const root = document.documentElement.style;
+    if (CSS.supports('transition-timing-function', 'linear(0, 1)')) root.setProperty('--spring', sp.easing);
+    root.setProperty('--dur', reduced ? '1ms' : `${sp.ms * (S.slow ? 4 : 1)}ms`);
+  }
+
+  /* ---------- data ---------- */
+  function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const hash = (s) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7);
+  const seasonHue = [215, 205, 120, 110, 95, 40, 195, 35, 28, 20, 15, 225];
+  function tileStyle(r, month) {
+    const base = seasonHue[month] + (r() * 50 - 25);
+    const h2 = base + (r() > 0.6 ? 160 : 30) * (r() > 0.5 ? 1 : -1);
+    const s = 35 + r() * 35, l = 32 + r() * 26;
+    return `background:radial-gradient(circle at ${(r() * 100) | 0}% ${(r() * 100) | 0}%,hsl(${h2} ${s + 10}% ${l + 18}%) 0,transparent ${45 + r() * 25}%),` +
+      `linear-gradient(${(r() * 360) | 0}deg,hsl(${base} ${s}% ${l}%),hsl(${base + 20} ${s}% ${Math.max(10, l - 20)}%))`;
+  }
+  const cache = new Map();
+  function timeline(key, monthsBack, minPer, maxPer, keep = 1) {
+    if (cache.has(key)) return cache.get(key);
+    const r = rng(hash(key)), out = [];
+    for (let i = 0; i < monthsBack; i++) {
+      if (r() > keep) continue;
+      const d = new Date(2026, 10 - i, 1);
+      const n = minPer + Math.floor(r() * (maxPer - minPer + 1));
+      out.push({ d, tiles: Array.from({ length: n }, () => ({ style: tileStyle(r, d.getMonth()), video: r() < 0.08 ? `0:${String(5 + Math.floor(r() * 50)).padStart(2, '0')}` : '', fav: r() < 0.12 })) });
+    }
+    cache.set(key, out);
+    return out;
+  }
+  const count = (ms) => ms.reduce((n, m) => n + m.tiles.length, 0);
+  const SPACES = [
+    { id: 'family', name: 'Family', members: ['P', 'L', 'M', 'D', 'N', 'A'], hue: 30 },
+    { id: 'lisbon', name: 'Lisbon road trip', members: ['P', 'L', 'T', 'S'], hue: 200 },
+    { id: 'climb', name: 'Climbing crew', members: ['P', 'J', 'K', 'R', 'E', 'O', 'B', 'C', 'F'], hue: 140 },
+    { id: 'grandma', name: 'Grandma’s albums', members: ['P', 'M', 'G'], hue: 20 },
+  ];
+  const PEOPLE = [
+    { id: 'lea', name: 'Lea', hue: 340 }, { id: 'max', name: 'Max', hue: 210 }, { id: 'mum', name: 'Mum', hue: 25 },
+    { id: 'noah', name: 'Noah', hue: 160 }, { id: 'biscuit', name: 'Biscuit', hue: 40 }, { id: 'dad', name: 'Dad', hue: 260 },
+  ];
+  const ALBUMS = [
+    { id: 'porto', name: 'Summer in Porto', hue: 35, shared: 3 }, { id: 'snow', name: 'Snow days', hue: 205, shared: 0 },
+    { id: 'kitchen', name: 'Kitchen renovation', hue: 20, shared: 1 }, { id: 'best25', name: 'Best of 2025', hue: 300, shared: 5 },
+  ];
+  const PLACES = ['Lisbon', 'Porto', 'Berlin', 'Chamonix', 'Paris', 'Hamburg'];
+  const TAGS = ['hiking', 'family', 'food', 'sunset', 'birthday'];
+  const find = (arr, id) => arr.find((x) => x.id === id);
+  const hueBg = (h) => `background:radial-gradient(circle at 70% 30%,hsl(${h + 40} 70% 65%) 0,transparent 55%),linear-gradient(140deg,hsl(${h} 55% 45%),hsl(${h + 30} 50% 22%))`;
+
+  /* ---------- routes ---------- */
+  const route = () => S.stack[S.stack.length - 1] || { type: 'root', tab: S.tab };
+  const isDetail = () => S.stack.length > 0;
+  const showsPhotos = (r) => r.type !== 'root' || r.tab === 'photos';
+  function scopeOf(r) {
+    switch (r.type) {
+      case 'space': { const s = find(SPACES, r.id); return { hint: `Search in ${s.name}`, key: 'space:' + r.id }; }
+      case 'album': { const a = find(ALBUMS, r.id); return { hint: `Search in ${a.name}`, key: 'album:' + r.id }; }
+      case 'person': { const p = find(PEOPLE, r.id); return { hint: `Search ${p.name}'s photos`, key: 'person:' + r.id, fixedPerson: true }; }
+      case 'favorites': return { hint: 'Search favorites', key: 'fav' };
+      default: return { hint: 'Search, @person, #tag, place', key: 'all' };
+    }
+  }
+  function photosOf(r) {
+    switch (r.type) {
+      case 'space': return timeline('space:' + r.id, 30, 3, 14, 0.7);
+      case 'album': return timeline('album:' + r.id, 14, 4, 18, 0.35);
+      case 'person': return timeline('person:' + r.id, 34, 1, 9, 0.75);
+      case 'favorites': return timeline('fav', 34, 1, 5, 0.6);
+      default: return timeline('all', 34, 4, 23);
+    }
+  }
+
+  /* ---------- search model ---------- */
+  const extraCount = () => (S.f.fav ? 1 : 0) + (S.f.video ? 1 : 0);
+  const activeCount = () => (S.f.text ? 1 : 0) + (S.f.people.length ? 1 : 0) + (S.f.when ? 1 : 0) + (S.f.place ? 1 : 0) + (S.f.tags.length ? 1 : 0) + extraCount();
+  function searchMonths() {
+    const r = route(), base = photosOf(r);
+    let ms = base;
+    if (activeCount()) {
+      const rr = rng(hash(JSON.stringify(S.f) + scopeOf(r).key));
+      let p = 1;
+      if (S.f.text) p *= 0.3;
+      if (S.f.people.length) p *= 0.4;
+      if (S.f.place) p *= 0.3;
+      if (S.f.tags.length) p *= 0.45;
+      ms = base
+        .filter((m) => !S.f.when || m.d.getFullYear() === S.f.when)
+        .map((m) => ({ d: m.d, tiles: m.tiles.filter((t) => (!S.f.fav || t.fav) && (!S.f.video || t.video) && rr() < p) }))
+        .filter((m) => m.tiles.length);
+    }
+    if (S.sort === 'oldest') ms = ms.slice().reverse().map((m) => ({ d: m.d, tiles: m.tiles.slice().reverse() }));
+    return ms;
+  }
+
+  /* ---------- rendering ---------- */
+  const tileHTML = (t) => `<div class="tile" style="${t.style}">${t.video ? `<span class="dur">${t.video}</span>` : ''}</div>`;
+  const fmtMonth = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' });
+  const n = (x) => x.toLocaleString('en');
+  const fmtShort = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+  const range = (ms) => ms.length ? `${fmtShort.format(ms[ms.length - 1].d)} – ${fmtShort.format(ms[0].d)}` : '';
+
+  function renderTimeline(ms) {
+    if (!ms.length) return `<div class="empty">No photos match these filters.</div>`;
+    if (S.grouping === 'months') return ms.map((m) => `<div class="grp-h"><b>${fmtMonth.format(m.d)}</b><span>${m.tiles.length} items</span></div><div class="grid">${m.tiles.map(tileHTML).join('')}</div>`).join('');
+    if (S.grouping === 'years') {
+      const ys = new Map();
+      ms.forEach((m) => { const y = m.d.getFullYear(); ys.set(y, (ys.get(y) || []).concat(m.tiles)); });
+      return [...ys].map(([y, ts]) => `<div class="grp-h year"><b>${y}</b><span>${n(ts.length)} items</span></div><div class="grid">${ts.map(tileHTML).join('')}</div>`).join('');
+    }
+    return `<div class="grid all">${ms.flatMap((m) => m.tiles).map(tileHTML).join('')}</div>`;
+  }
+  const back = (label) => `<button class="back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>${label}</button>`;
+  const head = (title, sub, extra = '', right = '', after = '') => `<header class="apphead">${extra}<div class="row"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${right}</div>${after}</header>`;
+  const memberStack = (ms) => `<div class="members"><div class="stack">${ms.slice(0, 5).map((m, i) => `<span style="background:hsl(${i * 67 + 10} 45% 42%)">${m}</span>`).join('')}</div>${ms.length} members</div>`;
+
+  function renderPage() {
+    if (S.state === 'search') return renderTimeline(searchMonths());
+    const r = route();
+    const parentLabel = { photos: 'Photos', spaces: 'Spaces', library: 'Library' }[S.tab];
+    switch (r.type) {
+      case 'root':
+        if (r.tab === 'photos') { const ms = photosOf(r); return head('Photos', `${n(count(ms))} items · ${range(ms)}`, '', '<div class="avatar" aria-hidden="true">P</div>') + renderTimeline(ms); }
+        if (r.tab === 'spaces') return head('Spaces', `${SPACES.length} spaces`) + `<div class="spaces">${SPACES.map((s) => `<button class="space-card" data-go="space:${s.id}"><div class="cover" style="${hueBg(s.hue)}"></div><div class="meta"><b>${s.name}</b><span>${s.members.length} members · ${n(count(photosOf({ type: 'space', id: s.id })))} photos</span></div></button>`).join('')}</div>`;
+        return head('Library', '') +
+          `<h2 class="sec">People</h2><div class="hrow">${PEOPLE.map((p) => `<button class="person" data-go="person:${p.id}"><div class="face" style="${hueBg(p.hue)}">${p.name[0]}</div>${p.name}</button>`).join('')}</div>` +
+          `<h2 class="sec">Albums</h2><div class="albums">${ALBUMS.map((a) => `<button data-go="album:${a.id}"><div class="cv" style="${hueBg(a.hue)}"></div>${a.name}<span>${n(count(photosOf({ type: 'album', id: a.id })))} items</span></button>`).join('')}</div>` +
+          `<div class="list"><button data-go="favorites:x">Favorites <span>${n(count(photosOf({ type: 'favorites' })))}</span></button><div>Places <span>148</span></div><div>Archive <span>62</span></div><div>Trash <span>9</span></div></div>`;
+      case 'space': {
+        const s = find(SPACES, r.id), ms = photosOf(r);
+        return head(s.name, `${n(count(ms))} items · ${range(ms)}`, back(parentLabel), '', memberStack(s.members)) +
+          `<h2 class="sec">Albums in this space</h2><div class="hrow">${ALBUMS.slice(0, 3).map((a) => `<button class="albumthumb" data-go="album:${a.id}"><div class="cv" style="${hueBg(a.hue + 15)}"></div>${a.name}<span>${n(count(photosOf({ type: 'album', id: a.id })))} items</span></button>`).join('')}</div>` +
+          renderTimeline(ms);
+      }
+      case 'album': { const a = find(ALBUMS, r.id), ms = photosOf(r); return head(a.name, `${n(count(ms))} items${a.shared ? ` · shared with ${a.shared}` : ''}`, back(S.stack.length > 1 ? 'Back' : parentLabel)) + renderTimeline(ms); }
+      case 'person': {
+        const p = find(PEOPLE, r.id), ms = photosOf(r);
+        return head(p.name, `${n(count(ms))} items · ${range(ms)}`, back(parentLabel) + `<div class="avatar xl" style="${hueBg(p.hue)}">${p.name[0]}</div>`) + renderTimeline(ms);
+      }
+      case 'favorites': { const ms = photosOf(r); return head('Favorites', `${n(count(ms))} items`, back(parentLabel)) + renderTimeline(ms); }
+    }
+  }
+  function render(anim) {
+    page.innerHTML = renderPage();
+    if (S.state === 'search') renderSearchHeader();
+    if (anim && !reduced) {
+      const from = anim === 'push' ? 'translateX(40px)' : anim === 'pop' ? 'translateX(-40px)' : 'translateY(10px)';
+      page.animate([{ transform: from, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 340, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+  }
+
+  /* ---------- search header (as shipped) ---------- */
+  function chip(key, label, on, opts = {}) {
+    if (opts.plain) return `<button class="chip plain" data-chip="${key}">${label}</button>`;
+    if (opts.lead) return `<button class="chip lead${on ? ' on' : ''}" data-chip="${key}">${opts.lead}${label}${opts.badge ? `<span class="badge">${opts.badge}</span>` : ''}</button>`;
+    return `<button class="chip${on ? ' on' : ''}" data-chip="${key}">${label}${ICON.caret}</button>`;
+  }
+  function renderSearchHeader() {
+    const sc = scopeOf(route());
+    q.placeholder = sc.hint;
+    $('#lead').innerHTML = S.f.text ? `<span class="token">${ICON.search}<span>${S.f.text}</span><button data-untoken aria-label="Remove search">${ICON.x}</button></span>` : ICON.search;
+    $('#lead').style.display = 'contents';
+    $('#lead').querySelector('svg').style.cssText = S.f.text ? '' : 'width:20px;height:20px;color:var(--muted);flex:none;margin:0 2px';
+    const people = S.f.people.map((id) => find(PEOPLE, id).name);
+    const chips = [
+      sc.fixedPerson ? '' : chip('people', people.length ? people.join(', ') : 'People', people.length > 0),
+      chip('when', S.f.when ? String(S.f.when) : 'When', !!S.f.when),
+      chip('places', S.f.place || 'Places', !!S.f.place),
+      chip('tags', S.f.tags.length ? S.f.tags.map((t) => '#' + t).join(' ') : 'Tags', S.f.tags.length > 0),
+      chip('filters', 'Filters', extraCount() > 0, { lead: ICON.tune, badge: extraCount() || 0 }),
+      activeCount() >= 2 ? chip('clear', 'Clear all', false, { plain: true }) : '',
+    ];
+    $('#chiprow').innerHTML = chips.join('');
+    const total = count(searchMonths());
+    $('#total').textContent = activeCount() ? `${n(total)} ${total === 1 ? 'match' : 'matches'}` : `${n(total)} photos and videos`;
+    $('#sortLbl').textContent = S.sort === 'newest' ? 'Newest first' : 'Oldest first';
+  }
+  function applySearch() { render(); screen.scrollTop = 0; lastY = 0; }
+
+  function renderDrop() {
+    const t = q.value.trim().toLowerCase();
+    if (!t || document.activeElement !== q) { drop.hidden = true; return; }
+    const ppl = PEOPLE.filter((p) => p.name.toLowerCase().startsWith(t.replace(/^@/, '')));
+    const pls = PLACES.filter((p) => p.toLowerCase().startsWith(t));
+    const tgs = TAGS.filter((x) => x.startsWith(t.replace(/^#/, '')));
+    let h = '';
+    if (ppl.length && !scopeOf(route()).fixedPerson) h += `<h5>People</h5>` + ppl.map((p) => `<button data-sug="person:${p.id}"><span class="ic" style="${hueBg(p.hue)}">${p.name[0]}</span>${p.name}</button>`).join('');
+    if (tgs.length) h += `<h5>Tags</h5>` + tgs.map((x) => `<button data-sug="tag:${x}"><span class="ic">${ICON.tag}</span>#${x}</button>`).join('');
+    if (pls.length) h += `<h5>Places</h5>` + pls.map((p) => `<button data-sug="place:${p}"><span class="ic">${ICON.place}</span>${p}</button>`).join('');
+    // The typed text is escaped: it lands in innerHTML and a data attribute.
+    const typed = q.value.trim().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    h += `<h5>Photos</h5><button data-sug="text:${typed}"><span class="ic">${ICON.image}</span><span>Photos of “${typed}”<small>Smart search</small></span></button>`;
+    drop.innerHTML = h; drop.hidden = false;
+  }
+  function submitText(text) {
+    text = text.trim(); if (!text) return;
+    S.f.text = text; q.value = ''; q.blur(); drop.hidden = true; applySearch();
+  }
+
+  /* chip sheets */
+  function openSheet(kind) {
+    S.sheet = kind;
+    const title = { people: 'People', when: 'When', places: 'Places', tags: 'Tags', filters: 'Filters' }[kind];
+    $('#sheetTitle').textContent = title;
+    const row = (val, label, on, lead = '') => `<button data-opt="${val}" class="${on ? 'on' : ''}"><span class="lead">${lead}${label}</span><span class="ck">${ICON.check}</span></button>`;
+    let h = '';
+    if (kind === 'people') h = PEOPLE.map((p) => row(p.id, p.name, S.f.people.includes(p.id), `<span class="face" style="${hueBg(p.hue)}">${p.name[0]}</span>`)).join('');
+    if (kind === 'when') h = [2026, 2025, 2024].map((y) => row(y, String(y), S.f.when === y)).join('');
+    if (kind === 'places') h = PLACES.map((p) => row(p, p, S.f.place === p)).join('');
+    if (kind === 'tags') h = TAGS.map((x) => row(x, '#' + x, S.f.tags.includes(x))).join('');
+    if (kind === 'filters') h = row('fav', 'Favorites', S.f.fav) + row('video', 'Videos only', S.f.video);
+    $('#sheetOpts').innerHTML = h;
+    phone.classList.add('sheet-open');
+  }
+  function closeSheet() { S.sheet = null; phone.classList.remove('sheet-open'); }
+  $('#sheetOpts').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-opt]'); if (!b) return;
+    const v = b.dataset.opt, k = S.sheet;
+    const toggle = (arr, x) => (arr.includes(x) ? arr.filter((y) => y !== x) : [...arr, x]);
+    if (k === 'people') S.f.people = toggle(S.f.people, v);
+    if (k === 'when') S.f.when = S.f.when === +v ? null : +v;
+    if (k === 'places') S.f.place = S.f.place === v ? null : v;
+    if (k === 'tags') S.f.tags = toggle(S.f.tags, v);
+    if (k === 'filters') S.f[v] = !S.f[v];
+    openSheet(k); applySearch();
+  });
+  $('#sheetScrim').addEventListener('click', closeSheet);
+
+  $('#chiprow').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-chip]'); if (!c) return;
+    if (c.dataset.chip === 'clear') { S.f = blankFilters(); applySearch(); return; }
+    openSheet(c.dataset.chip);
+  });
+  $('#field').addEventListener('click', (e) => { if (e.target.closest('[data-untoken]')) { S.f.text = ''; applySearch(); } });
+  q.addEventListener('input', () => { $('#qClear').hidden = !q.value; renderDrop(); });
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitText(q.value); });
+  q.addEventListener('focus', () => { dock.classList.add('kbd'); renderDrop(); });
+  q.addEventListener('blur', () => { setTimeout(() => { dock.classList.remove('kbd'); renderDrop(); }, 150); });
+  $('#qClear').addEventListener('click', () => { q.value = ''; $('#qClear').hidden = true; q.focus(); renderDrop(); });
+  drop.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-sug]'); if (!b) return;
+    e.preventDefault();
+    const [k, v] = b.dataset.sug.split(/:(.*)/s);
+    if (k === 'text') { submitText(v); return; }
+    if (k === 'person' && !S.f.people.includes(v)) S.f.people.push(v);
+    if (k === 'place') S.f.place = v;
+    if (k === 'tag' && !S.f.tags.includes(v)) S.f.tags.push(v);
+    q.value = ''; q.blur(); drop.hidden = true; applySearch();
+  });
+  $('#sort').addEventListener('click', () => { S.sort = S.sort === 'newest' ? 'oldest' : 'newest'; applySearch(); });
+  $('#sBack').addEventListener('click', () => leaveSearch());
+
+  /* ---------- dock geometry ---------- */
+  const C = 56, GAP = 10, TAB_H = 64, ACC_H = 52, PILL_W = 282;
+  function place(el, b) {
+    el.style.left = b.x + 'px'; el.style.bottom = b.b + 'px';
+    el.style.width = b.w + 'px'; el.style.height = b.h + 'px'; el.style.borderRadius = b.h / 2 + 'px';
+  }
+  function layout() {
+    const W = dock.clientWidth, st = S.state, slot = W / 4, detail = isDetail();
+    let tb, ab, sb, accOn, tabsOn = true, searchOn = true;
+    if (detail) {
+      // Pages over the shell keep today's pill: grouping plus a search button, no tab bar.
+      const pw = Math.min(W, PILL_W), x = (W - pw) / 2;
+      tb = { x, b: 0, w: C, h: C }; sb = { x: x + pw - C, b: 0, w: C, h: C };
+      ab = { x, b: 0, w: pw, h: C };
+      accOn = true; tabsOn = false; searchOn = false;
+    } else if (st === 'expanded') {
+      accOn = showsPhotos(route());
+      tb = { x: 0, b: 0, w: W, h: TAB_H };
+      ab = { x: 0, b: TAB_H + GAP, w: W, h: ACC_H };
+      sb = { x: 3 * slot, b: 0, w: slot, h: TAB_H };
+    } else if (st === 'collapsed') {
+      accOn = showsPhotos(route());
+      tb = { x: 0, b: 0, w: C, h: C };
+      ab = { x: C + GAP, b: 0, w: W - 2 * (C + GAP), h: C };
+      sb = { x: W - C, b: 0, w: C, h: C };
+    } else {
+      // Photos search: tab circle plus the grouping row, pinned to the bottom. The field lives in the top header.
+      accOn = true; searchOn = false;
+      tb = { x: 0, b: 0, w: C, h: C };
+      ab = { x: C + GAP, b: 0, w: W - C - GAP, h: C };
+      sb = { x: W - C, b: 0, w: C, h: C };
+    }
+    place(tabs, tb); place(acc, ab); place(search, sb);
+    tabs.classList.toggle('gone', !tabsOn);
+    search.classList.toggle('gone', !searchOn);
+    search.querySelector('.glass').style.opacity = st === 'expanded' && !detail ? 0 : 1;
+    acc.classList.toggle('hidden', !accOn);
+    if (!accOn) closePop();
+
+    // The pill's trailing button: display options on Photos, search on pages over the shell (hidden while searching).
+    const opt = $('#optBtn');
+    const want = detail ? 'search' : 'sliders';
+    if (opt.dataset.icon !== want) { opt.innerHTML = ICON[want]; opt.dataset.icon = want; opt.setAttribute('aria-label', detail ? 'Search' : 'Display options'); }
+
+    const active = TABS.indexOf(S.tab);
+    tabs.querySelectorAll('.tab').forEach((t, i) => {
+      if (st === 'expanded' && !detail) { t.style.left = i * slot + 'px'; t.style.width = slot + 'px'; t.style.height = TAB_H + 'px'; }
+      else { t.style.left = '0px'; t.style.width = C + 'px'; t.style.height = C + 'px'; }
+      t.classList.toggle('active', i === active);
+    });
+    if (st === 'expanded') Object.assign(sel.style, { left: active * slot + 4 + 'px', top: '4px', width: slot - 8 + 'px', height: TAB_H - 8 + 'px' });
+    else Object.assign(sel.style, { left: '4px', top: '4px', width: C - 8 + 'px', height: C - 8 + 'px' });
+
+    $('#segThumb').style.left = `calc(${['years', 'months', 'all'].indexOf(S.grouping)} * 100% / 3)`;
+    $('#toggle').textContent = st === 'collapsed' ? 'Unfold into two rows' : 'Fold into one row';
+    $('#toggle').disabled = detail || st === 'search';
+    $('#toggle').style.opacity = $('#toggle').disabled ? 0.4 : 1;
+  }
+
+  function setState(next) {
+    if (S.state === next) return;
+    S.state = next;
+    // On a detail page the search state keeps the pill's shape; only the shell's dock morphs.
+    dock.dataset.state = next === 'search' && isDetail() ? 'detailsearch' : next;
+    if (next !== 'expanded') closePop();
+    layout();
+  }
+  function enterSearch() {
+    if (!isDetail() && S.tab !== 'photos') { S.tab = 'photos'; S.stack = []; }
+    S.f = blankFilters(); S.sort = 'newest'; q.value = ''; $('#qClear').hidden = true;
+    phone.classList.add('searching');
+    setState('search');
+    render('fade'); screen.scrollTop = 0; lastY = 0;
+  }
+  function leaveSearch() {
+    if (S.state !== 'search') return;
+    q.blur(); drop.hidden = true; closeSheet(); dock.classList.remove('kbd');
+    phone.classList.remove('searching');
+    S.state = 'expanded'; dock.dataset.state = 'expanded';
+    render('fade'); screen.scrollTop = 0; lastY = 0; layout();
+  }
+
+  /* ---------- navigation ---------- */
+  function leaveIfSearch() { if (phone.classList.contains('searching')) leaveSearch(); else S.state = 'expanded'; }
+  function go(r) { leaveIfSearch(); S.stack.push(r); render('push'); screen.scrollTop = 0; lastY = 0; dock.dataset.state = 'expanded'; layout(); }
+  function popRoute() { leaveIfSearch(); S.stack.pop(); render('pop'); screen.scrollTop = 0; lastY = 0; dock.dataset.state = 'expanded'; layout(); }
+  function switchTab(t) { S.tab = t; S.stack = []; closePop(); render('fade'); screen.scrollTop = 0; lastY = 0; S.state = 'expanded'; dock.dataset.state = 'expanded'; layout(); }
+
+  page.addEventListener('click', (e) => {
+    if (e.target.closest('[data-back]')) { popRoute(); return; }
+    const g = e.target.closest('[data-go]'); if (!g) return;
+    const [type, id] = g.dataset.go.split(':');
+    go({ type, id });
+  });
+  tabs.addEventListener('click', (e) => {
+    if (S.state === 'search') { leaveSearch(); return; }
+    if (S.state === 'collapsed') { setState('expanded'); return; }
+    const t = e.target.closest('.tab'); if (!t) return;
+    if (t.dataset.tab !== S.tab) { switchTab(t.dataset.tab); return; }
+    screen.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  search.addEventListener('click', () => { if (S.state !== 'search') enterSearch(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (S.sheet) closeSheet(); else if (S.state === 'search') leaveSearch();
+    closePop();
+  });
+
+  $('#seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.dataset.g === S.grouping) return;
+    S.grouping = b.dataset.g;
+    $('#seg').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+    layout();
+    const y = screen.scrollTop; render('fade'); screen.scrollTop = Math.min(y, screen.scrollHeight);
+  });
+
+  function closePop() { pop.classList.add('closed'); $('#optBtn').classList.remove('on'); }
+  $('#optBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isDetail()) { if (S.state !== 'search') enterSearch(); return; }
+    const open = pop.classList.contains('closed');
+    if (open) pop.style.bottom = parseFloat(getComputedStyle(dock).bottom) + parseFloat(acc.style.bottom) + parseFloat(acc.style.height) + 10 + 'px';
+    pop.classList.toggle('closed', !open); $('#optBtn').classList.toggle('on', open);
+  });
+  pop.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-view]'); if (!b) return;
+    S.view = b.dataset.view;
+    pop.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    setTimeout(closePop, 180);
+  });
+  phone.addEventListener('click', (e) => { if (!pop.contains(e.target) && !e.target.closest('#optBtn')) closePop(); });
+
+  // Scroll direction folds the shell's dock: down past a short run folds it, up or the top unfolds it.
+  let lastY = 0, run = 0;
+  screen.addEventListener('scroll', () => {
+    const y = screen.scrollTop, dy = y - lastY; lastY = y;
+    if (isDetail() || S.state === 'search') return;
+    let dir = null;
+    if (y < 30) { run = 0; dir = 'up'; }
+    else if (y + screen.clientHeight >= screen.scrollHeight - 4) return;
+    else {
+      if (Math.sign(dy) !== Math.sign(run)) run = 0;
+      run += dy;
+      if (run > 24) dir = 'down'; else if (run < -24) dir = 'up';
+    }
+    if (dir) setState(dir === 'down' ? 'collapsed' : 'expanded');
+  }, { passive: true });
+
+  $('#toggle').addEventListener('click', () => { if (!isDetail() && S.state !== 'search') setState(S.state === 'expanded' ? 'collapsed' : 'expanded'); });
+  $('#slow').addEventListener('change', (e) => { S.slow = e.target.checked; applyMotion(); });
+  $('#jumps').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    leaveIfSearch(); closeSheet();
+    const j = b.dataset.jump;
+    S.tab = { photos: 'photos', space: 'spaces', spacesearch: 'spaces', album: 'library', person: 'library', search: 'photos' }[j];
+    S.stack = [];
+    if (j === 'space' || j === 'spacesearch') S.stack.push({ type: 'space', id: 'family' });
+    if (j === 'album') S.stack.push({ type: 'album', id: 'porto' });
+    if (j === 'person') S.stack.push({ type: 'person', id: 'lea' });
+    S.state = 'expanded'; dock.dataset.state = 'expanded';
+    render(S.stack.length ? 'push' : 'fade'); screen.scrollTop = 0; lastY = 0; layout();
+    if (j === 'search' || j === 'spacesearch') {
+      enterSearch();
+      if (j === 'search') { S.f.people = ['lea']; S.f.text = 'beach'; } else { S.f.when = 2025; }
+      applySearch();
+    }
+  });
+
+  /* ---------- boot ---------- */
+  applyMotion();
+  render();
+  dock.classList.add('no-anim');
+  layout();
+  requestAnimationFrame(() => requestAnimationFrame(() => dock.classList.remove('no-anim')));
+  new ResizeObserver(() => { dock.classList.add('no-anim'); layout(); requestAnimationFrame(() => dock.classList.remove('no-anim')); }).observe(dock);
+})();
+</script>

@@ -5,11 +5,11 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
@@ -60,7 +60,7 @@ class _FakeRemoteAlbumNotifier extends RemoteAlbumNotifier {
   }
 }
 
-/// Default portrait MediaQueryData (400x900) so tests exercise the pill branch.
+/// Default portrait MediaQueryData (400x900) so tests exercise the dock branch.
 /// Tests that need landscape or other viewInsets pass their own `mq`.
 const _portraitMq = MediaQueryData(size: Size(400, 900));
 
@@ -99,12 +99,13 @@ Widget _wrap(Widget child, {List<Override> overrides = const [], MediaQueryData?
 }
 
 void main() {
-  testWidgets('portrait: pill + blob both rendered', (tester) async {
+  testWidgets('portrait: the dock renders its tab bar and search slot', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router))));
     await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsOneWidget);
-    expect(find.byType(GallerySearchBlob), findsOneWidget);
+    expect(find.byType(GalleryDock), findsOneWidget);
+    expect(find.byKey(const Key('gallery-dock-tabs')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-dock-search')), findsOneWidget);
   });
 
   testWidgets('multi-select event hides nav (opacity→0)', (tester) async {
@@ -199,14 +200,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsNothing);
+    expect(find.byType(GalleryDock), findsNothing);
     expect(find.byKey(const Key('gallery-bottom-nav-rail')), findsOneWidget);
     final rail = tester.widget<NavigationRail>(find.byKey(const Key('gallery-bottom-nav-rail')));
     expect(rail.destinations, hasLength(3));
     expect(find.byKey(const Key('gallery-bottom-nav-rail-search')), findsOneWidget);
   });
 
-  testWidgets('readonly: blob disabled, pill dims Albums+Library, Photos enabled', (tester) async {
+  testWidgets('readonly: search disabled, the dock dims Albums+Library, Photos enabled', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
       localizedForTest(
@@ -218,12 +219,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
-    expect(pill.disabledTabs, containsAll({GalleryTabEnum.albums, GalleryTabEnum.library}));
-    expect(pill.disabledTabs.contains(GalleryTabEnum.photos), isFalse);
-
-    final blob = tester.widget<GallerySearchBlob>(find.byType(GallerySearchBlob));
-    expect(blob.enabled, isFalse);
+    final dock = tester.widget<GalleryDock>(find.byType(GalleryDock));
+    expect(dock.disabledTabs, containsAll({GalleryTabEnum.albums, GalleryTabEnum.library}));
+    expect(dock.disabledTabs.contains(GalleryTabEnum.photos), isFalse);
+    expect(dock.searchEnabled, isFalse);
   });
 
   testWidgets('publishes height to bottomNavHeightProvider when shown', (tester) async {
@@ -254,46 +253,52 @@ void main() {
     expect(container.read(bottomNavHeightProvider), greaterThan(0));
   });
 
-  testWidgets('iPhone safe area uses one bottom inset instead of stacking float and safe area', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(430, 932);
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    });
+  // iOS: 34 safe area less 14, down inside the home-indicator area as iOS's own tab bar sits. Android: above the safe
+  // area, out of the zone where a swipe up is the system's home gesture.
+  for (final (platform, float) in [(TargetPlatform.iOS, 20.0), (TargetPlatform.android, 34.0)]) {
+    testWidgets('${platform.name}: the dock floats $float above the bottom with a 34 safe area', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
 
-    final router = FakeTabsRouter();
-    final container = ProviderContainer(
-      overrides: [
-        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
-        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
-        ..._navOverrides(showSpaces: false),
-      ],
-    );
-    addTearDown(container.dispose);
+      final router = FakeTabsRouter();
+      final container = ProviderContainer(
+        overrides: [
+          readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+          hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+          ..._navOverrides(showSpaces: false),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      localizedForTest(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            home: MediaQuery(
-              data: const MediaQueryData(
-                size: Size(430, 932),
-                padding: EdgeInsets.only(bottom: 34),
-                textScaler: TextScaler.linear(0.45),
+      await tester.pumpWidget(
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: ThemeData(platform: platform),
+              home: MediaQuery(
+                data: const MediaQueryData(
+                  size: Size(430, 932),
+                  padding: EdgeInsets.only(bottom: 34),
+                  textScaler: TextScaler.linear(0.45),
+                ),
+                child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
               ),
-              child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(container.read(bottomNavHeightProvider), 86);
-    expect(tester.getRect(find.byType(GalleryNavPill)).bottom, 932 - 34);
-  });
+      // Photos: the float plus the dock's unfolded height (tab bar, gap, grouping row).
+      expect(container.read(bottomNavHeightProvider), float + GalleryDock.reservedHeight(showGrouping: true));
+      expect(tester.getRect(find.byKey(const Key('gallery-dock-tabs'))).bottom, 932 - float);
+    });
+  }
 
   testWidgets('narrow phone: the whole cluster stays inside the screen (#909)', (tester) async {
     tester.view.devicePixelRatio = 1;
@@ -314,15 +319,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final pill = tester.getRect(find.byType(GalleryNavPill));
-    final blob = tester.getRect(find.byType(GallerySearchBlob));
+    final tabs = tester.getRect(find.byKey(const Key('gallery-dock-tabs')));
+    final search = tester.getRect(find.byKey(const Key('gallery-dock-search')));
 
-    expect(pill.left, greaterThanOrEqualTo(0), reason: 'pill must not run off the left edge');
-    expect(blob.right, lessThanOrEqualTo(360), reason: 'search blob must not run off the right edge');
-    expect(pill.right, lessThanOrEqualTo(blob.left), reason: 'pill must not overlap the search blob');
+    expect(tabs.left, greaterThanOrEqualTo(0), reason: 'the tab bar must not run off the left edge');
+    expect(tabs.right, lessThanOrEqualTo(360), reason: 'the tab bar must not run off the right edge');
+    expect(search.right, lessThanOrEqualTo(tabs.right), reason: 'search keeps its slot inside the bar');
+    expect(tester.takeException(), isNull, reason: 'long labels shrink instead of overflowing');
   });
 
-  testWidgets('roomy screen: pill stays content-sized and the cluster stays centred', (tester) async {
+  testWidgets('roomy screen: the dock spans the width between the side gutters', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1024, 800);
     addTearDown(() {
@@ -335,22 +341,54 @@ void main() {
       localizedForTest(
         _wrap(
           GalleryBottomNav(tabsRouter: router),
-          // Portrait MediaQuery so the pill branch is exercised, not the rail.
+          // Portrait MediaQuery so the dock branch is exercised, not the rail.
           mq: const MediaQueryData(size: Size(1024, 1400)),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    final pill = tester.getRect(find.byType(GalleryNavPill));
-    final blob = tester.getRect(find.byType(GallerySearchBlob));
+    final tabs = tester.getRect(find.byKey(const Key('gallery-dock-tabs')));
+    expect(tabs.left, GalleryDockStyle.sideInset);
+    expect(tabs.right, 1024 - GalleryDockStyle.sideInset);
+  });
 
-    expect(pill.width, lessThan(1024 - 28 - 12 - 50), reason: 'pill must hug its tabs, not stretch to the free width');
-    expect(
-      (pill.left - (1024 - blob.right)).abs(),
-      lessThan(0.5),
-      reason: 'the pill+blob cluster stays centred: equal gaps either side',
+  testWidgets('Photos search keeps the dock: the tab circle and the grouping row on the bottom edge', (tester) async {
+    final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
+    final container = ProviderContainer(
+      overrides: [
+        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: false),
+      ],
     );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: _portraitMq,
+              child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    container.read(searchModeProvider.notifier).enter();
+    await tester.pumpAndSettle();
+
+    final dock = tester.widget<GalleryDock>(find.byType(GalleryDock));
+    expect(dock.mode, GalleryDockMode.search);
+    final opacity = tester.widget<AnimatedOpacity>(find.byKey(const Key('gallery-bottom-nav-opacity')));
+    expect(opacity.opacity, 1, reason: 'search mode no longer hides the nav');
+    final tabs = tester.getRect(find.byKey(const Key('gallery-dock-tabs')));
+    final grouping = tester.getRect(find.byKey(const Key('gallery-dock-grouping')));
+    expect(grouping.bottom, tabs.bottom);
+    expect(grouping.left, greaterThan(tabs.right));
   });
 
   testWidgets('narrow phone: the search blob is still tappable (#909)', (tester) async {
@@ -386,7 +424,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(GallerySearchBlob));
+    await tester.tap(find.byKey(const Key('gallery-dock-search')));
     await tester.pumpAndSettle();
 
     expect(container.read(searchModeProvider), isTrue);
@@ -491,29 +529,29 @@ void main() {
     expect(rail.destinations[slots.indexOf(GalleryTabEnum.library)].disabled, isTrue);
   });
 
-  testWidgets('with Spaces on, the pill renders a Spaces segment and no Albums segment', (tester) async {
+  testWidgets('with Spaces on, the dock renders a Spaces tab and no Albums tab', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
       localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: true))),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('gallery-nav-segment-spaces')), findsOneWidget);
-    expect(find.byKey(const Key('gallery-nav-segment-albums')), findsNothing);
+    expect(find.byKey(const Key('gallery-dock-tab-spaces')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-dock-tab-albums')), findsNothing);
   });
 
-  testWidgets('with Spaces off, the pill renders an Albums segment and no Spaces segment', (tester) async {
+  testWidgets('with Spaces off, the dock renders an Albums tab and no Spaces tab', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
       localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: false))),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('gallery-nav-segment-albums')), findsOneWidget);
-    expect(find.byKey(const Key('gallery-nav-segment-spaces')), findsNothing);
+    expect(find.byKey(const Key('gallery-dock-tab-albums')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-dock-tab-spaces')), findsNothing);
   });
 
-  testWidgets('tapping the Spaces segment activates slot 1 and does not refresh albums', (tester) async {
+  testWidgets('tapping the Spaces tab activates slot 1 and does not refresh albums', (tester) async {
     final router = FakeTabsRouter();
     final albums = _FakeRemoteAlbumNotifier();
 
@@ -527,14 +565,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('gallery-nav-segment-spaces')));
+    await tester.tap(find.byKey(const Key('gallery-dock-tab-spaces')));
     await tester.pumpAndSettle();
 
     expect(router.setCalls, [1]);
     expect(albums.refreshCalls, 0, reason: 'the albums tab is not on screen');
   });
 
-  testWidgets('tapping the Spaces segment refreshes the spaces list', (tester) async {
+  testWidgets('tapping the Spaces tab refreshes the spaces list', (tester) async {
     // The Spaces mirror of 'tapping Albums refreshes the existing album
     // provider'. Without it, dropping the invalidation back to a bare `break;`
     // leaves the whole nav suite green.
@@ -574,13 +612,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(spacesBuilds, 1, reason: 'built once for the listener');
 
-    await tester.tap(find.byKey(const Key('gallery-nav-segment-spaces')));
+    await tester.tap(find.byKey(const Key('gallery-dock-tab-spaces')));
     await tester.pumpAndSettle();
 
     expect(spacesBuilds, 2, reason: 'the tap invalidates sharedSpacesProvider, which rebuilds for its listener');
   });
 
-  testWidgets('tapping the Albums segment still refreshes albums', (tester) async {
+  testWidgets('tapping the Albums tab still refreshes albums', (tester) async {
     final router = FakeTabsRouter();
     final albums = _FakeRemoteAlbumNotifier();
 
@@ -594,7 +632,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('gallery-nav-segment-albums')));
+    await tester.tap(find.byKey(const Key('gallery-dock-tab-albums')));
     await tester.pumpAndSettle();
 
     expect(router.setCalls, [1]);
@@ -614,8 +652,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
-    expect(pill.disabledTabs, {GalleryTabEnum.spaces, GalleryTabEnum.library});
+    final dock = tester.widget<GalleryDock>(find.byType(GalleryDock));
+    expect(dock.disabledTabs, {GalleryTabEnum.spaces, GalleryTabEnum.library});
   });
 
   testWidgets('the landscape rail follows the same slots', (tester) async {
@@ -666,8 +704,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    var pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
-    expect(pill.activeTab, GalleryTabEnum.spaces);
+    var dock = tester.widget<GalleryDock>(find.byType(GalleryDock));
+    expect(dock.activeTab, GalleryTabEnum.spaces);
 
     container.updateOverrides([
       readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
@@ -676,8 +714,8 @@ void main() {
     ]);
     await tester.pumpAndSettle();
 
-    pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
-    expect(pill.activeTab, GalleryTabEnum.albums, reason: 'slot 1 changed occupant, the index did not');
-    expect(pill.slots, [GalleryTabEnum.photos, GalleryTabEnum.albums, GalleryTabEnum.library]);
+    dock = tester.widget<GalleryDock>(find.byType(GalleryDock));
+    expect(dock.activeTab, GalleryTabEnum.albums, reason: 'slot 1 changed occupant, the index did not');
+    expect(dock.slots, [GalleryTabEnum.photos, GalleryTabEnum.albums, GalleryTabEnum.library]);
   });
 }

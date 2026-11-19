@@ -19,6 +19,7 @@ import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
@@ -32,6 +33,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
+
+const _clearance = TimelineGroupingBottomPill.pillHeight + TimelineGroupingBottomPill.bottomFloat;
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -88,12 +91,12 @@ void main() {
       await _pumpTimeline(tester, withGroupingPill: true);
       final extentWith = tester.state<ScrollableState>(find.byType(Scrollable).first).position.maxScrollExtent;
 
-      // pillHeight(58) + bottomFloat(26) = 84 extra clearance when the flag is on.
-      expect(extentWith - extentWithout, closeTo(84, 0.5));
+      // pillHeight + bottomFloat of extra clearance when the flag is on.
+      expect(extentWith - extentWithout, closeTo(_clearance, 0.5));
     });
 
     testWidgets('default (false) renders no pill and no clearance — existing callers unchanged', (tester) async {
-      // Pump the flag-on timeline first to get a baseline extent with 84 padding.
+      // Pump the flag-on timeline first to get a baseline extent with the pill clearance.
       await _pumpTimeline(tester, withGroupingPill: true);
       final extentWith = tester.state<ScrollableState>(find.byType(Scrollable).first).position.maxScrollExtent;
 
@@ -102,8 +105,8 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-bottom-pill')), findsNothing);
       final extentWithout = tester.state<ScrollableState>(find.byType(Scrollable).first).position.maxScrollExtent;
 
-      // The scroll extent must be 84 less with the flag off (exactly the pill clearance removed).
-      expect(extentWith - extentWithout, closeTo(84, 0.5));
+      // The scroll extent must shrink by exactly the pill clearance with the flag off.
+      expect(extentWith - extentWithout, closeTo(_clearance, 0.5));
     });
 
     testWidgets('multiselect with the flag on: pill hides, clearance stays constant (+120 modifier), '
@@ -123,9 +126,9 @@ void main() {
 
       // Pill is hidden while multiselect is active.
       expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('timeline-grouping-bottom-pill-opacity'))).opacity, 0);
-      // 84 clearance + 120 bottomSheetOpenModifier = 204 → scroll extent grows by 120 vs baseline.
+      // pill clearance + 120 bottomSheetOpenModifier → scroll extent grows by 120 vs baseline.
       final extentMultiselect = tester.state<ScrollableState>(find.byType(Scrollable).first).position.maxScrollExtent;
-      // extentMultiselect = content + 84 + 120 = extentWith + 120
+      // extentMultiselect = content + clearance + 120 = extentWith + 120
       expect(extentMultiselect - extentBase, closeTo(120, 0.5));
 
       // Exit multiselect → pill returns, clearance back to 84.

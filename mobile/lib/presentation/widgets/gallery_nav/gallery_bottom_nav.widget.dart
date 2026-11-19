@@ -7,9 +7,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_fold.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
-import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart' show leaveSearchMode;
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
@@ -32,8 +34,6 @@ class GalleryBottomNav extends ConsumerStatefulWidget {
 class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   static const double _keyboardThreshold = 80;
   static const Duration _hideAnimation = Duration(milliseconds: 200);
-  static const double _pillHeight = 52;
-  static const double _bottomFloat = 26;
 
   bool _hiddenForMultiSelect = false;
   StreamSubscription? _multiSelectSub;
@@ -77,14 +77,21 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       return _landscapeRail(isReadonly, slots);
     }
 
-    // Photos search mode takes the screen's chrome, the nav included (← brings it back).
+    // Photos search mode keeps the dock: the tab circle and the grouping row stay at the bottom while the field and
+    // chips sit in the top header (specs/2026-11-17-mobile-nav-dock-design.md).
     final searching = ref.watch(searchModeProvider);
-    final hiding = _hiddenForMultiSelect || keyboardUp || searching;
-    final bottomInset = mq.padding.bottom > _bottomFloat ? mq.padding.bottom : _bottomFloat;
-    final pillVisibleHeight = bottomInset + _pillHeight;
+    final folded = ref.watch(galleryDockFoldedProvider);
+    final hiding = _hiddenForMultiSelect || keyboardUp;
+    final bottomInset = GalleryDockStyle.bottomInset(context);
+    // The clamp cannot fire in a settled tree: the shell builds its `routes:` from this same
+    // `galleryNavSlotsProvider`, so `routes.length == slots.length` and every router index is a valid slot index. It
+    // only covers the one frame between a slots change and auto_route rebuilding the tab stack.
+    final activeTab = slots[widget.tabsRouter.activeIndex.clamp(0, slots.length - 1)];
+    final showGrouping = activeTab == GalleryTabEnum.photos;
+    final dockVisibleHeight = bottomInset + GalleryDock.reservedHeight(showGrouping: showGrouping);
 
     if (!hiding) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(pillVisibleHeight));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(dockVisibleHeight));
     }
 
     return TweenAnimationBuilder<double>(
@@ -105,36 +112,33 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         child: IgnorePointer(
           ignoring: hiding,
           child: Padding(
-            padding: EdgeInsets.only(left: 14, right: 14, bottom: bottomInset),
-            // Google-Photos-style: the content-sized pill and the search blob form
-            // a single cluster centered horizontally (small fixed gap between them),
-            // rather than the pill hugging the left with a Spacer pushing search right.
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Flexible, not fixed: long localized labels (e.g. French
-                // "Bibliothèque") make the pill's natural width exceed a narrow
-                // phone, which used to push the search blob off-screen entirely
-                // (#909). The blob is laid out first and keeps its full size; the
-                // pill takes what is left and shrinks its tabs to fit.
-                Flexible(
-                  child: GalleryNavPill(
-                    slots: slots,
-                    // The clamp cannot fire in a settled tree: the shell builds
-                    // its `routes:` from this same `galleryNavSlotsProvider`, so
-                    // `routes.length == slots.length` and every router index is
-                    // a valid slot index. It only covers the one frame between a
-                    // slots change and auto_route rebuilding the tab stack.
-                    activeTab: slots[widget.tabsRouter.activeIndex.clamp(0, slots.length - 1)],
-                    // By slot, not by tab identity: slot 1 is whichever
-                    // collection tab the user configured.
-                    disabledTabs: isReadonly ? {slots[kGalleryCollectionIndex], slots[kGalleryLibraryIndex]} : const {},
-                    onTabTap: (tab) => _onTabTap(tab, slots),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GallerySearchBlob(enabled: !isReadonly, onTap: () => openGallerySearch(widget.tabsRouter, ref.read)),
-              ],
+            padding: EdgeInsets.only(
+              left: GalleryDockStyle.sideInset,
+              right: GalleryDockStyle.sideInset,
+              bottom: bottomInset,
+            ),
+            child: GalleryDock(
+              slots: slots,
+              activeTab: activeTab,
+              mode: searching
+                  ? GalleryDockMode.search
+                  : folded
+                  ? GalleryDockMode.folded
+                  : GalleryDockMode.unfolded,
+              showGrouping: showGrouping,
+              // By slot, not by tab identity: slot 1 is whichever collection tab the user configured.
+              disabledTabs: isReadonly ? {slots[kGalleryCollectionIndex], slots[kGalleryLibraryIndex]} : const {},
+              searchEnabled: !isReadonly,
+              onTabTap: (tab) => _onTabTap(tab, slots),
+              onSearchTap: () => openGallerySearch(widget.tabsRouter, ref.read),
+              onCircleTap: () {
+                ref.read(hapticFeedbackProvider.notifier).selectionClick();
+                if (searching) {
+                  leaveSearchMode(context, ref);
+                } else {
+                  ref.read(galleryDockFoldedProvider.notifier).state = false;
+                }
+              },
             ),
           ),
         ),

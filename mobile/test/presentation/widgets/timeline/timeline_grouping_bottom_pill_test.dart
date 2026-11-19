@@ -10,6 +10,8 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock.widget.dart';
+import 'package:immich_mobile/gallery/dock/gallery_dock_style.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
@@ -47,10 +49,17 @@ void main() {
   });
 
   /// Host the pill the way Timeline will in Slice 2: an overlay child of a Stack.
-  Widget host({EdgeInsets viewInsets = EdgeInsets.zero, EdgeInsets padding = EdgeInsets.zero}) {
+  Widget host({
+    EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets padding = EdgeInsets.zero,
+    TargetPlatform platform = TargetPlatform.android,
+  }) {
     return MediaQuery(
       data: MediaQueryData(viewInsets: viewInsets, padding: padding),
-      child: const Stack(children: [SizedBox.expand(), TimelineGroupingBottomPill()]),
+      child: Theme(
+        data: ThemeData(platform: platform),
+        child: const Stack(children: [SizedBox.expand(), TimelineGroupingBottomPill()]),
+      ),
     );
   }
 
@@ -65,9 +74,13 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
-      // The pill surface hugs the selector (218 self-cap + 2×8 padding) instead of
-      // spanning the screen — keeps the scrubber's right-edge margin clear.
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill'))).width, lessThanOrEqualTo(234));
+      // Like the Photos dock's grouping row: the full width less the dock's side insets, at the dock row's height.
+      final pill = tester.getSize(find.byKey(const Key('timeline-grouping-bottom-pill')));
+      expect(
+        pill.width,
+        tester.view.physicalSize.width / tester.view.devicePixelRatio - 2 * GalleryDockStyle.sideInset,
+      );
+      expect(pill.height, GalleryDock.groupingHeight);
     });
 
     testWidgets('selector inside the pill draws no surface of its own (single pill border)', (tester) async {
@@ -137,7 +150,9 @@ void main() {
       expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('timeline-grouping-bottom-pill-opacity'))).opacity, 1);
     });
 
-    testWidgets('floats max(safe-area, 26) above the bottom', (tester) async {
+    testWidgets('floats where the dock does: inside the iPhone home indicator, above the safe area on Android', (
+      tester,
+    ) async {
       EdgeInsets pillOuterPadding() {
         // The pill's own outer Padding (the one carrying the bottom float); nearest ancestor.
         final padding = tester.widget<Padding>(
@@ -153,10 +168,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(pillOuterPadding().bottom, 26);
 
-      // Large safe area → safe-area float.
-      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 50)));
+      // Android gesture area (34): above it, clear of the home gesture.
+      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 34)));
       await tester.pumpAndSettle();
-      expect(pillOuterPadding().bottom, 50);
+      expect(pillOuterPadding().bottom, 34);
+
+      // iPhone home indicator (34): 14 inside it, as the dock sits.
+      await tester.pumpConsumerWidget(host(padding: const EdgeInsets.only(bottom: 34), platform: TargetPlatform.iOS));
+      await tester.pumpAndSettle();
+      expect(pillOuterPadding().bottom, 20);
     });
 
     testWidgets('reduced motion applies hide state immediately (no animation)', (tester) async {
