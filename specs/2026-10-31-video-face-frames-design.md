@@ -195,9 +195,15 @@ inside the span and not at a time already sampled. People best seen at the same 
 shot costs four extra frames, not four per person.
 
 Each extra frame is searched like a sample (tiled too when tiled detection is on). A person is found in it by the
-tracker's continuity rule (`findAgain`): where their best view was, and within the relaxed distance of their looks,
-the closest in looks when several qualify. A find of higher quality becomes their best view and is added to their
-sightings (`withSighting`), so it can also join the averaged embedding. The pass picks a better view of someone already
+tracker's continuity rule (`findAgainAll`): where their best view was, and within the relaxed distance of their looks,
+the closest in looks when several qualify. Detections go out one to one, closest in looks first, as in a sampled
+frame: a detection is one person. The first version looked for each person on their own, so two halves of a split
+person best seen at the same moment could both take the same detection. Both then had a sighting in one frame with
+the same box, and the merge below kept them apart for good as seen together. That was most of the "seen together, at
+the same spot" pairs a reporter's rc.1 run logged (7 of 8 within 0.4 on stored embeddings, issue 1306); on the
+library copy, 1 pair in 4,141 that share a frame had the identical box, two faces 0.082 apart. A find of higher
+quality becomes their best view and is added to their sightings (`withSighting`), so it can also join the averaged
+embedding. The pass picks a better view of someone already
 found. It never adds a person or drops one, because only tracks that were already kept are looked for.
 
 The final merge then runs again over the kept faces, with the same rules (`mergeSeenApart`). A sharper view can be a
