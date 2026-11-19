@@ -1,10 +1,10 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getFaceRepairResolutions, getPeopleThumbnailPath, removeFaceRepairResolutions } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { onMount } from 'svelte';

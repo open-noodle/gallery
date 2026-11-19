@@ -8,7 +8,7 @@ describe('AdminPageLayout demo preview', () => {
   });
 
   it('keeps the admin header at navbar height', () => {
-    expect(source).toContain('max-md:h-(--navbar-height-md) h-(--navbar-height)');
+    expect(source).toContain('h-(--navbar-height) max-md:h-(--navbar-height-md)');
     expect(appCss).toContain('.demo-admin-shell > header');
     expect(appCss).toContain('height: var(--navbar-height);');
     expect(appCss).toContain('height: var(--navbar-height-md);');

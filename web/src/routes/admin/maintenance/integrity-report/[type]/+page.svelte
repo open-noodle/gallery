@@ -2,11 +2,11 @@
   import OnEvents from '#lib/components/OnEvents.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import IntegrityReportTableItem from '#lib/components/maintenance/integrity/IntegrityReportTableItem.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getIntegrityReportActions } from '#lib/services/integrity.service.ts';
   import { asyncTimeout } from '#lib/utils.ts';
   import { IntegrityReport, getIntegrityReport, getQueuesLegacy } from '@immich/sdk';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Button, Table, TableBody, TableHeader, TableHeading } from '@immich/ui';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';

@@ -1,15 +1,15 @@
 <script lang="ts">
   import StorageTemplateSettings from '#lib/components/admin-settings/StorageTemplateSettings.svelte';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
   import SearchBar from '#lib/elements/SearchBar.svelte';
   import { adminSettingsSearch } from '#lib/gallery/admin-settings-search.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
   import { getSystemConfigActions } from '#lib/services/system-config.service.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Alert, CommandPaletteDefaultProvider, Container } from '@immich/ui';
   import {
     mdiAccountOutline,

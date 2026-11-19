@@ -1,5 +1,7 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { searchUsersAdminQuery } from '#lib/queries/user-admin.query.ts';
   import { Route } from '#lib/route.ts';
@@ -7,8 +9,6 @@
   import { locale } from '#lib/stores/preferences.store.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import type { UserAdminResponseDto } from '@immich/sdk';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import {
     CommandPaletteDefaultProvider,
     Container,

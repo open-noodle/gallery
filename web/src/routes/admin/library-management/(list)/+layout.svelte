@@ -1,14 +1,14 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import { libraryTableClasses } from '#lib/constants.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAllLibrariesQuery } from '#lib/queries/library.query.ts';
   import { Route } from '#lib/route.ts';
   import { getLibrariesActions } from '#lib/services/library.service.ts';
   import { CommandPaletteDefaultProvider, Container, Table, TableBody, TableHeader, TableHeading } from '@immich/ui';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';

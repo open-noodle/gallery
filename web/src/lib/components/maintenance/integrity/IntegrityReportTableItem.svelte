@@ -1,7 +1,7 @@
 <script lang="ts">
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import { getIntegrityReportItemActions } from '#lib/services/integrity.service.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { getIntegrityReportItemActions } from '#lib/services/integrity.service.ts';
   import type { IntegrityReport } from '@immich/sdk';
   import { ContextMenuButton, TableCell, TableRow } from '@immich/ui';
   import { t } from 'svelte-i18n';

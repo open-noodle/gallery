@@ -1,8 +1,8 @@
 <script lang="ts">
   import UserAvatar from '#lib/components/shared-components/UserAvatar.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getPeopleThumbnailPath, type UserAdminResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAlertCircle, mdiArrowRight, mdiChevronRight, mdiClose, mdiMagnify } from '@mdi/js';

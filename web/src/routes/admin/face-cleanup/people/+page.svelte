@@ -1,11 +1,11 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import InfiniteScrollSentinel from '#lib/components/shared-components/infinite-scroll-sentinel.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountCircleOutline, mdiMagnify } from '@mdi/js';

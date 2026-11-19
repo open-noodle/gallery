@@ -1,7 +1,7 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountSearch, mdiArrowRight, mdiRadar, mdiSwapHorizontal } from '@mdi/js';
   import { t } from 'svelte-i18n';

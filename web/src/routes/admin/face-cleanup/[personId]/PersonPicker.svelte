@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import {
     createFaceRepairOwnerPerson,
     getFaceRepairOwnerPeople,

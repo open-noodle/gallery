@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import FaceActionsHelpModal from '#lib/components/face-cleanup/FaceActionsHelpModal.svelte';
   import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
   import FaceReviewDock from '#lib/components/face-cleanup/FaceReviewDock.svelte';
@@ -6,10 +7,10 @@
   import type { FaceActionId } from '#lib/components/face-cleanup/face-actions.ts';
   import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import {
     getFaceRepairClusterFaces,
     getFaceRepairPersonFaces,
@@ -21,7 +22,6 @@
   } from '@immich/sdk';
   import { Button, ConfirmModal, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiArrowRight, mdiCheckBold, mdiClose, mdiInformationOutline } from '@mdi/js';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { onMount } from 'svelte';
   import { t, type Translations } from 'svelte-i18n';
   import { SvelteSet } from 'svelte/reactivity';

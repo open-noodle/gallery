@@ -1,5 +1,6 @@
 <script lang="ts">
   import AuthPageLayout from '#lib/components/layouts/AuthPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import { MutationCancelledError, createPreloadedQuery } from '#lib/queries/client.ts';
   import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
@@ -9,7 +10,6 @@
   import { oauth } from '#lib/utils.ts';
   import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
   import { demoLogin, login, type LoginResponseDto } from '@immich/sdk';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Alert, Button, Field, Input, PasswordInput, Stack } from '@immich/ui';
   import { mdiShieldKeyOutline } from '@mdi/js';
   import { browserSupportsWebAuthn } from '@simplewebauthn/browser';

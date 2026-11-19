@@ -1,9 +1,9 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { declineFaceRepair, getFaceRepairPersonFaces, getLatestScan, resolveFaces, triggerScan } from '@immich/sdk';
   import { Button, ConfirmModal, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiClose, mdiRadar, mdiRefresh, mdiTune } from '@mdi/js';

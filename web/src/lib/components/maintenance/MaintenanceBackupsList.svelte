@@ -2,9 +2,9 @@
   import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import MaintenanceBackupEntry from '#lib/components/maintenance/MaintenanceBackupEntry.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getDatabaseBackupDateTime, handleUploadDatabaseBackup } from '#lib/services/database-backups.service.ts';
   import { listDatabaseBackups, type DatabaseBackupDto } from '@immich/sdk';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Card, CardBody, HStack, Icon, ProgressBar, Stack, Text } from '@immich/ui';
   import { mdiCalendar, mdiTrayArrowUp } from '@mdi/js';
   import { DateTime } from 'luxon';

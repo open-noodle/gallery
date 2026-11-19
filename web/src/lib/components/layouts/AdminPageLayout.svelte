@@ -35,7 +35,7 @@
 
 <div class="demo-admin-shell">
   <AppShell>
-    <AppShellHeader class="max-md:h-(--navbar-height-md) h-(--navbar-height)">
+    <AppShellHeader class="h-(--navbar-height) max-md:h-(--navbar-height-md)">
       <NavigationBar noBorder />
     </AppShellHeader>
     <AppShellSidebar

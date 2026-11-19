@@ -1,14 +1,14 @@
 <script lang="ts">
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import MaintenanceBackupsList from '#lib/components/maintenance/MaintenanceBackupsList.svelte';
   import ServerStatisticsCard from '#lib/components/server-statistics/ServerStatisticsCard.svelte';
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { handleCreateJob } from '#lib/services/job.service.ts';
   import { getMaintenanceAdminActions } from '#lib/services/maintenance.service.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import {
     IntegrityReport,
     ManualJobName,

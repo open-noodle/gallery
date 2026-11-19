@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiArrowRight, mdiCheckCircle, mdiChevronDown, mdiClose } from '@mdi/js';
   import { t } from 'svelte-i18n';

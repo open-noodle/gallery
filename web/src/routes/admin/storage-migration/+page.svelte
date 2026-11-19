@@ -1,7 +1,7 @@
 <script lang="ts">
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
-  import { handleError } from '#lib/utils/handle-error.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import {
     StorageMigrationDirection,
     getEstimate as getEstimateRaw,

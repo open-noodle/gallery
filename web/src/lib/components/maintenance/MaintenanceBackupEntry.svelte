@@ -1,9 +1,9 @@
 <script lang="ts">
   import OnEvents from '#lib/components/OnEvents.svelte';
   import MaintenanceBackupCard from '#lib/components/maintenance/MaintenanceBackupCard.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getDatabaseBackupActions, handleRestoreDatabaseBackup } from '#lib/services/database-backups.service.ts';
   import { Button, ContextMenuButton } from '@immich/ui';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { t } from 'svelte-i18n';
 
   type Props = {
@@ -36,7 +36,12 @@
       <Button size="small" onclick={() => handleRestoreDatabaseBackup(filename)} disabled={isDeleting}>
         {$t('restore')}
       </Button>
-      <ContextMenuButton disabled={isDeleting} position="top-right" aria-label={$t('open')} items={[Download, Delete]} />
+      <ContextMenuButton
+        disabled={isDeleting}
+        position="top-right"
+        aria-label={$t('open')}
+        items={[Download, Delete]}
+      />
     {/if}
   {/snippet}
 </MaintenanceBackupCard>

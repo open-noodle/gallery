@@ -1,6 +1,6 @@
 import { AuthService, LoginDetails } from 'src/services/auth.service.js';
 import { SessionFactory } from 'test/factories/session.factory.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe('AuthService (demo)', () => {
   let sut: AuthService;

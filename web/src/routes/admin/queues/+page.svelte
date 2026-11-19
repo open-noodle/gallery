@@ -1,10 +1,10 @@
 <script lang="ts">
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { queueManager } from '#lib/managers/queue-manager.svelte.ts';
   import { getQueuesActions } from '#lib/services/queue.service.ts';
-  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { type QueueResponseDto } from '@immich/sdk';
   import { CommandPaletteDefaultProvider, Container, type ActionItem } from '@immich/ui';
   import { onMount } from 'svelte';
