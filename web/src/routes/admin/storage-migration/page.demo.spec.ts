@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-const source = readFileSync(join(process.cwd(), 'src/routes/admin/storage-migration/+page.svelte'), 'utf8');
+import source from './+page.svelte?raw';
 
 describe('Storage migration demo mode', () => {
   it('does not poll status in read-only demo mode', () => {

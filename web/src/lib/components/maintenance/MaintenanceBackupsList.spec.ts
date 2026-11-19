@@ -1,9 +1,10 @@
-import { screen } from '@testing-library/svelte';
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderWithTooltips } from '$tests/helpers';
+import { page } from 'vitest/browser';
 import MaintenanceBackupsList from './MaintenanceBackupsList.svelte';
 
-vi.mock('#lib/services/database-backups.service.ts', () => ({
+vi.mock('#lib/services/database-backups.service.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/services/database-backups.service.ts')>()),
   getDatabaseBackupActions: () => ({
     Download: { type: 'command', title: 'Download', onAction: vi.fn() },
     Delete: { type: 'command', title: 'Delete', onAction: vi.fn() },
@@ -35,27 +36,27 @@ describe('MaintenanceBackupsList', () => {
     mockAuthManager.isReadOnlyDemo = false;
   });
 
-  it('renders the upload card for real admins', () => {
-    renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
+  it('renders the upload card for real admins', async () => {
+    await renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
 
-    expect(screen.getByText('admin.maintenance_upload_backup')).toBeInTheDocument();
+    await expect.element(page.getByText('admin.maintenance_upload_backup')).toBeInTheDocument();
   });
 
   // Uploading a backup is a POST the demo interceptor rejects, so the affordance would only ever
   // produce a 403 for demo preview users.
-  it('hides the upload card for demo preview users', () => {
+  it('hides the upload card for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
+    await renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
 
-    expect(screen.queryByText('admin.maintenance_upload_backup')).not.toBeInTheDocument();
+    await expect.element(page.getByText('admin.maintenance_upload_backup')).not.toBeInTheDocument();
   });
 
-  it('still lists the backups for demo preview users', () => {
+  it('still lists the backups for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
+    await renderWithTooltips(MaintenanceBackupsList, { backups, expectedVersion: '1.2.3' });
 
-    expect(screen.getByText(backups[0].filename)).toBeInTheDocument();
+    await expect.element(page.getByText(backups[0].filename)).toBeInTheDocument();
   });
 });

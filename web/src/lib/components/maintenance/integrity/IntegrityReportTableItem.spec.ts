@@ -1,7 +1,7 @@
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { IntegrityReport } from '@immich/sdk';
-import { screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderWithTooltips } from '$tests/helpers';
+import { page } from 'vitest/browser';
 import IntegrityReportTableItem from './IntegrityReportTableItem.svelte';
 
 vi.mock('#lib/services/integrity.service.ts', () => ({
@@ -32,27 +32,27 @@ describe('IntegrityReportTableItem', () => {
     mockAuthManager.isReadOnlyDemo = false;
   });
 
-  it('renders the download/delete menu for real admins', () => {
-    renderWithTooltips(IntegrityReportTableItem, itemProps);
+  it('renders the download/delete menu for real admins', async () => {
+    await renderWithTooltips(IntegrityReportTableItem, itemProps);
 
-    expect(screen.getByRole('button', { name: 'open' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'open' })).toBeInTheDocument();
   });
 
   // Download hits /admin/integrity/report/:id/file and delete is a DELETE — neither is reachable
   // for the demo user, so the row menu would only ever 403.
-  it('hides the download/delete menu for demo preview users', () => {
+  it('hides the download/delete menu for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderWithTooltips(IntegrityReportTableItem, itemProps);
+    await renderWithTooltips(IntegrityReportTableItem, itemProps);
 
-    expect(screen.queryByRole('button', { name: 'open' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'open' })).not.toBeInTheDocument();
   });
 
-  it('still renders the flagged path for demo preview users', () => {
+  it('still renders the flagged path for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderWithTooltips(IntegrityReportTableItem, itemProps);
+    await renderWithTooltips(IntegrityReportTableItem, itemProps);
 
-    expect(screen.getByText(itemProps.path)).toBeInTheDocument();
+    await expect.element(page.getByText(itemProps.path)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import ReadOnlyDemoNotice from './ReadOnlyDemoNotice.svelte';
 
 const mockAuthManager = vi.hoisted(() => ({
@@ -20,18 +20,18 @@ describe('ReadOnlyDemoNotice', () => {
     mockAuthManager.isReadOnlyDemo = false;
   });
 
-  it('renders the read-only demo notice for demo preview users', () => {
+  it('renders the read-only demo notice for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    render(ReadOnlyDemoNotice);
+    await render(ReadOnlyDemoNotice);
 
-    expect(screen.getByText('Read-only demo')).toBeInTheDocument();
-    expect(screen.getByText(/Changes are disabled/i)).toBeInTheDocument();
+    await expect.element(page.getByText('Read-only demo')).toBeInTheDocument();
+    await expect.element(page.getByText(/Changes are disabled/i)).toBeInTheDocument();
   });
 
-  it('does not render for normal users and real admins', () => {
-    render(ReadOnlyDemoNotice);
+  it('does not render for normal users and real admins', async () => {
+    await render(ReadOnlyDemoNotice);
 
-    expect(screen.queryByText('Read-only demo')).not.toBeInTheDocument();
+    await expect.element(page.getByText('Read-only demo')).not.toBeInTheDocument();
   });
 });

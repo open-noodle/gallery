@@ -1,6 +1,7 @@
 import { getFaceRepairClusterFaces, getFaceRepairPersonFaces, getLatestScan } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo gate for the per-person review page's Apply action — the last mutating control on the
@@ -30,7 +31,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -50,19 +51,21 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 // Stub Icon to a no-op to avoid undefined-path errors in happy-dom, same as page.spec.ts.
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
   };
 });
 
-vi.mock('#lib/utils/people-utils.ts', () => ({
+vi.mock('#lib/utils/people-utils.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/people-utils.ts')>()),
   getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
   getSpacePersonFaceThumbnailUrl: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
   goto: vi.fn(),
   afterNavigate: vi.fn(),
   beforeNavigate: vi.fn(),
@@ -131,11 +134,11 @@ const makeCompletedScan = () => ({
 const makePageData = () => ({ personId: PERSON_ID, meta: { title: 'Review person' } });
 
 const renderPersonPage = async () => {
-  const result = render(Page, { props: { data: makePageData() } });
+  const result = await render(Page, { props: { data: makePageData() } });
   // `tally` is rendered by the same footer snippet as Apply, unconditionally in BOTH branches — waiting on it
   // proves the footer (and therefore the dock) actually mounted before we assert on apply-btn's presence or
   // absence. Without this, a stub that drops `footer` entirely would make both assertions pass vacuously.
-  await waitFor(() => expect(screen.getByTestId('tally')).toBeInTheDocument());
+  await expect.element(page.getByTestId('tally')).toBeInTheDocument();
   return result;
 };
 
@@ -157,20 +160,20 @@ describe('face-cleanup person page — read-only demo', () => {
   it('shows Apply to a real admin', async () => {
     await renderPersonPage();
 
-    expect(screen.queryByTestId('apply-btn')).not.toBeNull();
+    await expect.element(page.getByTestId('apply-btn')).toBeInTheDocument();
   });
 
   it('hides Apply in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderPersonPage();
 
-    expect(screen.queryByTestId('apply-btn')).toBeNull();
+    await expect.element(page.getByTestId('apply-btn')).not.toBeInTheDocument();
   });
 
   it('shows Move entire cluster to a real admin', async () => {
     await renderPersonPage();
 
-    expect(screen.queryByTestId('move-entire-btn')).not.toBeNull();
+    await expect.element(page.getByTestId('move-entire-btn')).toBeInTheDocument();
   });
 
   it('hides Move entire cluster in read-only demo mode', async () => {
@@ -179,8 +182,8 @@ describe('face-cleanup person page — read-only demo', () => {
 
     // `rest-section` hosts the button and renders in BOTH branches, so a page that never got that far
     // fails here rather than passing on an absence it was always going to have.
-    expect(screen.getByTestId('rest-section')).toBeInTheDocument();
-    expect(screen.queryByTestId('move-entire-btn')).toBeNull();
+    await expect.element(page.getByTestId('rest-section')).toBeInTheDocument();
+    await expect.element(page.getByTestId('move-entire-btn')).not.toBeInTheDocument();
   });
 
   // The rest-of-cluster load is a POST the demo user is refused. Firing it would flip restLoadError and
@@ -188,8 +191,8 @@ describe('face-cleanup person page — read-only demo', () => {
   it('loads the rest of the cluster for a real admin', async () => {
     await renderPersonPage();
 
-    await waitFor(() => expect(getFaceRepairClusterFaces).toHaveBeenCalled());
-    expect(screen.queryByTestId('rest-load-error')).toBeNull();
+    await vi.waitFor(() => expect(getFaceRepairClusterFaces).toHaveBeenCalled());
+    await expect.element(page.getByTestId('rest-load-error')).not.toBeInTheDocument();
   });
 
   it('skips the blocked cluster-faces POST in read-only demo mode, with no error banner', async () => {
@@ -200,22 +203,22 @@ describe('face-cleanup person page — read-only demo', () => {
     await renderPersonPage();
 
     // The flagged grid still rendered, i.e. the page is genuinely usable rather than blank.
-    expect(screen.getByTestId('flagged-grid')).toBeInTheDocument();
+    await expect.element(page.getByTestId('flagged-grid')).toBeInTheDocument();
     expect(getFaceRepairClusterFaces).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('rest-load-error')).toBeNull();
-    expect(screen.queryByTestId('rest-load-error-retry')).toBeNull();
+    await expect.element(page.getByTestId('rest-load-error')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('rest-load-error-retry')).not.toBeInTheDocument();
   });
 
   it('renders the read-only notice in demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderPersonPage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 
   it('omits the read-only notice for a real admin', async () => {
     await renderPersonPage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 });

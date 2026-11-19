@@ -1,6 +1,7 @@
 import { getFaceRepairResolutions } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo gate for the resolutions page's Undo button. Mirrors the harness in
@@ -20,7 +21,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -82,8 +83,8 @@ const ROW = {
 };
 
 const renderResolutionsPage = async () => {
-  const result = render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
-  await waitFor(() => expect(screen.getAllByTestId('resolution-row')).toHaveLength(1));
+  const result = await render(Page, { props: { data: { meta: { title: 'Resolutions' } } } });
+  await vi.waitFor(() => expect(page.getByTestId('resolution-row').elements()).toHaveLength(1));
   return result;
 };
 
@@ -99,26 +100,26 @@ describe('face-cleanup resolutions page — read-only demo', () => {
   it('shows Undo to a real admin', async () => {
     await renderResolutionsPage();
 
-    expect(screen.queryByTestId('undo-button')).not.toBeNull();
+    await expect.element(page.getByTestId('undo-button')).toBeInTheDocument();
   });
 
   it('hides Undo in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderResolutionsPage();
 
-    expect(screen.queryByTestId('undo-button')).toBeNull();
+    await expect.element(page.getByTestId('undo-button')).not.toBeInTheDocument();
   });
 
   it('does not render the read-only demo notice for a real admin', async () => {
     await renderResolutionsPage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 
   it('renders the read-only demo notice in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderResolutionsPage();
 
-    expect(screen.getByTestId('read-only-demo-notice')).toBeInTheDocument();
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 });

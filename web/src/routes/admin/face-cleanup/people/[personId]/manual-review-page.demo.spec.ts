@@ -1,13 +1,13 @@
+import { readOnlyDemoAuthMock } from '#lib/gallery/__mocks__/read-only-demo-auth.mock.svelte.ts';
 import {
   getFaceRepairClusterFaces,
   getFaceRepairPersonMetadata,
   type FaceRepairClusterFacesResponseDto,
   type FaceRepairPersonMetadataResponseDto,
 } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readOnlyDemoAuthMock } from '@test-data/mocks/read-only-demo-auth.mock.svelte';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo behaviour for the MANUAL review page (/admin/face-cleanup/people/[personId]). Mirrors the
@@ -31,7 +31,7 @@ import Page from './+page.svelte';
 // Every assertion keys off data-testid: $t() renders raw keys in this repo's web specs, never English prose.
 
 vi.mock('#lib/managers/auth-manager.svelte.ts', async () => {
-  const { readOnlyDemoAuthMock: mock } = await import('@test-data/mocks/read-only-demo-auth.mock.svelte');
+  const { readOnlyDemoAuthMock: mock } = await import('#lib/gallery/__mocks__/read-only-demo-auth.mock.svelte.ts');
   return {
     authManager: {
       get isReadOnlyDemo() {
@@ -42,7 +42,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', async () => {
 });
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -60,43 +60,16 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 // Stub Icon to a no-op to avoid undefined-path errors in happy-dom, same as the sibling face-cleanup specs.
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
   };
 });
 
-vi.mock('#lib/utils/people-utils.ts', () => ({
+vi.mock('#lib/utils/people-utils.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/utils/people-utils.ts')>()),
   getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
-}));
-
-vi.mock('$app/navigation', () => ({
-  goto: vi.fn(),
-  afterNavigate: vi.fn(),
-  beforeNavigate: vi.fn(),
-  onNavigate: vi.fn(),
-}));
-
-vi.mock('$app/stores', () => ({
-  page: {
-    subscribe: vi.fn((run) => {
-      run({ url: new URL('http://localhost/admin/face-cleanup/people/person-1') });
-      return () => {};
-    }),
-  },
-  navigating: {
-    subscribe: vi.fn((run) => {
-      run(null);
-      return () => {};
-    }),
-  },
-  updated: {
-    subscribe: vi.fn((run) => {
-      run(false);
-      return () => {};
-    }),
-  },
 }));
 
 const PERSON_ID = 'person-1';
@@ -135,8 +108,8 @@ const makePageData = () => ({ personId: PERSON_ID, meta: { title: 'Review person
 // The header renders in every branch (populated grid, zero-faces, load error), so waiting on it proves the
 // page finished mounting without presupposing which branch it landed in.
 const renderManualPage = async () => {
-  const result = render(Page, { props: { data: makePageData() } });
-  await waitFor(() => expect(screen.getByTestId('manual-review-header')).toBeInTheDocument());
+  const result = await render(Page, { props: { data: makePageData() } });
+  await expect.element(page.getByTestId('manual-review-header')).toBeInTheDocument();
   return result;
 };
 
@@ -146,7 +119,7 @@ const renderManualPage = async () => {
 const renderAsDemoUser = async () => {
   readOnlyDemoAuthMock.isReadOnlyDemo = true;
   await renderManualPage();
-  await waitFor(() => expect(screen.getByTestId('manual-review-grid')).toBeInTheDocument());
+  await expect.element(page.getByTestId('manual-review-grid')).toBeInTheDocument();
 };
 
 describe('face-cleanup manual review page — read-only demo', () => {
@@ -159,9 +132,9 @@ describe('face-cleanup manual review page — read-only demo', () => {
   it('loads the cluster faces for a real admin', async () => {
     await renderManualPage();
 
-    await waitFor(() => expect(screen.getByTestId('manual-review-grid')).toBeInTheDocument());
+    await expect.element(page.getByTestId('manual-review-grid')).toBeInTheDocument();
     expect(getFaceRepairClusterFaces).toHaveBeenCalled();
-    expect(screen.queryByTestId('manual-review-load-error')).toBeNull();
+    await expect.element(page.getByTestId('manual-review-load-error')).not.toBeInTheDocument();
   });
 
   // THE REGRESSION TEST. The demo visitor must load the cluster, not an empty stub: while this POST was
@@ -172,55 +145,55 @@ describe('face-cleanup manual review page — read-only demo', () => {
     await renderAsDemoUser();
 
     expect(getFaceRepairClusterFaces).toHaveBeenCalled();
-    expect(screen.getAllByTestId('face-tile').length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('manual-review-empty')).toBeNull();
-    expect(screen.queryByTestId('manual-review-load-error')).toBeNull();
-    expect(screen.queryByTestId('manual-review-load-error-retry')).toBeNull();
+    await expect.element(page.getByTestId('face-tile').first()).toBeInTheDocument();
+    await expect.element(page.getByTestId('manual-review-empty')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('manual-review-load-error')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('manual-review-load-error-retry')).not.toBeInTheDocument();
     // The metadata leg still renders alongside it, so the header and the grid agree on the same person.
-    expect(screen.getByTestId('manual-review-heading')).toHaveTextContent('Jula');
-    expect(screen.getByTestId('manual-review-owner')).toHaveTextContent(OWNER_ID);
+    await expect.element(page.getByTestId('manual-review-heading')).toHaveTextContent('Jula');
+    await expect.element(page.getByTestId('manual-review-owner')).toHaveTextContent(OWNER_ID);
   });
 
   it('shows Move entire cluster to a real admin', async () => {
     await renderManualPage();
 
-    await waitFor(() => expect(screen.getByTestId('manual-review-move-entire-btn')).toBeInTheDocument());
+    await expect.element(page.getByTestId('manual-review-move-entire-btn')).toBeInTheDocument();
   });
 
   it('hides Move entire cluster in read-only demo mode', async () => {
     await renderAsDemoUser();
 
-    expect(screen.queryByTestId('manual-review-move-entire-btn')).toBeNull();
+    await expect.element(page.getByTestId('manual-review-move-entire-btn')).not.toBeInTheDocument();
     // The grid that HOSTS the button is still on screen, so its absence is the gate and not a vanished page.
-    expect(screen.getByTestId('manual-review-grid')).toBeInTheDocument();
+    await expect.element(page.getByTestId('manual-review-grid')).toBeInTheDocument();
   });
 
   it('shows Apply to a real admin', async () => {
     await renderManualPage();
 
-    await waitFor(() => expect(screen.getByTestId('manual-review-apply-btn')).toBeInTheDocument());
+    await expect.element(page.getByTestId('manual-review-apply-btn')).toBeInTheDocument();
   });
 
   it('hides Apply in read-only demo mode', async () => {
     await renderAsDemoUser();
 
-    expect(screen.queryByTestId('manual-review-apply-btn')).toBeNull();
+    await expect.element(page.getByTestId('manual-review-apply-btn')).not.toBeInTheDocument();
     // `manual-review-tally` is rendered by the SAME footer snippet as Apply, unconditionally in both
     // branches — its presence proves the dock is still mounted, so a dropped footer cannot make the
     // assertion above pass vacuously.
-    expect(screen.getByTestId('manual-review-tally')).toBeInTheDocument();
+    await expect.element(page.getByTestId('manual-review-tally')).toBeInTheDocument();
   });
 
   it('renders the read-only notice in demo mode', async () => {
     readOnlyDemoAuthMock.isReadOnlyDemo = true;
     await renderManualPage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 
   it('omits the read-only notice for a real admin', async () => {
     await renderManualPage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 });

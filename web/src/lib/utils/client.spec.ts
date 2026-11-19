@@ -13,8 +13,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({ authManager: mocks.authManager }));
 vi.mock('#lib/managers/feature-flags-manager.svelte.ts', () => ({ featureFlagsManager: mocks.featureFlagsManager }));
 vi.mock('#lib/queries/client.ts', () => ({ queryClient: { query: mocks.query } }));
-vi.mock('#lib/queries/server-info.query.ts', () => ({ getServerConfigQuery: () => ({ queryKey: ['server', 'config'] }) }));
-vi.mock('#lib/queries/config-public.query.ts', () => ({ getPublicConfigQuery: () => ({ queryKey: ['config', 'public'] }) }));
+vi.mock('#lib/queries/server-info.query.ts', () => ({
+  getServerConfigQuery: () => ({ queryKey: ['server', 'config'] }),
+}));
+vi.mock('#lib/queries/config-public.query.ts', () => ({
+  getPublicConfigQuery: () => ({ queryKey: ['config', 'public'] }),
+}));
 vi.mock('#lib/utils.ts', () => ({ initLanguage: mocks.initLanguage }));
 vi.mock('@immich/sdk', () => ({ setFetch: vi.fn(), setHeaders: vi.fn() }));
 

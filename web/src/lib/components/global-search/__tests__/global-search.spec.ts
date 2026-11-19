@@ -1571,7 +1571,7 @@ describe('global-search root', () => {
     expect(page.getByText('admin.classification_settings').query()).toBeNull();
   });
 
-  it('render-time filter keeps admin navigate recents visible for demo preview users', () => {
+  it('render-time filter keeps admin navigate recents visible for demo preview users', async () => {
     mockUser.current = { id: 'demo-user', isAdmin: false };
     mockUser.isDemo = true;
     addEntry({
@@ -1585,8 +1585,8 @@ describe('global-search root', () => {
     });
     const m = new GlobalSearchManager();
     m.open();
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.getByText('admin.classification_settings')).toBeInTheDocument();
+    await render(GlobalSearch, { props: { manager: m } });
+    await expect.element(page.getByText('admin.classification_settings')).toBeInTheDocument();
   });
 
   // CG6: feature-flag-disabled navigate recents must also be hidden pre-click.

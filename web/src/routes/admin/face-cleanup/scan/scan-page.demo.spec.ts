@@ -1,6 +1,7 @@
 import { getLatestScan } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo gate for the scan page's mutating actions (Advanced scan tuning, Re-scan/Run first scan).
@@ -18,7 +19,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -35,7 +36,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 // Stub Icon to a no-op to avoid undefined-path errors in happy-dom, same as page.spec.ts.
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -101,9 +102,9 @@ const makeFailedScan = () => ({
 const makePageData = () => ({ users: [], meta: { title: 'Guided cleanup' } });
 
 const renderScanPage = async () => {
-  const result = render(Page, { props: { data: makePageData() } });
+  const result = await render(Page, { props: { data: makePageData() } });
   // Header (and its Advanced/Rescan buttons) only render once the finished scan has loaded.
-  await waitFor(() => expect(screen.getByText('admin.face_cleanup_rescan')).toBeInTheDocument());
+  await expect.element(page.getByText('admin.face_cleanup_rescan')).toBeInTheDocument();
   return result;
 };
 
@@ -116,23 +117,21 @@ describe('face-cleanup scan page — read-only demo', () => {
   it('shows Rescan and Advanced to a real admin', async () => {
     await renderScanPage();
 
-    expect(screen.getByText('admin.face_cleanup_rescan')).toBeInTheDocument();
-    expect(screen.getByText('admin.face_cleanup_advanced')).toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_rescan')).toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_advanced')).toBeInTheDocument();
   });
 
   it('hides Rescan and Advanced in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // The header itself (title) still renders — only the mutating actions are gated — so wait on that
     // instead of the now-absent Rescan button. Scoped to the h1 (not `getByText`): the breadcrumb trail
     // also renders a crumb with the exact same "admin.face_cleanup" text.
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 1, name: 'admin.face_cleanup' })).toBeInTheDocument(),
-    );
+    await expect.element(page.getByRole('heading', { level: 1, name: 'admin.face_cleanup' })).toBeInTheDocument();
 
-    expect(screen.queryByText('admin.face_cleanup_rescan')).not.toBeInTheDocument();
-    expect(screen.queryByText('admin.face_cleanup_advanced')).not.toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_rescan')).not.toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_advanced')).not.toBeInTheDocument();
   });
 
   // The empty ("never scanned") state's own primary CTA. Latent on the live demo, which has a completed
@@ -141,47 +140,47 @@ describe('face-cleanup scan page — read-only demo', () => {
   // completed-scan fixture used above could never fail.
   it('shows the first-scan CTA to a real admin when nothing has been scanned', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByTestId('first-scan-cta')).toBeInTheDocument());
+    await expect.element(page.getByTestId('first-scan-cta')).toBeInTheDocument();
   });
 
   it('hides the first-scan CTA in read-only demo mode', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
     mockAuthManager.isReadOnlyDemo = true;
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
     // Wait on the empty state that HOSTS the CTA, so a page that never reached that branch fails loudly
     // rather than passing on an absence it was always going to have.
-    await waitFor(() => expect(screen.getByText('admin.face_cleanup_empty_no_scan')).toBeInTheDocument());
-    expect(screen.queryByTestId('first-scan-cta')).not.toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_empty_no_scan')).toBeInTheDocument();
+    await expect.element(page.getByTestId('first-scan-cta')).not.toBeInTheDocument();
   });
 
   it('shows the retry-scan button to a real admin when the last scan failed', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeFailedScan() as unknown as object);
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByTestId('retry-scan-btn')).toBeInTheDocument());
+    await expect.element(page.getByTestId('retry-scan-btn')).toBeInTheDocument();
   });
 
   it('hides the retry-scan button in read-only demo mode', async () => {
     vi.mocked(getLatestScan).mockResolvedValue(makeFailedScan() as unknown as object);
     mockAuthManager.isReadOnlyDemo = true;
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByText('admin.face_cleanup_scan_failed')).toBeInTheDocument());
-    expect(screen.queryByTestId('retry-scan-btn')).not.toBeInTheDocument();
+    await expect.element(page.getByText('admin.face_cleanup_scan_failed')).toBeInTheDocument();
+    await expect.element(page.getByTestId('retry-scan-btn')).not.toBeInTheDocument();
   });
 
   it('omits the read-only notice for a real admin', async () => {
     await renderScanPage();
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeInTheDocument();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 
   it('renders the read-only notice when in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
-    render(Page, { props: { data: makePageData() } });
+    await render(Page, { props: { data: makePageData() } });
 
-    await waitFor(() => expect(screen.getByTestId('read-only-demo-notice')).toBeInTheDocument());
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 });

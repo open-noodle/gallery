@@ -7,8 +7,10 @@ const mockUser = vi.hoisted(() => ({
   isDemo: true,
 }));
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('#lib/utils.ts', () => ({ copyToClipboard: vi.fn() }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
   authManager: {
     get authenticated() {
@@ -21,12 +23,6 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
       return !!mockUser.current && (mockUser.current.isAdmin || mockUser.isDemo);
     },
   },
-}));
-vi.mock('@immich/ui', () => ({
-  defaultProvider: vi.fn((provider) => provider),
-  screencastManager: { toggle: vi.fn() },
-  themeManager: { prefersDark: false, setPreference: vi.fn(), toggle: vi.fn() },
-  ThemePreference: { System: 'system' },
 }));
 
 describe('getMyImmichLink', () => {
@@ -65,9 +61,9 @@ describe('getPagesProvider admin preview', () => {
 
   it('shows admin pages for demo preview users without making them admins', () => {
     const provider = getPagesProvider(String) as unknown as {
-      actions: Array<{ title: string; $if?: () => boolean }>;
+      onSearch: (query: string) => Array<{ title: string; $if?: () => boolean }>;
     };
-    const systemSettings = provider.actions.find((action) => action.title === 'admin.system_settings');
+    const systemSettings = provider.onSearch('').find((action) => action.title === 'admin.system_settings');
 
     expect(mockUser.current?.isAdmin).toBe(false);
     expect(systemSettings?.$if?.()).toBe(true);
@@ -76,30 +72,33 @@ describe('getPagesProvider admin preview', () => {
   it('still hides admin pages from normal non-admin users', () => {
     mockUser.isDemo = false;
     const provider = getPagesProvider(String) as unknown as {
-      actions: Array<{ title: string; $if?: () => boolean }>;
+      onSearch: (query: string) => Array<{ title: string; $if?: () => boolean }>;
     };
 
     // The command palette also lists user/utility pages (visible to any authenticated user);
     // scope the assertion to the admin-only entries, which must stay hidden without preview.
-    const adminTitles = [
+    const adminTitles = new Set([
       'admin.user_management',
       'admin.system_settings',
       'admin.queues',
       'external_libraries',
       'server_stats',
-    ];
-    const adminActions = provider.actions.filter((action) => adminTitles.includes(action.title));
+    ]);
+    const adminActions = provider.onSearch('').filter((action) => adminTitles.has(action.title));
 
-    expect(adminActions).toHaveLength(adminTitles.length);
+    expect(adminActions).toHaveLength(adminTitles.size);
     expect(adminActions.every((action) => action.$if?.() === false)).toBe(true);
   });
 
   it('navigates admin settings through the existing action', () => {
     const provider = getPagesProvider(String) as unknown as {
-      actions: Array<{ title: string; onAction: () => void }>;
+      onSearch: (query: string) => Array<{ title: string; onAction: () => void }>;
     };
 
-    provider.actions.find((action) => action.title === 'admin.system_settings')?.onAction();
+    provider
+      .onSearch('')
+      .find((action) => action.title === 'admin.system_settings')
+      ?.onAction();
 
     expect(goto).toHaveBeenCalledWith('/admin/system-settings');
   });

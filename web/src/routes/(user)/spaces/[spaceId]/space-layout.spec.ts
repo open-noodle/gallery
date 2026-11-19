@@ -11,20 +11,24 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import SpaceLayout from './+layout.svelte';
 
-const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(() => ({
-  mockPage: { url: new URL('https://gallery.test/spaces/s1'), route: { id: '/(user)/spaces/[spaceId]' } },
+const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(() => {
   // Mirrors the real auth-manager: the demo user is not a real admin but still gets the
   // read-only admin preview, which is what gates the space Libraries tab.
-  mockAuthManager: {
+  const mockAuthManager = {
     user: { id: 'u1', isAdmin: false } as { id: string; isAdmin: boolean } | undefined,
     isDemo: false,
     get canPreviewAdmin() {
-      return !!this.user && (this.user.isAdmin || this.isDemo);
+      return !!mockAuthManager.user && (mockAuthManager.user.isAdmin || mockAuthManager.isDemo);
     },
-  },
-  gotoMock: vi.fn().mockResolvedValue(undefined),
-  invalidateAllMock: vi.fn().mockResolvedValue(undefined),
-}));
+  };
+  return {
+    mockPage: { url: new URL('https://gallery.test/spaces/s1'), route: { id: '/(user)/spaces/[spaceId]' } },
+    mockAuthManager,
+    gotoMock: vi.fn().mockResolvedValue(undefined),
+    invalidateAllMock: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 vi.mock('$app/state', async () => ({
   ...(await import('#test/unit/mocks/app-state.svelte.ts')),
   page: mockPage,

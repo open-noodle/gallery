@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo notice on the face-repair overview (chooser) page. Neither door on this page is a mutating
@@ -19,14 +20,14 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
 // Stub Icon to a no-op to avoid undefined-path errors in happy-dom, same as the sibling face-cleanup specs.
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -38,8 +39,8 @@ vi.mock('@immich/ui', async (original) => {
 const makePageData = () => ({ users: [], scan: null, meta: { title: 'Face cleanup' } });
 
 const renderOverview = async () => {
-  const result = render(Page, { props: { data: makePageData() } });
-  await screen.findByTestId('chooser-card-guided');
+  const result = await render(Page, { props: { data: makePageData() } });
+  await expect.element(page.getByTestId('chooser-card-guided')).toBeInTheDocument();
   return result;
 };
 
@@ -52,12 +53,12 @@ describe('face-cleanup overview page — read-only demo', () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderOverview();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 
   it('omits the notice for a real admin', async () => {
     await renderOverview();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 });

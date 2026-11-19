@@ -1,7 +1,8 @@
-import { getFaceRepairOwnerPeople } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
+import { getFaceRepairOwnerPeople } from '@immich/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import Page from './+page.svelte';
 
 // Read-only demo notice on the manual people browser. Its controls (owner select, search, person tiles) are
@@ -26,7 +27,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const { default: stub } = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const { default: stub } = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub };
 });
 
@@ -43,7 +44,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 // Stub Icon to a no-op to avoid undefined-path errors in happy-dom, same as the sibling face-cleanup specs.
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return {
     ...mod,
     Icon: noop.default,
@@ -90,10 +91,10 @@ const makeUser = (id: string, name: string) => ({
 const makePageData = () => ({ users: [makeUser('u1', 'Solo Admin')], meta: { title: 'Manual review' } });
 
 const renderPeoplePage = async () => {
-  const result = render(Page, { props: { data: makePageData() } });
+  const result = await render(Page, { props: { data: makePageData() } });
   // Settles on the owner-empty state (zero people for the resolved owner) — a genuinely finished render,
   // not a page stuck on the loading branch.
-  await waitFor(() => expect(screen.getByTestId('people-empty-owner')).toBeInTheDocument());
+  await expect.element(page.getByTestId('people-empty-owner')).toBeInTheDocument();
   return result;
 };
 
@@ -108,12 +109,12 @@ describe('face-cleanup people page — read-only demo', () => {
     mockAuthManager.isReadOnlyDemo = true;
     await renderPeoplePage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).toBeInTheDocument();
   });
 
   it('omits the notice for a real admin', async () => {
     await renderPeoplePage();
 
-    expect(screen.queryByTestId('read-only-demo-notice')).toBeNull();
+    await expect.element(page.getByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
 });

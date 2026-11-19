@@ -1,39 +1,25 @@
-import { demoLogin } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { goto } from '$app/navigation';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { queryClient } from '#lib/queries/client.ts';
+import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
+import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
+import PageHost from '#test/unit/mocks/PageHost.svelte';
+import { demoLogin } from '@immich/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
+import { goto } from '$app/navigation';
 import LoginPage from './+page.svelte';
 
-const { mockAuthManager, mockEventManager, mockPublicConfig, mockOauth, mockServerConfig, mockUser, gotoMock } =
-  vi.hoisted(() => ({
-    mockAuthManager: { isDemo: false },
-    mockEventManager: { emit: vi.fn(), on: vi.fn() },
-    mockPublicConfig: {
-      oauth: { enabled: true, autoLaunch: false, buttonText: 'Login with OAuth' },
-      passwordLogin: { enabled: true },
-      server: { loginPageMessage: '' },
-      theme: { customCss: '' },
-    },
-    mockOauth: {
-      authorize: vi.fn(),
-      isAutoLaunchDisabled: vi.fn(() => false),
-      isAutoLaunchEnabled: vi.fn(() => false),
-      isCallback: vi.fn(() => false),
-      login: vi.fn(),
-    },
-    mockServerConfig: {
-      demoAutoLogin: false,
-      demoMode: false,
-      isOnboarded: true,
-      loginPageMessage: '',
-      oauthButtonText: 'Login with OAuth',
-    },
-    mockUser: { accessToken: 'token', isAdmin: false, isOnboarded: true, shouldChangePassword: false },
-    gotoMock: vi.fn().mockResolvedValue(undefined),
-  }));
+const { mockAuthManager, mockEventManager, mockUser } = vi.hoisted(() => ({
+  mockAuthManager: { isDemo: false },
+  mockEventManager: { emit: vi.fn(), on: vi.fn() },
+  mockUser: { accessToken: 'token', isAdmin: false, isOnboarded: true, shouldChangePassword: false },
+}));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/navigation', async () => ({
+  ...(await import('#test/unit/mocks/app-navigation.ts')),
+  goto: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock(import('#lib/managers/auth-manager.svelte.ts'), () => ({
   authManager: mockAuthManager as never,
@@ -42,16 +28,6 @@ vi.mock(import('#lib/managers/auth-manager.svelte.ts'), () => ({
 vi.mock(import('#lib/managers/event-manager.svelte.ts'), () => ({
   eventManager: mockEventManager as never,
 }));
-
-vi.mock(import('$lib/managers/server-config-manager.svelte'), () => ({
-  serverConfigManager: {
-    get value() {
-      return mockServerConfig;
-    },
-  } as never,
-}));
-
-vi.mock('#lib/utils.ts', () => ({ oauth: mockOauth }));
 
 vi.mock('@immich/sdk', async (original) => {
   const actual = await original<typeof import('@immich/sdk')>();
@@ -62,50 +38,70 @@ vi.mock('@immich/sdk', async (original) => {
   };
 });
 
+// The page reads both configs through createPreloadedQuery, so they must already sit in the query cache,
+// exactly as the root layout's load leaves them.
+const seedConfig = ({ demoMode, demoAutoLogin }: { demoMode: boolean; demoAutoLogin: boolean }) => {
+  queryClient.setQueryData(getPublicConfigQuery().queryKey, {
+    oauth: { enabled: true, autoLaunch: false, buttonText: 'Login with OAuth' },
+    passwordLogin: { enabled: true },
+    passkey: { enabled: false },
+    server: { loginPageMessage: '' },
+  } as never);
+  queryClient.setQueryData(getServerConfigQuery().queryKey, {
+    demoAutoLogin,
+    demoMode,
+    isInitialized: true,
+    isOnboarded: true,
+    loginPageMessage: '',
+    maintenanceMode: false,
+    oauthButtonText: 'Login with OAuth',
+  } as never);
+};
+
+// PageHost supplies the QueryClientProvider the page's passkey mutation needs, as the root layout does.
 const renderLoginPage = () =>
-  render(LoginPage, {
-    data: {
-      error: undefined,
-      continueUrl: '/photos',
-      meta: { title: 'Login' },
-      publicConfig: mockPublicConfig,
-    },
+  render(PageHost, {
+    component: LoginPage as never,
+    data: { continueUrl: '/photos', meta: { title: 'Login' } },
+    params: {},
+    client: queryClient,
   });
 
 describe('LoginPage demo mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthManager.isDemo = false;
-    mockPublicConfig.oauth.enabled = true;
-    mockPublicConfig.oauth.autoLaunch = false;
-    mockPublicConfig.passwordLogin.enabled = true;
-    mockServerConfig.demoAutoLogin = false;
-    mockServerConfig.demoMode = false;
-    mockServerConfig.loginPageMessage = '';
-    mockServerConfig.oauthButtonText = 'Login with OAuth';
     vi.mocked(demoLogin).mockResolvedValue(mockUser as never);
   });
 
-  it('shows only the Try Demo button when manual demo login is enabled', () => {
-    mockServerConfig.demoMode = true;
+  it('shows only the Try Demo button when manual demo login is enabled', async () => {
+    seedConfig({ demoMode: true, demoAutoLogin: false });
 
-    renderLoginPage();
+    await renderLoginPage();
 
-    expect(screen.getByRole('button', { name: 'Try Demo' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('email')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('password')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Login with OAuth' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Try Demo' })).toBeInTheDocument();
+    await expect.element(page.getByLabelText('email')).not.toBeInTheDocument();
+    await expect.element(page.getByLabelText('password')).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Login with OAuth' })).not.toBeInTheDocument();
     expect(demoLogin).not.toHaveBeenCalled();
   });
 
+  it('keeps the standard login and no Try Demo button outside demo mode', async () => {
+    seedConfig({ demoMode: false, demoAutoLogin: false });
+
+    await renderLoginPage();
+
+    await expect.element(page.getByLabelText('email')).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Try Demo' })).not.toBeInTheDocument();
+  });
+
   it('logs in as the demo user automatically when demo auto-login is enabled', async () => {
-    mockServerConfig.demoAutoLogin = true;
-    mockServerConfig.demoMode = true;
+    seedConfig({ demoMode: true, demoAutoLogin: true });
 
-    renderLoginPage();
+    await renderLoginPage();
 
-    await waitFor(() => expect(demoLogin).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(demoLogin).toHaveBeenCalledTimes(1));
     expect(authManager.isDemo).toBe(true);
-    expect(goto).toHaveBeenCalledWith('/photos', { invalidateAll: true });
+    await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/photos', { refreshAll: true }));
   });
 });

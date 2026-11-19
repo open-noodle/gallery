@@ -1,7 +1,7 @@
+import { renderWithTooltips } from '#test/unit/helpers.ts';
 import { IntegrityReport } from '@immich/sdk';
-import { screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderWithTooltips } from '$tests/helpers';
+import { page } from 'vitest/browser';
 import IntegrityReportPage from './+page.svelte';
 
 const mockAuthManager = vi.hoisted(() => ({ isReadOnlyDemo: false }));
@@ -15,7 +15,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 }));
 
 vi.mock('#lib/components/layouts/AdminPageLayout.svelte', async () => {
-  const stub = await import('@test-data/mocks/admin-page-layout.stub.svelte');
+  const stub = await import('#lib/gallery/__mocks__/admin-page-layout.stub.svelte');
   return { default: stub.default };
 });
 
@@ -62,29 +62,29 @@ describe('admin integrity report page', () => {
     mockAuthManager.isReadOnlyDemo = false;
   });
 
-  it('exposes the report download and delete actions for real admins', () => {
-    renderPage();
+  it('exposes the report download and delete actions for real admins', async () => {
+    await renderPage();
 
-    expect(screen.getByRole('button', { name: 'Download report' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete report' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Download report' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Delete report' })).toBeInTheDocument();
   });
 
   // The CSV export lives at /admin/integrity/report/:type/csv, which is deliberately outside the
   // demo preview allowlist, and delete is a DELETE the demo interceptor rejects.
-  it('hides the report download and delete actions for demo preview users', () => {
+  it('hides the report download and delete actions for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByRole('button', { name: 'Download report' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Delete report' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Download report' })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Delete report' })).not.toBeInTheDocument();
   });
 
-  it('still lists the flagged files for demo preview users', () => {
+  it('still lists the flagged files for demo preview users', async () => {
     mockAuthManager.isReadOnlyDemo = true;
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByText('upload/library/admin/2026/untracked.jpg')).toBeInTheDocument();
+    await expect.element(page.getByText('upload/library/admin/2026/untracked.jpg')).toBeInTheDocument();
   });
 });

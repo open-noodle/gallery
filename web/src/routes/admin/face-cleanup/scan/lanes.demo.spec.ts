@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import ConfidentLane from './ConfidentLane.svelte';
 import ReviewFirstLane from './ReviewFirstLane.svelte';
 import { createScanTriageModel, type FaceCleanupPerson } from './scan-triage.svelte';
@@ -22,7 +22,7 @@ vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
 
 vi.mock('@immich/ui', async (orig) => {
   const mod = await orig<typeof import('@immich/ui')>();
-  const noop = await import('@test-data/mocks/noop-component.svelte');
+  const noop = await import('#lib/gallery/__mocks__/noop-component.svelte');
   return { ...mod, Icon: noop.default };
 });
 
@@ -77,25 +77,25 @@ describe('face-cleanup triage lanes — read-only demo', () => {
     mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
   });
 
-  it('ConfidentLane shows the approve action to a real admin', () => {
-    render(ConfidentLane, { props: { model: laneModel(), applying: false, onApprove: vi.fn() } });
-    expect(screen.queryByRole('button', { name: /apply|approve/i })).not.toBeNull();
+  it('ConfidentLane shows the approve action to a real admin', async () => {
+    await render(ConfidentLane, { props: { model: laneModel(), applying: false, onApprove: vi.fn() } });
+    await expect.element(page.getByRole('button', { name: /apply|approve/i })).toBeInTheDocument();
   });
 
-  it('ConfidentLane hides the approve action in read-only demo mode', () => {
+  it('ConfidentLane hides the approve action in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
-    render(ConfidentLane, { props: { model: laneModel(), applying: false, onApprove: vi.fn() } });
-    expect(screen.queryByRole('button', { name: /apply|approve/i })).toBeNull();
+    await render(ConfidentLane, { props: { model: laneModel(), applying: false, onApprove: vi.fn() } });
+    await expect.element(page.getByRole('button', { name: /apply|approve/i })).not.toBeInTheDocument();
   });
 
-  it('ReviewFirstLane shows the dismiss action to a real admin', () => {
-    render(ReviewFirstLane, { props: { people: [reviewPerson()], users: [], onDismiss: vi.fn() } });
-    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeNull();
+  it('ReviewFirstLane shows the dismiss action to a real admin', async () => {
+    await render(ReviewFirstLane, { props: { people: [reviewPerson()], users: [], onDismiss: vi.fn() } });
+    await expect.element(page.getByRole('button', { name: /dismiss/i })).toBeInTheDocument();
   });
 
-  it('ReviewFirstLane hides the dismiss action in read-only demo mode', () => {
+  it('ReviewFirstLane hides the dismiss action in read-only demo mode', async () => {
     mockAuthManager.isReadOnlyDemo = true;
-    render(ReviewFirstLane, { props: { people: [reviewPerson()], users: [], onDismiss: vi.fn() } });
-    expect(screen.queryByRole('button', { name: /dismiss/i })).toBeNull();
+    await render(ReviewFirstLane, { props: { people: [reviewPerson()], users: [], onDismiss: vi.fn() } });
+    await expect.element(page.getByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
   });
 });

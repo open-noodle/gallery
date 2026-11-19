@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-const source = readFileSync(join(process.cwd(), 'src/lib/components/layouts/AdminPageLayout.svelte'), 'utf8');
-const appCss = readFileSync(join(process.cwd(), 'src/app.css'), 'utf8');
+import appCss from '../../../app.css?raw';
+import source from './AdminPageLayout.svelte?raw';
 
 describe('AdminPageLayout demo preview', () => {
   it('wraps the admin shell for the demo preview', () => {
