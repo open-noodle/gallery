@@ -10,22 +10,52 @@ name: PR Release Candidate
 # on (or go back to) an earlier RC. All of a PR's RC tags are deleted when it closes
 # — see gallery-pr-rc-cleanup.yml.
 #
-# Server-only unless `rc-ml` is present. Same-repo PRs only (fork PRs can't push GHCR).
+# Server-only unless `rc-ml` is present.
+#
+# Two paths, one per kind of PR:
+#
+# - Same-repo PRs run under `pull_request`: labelling builds, and so does every later
+#   push while the label stays on.
+# - PRs from forks run under `pull_request_target`, because a `pull_request` run for a
+#   fork gets a read-only token and cannot push to GHCR. That run reads this workflow
+#   from the base branch and builds the fork's code with a `packages: write` token, so
+#   the label is the approval and it is guarded three ways:
+#   1. only the `labeled` action builds; a later push to the fork builds nothing until
+#      a maintainer has reviewed it and re-applies the label (remove, then add);
+#   2. the build is pinned to the head SHA in the `labeled` event, the commit that was
+#      reviewed, and `authorize` refuses a labeller below the `write` role (triage can
+#      label but is not trusted to approve code);
+#   3. the build runs with `use_cache: false`: the RC cache scopes are shared with the
+#      release builds, and a base-branch run would write untrusted layers into them.
+#   Review the fork's full diff (workflows, Dockerfiles, branding scripts and the
+#   `.github/actions/` the build runs from the checkout) before labelling.
 
 on:
   pull_request:
     types: [labeled, synchronize]
+  pull_request_target: # zizmor: ignore[dangerous-triggers] fork builds are gated on a write-role labeller and pinned to the labelled SHA; see above
+    types: [labeled]
 
 concurrency:
   # Concurrency is evaluated at workflow level, BEFORE any job `if:` gate — so a run
   # triggered by an unrelated label (`changelog:chore`, …) would join the per-PR group
   # and cancel an in-flight RC build, even though every one of its jobs then skips.
-  # Only RC-relevant events share the per-PR group; everything else gets a group of its
-  # own keyed on run id, so it can never cancel anything.
+  # Only RC-relevant runs share the per-PR group; everything else gets a group of its
+  # own keyed on run id, so it can never cancel anything. Labelling a fork PR fires
+  # BOTH events; only the `pull_request_target` one is relevant, so the skipped
+  # `pull_request` twin cannot cancel the real build.
   group: >-
-    ${{ (github.event.action == 'synchronize' ||
-         github.event.label.name == 'rc' ||
-         github.event.label.name == 'rc-ml')
+    ${{ ((github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          ((github.event.action == 'labeled' &&
+             (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml')) ||
+           (github.event.action == 'synchronize' &&
+             (contains(github.event.pull_request.labels.*.name, 'rc') ||
+              contains(github.event.pull_request.labels.*.name, 'rc-ml'))))) ||
+        (github.event_name == 'pull_request_target' &&
+          github.event.pull_request.head.repo.full_name != github.repository &&
+          github.event.action == 'labeled' &&
+          (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml')))
         && format('pr-rc-{0}', github.event.pull_request.number)
         || format('pr-rc-ignored-{0}', github.run_id) }}
   cancel-in-progress: true
@@ -33,19 +63,49 @@ concurrency:
 permissions: {}
 
 jobs:
+  authorize:
+    name: Authorize RC build
+    # The whole trigger gate lives here; `resolve`, `build` and `comment` hang off this
+    # job, so an unlabelled PR skips the chain without consuming a runner.
+    if: >
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        ((github.event.action == 'labeled' &&
+           (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml')) ||
+         (github.event.action == 'synchronize' &&
+           (contains(github.event.pull_request.labels.*.name, 'rc') ||
+            contains(github.event.pull_request.labels.*.name, 'rc-ml'))))) ||
+      (github.event_name == 'pull_request_target' &&
+        github.event.pull_request.head.repo.full_name != github.repository &&
+        github.event.action == 'labeled' &&
+        (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require a write-role labeller for fork PRs
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SENDER: ${{ github.event.sender.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          role=$(gh api "repos/${REPO}/collaborators/${SENDER}/permission" --jq '.role_name')
+          case "$role" in
+            admin | maintain | write)
+              echo "Fork RC build approved by ${SENDER} (${role}) for ${HEAD_SHA}."
+              ;;
+            *)
+              echo "::error::${SENDER} has the '${role}' role; only write, maintain or admin can approve an RC build of a fork PR."
+              exit 1
+              ;;
+          esac
+
   resolve:
     name: Resolve RC number
-    # The whole trigger gate lives here; `build` and `comment` hang off this job's
-    # result, so an unlabelled PR skips the chain without consuming a runner.
-    if: >
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (
-        (github.event.action == 'labeled' &&
-          (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml')) ||
-        (github.event.action == 'synchronize' &&
-          (contains(github.event.pull_request.labels.*.name, 'rc') ||
-           contains(github.event.pull_request.labels.*.name, 'rc-ml')))
-      )
+    # No `if:` needed — a skipped or failed `authorize` skips this job automatically.
+    needs: authorize
     runs-on: ubuntu-latest
     permissions:
       packages: read
@@ -146,6 +206,8 @@ jobs:
       rc_tag: ${{ needs.resolve.outputs.rc_tag }}
       ref: ${{ github.event.pull_request.head.sha }}
       build_ml: ${{ contains(github.event.pull_request.labels.*.name, 'rc-ml') }}
+      # Fork code must never write to the cache scopes the release builds read.
+      use_cache: ${{ github.event_name != 'pull_request_target' }}
 
   comment:
     name: Update RC comment
@@ -329,9 +391,13 @@ jobs:
               lines.push('', '</details>');
             }
 
+            const isFork = pr.head.repo?.full_name !== `${owner}/${repo}`;
+            const pushNote = isFork
+              ? 'This PR comes from a fork, so pushes are not built automatically: after reviewing new commits, a maintainer removes and re-adds the \`rc\`/\`rc-ml\` label to publish a new numbered RC.'
+              : 'Every push while the \`rc\`/\`rc-ml\` label is set publishes a new numbered RC.';
             lines.push(
               '',
-              `_Last updated ${new Date().toUTCString()}. Every push while the \`rc\`/\`rc-ml\` label is set publishes a new numbered RC. All \`pr-${prNumber}\` RC images are deleted when this PR closes._`,
+              `_Last updated ${new Date().toUTCString()}. ${pushNote} All \`pr-${prNumber}\` RC images are deleted when this PR closes._`,
             );
 
             const body = lines.join('\n');

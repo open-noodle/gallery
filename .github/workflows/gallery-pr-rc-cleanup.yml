@@ -37,13 +37,10 @@ permissions: {}
 jobs:
   cleanup:
     name: Delete RC images
-    # Same-repo only because RC images only ever exist for same-repo PRs — the build
-    # workflow skips forks. (Under `pull_request_target` the token would in fact be
-    # write-capable for a fork PR; the guard is now about not making pointless API
-    # calls, not about permissions.) Deliberately NOT gated on the `rc`/`rc-ml` label:
-    # a label removed before closing would otherwise orphan that PR's tags forever.
-    # With nothing to delete this is a cheap no-op.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Runs for every closed PR, fork PRs included: maintainers can build RCs of fork
+    # PRs (gallery-pr-rc-comment.yml, label-approved). Deliberately NOT gated on the
+    # `rc`/`rc-ml` label: a label removed before closing would otherwise orphan that
+    # PR's tags forever. With nothing to delete this is a cheap no-op.
     runs-on: ubuntu-latest
     permissions:
       packages: write
