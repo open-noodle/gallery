@@ -174,6 +174,20 @@ You can enable this feature under [`Account Settings > Features > Folders`](http
 
 <img src={require('./img/folder-view-1.webp').default} width="100%" title='Folder-view' />
 
+### Renaming a file
+
+The owner of a file can rename it from the pencil next to the file name in the asset viewer's info panel. The extension stays and is shown after the name; an extension such as `.JPEG` is saved as `.jpg`.
+
+By default only the name Gallery shows changes. For a file in an external library, tick **Also rename on disk** to rename the file itself, together with its sidecar (`.xmp`) files. A live photo is renamed as a pair. The asset keeps its albums, faces and edits.
+
+Renaming on disk needs write access to the folder, so the library's mount must not be read-only. Gallery checks the new name as you type:
+
+- A file that already has the name blocks the rename.
+- An item that was trashed in Gallery and has the name asks you to confirm, because renaming deletes it permanently.
+- An item that went offline because its file disappeared is deleted without asking, since its file is gone.
+
+Only one file operation runs at a time. If another is running, or the new name would be excluded by the library's [exclusion patterns](#exclusion-patterns), the rename is refused and nothing changes.
+
 ### Set Custom Scan Interval
 
 :::note
