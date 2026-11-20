@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
 import { utils } from 'src/utils';
 
-// Web E2E for the SPACE editor's face picker (`asset-viewer/SpacePersonSidePanel.svelte`), the
+// Web E2E for the SPACE editor's face picker (`gallery/asset-viewer/SpacePersonSidePanel.svelte`), the
 // other caller of the shared `PersonPickerPanel.svelte`.
 //
 // Its sibling specs (spaces-editor-face-affordances, spaces-editor-face-assign-completion) both

@@ -57,12 +57,14 @@ const editedFace = {
   sourceType: 'machine-learning',
 } as AssetFaceResponseDto;
 
-const renderPanel = (props: { onReassign?: (person: PersonResponseDto) => void; assetType?: AssetTypeEnum } = {}) =>
+const renderPanel = (
+  props: { onReassign?: (person: PersonResponseDto) => void; assetType?: AssetTypeEnum; onClose?: () => void } = {},
+) =>
   renderWithTooltips(AssignFaceSidePanel, {
     editedFace,
     assetId: 'asset-1',
     assetType: props.assetType ?? AssetTypeEnum.Image,
-    onClose: vi.fn(),
+    onClose: props.onClose ?? vi.fn(),
     onCreatePerson: vi.fn(),
     onReassign: props.onReassign ?? vi.fn(),
   });
@@ -130,6 +132,18 @@ describe('AssignFaceSidePanel', () => {
     await renderPanel();
 
     await expect.element(page.getByPlaceholder('search_people')).toBeInTheDocument();
+  });
+
+  // The field is focused on open, and `PersonSidePanel`'s document-level Escape skips keys typed
+  // into a text field, so the picker's own field has to hand Escape back as a close.
+  it('focuses the search field on open and closes on Escape', async () => {
+    const onClose = vi.fn();
+    await renderPanel({ onClose });
+    await expect.element(page.getByPlaceholder('search_people')).toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   // `getAllPeople` serves one page, so filtering the loaded list client-side would silently stop

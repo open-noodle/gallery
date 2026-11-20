@@ -1,9 +1,9 @@
 <script lang="ts">
-  import PersonPickerGrid, { type PickerCandidate } from '#lib/components/faces-page/PersonPickerGrid.svelte';
   import VideoFaceSightings from '#lib/gallery/asset-viewer/VideoFaceSightings.svelte';
+  import PersonPickerGrid, { type PickerCandidate } from '#lib/gallery/people/PersonPickerGrid.svelte';
   import { IconButton, Input } from '@immich/ui';
   import { mdiArrowLeftThin } from '@mdi/js';
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
@@ -66,6 +66,24 @@
     searchActions,
     videoFace,
   }: Props = $props();
+
+  let searchInputEl: HTMLInputElement | null = $state(null);
+
+  onMount(() => searchInputEl?.focus());
+
+  /**
+  The field is focused on open, and both callers close the picker with a document-level Escape
+  shortcut, which skips keys typed into a text field. So the field closes the picker itself, and
+  marks the key handled so the callers' shortcut does not also close their whole side panel.
+  Escape while an input method is composing only cancels the composition.
+  */
+  const onSearchKeydown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.isComposing) {
+      return;
+    }
+    event.preventDefault();
+    onClose();
+  };
 </script>
 
 <section
@@ -97,7 +115,14 @@
       <VideoFaceSightings faceIds={[videoFace.id]} canEdit={videoFace.canEdit} />
     {/if}
     <div class="mb-4 flex gap-2">
-      <Input placeholder={$t('search_people')} bind:value={query} oninput={() => onQueryChange?.(query)} size="tiny" />
+      <Input
+        placeholder={$t('search_people')}
+        bind:value={query}
+        bind:ref={searchInputEl}
+        oninput={() => onQueryChange?.(query)}
+        onkeydown={onSearchKeydown}
+        size="tiny"
+      />
       {#if searchActions}
         {@render searchActions()}
       {/if}

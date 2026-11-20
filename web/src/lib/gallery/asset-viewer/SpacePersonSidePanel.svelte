@@ -1,9 +1,9 @@
 <script lang="ts">
   import { shortcut } from '#lib/actions/shortcut.ts';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import { type PickerCandidate } from '#lib/components/faces-page/PersonPickerGrid.svelte';
-  import PersonPickerPanel from '#lib/components/faces-page/PersonPickerPanel.svelte';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
+  import { type PickerCandidate } from '#lib/gallery/people/PersonPickerGrid.svelte';
+  import PersonPickerPanel from '#lib/gallery/people/PersonPickerPanel.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { getSpacePersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';

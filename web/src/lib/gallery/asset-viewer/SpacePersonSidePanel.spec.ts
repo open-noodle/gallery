@@ -172,6 +172,30 @@ describe('SpacePersonSidePanel', () => {
     await expect.element(page.getByText('Bob')).toBeInTheDocument();
   });
 
+  // The picker focuses its search field on open, and this panel's document-level Escape skips keys
+  // typed into a text field. So Escape is caught in the field: it backs out of the picker only,
+  // and a second Escape (focus no longer in a field) closes the side panel as before.
+  it('backs out of the picker on Escape, then closes the panel on a second Escape', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Bob' })]);
+    const onClose = vi.fn();
+
+    await renderPanel({ onClose });
+    await vi.waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await page.getByRole('button', { name: 'select_new_face' }).click();
+    await expect.element(page.getByRole('textbox')).toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+
+    await expect.element(page.getByTestId('person-picker-panel')).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'select_new_face' })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   // Field report on #992 (pr-992-rc.3): the picker's only text field was the CREATE-person name
   // box, so typing a name filtered nothing and scrolling was the only way to reach anyone in a
   // space with hundreds of people -- which read as "assigning to an existing person is broken".
