@@ -1518,6 +1518,7 @@
   "spaces_show_on_timeline": "Показывать все фото Space на моей временной шкале",
   "spaces_show_people": "Показывать людей",
   "spaces_show_pets": "Показывать питомцев",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# объект не добавлен} few {# объекта не добавлены} many {# объектов не добавлено} other {# объекта не добавлены}} в Space. В Space можно добавлять только свои объекты или объекты партнёра.",
   "spaces_space": "Space",
   "spaces_space_load_failed": "Не удалось загрузить Space: {error}",
   "spaces_stop_sharing_person_metadata": "Перестать делиться именами людей",

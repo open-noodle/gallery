@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { PickerCollection } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
+  import { resolveSpaceShareableAssetIds } from '#lib/gallery/spaces/space-shareable-assets.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import CollectionPickerModal from '#lib/modals/CollectionPickerModal.svelte';
   import { addAssetsToCollections } from '#lib/services/collection.service.ts';
-  import { collectSearchResultAssetIds, type SearchTerms } from '#lib/services/search.service.ts';
+  import { collectSearchResultAssets, type SearchTerms } from '#lib/services/search.service.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { LoadingSpinner, Modal, ModalBody } from '@immich/ui';
+  import { LoadingSpinner, Modal, ModalBody, toastManager } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -29,8 +31,17 @@
     }
     pending = true;
     try {
-      const assetIds = await collectSearchResultAssetIds(terms, { smartSearchEnabled, language });
-      const ok = await addAssetsToCollections(collections, assetIds);
+      const assets = await collectSearchResultAssets(terms, { smartSearchEnabled, language });
+      const assetIds = assets.map(({ id }) => id);
+      // #1259: a space add fails as a whole on any asset the caller may not share, so spaces get only
+      // the caller's own and partners' assets. Albums keep the full selection.
+      const hasSpace = collections.some((c) => c.kind === 'space');
+      const spaceAssetIds = hasSpace ? await resolveSpaceShareableAssetIds(assets, authManager.user?.id) : [];
+      const ok = await addAssetsToCollections(collections, assetIds, { spaceAssetIds });
+      const skipped = assetIds.length - spaceAssetIds.length;
+      if (ok && hasSpace && skipped > 0) {
+        toastManager.warning($t('spaces_skipped_unshareable_assets', { values: { count: skipped } }));
+      }
       if (ok) {
         onClose();
       }

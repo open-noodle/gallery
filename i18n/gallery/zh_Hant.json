@@ -1531,6 +1531,7 @@
   "spaces_show_on_timeline": "在我的時間軸中顯示所有 Space 照片",
   "spaces_show_people": "顯示人物",
   "spaces_show_pets": "顯示寵物",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# 個項目} other {# 個項目}}未加入到 Space。只能將您自己或親友的項目加入到 Space。",
   "spaces_space": "Space",
   "spaces_space_load_failed": "載入 Space 失敗：{error}",
   "spaces_stop_sharing_person_metadata": "停止共享人物姓名",

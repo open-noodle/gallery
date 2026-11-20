@@ -1523,6 +1523,7 @@
   "spaces_show_on_timeline": "Show all space photos in my timeline",
   "spaces_show_people": "Show people",
   "spaces_show_pets": "Show pets",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# asset was} other {# assets were}} not added to spaces. You can only add your own or a partner's assets to a space.",
   "spaces_space": "Space",
   "spaces_space_load_failed": "Failed to load space: {error}",
   "spaces_stop_sharing_person_metadata": "Stop sharing person names",

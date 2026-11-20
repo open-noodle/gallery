@@ -1518,6 +1518,7 @@
   "spaces_show_on_timeline": "Mostrar todas las fotos del Space en mi línea de tiempo",
   "spaces_show_people": "Mostrar personas",
   "spaces_show_pets": "Mostrar mascotas",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# recurso no se ha añadido} other {# recursos no se han añadido}} a los Spaces. Solo puedes añadir a un Space tus propios recursos o los de un compañero.",
   "spaces_space": "Space",
   "spaces_space_load_failed": "Error al cargar el Space: {error}",
   "spaces_stop_sharing_person_metadata": "Dejar de compartir los nombres de las personas",

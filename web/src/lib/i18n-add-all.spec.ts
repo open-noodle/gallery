@@ -5,7 +5,12 @@ import { commands } from 'vitest/browser';
 const i18nDir = '../i18n/gallery/merged';
 
 const LOCALES = ['en', 'de', 'fr', 'it', 'nl', 'es'];
-const REQUIRED_KEYS = ['add_all_search_results', 'preparing_assets', 'spaces_hidden_too_many_assets'];
+const REQUIRED_KEYS = [
+  'add_all_search_results',
+  'preparing_assets',
+  'spaces_hidden_too_many_assets',
+  'spaces_skipped_unshareable_assets',
+];
 
 const load = async (locale: string): Promise<Record<string, unknown>> =>
   JSON.parse(await commands.readFile(`${i18nDir}/${locale}.json`, 'utf8'));

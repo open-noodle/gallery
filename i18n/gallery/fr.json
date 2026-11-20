@@ -1519,6 +1519,7 @@
   "spaces_show_on_timeline": "Afficher toutes les photos de l'espace dans ma Chronologie",
   "spaces_show_people": "Afficher les personnes",
   "spaces_show_pets": "Afficher les animaux",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# média n'a pas été ajouté} other {# médias n'ont pas été ajoutés}} aux espaces. Vous ne pouvez ajouter à un espace que vos propres médias ou ceux d'un partenaire.",
   "spaces_space": "Espace",
   "spaces_space_load_failed": "Échec du chargement de l'espace : {error}",
   "spaces_stop_sharing_person_metadata": "Ne plus partager les noms des Personnes",

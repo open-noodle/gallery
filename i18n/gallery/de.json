@@ -1520,6 +1520,7 @@
   "spaces_show_on_timeline": "Alle Space-Fotos in meiner Zeitleiste anzeigen",
   "spaces_show_people": "Personen anzeigen",
   "spaces_show_pets": "Haustiere anzeigen",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# Datei wurde} other {# Dateien wurden}} nicht zu Spaces hinzugefügt. Du kannst nur deine eigenen Dateien oder die eines Partners zu einem Space hinzufügen.",
   "spaces_space": "Space",
   "spaces_space_load_failed": "Space konnte nicht geladen werden: {error}",
   "spaces_stop_sharing_person_metadata": "Teilen von Personennamen beenden",

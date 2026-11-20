@@ -5,7 +5,7 @@ import { AssetTypeEnum } from '@immich/sdk';
 /**
 Maps the shared filter-panel state to metadata-search terms, so the exact filters that drive a
 timeline view can be replayed against `POST /search/metadata` to collect every matching asset id
-(see `collectSearchResultAssetIds`). Only the filter fields are mapped here — surface-specific
+(see `collectSearchResultAssets`). Only the filter fields are mapped here — surface-specific
 scoping (visibility, withPartners / withSharedSpaces, spaceId, albumIds, personId) is added by the
 caller, mirroring how each `build*TimelineOptions` helper scopes its own timeline query.
 */
