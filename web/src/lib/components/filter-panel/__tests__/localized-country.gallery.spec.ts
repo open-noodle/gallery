@@ -27,6 +27,16 @@ describe('localized country names', () => {
     expect(onSelectionChange).toHaveBeenCalledWith('Germany', undefined);
   });
 
+  it('lists countries in the order of their localized names', async () => {
+    await render(LocationFilter, {
+      props: { countries: ['Austria', 'Germany', 'Switzerland'], onCityFetch, onSelectionChange: () => {} },
+    });
+
+    await expect.element(page.getByTestId('location-country-Germany')).toBeInTheDocument();
+    const rows = page.getByTestId(/^location-country-/).elements();
+    expect(rows.map((row) => row.textContent?.trim())).toEqual(['Deutschland', 'Österreich', 'Schweiz']);
+  });
+
   it('finds a country by its localized or its English name', async () => {
     await render(LocationFilter, { props: { countries, onCityFetch, onSelectionChange: () => {} } });
     const input = page.getByTestId('location-search-input');

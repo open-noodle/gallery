@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { countryMatchesQuery, localizeCountry } from '#lib/gallery/utils/country-names.ts';
+  import { countryMatchesQuery, localizeCountry, sortCountries } from '#lib/gallery/utils/country-names.ts';
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { untrack } from 'svelte';
@@ -94,12 +94,15 @@
     cityCacheKey = nextKey;
   });
 
+  // Alphabetical by the label the row shows, so a localized list does not keep the English order.
+  let sortedCountries = $derived(sortCountries(countries, $locale));
+
   let filteredCountries = $derived.by(() => {
     if (!normalizedSearchQuery) {
-      return countries;
+      return sortedCountries;
     }
 
-    return countries.filter((country) => {
+    return sortedCountries.filter((country) => {
       const countryMatches = countryMatchesQuery(country, $locale, normalizedSearchQuery);
       const cityMatches =
         shouldFetchCitiesForSearch &&

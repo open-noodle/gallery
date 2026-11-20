@@ -1,4 +1,4 @@
-import { countryMatchesQuery, localizeCountry } from '#lib/gallery/utils/country-names.ts';
+import { countryMatchesQuery, localizeCountry, sortCountries } from '#lib/gallery/utils/country-names.ts';
 
 describe('localizeCountry', () => {
   it('translates a stored GeoNames name into the UI language', () => {
@@ -39,5 +39,25 @@ describe('countryMatchesQuery', () => {
     expect(countryMatchesQuery('Germany', 'de', 'deutsch')).toBe(true);
     expect(countryMatchesQuery('Germany', 'de', 'germ')).toBe(true);
     expect(countryMatchesQuery('Germany', 'de', 'france')).toBe(false);
+  });
+});
+
+describe('sortCountries', () => {
+  const stored = ['Austria', 'Germany', 'South Africa', 'Switzerland', 'United States'];
+
+  it('orders by the localized name and returns the stored names', () => {
+    expect(sortCountries(stored, 'de')).toEqual(['Germany', 'Austria', 'Switzerland', 'South Africa', 'United States']);
+  });
+
+  it('keeps the English order for English and unknown locales', () => {
+    expect(sortCountries(stored, 'en-US')).toEqual(stored);
+    expect(sortCountries(stored, 'not a locale')).toEqual(stored);
+    expect(sortCountries(stored)).toEqual(stored);
+  });
+
+  it('does not change the input', () => {
+    const input = ['Switzerland', 'Germany'];
+    sortCountries(input, 'de');
+    expect(input).toEqual(['Switzerland', 'Germany']);
   });
 });

@@ -292,3 +292,28 @@ export const localizeCountry = (name: string, locale?: string | null): string =>
 /** True when `query` (already lowercased) is in the stored name or in its localized form. */
 export const countryMatchesQuery = (name: string, locale: string | null | undefined, query: string): boolean =>
   name.toLowerCase().includes(query) || localizeCountry(name, locale).toLowerCase().includes(query);
+
+const collatorsByLocale = new Map<string, Intl.Collator>();
+
+const getCollator = (locale: string | null | undefined) => {
+  const key = locale ?? '';
+  let collator = collatorsByLocale.get(key);
+  if (!collator) {
+    try {
+      collator = new Intl.Collator(locale && locale !== 'dev' ? [locale] : undefined, { sensitivity: 'base' });
+    } catch {
+      collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+    }
+    collatorsByLocale.set(key, collator);
+  }
+  return collator;
+};
+
+/** The stored names, ordered by the name the UI shows for them (the server orders by the stored English name). */
+export const sortCountries = (names: readonly string[], locale?: string | null): string[] => {
+  const collator = getCollator(locale);
+  return names
+    .map((name) => ({ name, label: localizeCountry(name, locale) }))
+    .sort((a, b) => collator.compare(a.label, b.label))
+    .map(({ name }) => name);
+};
