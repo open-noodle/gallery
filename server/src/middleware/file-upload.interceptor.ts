@@ -137,6 +137,7 @@ export class FileUploadInterceptor implements NestInterceptor {
         const checksum = hash?.digest();
         const uploadError = getUploadError(head(), checksum, request.headers);
         if (uploadError) {
+          this.assetService.onUploadError(request, file).catch(this.logger.error);
           return callback(new BadRequestException(uploadError));
         }
         callback(null, {
