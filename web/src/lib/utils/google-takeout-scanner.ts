@@ -138,41 +138,125 @@ async function getZipEntryFile(zipFile: File, entryPath: string, name: string, l
   }
 }
 
-function trackItemStats(
-  metadata: TakeoutMetadata | undefined,
-  filePath: string,
-  progress: ScanProgress,
-): string | undefined {
+function trackMediaStats(filePath: string, progress: ScanProgress): void {
   // Tentative album name for progress display only. Authoritative value is
   // written later by finalizeItemAlbumNames once photoRoots is known.
   const parts = filePath.split('/');
-  let albumName: string | undefined;
   if (parts[0] === 'Takeout' && parts.length >= 4) {
-    albumName = parts[2];
-    progress.albumNames.add(albumName);
+    progress.albumNames.add(parts[2]);
   }
 
   progress.mediaCount++;
+}
 
-  if (metadata?.latitude !== undefined && metadata?.longitude !== undefined) {
+function trackMetadataStats(metadata: TakeoutMetadata, progress: ScanProgress): void {
+  if (metadata.latitude !== undefined && metadata.longitude !== undefined) {
     progress.withLocation++;
   }
-  if (metadata?.dateTaken) {
+  if (metadata.dateTaken) {
     progress.withDate++;
   }
-  if (metadata?.isFavorite) {
+  if (metadata.isFavorite) {
     progress.favorites++;
   }
-  if (metadata?.isArchived) {
+  if (metadata.isArchived) {
     progress.archived++;
   }
+}
 
-  return albumName;
+interface PendingSidecar {
+  path: string;
+  text: string;
+  metadata: TakeoutMetadata;
+}
+
+/**
+Media and sidecars still missing their partner. A Takeout split across parts can put a
+photo and its sidecar in different sources, so these wait for a later source.
+*/
+interface UnmatchedPool {
+  media: Map<string, TakeoutMediaItem>;
+  sidecars: PendingSidecar[];
+}
+
+function dirname(path: string): string {
+  return path.slice(0, Math.max(0, path.lastIndexOf('/')));
+}
+
+function indexByDir(index: Map<string, string[]>, path: string): void {
+  const dir = dirname(path);
+  const paths = index.get(dir);
+  if (paths) {
+    paths.push(path);
+  } else {
+    index.set(dir, [path]);
+  }
+}
+
+/**
+Match one source's sidecars and media against each other and the leftovers of earlier sources.
+Items are mutated in place; whatever is still unmatched stays in the pool.
+*/
+function matchWithPool(
+  pool: UnmatchedPool,
+  items: TakeoutMediaItem[],
+  sidecarTexts: Map<string, string>,
+  progress: ScanProgress,
+): void {
+  const candidates = new Map(pool.media);
+  const allByDir = new Map<string, string[]>();
+  const newByDir = new Map<string, string[]>();
+  for (const path of pool.media.keys()) {
+    indexByDir(allByDir, path);
+  }
+  for (const item of items) {
+    candidates.set(item.path, item);
+    indexByDir(allByDir, item.path);
+    indexByDir(newByDir, item.path);
+  }
+
+  const matched = new Map<string, TakeoutMetadata>();
+  const stillUnmatched: PendingSidecar[] = [];
+
+  const tryMatch = (sidecar: PendingSidecar, byDir: Map<string, string[]>) => {
+    const matches = matchSidecarToMedia(sidecar.path, sidecar.text, byDir.get(dirname(sidecar.path)) ?? []);
+    if (matches.length === 0) {
+      stillUnmatched.push(sidecar);
+      return;
+    }
+    for (const path of matches) {
+      matched.set(path, sidecar.metadata);
+    }
+  };
+
+  // A pooled sidecar already failed against the pooled media, so only new media can match it.
+  for (const sidecar of pool.sidecars) {
+    tryMatch(sidecar, newByDir);
+  }
+  for (const [path, text] of sidecarTexts) {
+    const metadata = parseGoogleTakeoutSidecar(text);
+    if (metadata) {
+      tryMatch({ path, text, metadata }, allByDir);
+    }
+  }
+
+  for (const [path, metadata] of matched) {
+    candidates.get(path)!.metadata = metadata;
+    trackMetadataStats(metadata, progress);
+    pool.media.delete(path);
+  }
+  for (const item of items) {
+    if (!item.metadata) {
+      pool.media.set(item.path, item);
+    }
+  }
+  pool.sidecars = stillUnmatched;
 }
 
 async function scanZipFile(
   zipFile: File,
   allItems: TakeoutMediaItem[],
+  pool: UnmatchedPool,
   progress: ScanProgress,
   onProgress?: (progress: ScanProgress) => void,
   signal?: AbortSignal,
@@ -185,7 +269,6 @@ async function scanZipFile(
 
   // Single pass: read all entries once to avoid stream reuse errors.
   // Wrap in try/finally to ensure reader is always closed.
-  const mediaPaths: string[] = [];
   const mediaDescriptors = new Map<string, ZipMediaDescriptor>();
   const sidecarTexts = new Map<string, string>();
 
@@ -214,7 +297,6 @@ async function scanZipFile(
           const name = basename(entry.filename);
           const lastModified = entry.lastModDate?.getTime() ?? zipFile.lastModified;
 
-          mediaPaths.push(entry.filename);
           mediaDescriptors.set(entry.filename, {
             path: entry.filename,
             name,
@@ -246,58 +328,30 @@ async function scanZipFile(
     await reader.close();
   }
 
-  // Match sidecars to media (no zip I/O needed)
-  const metadataMap = new Map<string, TakeoutMetadata>();
-  for (const [sidecarPath, text] of sidecarTexts) {
-    const matches = matchSidecarToMedia(sidecarPath, text, mediaPaths);
-    if (matches.length === 0) {
-      continue;
-    }
-    const metadata = parseGoogleTakeoutSidecar(text);
-    if (!metadata) {
-      continue;
-    }
-    for (const matchedPath of matches) {
-      metadataMap.set(matchedPath, metadata);
-    }
-  }
-
-  // Build items from media descriptors.
-  // mediaCount and albumNames were already updated during scanning,
-  // so only track metadata-dependent stats here (location, date, favorites, archived).
+  // mediaCount and albumNames were already updated during scanning.
+  const items: TakeoutMediaItem[] = [];
   for (const descriptor of mediaDescriptors.values()) {
-    const metadata = metadataMap.get(descriptor.path);
-
-    // Track metadata-dependent stats
-    if (metadata?.latitude !== undefined && metadata?.longitude !== undefined) {
-      progress.withLocation++;
-    }
-    if (metadata?.dateTaken) {
-      progress.withDate++;
-    }
-    if (metadata?.isFavorite) {
-      progress.favorites++;
-    }
-    if (metadata?.isArchived) {
-      progress.archived++;
-    }
-
-    allItems.push({
+    const item: TakeoutMediaItem = {
       path: descriptor.path,
       name: descriptor.name,
       size: descriptor.size,
       lastModified: descriptor.lastModified,
       getFile: () => getZipEntryFile(zipFile, descriptor.path, descriptor.name, descriptor.lastModified),
-      metadata,
+      metadata: undefined,
       albumName: undefined,
-    });
-    onProgress?.(progress);
+    };
+    items.push(item);
+    allItems.push(item);
   }
+
+  matchWithPool(pool, items, sidecarTexts, progress);
+  onProgress?.(progress);
 }
 
 async function scanFolderFiles(
   files: File[],
   allItems: TakeoutMediaItem[],
+  pool: UnmatchedPool,
   progress: ScanProgress,
   onProgress?: (progress: ScanProgress) => void,
   signal?: AbortSignal,
@@ -305,21 +359,17 @@ async function scanFolderFiles(
   // Classify files by their relative path
   const mediaFiles: File[] = [];
   const sidecarFiles: File[] = [];
-  const mediaPaths: string[] = [];
 
   for (const file of files) {
     const filePath = getFilePath(file);
     if (isMediaFile(filePath)) {
       mediaFiles.push(file);
-      mediaPaths.push(filePath);
     } else if (isSidecarFile(filePath)) {
       sidecarFiles.push(file);
     }
   }
 
-  // Read sidecars and match to media
-  const metadataMap = new Map<string, TakeoutMetadata>();
-
+  const sidecarTexts = new Map<string, string>();
   for (const sidecar of sidecarFiles) {
     checkAbort(signal);
 
@@ -327,29 +377,16 @@ async function scanFolderFiles(
     progress.currentFile = sidecarPath;
     onProgress?.(progress);
 
-    const text = await sidecar.text();
-    const matches = matchSidecarToMedia(sidecarPath, text, mediaPaths);
-    if (matches.length === 0) {
-      continue;
-    }
-    const metadata = parseGoogleTakeoutSidecar(text);
-    if (!metadata) {
-      continue;
-    }
-    for (const matchedPath of matches) {
-      metadataMap.set(matchedPath, metadata);
-    }
+    sidecarTexts.set(sidecarPath, await sidecar.text());
   }
 
-  // Build items from media files
+  const items: TakeoutMediaItem[] = [];
   for (const file of mediaFiles) {
     checkAbort(signal);
 
     const filePath = getFilePath(file);
     progress.currentFile = filePath;
-
-    const metadata = metadataMap.get(filePath);
-    trackItemStats(metadata, filePath, progress);
+    trackMediaStats(filePath, progress);
 
     const item: TakeoutMediaItem = {
       path: filePath,
@@ -357,13 +394,17 @@ async function scanFolderFiles(
       size: file.size,
       lastModified: file.lastModified,
       getFile: () => Promise.resolve(file),
-      metadata,
+      metadata: undefined,
       albumName: undefined,
     };
 
+    items.push(item);
     allItems.push(item);
     onProgress?.(progress);
   }
+
+  matchWithPool(pool, items, sidecarTexts, progress);
+  onProgress?.(progress);
 }
 
 export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult> {
@@ -398,6 +439,7 @@ export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult
   }
 
   progress.zipCount = zipFiles.length;
+  const pool: UnmatchedPool = { media: new Map(), sidecars: [] };
 
   // Process zip files
   for (let zipIndex = 0; zipIndex < zipFiles.length; zipIndex++) {
@@ -407,12 +449,12 @@ export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult
     progress.zipIndex = zipIndex;
     progress.currentZip = zipFile.name;
 
-    await scanZipFile(zipFile, allItems, progress, onProgress, signal);
+    await scanZipFile(zipFile, allItems, pool, progress, onProgress, signal);
   }
 
   // Process folder files
   if (folderFiles.length > 0) {
-    await scanFolderFiles(folderFiles, allItems, progress, onProgress, signal);
+    await scanFolderFiles(folderFiles, allItems, pool, progress, onProgress, signal);
   }
 
   const photoRoots = derivePhotoRoots(allItems);

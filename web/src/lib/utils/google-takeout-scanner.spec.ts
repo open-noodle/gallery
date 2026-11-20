@@ -596,3 +596,83 @@ describe('sidecar matching edge cases end-to-end', () => {
     expect(result.items[0].metadata!.latitude).toBe(48.8566);
   });
 });
+
+describe('sidecars and media split across sources', () => {
+  let scanTakeoutFiles: typeof import('#lib/utils/google-takeout-scanner.ts').scanTakeoutFiles;
+
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    const mod = await import('#lib/utils/google-takeout-scanner.ts');
+    scanTakeoutFiles = mod.scanTakeoutFiles;
+  });
+
+  const photoZip = () =>
+    createZipBlob([{ path: 'Takeout/Google Photos/Trip/IMG_001.jpg', content: 'photo' }]).then((blob) =>
+      blobToFile(blob, 'takeout-001.zip'),
+    );
+  const sidecarZip = () =>
+    createZipBlob([{ path: 'Takeout/Google Photos/Trip/IMG_001.jpg.json', content: makeSidecar() }]).then((blob) =>
+      blobToFile(blob, 'takeout-002.zip'),
+    );
+
+  it.each([
+    ['photo first', async () => [await photoZip(), await sidecarZip()]],
+    ['sidecar first', async () => [await sidecarZip(), await photoZip()]],
+  ])('matches a photo and sidecar in different zips (%s)', async (_label, getFiles) => {
+    const result = await scanTakeoutFiles({ files: await getFiles() });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].metadata?.latitude).toBe(48.8566);
+    expect(result.stats).toMatchObject({ totalMedia: 1, withLocation: 1, withDate: 1, favorites: 1 });
+    expect(result.albums.map((a) => a.name)).toEqual(['Trip']);
+  });
+
+  it('counts metadata stats once for a cross-zip match', async () => {
+    const result = await scanTakeoutFiles({ files: [await photoZip(), await sidecarZip()] });
+
+    expect(result.stats.withDate).toBe(1);
+    expect(result.stats.favorites).toBe(1);
+  });
+
+  it('matches a sidecar in a zip with a photo in a dropped folder', async () => {
+    const folderPhoto = createFileWithPath(
+      'photo',
+      'IMG_001.jpg',
+      'Takeout/Google Photos/Trip/IMG_001.jpg',
+      'image/jpeg',
+    );
+
+    const result = await scanTakeoutFiles({ files: [await sidecarZip(), folderPhoto] });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].metadata?.latitude).toBe(48.8566);
+    expect(result.stats.withLocation).toBe(1);
+  });
+
+  it('leaves a photo without metadata when no source holds its sidecar', async () => {
+    const result = await scanTakeoutFiles({ files: [await photoZip()] });
+
+    expect(result.items[0].metadata).toBeUndefined();
+    expect(result.stats.withDate).toBe(0);
+  });
+
+  it('does not retain a matched sidecar for an -edited variant in a later zip', async () => {
+    const first = blobToFile(
+      await createZipBlob([
+        { path: 'Takeout/Google Photos/Trip/IMAG.JPG', content: 'original' },
+        { path: 'Takeout/Google Photos/Trip/IMAG.JPG.supplemental-metadata.json', content: makeSidecar() },
+      ]),
+      'takeout-001.zip',
+    );
+    const second = blobToFile(
+      await createZipBlob([{ path: 'Takeout/Google Photos/Trip/IMAG-edited.JPG', content: 'edited' }]),
+      'takeout-002.zip',
+    );
+
+    const result = await scanTakeoutFiles({ files: [first, second] });
+
+    // The matched sidecar is not retained, so a later variant stays without metadata.
+    expect(result.items.find((i) => i.name === 'IMAG.JPG')?.metadata).toBeDefined();
+    expect(result.items.find((i) => i.name === 'IMAG-edited.JPG')?.metadata).toBeUndefined();
+  });
+});
