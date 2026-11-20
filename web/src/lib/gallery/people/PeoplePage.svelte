@@ -524,7 +524,7 @@
       loadedPages={currentPage}
       {loadNextPage}
       canEditNames={canEditName}
-      canShowActions={isPersonalPrimary}
+      canShowActions
       onNameSubmit={onNameChangeSubmit}
       searchNameSuggestions={searchPeopleWithSharedSpaces}
       {onSuggestionSelect}
@@ -539,13 +539,15 @@
           icon={mdiDotsVertical}
           title={$t('show_person_options')}
         >
-          <ActionMenuItem action={Actions.HidePerson} />
-          <ActionMenuItem action={Actions.SetDateOfBirth} />
-          <MenuOption
-            onClick={() => handleMergePeople(person)}
-            icon={mdiAccountMultipleCheckOutline}
-            text={$t('merge_people')}
-          />
+          {#if isPersonalPrimary(person)}
+            <ActionMenuItem action={Actions.HidePerson} />
+            <ActionMenuItem action={Actions.SetDateOfBirth} />
+            <MenuOption
+              onClick={() => handleMergePeople(person)}
+              icon={mdiAccountMultipleCheckOutline}
+              text={$t('merge_people')}
+            />
+          {/if}
           <ActionMenuItem action={Actions.Favorite} />
           <ActionMenuItem action={Actions.Unfavorite} />
         </ButtonContextMenu>

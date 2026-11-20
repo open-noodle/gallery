@@ -4,6 +4,7 @@ import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
+import { identityFavorite, reconcileIdentityFavorites } from 'src/gallery/utils/identity-favorite.js';
 import {
   clearOrphanPersonIdentity,
   personIdentityId,
@@ -304,6 +305,7 @@ export class GalleryPersonRepository {
       .values({ ownerId: input.ownerId, personGroupId: group.id, name: input.name })
       .execute();
     await writePersonSidecars(db, group.id, { type: input.type });
+    await reconcileIdentityFavorites(db, [input.identityId]);
 
     return { personGroupId: group.id };
   }
@@ -710,5 +712,57 @@ export class GalleryPersonRepository {
       .orderBy('person.personGroupId', 'asc')
       .limit(limit)
       .execute();
+  }
+
+  /** The identities among `identityIds` that the user has favorited, through their own person or the fallback row. */
+  async getFavoriteIdentityIds(userId: string, identityIds: string[]): Promise<Set<string>> {
+    if (identityIds.length === 0) {
+      return new Set();
+    }
+
+    const rows = await this.db
+      .selectFrom('face_identity')
+      .select('face_identity.id')
+      .where('face_identity.id', 'in', identityIds)
+      .where(identityFavorite(userId, sql.ref<string>('face_identity.id')))
+      .execute();
+    return new Set(rows.map(({ id }) => id));
+  }
+
+  /** Writes the user's own person when they have one for the identity, else the fallback row; never both. */
+  async setIdentityFavorite(userId: string, identityId: string, isFavorite: boolean): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      const owned = await trx
+        .selectFrom('person_identity')
+        .innerJoin('person', 'person.personGroupId', 'person_identity.personGroupId')
+        .select('person.personGroupId')
+        .where('person.ownerId', '=', userId)
+        .where('person_identity.identityId', '=', identityId)
+        .executeTakeFirst();
+
+      if (owned) {
+        await trx
+          .updateTable('person')
+          .set({ isFavorite })
+          .where('personGroupId', '=', owned.personGroupId)
+          .where('isFavorite', '!=', isFavorite)
+          .execute();
+      }
+
+      if (owned || !isFavorite) {
+        await trx
+          .deleteFrom('face_identity_favorite')
+          .where('userId', '=', userId)
+          .where('identityId', '=', identityId)
+          .execute();
+        return;
+      }
+
+      await trx
+        .insertInto('face_identity_favorite')
+        .values({ userId, identityId })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    });
   }
 }

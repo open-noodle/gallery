@@ -1,4 +1,4 @@
-import { updatePersonVisibility } from '#lib/gallery/people/person.service.ts';
+import { updatePersonFavorite, updatePersonVisibility } from '#lib/gallery/people/person.service.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import PersonEditBirthDateModal from '#lib/modals/PersonEditBirthDateModal.svelte';
@@ -38,11 +38,10 @@ export const getPersonActions = (
     onAction: () => modalManager.show(PersonEditBirthDateModal, { person }),
   };
 
-  // Shared space people have no favorite state, so don't offer it for them.
   const Favorite: ActionItem = {
     title: $t('to_favorite'),
     icon: mdiHeartOutline,
-    $if: () => !getSpaceProfile(person) && !person.isFavorite,
+    $if: () => !person.isFavorite,
     onAction: () => handleFavoritePerson(person),
     shortcuts: { key: 'f' },
   };
@@ -50,7 +49,7 @@ export const getPersonActions = (
   const Unfavorite: ActionItem = {
     title: $t('unfavorite'),
     icon: mdiHeartMinusOutline,
-    $if: () => !getSpaceProfile(person) && !!person.isFavorite,
+    $if: () => !!person.isFavorite,
     onAction: () => handleUnfavoritePerson(person),
     shortcuts: { key: 'f' },
   };
@@ -84,11 +83,11 @@ export const getPersonAssetActions = ($t: MessageFormatter, person: PersonRespon
   return { SetFeaturedPhoto };
 };
 
-const handleFavoritePerson = async (person: { id: string }) => {
+const handleFavoritePerson = async (person: PersonResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updatePerson({ id: person.id, personUpdateDto: { isFavorite: true } });
+    const response = await updatePersonFavorite(person, true);
     eventManager.emit('PersonUpdate', response);
     toastManager.primary($t('added_to_favorites'));
   } catch (error) {
@@ -96,11 +95,11 @@ const handleFavoritePerson = async (person: { id: string }) => {
   }
 };
 
-const handleUnfavoritePerson = async (person: { id: string }) => {
+const handleUnfavoritePerson = async (person: PersonResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updatePerson({ id: person.id, personUpdateDto: { isFavorite: false } });
+    const response = await updatePersonFavorite(person, false);
     eventManager.emit('PersonUpdate', response);
     toastManager.primary($t('removed_from_favorites'));
   } catch (error) {

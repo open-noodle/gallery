@@ -133,6 +133,7 @@ const SharedSpacePersonResponseSchema = z
     faceCount: z.int().describe('Number of faces assigned to this person'),
     assetCount: z.int().describe('Number of unique assets with this person'),
     alias: z.string().nullable().optional().describe('User-specific alias for this person'),
+    isFavorite: z.boolean().optional().describe('Whether the current user favorited this person'),
     createdAt: z.string().describe('Creation date'),
     updatedAt: z.string().describe('Last update date'),
     type: z.string().optional().describe('Person type (person or pet)'),

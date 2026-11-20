@@ -434,13 +434,34 @@ describe('Spaces person detail page', () => {
     expect(invalidateAllMock).toHaveBeenCalled();
   });
 
-  it('does not expose person actions to viewers', async () => {
+  it('exposes only favorite to viewers', async () => {
     await renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
-    await expect.element(page.getByLabelText('show_person_options')).not.toBeInTheDocument();
+    await expect.element(page.getByText('to_favorite')).toBeInTheDocument();
     await expect.element(page.getByText('set_date_of_birth')).not.toBeInTheDocument();
     await expect.element(page.getByText('merge_people')).not.toBeInTheDocument();
     await expect.element(page.getByText('separate_from_grouped_person')).not.toBeInTheDocument();
+    await expect.element(page.getByText('hide_person')).not.toBeInTheDocument();
+  });
+
+  it.each([SharedSpaceRole.Viewer, SharedSpaceRole.Editor])('favorites the person as a %s', async (role) => {
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined);
+    await renderPage({ members: [makeMember({ role })], person: makePerson({ isFavorite: false }) });
+
+    await userEvent.click(page.getByText('to_favorite'));
+
+    expect(sdkMock.favoriteSpacePerson).toHaveBeenCalledExactlyOnceWith({ id: 'space-1', personId: 'person-1' });
+    await expect.element(page.getByText('unfavorite')).toBeInTheDocument();
+  });
+
+  it('unfavorites a favorited person', async () => {
+    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined);
+    await renderPage({ person: makePerson({ isFavorite: true }) });
+
+    await userEvent.click(page.getByText('unfavorite'));
+
+    expect(sdkMock.unfavoriteSpacePerson).toHaveBeenCalledExactlyOnceWith({ id: 'space-1', personId: 'person-1' });
+    await expect.element(page.getByText('to_favorite')).toBeInTheDocument();
   });
 
   it('opens the representative face picker for editors', async () => {

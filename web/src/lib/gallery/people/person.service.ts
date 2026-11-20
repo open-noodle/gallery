@@ -9,8 +9,10 @@ import {
   ScopedPersonProfileType,
   SharedSpaceRole,
   detachScopedPerson,
+  favoriteSpacePerson,
   getPersonFaces,
   getSpacePersonFaces,
+  unfavoriteSpacePerson,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,
@@ -52,6 +54,19 @@ export const updatePersonVisibility = async (
     return { ...person, isHidden: updated.isHidden };
   }
   return updatePerson({ id: person.id, personUpdateDto: { isHidden } });
+};
+
+export const updatePersonFavorite = async (
+  person: PersonResponseDto,
+  isFavorite: boolean,
+): Promise<PersonResponseDto> => {
+  const profile = getSpaceProfile(person);
+  if (profile) {
+    const request = { id: profile.spaceId, personId: profile.id };
+    await (isFavorite ? favoriteSpacePerson(request) : unfavoriteSpacePerson(request));
+    return { ...person, isFavorite };
+  }
+  return updatePerson({ id: person.id, personUpdateDto: { isFavorite } });
 };
 
 export const getPersonFacesPage = (

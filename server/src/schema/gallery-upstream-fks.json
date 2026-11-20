@@ -98,6 +98,7 @@
         "asset_quality_ownerId_fkey",
         "cleanup_day_review_userId_fkey",
         "cleanup_decision_userId_fkey",
+        "face_identity_favorite_userId_fkey",
         "face_person_verdict_actorId_fkey",
         "face_repair_decline_declinedBy_fkey",
         "face_repair_scan_requestedBy_fkey",

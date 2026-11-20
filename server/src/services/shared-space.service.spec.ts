@@ -6328,6 +6328,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Has Thumb');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6355,6 +6356,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('person');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: expect.any(String),
         withHidden: false,
         petsEnabled: false,
         minimumFaceCount: 3,
@@ -6382,6 +6384,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Visible');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: expect.any(String),
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6412,6 +6415,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(2);
       expect(result.map((r) => r.type)).toEqual(expect.arrayContaining(['person', 'pet']));
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: expect.any(String),
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6451,6 +6455,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Temporal Person');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6487,6 +6492,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(1);
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6527,6 +6533,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('In Range');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6592,6 +6599,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(0);
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6618,6 +6626,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(0);
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6662,6 +6671,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(1);
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: expect.any(String),
         withHidden: true,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6687,6 +6697,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(0);
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: expect.any(String),
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6711,6 +6722,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { limit: 10 });
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6735,6 +6747,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { name: 'Ali', limit: 5 } as never);
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6795,6 +6808,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { withHidden: true, takenAfter, limit: 5 });
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: true,
         petsEnabled: false,
         minimumFaceCount: 3,
@@ -6819,6 +6833,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { limit: 50, offset: 10 });
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6843,6 +6858,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { named: true });
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6867,6 +6883,7 @@ describe(SharedSpaceService.name, () => {
       await sut.getSpacePeople(auth, spaceId, { named: true, withHidden: true });
 
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: true,
         petsEnabled: true,
         minimumFaceCount: 3,
@@ -6908,6 +6925,7 @@ describe(SharedSpaceService.name, () => {
       const [, options] = mocks.sharedSpace.getPersonsBySpaceId.mock.calls.at(-1)!;
       expect(options.type).toBe('pet');
       expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        viewerUserId: auth.user.id,
         withHidden: false,
         petsEnabled: true,
         minimumFaceCount: 3,

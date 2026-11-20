@@ -107,6 +107,8 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
 
   mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
   mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set<string>());
+  // Every space person read looks up the viewer's favorites.
+  mocks.galleryPerson.getFavoriteIdentityIds.mockResolvedValue(new Set<string>());
   // IntegrityService.handleUntrackedFiles reads it on every scan batch.
   mocks.spatialScene.getPathsByPaths.mockResolvedValue([]);
   mocks.dataSaverVideo.getPathsByPaths.mockResolvedValue([]);
