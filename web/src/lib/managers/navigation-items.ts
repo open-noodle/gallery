@@ -12,6 +12,7 @@ import {
   mdiClockOutline,
   mdiCog,
   mdiDatabaseOutline,
+  mdiFamilyTree,
   mdiFileCheckOutline,
   mdiFileDocumentOutline,
   mdiFolderOutline,
@@ -65,6 +66,7 @@ test in navigation-items.spec.ts grep-validates against that source file.
 const SYSTEM_SETTINGS_SOURCE: ReadonlyArray<[key: string, baseKey: string, icon: string]> = [
   ['authentication', 'authentication_settings', mdiLockOutline],
   ['backup', 'backup_settings', mdiBackupRestore],
+  ['family', 'family_admin_settings', mdiFamilyTree],
   ['image', 'image_settings', mdiImageOutline],
   ['integrity-checks', 'integrity_checks_settings', mdiFileCheckOutline],
   ['job', 'job_settings', mdiSync],

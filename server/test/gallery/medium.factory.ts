@@ -24,6 +24,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -39,6 +40,16 @@ export type Dep = (typeof BASE_SERVICE_DEPENDENCIES)[number] | (typeof GALLERY_R
 // `instances[i]` belongs to `deps[i]`; a repository listed in both dependency lists resolves to one instance.
 export const withGalleryRepositories = (deps: Dep[], instances: unknown[]) => {
   const byDep = new Map<Dep, unknown>(deps.map((dep) => [dep, instances[deps.indexOf(dep)]]));
+  // Every identity merge repoints family data (IdentityMergePropagationService.executePlanInTransaction calls
+  // repointIdentities unconditionally), so a spec that never listed FamilyRepository still needs a stand-in, not
+  // `undefined`. A non-strict automock resolves quietly: those specs never configure repointIdentities, and its
+  // `Promise<void>` result is exactly what an unconfigured mock returns.
+  if (byDep.get(FamilyRepository) === undefined) {
+    byDep.set(
+      FamilyRepository,
+      automock(FamilyRepository, { args: [undefined, { setContext: () => {} }], strict: false }),
+    );
+  }
   const galleryRepositories = GALLERY_REPOSITORY_DEPENDENCIES.map((dep) => byDep.get(dep));
   byDep.set(
     GalleryRepositories,
@@ -71,6 +82,10 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case DataSaverVideoRepository:
     case VideoFaceRepository: {
       return new key(db) as InstanceType<T>;
+    }
+
+    case FamilyRepository: {
+      return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
 
     case ClassificationRepository:
@@ -107,6 +122,10 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case DataSaverVideoRepository:
     case VideoFaceRepository: {
       return automock(key);
+    }
+
+    case FamilyRepository: {
+      return automock(FamilyRepository, { args: [undefined, { setContext: () => {} }] });
     }
 
     case QueueMaintenanceRepository: {

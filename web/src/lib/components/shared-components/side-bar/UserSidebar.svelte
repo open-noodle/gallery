@@ -6,6 +6,7 @@
   import BottomInfo from '#lib/gallery/sidebar/SidebarBottomInfo.svelte';
   import SpacesNavItem from '#lib/gallery/sidebar/SpacesNavItem.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { familyAccessManager } from '#lib/managers/family-access-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { Route } from '#lib/route.ts';
@@ -20,6 +21,7 @@
     mdiCards,
     mdiCardsOutline,
     mdiDatabaseImportOutline,
+    mdiFamilyTree,
     mdiFolderOutline,
     mdiHeart,
     mdiHeartOutline,
@@ -63,6 +65,13 @@
 
   {#if authManager.preferences.people.enabled && authManager.preferences.people.sidebarWeb}
     <NavbarItem title={$t('people')} href={Route.people()} icon={mdiAccountOutline} activeIcon={mdiAccount} />
+  {/if}
+
+  <!-- Gallery-fork: family relationships (A1/A12). Renders nothing at all — not a disabled entry
+       — when the viewer's effective family access is `none`, so this feature never advertises
+       itself to someone who cannot use it. Placed immediately after People per the design spec. -->
+  {#if familyAccessManager.granted}
+    <NavbarItem title={$t('family_canvas_nav_item')} href={Route.family()} icon={mdiFamilyTree} />
   {/if}
 
   {#if authManager.preferences.sharedLinks.enabled && authManager.preferences.sharedLinks.sidebarWeb}

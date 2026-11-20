@@ -120,6 +120,8 @@ describe('/server', () => {
         spatialScene: false,
         // off on the e2e stack: Data Saver video ships disabled
         dataSaverVideo: false,
+        // off on the e2e stack: family relationships ship disabled
+        familyTree: false,
         // The full list mirrors the SyncRequestType enum; pin the fork's space-album types,
         // which mobile's sync gate opens on (capability signalling).
         syncRequestTypes: expect.arrayContaining([
