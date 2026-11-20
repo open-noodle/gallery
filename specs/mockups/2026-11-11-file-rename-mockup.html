@@ -14,6 +14,7 @@
         --txt: #eceef2;
         --pri: #adcbfa;
         --warn: #fbbf24;
+        --err: #f87171;
       }
       * {
         box-sizing: border-box;
@@ -191,6 +192,14 @@
         color: var(--mut);
         font-size: 14px;
       }
+      .dialog .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--txt);
+      }
       .dialog .actions {
         display: flex;
         justify-content: flex-end;
@@ -212,6 +221,44 @@
         border-color: var(--pri);
         color: #0f1012;
         font-weight: 600;
+      }
+      .btn.danger {
+        background: var(--err);
+        border-color: var(--err);
+        color: #0f1012;
+        font-weight: 600;
+      }
+      .btn[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .namefield.bad {
+        border-color: var(--err);
+      }
+      .errtext {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--err);
+      }
+      .dialog p.body {
+        font-size: 13px;
+        color: var(--mut);
+      }
+      .dialog .item {
+        margin-top: 12px;
+        padding: 10px 12px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .dialog .item small {
+        display: block;
+        margin-top: 2px;
+        color: var(--mut);
+        font-size: 12px;
       }
       .toast {
         position: absolute;
@@ -264,14 +311,17 @@
   <body class="gx">
     <header class="intro">
       <h1>File rename: asset viewer</h1>
-      <p>A pencil on the filename row in the info panel renames the file. Only the owner sees it.</p>
+      <p>A pencil on the filename row in the info panel renames the file's name. Only the owner sees it. It opens stage 2 for a user-library asset and stage 3 for an external-library asset.</p>
     </header>
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-s="1" aria-selected="true">1 · Owner, info panel</button>
-      <button class="tab" role="tab" data-s="2">2 · Rename dialog</button>
-      <button class="tab" role="tab" data-s="3">3 · Renamed</button>
-      <button class="tab" role="tab" data-s="4">4 · Space viewer, no pencil</button>
+      <button class="tab" role="tab" data-s="2">2 · Rename dialog (user library)</button>
+      <button class="tab" role="tab" data-s="3">3 · Rename dialog (external library)</button>
+      <button class="tab" role="tab" data-s="4">4 · Renamed</button>
+      <button class="tab" role="tab" data-s="5">5 · Space viewer, no pencil</button>
+      <button class="tab" role="tab" data-s="6">6 · Name taken by a file</button>
+      <button class="tab" role="tab" data-s="7">7 · Name held by a trashed item</button>
     </div>
 
     <main>
@@ -330,7 +380,7 @@
               </div>
               <div class="actions">
                 <button class="btn" data-go="1">Cancel</button>
-                <button class="btn primary" data-go="3">Rename</button>
+                <button class="btn primary" data-go="4">Rename</button>
               </div>
             </div>
           </div>
@@ -338,6 +388,45 @@
       </section>
 
       <section class="screen" id="s3" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file" data-go="3">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+          <div class="scrim">
+            <div class="dialog" role="dialog" aria-label="Rename file">
+              <h2>Rename file</h2>
+              <label for="fn-ext">Name</label>
+              <div class="namefield">
+                <input class="field" id="fn-ext" value="Beach 2006-08" />
+                <span class="ext">.jpg</span>
+              </div>
+              <label class="check"><input type="checkbox" /> Also rename on disk</label>
+              <div class="actions">
+                <button class="btn" data-go="1">Cancel</button>
+                <button class="btn primary" data-go="4">Rename</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s4" hidden>
         <div class="frame">
           <div class="photo">Photo</div>
           <aside class="info">
@@ -366,7 +455,7 @@
         </div>
       </section>
 
-      <section class="screen" id="s4" hidden>
+      <section class="screen" id="s5" hidden>
         <div class="frame">
           <div class="photo">Photo</div>
           <aside class="info">
@@ -388,14 +477,102 @@
           </aside>
         </div>
       </section>
+
+      <section class="screen" id="s6" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+          <div class="scrim">
+            <div class="dialog" role="dialog" aria-label="Rename file">
+              <h2>Rename file</h2>
+              <label for="fn-taken">Name</label>
+              <div class="namefield bad">
+                <input class="field" id="fn-taken" value="IMG_0008" aria-invalid="true" />
+                <span class="ext">.jpg</span>
+              </div>
+              <div class="errtext" role="alert">
+                <span>&#9888;</span>
+                <span>A file named IMG_0008.jpg already exists in this folder. Choose another name.</span>
+              </div>
+              <label class="check"><input type="checkbox" checked /> Also rename on disk</label>
+              <div class="actions">
+                <button class="btn" data-go="1">Cancel</button>
+                <button class="btn primary" disabled>Rename</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s7" hidden>
+        <div class="frame">
+          <div class="photo">Photo</div>
+          <aside class="info">
+            <div class="info-row">
+              <span class="ico">&#128197;</span>
+              <div class="val">Tue, 15 Aug 2006, 14:02<button class="ibtn" aria-label="Edit date">&#9998;</button></div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9635;</span>
+              <div class="val">
+                IMG_0007.jpg
+                <button class="ibtn" aria-label="Show file location">&#9432;</button>
+                <button class="ibtn" aria-label="Rename file">&#9998;</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="ico">&#9638;</span>
+              <div class="val">4032 × 3024<small>2.4 MB</small></div>
+            </div>
+          </aside>
+          <div class="scrim">
+            <div class="dialog" role="alertdialog" aria-label="Replace trashed item">
+              <h2>Delete the trashed item and rename?</h2>
+              <p class="body">A trashed item already uses the name Beach 2006-08.jpg. It is not on disk. Renaming deletes it permanently, with its albums, faces and edits.</p>
+              <div class="item">
+                Beach 2006-08.jpg
+                <small>Trashed 3 Nov 2026</small>
+              </div>
+              <div class="actions">
+                <button class="btn" data-go="3">Cancel</button>
+                <button class="btn danger" data-go="4">Delete it and rename</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <section class="notes" style="margin-top: 28px">
       <div><b>Placement.</b> The pencil sits on the filename row, next to the existing location button. The date row already has an owner-only pencil for the same kind of edit.</div>
       <div><b>Why not the overflow menu.</b> The filename is already in the info panel, and the viewer's overflow menu already holds many actions. Two entry points for one value would drift apart, so the mockup uses one.</div>
-      <div><b>Who can rename.</b> Owners only, gated like the date pencil. A space viewer sees the filename and location button with no pencil (stage 4).</div>
-      <div><b>Dialog.</b> The name field is the filename without its extension. The extension is shown after the field and cannot be changed here.</div>
-      <div><b>Open.</b> The mockup does not decide whether the file on disk is renamed or only the name Gallery shows. That needs a decision before the rename spec.</div>
+      <div><b>Who can rename.</b> Owners only, gated like the date pencil. A space viewer sees the filename and location button with no pencil (stage 5).</div>
+      <div><b>Dialog.</b> The name field is the filename without its extension. The extension is shown after the field and cannot be changed here. On save, the extension is normalized as a templated rename does (for example .JPEG becomes .jpg).</div>
+      <div><b>Also rename on disk (stage 3).</b> The external library dialog adds one checkbox, unchecked by default. Unchecked changes only the name Gallery shows. Checked also renames the file on disk, with its sidecar.</div>
+      <div><b>Which dialog.</b> Stage 2 is for user-library assets. Their display name changes and the file never does, so it has no checkbox. Stage 3 is for external-library assets and adds the checkbox.</div>
+      <div><b>Extension.</b> Every rename writes the normalized extension to the name Gallery shows, checked or not. Only a checked external rename also changes the file on disk, so the disk may keep its own extension (spec open question 16, decided).</div>
+      <div><b>Name checks (stages 6 and 7).</b> They apply only when "Also rename on disk" is checked. Unchecked, the path does not change, so nothing can clash.</div>
+      <div><b>Live check (stage 6).</b> While the user types, and when the box is ticked, the dialog asks the server whether the new file name is free. A file already at that path shows the red message and greys out Rename. The server checks again when Rename is pressed, so a name taken in the meantime is refused.</div>
+      <div><b>Trashed item (stage 7).</b> If the name is held by an item the user trashed (its file is not on disk), pressing Rename opens this confirmation. Cancel goes back to the rename dialog.</div>
+      <div><b>Offline item (no dialog).</b> If the name is held by an item that went offline because its file disappeared, the row is deleted and the rename goes ahead, with no extra step.</div>
+      <div><b>Live photos.</b> The name is checked for both files of the pair. Either one clashing blocks the rename.</div>
     </section>
 
     <script>
