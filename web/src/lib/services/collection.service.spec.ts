@@ -110,6 +110,35 @@ describe('addAssetsToCollections', () => {
     expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], assetIds, { notify: true }); // total becomes 1 → single path
   });
 
+  it('spaceAssetIds narrows what spaces receive while albums keep the full selection', async () => {
+    await expect(
+      addAssetsToCollections([albumCol('a1'), spaceCol('s1')], ['mine', 'theirs'], { spaceAssetIds: ['mine'] }),
+    ).resolves.toBe(true);
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['mine', 'theirs'], { notify: false });
+    expect(addAssetsToSpace).toHaveBeenCalledWith('s1', ['mine'], { notify: false, hiddenFromMyTimeline: false });
+  });
+
+  it('single space with spaceAssetIds receives only those ids', async () => {
+    await expect(
+      addAssetsToCollections([spaceCol('s1')], ['mine', 'theirs'], { spaceAssetIds: ['mine'] }),
+    ).resolves.toBe(true);
+    expect(addAssetsToSpace).toHaveBeenCalledWith('s1', ['mine'], { notify: true, hiddenFromMyTimeline: false });
+  });
+
+  it('skips spaces when spaceAssetIds is empty, still adding to albums', async () => {
+    await expect(
+      addAssetsToCollections([albumCol('a1'), spaceCol('s1')], ['theirs'], { spaceAssetIds: [] }),
+    ).resolves.toBe(true);
+    expect(addAssetsToSpace).not.toHaveBeenCalled();
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['theirs'], { notify: true });
+  });
+
+  it('spaces-only selection with empty spaceAssetIds is a no-op and returns true', async () => {
+    await expect(addAssetsToCollections([spaceCol('s1')], ['theirs'], { spaceAssetIds: [] })).resolves.toBe(true);
+    expect(addAssetsToSpace).not.toHaveBeenCalled();
+    expect(primary).not.toHaveBeenCalled();
+  });
+
   it('empty selection is a no-op and returns true', async () => {
     await expect(addAssetsToCollections([], ['x'])).resolves.toBe(true);
     expect(addAssetsToAlbums).not.toHaveBeenCalled();

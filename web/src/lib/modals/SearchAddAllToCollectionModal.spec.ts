@@ -16,7 +16,7 @@ const { mockUser, mockAdd, mockCollect, mockHandleError } = vi.hoisted(() => ({
   mockHandleError: vi.fn(),
 }));
 vi.mock('#lib/services/collection.service.js', () => ({ addAssetsToCollections: mockAdd }));
-vi.mock('#lib/services/search.service.js', () => ({ collectSearchResultAssetIds: mockCollect }));
+vi.mock('#lib/services/search.service.js', () => ({ collectSearchResultAssets: mockCollect }));
 vi.mock('#lib/utils/handle-error.js', () => ({ handleError: mockHandleError }));
 vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
   authManager: {
@@ -51,7 +51,11 @@ beforeEach(() => {
   vi.resetAllMocks();
   mockUser.current = { id: 'me', isAdmin: false };
   mockAdd.mockResolvedValue(true);
-  mockCollect.mockResolvedValue(['1', '2', '3']);
+  mockCollect.mockResolvedValue([
+    { id: '1', ownerId: 'me' },
+    { id: '2', ownerId: 'me' },
+    { id: '3', ownerId: 'me' },
+  ]);
   sdkMock.getAllAlbums.mockImplementation(({ isShared }: { isShared?: boolean }) =>
     Promise.resolve(isShared ? [] : [album('a1', 'Trip')]),
   );
@@ -73,13 +77,15 @@ describe('SearchAddAllToCollectionModal', () => {
     await vi.waitFor(() =>
       expect(mockCollect).toHaveBeenCalledWith({ isFavorite: true }, { smartSearchEnabled: false, language: 'en' }),
     );
-    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2', '3']);
+    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2', '3'], {
+      spaceAssetIds: ['1', '2', '3'],
+    });
     await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
   it('shows the preparing indicator while collecting', async () => {
-    let resolveCollect!: (ids: string[]) => void;
-    mockCollect.mockReturnValue(new Promise<string[]>((resolve) => (resolveCollect = resolve)));
+    let resolveCollect!: (assets: unknown[]) => void;
+    mockCollect.mockReturnValue(new Promise<unknown[]>((resolve) => (resolveCollect = resolve)));
     await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose: vi.fn() });
 
     const trip = await vi.waitFor(() => {
@@ -90,7 +96,7 @@ describe('SearchAddAllToCollectionModal', () => {
     await userEvent.click(trip[0]);
 
     await vi.waitFor(() => page.getByTestId('preparing-indicator').element());
-    resolveCollect(['1']);
+    resolveCollect([{ id: '1', ownerId: 'me' }]);
   });
 
   it('closes without collecting or adding when dismissed', async () => {
@@ -147,5 +153,38 @@ describe('SearchAddAllToCollectionModal', () => {
     await render(SearchAddAllToCollectionModal, { ...baseProps({ total: 50_001 }), onClose: vi.fn() });
 
     await vi.waitFor(() => page.getByTestId('spaces-hidden-notice').element());
+  });
+
+  it('gives a space only the caller’s own assets when the results include other users’ photos', async () => {
+    mockCollect.mockResolvedValue([
+      { id: '1', ownerId: 'me' },
+      { id: '2', ownerId: 'someone-else' },
+      { id: '3', ownerId: 'me' },
+    ]);
+    sdkMock.getAllSpaces.mockResolvedValue([
+      {
+        id: 's1',
+        name: 'Family',
+        createdById: 'me',
+        members: [],
+        memberCount: 1,
+        assetCount: 1,
+        recentAssetIds: [],
+      } as unknown as SharedSpaceResponseDto,
+    ]);
+    const onClose = vi.fn();
+    await render(SearchAddAllToCollectionModal, { ...baseProps(), onClose });
+
+    const family = await vi.waitFor(() => {
+      const found = page.getByRole('button', { name: /Family/ }).elements();
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    await userEvent.click(family[0]);
+
+    await vi.waitFor(() => expect(mockAdd).toHaveBeenCalledOnce());
+    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 's1', kind: 'space' })], ['1', '2', '3'], {
+      spaceAssetIds: ['1', '3'],
+    });
   });
 });

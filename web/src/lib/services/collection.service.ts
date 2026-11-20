@@ -24,12 +24,18 @@ type AddToCollectionsOptions = {
   even if a caller passes some anyway.
   */
   contributionMode?: boolean;
+  /**
+  The ids the spaces receive; defaults to `assetIds`. `POST /shared-spaces/:id/assets` rejects the
+  whole request when any id is not the caller's, so a mixed selection passes only the caller's own
+  assets here. Albums always receive the full `assetIds`. An empty list drops the spaces.
+  */
+  spaceAssetIds?: string[];
 };
 
 export const addAssetsToCollections = async (
   collections: PickerCollection[],
   assetIds: string[],
-  { contributionMode = false }: AddToCollectionsOptions = {},
+  { contributionMode = false, spaceAssetIds = assetIds }: AddToCollectionsOptions = {},
 ): Promise<boolean> => {
   const $t = await getFormatter();
 
@@ -38,7 +44,7 @@ export const addAssetsToCollections = async (
   // here from the picker's already-loaded DTO, so `addAssetsToSpace` can tell the timeline that
   // assets landing in a hidden space have just left it.
   const spaces =
-    contributionMode || assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST
+    contributionMode || spaceAssetIds.length === 0 || spaceAssetIds.length > MAX_SPACE_ASSETS_PER_REQUEST
       ? []
       : collections
           .filter((c) => c.kind === 'space')
@@ -56,7 +62,7 @@ export const addAssetsToCollections = async (
     return addAssetsToAlbums(albumIds, assetIds, { notify: true });
   }
   if (total === 1 && spaces.length === 1) {
-    return addAssetsToSpace(spaces[0].id, assetIds, {
+    return addAssetsToSpace(spaces[0].id, spaceAssetIds, {
       notify: true,
       hiddenFromMyTimeline: spaces[0].hiddenFromMyTimeline,
     });
@@ -74,7 +80,7 @@ export const addAssetsToCollections = async (
     tasks.push({
       count: 1,
       run: () =>
-        addAssetsToSpace(space.id, assetIds, { notify: false, hiddenFromMyTimeline: space.hiddenFromMyTimeline }),
+        addAssetsToSpace(space.id, spaceAssetIds, { notify: false, hiddenFromMyTimeline: space.hiddenFromMyTimeline }),
     });
   }
 

@@ -4,15 +4,17 @@ const COLLECT_PAGE_SIZE = 1000;
 
 export type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
 
+export type CollectedSearchAsset = { id: string; ownerId: string };
+
 /**
-Pages through the search API for the given filter and returns the ids of every matching asset.
-IDs only — `withExif: false` keeps each page payload minimal.
+Pages through the search API for the given filter and returns the id and owner of every matching asset.
+Only those two fields are kept — `withExif: false` keeps each page payload minimal.
 */
-export const collectSearchResultAssetIds = async (
+export const collectSearchResultAssets = async (
   terms: SearchTerms,
   options: { smartSearchEnabled: boolean; language: string },
-): Promise<string[]> => {
-  const ids: string[] = [];
+): Promise<CollectedSearchAsset[]> => {
+  const collected: CollectedSearchAsset[] = [];
   let page: number | undefined = 1;
 
   while (page) {
@@ -24,10 +26,10 @@ export const collectSearchResultAssetIds = async (
       ? await searchSmart({ smartSearchDto: { ...searchDto, language: options.language } })
       : await searchAssets({ metadataSearchDto: searchDto });
 
-    ids.push(...assets.items.map((asset) => asset.id));
+    collected.push(...assets.items.map(({ id, ownerId }) => ({ id, ownerId })));
 
     page = assets.items.length > 0 && assets.nextPage ? Number(assets.nextPage) : undefined;
   }
 
-  return ids;
+  return collected;
 };
