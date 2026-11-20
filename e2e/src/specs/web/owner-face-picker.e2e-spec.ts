@@ -113,6 +113,23 @@ test.describe("Owner's face picker — named people first, search in plain sight
     await expect(panel.getByPlaceholder('Search people')).toBeVisible();
   });
 
+  // The search field is focused when the picker opens, and `PersonSidePanel`'s Escape shortcut skips
+  // keys typed into a text field. Escape must still back out of the picker, and only the picker.
+  test('takes typing straight away, and Escape backs out of the picker only', async ({ context, page }) => {
+    await utils.setAuthCookies(context, owner.accessToken);
+
+    const { panel } = await openFacePicker(page, assetId);
+    await expect(panel.getByPlaceholder('Search people')).toBeFocused();
+
+    await page.keyboard.type('Zel');
+    await expect(panel.getByPlaceholder('Search people')).toHaveValue('Zel');
+
+    await page.keyboard.press('Escape');
+
+    await expect(panel).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Select new face', exact: true }).first()).toBeVisible();
+  });
+
   // Dropping `PeopleSearch` meant reissuing its request from the panel. This is the part component
   // tests cannot prove: that the rewired query reaches the real `/search/person` endpoint and that
   // the picker renders what came back, rather than filtering the page it had already loaded.
