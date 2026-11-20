@@ -713,6 +713,31 @@ describe('VideoFaceDetector', () => {
       );
     });
 
+    it('never gives one detection to two faces, which would keep them apart for good (issue 1306)', async () => {
+      // One person split in two a second apart, beside each other but not in the same place: their views are 0.55
+      // apart, too far to merge. The extra frame at 1 s is planned for both and holds one view near both. Given to
+      // both, it put them in one frame at the same spot, and the merge after sharper views kept them apart as seen
+      // together.
+      withVideo({ sampleInterval: 1 });
+      const left = normalize([1, -0.5, 0, 0]);
+      const right = normalize([1, 0.75, 0, 0]);
+      framesAt({
+        0.5: [face(left, 100, 60)],
+        1.5: [face(right, 200, 60)],
+        1: [face(alice, 150, 110)],
+        1.75: [face(alice, 210, 110)],
+      });
+
+      await sut.handleDetectFaces({ id: 'asset-id' });
+
+      const { insert, frames } = mocks.videoFace.apply.mock.calls[0][0];
+      expect(insert).toHaveLength(1);
+      expect(frames[0].sightings?.map(({ t }) => t)).toEqual([0.5, 1, 1.5, 1.75]);
+      expect(loggedMessages(mocks)).toContainEqual(
+        expect.stringMatching(/, 2 sharper views from 7 extra frames, 1 merged after sharper views$/),
+      );
+    });
+
     it('looks once at the frames around a moment several people are best seen in', async () => {
       framesAt({ 1: [face(alice, 100), face(bob, 900)] });
 

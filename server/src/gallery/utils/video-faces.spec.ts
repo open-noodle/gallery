@@ -6,6 +6,7 @@ import {
   addSightings,
   detectionAt,
   findAgain,
+  findAgainAll,
   findSightingAt,
   isSharpenTimeFor,
   liveSightings,
@@ -616,6 +617,48 @@ describe('sharper view', () => {
     expect(findAgain(track, [detection(bob, box(110, 105, 64)), near], 0.5)).toBe(near);
     expect(findAgain(track, [detection(alice, box(900, 100, 60))], 0.5)).toBeUndefined();
     expect(findAgain(track, [detection(bob, box(100, 100, 60))], 0.5)).toBeUndefined();
+  });
+
+  it('gives each detection in an extra frame to one track only, the closest in looks (issue 1306)', () => {
+    // Two halves of one person best seen at the same moment and spot: both would take the one detection, and the
+    // shared frame would then keep them apart for good.
+    const close = trackAt(1);
+    const further = {
+      ...trackAt(1.25),
+      centroid: aliceTurned,
+      best: { ...trackAt(1.25).best, embedding: aliceTurned },
+    };
+    const only = detection(alice, box(104, 102, 64));
+
+    const found = findAgainAll(
+      new Map([
+        [0, close],
+        [1, further],
+      ]),
+      [only],
+      0.5,
+    );
+
+    expect([...found]).toEqual([[0, only]]);
+  });
+
+  it('gives the next track the next detection it qualifies for', () => {
+    const first = trackAt(1);
+    const second = { ...trackAt(1), centroid: aliceTurned, best: { ...trackAt(1).best, embedding: aliceTurned } };
+    const exact = detection(alice, box(100, 100, 60));
+    const turned = detection(aliceTurned, box(108, 100, 60));
+
+    const found = findAgainAll(
+      new Map([
+        [3, first],
+        [7, second],
+      ]),
+      [turned, exact],
+      0.5,
+    );
+
+    expect(found.get(3)).toBe(exact);
+    expect(found.get(7)).toBe(turned);
   });
 
   it('adds a sighting in time order, as the best view only when it is better', () => {

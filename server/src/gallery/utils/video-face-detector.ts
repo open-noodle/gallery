@@ -16,7 +16,7 @@ import {
   VIDEO_FACE_SAMPLER_VERSION,
   absorbedFaces,
   acceptTrack,
-  findAgain,
+  findAgainAll,
   isSharpenTimeFor,
   matchExistingFaces,
   mergeDetections,
@@ -318,12 +318,14 @@ export class VideoFaceDetector {
         }
 
         const detections = await detectionsIn(path, frameSize);
-        for (const [trackIndex, track] of tracks.entries()) {
-          if (!isSharpenTimeFor(t, bestTimes[trackIndex])) {
-            continue;
-          }
-          const found = findAgain(track, detections, sameFaceDistance);
-          if (!found || found.quality <= track.best.quality) {
+        const planned = new Map(
+          tracks.flatMap((track, trackIndex) =>
+            isSharpenTimeFor(t, bestTimes[trackIndex]) ? [[trackIndex, track]] : [],
+          ),
+        );
+        for (const [trackIndex, found] of findAgainAll(planned, detections, sameFaceDistance)) {
+          const track = tracks[trackIndex];
+          if (found.quality <= track.best.quality) {
             continue;
           }
           tracks[trackIndex] = withSighting(track, { ...found, t, frameIndex });

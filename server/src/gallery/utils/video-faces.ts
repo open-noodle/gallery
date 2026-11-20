@@ -547,22 +547,43 @@ export const isSharpenTimeFor = (t: number, bestT: number) =>
 The track's person among an extra frame's detections, by the tracker's continuity rule: where their best view was
 and close enough in looks with the relaxation. The closest in looks when several qualify, as in a crowd.
 */
-export const findAgain = (track: FaceTrack, detections: Detection[], maxDistance: number): Detection | undefined => {
-  let found: Detection | undefined;
-  let foundDistance = maxDistance + CONTINUITY_RELAXATION;
-  for (const detection of detections) {
-    if (!nearby(detection.box, track.best.box)) {
+export const findAgain = (track: FaceTrack, detections: Detection[], maxDistance: number): Detection | undefined =>
+  findAgainAll(new Map([[0, track]]), detections, maxDistance).get(0);
+
+/**
+findAgain for every track an extra frame was planned for, one to one: closest in looks first, as the tracker matches
+a sampled frame. A detection is one person. Given to two halves of a split person best seen at the same moment, it put
+both in one frame at the same spot, and the merge then kept them apart for good as seen together (issue 1306).
+*/
+export const findAgainAll = (
+  tracks: Map<number, FaceTrack>,
+  detections: Detection[],
+  maxDistance: number,
+): Map<number, Detection> => {
+  const pairs: { trackIndex: number; detection: number; distance: number }[] = [];
+  for (const [trackIndex, track] of tracks) {
+    for (const [detectionIndex, detection] of detections.entries()) {
+      if (!nearby(detection.box, track.best.box)) {
+        continue;
+      }
+      const distance = Math.min(
+        cosineDistance(detection.embedding, track.centroid),
+        cosineDistance(detection.embedding, track.best.embedding),
+      );
+      if (distance < maxDistance + CONTINUITY_RELAXATION) {
+        pairs.push({ trackIndex, detection: detectionIndex, distance });
+      }
+    }
+  }
+
+  const found = new Map<number, Detection>();
+  const taken = new Set<number>();
+  for (const { trackIndex, detection, distance: _ } of pairs.sort((a, b) => a.distance - b.distance)) {
+    if (found.has(trackIndex) || taken.has(detection)) {
       continue;
     }
-    const distance = Math.min(
-      cosineDistance(detection.embedding, track.centroid),
-      cosineDistance(detection.embedding, track.best.embedding),
-    );
-    if (distance >= foundDistance) {
-      continue;
-    }
-    found = detection;
-    foundDistance = distance;
+    found.set(trackIndex, detections[detection]);
+    taken.add(detection);
   }
   return found;
 };
