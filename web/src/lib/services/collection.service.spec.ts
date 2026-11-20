@@ -110,6 +110,22 @@ describe('addAssetsToCollections', () => {
     expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], assetIds, { notify: true }); // total becomes 1 → single path
   });
 
+  it('applies the space cap to spaceAssetIds, not to the full selection', async () => {
+    const assetIds = Array.from({ length: 50_001 }, (_, i) => `x${i}`);
+    const spaceAssetIds = assetIds.slice(0, 50_000);
+    await expect(addAssetsToCollections([spaceCol('s1')], assetIds, { spaceAssetIds })).resolves.toBe(true);
+    expect(addAssetsToSpace).toHaveBeenCalledWith('s1', spaceAssetIds, { notify: true, hiddenFromMyTimeline: false });
+  });
+
+  it('drops spaces when spaceAssetIds itself is over the cap', async () => {
+    const spaceAssetIds = Array.from({ length: 50_001 }, (_, i) => `x${i}`);
+    await expect(addAssetsToCollections([albumCol('a1'), spaceCol('s1')], ['a'], { spaceAssetIds })).resolves.toBe(
+      true,
+    );
+    expect(addAssetsToSpace).not.toHaveBeenCalled();
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['a'], { notify: true });
+  });
+
   it('spaceAssetIds narrows what spaces receive while albums keep the full selection', async () => {
     await expect(
       addAssetsToCollections([albumCol('a1'), spaceCol('s1')], ['mine', 'theirs'], { spaceAssetIds: ['mine'] }),

@@ -2,7 +2,8 @@ import { AssetVisibility, PartnerDirection, getPartners } from '@immich/sdk';
 
 export type ShareableCandidate = { id: string; ownerId: string; visibility: AssetVisibility };
 
-// A partner's asset is shareable only while the partner query can see it (checkPartnerAccess).
+// A partner's asset is shareable only while the partner query can see it (checkPartnerAccess). The caller's own
+// assets are shareable in any visibility but Locked: the space add runs the owner check without elevation.
 const PARTNER_SHAREABLE_VISIBILITIES: ReadonlySet<AssetVisibility> = new Set([
   AssetVisibility.Timeline,
   AssetVisibility.Hidden,
@@ -10,8 +11,8 @@ const PARTNER_SHAREABLE_VISIBILITIES: ReadonlySet<AssetVisibility> = new Set([
 
 /**
 The ids `POST /shared-spaces/:id/assets` accepts from `userId`, in input order. Mirrors the server's
-`requireSpaceShareAccess` (owner ∪ partner, rbac-2): the caller's own assets, plus timeline or hidden assets of
-a user who shares their library with the caller. The server rejects the whole request on any other id, so a
+`requireSpaceShareAccess` (owner ∪ partner, rbac-2): the caller's own assets that are not locked, plus timeline or
+hidden assets of a user who shares their library with the caller. The server rejects the whole request on any other id, so a
 caller sends only these. With no `userId` nothing qualifies.
 */
 export const pickSpaceShareableAssetIds = (
@@ -25,7 +26,8 @@ export const pickSpaceShareableAssetIds = (
   return assets
     .filter(
       ({ ownerId, visibility }) =>
-        ownerId === userId || (partnerIds.has(ownerId) && PARTNER_SHAREABLE_VISIBILITIES.has(visibility)),
+        (ownerId === userId && visibility !== AssetVisibility.Locked) ||
+        (partnerIds.has(ownerId) && PARTNER_SHAREABLE_VISIBILITIES.has(visibility)),
     )
     .map(({ id }) => id);
 };

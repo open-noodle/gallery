@@ -12,7 +12,8 @@ const { pickSpaceShareableAssetIds, resolveSpaceShareableAssetIds } = await impo
 const partner = (id: string) => ({ id }) as PartnerResponseDto;
 
 // Truth table of the server's requireSpaceShareAccess (server/src/gallery/utils/access-grants.ts):
-// owner → any visibility; partner (shares with the caller) → timeline or hidden only; anyone else → never.
+// owner → anything but locked (checkOwnerAccess without elevation); partner (shares with the caller) → timeline
+// or hidden only; anyone else → never.
 // Locked never reaches a search collector, but the rule is spelled out for every visibility.
 type Owner = 'me' | 'partner' | 'stranger';
 const TRUTH: Record<Owner, Record<Visibility, boolean>> = {
@@ -20,7 +21,7 @@ const TRUTH: Record<Owner, Record<Visibility, boolean>> = {
     [AssetVisibility.Timeline]: true,
     [AssetVisibility.Hidden]: true,
     [AssetVisibility.Archive]: true,
-    [AssetVisibility.Locked]: true,
+    [AssetVisibility.Locked]: false,
   },
   partner: {
     [AssetVisibility.Timeline]: true,

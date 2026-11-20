@@ -26,8 +26,9 @@ type AddToCollectionsOptions = {
   contributionMode?: boolean;
   /**
   The ids the spaces receive; defaults to `assetIds`. `POST /shared-spaces/:id/assets` rejects the
-  whole request when any id is not the caller's, so a mixed selection passes only the caller's own
-  assets here. Albums always receive the full `assetIds`. An empty list drops the spaces.
+  whole request when the caller may not share any one id (owner or partner only), so a mixed selection
+  passes only the shareable ones here (`resolveSpaceShareableAssetIds`). Albums always receive the full
+  `assetIds`. An empty list drops the spaces, and the per-request cap applies to this list.
   */
   spaceAssetIds?: string[];
 };
