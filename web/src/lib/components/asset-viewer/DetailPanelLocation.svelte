@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { localizeCountry } from '#lib/gallery/utils/country-names.ts';
   import GeolocationPointPickerModal from '#lib/modals/GeolocationPointPickerModal.svelte';
   import { applyContextualFilter, buildContextualMapUrl } from '#lib/utils/filter-target.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { updateAsset, type AssetResponseDto } from '@immich/sdk';
   import { Icon, IconButton, modalManager } from '@immich/ui';
   import { mdiMapMarkerOutline, mdiMapOutline, mdiPencil } from '@mdi/js';
-  import { t } from 'svelte-i18n';
+  import { locale, t } from 'svelte-i18n';
   import { page } from '$app/state';
 
   type Props = {
@@ -25,6 +26,7 @@
   const city = $derived(asset.exifInfo?.city?.trim() ?? '');
   const state = $derived(asset.exifInfo?.state?.trim() ?? '');
   const country = $derived(asset.exifInfo?.country?.trim() ?? '');
+  const countryLabel = $derived(localizeCountry(country, $locale));
 
   // E10 — the pin carries the current context (Space scope + active filters) to the full map, and
   // centers it on this asset. Null on an album, which has no map URL (see buildContextualMapUrl).
@@ -106,13 +108,13 @@
                 <button
                   type="button"
                   class="text-left hover:text-primary"
-                  aria-label="{$t('filter_by_location')}: {country}"
+                  aria-label="{$t('filter_by_location')}: {countryLabel}"
                   onclick={() => applyContextualFilter({ city: undefined, state: undefined, country })}
                 >
-                  {asset.exifInfo.country}
+                  {countryLabel}
                 </button>
               {:else}
-                <span>{asset.exifInfo.country}</span>
+                <span>{countryLabel}</span>
               {/if}
             </p>
           </div>

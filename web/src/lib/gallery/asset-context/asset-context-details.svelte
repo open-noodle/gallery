@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cleanClass } from '#lib';
+  import { localizeCountry } from '#lib/gallery/utils/country-names.ts';
   import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
   import { getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
@@ -81,7 +82,11 @@
   });
 
   const place = $derived(
-    [asset?.exifInfo?.city, asset?.exifInfo?.state, asset?.exifInfo?.country]
+    [
+      asset?.exifInfo?.city,
+      asset?.exifInfo?.state,
+      asset?.exifInfo?.country ? localizeCountry(asset.exifInfo.country, $locale) : undefined,
+    ]
       .map((part) => part?.trim())
       .filter(Boolean)
       .join(', '),

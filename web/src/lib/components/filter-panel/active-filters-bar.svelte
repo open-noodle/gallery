@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localizeCountry } from '#lib/gallery/utils/country-names.ts';
   import { Icon } from '@immich/ui';
   import {
     mdiAccount,
@@ -24,7 +25,7 @@
     mdiTextSearch,
     mdiVideo,
   } from '@mdi/js';
-  import { t, type Translations } from 'svelte-i18n';
+  import { locale, t, type Translations } from 'svelte-i18n';
   import type { FilterState, PinnedFilterChip } from './filter-panel';
 
   const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -121,7 +122,11 @@
 
     // Location chip (city + state + country fold into ONE chip — getActiveFilterCount already
     // counts all three as a single filter, so all three must render — and clear — together)
-    const locationParts = [filters.city, filters.state, filters.country].filter(Boolean);
+    const locationParts = [
+      filters.city,
+      filters.state,
+      filters.country ? localizeCountry(filters.country, $locale) : undefined,
+    ].filter(Boolean);
     if (locationParts.length > 0) {
       result.push({ type: 'location', icon: mdiMapMarker, label: locationParts.join(', ') });
     }
