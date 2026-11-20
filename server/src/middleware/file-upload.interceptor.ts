@@ -10,6 +10,7 @@ import { pipeline } from 'node:stream';
 import { Observable } from 'rxjs';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { RouteKey } from 'src/enum.js';
+import { getUploadError, watchUploadHead } from 'src/gallery/utils/upload-guard.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
@@ -118,6 +119,7 @@ export class FileUploadInterceptor implements NestInterceptor {
       const hash = file.fieldname === UploadFieldName.ASSET_DATA ? createHash('sha1') : null;
 
       let size = 0;
+      const head = watchUploadHead(file.stream);
 
       file.stream.on('data', (chunk) => {
         hash?.update(chunk);
@@ -132,10 +134,16 @@ export class FileUploadInterceptor implements NestInterceptor {
         if (size === 0) {
           return callback(new BadRequestException('File is empty'));
         }
+        const checksum = hash?.digest();
+        const uploadError = getUploadError(head(), checksum, request.headers);
+        if (uploadError) {
+          this.assetService.onUploadError(request, file).catch(this.logger.error);
+          return callback(new BadRequestException(uploadError));
+        }
         callback(null, {
           path,
           size,
-          checksum: hash?.digest(),
+          checksum,
         });
       });
     } catch (error: Error | any) {
