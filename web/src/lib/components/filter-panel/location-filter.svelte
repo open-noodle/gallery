@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { countryMatchesQuery, localizeCountry, sortCountries } from '#lib/gallery/utils/country-names.ts';
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { untrack } from 'svelte';
-  import { t } from 'svelte-i18n';
+  import { locale, t } from 'svelte-i18n';
   import type { FilterContext } from './filter-panel';
 
   interface Props {
@@ -93,13 +94,16 @@
     cityCacheKey = nextKey;
   });
 
+  // Alphabetical by the label the row shows, so a localized list does not keep the English order.
+  let sortedCountries = $derived(sortCountries(countries, $locale));
+
   let filteredCountries = $derived.by(() => {
     if (!normalizedSearchQuery) {
-      return countries;
+      return sortedCountries;
     }
 
-    return countries.filter((country) => {
-      const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
+    return sortedCountries.filter((country) => {
+      const countryMatches = countryMatchesQuery(country, $locale, normalizedSearchQuery);
       const cityMatches =
         shouldFetchCitiesForSearch &&
         (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
@@ -240,7 +244,7 @@
       return cachedCities;
     }
 
-    const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
+    const countryMatches = countryMatchesQuery(country, $locale, normalizedSearchQuery);
     const filtered =
       expandedCountry === country && countryMatches
         ? cachedCities
@@ -395,7 +399,7 @@
             <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
-        <span class="flex-1 truncate text-left">{orphanedCountry}</span>
+        <span class="flex-1 truncate text-left">{localizeCountry(orphanedCountry, $locale)}</span>
       </button>
       {#if selectedState}
         {@render stateRow(selectedState, orphanedCountry)}
@@ -459,7 +463,7 @@
         </div>
 
         <!-- Label -->
-        <span class="flex-1 truncate text-left">{country}</span>
+        <span class="flex-1 truncate text-left">{localizeCountry(country, $locale)}</span>
       </button>
 
       {#if selectedState && isCountrySelected}
