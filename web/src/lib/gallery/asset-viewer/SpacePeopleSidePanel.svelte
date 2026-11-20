@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SpacePersonSidePanel from '#lib/components/asset-viewer/SpacePersonSidePanel.svelte';
+  import SpacePersonSidePanel from '#lib/gallery/asset-viewer/SpacePersonSidePanel.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { refreshAssetPeople } from '#lib/utils/refresh-asset-people.ts';

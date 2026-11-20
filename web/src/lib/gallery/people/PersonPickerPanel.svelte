@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PersonPickerGrid, { type PickerCandidate } from '#lib/components/faces-page/PersonPickerGrid.svelte';
+  import PersonPickerGrid, { type PickerCandidate } from '#lib/gallery/people/PersonPickerGrid.svelte';
   import VideoFaceSightings from '#lib/gallery/asset-viewer/VideoFaceSightings.svelte';
   import { IconButton, Input } from '@immich/ui';
   import { mdiArrowLeftThin } from '@mdi/js';

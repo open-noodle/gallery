@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { type PickerCandidate } from '#lib/components/faces-page/PersonPickerGrid.svelte';
-  import PersonPickerPanel from '#lib/components/faces-page/PersonPickerPanel.svelte';
+  import { type PickerCandidate } from '#lib/gallery/people/PersonPickerGrid.svelte';
+  import PersonPickerPanel from '#lib/gallery/people/PersonPickerPanel.svelte';
   import { maximumLengthSearchPeople, timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { getPeopleThumbnailUrl, handlePromiseError } from '#lib/utils.ts';

@@ -116,7 +116,7 @@ vi.mock('#lib/components/faces-page/PersonSidePanel.svelte', async () => {
   const { default: MockComponent } = await import('#lib/gallery/__mocks__/person-side-panel.stub.svelte');
   return { default: MockComponent };
 });
-vi.mock('#lib/components/asset-viewer/SpacePersonSidePanel.svelte', async () => {
+vi.mock('#lib/gallery/asset-viewer/SpacePersonSidePanel.svelte', async () => {
   const { default: MockComponent } = await import('#lib/gallery/__mocks__/space-person-side-panel-refresh.stub.svelte');
   return { default: MockComponent };
 });
