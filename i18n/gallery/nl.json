@@ -1513,6 +1513,7 @@
   "spaces_show_on_timeline": "Alle Space-foto's tonen in mijn tijdlijn",
   "spaces_show_people": "Mensen tonen",
   "spaces_show_pets": "Huisdieren tonen",
+  "spaces_skipped_unshareable_assets": "{count, plural, one {# item is} other {# items zijn}} niet aan Spaces toegevoegd. Je kunt alleen je eigen items of die van een partner aan een Space toevoegen.",
   "spaces_space": "Space",
   "spaces_space_load_failed": "Space laden mislukt: {error}",
   "spaces_stop_sharing_person_metadata": "Stoppen met delen van persoonsnamen",

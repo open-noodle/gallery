@@ -1,14 +1,21 @@
-import { searchAssets, searchSmart, type MetadataSearchDto, type SmartSearchDto } from '@immich/sdk';
+import {
+  searchAssets,
+  searchSmart,
+  type AssetResponseDto,
+  type MetadataSearchDto,
+  type SmartSearchDto,
+} from '@immich/sdk';
 
 const COLLECT_PAGE_SIZE = 1000;
 
 export type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
 
-export type CollectedSearchAsset = { id: string; ownerId: string };
+export type CollectedSearchAsset = Pick<AssetResponseDto, 'id' | 'ownerId' | 'visibility'>;
 
 /**
-Pages through the search API for the given filter and returns the id and owner of every matching asset.
-Only those two fields are kept — `withExif: false` keeps each page payload minimal.
+Pages through the search API for the given filter and returns the id, owner and visibility of every matching
+asset: what a caller needs to tell which of them a space accepts (see `resolveSpaceShareableAssetIds`). Only those
+fields are kept; `withExif: false` keeps each page payload minimal.
 */
 export const collectSearchResultAssets = async (
   terms: SearchTerms,
@@ -26,7 +33,7 @@ export const collectSearchResultAssets = async (
       ? await searchSmart({ smartSearchDto: { ...searchDto, language: options.language } })
       : await searchAssets({ metadataSearchDto: searchDto });
 
-    collected.push(...assets.items.map(({ id, ownerId }) => ({ id, ownerId })));
+    collected.push(...assets.items.map(({ id, ownerId, visibility }) => ({ id, ownerId, visibility })));
 
     page = assets.items.length > 0 && assets.nextPage ? Number(assets.nextPage) : undefined;
   }

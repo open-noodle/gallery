@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // The browser links every static import before any module body runs, so a static import of the
 // service would load the real @immich/sdk before sdk.mock.ts registers its vi.mock. Loading it
 // after that registration gives it the mocked module.
-const { collectSearchResultAssets: collectSearchResultAssets } = await import('./search.service');
+const { collectSearchResultAssets } = await import('./search.service');
 
 const page = (ids: string[], nextPage: string | null) =>
   ({
     albums: { items: [], count: 0, facets: [], nextPage: null, total: 0 },
     assets: {
-      items: ids.map((id) => ({ id, ownerId: 'me' })),
+      items: ids.map((id) => ({ id, ownerId: 'me', visibility: 'timeline', isFavorite: false })),
       count: ids.length,
       facets: [],
       nextPage,
@@ -29,9 +29,9 @@ describe('collectSearchResultAssets', () => {
     const ids = await collectSearchResultAssets({ isFavorite: true }, { smartSearchEnabled: false, language: 'en' });
 
     expect(ids).toEqual([
-      { id: 'a', ownerId: 'me' },
-      { id: 'b', ownerId: 'me' },
-      { id: 'c', ownerId: 'me' },
+      { id: 'a', ownerId: 'me', visibility: 'timeline' },
+      { id: 'b', ownerId: 'me', visibility: 'timeline' },
+      { id: 'c', ownerId: 'me', visibility: 'timeline' },
     ]);
     expect(sdkMock.searchAssets).toHaveBeenCalledTimes(2);
     expect(sdkMock.searchAssets).toHaveBeenNthCalledWith(1, {
@@ -46,7 +46,7 @@ describe('collectSearchResultAssets', () => {
   it('handles a single page', async () => {
     sdkMock.searchAssets.mockResolvedValueOnce(page(['x'], null));
     const ids = await collectSearchResultAssets({}, { smartSearchEnabled: false, language: 'en' });
-    expect(ids).toEqual([{ id: 'x', ownerId: 'me' }]);
+    expect(ids).toEqual([{ id: 'x', ownerId: 'me', visibility: 'timeline' }]);
     expect(sdkMock.searchAssets).toHaveBeenCalledTimes(1);
   });
 
@@ -59,7 +59,7 @@ describe('collectSearchResultAssets', () => {
   it('uses smart search (with language) when a query is present and smart search is enabled', async () => {
     sdkMock.searchSmart.mockResolvedValueOnce(page(['q1'], null));
     const ids = await collectSearchResultAssets({ query: 'dogs' }, { smartSearchEnabled: true, language: 'de' });
-    expect(ids).toEqual([{ id: 'q1', ownerId: 'me' }]);
+    expect(ids).toEqual([{ id: 'q1', ownerId: 'me', visibility: 'timeline' }]);
     expect(sdkMock.searchSmart).toHaveBeenCalledWith({
       smartSearchDto: { query: 'dogs', page: 1, size: 1000, withExif: false, language: 'de' },
     });
@@ -100,22 +100,34 @@ describe('collectSearchResultAssets', () => {
     expect(sdkMock.searchAssets).not.toHaveBeenCalled();
   });
 
-  it('keeps each asset’s owner, including assets owned by other users, across pages', async () => {
+  it('keeps each asset’s owner and visibility, including assets owned by other users, across pages', async () => {
     sdkMock.searchAssets
       .mockResolvedValueOnce({
-        assets: { items: [{ id: 'mine', ownerId: 'me' }], count: 1, facets: [], nextPage: '2', total: 2 },
+        assets: {
+          items: [{ id: 'mine', ownerId: 'me', visibility: 'timeline' }],
+          count: 1,
+          facets: [],
+          nextPage: '2',
+          total: 2,
+        },
         albums: { items: [], count: 0, facets: [], nextPage: null, total: 0 },
       } as never)
       .mockResolvedValueOnce({
-        assets: { items: [{ id: 'theirs', ownerId: 'someone-else' }], count: 1, facets: [], nextPage: null, total: 2 },
+        assets: {
+          items: [{ id: 'theirs', ownerId: 'someone-else', visibility: 'archive' }],
+          count: 1,
+          facets: [],
+          nextPage: null,
+          total: 2,
+        },
         albums: { items: [], count: 0, facets: [], nextPage: null, total: 0 },
       } as never);
 
     const assets = await collectSearchResultAssets({}, { smartSearchEnabled: false, language: 'en' });
 
     expect(assets).toEqual([
-      { id: 'mine', ownerId: 'me' },
-      { id: 'theirs', ownerId: 'someone-else' },
+      { id: 'mine', ownerId: 'me', visibility: 'timeline' },
+      { id: 'theirs', ownerId: 'someone-else', visibility: 'archive' },
     ]);
   });
 });

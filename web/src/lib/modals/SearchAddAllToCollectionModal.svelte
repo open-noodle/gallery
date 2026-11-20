@@ -1,11 +1,12 @@
 <script lang="ts">
   import type { PickerCollection } from '#lib/components/shared-components/collection-selection/collection-selection-utils.ts';
+  import { resolveSpaceShareableAssetIds } from '#lib/gallery/spaces/space-shareable-assets.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import CollectionPickerModal from '#lib/modals/CollectionPickerModal.svelte';
   import { addAssetsToCollections } from '#lib/services/collection.service.ts';
   import { collectSearchResultAssets, type SearchTerms } from '#lib/services/search.service.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { LoadingSpinner, Modal, ModalBody } from '@immich/ui';
+  import { LoadingSpinner, Modal, ModalBody, toastManager } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -32,11 +33,15 @@
     try {
       const assets = await collectSearchResultAssets(terms, { smartSearchEnabled, language });
       const assetIds = assets.map(({ id }) => id);
-      // The server rejects a space add that includes any asset the caller does not own, so spaces
-      // get only the caller's own assets. Albums keep the full selection.
-      const userId = authManager.user?.id;
-      const ownedAssetIds = assets.filter(({ ownerId }) => ownerId === userId).map(({ id }) => id);
-      const ok = await addAssetsToCollections(collections, assetIds, { spaceAssetIds: ownedAssetIds });
+      // #1259: a space add fails as a whole on any asset the caller may not share, so spaces get only
+      // the caller's own and partners' assets. Albums keep the full selection.
+      const hasSpace = collections.some((c) => c.kind === 'space');
+      const spaceAssetIds = hasSpace ? await resolveSpaceShareableAssetIds(assets, authManager.user?.id) : [];
+      const ok = await addAssetsToCollections(collections, assetIds, { spaceAssetIds });
+      const skipped = assetIds.length - spaceAssetIds.length;
+      if (ok && hasSpace && skipped > 0) {
+        toastManager.warning($t('spaces_skipped_unshareable_assets', { values: { count: skipped } }));
+      }
       if (ok) {
         onClose();
       }
