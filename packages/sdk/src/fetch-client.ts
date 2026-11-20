@@ -2037,6 +2037,23 @@ export type AssetOcrResponseDto = {
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
 };
+export type AssetRenameDto = {
+    /** Confirm deleting an item the user trashed that holds the new name on disk */
+    deleteTrashed?: boolean;
+    /** The new name, without its extension. The extension is kept and normalized, e.g. .JPEG becomes .jpg */
+    fileName: string;
+    /** Also rename the file on disk, with its sidecar. Only for external library assets; otherwise only the name Gallery shows changes */
+    renameOnDisk?: boolean;
+};
+export type AssetRenameResponseDto = {
+    /** The name Gallery shows */
+    originalFileName: string;
+    /** The path of the original file */
+    originalPath: string;
+};
+export type AssetRenameCheckResponseDto = {
+    state: AssetRenameTargetState;
+};
 export type AssetVideoTrimResponseDto = {
     /** End of the kept part, in seconds from the start of the original video */
     endTime: number;
@@ -7342,6 +7359,38 @@ export function downloadAsset({ download, edited, id, key, slug }: {
         edited,
         key,
         slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Rename a file
+ */
+export function renameAsset({ id, assetRenameDto }: {
+    id: string;
+    assetRenameDto: AssetRenameDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetRenameResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/rename`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: assetRenameDto
+    })));
+}
+/**
+ * Check a new file name
+ */
+export function checkAssetRename({ fileName, id }: {
+    fileName: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetRenameCheckResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/rename-check${QS.query(QS.explode({
+        fileName
     }))}`, {
         ...opts
     }));
@@ -12775,6 +12824,12 @@ export enum AssetEditAction {
 export enum MirrorAxis {
     Horizontal = "horizontal",
     Vertical = "vertical"
+}
+export enum AssetRenameTargetState {
+    Free = "free",
+    Offline = "offline",
+    Trashed = "trashed",
+    Exists = "exists"
 }
 export enum AssetMediaSize {
     Original = "original",
