@@ -1,4 +1,5 @@
 import { Kysely, Transaction, sql } from 'kysely';
+import { reconcileIdentityFavorites } from 'src/gallery/utils/identity-favorite.js';
 import { DB } from 'src/schema/index.js';
 
 // person.identityId, person.type and person.species live in the fork sidecars person_identity and
@@ -100,6 +101,7 @@ export const setPersonIdentity = async (
     .values({ personGroupId, ownerId: person.ownerId, identityId })
     .onConflict((oc) => oc.column('personGroupId').doUpdateSet({ identityId }))
     .execute();
+  await reconcileIdentityFavorites(db, [identityId]);
 };
 
 /**

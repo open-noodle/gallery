@@ -7,7 +7,14 @@ import {
   getSpaceProfile,
 } from '#lib/utils/global-person-route.ts';
 import { getPhotosPersonFilterThumbnailUrl } from '#lib/utils/photos-filter-options.ts';
-import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
+import {
+  Type,
+  favoriteSpacePerson,
+  unfavoriteSpacePerson,
+  updatePerson,
+  updateSpacePerson,
+  type PersonResponseDto,
+} from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -17,6 +24,8 @@ vi.mock('@immich/ui', async (orig) => ({
 
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
+  favoriteSpacePerson: vi.fn(),
+  unfavoriteSpacePerson: vi.fn(),
   updatePerson: vi.fn(),
   updateSpacePerson: vi.fn(),
 }));
@@ -136,12 +145,12 @@ describe('person scope: which action', () => {
   it.each([
     { scope: 'personal', row: person(), favorite: true, unfavorite: false, ...personal },
     { scope: 'personal favorite', row: person({ isFavorite: true }), favorite: false, unfavorite: true, ...personal },
-    { scope: 'space', row: person({ primaryProfile: spaceProfile }), favorite: false, unfavorite: false, ...space },
+    { scope: 'space', row: person({ primaryProfile: spaceProfile }), favorite: true, unfavorite: false, ...space },
     {
       scope: 'space favorite',
       row: person({ primaryProfile: spaceProfile, isFavorite: true }),
       favorite: false,
-      unfavorite: false,
+      unfavorite: true,
       ...space,
     },
   ])('$scope: hide, favorite and edit target', async ({ row, favorite, unfavorite, endpoint, other, hide, rename }) => {
@@ -157,5 +166,43 @@ describe('person scope: which action', () => {
     await updatePersonName(row, 'Bea');
     expect(endpoint).toHaveBeenCalledExactlyOnceWith(rename);
     expect(other).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { scope: 'personal', row: person(), isFavorite: true },
+    { scope: 'personal', row: person({ isFavorite: true }), isFavorite: false },
+  ])('$scope: favorite writes the person', async ({ row, isFavorite }) => {
+    const { Favorite, Unfavorite } = getPersonActions($t, row);
+    const action = isFavorite ? Favorite : Unfavorite;
+
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(updatePerson).toHaveBeenCalledExactlyOnceWith({ id: 'person-1', personUpdateDto: { isFavorite } });
+    expect(favoriteSpacePerson).not.toHaveBeenCalled();
+    expect(unfavoriteSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      row: person({ primaryProfile: spaceProfile }),
+      isFavorite: true,
+      call: favoriteSpacePerson,
+      other: unfavoriteSpacePerson,
+    },
+    {
+      row: person({ primaryProfile: spaceProfile, isFavorite: true }),
+      isFavorite: false,
+      call: unfavoriteSpacePerson,
+      other: favoriteSpacePerson,
+    },
+  ])('space: favorite goes to the space endpoint (favorite=$isFavorite)', async ({ row, isFavorite, call, other }) => {
+    const { Favorite, Unfavorite } = getPersonActions($t, row);
+    const action = isFavorite ? Favorite : Unfavorite;
+
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(call).toHaveBeenCalledExactlyOnceWith({ id: 'space-1', personId: 'space-person-1' });
+    expect(other).not.toHaveBeenCalled();
+    expect(updatePerson).not.toHaveBeenCalled();
   });
 });

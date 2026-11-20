@@ -5,6 +5,7 @@ import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { PeopleResponseDto, PersonResponseDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
 import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum.js';
 import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
+import { identityFavorite, moveIdentityFavorites } from 'src/gallery/utils/identity-favorite.js';
 import {
   clearOrphanPersonIdentities,
   personIdentityId,
@@ -1846,7 +1847,7 @@ export class FaceIdentityRepository {
           shared_space_person."identityId",
           COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name,
           shared_space_person."isHidden",
-          NULL::boolean AS "isFavorite",
+          ${identityFavorite(input.userId, sql.ref<string | null>('shared_space_person.identityId'))} AS "isFavorite",
           shared_space_person."updatedAt",
           shared_space_person.id AS "profileId",
           shared_space_person.type,
@@ -2106,7 +2107,7 @@ export class FaceIdentityRepository {
           shared_space_person."birthDateSourceUpdatedAt",
           ''::text AS "thumbnailPath",
           shared_space_person."isHidden",
-          NULL::boolean AS "isFavorite",
+          ${identityFavorite(input.userId, sql.ref<string | null>('shared_space_person.identityId'))} AS "isFavorite",
           NULL::text AS color,
           shared_space_person."updatedAt",
           shared_space_person.type,
@@ -3455,6 +3456,7 @@ export class FaceIdentityRepository {
       // D1: move any verdict rows off the merged-away identities onto the survivor before those
       // identities are deleted (identityId FK is SET NULL, but we re-key so identity-first reads keep working).
       await rekeyVerdictIdentity(trx, mergeableSourceIdentityIds, input.targetIdentityId);
+      await moveIdentityFavorites(trx, mergeableSourceIdentityIds, input.targetIdentityId);
 
       const deletable = await trx
         .selectFrom('face_identity')
@@ -3592,6 +3594,7 @@ export class FaceIdentityRepository {
 
     // D1: same re-key as mergeIdentities, on the production person-merge path.
     await rekeyVerdictIdentity(db, sourceIdentityIds, input.targetIdentityId);
+    await moveIdentityFavorites(db, sourceIdentityIds, input.targetIdentityId);
 
     const deletable = await db
       .selectFrom('face_identity')

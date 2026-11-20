@@ -12,6 +12,7 @@ import {
   VectorIndex,
 } from 'src/enum.js';
 import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
+import { identityFavorite } from 'src/gallery/utils/identity-favorite.js';
 import { personIdentityId, personIsPet, personSpecies, personType } from 'src/gallery/utils/person-sidecar.js';
 import { probes } from 'src/repositories/database.repository.js';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
@@ -2378,6 +2379,7 @@ export class SharedSpaceRepository {
       takenBefore?: Date;
       minimumFaceCount?: number;
       type?: string;
+      viewerUserId?: string;
     },
   ) {
     const escapedName = options.name
@@ -2487,6 +2489,12 @@ export class SharedSpaceRepository {
           ),
         )
         .orderBy('shared_space_person.isHidden', 'asc')
+        .$if(!!options.viewerUserId, (qb) =>
+          qb.orderBy(
+            identityFavorite(options.viewerUserId!, sql.ref<string | null>('shared_space_person.identityId')),
+            (om) => om.desc(),
+          ),
+        )
         .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '')`, (om) => om.asc().nullsLast())
         .orderBy(
           sql`CASE WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount" END`,

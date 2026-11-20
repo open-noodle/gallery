@@ -37,12 +37,14 @@
     confirmSpacePersonFaceSuggestion,
     detachScopedPerson,
     dismissSpacePersonFaceSuggestion,
+    favoriteSpacePerson,
     getSpacePeople,
     getSpacePersonFaceSuggestions,
     getSpacePersonFaces,
     ignoreSpacePersonFaceSuggestion,
     mergeSpacePeople,
     searchPerson,
+    unfavoriteSpacePerson,
     updateSpacePerson,
     updateSpacePersonRepresentativeFace,
     type PersonFaceResponseDto,
@@ -60,6 +62,8 @@
     mdiArrowLeft,
     mdiCalendarEditOutline,
     mdiEyeOffOutline,
+    mdiHeartMinusOutline,
+    mdiHeartOutline,
   } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { tick } from 'svelte';
@@ -508,6 +512,17 @@
     }
   }
 
+  async function handleFavoritePerson(isFavorite: boolean) {
+    try {
+      const request = { id: space.id, personId: person.id };
+      await (isFavorite ? favoriteSpacePerson(request) : unfavoriteSpacePerson(request));
+      setPerson({ ...person, isFavorite });
+      toastManager.primary($t(isFavorite ? 'added_to_favorites' : 'removed_from_favorites'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: isFavorite } }));
+    }
+  }
+
   async function handleHidePerson() {
     try {
       await updateSpacePerson({
@@ -542,7 +557,20 @@
   }
 
   const actionItems = $derived.by(() => {
-    const items: ActionItem[] = [];
+    const items: ActionItem[] = [
+      {
+        title: $t('to_favorite'),
+        icon: mdiHeartOutline,
+        $if: () => !person.isFavorite,
+        onAction: () => void handleFavoritePerson(true),
+      },
+      {
+        title: $t('unfavorite'),
+        icon: mdiHeartMinusOutline,
+        $if: () => !!person.isFavorite,
+        onAction: () => void handleFavoritePerson(false),
+      },
+    ];
 
     if (isEditor) {
       items.push(
@@ -786,7 +814,7 @@
   {:else}
     <ControlAppBar backIcon={mdiArrowLeft} onClose={handleBack}>
       {#snippet trailing()}
-        {#if isEditor && action !== 'merge'}
+        {#if action !== 'merge'}
           <ContextMenuButton items={actionItems} aria-label={$t('show_person_options')} />
         {/if}
       {/snippet}

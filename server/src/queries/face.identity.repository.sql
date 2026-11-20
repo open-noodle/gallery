@@ -265,7 +265,26 @@ WITH
         ''
       ) AS name,
       shared_space_person."isHidden",
-      NULL::boolean AS "isFavorite",
+      COALESCE(
+        (
+          SELECT
+            "fav_person"."isFavorite"
+          FROM
+            "person_identity" AS "fav_link"
+            INNER JOIN "person" AS "fav_person" ON "fav_person"."personGroupId" = "fav_link"."personGroupId"
+          WHERE
+            "fav_link"."identityId" = "shared_space_person"."identityId"
+            AND "fav_person"."ownerId" = $7
+        ),
+        EXISTS (
+          SELECT
+          FROM
+            "face_identity_favorite" AS "fav_row"
+          WHERE
+            "fav_row"."userId" = $8
+            AND "fav_row"."identityId" = "shared_space_person"."identityId"
+        )
+      ) AS "isFavorite",
       shared_space_person."updatedAt",
       shared_space_person.id AS "profileId",
       shared_space_person.type,
@@ -277,7 +296,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $9
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -300,8 +319,8 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $10 = ''
+        OR shared_space_person.type = $11
       )
       AND (
         shared_space_person.type <> 'pet'
@@ -329,12 +348,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -412,10 +431,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $13 = 'pet'
+        $15 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $14
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -425,9 +444,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $15
+      $17
     OFFSET
-      $16
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -597,7 +616,26 @@ WITH
         ''
       ) AS name,
       shared_space_person."isHidden",
-      NULL::boolean AS "isFavorite",
+      COALESCE(
+        (
+          SELECT
+            "fav_person"."isFavorite"
+          FROM
+            "person_identity" AS "fav_link"
+            INNER JOIN "person" AS "fav_person" ON "fav_person"."personGroupId" = "fav_link"."personGroupId"
+          WHERE
+            "fav_link"."identityId" = "shared_space_person"."identityId"
+            AND "fav_person"."ownerId" = $7
+        ),
+        EXISTS (
+          SELECT
+          FROM
+            "face_identity_favorite" AS "fav_row"
+          WHERE
+            "fav_row"."userId" = $8
+            AND "fav_row"."identityId" = "shared_space_person"."identityId"
+        )
+      ) AS "isFavorite",
       shared_space_person."updatedAt",
       shared_space_person.id AS "profileId",
       shared_space_person.type,
@@ -609,7 +647,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $9
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -632,8 +670,8 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $10 = ''
+        OR shared_space_person.type = $11
       )
       AND (
         shared_space_person.type <> 'pet'
@@ -661,12 +699,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -744,10 +782,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $13 = 'pet'
+        $15 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $14
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -757,9 +795,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $15
+      $17
     OFFSET
-      $16
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -1461,7 +1499,26 @@ WITH
         ''
       ) AS name,
       shared_space_person."isHidden",
-      NULL::boolean AS "isFavorite",
+      COALESCE(
+        (
+          SELECT
+            "fav_person"."isFavorite"
+          FROM
+            "person_identity" AS "fav_link"
+            INNER JOIN "person" AS "fav_person" ON "fav_person"."personGroupId" = "fav_link"."personGroupId"
+          WHERE
+            "fav_link"."identityId" = "shared_space_person"."identityId"
+            AND "fav_person"."ownerId" = $7
+        ),
+        EXISTS (
+          SELECT
+          FROM
+            "face_identity_favorite" AS "fav_row"
+          WHERE
+            "fav_row"."userId" = $8
+            AND "fav_row"."identityId" = "shared_space_person"."identityId"
+        )
+      ) AS "isFavorite",
       shared_space_person."updatedAt",
       shared_space_person.id AS "profileId",
       shared_space_person.type,
@@ -1473,7 +1530,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $9
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1496,8 +1553,8 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $10 = ''
+        OR shared_space_person.type = $11
       )
       AND (
         shared_space_person.type <> 'pet'
@@ -1525,12 +1582,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1608,10 +1665,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $13 = 'pet'
+        $15 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $14
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1621,9 +1678,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $15
+      $17
     OFFSET
-      $16
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -1833,7 +1890,26 @@ WITH
         ''
       ) AS name,
       shared_space_person."isHidden",
-      NULL::boolean AS "isFavorite",
+      COALESCE(
+        (
+          SELECT
+            "fav_person"."isFavorite"
+          FROM
+            "person_identity" AS "fav_link"
+            INNER JOIN "person" AS "fav_person" ON "fav_person"."personGroupId" = "fav_link"."personGroupId"
+          WHERE
+            "fav_link"."identityId" = "shared_space_person"."identityId"
+            AND "fav_person"."ownerId" = $7
+        ),
+        EXISTS (
+          SELECT
+          FROM
+            "face_identity_favorite" AS "fav_row"
+          WHERE
+            "fav_row"."userId" = $8
+            AND "fav_row"."identityId" = "shared_space_person"."identityId"
+        )
+      ) AS "isFavorite",
       shared_space_person."updatedAt",
       shared_space_person.id AS "profileId",
       shared_space_person.type,
@@ -1845,7 +1921,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $9
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1868,8 +1944,8 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $10 = ''
+        OR shared_space_person.type = $11
       )
       AND (
         shared_space_person.type <> 'pet'
@@ -1897,12 +1973,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1980,10 +2056,10 @@ WITH
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
       OR (
-        $13 = 'pet'
+        $15 = 'pet'
         AND identity_types."isPet"
       )
-      OR identity_counts."visibleAssetCount" >= $14
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1993,9 +2069,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $15
+      $17
     OFFSET
-      $16
+      $18
   ),
   all_identity_counts AS (
     SELECT
@@ -2030,10 +2106,10 @@ WITH
     WHERE
       identity_visibility."hasNamedProfile" = true
       OR (
-        $17 = 'pet'
+        $19 = 'pet'
         AND identity_visibility."hasPetProfile"
       )
-      OR all_identity_counts."visibleAssetCount" >= $18
+      OR all_identity_counts."visibleAssetCount" >= $20
   )
 SELECT
   page_rows."identityId",
@@ -2216,7 +2292,26 @@ WITH
       shared_space_person."birthDateSourceUpdatedAt",
       ''::text AS "thumbnailPath",
       shared_space_person."isHidden",
-      NULL::boolean AS "isFavorite",
+      COALESCE(
+        (
+          SELECT
+            "fav_person"."isFavorite"
+          FROM
+            "person_identity" AS "fav_link"
+            INNER JOIN "person" AS "fav_person" ON "fav_person"."personGroupId" = "fav_link"."personGroupId"
+          WHERE
+            "fav_link"."identityId" = "shared_space_person"."identityId"
+            AND "fav_person"."ownerId" = $7
+        ),
+        EXISTS (
+          SELECT
+          FROM
+            "face_identity_favorite" AS "fav_row"
+          WHERE
+            "fav_row"."userId" = $8
+            AND "fav_row"."identityId" = "shared_space_person"."identityId"
+        )
+      ) AS "isFavorite",
       NULL::text AS color,
       shared_space_person."updatedAt",
       shared_space_person.type,
@@ -2230,10 +2325,10 @@ WITH
       INNER JOIN requested_identities ON requested_identities."identityId" = shared_space_person."identityId"
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $9
     WHERE
       (
-        $8::boolean
+        $10::boolean
         OR shared_space_person."isHidden" = false
       )
       AND EXISTS (

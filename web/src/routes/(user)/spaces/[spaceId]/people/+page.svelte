@@ -25,10 +25,12 @@
   import { appendUniqueById, sortPeople } from '#lib/utils/people-utils.ts';
   import {
     SharedSpaceRole,
+    favoriteSpacePerson,
     getSpacePeople,
     getSpacePeopleFaceStatistics,
     getSpacePeopleStatistics,
     mergeSpacePeople,
+    unfavoriteSpacePerson,
     updateSpacePerson,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePeopleStatisticsResponseDto,
@@ -44,6 +46,8 @@
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
+    mdiHeartMinusOutline,
+    mdiHeartOutline,
     mdiPaw,
     mdiSortAlphabeticalAscending,
     mdiSortNumericDescending,
@@ -207,6 +211,7 @@
     type: person.type,
     assetCount: person.assetCount,
     faceCount: person.faceCount,
+    isFavorite: person.isFavorite,
   });
 
   const getPeopleQuery = (
@@ -549,6 +554,20 @@
     });
   }
 
+  async function handleFavorite(person: SharedSpacePersonResponseDto, isFavorite: boolean) {
+    try {
+      const request = { id: space.id, personId: person.id };
+      await (isFavorite ? favoriteSpacePerson(request) : unfavoriteSpacePerson(request));
+      const idx = people.findIndex((p) => p.id === person.id);
+      if (idx !== -1) {
+        people[idx] = { ...people[idx], isFavorite };
+      }
+      toastManager.primary($t(isFavorite ? 'added_to_favorites' : 'removed_from_favorites'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: isFavorite } }));
+    }
+  }
+
   async function handleHide(person: SharedSpacePersonResponseDto) {
     try {
       await updateSpacePerson({
@@ -652,7 +671,7 @@
         {loading}
         loadNextPage={loadMore}
         canEditNames={isEditor}
-        canShowActions={isEditor}
+        canShowActions
         {onNameSubmit}
         {searchNameSuggestions}
         {onSuggestionSelect}
@@ -666,17 +685,32 @@
             icon={mdiDotsVertical}
             title={$t('show_person_options')}
           >
-            <MenuOption
-              onClick={() => void openBirthDateModal(person)}
-              icon={mdiCalendarEditOutline}
-              text={$t('set_date_of_birth')}
-            />
-            <MenuOption onClick={() => handleHide(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
-            <MenuOption
-              onClick={() => (mergingPerson = person)}
-              icon={mdiAccountMultipleCheckOutline}
-              text={$t('merge_people')}
-            />
+            {#if isEditor}
+              <MenuOption
+                onClick={() => void openBirthDateModal(person)}
+                icon={mdiCalendarEditOutline}
+                text={$t('set_date_of_birth')}
+              />
+              <MenuOption onClick={() => handleHide(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
+              <MenuOption
+                onClick={() => (mergingPerson = person)}
+                icon={mdiAccountMultipleCheckOutline}
+                text={$t('merge_people')}
+              />
+            {/if}
+            {#if person.isFavorite}
+              <MenuOption
+                onClick={() => handleFavorite(person, false)}
+                icon={mdiHeartMinusOutline}
+                text={$t('unfavorite')}
+              />
+            {:else}
+              <MenuOption
+                onClick={() => handleFavorite(person, true)}
+                icon={mdiHeartOutline}
+                text={$t('to_favorite')}
+              />
+            {/if}
           </ButtonContextMenu>
         {/snippet}
       </PeopleManagementGrid>

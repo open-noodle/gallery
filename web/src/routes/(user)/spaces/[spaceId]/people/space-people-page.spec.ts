@@ -78,8 +78,11 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
   };
 }
 
-// eslint-disable-next-line unicorn/no-unnecessary-parameters
-function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: SharedSpacePeopleStatisticsResponseDto) {
+function renderPage(
+  people: SharedSpacePersonResponseDto[],
+  peopleStatistics?: SharedSpacePeopleStatisticsResponseDto,
+  role: SharedSpaceRole = SharedSpaceRole.Editor,
+) {
   peopleStatistics ??= {
     total: people.length,
     hidden: people.filter((person) => person.isHidden).length,
@@ -113,7 +116,7 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
       userId: 'current-user-id',
       email: 'user@example.com',
       name: 'Current User',
-      role: SharedSpaceRole.Editor,
+      role,
       showInTimeline: false,
       sharePersonMetadata: true,
       joinedAt: '2026-01-01T00:00:00.000Z',
@@ -410,6 +413,53 @@ describe('Space people page', () => {
       }),
     );
     expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it('offers a viewer only favorite, and favorites through the space endpoint', async () => {
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined);
+    const alice = makeSpacePerson({ id: 'space-person-alice', name: 'Alice' });
+    await renderPage([alice], { total: 1, hidden: 0, detectedFaceCount: 0 }, SharedSpaceRole.Viewer);
+
+    await userEvent.hover(page.getByRole('group'));
+    await userEvent.click(page.getByLabelText('show_person_options'));
+
+    await expect.element(page.getByText('hide_person')).not.toBeInTheDocument();
+    await expect.element(page.getByText('merge_people')).not.toBeInTheDocument();
+    await expect.element(page.getByText('set_date_of_birth')).not.toBeInTheDocument();
+
+    await userEvent.click(page.getByText('to_favorite'));
+
+    await vi.waitFor(() =>
+      expect(sdkMock.favoriteSpacePerson).toHaveBeenCalledExactlyOnceWith({
+        id: 'space-1',
+        personId: 'space-person-alice',
+      }),
+    );
+  });
+
+  it('unfavorites a favorited person and pins favorites first', async () => {
+    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined);
+    const zed = makeSpacePerson({ id: 'space-person-zed', name: 'Zed', assetCount: 1, isFavorite: true });
+    const amy = makeSpacePerson({ id: 'space-person-amy', name: 'Amy', assetCount: 50 });
+    await renderPage([amy, zed]);
+
+    expect(
+      page
+        .getByPlaceholder('add_a_name')
+        .elements()
+        .map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['Zed', 'Amy']);
+
+    await userEvent.hover(page.getByRole('group').first());
+    await userEvent.click(page.getByLabelText('show_person_options').first());
+    await userEvent.click(page.getByText('unfavorite'));
+
+    await vi.waitFor(() =>
+      expect(sdkMock.unfavoriteSpacePerson).toHaveBeenCalledExactlyOnceWith({
+        id: 'space-1',
+        personId: 'space-person-zed',
+      }),
+    );
   });
 
   it('picks a suggestion with the keyboard', async () => {

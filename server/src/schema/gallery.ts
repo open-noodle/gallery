@@ -14,6 +14,7 @@ import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js
 import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';
 import { CleanupDecisionTable } from 'src/schema/tables/cleanup-decision.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
+import { FaceIdentityFavoriteTable } from 'src/schema/tables/face-identity-favorite.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
 import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
@@ -75,6 +76,7 @@ export const galleryTables = [
   AssetVideoTrimTable,
   FaceIdentityTable,
   FaceIdentityFaceTable,
+  FaceIdentityFavoriteTable,
   FaceRepairDeclineTable,
   FaceRepairScanFlaggedFaceTable,
   FaceRepairScanTable,
@@ -135,6 +137,7 @@ export interface GalleryDB {
   asset_video_trim: AssetVideoTrimTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
+  face_identity_favorite: FaceIdentityFavoriteTable;
   face_repair_decline: FaceRepairDeclineTable;
   face_repair_scan_flagged_face: FaceRepairScanFlaggedFaceTable;
   face_repair_scan: FaceRepairScanTable;
