@@ -7,7 +7,7 @@
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import SingleGridRow from '#lib/components/shared-components/SingleGridRow.svelte';
   import Portal from '#lib/elements/Portal.svelte';
-  import { sortPeopleByPreference } from '#lib/gallery/people/people-sort.store.ts';
+  import { peopleSortManager } from '#lib/gallery/managers/people-sort-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
@@ -37,7 +37,7 @@
     getFieldItems(data.explore, 'createdAt').sort((a, b) => new Date(b.value).getTime() - new Date(a.value).getTime()),
   );
   let people = $state(data.people.people);
-  let sortedPeople = $derived($sortPeopleByPreference(people));
+  let sortedPeople = $derived(peopleSortManager.sort(people));
   let memories = $derived(
     data.memories.map((memory) => ({
       id: memory.id,
