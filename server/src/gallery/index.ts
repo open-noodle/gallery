@@ -18,6 +18,7 @@ import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timel
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FileOperationRepository } from 'src/gallery/repositories/file-operation.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
@@ -35,6 +36,7 @@ import { SpatialSceneRepository } from 'src/gallery/repositories/spatial-scene.r
 import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
+import { AssetRenameService } from 'src/gallery/services/asset-rename.service.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { CleanupService } from 'src/gallery/services/cleanup.service.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
@@ -132,12 +134,14 @@ export const galleryRepositories = [
   GalleryMachineLearningRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  FileOperationRepository,
 ];
 
 export const galleryServices = [
   AppMetricsService,
   // not a service of its own: a provider DatabaseBackupService injects to learn where a backup goes
   BackupStoreResolver,
+  AssetRenameService,
   AssetVisibilityTransitionService,
   ClassificationService,
   CleanupService,

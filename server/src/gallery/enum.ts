@@ -61,3 +61,11 @@ export const LibraryViewSchema = z
   .enum(LibraryView)
   .describe('Only your photos that are in no space, or only the photos of the spaces on your timeline (unset: both)')
   .meta({ id: 'LibraryView' });
+
+// In-app rename of an external library file (specs/2026-11-10-external-library-move-rename-design.md)
+export enum AssetRenameTargetState {
+  Free = 'free',
+  Offline = 'offline',
+  Trashed = 'trashed',
+  Exists = 'exists',
+}
