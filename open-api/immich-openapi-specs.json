@@ -6864,6 +6864,268 @@
         "x-immich-state": "Beta"
       }
     },
+    "/assets/{id}/versions": {
+      "get": {
+        "description": "Returns the files of the photo's shot, the photo's own file among them (edits newest first, then the original, then the RAW), with the one the photo shows marked, for everyone who can see the photo. Empty when it has none.",
+        "operationId": "getAssetVersions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetVersionsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List the versions of a photo",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/assets/{id}/versions/{versionId}/original": {
+      "get": {
+        "description": "Returns a version's file, for everyone who may download the photo. Supports byte range requests.",
+        "operationId": "downloadAssetVersion",
+        "parameters": [
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return the file as an attachment download",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Asset ID of the photo",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "description": "Asset ID of the version",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Download a version",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.download",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/assets/{id}/versions/{versionId}/thumbnail": {
+      "get": {
+        "description": "Returns a version's thumbnail or preview, for everyone who can see the photo.",
+        "operationId": "viewAssetVersionThumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Asset ID of the photo",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AssetVersionImageSize"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "description": "Asset ID of the version",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "View the thumbnail of a version",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.view",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/video/data-saver": {
       "get": {
         "description": "Streams the small Data Saver copy of a video, made for playback on mobile data. Without one, streams what /assets/{id}/video/playback does. Supports byte range requests.",
@@ -29323,6 +29585,19 @@
         ],
         "type": "object"
       },
+      "AdminConfigAssetVersionsDto": {
+        "properties": {
+          "detectEdits": {
+            "description": "Also group exported edits (Lightroom, darktable, ...) with the photo they were made from, and show the newest one as the photo's picture: the photo stays the same photo, and the edits are kept behind it. Needs enabled.",
+            "type": "boolean"
+          },
+          "enabled": {
+            "description": "Find the files of one shot from their metadata and show them as one photo: a RAW is kept behind the camera's JPEG or HEIC of the same shot instead of beside it in the timeline.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "AdminConfigBackupsDto": {
         "properties": {
           "beta": {
@@ -30020,6 +30295,9 @@
       },
       "AdminConfigJobDto": {
         "properties": {
+          "assetVersions": {
+            "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
+          },
           "backgroundTask": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
@@ -30082,6 +30360,7 @@
           }
         },
         "required": [
+          "assetVersions",
           "backgroundTask",
           "classification",
           "editor",
@@ -30684,6 +30963,9 @@
       },
       "AdminConfigServerDto": {
         "properties": {
+          "assetVersions": {
+            "$ref": "#/components/schemas/AdminConfigAssetVersionsDto"
+          },
           "externalDomain": {
             "description": "External domain",
             "type": "string"
@@ -30710,6 +30992,7 @@
           }
         },
         "required": [
+          "assetVersions",
           "externalDomain",
           "loginPageMessage",
           "publicUsers"
@@ -33150,6 +33433,135 @@
           "reject"
         ],
         "type": "string"
+      },
+      "AssetVersionImageSize": {
+        "description": "Image size",
+        "enum": [
+          "thumbnail",
+          "preview"
+        ],
+        "type": "string"
+      },
+      "AssetVersionKind": {
+        "description": "What the file is: the RAW, the camera's own JPEG or HEIC, or an edit made from them",
+        "enum": [
+          "raw",
+          "original",
+          "edit"
+        ],
+        "type": "string"
+      },
+      "AssetVersionResponseDto": {
+        "properties": {
+          "fileCreatedAt": {
+            "description": "Capture time of the version",
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileModifiedAt": {
+            "description": "When the file was last written: for an edit, when it was made. The newest edit is the one shown",
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileSizeInByte": {
+            "description": "File size in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          },
+          "height": {
+            "description": "Height in pixels",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          },
+          "id": {
+            "description": "Asset ID of the file: a hidden asset reached through its photo, or the photo itself for its own file",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "isOffline": {
+            "description": "Whether its file is offline (an external library file that went missing)",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AssetVersionKind"
+          },
+          "originalFileName": {
+            "description": "File name",
+            "type": "string"
+          },
+          "originalMimeType": {
+            "description": "MIME type",
+            "type": "string"
+          },
+          "rule": {
+            "description": "The detection rule that paired it (raw:name, edit:name, edit:time); photo for the photo itself",
+            "type": "string"
+          },
+          "shown": {
+            "description": "Whether this file is the one the photo's picture comes from",
+            "type": "boolean"
+          },
+          "source": {
+            "description": "Where it came from, when known: camera, lightroom, darktable, ...",
+            "nullable": true,
+            "type": "string"
+          },
+          "thumbhash": {
+            "description": "Thumbhash of the version (base64)",
+            "nullable": true,
+            "type": "string"
+          },
+          "width": {
+            "description": "Width in pixels",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fileCreatedAt",
+          "fileModifiedAt",
+          "fileSizeInByte",
+          "height",
+          "id",
+          "isOffline",
+          "kind",
+          "originalFileName",
+          "rule",
+          "shown",
+          "source",
+          "thumbhash",
+          "width"
+        ],
+        "type": "object"
+      },
+      "AssetVersionsResponseDto": {
+        "properties": {
+          "assetId": {
+            "description": "The photo",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "versions": {
+            "description": "The files of the photo's shot, its own file included: edits newest first, then the original, then the RAW. Empty when the photo has no versions",
+            "items": {
+              "$ref": "#/components/schemas/AssetVersionResponseDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetId",
+          "versions"
+        ],
+        "type": "object"
       },
       "AssetVideoTrimDto": {
         "properties": {
@@ -36395,6 +36807,10 @@
           "PetRecognition",
           "SpatialSceneQueueAll",
           "SpatialScene",
+          "AssetVersionDetectQueueAll",
+          "AssetVersionDetect",
+          "AssetVersionCleanup",
+          "AssetVersionUndo",
           "AssetEncodeDataSaverVideoQueueAll",
           "AssetEncodeDataSaverVideo",
           "WorkflowAssetTrigger",
@@ -36954,7 +37370,8 @@
           "integrity-checksum-mismatch-delete-all",
           "face-identity-backfill",
           "face-suggestion-maintenance",
-          "shared-space-person-metadata-backfill"
+          "shared-space-person-metadata-backfill",
+          "asset-version-undo"
         ],
         "type": "string"
       },
@@ -40567,7 +40984,8 @@
           "storageBackendMigration",
           "classification",
           "qualityAnalysis",
-          "spatialScene"
+          "spatialScene",
+          "assetVersions"
         ],
         "type": "string"
       },
@@ -40706,6 +41124,9 @@
       },
       "QueuesResponseLegacyDto": {
         "properties": {
+          "assetVersions": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "backgroundTask": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -40786,6 +41207,7 @@
           }
         },
         "required": [
+          "assetVersions",
           "backgroundTask",
           "backupDatabase",
           "classification",
@@ -42889,6 +43311,10 @@
       },
       "ServerFeaturesDto": {
         "properties": {
+          "assetVersions": {
+            "description": "Whether the server supports asset versions and has them enabled. While they are off, nothing is detected and the versions already made are not listed. Absent on older servers.",
+            "type": "boolean"
+          },
           "backups": {
             "description": "Whether the backups feature is enabled",
             "type": "boolean"

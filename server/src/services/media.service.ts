@@ -25,6 +25,7 @@ import {
   VideoContainer,
 } from 'src/enum.js';
 import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
+import { resolveVersionLook, withLookPublished } from 'src/gallery/utils/asset-version-look.js';
 import { getRelativeEncodedVideoPath, getRelativePersonThumbnailPath } from 'src/gallery/utils/storage-keys.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
@@ -192,6 +193,7 @@ export class MediaService extends BaseService {
       asset.files.filter((file) => file.isEdited),
       generated?.files ?? [],
     );
+    await generated?.published?.();
 
     let thumbhash: Buffer | undefined = generated?.thumbhash;
     if (!thumbhash) {
@@ -223,7 +225,8 @@ export class MediaService extends BaseService {
       return JobStatus.Failed;
     }
 
-    if (asset.visibility === AssetVisibility.Hidden) {
+    // a version (src/gallery/services/asset-version.service.ts) is hidden but shows its own thumbnail in the photo's list
+    if (asset.visibility === AssetVisibility.Hidden && !(await this.assetVersionRepository.isVersion(id))) {
       this.logger.verbose(`Thumbnail generation skipped for asset ${id}: not visible`);
       return JobStatus.Skipped;
     }
@@ -254,6 +257,7 @@ export class MediaService extends BaseService {
     }
 
     await this.syncFiles(asset.files, generated.files);
+    await editedGenerated?.published?.();
     const thumbhash = editedGenerated?.thumbhash || generated.thumbhash;
 
     if (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbhash) !== 0) {
@@ -910,13 +914,29 @@ export class MediaService extends BaseService {
   private async generateEditedThumbnails(asset: ThumbnailAsset, config: SystemConfig, localOriginalPath?: string) {
     // Gallery: the Adjust panel's colour adjustment lives beside asset_edit (src/gallery/utils/image-adjust.ts).
     const adjust = asset.type === AssetType.Image ? await this.imageAdjustRepository.getForRender(asset.id) : undefined;
-    if (asset.type !== AssetType.Image || (asset.files.length === 0 && asset.edits.length === 0 && !adjust)) {
+    // Gallery: a photo with versions shows its newest edit, rendered from that file (src/gallery/utils/asset-version-look.ts).
+    await using look = await resolveVersionLook(
+      {
+        assetVersionRepository: this.assetVersionRepository,
+        assetJobRepository: this.assetJobRepository,
+        backendMedia: this.backendMedia,
+      },
+      asset,
+    );
+    if (asset.type !== AssetType.Image || (asset.files.length === 0 && asset.edits.length === 0 && !adjust && !look)) {
       return;
     }
+    const published = look?.published;
 
     const generated =
-      asset.edits.length > 0 || adjust
-        ? await this.generateImageThumbnails(asset, config, true, localOriginalPath, adjust)
+      asset.edits.length > 0 || adjust || look
+        ? await this.generateImageThumbnails(
+            look?.asset ?? asset,
+            config,
+            true,
+            look?.localPath ?? localOriginalPath,
+            adjust,
+          )
         : undefined;
 
     const crop = asset.edits.find((e) => e.action === AssetEditAction.Crop);
@@ -942,7 +962,8 @@ export class MediaService extends BaseService {
       .join(' ');
     await this.ocrRepository.updateOcrVisibilities(asset.id, ocrStatuses.visible, ocrStatuses.hidden, searchText);
 
-    return generated;
+    // Gallery: the look is recorded by the caller once the files are stored (src/gallery/utils/asset-version-look.ts)
+    return withLookPublished(generated, published);
   }
 
   private warnOnTransparencyLoss(isTransparent: boolean, format: ImageFormat, assetId: string) {

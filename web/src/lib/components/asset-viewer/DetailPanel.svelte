@@ -18,6 +18,7 @@
     lensFilter,
     ownerFilter,
   } from '#lib/gallery/asset-viewer/detail-panel-filters.ts';
+  import AssetVersions from '#lib/gallery/versions/AssetVersions.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getAlbumsByAssetQuery } from '#lib/queries/album.query.ts';
@@ -356,6 +357,7 @@
     </section>
   {/if}
 
+  <AssetVersions {asset} />
   {#if albums.length > 0}
     <section class="p-6 dark:text-immich-dark-fg">
       <div class="pb-4">

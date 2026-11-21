@@ -333,6 +333,93 @@ END $$;
 -- is a no-op when the fork table, column or rows are absent.
 -- -----------------------------------------------------------------------------
 
+-- Asset versions: a base photo whose picture was rendered from another file
+-- of its shot (its asset_version row has a look) shows its own file again. Its
+-- edited files have that picture baked in: drop them and clear the thumbhash,
+-- as for image adjustments further down, so Immich regenerates from asset_edit
+-- alone or the plain thumbnails. Every look counts, also one whose file is gone.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_version') IS NOT NULL THEN
+    UPDATE "asset"
+       SET "thumbhash" = NULL,
+           "isEdited" = EXISTS (SELECT FROM "asset_edit" e WHERE e."assetId" = "asset"."id")
+     WHERE "asset"."id" IN (SELECT "versionAssetId" FROM "asset_version"
+                         WHERE "role" = 'base_photo' AND "lookUpdatedAt" IS NOT NULL);
+    -- its size was the shown file's: back to its own file's, upright (unless
+    -- cropped in the editor, whose size Immich's edit job sets)
+    UPDATE "asset"
+       SET "width" = CASE WHEN x."orientation" IN ('5', '6', '7', '8')
+                          THEN x."exifImageHeight" ELSE x."exifImageWidth" END,
+           "height" = CASE WHEN x."orientation" IN ('5', '6', '7', '8')
+                           THEN x."exifImageWidth" ELSE x."exifImageHeight" END
+      FROM "asset_exif" x
+     WHERE x."assetId" = "asset"."id"
+       AND "asset"."id" IN (SELECT "versionAssetId" FROM "asset_version"
+                         WHERE "role" = 'base_photo' AND "lookUpdatedAt" IS NOT NULL)
+       AND x."exifImageWidth" > 0 AND x."exifImageHeight" > 0
+       AND NOT EXISTS (SELECT FROM "asset_edit" e WHERE e."assetId" = "asset"."id");
+    DELETE FROM "asset_file"
+     WHERE "isEdited"
+       AND "assetId" IN (SELECT "versionAssetId" FROM "asset_version"
+                         WHERE "role" = 'base_photo' AND "lookUpdatedAt" IS NOT NULL);
+  END IF;
+END
+$$;
+
+-- Asset versions (specs/2026-11-07-asset-versions-design.md). A version is a
+-- hidden asset that only asset_version (a row with role 'version') ties to its
+-- base photo; the base photo's own row ('base_photo') changes nothing here. Without this, stock
+-- Immich would keep it hidden for good. Each version is shown again: locked,
+-- archived or in the trash if its photo is now, otherwise the way it was before
+-- it went behind its photo; stacked under the photo (the photo on top) only if
+-- it shared a stack with it then; a version whose photo is gone is shown on its
+-- own. The same as the migration's down() and as undoing versions
+-- in Gallery (asset-version-undo.ts).
+DO $$
+BEGIN
+  IF to_regclass('public.asset_version') IS NOT NULL THEN
+    -- a photo that a version shared a stack with, and that is in none now (a
+    -- stack left with one asset was dissolved), gets one, with itself on top; a
+    -- locked photo is in no stack
+    INSERT INTO "stack" ("primaryAssetId", "ownerId")
+    SELECT p."id", p."ownerId" FROM "asset" p
+     WHERE p."stackId" IS NULL AND p."visibility" <> 'locked'
+       AND EXISTS (SELECT 1 FROM "asset_version" v
+                    WHERE v."assetId" = p."id" AND v."role" = 'version' AND v."wasStacked");
+    UPDATE "asset" p SET "stackId" = s."id" FROM "stack" s
+     WHERE s."primaryAssetId" = p."id" AND p."stackId" IS NULL
+       AND p."visibility" <> 'locked'
+       AND EXISTS (SELECT 1 FROM "asset_version" v
+                    WHERE v."assetId" = p."id" AND v."role" = 'version' AND v."wasStacked");
+    -- shown as the photo is now where that is a decision about the shot (locked
+    -- with a locked photo, archived with an archived one, in the trash with a
+    -- trashed one), else archived if it was archived before
+    UPDATE "asset" a SET
+           "stackId" = CASE WHEN v."wasStacked" AND p."visibility" <> 'locked'
+                            THEN p."stackId" END,
+           "visibility" = CASE WHEN p."visibility" = 'locked'
+                               THEN 'locked'::asset_visibility_enum
+                               WHEN p."visibility" = 'archive'
+                                 OR v."priorVisibility" = 'archive'
+                               THEN 'archive'::asset_visibility_enum
+                               ELSE 'timeline'::asset_visibility_enum END,
+           "deletedAt" = COALESCE(a."deletedAt", p."deletedAt"),
+           -- trash is the timestamp and the status together
+           "status" = CASE WHEN a."deletedAt" IS NULL AND p."deletedAt" IS NOT NULL
+                           THEN p."status" ELSE a."status" END
+      FROM "asset_version" v JOIN "asset" p ON p."id" = v."assetId"
+     WHERE a."id" = v."versionAssetId" AND v."role" = 'version';
+    -- its photo is gone: on its own, in the timeline or the archive as before
+    UPDATE "asset" a
+       SET "visibility" = CASE WHEN v."priorVisibility" = 'archive'
+                               THEN 'archive'::asset_visibility_enum
+                               ELSE 'timeline'::asset_visibility_enum END
+      FROM "asset_version" v
+     WHERE a."id" = v."versionAssetId" AND v."role" = 'version' AND v."assetId" IS NULL;
+  END IF;
+END $$;
+
 -- Pets. Gallery stores them as upstream person/asset_face rows told apart only
 -- by person_pet (person.type on databases from before it; both go in sections 2
 -- and 4) and pet_search (dropped in section 2), so without this they come back
@@ -757,6 +844,8 @@ DROP TABLE IF EXISTS "asset_data_saver_video" CASCADE;
 -- Best frames of video faces. The faces stay in asset_face; the <assetId>_faces/
 -- folders stay in the thumbnails folder, where Immich never reads them.
 DROP TABLE IF EXISTS "asset_face_video_frame" CASCADE;
+-- Asset versions: the versions were shown and stacked in section 0b.
+DROP TABLE IF EXISTS "asset_version" CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
@@ -856,6 +945,7 @@ UPDATE "system_metadata"
      #- '{job,classification}'
      #- '{job,qualityAnalysis}'
      #- '{job,spatialScene}'
+     #- '{job,assetVersions}'
      #- '{machineLearning,clip,maxDistance}'
      #- '{machineLearning,petDetection}'
      #- '{machineLearning,petRecognition}'
@@ -867,6 +957,7 @@ UPDATE "system_metadata"
      #- '{server,mergePeopleAcrossOwners}'
      #- '{server,spaceEditorsCanAddMembers}'
      #- '{server,spaceEditorsCanChangeRoles}'
+     #- '{server,assetVersions}'
  WHERE "key" = 'system-config';
 
 -- Gallery's per-type memory switches (memories.types), which Immich's
@@ -1241,6 +1332,7 @@ DELETE FROM "kysely_migrations"
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
   '1800100000000-AddVideoPetsSampledAt',
+  '1800900000000-AddAssetVersionTables',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1354,6 +1446,7 @@ BEGIN
        'asset_spatial_scene',
        'asset_data_saver_video',
        'asset_face_video_frame',
+       'asset_version',
        'person_identity',
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',

@@ -32,6 +32,7 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
   server: [
     '/src/routes/admin/system-settings/ServerSettings.svelte',
     '/src/lib/gallery/components/admin/space-member-management-settings.svelte',
+    '/src/lib/gallery/admin/AssetVersionsSettings.svelte',
   ],
   'storage-template': '/src/lib/components/admin-settings/StorageTemplateSettings.svelte',
   'storage-usage': '/src/routes/admin/system-settings/StorageUsageSettings.svelte',
@@ -51,6 +52,7 @@ const sourceLoaders = import.meta.glob<string>(
     '/src/routes/admin/system-settings/*.svelte',
     '/src/lib/components/admin-settings/StorageTemplateSettings.svelte',
     '/src/lib/gallery/components/admin/*.svelte',
+    '/src/lib/gallery/admin/AssetVersionsSettings.svelte',
   ],
   { query: '?raw', import: 'default' },
 );

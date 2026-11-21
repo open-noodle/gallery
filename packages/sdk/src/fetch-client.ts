@@ -199,6 +199,7 @@ export type AdminConfigJobSettingsDto = {
     concurrency: number;
 };
 export type AdminConfigJobDto = {
+    assetVersions: AdminConfigJobSettingsDto;
     backgroundTask: AdminConfigJobSettingsDto;
     classification: AdminConfigJobSettingsDto;
     editor: AdminConfigJobSettingsDto;
@@ -516,7 +517,14 @@ export type AdminConfigReverseGeocodingDto = {
     /** Enabled */
     enabled: boolean;
 };
+export type AdminConfigAssetVersionsDto = {
+    /** Also group exported edits (Lightroom, darktable, ...) with the photo they were made from, and show the newest one as the photo's picture: the photo stays the same photo, and the edits are kept behind it. Needs enabled. */
+    detectEdits?: boolean;
+    /** Find the files of one shot from their metadata and show them as one photo: a RAW is kept behind the camera's JPEG or HEIC of the same shot instead of beside it in the timeline. */
+    enabled?: boolean;
+};
 export type AdminConfigServerDto = {
+    assetVersions: AdminConfigAssetVersionsDto;
     /** External domain */
     externalDomain: string;
     /** Login page message */
@@ -2051,6 +2059,41 @@ export type AssetVideoTrimDto = {
     /** Start of the kept part, in seconds from the start of the original video */
     startTime: number;
 };
+export type AssetVersionResponseDto = {
+    /** Capture time of the version */
+    fileCreatedAt: string;
+    /** When the file was last written: for an edit, when it was made. The newest edit is the one shown */
+    fileModifiedAt: string;
+    /** File size in bytes */
+    fileSizeInByte: number | null;
+    /** Height in pixels */
+    height: number | null;
+    /** Asset ID of the file: a hidden asset reached through its photo, or the photo itself for its own file */
+    id: string;
+    /** Whether its file is offline (an external library file that went missing) */
+    isOffline: boolean;
+    kind: AssetVersionKind;
+    /** File name */
+    originalFileName: string;
+    /** MIME type */
+    originalMimeType?: string;
+    /** The detection rule that paired it (raw:name, edit:name, edit:time); photo for the photo itself */
+    rule: string;
+    /** Whether this file is the one the photo's picture comes from */
+    shown: boolean;
+    /** Where it came from, when known: camera, lightroom, darktable, ... */
+    source: string | null;
+    /** Thumbhash of the version (base64) */
+    thumbhash: string | null;
+    /** Width in pixels */
+    width: number | null;
+};
+export type AssetVersionsResponseDto = {
+    /** The photo */
+    assetId: string;
+    /** The files of the photo's shot, its own file included: edits newest first, then the original, then the RAW. Empty when the photo has no versions */
+    versions: AssetVersionResponseDto[];
+};
 export type SignUpDto = {
     /** User email */
     email: string;
@@ -2510,6 +2553,7 @@ export type QueueResponseLegacyDto = {
     queueStatus: QueueStatusLegacyDto;
 };
 export type QueuesResponseLegacyDto = {
+    assetVersions: QueueResponseLegacyDto;
     backgroundTask: QueueResponseLegacyDto;
     backupDatabase: QueueResponseLegacyDto;
     classification: QueueResponseLegacyDto;
@@ -4078,6 +4122,8 @@ export type ServerConfigDto = {
     userDeleteDelay: number;
 };
 export type ServerFeaturesDto = {
+    /** Whether the server supports asset versions and has them enabled. While they are off, nothing is detected and the versions already made are not listed. Absent on older servers. */
+    assetVersions?: boolean;
     /** Whether the backups feature is enabled */
     backups: boolean;
     /** Whether config file is available */
@@ -7407,6 +7453,66 @@ export function updateAssetTrim({ id, assetVideoTrimDto }: {
         method: "PUT",
         body: assetVideoTrimDto
     })));
+}
+/**
+ * List the versions of a photo
+ */
+export function getAssetVersions({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetVersionsResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/versions${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Download a version
+ */
+export function downloadAssetVersion({ download, id, key, slug, versionId }: {
+    download?: boolean;
+    id: string;
+    key?: string;
+    slug?: string;
+    versionId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/assets/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/original${QS.query(QS.explode({
+        download,
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * View the thumbnail of a version
+ */
+export function viewAssetVersionThumbnail({ id, key, size, slug, versionId }: {
+    id: string;
+    key?: string;
+    size?: AssetVersionImageSize;
+    slug?: string;
+    versionId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/assets/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/thumbnail${QS.query(QS.explode({
+        key,
+        size,
+        slug
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Play the Data Saver copy of a video
@@ -12782,6 +12888,15 @@ export enum AssetMediaSize {
     Preview = "preview",
     Thumbnail = "thumbnail"
 }
+export enum AssetVersionKind {
+    Raw = "raw",
+    Original = "original",
+    Edit = "edit"
+}
+export enum AssetVersionImageSize {
+    Thumbnail = "thumbnail",
+    Preview = "preview"
+}
 export enum CleanupQueue {
     Rewind = "rewind",
     SpaceHogs = "space_hogs",
@@ -12854,7 +12969,8 @@ export enum ManualJobName {
     IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all",
     FaceIdentityBackfill = "face-identity-backfill",
     FaceSuggestionMaintenance = "face-suggestion-maintenance",
-    SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill"
+    SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill",
+    AssetVersionUndo = "asset-version-undo"
 }
 export enum QueueName {
     ThumbnailGeneration = "thumbnailGeneration",
@@ -12882,7 +12998,8 @@ export enum QueueName {
     StorageBackendMigration = "storageBackendMigration",
     Classification = "classification",
     QualityAnalysis = "qualityAnalysis",
-    SpatialScene = "spatialScene"
+    SpatialScene = "spatialScene",
+    AssetVersions = "assetVersions"
 }
 export enum QueueCommand {
     Start = "start",
@@ -13000,6 +13117,10 @@ export enum JobName {
     PetRecognition = "PetRecognition",
     SpatialSceneQueueAll = "SpatialSceneQueueAll",
     SpatialScene = "SpatialScene",
+    AssetVersionDetectQueueAll = "AssetVersionDetectQueueAll",
+    AssetVersionDetect = "AssetVersionDetect",
+    AssetVersionCleanup = "AssetVersionCleanup",
+    AssetVersionUndo = "AssetVersionUndo",
     AssetEncodeDataSaverVideoQueueAll = "AssetEncodeDataSaverVideoQueueAll",
     AssetEncodeDataSaverVideo = "AssetEncodeDataSaverVideo",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",

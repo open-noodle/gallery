@@ -1,4 +1,4 @@
-import { AssetType, AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { AssetType, AssetVisibility, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { UserFactory } from 'test/factories/user.factory.js';
@@ -129,5 +129,16 @@ describe('JobService.onJobRun for AssetVideoTrimGenerate', () => {
     await sut.onJobRun(QueueName.Editor, { name: JobName.AssetVideoTrimGenerate, data: { id: newUuid() } });
 
     expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('JobService.create for undoing asset versions', () => {
+  it('queues the undo job when an administrator starts it', async () => {
+    const { sut, mocks } = newTestService(JobService);
+
+    await sut.create({ name: ManualJobName.AssetVersionUndo });
+
+    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetVersionUndo, data: {} });
+    expect(mocks.job.queue).toHaveBeenCalledTimes(1);
   });
 });

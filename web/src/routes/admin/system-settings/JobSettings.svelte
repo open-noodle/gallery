@@ -67,6 +67,7 @@
     [QueueName.Classification]: 'Auto-Classification',
     [QueueName.QualityAnalysis]: $t('admin.quality_analysis_job'),
     [QueueName.SpatialScene]: $t('admin.machine_learning_spatial_scene'),
+    [QueueName.AssetVersions]: $t('admin.asset_versions_settings'),
   });
 </script>
 

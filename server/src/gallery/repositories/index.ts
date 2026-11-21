@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AssetVersionRepository } from 'src/gallery/repositories/asset-version.repository.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -62,6 +63,7 @@ export const GALLERY_REPOSITORY_DEPENDENCIES = [
   SpatialSceneRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  AssetVersionRepository,
 ] as const;
 
 // Every fork repository a service needs, injected into upstream's BaseService as one constructor parameter.
@@ -98,5 +100,6 @@ export class GalleryRepositories {
     public spatialSceneRepository: SpatialSceneRepository,
     public dataSaverVideoRepository: DataSaverVideoRepository,
     public videoFaceRepository: VideoFaceRepository,
+    public assetVersionRepository: AssetVersionRepository,
   ) {}
 }

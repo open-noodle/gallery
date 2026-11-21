@@ -164,6 +164,7 @@ describe(ServerService.name, () => {
         searchFavoritesAcrossSpaces: true,
         spatialScene: false,
         dataSaverVideo: false,
+        assetVersions: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
