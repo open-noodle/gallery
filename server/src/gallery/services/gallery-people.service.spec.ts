@@ -332,6 +332,8 @@ describe(GalleryPeopleService.name, () => {
         name: JobName.PersonGenerateThumbnail,
         data: { ownerId: person.ownerId, personGroupId: person.personGroupId },
       });
+      // Person covers: the cover job never replaces a face picked here.
+      expect(mocks.personCover.recordHandPick).toHaveBeenCalledWith(person.personGroupId, face.id);
     });
 
     it('rejects a face that does not belong to the requested person or identity', async () => {
@@ -349,6 +351,7 @@ describe(GalleryPeopleService.name, () => {
 
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.personCover.recordHandPick).not.toHaveBeenCalled();
     });
 
     it('rejects a selected face when the actor cannot read the face asset', async () => {

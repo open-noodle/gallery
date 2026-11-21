@@ -27,6 +27,7 @@ import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.rep
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PersonCoverRepository } from 'src/gallery/repositories/person-cover.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
@@ -44,6 +45,7 @@ import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
+import { PersonCoverService } from 'src/gallery/services/person-cover.service.js';
 import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
 import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
@@ -132,6 +134,7 @@ export const galleryRepositories = [
   GalleryMachineLearningRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  PersonCoverRepository,
 ];
 
 export const galleryServices = [
@@ -150,6 +153,7 @@ export const galleryServices = [
   GallerySearchService,
   GalleryStackService,
   LibraryManifestService,
+  PersonCoverService,
   PetDetectionService,
   SpatialSceneService,
   DataSaverVideoService,

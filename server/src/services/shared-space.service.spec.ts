@@ -7705,6 +7705,8 @@ describe(SharedSpaceService.name, () => {
         identityId,
         assetFaceId: faceId,
       });
+      // Person covers: the hand pick gets its timestamp, for propagation through the identity later.
+      expect(mocks.personCover.recordSpaceHandPick).toHaveBeenCalledWith(personId, faceId);
     });
 
     it('clears a manual representative face override for a space person', async () => {
@@ -7738,6 +7740,8 @@ describe(SharedSpaceService.name, () => {
         representativeFaceSource: 'auto',
         representativeFaceId: faceId,
       });
+      // Person covers: back to automatic, so the cover job picks for it.
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SpacePersonCover, data: { id: personId } });
     });
 
     it('rejects a representative face that is not assigned to the requested space person', async () => {

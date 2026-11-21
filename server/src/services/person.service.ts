@@ -279,6 +279,7 @@ export class PersonService extends BaseService {
     }
 
     await this.jobRepository.queueAll(jobs);
+    await this.queuePersonCoverPicks(changeFeaturePhoto.map(({ personGroupId }) => personGroupId));
   }
 
   async getById(auth: AuthDto, id: string): Promise<PersonResponseDto> {
@@ -399,6 +400,9 @@ export class PersonService extends BaseService {
 
     if (assetId) {
       await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
+    }
+    if (faceId) {
+      await this.personCoverRepository.recordHandPick(personGroupId, faceId);
     }
 
     if (person.identityId && (name !== undefined || birthDate !== undefined)) {

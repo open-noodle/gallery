@@ -11,6 +11,7 @@ import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.rep
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PersonCoverRepository } from 'src/gallery/repositories/person-cover.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
@@ -68,6 +69,7 @@ export type GalleryServiceOverrides = {
   spatialScene: SpatialSceneRepository;
   dataSaverVideo: DataSaverVideoRepository;
   videoFace: VideoFaceRepository;
+  personCover: PersonCoverRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -103,6 +105,7 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
     spatialScene: automock(SpatialSceneRepository, { strict: false }),
     dataSaverVideo: automock(DataSaverVideoRepository, { strict: false }),
     videoFace: automock(VideoFaceRepository, { strict: false }),
+    personCover: automock(PersonCoverRepository, { strict: false }),
   };
 
   mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
@@ -151,4 +154,5 @@ export const newGalleryRepositories = (
     overrides.spatialScene || (mocks.spatialScene as As<SpatialSceneRepository>),
     overrides.dataSaverVideo || (mocks.dataSaverVideo as As<DataSaverVideoRepository>),
     overrides.videoFace || (mocks.videoFace as As<VideoFaceRepository>),
+    overrides.personCover || (mocks.personCover as As<PersonCoverRepository>),
   );

@@ -155,6 +155,11 @@ export type GalleryJobItem =
   | { name: JobName.SpatialSceneQueueAll; data: IBaseJob }
   | { name: JobName.SpatialScene; data: IEntityJob }
 
+  // Person covers (`id` is a personGroupId or a space person id; `force` is the All run)
+  | { name: JobName.PersonCoverQueueAll; data: IBaseJob }
+  | { name: JobName.PersonCover; data: IEntityJob }
+  | { name: JobName.SpacePersonCover; data: IEntityJob }
+
   // Data Saver video
   | { name: JobName.AssetEncodeDataSaverVideoQueueAll; data: IBaseJob }
   | { name: JobName.AssetEncodeDataSaverVideo; data: IEntityJob }

@@ -922,6 +922,7 @@ export enum QueueName {
   Classification = 'classification',
   QualityAnalysis = 'qualityAnalysis',
   SpatialScene = 'spatialScene',
+  PersonCover = 'personCover',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -1036,6 +1037,11 @@ export enum JobName {
   // Spatial Scene
   SpatialSceneQueueAll = 'SpatialSceneQueueAll',
   SpatialScene = 'SpatialScene',
+
+  // Person covers
+  PersonCoverQueueAll = 'PersonCoverQueueAll',
+  PersonCover = 'PersonCover',
+  SpacePersonCover = 'SpacePersonCover',
 
   // Data Saver video
   AssetEncodeDataSaverVideoQueueAll = 'AssetEncodeDataSaverVideoQueueAll',

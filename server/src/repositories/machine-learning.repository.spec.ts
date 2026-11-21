@@ -48,6 +48,7 @@ describe(MachineLearningRepository.name, () => {
         createPeople: true,
         minRecognitionScore: 0.75,
       },
+      covers: { enabled: true },
     },
     ocr: {
       enabled: false,

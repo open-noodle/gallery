@@ -9,6 +9,7 @@ import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { GALLERY_REPOSITORY_DEPENDENCIES, GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PersonCoverRepository } from 'src/gallery/repositories/person-cover.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
@@ -69,7 +70,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryPersonRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case PersonCoverRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -105,7 +107,8 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case CleanupRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case PersonCoverRepository: {
       return automock(key);
     }
 
