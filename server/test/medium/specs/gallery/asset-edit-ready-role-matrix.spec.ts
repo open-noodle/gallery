@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobName, JobStatus, QueueName, SharedSpaceRole } from 'src/enum.js';
+import { AssetType, AssetVisibility, JobName, JobStatus, QueueName, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -57,7 +57,7 @@ describe('Edit-ready delivery role × visibility × timeline preference × compl
         if (isMember) {
           await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role, showInTimeline });
         }
-        const { asset } = await ctx.newAsset({ ownerId: host.id, duration: 100_000 });
+        const { asset } = await ctx.newAsset({ ownerId: host.id, type: AssetType.Video, duration: 100_000 });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: host.id });
         await db
           .insertInto('asset_video_trim')

@@ -111,7 +111,7 @@ describe('Space editor receives edit completion (#1321)', () => {
         .put('/assets/favorites')
         .set(asBearerAuth(ctx.spaceOwner.token!))
         .send({ ids: [asset.id], isFavorite: true });
-      expect(favorite.status).toBe(200);
+      expect(favorite.status).toBe(204);
       const path = `/assets/${asset.id}/${endpoint}`;
       await save(asset.id, path, body);
       if (reset) {
