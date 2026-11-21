@@ -20,6 +20,11 @@ contain only a pending flag, no sidecar descriptions, coordinates or file bytes.
 singleton class in `web/src/lib/gallery/managers/*.svelte.ts`: the root layering
 rule requires new fork code under `gallery/`, so the manager mirrors the web's
 manager convention there rather than adding an upstream file.
+The existing asset metadata write goes through `gallery/queries/asset.query.ts`
+using `asMutation` and `executeMutation`. Its error toast is disabled because the
+importer reports per-item errors itself. Since `executeMutation` normally swallows
+failures, the wrapper captures `onError` and rethrows after the mutation settles;
+otherwise a failed write would incorrectly clear the pending marker.
 If browser storage is blocked or full, a memory fallback supports retries within
 the current page. The retry uses the selected file's current sidecar and current
 import options, including disabled description/archive options. A retry without
@@ -40,6 +45,9 @@ Old app/new server behavior is unchanged; new web/old server uses the same
 existing requests, and stock Immich clients see no change. The uploader is
 already a fork-owned file, and the new metadata helper, manager and tests live
 in the Gallery namespace, so Immich-owned files gain no divergence.
+The existing uploader unit tests also move into `gallery/import/` and use the
+API fixture rather than mocking SDK exports; the album grouping tests keep their
+existing unit boundary at the album helper.
 
 Regression tests use `#test/unit/fixtures.ts` and its `api` fixture to exercise
 real SDK requests from the uploader; only XHR upload and worker hashing are

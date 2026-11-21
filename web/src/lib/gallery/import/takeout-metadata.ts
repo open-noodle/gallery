@@ -1,8 +1,9 @@
 import { takeoutMetadataManager } from '#lib/gallery/managers/takeout-metadata-manager.svelte.ts';
+import { updateTakeoutMetadata } from '#lib/gallery/queries/asset.query.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
 import type { TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
-import { AssetVisibility, getBaseUrl, updateAsset, type UpdateAssetDto } from '@immich/sdk';
+import { AssetVisibility, getBaseUrl, type UpdateAssetDto } from '@immich/sdk';
 
 /** Finish this import's metadata work without changing ordinary pre-existing duplicates. */
 export async function applyTakeoutMetadata(
@@ -38,7 +39,7 @@ export async function applyTakeoutMetadata(
     // Record before awaiting: a failed/ambiguous response must remain retryable, including
     // after a reload. Only clear the marker once the metadata write succeeds.
     takeoutMetadataManager.setPending(key, true);
-    await updateAsset({ id: assetId, updateAssetDto: updateDto });
+    await updateTakeoutMetadata({ id: assetId, updateAssetDto: updateDto });
   }
   takeoutMetadataManager.setPending(key, false);
 }
