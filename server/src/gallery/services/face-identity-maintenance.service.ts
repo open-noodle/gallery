@@ -293,6 +293,9 @@ export class FaceIdentityMaintenanceService extends BaseService {
       return JobStatus.Success;
     }
 
+    // Recognition has drained: pick covers for the people it created or grew (specs/2026-11-21-person-cover-quality-design.md).
+    await this.jobRepository.queue({ name: JobName.PersonCoverQueueAll, data: { force: false } });
+
     const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
       status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],
     });

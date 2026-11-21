@@ -7,6 +7,7 @@ import {
   RepresentativeFaceSource,
   SharedSpaceRole,
   Type,
+  chooseRepresentativeFaceAutomatically,
   getMembers,
   getPersonFaces,
   getSpacePersonFaces,
@@ -25,6 +26,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getPersonFaceThumbnail,
   getPersonFacesPage,
+  getPersonPageActions,
   handleUpdatePersonBirthDate,
   isSpaceEditor,
   updatePersonName,
@@ -44,6 +46,7 @@ vi.mock(import('#lib/utils/handle-error.ts'), { spy: true });
 
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
+  chooseRepresentativeFaceAutomatically: vi.fn(),
   getMembers: vi.fn(),
   getPersonFaces: vi.fn(),
   getSpacePersonFaces: vi.fn(),
@@ -363,5 +366,56 @@ describe('updatePersonName', () => {
         updatedAt: '2026-01-02T00:00:00Z',
       }),
     );
+  });
+});
+
+describe('getPersonPageActions ChooseFaceAutomatically', () => {
+  const $t = ((key: string) => key) as unknown as MessageFormatter;
+  const setup = (person: PersonResponseDto) => {
+    const onPersonUpdate = vi.fn();
+    const onThumbnailUpdate = vi.fn();
+    const { ChooseFaceAutomatically } = getPersonPageActions($t, {
+      getPerson: () => person,
+      canEditSpacePerson: () => true,
+      onPersonUpdate,
+      onThumbnailUpdate,
+    });
+    return { action: ChooseFaceAutomatically, onPersonUpdate, onThumbnailUpdate };
+  };
+
+  it('chooses the cover of an owned person and refreshes the thumbnail', async () => {
+    const person = factory.person({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
+    const updated = { ...person, updatedAt: '2026-11-21T12:00:00Z' };
+    vi.mocked(chooseRepresentativeFaceAutomatically).mockResolvedValue(updated);
+    const { action, onPersonUpdate, onThumbnailUpdate } = setup(person);
+
+    expect(action.$if?.()).toBe(true);
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(chooseRepresentativeFaceAutomatically).toHaveBeenCalledWith({ id: person.id });
+    expect(onPersonUpdate).toHaveBeenCalledWith(updated);
+    expect(onThumbnailUpdate).toHaveBeenCalled();
+    expect(toastManager.primary).toHaveBeenCalledWith('representative_face_updated');
+  });
+
+  it('is not offered for a space person, whose owner may not be the viewer', () => {
+    const person = factory.person({
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+    });
+
+    expect(setup(person).action.$if?.()).toBe(false);
+  });
+
+  it('reports a failure without touching the page', async () => {
+    const person = factory.person({ primaryProfile: { type: Type.UserPerson, id: 'person-1' } });
+    const error = new Error('Person has no photo to choose a thumbnail from');
+    vi.mocked(chooseRepresentativeFaceAutomatically).mockRejectedValue(error);
+    const { action, onPersonUpdate, onThumbnailUpdate } = setup(person);
+
+    await action.onAction({ action, event: new Event('click') });
+
+    expect(handleErrorSpy).toHaveBeenCalledWith(error, 'errors.unable_to_choose_representative_face');
+    expect(onPersonUpdate).not.toHaveBeenCalled();
+    expect(onThumbnailUpdate).not.toHaveBeenCalled();
   });
 });

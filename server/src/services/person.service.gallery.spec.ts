@@ -2,6 +2,7 @@ import { JobStatus } from 'src/enum.js';
 import { PersonService } from 'src/services/person.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
+import { AuthFactory } from 'test/factories/auth.factory.js';
 import { PersonGroupFactory } from 'test/factories/person-group.factory.js';
 import { PersonFactory } from 'test/factories/person.factory.js';
 import { getForFaceSearch, getForFacialRecognitionJob } from 'test/mappers.js';
@@ -127,6 +128,36 @@ describe(PersonService.name, () => {
 
         expect(mocks.person.createGroup).toHaveBeenCalled();
       });
+    });
+  });
+
+  // Person covers (specs/2026-11-21-person-cover-quality-design.md).
+  describe('person covers', () => {
+    it('records a featured photo set through PUT /people/:id as hand-picked', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+      const face = AssetFaceFactory.create({ personGroupId: person.personGroupId });
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.update.mockResolvedValue(person);
+      mocks.person.getForFeatureFaceUpdate.mockResolvedValue(face);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([face.assetId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+
+      await sut.update(auth, person.personGroupId, { featureFaceAssetId: face.assetId });
+
+      expect(mocks.personCover.recordHandPick).toHaveBeenCalledWith(person.personGroupId, face.id);
+    });
+
+    it('records nothing for an update that leaves the cover alone', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.update.mockResolvedValue(person);
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+
+      await sut.update(auth, person.personGroupId, { name: 'Ada' });
+
+      expect(mocks.personCover.recordHandPick).not.toHaveBeenCalled();
     });
   });
 });

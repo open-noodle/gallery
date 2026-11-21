@@ -6,6 +6,7 @@
   import { SettingInputFieldType } from '#lib/constants.ts';
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import SpatialSceneSettings from '#lib/gallery/admin/SpatialSceneSettings.svelte';
+  import PersonCoverSettings from '#lib/gallery/components/admin/person-cover-settings.svelte';
   import VideoFaceSettings from '#lib/gallery/components/admin/video-face-settings.svelte';
   import VideoPetSettings from '#lib/gallery/components/admin/video-pet-settings.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
@@ -338,6 +339,7 @@
           />
 
           <VideoFaceSettings bind:configToEdit {config} {disabled} />
+          <PersonCoverSettings bind:configToEdit {disabled} />
         </div>
       </SettingAccordion>
 

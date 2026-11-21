@@ -22,6 +22,7 @@ import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
+import { PersonCoverTable } from 'src/schema/tables/person-cover.table.js';
 import { PersonGroupSplitPersonTable } from 'src/schema/tables/person-group-split-person.table.js';
 import { PersonGroupSplitShareTable } from 'src/schema/tables/person-group-split-share.table.js';
 import { PersonGroupSplitTable } from 'src/schema/tables/person-group-split.table.js';
@@ -49,6 +50,7 @@ import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.
 import { SharedSpaceMemberAuditTable } from 'src/schema/tables/shared-space-member-audit.table.js';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table.js';
 import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table.js';
+import { SharedSpacePersonCoverTable } from 'src/schema/tables/shared-space-person-cover.table.js';
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
@@ -85,6 +87,7 @@ export const galleryTables = [
   PersonGroupSplitTable,
   PersonGroupSplitShareTable,
   PersonGroupSplitPersonTable,
+  PersonCoverTable,
   PersonIdentityTable,
   PersonPetTable,
   PetSearchTable,
@@ -110,6 +113,7 @@ export const galleryTables = [
   SharedSpaceLibraryAssetAuditTable,
   SharedSpaceActivityTable,
   SharedSpacePersonTable,
+  SharedSpacePersonCoverTable,
   SharedSpacePersonFaceTable,
   SharedSpacePersonAliasTable,
   UserGroupTable,
@@ -145,6 +149,7 @@ export interface GalleryDB {
   person_group_split: PersonGroupSplitTable;
   person_group_split_share: PersonGroupSplitShareTable;
   person_group_split_person: PersonGroupSplitPersonTable;
+  person_cover: PersonCoverTable;
   person_identity: PersonIdentityTable;
   person_pet: PersonPetTable;
   pet_search: PetSearchTable;
@@ -170,6 +175,7 @@ export interface GalleryDB {
   shared_space_library_asset_audit: SharedSpaceLibraryAssetAuditTable;
   shared_space_activity: SharedSpaceActivityTable;
   shared_space_person: SharedSpacePersonTable;
+  shared_space_person_cover: SharedSpacePersonCoverTable;
   shared_space_person_face: SharedSpacePersonFaceTable;
   shared_space_person_alias: SharedSpacePersonAliasTable;
   user_group: UserGroupTable;

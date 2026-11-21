@@ -10,6 +10,7 @@ import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PersonCoverRepository } from 'src/gallery/repositories/person-cover.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
@@ -62,6 +63,7 @@ export const GALLERY_REPOSITORY_DEPENDENCIES = [
   SpatialSceneRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  PersonCoverRepository,
 ] as const;
 
 // Every fork repository a service needs, injected into upstream's BaseService as one constructor parameter.
@@ -98,5 +100,6 @@ export class GalleryRepositories {
     public spatialSceneRepository: SpatialSceneRepository,
     public dataSaverVideoRepository: DataSaverVideoRepository,
     public videoFaceRepository: VideoFaceRepository,
+    public personCoverRepository: PersonCoverRepository,
   ) {}
 }

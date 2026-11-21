@@ -405,6 +405,9 @@ export class PersonService extends BaseService {
     if (assetId) {
       await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
     }
+    if (faceId) {
+      await this.personCoverRepository.recordHandPick(personGroupId, faceId);
+    }
 
     if (person.identityId && (name !== undefined || birthDate !== undefined)) {
       await this.jobRepository.queue({
