@@ -42,11 +42,15 @@ class _TagDetailsState extends ConsumerState<TagDetails> {
     final asset = widget.asset;
     final isTagsEnabled = ref.watch(Store.userMetadata.preferences()).valueOrNull?.tagsEnabled ?? false;
     final user = ref.watch(currentUserProvider);
-    if (asset is! RemoteAsset || !isTagsEnabled || asset.ownerId != user?.id) {
+    if (asset is! RemoteAsset || !isTagsEnabled) {
       return const SizedBox.shrink();
     }
 
     final tags = ref.watch(Store.tags.forAsset(asset.id)).valueOrNull ?? const <Tag>[];
+    // gallery-fork: readers of a shared asset see its tags read-only (#796); only the owner keeps an empty section.
+    if (asset.ownerId != user?.id && tags.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final tagAction = const TagAction(source: .viewer).create(context, ref);
     final tagBackground = context.primaryColor.withAlpha(25);
     final tagBorder = context.colorScheme.outlineVariant;
