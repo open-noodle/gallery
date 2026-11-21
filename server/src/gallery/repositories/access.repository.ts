@@ -1,4 +1,4 @@
-import { type Kysely } from 'kysely';
+import { type ExpressionBuilder, type Kysely, type ReferenceExpression } from 'kysely';
 import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
@@ -474,12 +474,22 @@ export class GalleryPersonAccess {
             .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
+            // Only a space the person's owner belongs to: the owner's layer is never edited through a space they
+            // never joined (the rule linkFaceToSpacePerson and createSpaceAssetFace apply). The alias keeps it apart
+            // from the helper's own shared_space_member joins; the cast only widens the builder type for that alias.
+            .innerJoin('shared_space_member as owner_membership', (join) =>
+              join.onRef('owner_membership.userId', '=', 'person.ownerId'),
+            )
             .where((eb) =>
               eb.or(
-                spaceAssetPathBranches(eb, {
+                spaceAssetPathBranches(eb as unknown as ExpressionBuilder<DB, keyof DB>, {
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
-                  scope: { memberUserId: userId, memberRole: [SharedSpaceRole.Owner, SharedSpaceRole.Editor] },
+                  scope: {
+                    memberUserId: userId,
+                    memberRole: [SharedSpaceRole.Owner, SharedSpaceRole.Editor],
+                    spaceIdRef: 'owner_membership.spaceId' as ReferenceExpression<DB, keyof DB>,
+                  },
                   albumTimelineGate: 'none',
                 }),
               ),
