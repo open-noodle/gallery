@@ -10,6 +10,11 @@ export interface IAssetDetectFacesJob extends IEntityJob {
   force?: boolean;
 }
 
+export interface IAssetEditJob extends IEntityJob {
+  /** Server-set recipient of a cross-owner edit; never supplied by a client DTO. */
+  initiatorId?: string;
+}
+
 export interface IFacialRecognitionJob extends IDeferrableJob {
   skipSharedSpaceMatch?: boolean;
 }
@@ -198,7 +203,7 @@ export type GalleryJobItem =
   | { name: JobName.MemoryRuleGenerate; data?: IBaseJob }
 
   // Video trim
-  | { name: JobName.AssetVideoTrimGenerate; data: IEntityJob };
+  | { name: JobName.AssetVideoTrimGenerate; data: IAssetEditJob };
 
 export type RuleMemoryData = {
   ruleId: string;

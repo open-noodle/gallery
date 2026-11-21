@@ -38,6 +38,7 @@ import type {
   GalleryJobItem,
   GallerySystemMetadata,
   IAssetDetectFacesJob,
+  IAssetEditJob,
   IFacialRecognitionJob,
   RuleMemoryData,
 } from 'src/gallery/types.js';
@@ -470,7 +471,7 @@ export type JobItem =
   | { name: JobName.IntegrityDeleteReports; data: IIntegrityDeleteReportsJob }
 
   // Editor
-  | { name: JobName.AssetEditThumbnailGeneration; data: IEntityJob };
+  | { name: JobName.AssetEditThumbnailGeneration; data: IAssetEditJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 
