@@ -421,6 +421,12 @@ export class WorkflowExecutionService extends BaseService {
 
     const { read, write } = handler;
     const readResult = await read(type);
+    // Gallery fork: the run acts as the asset's owner, and a space Editor's tag (#992) queues the Editor's workflows
+    // on a member's asset. Only the workflow's own owner may be the identity it runs as.
+    if (readResult.authUserId !== workflow.ownerId) {
+      this.logger.debug(`Workflow ${workflowId} skipped: entity ${readResult.entityId} belongs to another user`);
+      return;
+    }
     let data = readResult.data;
     const runId = crypto.randomUUID();
     const galleryHost = BaseService.create(GalleryWorkflowHostService, this);

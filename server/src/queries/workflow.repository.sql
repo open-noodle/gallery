@@ -76,6 +76,7 @@ select
   "workflow"."name",
   "workflow"."trigger",
   "workflow"."logging",
+  "workflow"."ownerId",
   (
     select
       coalesce(json_agg(agg), '[]')

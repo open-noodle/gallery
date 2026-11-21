@@ -472,6 +472,7 @@ describe('WorkflowExecutionService with a gallery-core step', () => {
     const { sut, mocks } = newTestService(WorkflowExecutionService);
     mocks.workflow.getForWorkflowRun.mockResolvedValue({
       id: 'workflow-1',
+      ownerId: 'user-1',
       trigger: 'AssetCreate',
       logging: false,
       steps: [
