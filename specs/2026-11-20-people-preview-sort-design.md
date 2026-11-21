@@ -25,11 +25,30 @@ reactively; it adds no new store or persisted state. The manager follows the
 web's `*.svelte.ts` singleton class convention inside `gallery/managers/`, as
 required by the root rule keeping new fork code in its namespace.
 
+## Photo counts on the owner-only list
+
+Explore reads the grouped list (`withSharedSpaces=true`), which already carries
+`numberOfAssets`. Visibility management reads the owner-only list
+(`withHidden=true`), whose upstream `mapPerson` has no count, so on its own the
+client sort fell back to names under Most photos and ordered unnamed people by id.
+`PersonService.getAll` therefore passes that list through one Gallery call,
+`withOwnedPersonAssetCounts` (`server/src/gallery/utils/owned-person-asset-counts.ts`),
+which adds `numberOfAssets` from `GalleryPersonRepository.getOwnedPersonAssetCounts`.
+It counts the way the grouped list does: distinct non-deleted, online, timeline
+assets with a visible, non-deleted face of the person. The field is set only for
+people with a counted photo; the comparator reads an absent count as 0. Stock
+clients skip the query and get upstream's response unchanged.
+
 This remains a client-side sort of loaded rows, matching the People page. It does
 not change API pagination, permissions, people type filters, or mobile behavior.
-Older Gallery and stock Immich servers require no new fields or endpoints.
-Old app/new server behavior stays unchanged; new web/old server sorts the same
-existing fields, and stock Immich clients see no change.
+Rows already shown can move when a later page loads (one page holds 500 people).
+
+Version pairings: `numberOfAssets` is an existing optional field on
+`PersonResponseDto`, now also filled on the owner-only list.
+- Old web/new server: the old web ignores the field on this list; unchanged.
+- New web/old server: no counts on the owner-only list, so visibility management
+  sorts by name under both modes, as before this change; Explore is sorted.
+- Stock Immich clients: response unchanged and no extra query.
 
 Route-adjacent `page.gallery.spec.ts` files use `#test/unit/fixtures.ts`, real
 page loaders and the mock API. Coverage checks both sort modes and preference
