@@ -1,36 +1,8 @@
+import { takeoutMetadataManager } from '#lib/gallery/managers/takeout-metadata-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
 import type { TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
 import { AssetVisibility, getBaseUrl, updateAsset, type UpdateAssetDto } from '@immich/sdk';
-
-// Only ids are persisted, never the sidecar's descriptions or coordinates. Keep an in-memory
-// fallback when the browser blocks storage; those retries survive only in the current page.
-const pending = new Set<string>();
-
-function hasPendingMetadata(key: string): boolean {
-  try {
-    return pending.has(key) || localStorage.getItem(key) === 'pending';
-  } catch {
-    return pending.has(key);
-  }
-}
-
-function setPendingMetadata(key: string, value: boolean): void {
-  if (value) {
-    pending.add(key);
-  } else {
-    pending.delete(key);
-  }
-  try {
-    if (value) {
-      localStorage.setItem(key, 'pending');
-    } else {
-      localStorage.removeItem(key);
-    }
-  } catch {
-    // Uploading still works when storage is unavailable.
-  }
-}
 
 /** Finish this import's metadata work without changing ordinary pre-existing duplicates. */
 export async function applyTakeoutMetadata(
@@ -43,7 +15,7 @@ export async function applyTakeoutMetadata(
     return;
   }
   const key = `gallery:takeout-metadata:${JSON.stringify([getBaseUrl(), authManager.user.id, assetId])}`;
-  if (isDuplicate && !hasPendingMetadata(key)) {
+  if (isDuplicate && !takeoutMetadataManager.hasPending(key)) {
     return;
   }
 
@@ -65,8 +37,8 @@ export async function applyTakeoutMetadata(
   if (Object.keys(updateDto).length > 0) {
     // Record before awaiting: a failed/ambiguous response must remain retryable, including
     // after a reload. Only clear the marker once the metadata write succeeds.
-    setPendingMetadata(key, true);
+    takeoutMetadataManager.setPending(key, true);
     await updateAsset({ id: assetId, updateAssetDto: updateDto });
   }
-  setPendingMetadata(key, false);
+  takeoutMetadataManager.setPending(key, false);
 }

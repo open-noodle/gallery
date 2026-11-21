@@ -16,6 +16,10 @@ so its failure cannot fall through into another upload.
 Markers live in localStorage, scoped by API base URL, authenticated user id and
 asset id. They survive rescanning the export or reopening the importer. They
 contain only a pending flag, no sidecar descriptions, coordinates or file bytes.
+`takeoutMetadataManager` owns the journal and its memory fallback. It is a
+singleton class in `web/src/lib/gallery/managers/*.svelte.ts`: the root layering
+rule requires new fork code under `gallery/`, so the manager mirrors the web's
+manager convention there rather than adding an upstream file.
 If browser storage is blocked or full, a memory fallback supports retries within
 the current page. The retry uses the selected file's current sidecar and current
 import options, including disabled description/archive options. A retry without
@@ -32,10 +36,14 @@ This cannot recover a lost upload response before the client learns the asset id
 or pending work from imports performed before this change. Markers are local to
 the browser profile. It changes no server API, authorization or mobile behavior;
 older Gallery servers and stock Immich use the existing asset update endpoint.
-The uploader is already a fork-owned file, and the new metadata helper and tests
-live in the Gallery namespace, so Immich-owned files gain no divergence.
+Old app/new server behavior is unchanged; new web/old server uses the same
+existing requests, and stock Immich clients see no change. The uploader is
+already a fork-owned file, and the new metadata helper, manager and tests live
+in the Gallery namespace, so Immich-owned files gain no divergence.
 
-Regression tests exercise real uploader calls with mocked network responses:
+Regression tests use `#test/unit/fixtures.ts` and its `api` fixture to exercise
+real SDK requests from the uploader; only XHR upload and worker hashing are
+mocked. They cover:
 success followed by metadata failure, retry through each duplicate path,
 repeated failure, marker cleanup, existing duplicates, changed import options,
 user/server isolation, browser storage recovery, and an upload failure before an
