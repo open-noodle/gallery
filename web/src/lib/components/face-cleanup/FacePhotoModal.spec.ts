@@ -137,6 +137,12 @@ describe('FacePhotoModal', () => {
     const frame = frameAroundFace({ left: 0, top: 150, width: 800, height: 150 });
     expect(box.style.left).toBe(`${frame.left}px`);
     expect(box.style.width).toBe(`${frame.width}px`);
+    // The frame overhangs the photo by its margin, so the photo's wrapper clips it, and the ring is an
+    // outline outside the frame rather than a border over the face.
+    expect(frame.left).toBeLessThan(0);
+    expect(box.parentElement?.className).toMatch(/\boverflow-hidden\b/);
+    expect(box.className).toMatch(/\boutline-2\b/);
+    expect(box.className).not.toMatch(/\bborder/);
   });
 
   it('T6.6: the arrows page forward and back, and the photo follows', async () => {

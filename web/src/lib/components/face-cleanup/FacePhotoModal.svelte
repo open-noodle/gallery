@@ -93,8 +93,9 @@
            (container − img)/2, so a box positioned from the outer div's edge lands offset on any photo whose
            aspect ratio doesn't fill the row (portrait previews inside this modal's ~728px body). This inner
            div is a flex item sized to its own content (the img), so it and the img share one coordinate
-           origin — see PersonSuggestionReviewModal.svelte for the same shrink-wrap principle. -->
-      <div class="relative">
+           origin — see PersonSuggestionReviewModal.svelte for the same shrink-wrap principle. It also clips, so
+           the frame around a face at the photo's edge, and its dimming, stop at the photo. -->
+      <div class="relative overflow-hidden">
         <img
           src={getAdminFacePreviewUrl(face.assetFaceId)}
           alt=""
