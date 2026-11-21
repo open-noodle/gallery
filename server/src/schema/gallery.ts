@@ -22,10 +22,10 @@ import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
+import { PersonCoverTable } from 'src/schema/tables/person-cover.table.js';
 import { PersonGroupSplitPersonTable } from 'src/schema/tables/person-group-split-person.table.js';
 import { PersonGroupSplitShareTable } from 'src/schema/tables/person-group-split-share.table.js';
 import { PersonGroupSplitTable } from 'src/schema/tables/person-group-split.table.js';
-import { PersonCoverTable } from 'src/schema/tables/person-cover.table.js';
 import { PersonIdentityTable } from 'src/schema/tables/person-identity.table.js';
 import { PersonPetTable } from 'src/schema/tables/person-pet.table.js';
 import { PetSearchTable } from 'src/schema/tables/pet-search.table.js';

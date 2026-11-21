@@ -390,7 +390,7 @@ describe('getPersonPageActions ChooseFaceAutomatically', () => {
     const { action, onPersonUpdate, onThumbnailUpdate } = setup(person);
 
     expect(action.$if?.()).toBe(true);
-    await action.onAction(action);
+    await action.onAction({ action, event: new Event('click') });
 
     expect(chooseRepresentativeFaceAutomatically).toHaveBeenCalledWith({ id: person.id });
     expect(onPersonUpdate).toHaveBeenCalledWith(updated);
@@ -412,7 +412,7 @@ describe('getPersonPageActions ChooseFaceAutomatically', () => {
     vi.mocked(chooseRepresentativeFaceAutomatically).mockRejectedValue(error);
     const { action, onPersonUpdate, onThumbnailUpdate } = setup(person);
 
-    await action.onAction(action);
+    await action.onAction({ action, event: new Event('click') });
 
     expect(handleErrorSpy).toHaveBeenCalledWith(error, 'errors.unable_to_choose_representative_face');
     expect(onPersonUpdate).not.toHaveBeenCalled();
