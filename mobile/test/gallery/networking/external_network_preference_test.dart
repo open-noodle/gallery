@@ -168,4 +168,14 @@ void main() {
     expect(find.byKey(const ValueKey('error')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('loads saved URLs as unchecked rather than reachable', (tester) async {
+    await settings.write(SettingsKey.networkExternalEndpointList, ['https://first.example.com', endpoint]);
+    await mount(tester);
+    await tester.pumpAndSettle();
+
+    expect(input, findsNWidgets(2));
+    expect(find.byKey(const ValueKey('unknown')), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('success')), findsNothing);
+  });
 }

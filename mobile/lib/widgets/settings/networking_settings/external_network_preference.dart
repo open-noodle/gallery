@@ -61,7 +61,8 @@ class ExternalNetworkPreference extends HookConsumerWidget {
         return null;
       }
 
-      entries.value = urls.map((url) => AuxilaryEndpoint(url: url, status: .valid)).toList();
+      // gallery-fork: a saved URL may never have passed its check (#1220), so it loads unchecked.
+      entries.value = urls.map((url) => AuxilaryEndpoint(url: url, status: .unknown)).toList();
       return null;
     }, const []);
 
