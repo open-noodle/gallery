@@ -472,7 +472,13 @@
     "transcoding_data_saver_resolution": "分辨率",
     "transcoding_data_saver_resolution_description": "大于此尺寸的视频会在副本中缩小。已在此尺寸和码率上限之内的视频不会生成副本。",
     "transcoding_data_saver_video_codec": "视频编码格式",
-    "transcoding_data_saver_video_codec_description": "同样的画质下，HEVC 所需码率约为 H.264 的一半，且近年的手机都能播放。"
+    "transcoding_data_saver_video_codec_description": "同样的画质下，HEVC 所需码率约为 H.264 的一半，且近年的手机都能播放。",
+    "video_sample_cache": "共享视频采样缓存",
+    "video_sample_cache_description": "使用服务器临时存储，在人脸和宠物检测任务之间重复使用视频帧。",
+    "video_sample_cache_retention": "保留未使用的采样（小时）",
+    "video_sample_cache_retention_description": "采样在此小时数内未被重复使用后过期。更改无需重启服务器即可生效。",
+    "video_sample_cache_size": "最大缓存大小（GiB）",
+    "video_sample_cache_size_description": "设为 0 可禁用缓存。降低上限会移除较旧的采样。"
   },
   "album_linked_to_space": "已关联到“{space}”",
   "album_stack_count_in_album": "堆叠中仅统计此相册的照片",

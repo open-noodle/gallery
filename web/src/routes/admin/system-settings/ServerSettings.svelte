@@ -4,6 +4,7 @@
   import SettingButtonsRow from '#lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import { SettingInputFieldType } from '#lib/constants.ts';
   import SpaceMemberManagementSettings from '#lib/gallery/components/admin/space-member-management-settings.svelte';
+  import VideoSampleCacheSettings from '#lib/gallery/components/admin/video-sample-cache-settings.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
@@ -53,6 +54,7 @@
         />
 
         <SpaceMemberManagementSettings bind:server={configToEdit.server} {disabled} />
+        <VideoSampleCacheSettings bind:server={configToEdit.server} saved={config.server} {disabled} />
         <div class="ms-4">
           <SettingButtonsRow bind:configToEdit keys={['server']} {disabled} />
         </div>

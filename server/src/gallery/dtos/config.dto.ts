@@ -279,7 +279,22 @@ export const GalleryClipExtension = {
     .describe('Maximum cosine distance for smart search results. 0 = disabled.'),
 };
 
+export const galleryVideoSampleCacheDefaults = { maxSizeGiB: 2, retentionHours: 24 };
+
+export const GalleryVideoSampleCacheSchema = z
+  .object({
+    maxSizeGiB: z
+      .number()
+      .meta({ format: 'double' })
+      .min(0)
+      .max(1024)
+      .describe('Maximum shared video sample cache size in GiB. 0 disables caching.'),
+    retentionHours: z.int().min(1).max(8760).describe('Hours to keep video samples after their last reuse'),
+  })
+  .meta({ id: 'AdminConfigVideoSampleCacheDto' });
+
 export const GalleryServerExtension = {
+  videoSampleCache: GalleryVideoSampleCacheSchema.optional(),
   mergePeopleAcrossOwners: galleryConfigBool.describe(
     "Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation.",
   ),
@@ -357,6 +372,7 @@ export const galleryBackupDatabaseDefaults = {
 };
 
 export const galleryServerDefaults = {
+  videoSampleCache: galleryVideoSampleCacheDefaults,
   mergePeopleAcrossOwners: false,
   spaceEditorsCanAddMembers: false,
   spaceEditorsCanChangeRoles: false,

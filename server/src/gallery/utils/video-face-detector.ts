@@ -9,6 +9,7 @@ import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetType, JobName, JobStatus, LogLevel, SourceType, StorageFolder } from 'src/enum.js';
 import type { VideoFaceChanges, VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import type { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
+import { CachedVideoFrames } from 'src/gallery/utils/cached-video-frames.js';
 import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 import {
   FaceTracker,
@@ -187,10 +188,11 @@ export class VideoFaceDetector {
       return;
     }
 
+    const samples = new CachedVideoFrames(this.frames, asset);
     let cuts: number[] = [];
     if (options.sceneDetection) {
       try {
-        cuts = await this.frames.findSceneCuts(original.localPath);
+        cuts = await samples.findSceneCuts(original.localPath);
       } catch (error) {
         this.deps.logger.warn(`Scene detection failed for video ${id}, sampling at intervals only: ${error}`);
       }
@@ -223,7 +225,7 @@ export class VideoFaceDetector {
       const extract = async (index: number, t: number) => {
         const path = join(tempDir, `${index}.jpeg`);
         try {
-          await this.frames.extractFrame(original.localPath, path, t, { ffmpeg, videoStream });
+          await samples.extractFrame(original.localPath, path, t, { ffmpeg, videoStream });
           return path;
         } catch (error) {
           this.deps.logger.debug(`Could not extract frame at ${t}s of video ${id}: ${error}`);
@@ -354,7 +356,7 @@ export class VideoFaceDetector {
       });
       this.deps.logger.log(
         `Found ${plural(faces.length, 'face')} in ${times.length} frames of video ${id} in ` +
-          `${humanDuration(Date.now() - startedAt)}: ${added} added, ${updated} updated, ${removed} deleted, ` +
+          `${humanDuration(Date.now() - startedAt)} (${samples.reusedFrames} frames reused): ${added} added, ${updated} updated, ${removed} deleted, ` +
           `${candidates.length - kept.length} dropped as too small or unsure, ` +
           `${plural(sharpened.size, 'sharper view')} from ${plural(sharpenTimes.length, 'extra frame')}` +
           (faces.length < tracks.length ? `, ${tracks.length - faces.length} merged after sharper views` : '') +

@@ -32,6 +32,7 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
   server: [
     '/src/routes/admin/system-settings/ServerSettings.svelte',
     '/src/lib/gallery/components/admin/space-member-management-settings.svelte',
+    '/src/lib/gallery/components/admin/video-sample-cache-settings.svelte',
   ],
   'storage-template': '/src/lib/components/admin-settings/StorageTemplateSettings.svelte',
   'storage-usage': '/src/routes/admin/system-settings/StorageUsageSettings.svelte',

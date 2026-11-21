@@ -8,6 +8,7 @@ import type { GalleryMachineLearningRepository } from 'src/gallery/repositories/
 import type { PetFaceRepository, VideoPetChanges } from 'src/gallery/repositories/pet-face.repository.js';
 import type { VideoFaceRepository } from 'src/gallery/repositories/video-face.repository.js';
 import type { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
+import { CachedVideoFrames } from 'src/gallery/utils/cached-video-frames.js';
 import { isPetRecognitionEnabled, isRecognizablePetSpecies } from 'src/gallery/utils/misc.js';
 import { coverPersonIfMissing, speciesPersonFor } from 'src/gallery/utils/pet-buckets.js';
 import { videoFaceFrameFolder } from 'src/gallery/utils/video-face-detector.js';
@@ -134,10 +135,11 @@ export class VideoPetDetector {
       return;
     }
 
+    const samples = new CachedVideoFrames(this.frames, asset);
     let cuts: number[] = [];
     if (options.sceneDetection) {
       try {
-        cuts = await this.frames.findSceneCuts(original.localPath);
+        cuts = await samples.findSceneCuts(original.localPath);
       } catch (error) {
         this.deps.logger.warn(`Scene detection failed for video ${id}, sampling at intervals only: ${error}`);
       }
@@ -165,7 +167,7 @@ export class VideoPetDetector {
       const extract = async (index: number, t: number) => {
         const path = join(tempDir, `${index}.jpeg`);
         try {
-          await this.frames.extractFrame(original.localPath, path, t, { ffmpeg, videoStream });
+          await samples.extractFrame(original.localPath, path, t, { ffmpeg, videoStream });
           return path;
         } catch (error) {
           this.deps.logger.debug(`Could not extract frame at ${t}s of video ${id}: ${error}`);
@@ -256,7 +258,7 @@ export class VideoPetDetector {
       });
       this.deps.logger.log(
         `Found ${plural(tracks.length, 'pet')} in ${times.length} frames of video ${id} in ` +
-          `${humanDuration(Date.now() - startedAt)}: ${added} added, ${updated} updated, ${removed} deleted` +
+          `${humanDuration(Date.now() - startedAt)} (${samples.reusedFrames} frames reused): ${added} added, ${updated} updated, ${removed} deleted` +
           (unreadable > 0 ? `, ${plural(unreadable, 'frame')} unreadable` : ''),
       );
     } catch (error) {

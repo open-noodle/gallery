@@ -579,7 +579,7 @@ describe('VideoFaceDetector', () => {
       expect(loggedMessages(mocks).filter((message) => message.includes('video asset-id'))).toEqual([
         'Sampling 33 frames across 1m, 6s of video asset-id (about every 2s, 0 scene cuts)',
         expect.stringMatching(
-          /^Found 2 faces in 33 frames of video asset-id in \d+s: 2 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, 0 sharper views from 8 extra frames$/,
+          /^Found 2 faces in 33 frames of video asset-id in \d+s \(0 frames reused\): 2 added, 0 updated, 0 deleted, 0 dropped as too small or unsure, 0 sharper views from 8 extra frames$/,
         ),
       ]);
     });

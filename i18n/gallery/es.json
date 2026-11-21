@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Resolución",
     "transcoding_data_saver_resolution_description": "Los vídeos más grandes se reducen para la copia. Los vídeos que ya están dentro de este tamaño y del límite de tasa de bits no reciben copia.",
     "transcoding_data_saver_video_codec": "Códec de vídeo",
-    "transcoding_data_saver_video_codec_description": "HEVC necesita aproximadamente la mitad de tasa de bits que H.264 para la misma imagen, y cualquier teléfono reciente lo reproduce."
+    "transcoding_data_saver_video_codec_description": "HEVC necesita aproximadamente la mitad de tasa de bits que H.264 para la misma imagen, y cualquier teléfono reciente lo reproduce.",
+    "video_sample_cache": "Caché compartida de fotogramas de vídeo",
+    "video_sample_cache_description": "Reutiliza los fotogramas de vídeo entre las tareas de detección de rostros y mascotas mediante el almacenamiento temporal del servidor.",
+    "video_sample_cache_retention": "Conservar muestras sin usar (horas)",
+    "video_sample_cache_retention_description": "Las muestras caducan tras este número de horas sin reutilizarse. Los cambios se aplican sin reiniciar el servidor.",
+    "video_sample_cache_size": "Tamaño máximo de la caché (GiB)",
+    "video_sample_cache_size_description": "Establece 0 para desactivar la caché. Al reducir el límite se eliminan las muestras más antiguas."
   },
   "album_linked_to_space": "Vinculado a \"{space}\"",
   "album_stack_count_in_album": "Contar solo las fotos de este álbum en las pilas",

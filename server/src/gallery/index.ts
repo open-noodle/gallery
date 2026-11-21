@@ -49,6 +49,7 @@ import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.
 import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { VideoFaceService } from 'src/gallery/services/video-face.service.js';
+import { VideoSampleCacheService } from 'src/gallery/services/video-sample-cache.service.js';
 import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
@@ -153,6 +154,7 @@ export const galleryServices = [
   PetDetectionService,
   SpatialSceneService,
   DataSaverVideoService,
+  VideoSampleCacheService,
   PetRecognitionService,
   SharedSpaceService,
   StorageMigrationService,

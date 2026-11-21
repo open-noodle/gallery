@@ -481,7 +481,13 @@
     "transcoding_max_bitrate_description": "設定最大位元率能讓檔案大小更穩定，但會稍微犧牲品質。720p 下的典型值為：VP9 或 HEVC 為 2600 kbit/s，H.264 為 4500 kbit/s。設為 0 則停用。若未指定單位，系統將預設為 k (即 kbit/s)；因此 5000、5000k 與 5M (即 Mbit/s) 是等效的。",
     "transcoding_realtime": "即時轉碼 [實驗性功能]",
     "transcoding_realtime_resolutions_description": "實時轉碼所提供的解析度。如果伺服器無法以足夠快的速度進行轉碼，使用更高的解析度可能會導致播放問題。",
-    "transcoding_realtime_video_codecs_description": "用於實時轉碼的影片編碼器選項。用戶端會在播放的時候選擇支持的最佳方案。 AV1 的效率高於 HEVC，而 HEVC 的效率又高於 H.264。使用硬體加速時，請只選擇加速器支持編碼的編碼器。使用軟體轉碼時，H.264 的速度快於 AV1，而 AV1 的速度快於 HEVC。"
+    "transcoding_realtime_video_codecs_description": "用於實時轉碼的影片編碼器選項。用戶端會在播放的時候選擇支持的最佳方案。 AV1 的效率高於 HEVC，而 HEVC 的效率又高於 H.264。使用硬體加速時，請只選擇加速器支持編碼的編碼器。使用軟體轉碼時，H.264 的速度快於 AV1，而 AV1 的速度快於 HEVC。",
+    "video_sample_cache": "共用影片取樣快取",
+    "video_sample_cache_description": "使用伺服器暫存空間，在人臉和寵物偵測工作之間重複使用影片影格。",
+    "video_sample_cache_retention": "保留未使用的取樣（小時）",
+    "video_sample_cache_retention_description": "取樣在此小時數內未被重複使用後到期。變更無須重新啟動伺服器即可生效。",
+    "video_sample_cache_size": "快取大小上限（GiB）",
+    "video_sample_cache_size_description": "設為 0 可停用快取。降低上限會移除較舊的取樣。"
   },
   "album_linked_to_space": "已連結至「{space}」",
   "album_stack_count_in_album": "堆疊中僅計算此相簿的相片",
