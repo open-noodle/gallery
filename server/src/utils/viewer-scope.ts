@@ -7,7 +7,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Kysely, SqlBool, Transaction, sql } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SearchFilter } from 'src/dtos/search.dto.js';
-import { AssetVisibility } from 'src/enum.js';
+import { AssetAspectClass, AssetVisibility } from 'src/enum.js';
 import { checkLibraryView, type LibraryViewOptions } from 'src/gallery/utils/library-view.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import type { AssetSearchScope } from 'src/repositories/search.repository.js';
@@ -272,6 +272,7 @@ export type StructuredSearchRequest = LibraryViewOptions & {
   spacePersonIds?: string[];
   ownerId?: string;
   isInAlbum?: boolean;
+  aspectClasses?: AssetAspectClass[];
 };
 
 /**
@@ -280,9 +281,16 @@ structured meaning; the others have no structured form, so they are rejected rat
 answer with a wider set than was asked for.
 */
 export const structuredSearchViewerRequest = (dto: StructuredSearchRequest, albumIds: string[]): ViewerScopeRequest => {
-  if (dto.spaceId || dto.spacePersonIds?.length || dto.ownerId || dto.isInAlbum !== undefined || dto.libraryView) {
+  if (
+    dto.spaceId ||
+    dto.spacePersonIds?.length ||
+    dto.ownerId ||
+    dto.isInAlbum !== undefined ||
+    dto.libraryView ||
+    dto.aspectClasses?.length
+  ) {
     throw new BadRequestException(
-      'spaceId, spacePersonIds, ownerId, isInAlbum and libraryView need the flat search fields',
+      'spaceId, spacePersonIds, ownerId, isInAlbum, aspectClasses and libraryView need the flat search fields',
     );
   }
   const filter = dto.filter ?? {};

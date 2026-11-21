@@ -24,7 +24,7 @@ import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-pers
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
-import { assetFilterConditions, assetFilterKeys, withAssetFilter } from 'src/utils/asset-filter.js';
+import { AssetFilter, assetFilterConditions, assetFilterKeys, withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
@@ -2236,7 +2236,7 @@ export class SharedSpaceRepository {
   @GenerateSql({
     params: [{ userIds: [DummyValue.UUID], visibility: AssetVisibility.Timeline }],
   })
-  getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
+  getFilteredMapMarkers(options: AssetSearchBuilderOptions & Pick<AssetFilter, 'aspectClasses'>) {
     // The map answers the filter panel like the timeline does, so the panel's taken, place, camera
     // and rating filters come from the shared asset filter; scope and the remaining filters (text,
     // type, favourites, tags, people, albums) stay with upstream search. The filter's asset_exif
