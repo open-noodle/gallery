@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`an album share link made from a space > outcome grid 1`] = `
+{
+  "album editor": {
+    "album unlinked": "serves",
+    "creator demoted to viewer": "serves",
+    "creator leaves the space": "serves",
+    "none": "serves",
+  },
+  "album owner": {
+    "album unlinked": "serves",
+    "creator demoted to viewer": "serves",
+    "creator leaves the space": "serves",
+    "none": "serves",
+  },
+  "space editor": {
+    "album unlinked": "revoked",
+    "creator demoted to viewer": "revoked",
+    "creator leaves the space": "revoked",
+    "none": "serves",
+  },
+  "space owner": {
+    "album unlinked": "revoked",
+    "creator demoted to viewer": "revoked",
+    "creator leaves the space": "revoked",
+    "none": "serves",
+  },
+}
+`;

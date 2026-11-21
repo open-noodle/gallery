@@ -19,7 +19,7 @@
 //
 // Every caller must LEFT JOIN `shared_link_space` on `shared_link.id`; a missing join fails the query.
 import { Expression, ExpressionBuilder, SqlBool } from 'kysely';
-import { SharedSpaceRole } from 'src/enum.js';
+import { AlbumUserRole, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
@@ -73,6 +73,42 @@ tether currently holds. Correlates on the outer `asset` row.
 */
 export const sharedLinkAssetIsServable = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
   eb.or([eb(eb.ref('asset.ownerId'), '=', eb.ref('shared_link.userId')), sharedLinkSpaceTether(eb)]);
+
+/**
+An ALBUM link made from a space authenticates only while it could still be made.
+
+A space Owner/Editor may publish an album linked into the space without `AlbumShare` on it, so for that creator the
+space is the whole grant: the link serves only while the creator still holds a publisher role there and the album is
+still linked to it. A creator who holds `AlbumShare` (album owner or album Editor, as in utils/access.ts) could have
+published the album without the space and keeps upstream's behaviour. Individual links and links made outside a space
+are untouched; their non-owned assets are tethered per asset by `sharedLinkAssetIsServable`.
+
+Applied at link authentication, so reads, downloads, the link payload and uploads through the link all stop together.
+Needs `shared_link` and a LEFT JOIN of `shared_link_space` in scope.
+*/
+export const sharedLinkAlbumIsServable = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
+  eb.or([
+    eb('shared_link.albumId', 'is', null),
+    eb('shared_link_space.spaceId', 'is', null),
+    eb.exists(
+      eb
+        .selectFrom('album_user')
+        .select(eb.lit(1).as('exists'))
+        .whereRef('album_user.albumId', '=', 'shared_link.albumId')
+        .whereRef('album_user.userId', '=', 'shared_link.userId')
+        .where('album_user.role', 'in', [AlbumUserRole.Owner, AlbumUserRole.Editor]),
+    ),
+    eb.and([
+      sharedLinkCreatorCanPublish(eb),
+      eb.exists(
+        eb
+          .selectFrom('shared_space_album')
+          .select(eb.lit(1).as('exists'))
+          .whereRef('shared_space_album.albumId', '=', 'shared_link.albumId')
+          .whereRef('shared_space_album.spaceId', '=', 'shared_link_space.spaceId'),
+      ),
+    ]),
+  ]);
 
 /**
 Kysely types every table inside a LEFT JOIN's `ON` context as `Nullable<...>`, which makes that
