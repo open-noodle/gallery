@@ -3,6 +3,7 @@ import type { IconLike } from '@immich/ui';
 import {
   mdiCloudSyncOutline,
   mdiCubeOutline,
+  mdiFaceManProfile,
   mdiImageFilterCenterFocusWeak,
   mdiPaw,
   mdiPawOutline,
@@ -68,7 +69,8 @@ type GalleryQueueName =
   | QueueName.StorageBackendMigration
   | QueueName.Classification
   | QueueName.QualityAnalysis
-  | QueueName.SpatialScene;
+  | QueueName.SpatialScene
+  | QueueName.PersonCover;
 
 /** Fork queues, spread into upstream's `asQueueItem` map. */
 export const galleryQueueItems = (
@@ -107,5 +109,10 @@ export const galleryQueueItems = (
     icon: mdiCubeOutline,
     title: $t('admin.machine_learning_spatial_scene'),
     subtitle: $t('admin.spatial_scene_job_description'),
+  },
+  [QueueName.PersonCover]: {
+    icon: mdiFaceManProfile,
+    title: $t('admin.person_cover_job'),
+    subtitle: $t('admin.person_cover_job_description'),
   },
 });

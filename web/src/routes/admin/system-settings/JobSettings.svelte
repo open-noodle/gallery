@@ -34,6 +34,7 @@
     QueueName.Classification,
     QueueName.QualityAnalysis,
     QueueName.SpatialScene,
+    QueueName.PersonCover,
   ];
 
   function isSystemConfigJobDto(jobName: string): jobName is keyof AdminConfigJobDto {
@@ -67,6 +68,7 @@
     [QueueName.Classification]: 'Auto-Classification',
     [QueueName.QualityAnalysis]: $t('admin.quality_analysis_job'),
     [QueueName.SpatialScene]: $t('admin.machine_learning_spatial_scene'),
+    [QueueName.PersonCover]: $t('admin.person_cover_job'),
   });
 </script>
 

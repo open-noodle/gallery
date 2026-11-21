@@ -100,6 +100,10 @@
       allText: $t('all'),
       missingText: $t('missing'),
     },
+    [QueueName.PersonCover]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),
@@ -148,6 +152,13 @@
           if (!confirmed) {
             return;
           }
+        }
+        break;
+      }
+
+      case QueueName.PersonCover: {
+        if (dto.force && !(await modalManager.showDialog({ prompt: $t('admin.confirm_person_cover_all') }))) {
+          return;
         }
         break;
       }

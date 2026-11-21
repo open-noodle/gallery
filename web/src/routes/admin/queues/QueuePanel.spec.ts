@@ -1,5 +1,5 @@
 import { renderWithTooltips } from '#test/unit/helpers.ts';
-import { QueueName, type QueueResponseDto } from '@immich/sdk';
+import { QueueCommand, QueueName, runQueueCommandLegacy, type QueueResponseDto } from '@immich/sdk';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -74,5 +74,35 @@ describe('QueuePanel', () => {
           'Are you sure you want to reprocess all pet recognition? This always deletes all named pets and their embeddings. Reprocessing only runs while pet detection is enabled.',
       });
     });
+  });
+
+  // Person covers (specs/2026-11-21-person-cover-quality-design.md): only the All run carries the warning that hand
+  // picks from before the feature cannot be told apart.
+  it('warns before choosing person thumbnails again for everyone, and runs nothing when declined', async () => {
+    await renderWithTooltips(QueuePanel, { queues: [makeQueue({ name: QueueName.PersonCover })] });
+
+    await userEvent.click(page.getByText('All'));
+
+    await vi.waitFor(() => {
+      expect(mocks.showDialog).toHaveBeenCalledWith({
+        prompt:
+          'Choose the thumbnail again for every person? Thumbnails chosen by hand before this version cannot be told apart from automatic ones and may be replaced. Thumbnails chosen by hand since then are kept.',
+      });
+    });
+    expect(runQueueCommandLegacy).not.toHaveBeenCalled();
+  });
+
+  it('runs person thumbnails on Missing without asking', async () => {
+    await renderWithTooltips(QueuePanel, { queues: [makeQueue({ name: QueueName.PersonCover })] });
+
+    await userEvent.click(page.getByText('Missing'));
+
+    await vi.waitFor(() => {
+      expect(runQueueCommandLegacy).toHaveBeenCalledWith({
+        name: QueueName.PersonCover,
+        queueCommandDto: { command: QueueCommand.Start, force: false },
+      });
+    });
+    expect(mocks.showDialog).not.toHaveBeenCalled();
   });
 });

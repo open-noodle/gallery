@@ -21,6 +21,7 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
   'machine-learning': [
     '/src/routes/admin/system-settings/MachineLearningSettings.svelte',
     '/src/lib/gallery/components/admin/video-face-settings.svelte',
+    '/src/lib/gallery/components/admin/person-cover-settings.svelte',
     '/src/lib/gallery/components/admin/video-pet-settings.svelte',
   ],
   classification: '/src/routes/admin/system-settings/ClassificationSettings.svelte',

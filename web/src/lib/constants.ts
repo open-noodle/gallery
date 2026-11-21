@@ -350,6 +350,7 @@ export const ADMIN_VISIBLE_QUEUES = [
   QueueName.FaceDetection,
   QueueName.FacialRecognition,
   QueueName.PeopleBackfill,
+  QueueName.PersonCover,
   QueueName.Ocr,
   QueueName.PetDetection,
   QueueName.PetRecognition,

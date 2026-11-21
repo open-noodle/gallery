@@ -8,6 +8,7 @@ import {
   PersonType,
   ScopedPersonProfileType,
   SharedSpaceRole,
+  chooseRepresentativeFaceAutomatically,
   detachScopedPerson,
   getPersonFaces,
   getSpacePersonFaces,
@@ -21,7 +22,7 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
-import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline, mdiSwapHorizontal } from '@mdi/js';
+import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline, mdiAutoFix, mdiSwapHorizontal } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 import { refreshAll } from '$app/navigation';
 
@@ -168,6 +169,23 @@ export const getPersonPageActions = (
     },
   };
 
+  // Person covers (specs/2026-11-21-person-cover-quality-design.md): owner only, so a personal profile only. The pick
+  // is recorded as automatic, which lets the cover job update it later.
+  const ChooseFaceAutomatically: ActionItem = {
+    title: $t('choose_representative_face_automatically'),
+    icon: mdiAutoFix,
+    $if: () => !getSpaceProfile(getPerson()),
+    onAction: async () => {
+      try {
+        onPersonUpdate(await chooseRepresentativeFaceAutomatically({ id: getPerson().id }));
+        onThumbnailUpdate();
+        toastManager.primary($t('representative_face_updated'));
+      } catch (error) {
+        handleError(error, $t('errors.unable_to_choose_representative_face'));
+      }
+    },
+  };
+
   const SeparateFromGroupedPerson: ActionItem = {
     title: $t('separate_from_grouped_person'),
     icon: mdiAccountMultipleCheckOutline,
@@ -189,7 +207,7 @@ export const getPersonPageActions = (
     },
   };
 
-  return { SelectRepresentativeFace, SeparateFromGroupedPerson };
+  return { SelectRepresentativeFace, ChooseFaceAutomatically, SeparateFromGroupedPerson };
 };
 
 // Reclassifies a personal cluster as person or pet; the title names the destination type. Faces stay where they

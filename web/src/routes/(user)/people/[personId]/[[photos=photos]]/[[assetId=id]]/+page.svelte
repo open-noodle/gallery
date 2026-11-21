@@ -350,7 +350,7 @@
     getPersonActions($t, person, { canEditSpacePerson }),
   );
   const refreshThumbnail = () => (thumbnailData = getScopedThumbnailUrl(person, Date.now().toString()));
-  const { SelectRepresentativeFace, SeparateFromGroupedPerson } = getPersonPageActions($t, {
+  const { SelectRepresentativeFace, SeparateFromGroupedPerson, ChooseFaceAutomatically } = getPersonPageActions($t, {
     getPerson: () => person,
     canEditSpacePerson: () => canEditSpacePerson,
     onPersonUpdate: (updated) => (person = updated),
@@ -571,6 +571,7 @@
         <ContextMenuButton
           items={[
             SelectRepresentativeFace,
+            ChooseFaceAutomatically,
             HidePerson,
             ShowPerson,
             SetDateOfBirth,
