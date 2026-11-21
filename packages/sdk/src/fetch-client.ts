@@ -210,6 +210,7 @@ export type AdminConfigJobDto = {
     notifications: AdminConfigJobSettingsDto;
     ocr: AdminConfigJobSettingsDto;
     peopleBackfill: AdminConfigJobSettingsDto;
+    personCover: AdminConfigJobSettingsDto;
     petDetection: AdminConfigJobSettingsDto;
     qualityAnalysis: AdminConfigJobSettingsDto;
     search: AdminConfigJobSettingsDto;
@@ -259,6 +260,10 @@ export type AdminConfigDuplicateDetectionDto = {
     /** Maximum distance threshold for duplicate detection */
     maxDistance: number;
 };
+export type AdminConfigPersonCoverDto = {
+    /** Choose person thumbnails automatically: a sharp, well-lit, recent face for new people, kept up to date. Never replaces a thumbnail chosen by hand. */
+    enabled?: boolean;
+};
 export type AdminConfigFaceSuggestionDto = {
     /** Whether face suggestions are enabled */
     enabled: boolean;
@@ -288,6 +293,7 @@ export type AdminConfigVideoFacesDto = {
     tiledDetection?: boolean;
 };
 export type AdminConfigFacialRecognitionDto = {
+    covers: AdminConfigPersonCoverDto;
     /** Whether the task is enabled */
     enabled: boolean;
     /** Maximum distance threshold for face recognition */
@@ -2524,6 +2530,7 @@ export type QueuesResponseLegacyDto = {
     notifications: QueueResponseLegacyDto;
     ocr: QueueResponseLegacyDto;
     peopleBackfill: QueueResponseLegacyDto;
+    personCover: QueueResponseLegacyDto;
     petDetection: QueueResponseLegacyDto;
     petRecognition: QueueResponseLegacyDto;
     qualityAnalysis: QueueResponseLegacyDto;
@@ -9309,6 +9316,20 @@ export function updateRepresentativeFace({ id, representativeFaceUpdateDto }: {
     })));
 }
 /**
+ * Choose representative face automatically
+ */
+export function chooseRepresentativeFaceAutomatically({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/representative-face/auto`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Get person statistics
  */
 export function getPersonStatistics({ id }: {
@@ -12882,7 +12903,8 @@ export enum QueueName {
     StorageBackendMigration = "storageBackendMigration",
     Classification = "classification",
     QualityAnalysis = "qualityAnalysis",
-    SpatialScene = "spatialScene"
+    SpatialScene = "spatialScene",
+    PersonCover = "personCover"
 }
 export enum QueueCommand {
     Start = "start",
@@ -13000,6 +13022,9 @@ export enum JobName {
     PetRecognition = "PetRecognition",
     SpatialSceneQueueAll = "SpatialSceneQueueAll",
     SpatialScene = "SpatialScene",
+    PersonCoverQueueAll = "PersonCoverQueueAll",
+    PersonCover = "PersonCover",
+    SpacePersonCover = "SpacePersonCover",
     AssetEncodeDataSaverVideoQueueAll = "AssetEncodeDataSaverVideoQueueAll",
     AssetEncodeDataSaverVideo = "AssetEncodeDataSaverVideo",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",

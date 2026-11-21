@@ -15002,6 +15002,63 @@
         "x-immich-state": "Stable"
       }
     },
+    "/people/{id}/representative-face/auto": {
+      "post": {
+        "description": "Pick the person's thumbnail from their photos by sharpness, exposure, size, typicality and date. The pick is recorded as automatic, so the person cover job may update it later.",
+        "operationId": "chooseRepresentativeFaceAutomatically",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Choose representative face automatically",
+        "tags": [
+          "People"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "person.update",
+        "x-immich-state": "Alpha"
+      }
+    },
     "/people/{id}/statistics": {
       "get": {
         "description": "Retrieve statistics about a specific person.",
@@ -29817,6 +29874,9 @@
       },
       "AdminConfigFacialRecognitionDto": {
         "properties": {
+          "covers": {
+            "$ref": "#/components/schemas/AdminConfigPersonCoverDto"
+          },
           "enabled": {
             "description": "Whether the task is enabled",
             "type": "boolean"
@@ -29853,6 +29913,7 @@
           }
         },
         "required": [
+          "covers",
           "enabled",
           "maxDistance",
           "minFaces",
@@ -30053,6 +30114,9 @@
           "peopleBackfill": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
+          "personCover": {
+            "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
+          },
           "petDetection": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
@@ -30093,6 +30157,7 @@
           "notifications",
           "ocr",
           "peopleBackfill",
+          "personCover",
           "petDetection",
           "qualityAnalysis",
           "search",
@@ -30605,6 +30670,15 @@
         "required": [
           "enabled"
         ],
+        "type": "object"
+      },
+      "AdminConfigPersonCoverDto": {
+        "properties": {
+          "enabled": {
+            "description": "Choose person thumbnails automatically: a sharp, well-lit, recent face for new people, kept up to date. Never replaces a thumbnail chosen by hand.",
+            "type": "boolean"
+          }
+        },
         "type": "object"
       },
       "AdminConfigPetDetectionDto": {
@@ -36395,6 +36469,9 @@
           "PetRecognition",
           "SpatialSceneQueueAll",
           "SpatialScene",
+          "PersonCoverQueueAll",
+          "PersonCover",
+          "SpacePersonCover",
           "AssetEncodeDataSaverVideoQueueAll",
           "AssetEncodeDataSaverVideo",
           "WorkflowAssetTrigger",
@@ -40567,7 +40644,8 @@
           "storageBackendMigration",
           "classification",
           "qualityAnalysis",
-          "spatialScene"
+          "spatialScene",
+          "personCover"
         ],
         "type": "string"
       },
@@ -40748,6 +40826,9 @@
           "peopleBackfill": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "personCover": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "petDetection": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -40800,6 +40881,7 @@
           "notifications",
           "ocr",
           "peopleBackfill",
+          "personCover",
           "petDetection",
           "petRecognition",
           "qualityAnalysis",
