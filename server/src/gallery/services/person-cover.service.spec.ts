@@ -232,12 +232,7 @@ describe(PersonCoverService.name, () => {
 
       it('leaves the person to a hand-picked cover elsewhere in its identity that is one of its own faces', async () => {
         mocks.personCover.getIdentityHandPickedCovers.mockResolvedValue([
-          {
-            profileType: 'space-person',
-            profileId: 'space-person-1',
-            faceId: 'face-old',
-            facePersonGroupId: linked.personGroupId,
-          },
+          { faceId: 'face-old', facePersonGroupId: linked.personGroupId },
         ]);
 
         await expect(sut.handlePersonCover({ id: linked.personGroupId, force: true })).resolves.toBe(JobStatus.Skipped);
@@ -247,7 +242,7 @@ describe(PersonCoverService.name, () => {
 
       it('picks when the hand-picked face is on another person', async () => {
         mocks.personCover.getIdentityHandPickedCovers.mockResolvedValue([
-          { profileType: 'person', profileId: 'person-2', faceId: 'face-elsewhere', facePersonGroupId: 'person-2' },
+          { faceId: 'face-elsewhere', facePersonGroupId: 'person-2' },
         ]);
 
         await sut.handlePersonCover({ id: linked.personGroupId });
@@ -278,7 +273,7 @@ describe(PersonCoverService.name, () => {
         version: null,
       });
       mocks.personCover.getIdentityHandPickedCovers.mockResolvedValue([
-        { profileType: 'space-person', profileId: 'sp-1', faceId: 'face-old', facePersonGroupId: person.personGroupId },
+        { faceId: 'face-old', facePersonGroupId: person.personGroupId },
       ]);
 
       await expect(sut.chooseAutomatically(auth, person.personGroupId)).resolves.toEqual(
@@ -379,7 +374,7 @@ describe(PersonCoverService.name, () => {
 
     it('leaves the space person to a hand-picked face of its identity that is valid in the space', async () => {
       mocks.personCover.getIdentityHandPickedCovers.mockResolvedValue([
-        { profileType: 'person', profileId: 'person-1', faceId: 'face-owner-pick', facePersonGroupId: 'person-1' },
+        { faceId: 'face-owner-pick', facePersonGroupId: 'person-1' },
       ]);
       mocks.sharedSpace.isSpacePersonRepresentativeFaceValid.mockResolvedValue(true);
 
@@ -394,7 +389,7 @@ describe(PersonCoverService.name, () => {
 
     it('picks when that hand-picked face is not in the space', async () => {
       mocks.personCover.getIdentityHandPickedCovers.mockResolvedValue([
-        { profileType: 'person', profileId: 'person-1', faceId: 'face-owner-pick', facePersonGroupId: 'person-1' },
+        { faceId: 'face-owner-pick', facePersonGroupId: 'person-1' },
       ]);
       mocks.sharedSpace.isSpacePersonRepresentativeFaceValid.mockResolvedValue(false);
 

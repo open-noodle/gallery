@@ -23,15 +23,22 @@ import { batched, findOrFail } from 'src/utils/misc.js';
 
 type ChooseOutcome = { result: CoverPickResult; candidateCount: number };
 
+const toJobStatus = (outcome?: ChooseOutcome) =>
+  !outcome || outcome.result === 'skipped' ? JobStatus.Skipped : JobStatus.Success;
+
+/** Preview reads one pick runs at once: a remote storage backend makes each read a round trip. */
+const PREVIEW_READ_CONCURRENCY = 4;
+
 /**
 Person covers picked by quality (specs/2026-11-21-person-cover-quality-design.md): the Missing / All job over personal
-and space people, and Choose automatically on one personal person.
+and space people, and Choose automatically on one personal person. Callers queue these jobs unconditionally; the
+handlers check the setting.
 */
 @Injectable()
 export class PersonCoverService extends BaseService {
   @OnJob({ name: JobName.PersonCoverQueueAll, queue: QueueName.PersonCover })
   async handleQueueAll({ force = false }: JobOf<JobName.PersonCoverQueueAll>): Promise<JobStatus> {
-    if (!(await this.isEnabled())) {
+    if (!(await this.isEnabled({ withCache: false }))) {
       return JobStatus.Skipped;
     }
 
@@ -50,20 +57,18 @@ export class PersonCoverService extends BaseService {
 
   @OnJob({ name: JobName.PersonCover, queue: QueueName.PersonCover })
   async handlePersonCover({ id, force }: JobOf<JobName.PersonCover>): Promise<JobStatus> {
-    if (!(await this.isEnabled())) {
+    if (!(await this.isEnabled({ withCache: true }))) {
       return JobStatus.Skipped;
     }
-    const outcome = await this.choosePersonCover(id, force ? 'all' : 'missing');
-    return outcome?.result === 'skipped' || !outcome ? JobStatus.Skipped : JobStatus.Success;
+    return toJobStatus(await this.choosePersonCover(id, force ? 'all' : 'missing'));
   }
 
   @OnJob({ name: JobName.SpacePersonCover, queue: QueueName.PersonCover })
   async handleSpacePersonCover({ id, force }: JobOf<JobName.SpacePersonCover>): Promise<JobStatus> {
-    if (!(await this.isEnabled())) {
+    if (!(await this.isEnabled({ withCache: true }))) {
       return JobStatus.Skipped;
     }
-    const outcome = await this.chooseSpacePersonCover(id, force ? 'all' : 'missing');
-    return outcome?.result === 'skipped' || !outcome ? JobStatus.Skipped : JobStatus.Success;
+    return toJobStatus(await this.chooseSpacePersonCover(id, force ? 'all' : 'missing'));
   }
 
   /** POST /people/{id}/representative-face/auto: owner only, whether the setting is on or off. */
@@ -78,7 +83,7 @@ export class PersonCoverService extends BaseService {
 
   /**
   Picks one personal person's cover for `mode`. Undefined when nothing was looked at: the person is gone, hidden, a
-  pet, protected, not stale, or left to a hand-picked cover elsewhere in its identity.
+  pet, protected, left to a hand-picked cover elsewhere in its identity, or not stale.
   */
   private async choosePersonCover(personGroupId: string, mode: PersonCoverMode): Promise<ChooseOutcome | undefined> {
     const person = await this.personRepository.getByGroupIdOnly(personGroupId);
@@ -91,30 +96,27 @@ export class PersonCoverService extends BaseService {
       return;
     }
 
+    // This person's own hand pick was turned away above; any other one counts when it is one of this person's faces.
+    if (mode !== 'action' && person.identityId) {
+      const handPicked = await this.personCoverRepository.getIdentityHandPickedCovers(person.identityId);
+      if (handPicked.some(({ facePersonGroupId }) => facePersonGroupId === personGroupId)) {
+        return;
+      }
+    }
+
     const candidates = await this.personCoverRepository.getPersonCandidates(personGroupId);
     if (mode === 'missing' && !isPickStale(cover, person.faceAssetId, candidates.length)) {
       return;
     }
 
-    if (mode !== 'action' && person.identityId) {
-      const handPicked = await this.personCoverRepository.getIdentityHandPickedCovers(person.identityId);
-      const reachable = handPicked.some(
-        (row) =>
-          !(row.profileType === 'person' && row.profileId === personGroupId) && row.facePersonGroupId === personGroupId,
-      );
-      if (reachable) {
-        return;
-      }
-    }
-
     const faceId = await this.chooseFace(candidates, person.faceAssetId, mode);
-    if (faceId === undefined && mode === 'action') {
+    if (faceId === null && mode === 'action') {
       return { result: 'skipped', candidateCount: candidates.length };
     }
 
     const result = await this.personCoverRepository.applyPersonPick({
       personGroupId,
-      faceId: faceId ?? null,
+      faceId,
       candidateCount: candidates.length,
       mode,
     });
@@ -137,6 +139,15 @@ export class PersonCoverService extends BaseService {
       return;
     }
 
+    // A hand pick on this space person would have made it `manual`; any other one counts when it is valid here.
+    if (person.identityId) {
+      for (const { faceId } of await this.personCoverRepository.getIdentityHandPickedCovers(person.identityId)) {
+        if (await this.sharedSpaceRepository.isSpacePersonRepresentativeFaceValid(spacePersonId, faceId)) {
+          return;
+        }
+      }
+    }
+
     const candidates = await this.personCoverRepository.getSpacePersonCandidates(spacePersonId);
     if (mode === 'missing') {
       const pick = await this.personCoverRepository.getSpacePersonCover(spacePersonId);
@@ -145,22 +156,10 @@ export class PersonCoverService extends BaseService {
       }
     }
 
-    if (person.identityId) {
-      const handPicked = await this.personCoverRepository.getIdentityHandPickedCovers(person.identityId);
-      for (const row of handPicked) {
-        if (row.profileType === 'space-person' && row.profileId === spacePersonId) {
-          continue;
-        }
-        if (await this.sharedSpaceRepository.isSpacePersonRepresentativeFaceValid(spacePersonId, row.faceId)) {
-          return;
-        }
-      }
-    }
-
     const faceId = await this.chooseFace(candidates, person.representativeFaceId, mode);
     const result = await this.personCoverRepository.applySpacePersonPick({
       spacePersonId,
-      faceId: faceId ?? null,
+      faceId,
       candidateCount: candidates.length,
     });
     return { result, candidateCount: candidates.length };
@@ -168,58 +167,62 @@ export class PersonCoverService extends BaseService {
 
   /**
   The face to make the cover. The job needs two candidates to choose from (one, when the profile has no cover at
-  all) and keeps the current cover within the margin; the action takes the best of any number. Undefined when there
-  is nothing to choose, which keeps the current cover.
+  all) and keeps the current cover within the margin; the action takes the best of any number. Null when there is
+  nothing to choose, which keeps the current cover.
   */
   private async chooseFace(
     candidates: CoverCandidateRow[],
     currentFaceId: string | null,
     mode: PersonCoverMode,
-  ): Promise<string | undefined> {
+  ): Promise<string | null> {
     const minimum = mode === 'action' || currentFaceId === null ? 1 : 2;
     if (candidates.length < minimum) {
-      return;
+      return null;
     }
 
-    const pixels = await this.readPixels(selectCoverPool(candidates) as CoverCandidateRow[]);
+    const pixels = await this.readPixels(selectCoverPool(candidates));
     const pick = pickCover({
       candidates,
       pixels,
       currentFaceId,
       margin: mode === 'action' ? 0 : PERSON_COVER_MARGIN,
     });
-    return pick?.faceId;
+    return pick?.faceId ?? null;
   }
 
   private async readPixels(pool: CoverCandidateRow[]): Promise<Map<string, CoverPixels>> {
     const pixels = new Map<string, CoverPixels>();
-    for (const face of pool) {
-      if (!face.previewPath) {
-        continue;
-      }
-      try {
-        await using preview = await this.backendMedia.ensureLocalFile(face.previewPath);
-        const data = await readFaceGreyscalePixels(
-          preview.localPath,
-          { x1: face.boundingBoxX1, y1: face.boundingBoxY1, x2: face.boundingBoxX2, y2: face.boundingBoxY2 },
-          { width: face.imageWidth, height: face.imageHeight },
-          PERSON_COVER_CROP_SIZE,
-        );
-        const { brightness, clippedDark } = exposureStats(data);
-        pixels.set(face.faceId, {
-          sharpness: laplacianVariance(data, PERSON_COVER_CROP_SIZE, PERSON_COVER_CROP_SIZE),
-          brightness,
-          clippedDark,
-        });
-      } catch (error) {
-        this.logger.warn(`Person cover: could not read the preview of face ${face.faceId}: ${error}`);
-      }
+    for (let start = 0; start < pool.length; start += PREVIEW_READ_CONCURRENCY) {
+      await Promise.all(pool.slice(start, start + PREVIEW_READ_CONCURRENCY).map((face) => this.readFace(face, pixels)));
     }
     return pixels;
   }
 
-  private async isEnabled() {
-    const { machineLearning } = await this.getConfig({ withCache: false });
+  private async readFace(face: CoverCandidateRow, pixels: Map<string, CoverPixels>) {
+    if (!face.previewPath) {
+      return;
+    }
+    try {
+      await using preview = await this.backendMedia.ensureLocalFile(face.previewPath);
+      const data = await readFaceGreyscalePixels(
+        preview.localPath,
+        { x1: face.boundingBoxX1, y1: face.boundingBoxY1, x2: face.boundingBoxX2, y2: face.boundingBoxY2 },
+        { width: face.imageWidth, height: face.imageHeight },
+        PERSON_COVER_CROP_SIZE,
+      );
+      const { brightness, clippedDark } = exposureStats(data);
+      pixels.set(face.faceId, {
+        sharpness: laplacianVariance(data, PERSON_COVER_CROP_SIZE, PERSON_COVER_CROP_SIZE),
+        brightness,
+        clippedDark,
+      });
+    } catch (error) {
+      this.logger.warn(`Person cover: could not read the preview of face ${face.faceId}: ${error}`);
+    }
+  }
+
+  private async isEnabled(options: { withCache: boolean }) {
+    const { machineLearning } = await this.getConfig(options);
     return isPersonCoverEnabled(machineLearning);
   }
 }

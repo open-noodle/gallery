@@ -63,12 +63,66 @@ const writeCover = (
     .onConflict((oc) => oc.column('personGroupId').doUpdateSet({ ...row, candidateCount }))
     .execute();
 
-const streamed = async <T>(rows: AsyncIterable<T>) => {
-  const all: T[] = [];
-  for await (const row of rows) {
-    all.push(row);
-  }
-  return all;
+/** One person in each state the Missing and All selections tell apart. */
+const peopleInEveryState = async () => {
+  const { ctx, sut } = setup();
+  const { user } = await ctx.newUser();
+  const person = async (name: string, extra: Record<string, unknown> = {}) => {
+    const { person } = await ctx.newPerson({ ownerId: user.id, name, ...extra });
+    const { face } = await photoFace(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+    await photoFace(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+    await setCover(ctx, person.personGroupId, face.id);
+    return { id: person.personGroupId, face: face.id };
+  };
+
+  const created = await person('created since the table');
+  const fresh = await person('fresh automatic pick');
+  await writeCover(
+    ctx,
+    { personGroupId: fresh.id, faceId: fresh.face, source: 'auto', version: PERSON_COVER_VERSION },
+    2,
+  );
+  const older = await person('pick from an older version');
+  await writeCover(ctx, { personGroupId: older.id, faceId: older.face, source: 'auto', version: 0 }, 2);
+  const grown = await person('grown since the pick');
+  await writeCover(
+    ctx,
+    { personGroupId: grown.id, faceId: grown.face, source: 'auto', version: PERSON_COVER_VERSION },
+    1,
+  );
+  const manual = await person('hand-picked');
+  await writeCover(ctx, { personGroupId: manual.id, faceId: manual.face, source: 'manual' });
+  const lostManual = await person('hand-picked face gone');
+  await writeCover(ctx, {
+    personGroupId: lostManual.id,
+    faceId: 'ffffffff-0000-4000-8000-000000000000',
+    source: 'manual',
+  });
+  const unknown = await person('from before the table');
+  await writeCover(ctx, { personGroupId: unknown.id, faceId: unknown.face, source: 'unknown' });
+  const hidden = await person('hidden', { isHidden: true });
+  const pet = await person('pet', { type: 'pet' });
+
+  const ids = {
+    created: created.id,
+    fresh: fresh.id,
+    older: older.id,
+    grown: grown.id,
+    manual: manual.id,
+    lostManual: lostManual.id,
+    unknown: unknown.id,
+    hidden: hidden.id,
+    pet: pet.id,
+  };
+  const names = Object.fromEntries(Object.entries(ids).map(([name, id]) => [id, name]));
+  const pick = async (force: boolean) => {
+    const rows = await Array.fromAsync(sut.streamPeopleToPick({ force }));
+    return rows
+      .map(({ personGroupId }) => names[personGroupId])
+      .filter(Boolean)
+      .toSorted();
+  };
+  return { pick };
 };
 
 describe(PersonCoverRepository.name, () => {
@@ -83,14 +137,13 @@ describe(PersonCoverRepository.name, () => {
       const { face: kept } = await photoFace(ctx, { ownerId: user.id, personGroupId });
       await ctx.newExif({ assetId: kept.assetId, make: 'Canon' });
 
-      const left: string[] = [];
-      const note = (face: { id: string }) => left.push(face.id);
-      note((await photoFace(ctx, { ownerId: user.id, personGroupId, type: AssetType.Video })).face);
+      // Everything below is left out.
+      await photoFace(ctx, { ownerId: user.id, personGroupId, type: AssetType.Video });
       for (const visibility of [AssetVisibility.Locked, AssetVisibility.Hidden, AssetVisibility.Archive]) {
-        note((await photoFace(ctx, { ownerId: user.id, personGroupId, visibility })).face);
+        await photoFace(ctx, { ownerId: user.id, personGroupId, visibility });
       }
-      note((await photoFace(ctx, { ownerId: user.id, personGroupId, deletedAt: new Date() })).face);
-      note((await photoFace(ctx, { ownerId: user.id, personGroupId, isOffline: true })).face);
+      await photoFace(ctx, { ownerId: user.id, personGroupId, deletedAt: new Date() });
+      await photoFace(ctx, { ownerId: user.id, personGroupId, isOffline: true });
 
       const invisible = await photoFace(ctx, { ownerId: user.id, personGroupId });
       await ctx.database
@@ -98,7 +151,6 @@ describe(PersonCoverRepository.name, () => {
         .set({ isVisible: false })
         .where('id', '=', invisible.face.id)
         .execute();
-      note(invisible.face);
 
       const deleted = await photoFace(ctx, { ownerId: user.id, personGroupId });
       await ctx.database
@@ -106,25 +158,20 @@ describe(PersonCoverRepository.name, () => {
         .set({ deletedAt: new Date() })
         .where('id', '=', deleted.face.id)
         .execute();
-      note(deleted.face);
 
       const unembedded = await photoFace(ctx, { ownerId: user.id, personGroupId });
       await ctx.database.deleteFrom('face_search').where('faceId', '=', unembedded.face.id).execute();
-      note(unembedded.face);
 
       const videoFace = await photoFace(ctx, { ownerId: user.id, personGroupId });
       await ctx.database
         .insertInto('asset_face_video_frame')
         .values({ faceId: videoFace.face.id, path: '/thumbs/frame.jpeg', timeSeconds: 1, quality: 0.5, version: 1 })
         .execute();
-      note(videoFace.face);
 
       // Two faces of the person on one photo: one is misfiled, so neither counts.
       const twice = await photoFace(ctx, { ownerId: user.id, personGroupId });
       const { assetFace: second } = await ctx.newAssetFace({ assetId: twice.asset.id, personGroupId });
       await ctx.database.insertInto('face_search').values({ faceId: second.id, embedding: newEmbedding() }).execute();
-      note(twice.face);
-      note(second);
 
       // Someone else's face on the same photo as a kept one does not count against it.
       await ctx.newAssetFace({ assetId: kept.assetId, personGroupId: other.personGroupId });
@@ -132,7 +179,6 @@ describe(PersonCoverRepository.name, () => {
       const candidates = await sut.getPersonCandidates(personGroupId);
 
       expect(candidates.map(({ faceId }) => faceId)).toEqual([kept.id]);
-      expect(left).not.toContain(kept.id);
       expect(candidates[0]).toEqual(
         expect.objectContaining({
           assetId: kept.assetId,
@@ -190,73 +236,14 @@ describe(PersonCoverRepository.name, () => {
   });
 
   describe('streamPeopleToPick', () => {
-    const scenario = async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const person = async (name: string, extra: Record<string, unknown> = {}) => {
-        const { person } = await ctx.newPerson({ ownerId: user.id, name, ...extra });
-        const { face } = await photoFace(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-        await photoFace(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-        await setCover(ctx, person.personGroupId, face.id);
-        return { id: person.personGroupId, face: face.id };
-      };
-
-      const created = await person('created since the table');
-      const fresh = await person('fresh automatic pick');
-      await writeCover(
-        ctx,
-        { personGroupId: fresh.id, faceId: fresh.face, source: 'auto', version: PERSON_COVER_VERSION },
-        2,
-      );
-      const older = await person('pick from an older version');
-      await writeCover(ctx, { personGroupId: older.id, faceId: older.face, source: 'auto', version: 0 }, 2);
-      const grown = await person('grown since the pick');
-      await writeCover(
-        ctx,
-        { personGroupId: grown.id, faceId: grown.face, source: 'auto', version: PERSON_COVER_VERSION },
-        1,
-      );
-      const manual = await person('hand-picked');
-      await writeCover(ctx, { personGroupId: manual.id, faceId: manual.face, source: 'manual' });
-      const lostManual = await person('hand-picked face gone');
-      await writeCover(ctx, {
-        personGroupId: lostManual.id,
-        faceId: 'ffffffff-0000-4000-8000-000000000000',
-        source: 'manual',
-      });
-      const unknown = await person('from before the table');
-      await writeCover(ctx, { personGroupId: unknown.id, faceId: unknown.face, source: 'unknown' });
-      const hidden = await person('hidden', { isHidden: true });
-      const pet = await person('pet', { type: 'pet' });
-
-      const ids = {
-        created: created.id,
-        fresh: fresh.id,
-        older: older.id,
-        grown: grown.id,
-        manual: manual.id,
-        lostManual: lostManual.id,
-        unknown: unknown.id,
-        hidden: hidden.id,
-        pet: pet.id,
-      };
-      const names = Object.fromEntries(Object.entries(ids).map(([name, id]) => [id, name]));
-      const pick = async (force: boolean) =>
-        (await streamed(sut.streamPeopleToPick({ force })))
-          .map(({ personGroupId }) => names[personGroupId])
-          .filter(Boolean)
-          .toSorted();
-      return { pick };
-    };
-
     it('takes the stale automatic covers on a Missing run', async () => {
-      const { pick } = await scenario();
+      const { pick } = await peopleInEveryState();
 
       await expect(pick(false)).resolves.toEqual(['created', 'grown', 'lostManual', 'older'].toSorted());
     });
 
     it('takes every cover not hand-picked on an All run, including those from before the table', async () => {
-      const { pick } = await scenario();
+      const { pick } = await peopleInEveryState();
 
       await expect(pick(true)).resolves.toEqual(
         ['created', 'fresh', 'grown', 'lostManual', 'older', 'unknown'].toSorted(),
@@ -285,7 +272,7 @@ describe(PersonCoverRepository.name, () => {
       await writeCover(ctx, { personGroupId: theirs.personGroupId, faceId: myFace.id, source: 'manual' });
 
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
-      const spacePerson = await ctx.database
+      await ctx.database
         .insertInto('shared_space_person')
         .values({
           spaceId: space.id,
@@ -293,25 +280,14 @@ describe(PersonCoverRepository.name, () => {
           representativeFaceId: theirFace.id,
           representativeFaceSource: 'manual',
         })
-        .returning('id')
-        .executeTakeFirstOrThrow();
+        .execute();
 
       const covers = await sut.getIdentityHandPickedCovers(identity.id);
 
       expect(covers).toEqual(
         expect.arrayContaining([
-          {
-            profileType: 'person',
-            profileId: mine.personGroupId,
-            faceId: myFace.id,
-            facePersonGroupId: mine.personGroupId,
-          },
-          {
-            profileType: 'space-person',
-            profileId: spacePerson.id,
-            faceId: theirFace.id,
-            facePersonGroupId: theirs.personGroupId,
-          },
+          { faceId: myFace.id, facePersonGroupId: mine.personGroupId },
+          { faceId: theirFace.id, facePersonGroupId: theirs.personGroupId },
         ]),
       );
       expect(covers).toHaveLength(2);

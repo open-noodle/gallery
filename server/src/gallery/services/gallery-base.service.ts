@@ -1,10 +1,8 @@
 import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
-import { JobName } from 'src/enum.js';
 import type { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hooks.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
-import { isPersonCoverEnabled } from 'src/gallery/utils/person-cover.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
 import { VideoFaceDetector } from 'src/gallery/utils/video-face-detector.js';
 import type { AccessRepository } from 'src/repositories/access.repository.js';
@@ -149,18 +147,6 @@ export abstract class GalleryBaseService {
       this.videoFaceRepository.getPathsByPaths(paths),
     ]);
     return [...depthMaps, ...videoFaceFrames];
-  }
-
-  /**
-  Queues a quality pick for people whose cover just fell back to the first face (PersonService.createNewFeaturePhoto),
-  when person covers are on (specs/2026-11-21-person-cover-quality-design.md).
-  */
-  protected async queuePersonCoverPicks(personGroupIds: string[]): Promise<void> {
-    const { machineLearning } = await this.getConfig({ withCache: true });
-    if (personGroupIds.length === 0 || !isPersonCoverEnabled(machineLearning)) {
-      return;
-    }
-    await this.jobRepository.queueAll(personGroupIds.map((id) => ({ name: JobName.PersonCover, data: { id } })));
   }
 
   /** Fork: what this viewer may see on a surface — see src/utils/viewer-scope.ts. */

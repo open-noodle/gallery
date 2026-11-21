@@ -139,6 +139,7 @@ space by the existing rule (`isSpacePersonRepresentativeFaceValid`: a space asse
 again with `visibility = 'timeline'`.
 
 A profile with fewer than two candidates keeps its cover, and no preview is read; the job only records the count.
+The one exception is a profile with no cover at all, which takes its only candidate.
 
 ### Pool: recent enough, large enough
 
@@ -160,7 +161,9 @@ The largest faces are where the sharp ones are, and the cap bounds the work per 
 
 ### Score
 
-For each face of the pool, the preview is read once and the face box cropped and reduced to 128 × 128 grey pixels.
+For each face of the pool, the unedited preview (the image the box was detected on, which the person thumbnail job
+reads too) is read once and the face box cropped and reduced to 128 × 128 grey pixels. Up to four previews are read at
+once, since a remote storage backend makes each read a round trip.
 From that crop:
 
 - **sharpness** = `laplacianVariance`;
@@ -211,6 +214,13 @@ cover is at most a tenth of the score range below the best, in practice much les
 changes but keep visibly worse covers. A face one rank better on every measure gains `1/(m − 1)` in a pool of `m`
 kept faces, so in a pool of 40 the challenger must be about four places better on average; in a pool of 3 any face
 that is better on most measures wins.
+
+**Implementation check.** On the same library, with the server's own pixel path (`sharp` reading the previews),
+`pickCover` picks the prototype's face for 231 of the 270 people with two or more candidates, and 24 of the other 39 are
+within the margin of it. Fed the prototype's own pixel values it picks the same face for 249 of 270, and for 269 once
+the prototype ranks ties by their average rank as this implementation does; the rest of the gap is the resampling
+kernel (`sharp` against PIL), not the rules. The 1,638 previews of those pools were read and scored in 20 s, about
+12 ms a face.
 
 The margin applies to the job (Missing and All). **Choose automatically** has no margin: the owner asked for the best
 face now.
@@ -276,16 +286,16 @@ Every write of `person.faceAssetId`, and what `person_cover` records:
 | `PersonService.update` with `featureFaceAssetId` (upstream `PUT /people/{id}` and `PUT /people`, stock apps) | `manual` (one call into the fork module) |
 | `GalleryPeopleService.updateRepresentativeFace` (the picker)     | `manual`                                     |
 | The job and **Choose automatically**                             | `auto` with `candidateCount` and `version`   |
-| `createNewFeaturePhoto` (face reassigned, deleted, created)      | nothing; the row stops holding, and the person is queued for a pick (one call into the fork module) |
-| Other `getRandomFace` fallbacks, merges, repair, video and pet paths | nothing; the row stops holding           |
+| `getRandomFace` fallbacks (`createNewFeaturePhoto`, the thumbnail queue, merges, face suggestions), repair, video and pet paths | nothing; the row stops holding, and the next Missing run picks |
 | Person creation, any path                                        | nothing; no row is automatic                 |
 
 ### Space people: `representativeFaceSource` and `shared_space_person_cover`
 
 A space person already records its source: `manual` is never replaced, `auto` may be. There is no unknown state: the
 column has existed since `1778500000000`, and the picker that writes `manual` came with it. The job's bookkeeping for
-space people goes in a sibling fork table, so `shared_space_person` (which reaches the mobile app through sync) gains
-no column:
+space people goes in a sibling fork table rather than new columns on `shared_space_person`, so the paths that create,
+merge, reset and copy space people (dedup, identity backfill, face-match rebuilds) neither carry it nor reset it by
+accident, and a deleted space person takes its row with it:
 
 ```ts
 @Table('shared_space_person_cover')
@@ -347,16 +357,19 @@ constraint widened), and the job's identity rule above already keeps it from und
   - **Missing** (`force: false`) takes the automatic profiles whose pick is stale: no row (a personal person created
     since), a row that no longer holds, a `version` older than `PERSON_COVER_VERSION`, or a `candidateCount` that has
     grown by at least a quarter since the pick. Unnamed groups grow a face at a time, and a group of 2 that reaches 3
-    is cheap to look at again (3 preview reads).
+    is cheap to look at again (3 preview reads). The growth test counts the profile's raw faces first, on their index,
+    and its candidates only when that count could have grown enough, so a run over fresh picks scans no candidates.
   - **All** (`force: true`) takes every profile whose cover is not hand-picked, including the unknown ones. The Jobs
     page confirms it with the only warning this feature needs: "Thumbnails chosen by hand before this version cannot
     be told apart from automatic ones and may be replaced. Thumbnails chosen by hand since are kept."
   - Both skip the identity rule's profiles, and do nothing while the setting is off. Hidden people and pets are never
     queued.
 - **After recognition.** `handleFaceIdentityMaintenanceAfterRecognition` runs once a recognition run has drained; it
-  also queues `PersonCoverQueueAll { force: false }` when the setting is on.
-- **After a lost cover.** `createNewFeaturePhoto` keeps its immediate fallback, so a person never has no thumbnail, and
-  also queues `PersonCover { force: false }` for those people when the setting is on.
+  also queues `PersonCoverQueueAll { force: false }`. Callers queue cover jobs whatever the setting; the handlers check
+  it, so the rule lives in one place.
+- **After a lost cover.** The fallbacks keep their immediate first face, so a person never has no thumbnail. Their rows
+  stop holding, so the next Missing run picks a better face. No fallback is hooked: there are six of them, mostly in
+  upstream files, and the mismatch already finds them all.
 - **Choose automatically.** `POST /people/{id}/representative-face/auto` (`GalleryPeopleController`) picks for one
   personal person and returns the updated `PersonResponseDto`. It reads at most 40 previews, so it answers within about
   a second. It works whether the setting is on or off, since the owner asked, and turns a `manual` or `unknown` row into
@@ -415,13 +428,12 @@ nine maintained locales).
 
 Upstream files gain only registration lines and calls into the fork module: `server/src/enum.ts` (three `JobName`, one
 `QueueName`), `server/src/dtos/config.dto.ts` and `server/src/dtos/queue-legacy.dto.ts` (one queue entry each),
-`server/src/services/queue.service.ts` (one `case`), `PersonService.update` and `createNewFeaturePhoto` (one call
-each), the web Jobs page and job settings queue lists, `MachineLearningSettings.svelte` (one component line) and the
+`server/src/services/queue.service.ts` (one `case`), `PersonService.update` (one call), the web Jobs page and job settings queue lists, `MachineLearningSettings.svelte` (one component line) and the
 person page menu (one action).
 
 `person_cover.personGroupId` is a fork foreign key onto `person_group_pkey`, listed in
-`server/src/schema/gallery-upstream-fks.json`. That key already carries five fork FKs and is the one `ClusterGroups`
-rebuilt; this makes six, the same pattern as `person_pet` and `person_identity`, and the upstream preflight flags any
+`server/src/schema/gallery-upstream-fks.json`. That key already carries eight fork FKs and is the one `ClusterGroups`
+rebuilt; this makes nine, the same pattern as `person_pet` and `person_identity`, and the upstream preflight flags any
 incoming migration that rebuilds it. `shared_space_person_cover` hangs off a fork table and needs no entry.
 
 ## Testing
@@ -437,7 +449,7 @@ incoming migration that rebuilds it. `shared_space_person_cover` hangs off a for
   setting off makes the jobs no-ops but not the action; the identity rule for personal and space people, reachable and
   not; space `manual` is never touched; a pick queues the thumbnail and never writes the identity's representative
   face; `PersonService.update` with `featureFaceAssetId` and `updateRepresentativeFace` both write `manual`; the space
-  hand pick writes its row; the after-recognition hook queues Missing.
+  hand pick writes its row and the reset queues a pick; the after-recognition hook queues Missing.
 - **Medium (database):** the candidate query leaves out videos, video faces, locked, hidden and archived assets,
   deleted and offline assets, invisible and deleted faces, faces without an embedding, photos with two faces of the
   person, and other people's faces; the space candidate query keeps only faces reachable in the space; the selection
@@ -469,5 +481,5 @@ The open questions of the first draft, as settled on the discussion:
    measurement above.
 4. **Video faces.** Not candidates in this version: their best frame has its own quality (detector score × size ×
    sharpness) on a different scale, and mixing the two needs its own measurement.
-5. **Foreign key.** A sixth fork FK on `person_group_pkey`, like the other person sidecars.
+5. **Foreign key.** One more fork FK on `person_group_pkey`, like the other person sidecars.
 6. **Churn.** A margin of 0.10 on the score, measured above.

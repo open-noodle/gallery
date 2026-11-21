@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
-import { isPersonCoverEnabled } from 'src/gallery/utils/person-cover.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type {
   AccessibleIdentityFaceMatch,
@@ -295,10 +294,7 @@ export class FaceIdentityMaintenanceService extends BaseService {
     }
 
     // Recognition has drained: pick covers for the people it created or grew (specs/2026-11-21-person-cover-quality-design.md).
-    const { machineLearning } = await this.getConfig({ withCache: true });
-    if (isPersonCoverEnabled(machineLearning)) {
-      await this.jobRepository.queue({ name: JobName.PersonCoverQueueAll, data: { force: false } });
-    }
+    await this.jobRepository.queue({ name: JobName.PersonCoverQueueAll, data: { force: false } });
 
     const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
       status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],

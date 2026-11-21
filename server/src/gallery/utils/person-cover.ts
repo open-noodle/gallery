@@ -1,3 +1,6 @@
+import type { SystemConfig } from 'src/dtos/config.dto.js';
+import { cosineDistance, normalize } from 'src/gallery/utils/video-faces.js';
+
 /**
 Person covers picked by quality (specs/2026-11-21-person-cover-quality-design.md, "Choosing a cover"). Pure: the
 service reads the candidates and the pixels of the pool, this module chooses.
@@ -14,28 +17,27 @@ export const PERSON_COVER_MARGIN = 0.1;
 export const PERSON_COVER_POOL_SIZE = 40;
 
 /** Year windows before the latest trusted date, tried in order until one holds enough faces. */
-export const PERSON_COVER_WINDOWS_YEARS = [3, 6, 10, 20] as const;
+const PERSON_COVER_WINDOWS_YEARS = [3, 6, 10, 20] as const;
 
 /** Side, in pixels, of the grey square each face is reduced to before scoring. */
 export const PERSON_COVER_CROP_SIZE = 128;
 
 export const PERSON_COVER_EXPOSURE = { minBrightness: 64, maxBrightness: 204, maxClippedDark: 0.25 } as const;
 
-export const PERSON_COVER_WEIGHTS = { sharpness: 0.35, typicality: 0.3, size: 0.2, date: 0.15 } as const;
+const PERSON_COVER_WEIGHTS = { sharpness: 0.35, typicality: 0.3, size: 0.2, date: 0.15 } as const;
 
 /** A Missing run looks again at an automatic cover once the person has this many times the candidates it had. */
 export const PERSON_COVER_GROWTH = 1.25;
 
 const DAY_MS = 86_400_000;
 
-/** The setting, off when an older config has no `covers` block. */
-export const isPersonCoverEnabled = (machineLearning: { facialRecognition: { covers?: { enabled: boolean } } }) =>
-  machineLearning.facialRecognition.covers?.enabled ?? false;
+export const isPersonCoverEnabled = (machineLearning: SystemConfig['machineLearning']) =>
+  machineLearning.facialRecognition.covers.enabled;
 
 /** `missing` and `all` are the job's runs; `action` is Choose automatically on one person. */
 export type PersonCoverMode = 'missing' | 'all' | 'action';
 
-export type PersonCoverState = { source: 'auto' | 'manual' | 'unknown'; faceId: string | null };
+type PersonCoverState = { source: 'auto' | 'manual' | 'unknown'; faceId: string | null };
 
 /**
 The three-state rule (specs/2026-11-21-person-cover-quality-design.md, "Where a cover came from"). A row holds while
@@ -77,7 +79,7 @@ export type CoverCandidate = {
   trustedDate: boolean;
   /** Short side of the face box, in the coordinates face detection stored. */
   size: number;
-  embedding: ArrayLike<number>;
+  embedding: number[];
 };
 
 export type CoverPixels = { sharpness: number; brightness: number; clippedDark: number };
@@ -97,7 +99,7 @@ export const hasGrownSincePick = (recorded: number, current: number) =>
 The faces worth reading pixels for: the trusted candidates (all of them when none is trusted) within the shortest
 window before the latest that holds `k` of them, cut to the largest `PERSON_COVER_POOL_SIZE`.
 */
-export const selectCoverPool = (candidates: CoverCandidate[]): CoverCandidate[] => {
+export const selectCoverPool = <T extends CoverCandidate>(candidates: T[]): T[] => {
   const trusted = candidates.filter((candidate) => candidate.trustedDate);
   const dated = trusted.length > 0 ? trusted : candidates;
   if (dated.length === 0) {
@@ -143,42 +145,17 @@ export const scaledRanks = (values: number[]): number[] => {
   return ranks;
 };
 
-const normalize = (vector: ArrayLike<number>): Float64Array => {
-  const out = Float64Array.from(vector);
-  let norm = 0;
-  for (const value of out) {
-    norm += value * value;
-  }
-  norm = Math.sqrt(norm);
-  if (norm > 0) {
-    for (let i = 0; i < out.length; i++) {
-      out[i] /= norm;
-    }
-  }
-  return out;
-};
-
 /** Cosine similarity of each candidate's embedding to the normalised mean of all the candidates' embeddings. */
 export const typicality = (candidates: CoverCandidate[]): Map<string, number> => {
   const vectors = candidates.map(({ embedding }) => normalize(embedding));
-  const dimensions = vectors[0]?.length ?? 0;
-  const mean = new Float64Array(dimensions);
+  const sum = Array.from({ length: vectors[0]?.length ?? 0 }, () => 0);
   for (const vector of vectors) {
-    for (let i = 0; i < dimensions; i++) {
-      mean[i] += vector[i];
+    for (let i = 0; i < sum.length; i++) {
+      sum[i] += vector[i];
     }
   }
-  const center = normalize(mean);
-
-  return new Map(
-    candidates.map(({ faceId }, index) => {
-      let dot = 0;
-      for (let i = 0; i < dimensions; i++) {
-        dot += vectors[index][i] * center[i];
-      }
-      return [faceId, dot];
-    }),
-  );
+  const center = normalize(sum);
+  return new Map(candidates.map(({ faceId }, index) => [faceId, 1 - cosineDistance(vectors[index], center)]));
 };
 
 const isWellExposed = ({ brightness, clippedDark }: CoverPixels) =>

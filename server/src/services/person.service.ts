@@ -279,7 +279,6 @@ export class PersonService extends BaseService {
     }
 
     await this.jobRepository.queueAll(jobs);
-    await this.queuePersonCoverPicks(changeFeaturePhoto.map(({ personGroupId }) => personGroupId));
   }
 
   async getById(auth: AuthDto, id: string): Promise<PersonResponseDto> {

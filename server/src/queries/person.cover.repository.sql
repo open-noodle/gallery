@@ -23,11 +23,8 @@ select
       "asset_file"
     where
       "asset_file"."assetId" = "asset"."id"
-      and "asset_file"."type" = $1
-    order by
-      "asset_file"."isEdited" asc
-    limit
-      1
+      and "asset_file"."type" = 'preview'
+      and "asset_file"."isEdited" = false
   ) as "previewPath"
 from
   "asset_face"
@@ -36,7 +33,7 @@ from
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
 where
   "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $2
+  and "asset_face"."isVisible" = $1
   and not exists (
     select
     from
@@ -44,11 +41,11 @@ where
     where
       "asset_face_video_frame"."faceId" = "asset_face"."id"
   )
-  and "asset"."type" = $3
+  and "asset"."type" = $2
   and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $4
-  and "asset"."visibility" = $5
-  and "asset_face"."personGroupId" = $6
+  and "asset"."isOffline" = $3
+  and "asset"."visibility" = $4
+  and "asset_face"."personGroupId" = $5
   and not exists (
     select
     from
@@ -58,7 +55,7 @@ where
       and "sibling"."personGroupId" = "asset_face"."personGroupId"
       and "sibling"."id" != "asset_face"."id"
       and "sibling"."deletedAt" is null
-      and "sibling"."isVisible" = $7
+      and "sibling"."isVisible" = $6
   )
 order by
   "asset_face"."id"
@@ -86,11 +83,8 @@ select
       "asset_file"
     where
       "asset_file"."assetId" = "asset"."id"
-      and "asset_file"."type" = $1
-    order by
-      "asset_file"."isEdited" asc
-    limit
-      1
+      and "asset_file"."type" = 'preview'
+      and "asset_file"."isEdited" = false
   ) as "previewPath"
 from
   "asset_face"
@@ -101,7 +95,7 @@ from
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
 where
   "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $2
+  and "asset_face"."isVisible" = $1
   and not exists (
     select
     from
@@ -109,11 +103,11 @@ where
     where
       "asset_face_video_frame"."faceId" = "asset_face"."id"
   )
-  and "asset"."type" = $3
+  and "asset"."type" = $2
   and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $4
-  and "asset"."visibility" = $5
-  and "shared_space_person_face"."personId" = $6
+  and "asset"."isOffline" = $3
+  and "asset"."visibility" = $4
+  and "shared_space_person_face"."personId" = $5
   and not exists (
     select
     from
@@ -124,11 +118,12 @@ where
       and "sibling"."assetId" = "asset_face"."assetId"
       and "sibling"."id" != "asset_face"."id"
       and "sibling"."deletedAt" is null
-      and "sibling"."isVisible" = $7
+      and "sibling"."isVisible" = $6
   )
   and (
     exists (
       select
+        1 as "exists"
       from
         "shared_space_asset"
       where
@@ -137,6 +132,7 @@ where
     )
     or exists (
       select
+        1 as "exists"
       from
         "shared_space_library"
       where
@@ -203,11 +199,11 @@ from
   left join "person_cover" on "person_cover"."personGroupId" = "person"."personGroupId"
 where
   "person"."isHidden" = $1
-  and not exists (
-    select
-    from
+  and not EXISTS (
+    SELECT
+    FROM
       "person_pet"
-    where
+    WHERE
       "person_pet"."personGroupId" = "person"."personGroupId"
   )
   and not coalesce(
@@ -219,8 +215,20 @@ where
     "person_cover"."personGroupId" is null
     or "person_cover"."faceId" is distinct from "person"."faceAssetId"
     or "person_cover"."version" is distinct from 1
-    or (
-      (
+    or case
+      when (
+        select
+          count(*)::int
+        from
+          "asset_face"
+        where
+          "asset_face"."personGroupId" = "person"."personGroupId"
+      ) >= greatest(
+        ceil(
+          coalesce("person_cover"."candidateCount", 0) * 1.25
+        ),
+        coalesce("person_cover"."candidateCount", 0) + 1
+      ) then (
         select
           count(*)::int
         from
@@ -260,51 +268,14 @@ where
                 )
             )
           ) as candidates
-      ) > coalesce("person_cover"."candidateCount", 0)
-      and (
-        select
-          count(*)::int
-        from
-          (
-            (
-              select
-                "asset_face"."id"
-              from
-                "asset_face"
-                inner join "asset" on "asset"."id" = "asset_face"."assetId"
-                inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
-              where
-                "asset_face"."deletedAt" is null
-                and "asset_face"."isVisible" = $9
-                and not exists (
-                  select
-                  from
-                    "asset_face_video_frame"
-                  where
-                    "asset_face_video_frame"."faceId" = "asset_face"."id"
-                )
-                and "asset"."type" = $10
-                and "asset"."deletedAt" is null
-                and "asset"."isOffline" = $11
-                and "asset"."visibility" = $12
-                and "asset_face"."personGroupId" = "person"."personGroupId"
-                and not exists (
-                  select
-                  from
-                    "asset_face" as "sibling"
-                  where
-                    "sibling"."assetId" = "asset_face"."assetId"
-                    and "sibling"."personGroupId" = "asset_face"."personGroupId"
-                    and "sibling"."id" != "asset_face"."id"
-                    and "sibling"."deletedAt" is null
-                    and "sibling"."isVisible" = $13
-                )
-            )
-          ) as candidates
-      ) >= ceil(
-        coalesce("person_cover"."candidateCount", 0) * 1.25
+      ) >= greatest(
+        ceil(
+          coalesce("person_cover"."candidateCount", 0) * 1.25
+        ),
+        coalesce("person_cover"."candidateCount", 0) + 1
       )
-    )
+      else false
+    end
   )
 order by
   "person"."personGroupId"
@@ -323,8 +294,20 @@ where
     "shared_space_person_cover"."spacePersonId" is null
     or "shared_space_person_cover"."faceId" is distinct from "candidate_person"."representativeFaceId"
     or "shared_space_person_cover"."version" is distinct from 1
-    or (
-      (
+    or case
+      when (
+        select
+          count(*)::int
+        from
+          "shared_space_person_face"
+        where
+          "shared_space_person_face"."personId" = "candidate_person"."id"
+      ) >= greatest(
+        ceil(
+          coalesce("shared_space_person_cover"."candidateCount", 0) * 1.25
+        ),
+        coalesce("shared_space_person_cover"."candidateCount", 0) + 1
+      ) then (
         select
           count(*)::int
         from
@@ -337,6 +320,7 @@ where
                 inner join "asset" on "asset"."id" = "asset_face"."assetId"
                 inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
                 inner join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
+                inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
               where
                 "asset_face"."deletedAt" is null
                 and "asset_face"."isVisible" = $4
@@ -367,19 +351,21 @@ where
                 and (
                   exists (
                     select
+                      1 as "exists"
                     from
                       "shared_space_asset"
                     where
                       "shared_space_asset"."assetId" = "asset_face"."assetId"
-                      and "shared_space_asset"."spaceId" = "candidate_person"."spaceId"
+                      and "shared_space_asset"."spaceId" = "shared_space_person"."spaceId"
                   )
                   or exists (
                     select
+                      1 as "exists"
                     from
                       "shared_space_library"
                     where
                       "shared_space_library"."libraryId" = "asset"."libraryId"
-                      and "shared_space_library"."spaceId" = "candidate_person"."spaceId"
+                      and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
                   )
                   or (
                     exists (
@@ -392,7 +378,7 @@ where
                         and "linked_album"."deletedAt" is null
                       where
                         "album_asset"."assetId" = "asset_face"."assetId"
-                        and "shared_space_album"."spaceId" = "candidate_person"."spaceId"
+                        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
                     )
                     or exists (
                       select
@@ -405,112 +391,27 @@ where
                         and "linked_album"."deletedAt" is null
                       where
                         "album_space_asset"."assetId" = "asset_face"."assetId"
-                        and "shared_space_album"."spaceId" = "candidate_person"."spaceId"
+                        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
                     )
                   )
                 )
             )
           ) as candidates
-      ) > coalesce("shared_space_person_cover"."candidateCount", 0)
-      and (
-        select
-          count(*)::int
-        from
-          (
-            (
-              select
-                "asset_face"."id"
-              from
-                "asset_face"
-                inner join "asset" on "asset"."id" = "asset_face"."assetId"
-                inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
-                inner join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
-              where
-                "asset_face"."deletedAt" is null
-                and "asset_face"."isVisible" = $9
-                and not exists (
-                  select
-                  from
-                    "asset_face_video_frame"
-                  where
-                    "asset_face_video_frame"."faceId" = "asset_face"."id"
-                )
-                and "asset"."type" = $10
-                and "asset"."deletedAt" is null
-                and "asset"."isOffline" = $11
-                and "asset"."visibility" = $12
-                and "shared_space_person_face"."personId" = "candidate_person"."id"
-                and not exists (
-                  select
-                  from
-                    "shared_space_person_face" as "sibling_link"
-                    inner join "asset_face" as "sibling" on "sibling"."id" = "sibling_link"."assetFaceId"
-                  where
-                    "sibling_link"."personId" = "shared_space_person_face"."personId"
-                    and "sibling"."assetId" = "asset_face"."assetId"
-                    and "sibling"."id" != "asset_face"."id"
-                    and "sibling"."deletedAt" is null
-                    and "sibling"."isVisible" = $13
-                )
-                and (
-                  exists (
-                    select
-                    from
-                      "shared_space_asset"
-                    where
-                      "shared_space_asset"."assetId" = "asset_face"."assetId"
-                      and "shared_space_asset"."spaceId" = "candidate_person"."spaceId"
-                  )
-                  or exists (
-                    select
-                    from
-                      "shared_space_library"
-                    where
-                      "shared_space_library"."libraryId" = "asset"."libraryId"
-                      and "shared_space_library"."spaceId" = "candidate_person"."spaceId"
-                  )
-                  or (
-                    exists (
-                      select
-                        1 as "exists"
-                      from
-                        "shared_space_album"
-                        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-                        and "linked_album"."deletedAt" is null
-                      where
-                        "album_asset"."assetId" = "asset_face"."assetId"
-                        and "shared_space_album"."spaceId" = "candidate_person"."spaceId"
-                    )
-                    or exists (
-                      select
-                        1 as "exists"
-                      from
-                        "shared_space_album"
-                        inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                        and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-                        and "linked_album"."deletedAt" is null
-                      where
-                        "album_space_asset"."assetId" = "asset_face"."assetId"
-                        and "shared_space_album"."spaceId" = "candidate_person"."spaceId"
-                    )
-                  )
-                )
-            )
-          ) as candidates
-      ) >= ceil(
-        coalesce("shared_space_person_cover"."candidateCount", 0) * 1.25
+      ) >= greatest(
+        ceil(
+          coalesce("shared_space_person_cover"."candidateCount", 0) * 1.25
+        ),
+        coalesce("shared_space_person_cover"."candidateCount", 0) + 1
       )
-    )
+      else false
+    end
   )
 order by
   "candidate_person"."id"
 
 -- PersonCoverRepository.getIdentityHandPickedCovers
 select
-  "person"."personGroupId" as "profileId",
-  "person_cover"."faceId",
+  "asset_face"."id" as "faceId",
   "asset_face"."personGroupId" as "facePersonGroupId"
 from
   "person_identity"
@@ -523,8 +424,7 @@ where
   and "person_cover"."faceId" = "person"."faceAssetId"
   and "asset_face"."deletedAt" is null
 select
-  "shared_space_person"."id" as "profileId",
-  "shared_space_person"."representativeFaceId" as "faceId",
+  "asset_face"."id" as "faceId",
   "asset_face"."personGroupId" as "facePersonGroupId"
 from
   "shared_space_person"

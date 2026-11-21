@@ -1,4 +1,4 @@
-import { JobName, JobStatus } from 'src/enum.js';
+import { JobStatus } from 'src/enum.js';
 import { PersonService } from 'src/services/person.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -158,31 +158,6 @@ describe(PersonService.name, () => {
       await sut.update(auth, person.personGroupId, { name: 'Ada' });
 
       expect(mocks.personCover.recordHandPick).not.toHaveBeenCalled();
-    });
-
-    it('queues a quality pick after falling back to the first face', async () => {
-      const person = PersonFactory.create();
-      mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
-
-      await sut.createNewFeaturePhoto([person]);
-
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.PersonCover, data: { id: person.personGroupId } },
-      ]);
-    });
-
-    it('queues no pick while person covers are off', async () => {
-      const person = PersonFactory.create();
-      mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
-      mocks.systemMetadata.get.mockResolvedValue({
-        machineLearning: { facialRecognition: { covers: { enabled: false } } },
-      });
-
-      await sut.createNewFeaturePhoto([person]);
-
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith([
-        { name: JobName.PersonCover, data: { id: person.personGroupId } },
-      ]);
     });
   });
 });

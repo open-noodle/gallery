@@ -69,7 +69,6 @@ import {
   UserAvatarColor,
 } from 'src/enum.js';
 import { requireSpaceShareAccess } from 'src/gallery/utils/access-grants.js';
-import { isPersonCoverEnabled } from 'src/gallery/utils/person-cover.js';
 import {
   resolveSpaceMemberManagement,
   type ServerMemberPermissionSettings,
@@ -2636,10 +2635,7 @@ export class SharedSpaceService extends BaseService {
         representativeFaceId,
       });
       // Back to automatic: let the cover job pick for it (specs/2026-11-21-person-cover-quality-design.md).
-      const { machineLearning } = await this.getConfig({ withCache: true });
-      if (isPersonCoverEnabled(machineLearning)) {
-        await this.jobRepository.queue({ name: JobName.SpacePersonCover, data: { id: person.id } });
-      }
+      await this.jobRepository.queue({ name: JobName.SpacePersonCover, data: { id: person.id } });
       const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
       return this.mapSpacePerson(updated, alias?.alias ?? null);
     }
