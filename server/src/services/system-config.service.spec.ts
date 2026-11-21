@@ -17,6 +17,7 @@ import {
   VideoCodec,
   VideoContainer,
 } from 'src/enum.js';
+import { galleryServerDefaults } from 'src/gallery/dtos/config.dto.js';
 import { MEMORY_TYPE_KEYS } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 import type { DeepPartial } from 'src/types.js';
@@ -280,9 +281,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     externalDomain: '',
     loginPageMessage: '',
     publicUsers: true,
-    mergePeopleAcrossOwners: false,
-    spaceEditorsCanAddMembers: false,
-    spaceEditorsCanChangeRoles: false,
+    ...galleryServerDefaults,
   },
   storageTemplate: {
     enabled: false,

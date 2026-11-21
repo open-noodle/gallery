@@ -35,8 +35,12 @@ the original checksum, with their generated SQL documentation updated. The upstr
 only an import and one component call: its diff against `refs/upstream/v3.4.2` grows from 9 to 11 added lines
 (+2, no deletions). The controls and settings
 search registration live in fork files. `docs/fork/ownership.yml` explicitly owns the cache modules and records
-the upstream settings adapter under `shared-video-samples`. OpenAPI and TypeScript/Dart clients are regenerated from the schema. No
-migrations or authorization rules change. Cache controls are an optional `server.videoSampleCache` block in the
+the upstream settings adapter and config-test fixture hook under `shared-video-samples`. OpenAPI and TypeScript/Dart clients are regenerated from the schema. No
+migrations or authorization rules change. The revert script strips `server.videoSampleCache` from stored system
+config, so switching back leaves no Gallery cache configuration in Immich's metadata. The existing system-config
+service fixture imports the fork server defaults through one spread, covering the additional config values without
+adding fork-specific assertions to the upstream test suite. Its diff against `refs/upstream/v3.4.2` shrinks from
+643 to 642 added lines (3 existing deletions unchanged). Cache controls are an optional `server.videoSampleCache` block in the
 admin config API. Older admin clients omit that block; the existing config-body interceptor preserves its
 stored values. New web clients hide the controls against servers without the block. Stock Immich clients keep
 their existing behavior, and stock Immich servers ignore the temporary files.

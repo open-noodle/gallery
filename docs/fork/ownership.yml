@@ -403,6 +403,7 @@ features:
       - server/src/gallery/services/video-sample-cache.service*.ts
       - web/src/lib/gallery/components/admin/video-sample-cache-settings.*
     upstream_extension_paths:
+      - server/src/services/system-config.service.spec.ts
       - web/src/routes/admin/system-settings/ServerSettings.svelte
     required_checks: [ci-invariants-check]
 
