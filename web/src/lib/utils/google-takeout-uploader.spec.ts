@@ -2,6 +2,10 @@ import type { ImportOptions } from '#lib/managers/import-manager.svelte.ts';
 import type { TakeoutMediaItem } from '#lib/utils/google-takeout-parser.ts';
 import { AssetRejectReason, AssetUploadAction } from '@immich/sdk';
 
+vi.mock('#lib/managers/auth-manager.svelte.ts', () => ({
+  authManager: { user: { id: 'takeout-uploader-unit-user' } },
+}));
+
 vi.mock('@immich/sdk', () => ({
   getBaseUrl: vi.fn(() => 'http://localhost'),
   checkBulkUpload: vi.fn(),
