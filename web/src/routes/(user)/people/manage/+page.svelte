@@ -5,6 +5,7 @@
     VisibilitySaveResult,
   } from '#lib/components/people/people-types.ts';
   import PeopleVisibilityModal from '#lib/components/people/people-visibility-modal.svelte';
+  import { sortPeopleByPreference } from '#lib/gallery/people/people-sort.store.ts';
   import { getPeopleThumbnailUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { getAllPeople, updatePeople, type PersonResponseDto } from '@immich/sdk';
@@ -22,9 +23,10 @@
   const totalPeopleCount = $derived(data.people.total);
   let nextPage = $state(data.people.hasNextPage ? 2 : null);
   let loading = $state(false);
+  let sortedPeople = $derived($sortPeopleByPreference(people));
 
   const visibilityPeople: VisibilityPerson[] = $derived(
-    people.map((person) => ({
+    sortedPeople.map((person) => ({
       id: person.id,
       displayName: person.name,
       thumbnailUrl: getPeopleThumbnailUrl(person),
