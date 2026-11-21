@@ -6,6 +6,7 @@
   import { faceSuggestionContextExpanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
   import { getSuggestionAssetHref } from '#lib/gallery/people/suggestion-asset-href.ts';
   import SuggestionAssetSummary from '#lib/gallery/people/suggestion-asset-summary.svelte';
+  import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
   import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
   import { getAssetMediaUrl } from '#lib/utils.ts';
@@ -92,24 +93,26 @@
   // the numerator never outruns it.
   const displayTotal = $derived(total + actedFaceIds.size);
 
-  const highlight = $derived.by(() => {
+  const frame = $derived.by(() => {
     if (!current || !imgReady || !imgEl) {
       return undefined;
     }
-    return getBoundingBox(
-      [
-        {
-          id: current.assetFaceId,
-          imageWidth: current.imageWidth,
-          imageHeight: current.imageHeight,
-          boundingBoxX1: current.boundingBoxX1,
-          boundingBoxX2: current.boundingBoxX2,
-          boundingBoxY1: current.boundingBoxY1,
-          boundingBoxY2: current.boundingBoxY2,
-        } satisfies Faces,
-      ],
-      getContentMetrics(imgEl),
-    )[0];
+    return frameAroundFace(
+      getBoundingBox(
+        [
+          {
+            id: current.assetFaceId,
+            imageWidth: current.imageWidth,
+            imageHeight: current.imageHeight,
+            boundingBoxX1: current.boundingBoxX1,
+            boundingBoxX2: current.boundingBoxX2,
+            boundingBoxY1: current.boundingBoxY1,
+            boundingBoxY2: current.boundingBoxY2,
+          } satisfies Faces,
+        ],
+        getContentMetrics(imgEl),
+      )[0],
+    );
   });
 
   // Always page 1: acted rows have drained server-side, so a fresh page-1 read is the only reliable view of
@@ -351,26 +354,29 @@
           -->
             <!-- The photo yields to the window: the header, counter, summary row, face crops and footer take about
                29rem (31rem on a phone, whose footer stacks three buttons), and the photo gets the rest, up to 40vh
-               on a phone and 60vh above. A fixed 60vh photo left the crops half under the footer at 900px tall. -->
-            <div class="relative mx-auto max-h-[min(40vh,calc(100vh-31rem))] sm:max-h-[min(60vh,calc(100vh-29rem))]">
+               on a phone and 60vh above. A fixed 60vh photo left the crops half under the footer at 900px tall.
+               `overflow-hidden` clips a face frame that runs past the photo's edge. -->
+            <div
+              class="relative mx-auto max-h-[min(40vh,calc(100vh-31rem))] overflow-hidden rounded-lg sm:max-h-[min(60vh,calc(100vh-29rem))]"
+            >
               <img
                 bind:this={imgEl}
                 data-testid="suggestion-full-photo"
                 src={photoUrl}
                 alt={$t('face_suggestion_candidate')}
-                class="max-h-[min(40vh,calc(100vh-31rem))] w-auto rounded-lg object-contain sm:max-h-[min(60vh,calc(100vh-29rem))]"
+                class="max-h-[min(40vh,calc(100vh-31rem))] w-auto object-contain sm:max-h-[min(60vh,calc(100vh-29rem))]"
                 onload={() => (imgReady = true)}
               />
-              {#if highlight}
+              {#if frame}
                 <svg class="pointer-events-none absolute inset-0 size-full">
                   <defs>
                     <mask id="suggestion-dim-mask">
                       <rect width="100%" height="100%" fill="white" />
                       <rect
-                        x={highlight.left}
-                        y={highlight.top}
-                        width={highlight.width}
-                        height={highlight.height}
+                        x={frame.left}
+                        y={frame.top}
+                        width={frame.width}
+                        height={frame.height}
                         rx="8"
                         fill="black"
                       />
@@ -380,8 +386,8 @@
                 </svg>
                 <div
                   data-testid="suggestion-highlight"
-                  class="pointer-events-none absolute rounded-lg border-3 border-solid border-white"
-                  style="top: {highlight.top}px; left: {highlight.left}px; width: {highlight.width}px; height: {highlight.height}px;"
+                  class="pointer-events-none absolute rounded-lg outline-3 outline-white"
+                  style="top: {frame.top}px; left: {frame.left}px; width: {frame.width}px; height: {frame.height}px;"
                 ></div>
               {:else}
                 <div data-testid="suggestion-highlight-placeholder" class="hidden"></div>
