@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Risoluzione",
     "transcoding_data_saver_resolution_description": "I video più grandi vengono ridimensionati per la copia. I video già entro questa dimensione e il limite di bitrate non ricevono una copia.",
     "transcoding_data_saver_video_codec": "Codec video",
-    "transcoding_data_saver_video_codec_description": "HEVC richiede circa metà del bitrate di H.264 per la stessa immagine, e ogni telefono recente lo riproduce."
+    "transcoding_data_saver_video_codec_description": "HEVC richiede circa metà del bitrate di H.264 per la stessa immagine, e ogni telefono recente lo riproduce.",
+    "video_sample_cache": "Cache condivisa dei fotogrammi video",
+    "video_sample_cache_description": "Riutilizza i fotogrammi video tra le attività di rilevamento di volti e animali usando lo spazio temporaneo del server.",
+    "video_sample_cache_retention": "Conserva i campioni inutilizzati (ore)",
+    "video_sample_cache_retention_description": "I campioni scadono dopo questo numero di ore senza riutilizzo. Le modifiche si applicano senza riavviare il server.",
+    "video_sample_cache_size": "Dimensione massima della cache (GiB)",
+    "video_sample_cache_size_description": "Imposta 0 per disattivare la cache. Riducendo il limite, i campioni più vecchi vengono rimossi."
   },
   "album_linked_to_space": "Collegato a \"{space}\"",
   "album_stack_count_in_album": "Conta solo le foto di questo album nei gruppi",

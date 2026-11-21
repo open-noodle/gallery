@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Разрешение",
     "transcoding_data_saver_resolution_description": "Видео большего размера уменьшаются для копии. Видео, которые уже укладываются в этот размер и ограничение битрейта, копию не получают.",
     "transcoding_data_saver_video_codec": "Видеокодек",
-    "transcoding_data_saver_video_codec_description": "HEVC требуется примерно вдвое меньший битрейт, чем H.264, для той же картинки, и его воспроизводит любой современный телефон."
+    "transcoding_data_saver_video_codec_description": "HEVC требуется примерно вдвое меньший битрейт, чем H.264, для той же картинки, и его воспроизводит любой современный телефон.",
+    "video_sample_cache": "Общий кэш кадров видео",
+    "video_sample_cache_description": "Повторно используйте кадры видео в задачах обнаружения лиц и питомцев во временном хранилище сервера.",
+    "video_sample_cache_retention": "Хранить неиспользуемые образцы (часы)",
+    "video_sample_cache_retention_description": "Образцы удаляются через указанное число часов без повторного использования. Изменения применяются без перезапуска сервера.",
+    "video_sample_cache_size": "Максимальный размер кэша (ГиБ)",
+    "video_sample_cache_size_description": "Укажите 0, чтобы отключить кэширование. При уменьшении лимита старые образцы удаляются."
   },
   "album_linked_to_space": "Привязан к «{space}»",
   "album_stack_count_in_album": "Считать в группах только фото из этого альбома",

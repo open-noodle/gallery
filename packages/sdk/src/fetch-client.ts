@@ -516,6 +516,12 @@ export type AdminConfigReverseGeocodingDto = {
     /** Enabled */
     enabled: boolean;
 };
+export type AdminConfigVideoSampleCacheDto = {
+    /** Maximum shared video sample cache size in GiB. 0 disables caching. */
+    maxSizeGiB: number;
+    /** Hours to keep video samples after their last reuse */
+    retentionHours: number;
+};
 export type AdminConfigServerDto = {
     /** External domain */
     externalDomain: string;
@@ -529,6 +535,7 @@ export type AdminConfigServerDto = {
     spaceEditorsCanAddMembers?: boolean;
     /** Let editors of a shared space switch members between viewer and editor. A space owner can override this per space. */
     spaceEditorsCanChangeRoles?: boolean;
+    videoSampleCache?: AdminConfigVideoSampleCacheDto;
 };
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */

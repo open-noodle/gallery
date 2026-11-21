@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Résolution",
     "transcoding_data_saver_resolution_description": "Les vidéos plus grandes sont réduites pour la copie. Les vidéos déjà dans cette taille et sous ce débit maximal n'ont pas de copie.",
     "transcoding_data_saver_video_codec": "Codec vidéo",
-    "transcoding_data_saver_video_codec_description": "Le HEVC demande environ la moitié du débit du H.264 pour la même image, et tous les téléphones récents le lisent."
+    "transcoding_data_saver_video_codec_description": "Le HEVC demande environ la moitié du débit du H.264 pour la même image, et tous les téléphones récents le lisent.",
+    "video_sample_cache": "Cache partagé des images vidéo",
+    "video_sample_cache_description": "Réutilisez les images vidéo entre les tâches de détection des visages et des animaux grâce au stockage temporaire du serveur.",
+    "video_sample_cache_retention": "Conserver les images inutilisées (heures)",
+    "video_sample_cache_retention_description": "Les images expirent après ce nombre d’heures sans réutilisation. Les modifications s’appliquent sans redémarrer le serveur.",
+    "video_sample_cache_size": "Taille maximale du cache (Gio)",
+    "video_sample_cache_size_description": "Indiquez 0 pour désactiver le cache. Réduire la limite supprime les anciennes images."
   },
   "album_linked_to_space": "Lié à \"{space}\"",
   "album_stack_count_in_album": "Ne compter que les photos de cet album dans les piles",
