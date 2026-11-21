@@ -11,6 +11,7 @@ import type {
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
+import { assetOwnerTagIds } from 'src/gallery/utils/asset-owner-tags.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table.js';
@@ -225,7 +226,12 @@ export class TagRepository {
   @Chunked({ paramIndex: 1 })
   replaceAssetTags(assetId: string, tagIds: string[]) {
     return this.db.transaction().execute(async (tx) => {
-      await tx.deleteFrom('tag_asset').where('assetId', '=', assetId).execute();
+      // gallery-fork (#992): replace only the owner's tags; a space editor's tag on the asset stays
+      await tx
+        .deleteFrom('tag_asset')
+        .where('assetId', '=', assetId)
+        .where('tagId', 'in', assetOwnerTagIds(assetId))
+        .execute();
 
       if (tagIds.length === 0) {
         return;

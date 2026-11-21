@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`POST /faces naming another member's person > outcome grid 1`] = `
+{
+  "admin non-member": "refused: Not found or no person.update access",
+  "non-member": "refused: Not found or no person.update access",
+  "person owner": "created",
+  "space editor": "refused: Not found or no person.update access",
+  "space owner": "refused: Not found or no person.update access",
+  "space viewer": "refused: Not found or no person.update access",
+}
+`;

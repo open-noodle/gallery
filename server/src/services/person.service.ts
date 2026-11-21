@@ -1039,7 +1039,9 @@ export class PersonService extends BaseService {
   async createFace(auth: AuthDto, dto: AssetFaceCreateDto): Promise<void> {
     await Promise.all([
       requireAssetEditAccess(this.accessRepository, { auth, ids: [dto.assetId] }),
-      this.requireAccess({ auth, permission: Permission.PersonRead, ids: [dto.personId] }),
+      // Upstream requires the caller's own person. PersonRead also admits space members, which would let them write
+      // faces into another member's person; space people go through SharedSpaceService.createSpaceAssetFace.
+      this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [dto.personId] }),
     ]);
 
     const [asset, person] = await Promise.all([

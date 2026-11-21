@@ -69,7 +69,7 @@ export class WorkflowRepository {
   getForWorkflowRun(id: string) {
     return this.db
       .selectFrom('workflow')
-      .select(['workflow.id', 'workflow.name', 'workflow.trigger', 'workflow.logging'])
+      .select(['workflow.id', 'workflow.name', 'workflow.trigger', 'workflow.logging', 'workflow.ownerId'])
       .select((eb) => [
         jsonArrayFrom(
           eb

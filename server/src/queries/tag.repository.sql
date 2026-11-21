@@ -232,6 +232,15 @@ begin
 delete from "tag_asset"
 where
   "assetId" = $1
+  and "tagId" in (
+    select
+      "tag"."id"
+    from
+      "tag"
+      inner join "asset" on "asset"."ownerId" = "tag"."userId"
+    where
+      "asset"."id" = $2
+  )
 insert into
   "tag_asset" ("tagId", "assetId")
 values

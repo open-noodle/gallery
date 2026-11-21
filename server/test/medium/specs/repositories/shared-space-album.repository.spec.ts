@@ -382,6 +382,9 @@ const seedPersonOnSpaceLinkedAlbum = async (ctx: ReturnType<typeof setup>['ctx']
   const { user: editor } = await ctx.newUser();
   const { user: viewer } = await ctx.newUser();
   const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  // The space's creator is its Owner member, as the app records it. An Editor may only edit a person whose owner is
+  // in the space (representative-face-owner-membership-matrix).
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: editor.id, role: 'editor' });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: 'viewer' });
   const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonEditAlbum' });
