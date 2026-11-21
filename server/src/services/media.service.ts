@@ -159,7 +159,10 @@ export class MediaService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetEditThumbnailGeneration, queue: QueueName.Editor })
-  async handleAssetEditThumbnailGeneration({ id }: JobOf<JobName.AssetEditThumbnailGeneration>): Promise<JobStatus> {
+  async handleAssetEditThumbnailGeneration({
+    id,
+    ...editJob
+  }: JobOf<JobName.AssetEditThumbnailGeneration>): Promise<JobStatus> {
     const asset = await this.assetJobRepository.getForGenerateThumbnailJob(id);
     const config = await this.getConfig({ withCache: true });
 
@@ -170,7 +173,7 @@ export class MediaService extends BaseService {
 
     // Gallery: a video's edited files are its trim's (src/gallery/services/video-trim.service.ts)
     if (asset.type === AssetType.Video) {
-      await this.jobRepository.queue({ name: JobName.AssetVideoTrimGenerate, data: { id } });
+      await this.jobRepository.queue({ name: JobName.AssetVideoTrimGenerate, data: { id, ...editJob } });
       return JobStatus.Success;
     }
 

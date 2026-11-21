@@ -718,7 +718,10 @@ export class AssetService extends BaseService {
     }
 
     const newEdits = await this.assetEditRepository.replaceAll(id, edits);
-    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetEditThumbnailGeneration,
+      data: await this.assetEditJobData(auth, id),
+    });
 
     // #734: after the write succeeds — a rejected write must log nothing.
     await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
@@ -739,7 +742,10 @@ export class AssetService extends BaseService {
     }
 
     await this.assetEditRepository.replaceAll(id, []);
-    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetEditThumbnailGeneration,
+      data: await this.assetEditJobData(auth, id),
+    });
 
     // #734: after the write succeeds — a rejected write must log nothing.
     await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);

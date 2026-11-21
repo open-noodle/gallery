@@ -148,7 +148,7 @@ export class JobService extends BaseService {
         const edits = await this.assetEditRepository.getWithSyncInfo(item.data.id);
 
         if (asset) {
-          this.websocketRepository.clientSend('AssetEditReadyV2', asset.ownerId, {
+          await this.notifyAssetEditReady(item.data, {
             asset: {
               id: asset.id,
               ownerId: asset.ownerId,
