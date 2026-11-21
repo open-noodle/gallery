@@ -1,4 +1,5 @@
 import FacePhotoModal from '#lib/components/face-cleanup/FacePhotoModal.svelte';
+import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
 import { Settings } from 'luxon';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { SvelteSet } from 'svelte/reactivity';
@@ -66,9 +67,11 @@ describe('FacePhotoModal', () => {
     await expect.element(page.getByTestId('face-photo-box').first()).toBeInTheDocument();
     const boxes = page.getByTestId('face-photo-box').elements();
     expect(boxes).toHaveLength(1);
-    // 400x300 natural inside 800x600 client => contentWidth 800, offset 0; x1 100/400 * 800 = 200.
-    expect(boxes[0].style.left).toBe('200px');
-    expect(boxes[0].style.width).toBe('200px');
+    // 400x300 natural inside 800x600 client => contentWidth 800, offset 0; x1 100/400 * 800 = 200, and the face
+    // is 200px wide. The box is the frame around it.
+    const frame = frameAroundFace({ left: 200, top: 150, width: 200, height: 150 });
+    expect(boxes[0].style.left).toBe(`${frame.left}px`);
+    expect(boxes[0].style.width).toBe(`${frame.width}px`);
   });
 
   // I1 regression: the image metrics are stubbed (the preview never loads here), so this runner cannot
@@ -129,9 +132,11 @@ describe('FacePhotoModal', () => {
     });
     sizeImage((await page.getByTestId('face-photo').findElement()) as HTMLImageElement);
 
+    // Clamped to the 800px-wide image, then framed.
     const box = await page.getByTestId('face-photo-box').findElement();
-    expect(box.style.left).toBe('0px');
-    expect(box.style.width).toBe('800px');
+    const frame = frameAroundFace({ left: 0, top: 150, width: 800, height: 150 });
+    expect(box.style.left).toBe(`${frame.left}px`);
+    expect(box.style.width).toBe(`${frame.width}px`);
   });
 
   it('T6.6: the arrows page forward and back, and the photo follows', async () => {

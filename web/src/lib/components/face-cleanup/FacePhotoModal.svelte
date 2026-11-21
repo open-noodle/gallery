@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FacePhotoFace } from '#lib/components/face-cleanup/face-photo.ts';
   import { dateFormats } from '#lib/constants.ts';
+  import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
   import { getContentMetrics, type ContentMetrics } from '#lib/utils/container-utils.ts';
   import {
     clampFaceBoxToImage,
@@ -59,7 +60,7 @@
     if (!metrics || !isUsableFaceBox(face)) {
       return null;
     }
-    return getBoundingBox([{ id: face.assetFaceId, ...clampFaceBoxToImage(face) }], metrics)[0] ?? null;
+    return frameAroundFace(getBoundingBox([{ id: face.assetFaceId, ...clampFaceBoxToImage(face) }], metrics)[0]);
   });
 
   // Luxon directly rather than fromISODateTimeUTC: that helper casts to `DateTime<true>`, which erases the
@@ -105,7 +106,7 @@
           <!-- Only the CLICKED face is boxed. The console holds no data for the other people in the frame, and
                one box answers the question the admin is actually asking. -->
           <div
-            class="pointer-events-none absolute rounded-sm border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+            class="pointer-events-none absolute rounded-sm shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] outline-2 outline-primary"
             style="top: {box.top}px; left: {box.left}px; width: {box.width}px; height: {box.height}px;"
             data-testid="face-photo-box"
           ></div>

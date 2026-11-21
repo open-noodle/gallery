@@ -1,5 +1,6 @@
 <script lang="ts">
   import { videoFaceBox } from '#lib/gallery/asset-viewer/video-face-box.svelte.ts';
+  import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
   import { mapNormalizedRectToContent } from '#lib/utils/container-utils.ts';
   import { computeImageContentMetrics } from '#lib/utils/face-box-drag.ts';
 
@@ -31,10 +32,12 @@
     }
 
     const { x1, y1, x2, y2 } = shown.box;
-    const face = mapNormalizedRectToContent(
-      { x: x1, y: y1 },
-      { x: x2, y: y2 },
-      { contentWidth: metrics.contentWidth, contentHeight: metrics.contentHeight, offsetX: 0, offsetY: 0 },
+    const frame = frameAroundFace(
+      mapNormalizedRectToContent(
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+        { contentWidth: metrics.contentWidth, contentHeight: metrics.contentHeight, offsetX: 0, offsetY: 0 },
+      ),
     );
     return {
       picture: {
@@ -43,13 +46,13 @@
         width: px(metrics.contentWidth),
         height: px(metrics.contentHeight),
       },
-      face: { left: px(face.left), top: px(face.top), width: px(face.width), height: px(face.height) },
+      frame: { left: px(frame.left), top: px(frame.top), width: px(frame.width), height: px(frame.height) },
     };
   });
 </script>
 
 {#if placement}
-  {const { picture, face } = $derived(placement)}
+  {const { picture, frame } = $derived(placement)}
   <div
     class="pointer-events-none absolute z-5 overflow-hidden"
     style:left={picture.left}
@@ -59,11 +62,11 @@
     data-testid="video-face-box"
   >
     <div
-      class="absolute rounded-lg border-3 border-solid border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]"
-      style:left={face.left}
-      style:top={face.top}
-      style:width={face.width}
-      style:height={face.height}
+      class="absolute rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.4)] outline-3 outline-white"
+      style:left={frame.left}
+      style:top={frame.top}
+      style:width={frame.width}
+      style:height={frame.height}
       data-testid="video-face-box-face"
     ></div>
   </div>

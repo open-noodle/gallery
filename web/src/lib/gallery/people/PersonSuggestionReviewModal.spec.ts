@@ -1,6 +1,7 @@
 import { reactivePageMock } from '#lib/gallery/__mocks__/reactive-page.mock.svelte.ts';
 import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
 import { faceSuggestionContextExpanded } from '#lib/gallery/people/face-suggestion-context.store.ts';
+import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
 import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
 import { handleError } from '#lib/utils/handle-error.ts';
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
@@ -152,11 +153,16 @@ describe('PersonSuggestionReviewModal', () => {
     //   offsetX = (400 - 400) / 2 = 0,    offsetY = (300 - 200) / 2 = 50
     //   left = 0.1 * 400 + 0 = 40,   top    = 0.1 * 200 + 50 = 70
     //   width = 0.4 * 400 - 40 = 120, height = 0.4 * 200 + 50 - 70 = 60
-    const overlay = page.getByTestId('suggestion-highlight').element() as HTMLElement;
-    expect(overlay.style.left).toBe('40px');
-    expect(overlay.style.top).toBe('70px');
-    expect(overlay.style.width).toBe('120px');
-    expect(overlay.style.height).toBe('60px');
+    // The overlay is the frame around that box (face-frame.spec.ts covers the frame itself).
+    const { style } = page.getByTestId('suggestion-highlight').element() as HTMLElement;
+    const placed = { left: style.left, top: style.top, width: style.width, height: style.height };
+    const frame = frameAroundFace({ left: 40, top: 70, width: 120, height: 60 });
+    expect(placed).toEqual({
+      left: `${frame.left}px`,
+      top: `${frame.top}px`,
+      width: `${frame.width}px`,
+      height: `${frame.height}px`,
+    });
   });
 
   it('Same person calls confirm then advances; last item closes with confirmed count', async () => {
