@@ -113,6 +113,8 @@ export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
   mocks.videoFace.getPathsByPaths.mockResolvedValue([]);
   // Every pet purge reads the frame files it is about to orphan (specs/2026-11-16-video-pet-detection-design.md).
   mocks.petFace.getPetFramePaths.mockResolvedValue([]);
+  // PersonService.getAll adds photo counts to the owner-only list (#1232).
+  mocks.galleryPerson.getOwnedPersonAssetCounts.mockResolvedValue(new Map());
 
   return mocks;
 };

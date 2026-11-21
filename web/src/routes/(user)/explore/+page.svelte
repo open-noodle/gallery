@@ -7,6 +7,7 @@
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import SingleGridRow from '#lib/components/shared-components/SingleGridRow.svelte';
   import Portal from '#lib/elements/Portal.svelte';
+  import { peopleSortManager } from '#lib/gallery/managers/people-sort-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
@@ -36,6 +37,7 @@
     getFieldItems(data.explore, 'createdAt').sort((a, b) => new Date(b.value).getTime() - new Date(a.value).getTime()),
   );
   let people = $state(data.people.people);
+  let sortedPeople = $derived(peopleSortManager.sort(people));
   let memories = $derived(
     data.memories.map((memory) => ({
       id: memory.id,
@@ -90,7 +92,7 @@
       </div>
       <SingleGridRow class="grid grid-flow-col grid-auto-fill-20 gap-x-4 md:grid-auto-fill-28">
         {#snippet children({ itemCount })}
-          {#each people.slice(0, itemCount) as person (person.id)}
+          {#each sortedPeople.slice(0, itemCount) as person (person.id)}
             <a href={getPersonHref(person)} class="text-center">
               <div class="@container relative">
                 <ImageThumbnail

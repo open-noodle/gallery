@@ -97,6 +97,34 @@ scans), kept out of the replay-owned PersonRepository. See specs/2026-10-10-gall
 export class GalleryPersonRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
+  /**
+  Photo counts for the owner-only people list (#1232), counted like the People page's grouped list
+  (`FaceIdentityRepository` asset_counts): distinct live timeline assets with a visible face of the
+  person. People with no such asset are absent from the map.
+  */
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async getOwnedPersonAssetCounts(ownerId: string, personGroupIds: string[]): Promise<Map<string, number>> {
+    if (personGroupIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select((eb) => ['asset_face.personGroupId', eb.fn.count<string>('asset_face.assetId').distinct().as('count')])
+      .where('asset_face.personGroupId', 'in', personGroupIds)
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', 'is', false)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .groupBy('asset_face.personGroupId')
+      .execute();
+
+    return new Map(rows.map(({ personGroupId, count }) => [personGroupId!, Number(count)]));
+  }
+
   async mergePersonProfile(
     input: {
       sourcePersonId: string;
