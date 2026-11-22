@@ -5,11 +5,12 @@
   import GlobalSearch from '#lib/components/global-search/global-search.svelte';
   import OpenInAppBanner from '#lib/components/shared-components/open-in-app-banner.svelte';
   import { setupMotion } from '#lib/gallery/motion/index.ts';
+  import { nextSearchMode } from '#lib/gallery/search/full-path-search.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { closePaletteOnNavigate } from '#lib/managers/close-palette-on-navigate.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import ServerRestartingModal from '#lib/modals/ServerRestartingModal.svelte';
   import { queryClient } from '#lib/queries/client.ts';
   import { Route } from '#lib/route.ts';
@@ -259,9 +260,7 @@
         if (!globalSearchManager.isOpen) {
           return;
         }
-        const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
-        const next = order[(order.indexOf(globalSearchManager.mode) + 1) % order.length];
-        globalSearchManager.setMode(next);
+        globalSearchManager.setMode(nextSearchMode(globalSearchManager.mode));
       },
     },
     ...searchShortcuts(openModalSearch),
