@@ -2,18 +2,13 @@
   import { maximumLengthSearchPeople, timeBeforeShowLoadingSpinner } from '#lib/constants.ts';
   import { type PickerCandidate } from '#lib/gallery/people/PersonPickerGrid.svelte';
   import PersonPickerPanel from '#lib/gallery/people/PersonPickerPanel.svelte';
+  import { loadOwnedPickerPeople, searchOwnedPickerPeople } from '#lib/gallery/people/owned-picker-people.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { getPeopleThumbnailUrl, handlePromiseError } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { orderPickerCandidates, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
   import { getPersonNameWithHiddenValue, searchNameLocal } from '#lib/utils/person.ts';
-  import {
-    AssetTypeEnum,
-    getAllPeople,
-    searchPerson,
-    type AssetFaceResponseDto,
-    type PersonResponseDto,
-  } from '@immich/sdk';
+  import { AssetTypeEnum, type AssetFaceResponseDto, type PersonResponseDto } from '@immich/sdk';
   import { IconButton, LoadingSpinner } from '@immich/ui';
   import { mdiPlus } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -40,19 +35,21 @@
   That parameter orders the whole list by how much each person's face resembles the one you
   tapped. It is a name suggestion, and a good one for the first handful of rows -- but past those
   it is indistinguishable from random, and a library with several hundred named people is then
-  several hundred rows nobody can scan or scroll to (#992). Dropping it takes `getAllForUser`'s
-  other branch, which sorts named people alphabetically and puts the unnamed clusters after them
-  by face count -- the same order `getPersonsBySpaceId` serves the space picker, and the same one
-  every other people list in the fork already uses. This picker was the sole exception.
-  
+  several hundred rows nobody can scan or scroll to (#992). Without it the list sorts named people
+  alphabetically and puts the unnamed clusters after them by face count -- the same order
+  `getPersonsBySpaceId` serves the space picker, and the same one every other people list in the
+  fork already uses. This picker was the sole exception.
+
   The resemblance ordering itself stays on the server for the person page's "sort faces" toggle
   (`closestPersonId`), which opts into it explicitly.
+
+  The list and the search both read the identity endpoints, so a name set inside a space shows
+  here (#1287); see `owned-picker-people.ts`.
   */
   async function loadPeople() {
     const timeout = setTimeout(() => (isShowLoadingPeople = true), timeBeforeShowLoadingSpinner);
     try {
-      const { people } = await getAllPeople({ withHidden: true });
-      allPeople = people;
+      allPeople = await loadOwnedPickerPeople();
     } catch (error) {
       handleError(error, $t('errors.cant_get_faces'));
     } finally {
@@ -72,6 +69,7 @@
   /** The last server response, and the query that produced it — see the short-circuit below. */
   let searchResults: PersonResponseDto[] = [];
   let searchWord = '';
+  let searchIsComplete = false;
 
   /**
   The search used to sit behind a magnifier icon, in a `PeopleSearch` that swapped out the whole
@@ -93,12 +91,13 @@
       searchAbortController = null;
       searchResults = [];
       searchWord = '';
+      searchIsComplete = false;
       searchedPeople = [];
       isShowLoadingSearch = false;
       return;
     }
 
-    if (searchResults.length > 0 && searchResults.length < maximumLengthSearchPeople && query.startsWith(searchWord)) {
+    if (searchResults.length > 0 && searchIsComplete && query.startsWith(searchWord)) {
       searchedPeople = searchNameLocal(query, searchResults, maximumLengthSearchPeople);
       return;
     }
@@ -108,9 +107,10 @@
     searchAbortController = abortController;
     const timeout = setTimeout(() => (isShowLoadingSearch = true), timeBeforeShowLoadingSpinner);
     try {
-      const people = await searchPerson({ name: query }, { signal: abortController.signal });
+      const { people, isComplete } = await searchOwnedPickerPeople(query, { signal: abortController.signal });
       searchResults = people;
       searchWord = query;
+      searchIsComplete = isComplete;
       searchedPeople = searchNameLocal(query, people, maximumLengthSearchPeople);
     } catch (error) {
       if (!abortController.signal.aborted) {
