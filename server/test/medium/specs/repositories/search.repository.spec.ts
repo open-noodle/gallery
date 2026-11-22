@@ -1997,6 +1997,20 @@ describe(SearchRepository.name, () => {
         }),
       ).rejects.toThrow('Cannot mix spaceId and userIds');
     });
+
+    it('rejects spaceAssetOwnerId without spaceId', async () => {
+      const { faceSearch } = setup();
+
+      await expect(
+        faceSearch.searchFaces({
+          userIds: [ownerId],
+          spaceAssetOwnerId: ownerId,
+          embedding: faceEmbedding,
+          numResults: 10,
+          maxDistance: 2,
+        }),
+      ).rejects.toThrow('spaceAssetOwnerId requires spaceId');
+    });
   });
 
   // Slice 1 (F2): the owner-scoped branch of searchFaces has no visibility gate by default — a Locked or

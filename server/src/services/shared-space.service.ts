@@ -3261,15 +3261,17 @@ export class SharedSpaceService extends BaseService {
       members = await this.sharedSpaceRepository.getMembers(job.spaceId);
     }
 
-    const spacePeopleWithEmbeddings = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
-    const spacePeople = spacePeopleWithEmbeddings.filter(
-      (person) => (!job.spacePersonId || person.id === job.spacePersonId) && person.identityId && !person.isHidden,
-    );
-
     for (const member of members) {
+      // Re-read per member: a claim applied for an earlier member can merge a space person's identity away or
+      // fold a duplicate space person into another, and a stale target would fail the whole run (#1317).
+      const spacePeopleWithEmbeddings = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
+      const spacePeople = spacePeopleWithEmbeddings.filter(
+        (person) => (!job.spacePersonId || person.id === job.spacePersonId) && person.identityId && !person.isHidden,
+      );
       const claims: SharedSpaceIdentityReconciliationClaim[] = [];
       for (const spacePerson of spacePeople) {
         const claim = await this.findStrictSpacePersonLocalIdentityClaim({
+          spaceId: job.spaceId,
           memberUserId: member.userId,
           spacePerson,
           maxDistance,
@@ -3288,6 +3290,7 @@ export class SharedSpaceService extends BaseService {
   }
 
   private async findStrictSpacePersonLocalIdentityClaim(input: {
+    spaceId: string;
     memberUserId: string;
     spacePerson: {
       id: string;
@@ -3303,8 +3306,12 @@ export class SharedSpaceService extends BaseService {
       return;
     }
 
+    // #1317: only faces the space can see — the member's assets reachable through this space (direct,
+    // linked library or linked album, visibility-gated). An owner-scoped scan here bound the member's
+    // PRIVATE faces into the space identity, where every other account on that identity could see them.
     const matches = await this.faceSearchRepository.searchFaces({
-      userIds: [input.memberUserId],
+      spaceId: input.spaceId,
+      spaceAssetOwnerId: input.memberUserId,
       embedding: input.spacePerson.embedding,
       maxDistance: input.maxDistance,
       numResults: 2,
@@ -3371,6 +3378,13 @@ export class SharedSpaceService extends BaseService {
   private async applySharedSpaceIdentityReconciliationClaim(
     claim: SharedSpaceIdentityReconciliationClaim,
   ): Promise<void> {
+    // An earlier claim in this run may have moved the space person to another identity or folded it away.
+    const spacePerson = await this.sharedSpaceRepository.getPersonById(claim.spacePersonId);
+    if (spacePerson?.identityId !== claim.targetIdentityId) {
+      this.logger.debug(`Skipping stale identity reconciliation claim for space person ${claim.spacePersonId}`);
+      return;
+    }
+
     const conflicts = await this.faceIdentityRepository.getMergeConflicts({
       targetIdentityId: claim.targetIdentityId,
       sourceIdentityIds: [claim.sourceIdentityId],

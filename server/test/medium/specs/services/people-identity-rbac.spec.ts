@@ -95,6 +95,8 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
       // this.databaseRepository.transaction() — needs a real connection to the test DB.
       DatabaseRepository,
       FaceIdentityRepository,
+      // Space person dedup drains pending suggestions for faces it moves.
+      FacePersonVerdictRepository,
       PersonRepository,
       FilterSuggestionRepository,
       SearchRepository,
@@ -130,6 +132,10 @@ const drainSharedSpaceFaceJobs = async (sharedSpaceService: SharedSpaceService, 
       }
       if (job.name === JobName.SharedSpaceIdentityReconciliation) {
         await sharedSpaceService.handleSharedSpaceIdentityReconciliation(job.data);
+      }
+      // Reconciliation queues this to recompute the inherited name after a join, as production runs it.
+      if (job.name === JobName.SharedSpacePersonMetadataBackfill) {
+        await sharedSpaceService.handleSharedSpacePersonMetadataBackfill(job.data);
       }
     }
   }
@@ -389,15 +395,24 @@ const authFor = (user: { id: string; name: string; email: string; isAdmin?: bool
 // every face to that person's identity. Returns the person + identity.
 const addMatchingMemberPerson = async (
   fx: Awaited<ReturnType<typeof createLinkedLibraryIdentityFixture>>,
-  input: { memberId: string; name: string; embedding: string; photoCount: number },
+  input: { memberId: string; name: string; embedding: string; photoCount: number; sharedCount?: number },
 ) => {
   const { result: person } = await fx.ctx.newPerson({ ownerId: input.memberId, name: input.name });
   const identity = await fx.faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
+  // #1317: the first `sharedCount` photos (default 1) are in the space; a join needs one the space can see.
+  const sharedCount = input.sharedCount ?? 1;
   for (let i = 0; i < input.photoCount; i++) {
     const { asset } = await fx.ctx.newAsset({ ownerId: input.memberId, visibility: AssetVisibility.Timeline });
     const { result: face } = await fx.ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    if (i < sharedCount) {
+      await fx.ctx.newSharedSpaceAsset({ spaceId: fx.space.id, assetId: asset.id, addedById: input.memberId });
+    }
     await fx.ctx.database.insertInto('face_search').values({ faceId: face, embedding: input.embedding }).execute();
     await fx.faceIdentityRepository.linkFace({ assetFaceId: face, identityId: identity.id, source: 'owner-person' });
+    if (i < sharedCount) {
+      // Project the shared face the way the server does when a photo is added to a space.
+      await fx.sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: fx.space.id, assetId: asset.id });
+    }
   }
   return { person, identityId: identity.id };
 };
@@ -429,7 +444,7 @@ const addCity = async (ctx: IdentityRbacContext, assetId: string, city: string) 
 };
 
 const setupJoinAfterDuplicatesFixture = async (
-  input: { showInTimeline?: boolean; memberBeforeSpaceEvidence?: boolean } = {},
+  input: { showInTimeline?: boolean; memberBeforeSpaceEvidence?: boolean; memberPhotoShared?: boolean } = {},
 ) => {
   const { ctx, sut: personService, faceIdentityRepository } = setup();
   const { sut: sharedSpaceService } = setupSharedSpace();
@@ -479,6 +494,8 @@ const setupJoinAfterDuplicatesFixture = async (
       spaceId: space.id,
       identityId: ownerIdentity.id,
       name: 'Owner Shared Name',
+      // As on a real instance: the space person inherited the owner's name, so it survives a duplicate collapse.
+      nameSource: 'inherited',
       representativeFaceId: ownerFace,
       type: 'person',
     })
@@ -491,6 +508,12 @@ const setupJoinAfterDuplicatesFixture = async (
 
   if (!input.memberBeforeSpaceEvidence) {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+  }
+  // #1317: a member is joined to the space person only on a photo of theirs the space can see.
+  if (input.memberPhotoShared ?? true) {
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: memberAsset.id, addedById: member.id });
+    // Project the shared face the way the server does when a photo is added to a space.
+    await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: memberAsset.id });
   }
   await setSpaceTimeline(ctx, {
     spaceId: space.id,
@@ -903,7 +926,64 @@ describe('People identity RBAC projection', () => {
     ]);
   });
 
-  it('reconciles a late member local person against linked-library space evidence', async () => {
+  it('reconciles a late member local person once one of their matching photos is in the space', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ memberInitiallyJoined: false });
+    const embeddingRow = await fx.ctx.database
+      .selectFrom('face_search')
+      .select('embedding')
+      .where('faceId', '=', fx.face.faceId)
+      .executeTakeFirstOrThrow();
+
+    const { result: memberPerson } = await fx.ctx.newPerson({
+      ownerId: fx.member.id,
+      name: 'Member Private Name',
+    });
+    const { asset: memberAsset } = await fx.ctx.newAsset({
+      ownerId: fx.member.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    const { result: memberFace } = await fx.ctx.newAssetFace({
+      assetId: memberAsset.id,
+      personGroupId: memberPerson.personGroupId,
+    });
+    await fx.ctx.database
+      .insertInto('face_search')
+      .values({ faceId: memberFace, embedding: embeddingRow.embedding })
+      .execute();
+    const memberIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
+    await fx.faceIdentityRepository.linkFace({
+      assetFaceId: memberFace,
+      identityId: memberIdentity.id,
+      source: 'owner-person',
+    });
+    await fx.ctx.newSharedSpaceAsset({ spaceId: fx.space.id, assetId: memberAsset.id, addedById: fx.member.id });
+    await fx.sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: fx.space.id, assetId: memberAsset.id });
+
+    await fx.sharedSpaceService.addMember(authFor(fx.source), fx.space.id, {
+      userId: fx.member.id,
+      role: SharedSpaceRole.Viewer,
+    });
+    await fx.sharedSpaceService.handleSharedSpaceIdentityReconciliation({
+      spaceId: fx.space.id,
+      userId: fx.member.id,
+    });
+
+    const result = await fx.personService.getAll(authFor(fx.member), {
+      withHidden: false,
+      withSharedSpaces: true,
+      page: 1,
+      size: 50,
+    } as any);
+
+    expect(result.people).toEqual([
+      expect.objectContaining({
+        primaryProfile: { type: 'user-person', id: memberPerson.personGroupId },
+        numberOfAssets: 2,
+      }),
+    ]);
+  });
+
+  it('does not join a late member whose matching photos are all private (#1317)', async () => {
     const fx = await createLinkedLibraryIdentityFixture({ memberInitiallyJoined: false });
     const embeddingRow = await fx.ctx.database
       .selectFrom('face_search')
@@ -950,12 +1030,18 @@ describe('People identity RBAC projection', () => {
       size: 50,
     } as any);
 
-    expect(result.people).toEqual([
-      expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: memberPerson.personGroupId },
-        numberOfAssets: 2,
-      }),
-    ]);
+    // The member sees their own person and the space person separately; their private photos never joined
+    // the space identity.
+    expect(result.people).toHaveLength(2);
+    expect(result.people).toContainEqual(
+      expect.objectContaining({ primaryProfile: { type: 'user-person', id: memberPerson.personGroupId } }),
+    );
+    const memberIdentityAfter = await fx.ctx.database
+      .selectFrom('person_identity')
+      .select('identityId')
+      .where('personGroupId', '=', memberPerson.personGroupId)
+      .executeTakeFirstOrThrow();
+    expect(memberIdentityAfter.identityId).toBe(memberIdentity.id);
   });
 
   // Count-invariance: searchFaces caps at numResults:2, so 1/2/3/5 photos of the member's one person
@@ -1399,7 +1485,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('shows a late member the accessible space person without creating a local profile', async () => {
-    const fixture = await setupJoinAfterDuplicatesFixture();
+    const fixture = await setupJoinAfterDuplicatesFixture({ memberPhotoShared: false });
     const { ctx, personService, sharedSpaceService, space } = fixture;
     const { user: lateMember } = await ctx.newUser();
 
@@ -1485,7 +1571,8 @@ describe('People identity RBAC projection', () => {
     expect(uploaderPeople.people[0]).toEqual(
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
-        numberOfAssets: 2,
+        // The uploader's own photo, plus the owner's and the fixture member's photos in the space.
+        numberOfAssets: 3,
       }),
     );
     expect(ownerPeople.people).toEqual([
@@ -1498,7 +1585,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('keeps one visible person when a post-join upload is added to the space', async () => {
-    const fixture = await setupJoinAfterDuplicatesFixture();
+    const fixture = await setupJoinAfterDuplicatesFixture({ memberPhotoShared: false });
     const { ctx, personService, sharedSpaceService, space } = fixture;
     const { user: uploader } = await ctx.newUser();
     const embeddingRow = await ctx.database
@@ -1610,6 +1697,8 @@ describe('People identity RBAC projection', () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: existingMember.id, role: SharedSpaceRole.Viewer });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceAsset.id, addedById: owner.id });
+    // #1317: the late member is joined on a photo of theirs the space can see.
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: lateMemberAsset.id, addedById: lateMember.id });
 
     await expect(sharedSpaceService.getSpacePeople(authFor(owner), space.id)).resolves.toEqual([]);
 
@@ -1682,16 +1771,17 @@ describe('People identity RBAC projection', () => {
       size: 50,
     } as any);
 
+    // Counts include the late member's photo, which is in the space (#1317).
     expect(ownerPeople.people).toEqual([
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: ownerPerson.personGroupId },
-        numberOfAssets: 1,
+        numberOfAssets: 2,
       }),
     ]);
     expect(existingMemberPeople.people).toEqual([
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: existingMemberPerson.personGroupId },
-        numberOfAssets: 2,
+        numberOfAssets: 3,
       }),
     ]);
     expect(lateMemberPeople.people).toEqual([
@@ -1784,7 +1874,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('keeps timeline-disabled space evidence out of global people while explicit space people still resolve', async () => {
-    const fixture = await setupJoinAfterDuplicatesFixture({ showInTimeline: false });
+    const fixture = await setupJoinAfterDuplicatesFixture({ showInTimeline: false, memberPhotoShared: false });
 
     const globalPeople = await fixture.personService.getAll(fixture.memberAuth, {
       withHidden: false,
@@ -1898,18 +1988,30 @@ describe('People identity RBAC projection', () => {
       spaceId: fixture.space.id,
       userId: fixture.member.id,
     });
+    // The member's shared photo gave them a space person too; reconciliation folded the two into one. Which of the
+    // two survives is a tie-break, so take the survivor rather than the fixture's original row.
+    const survivor = await fixture.ctx.database
+      .selectFrom('shared_space_person')
+      .select(['id'])
+      .where('spaceId', '=', fixture.space.id)
+      .executeTakeFirstOrThrow();
     await fixture.ctx.database
       .updateTable('shared_space_person')
       .set({ representativeFaceId: null, representativeFaceSource: 'auto' })
-      .where('id', '=', fixture.spacePerson.id)
+      .where('id', '=', survivor.id)
       .execute();
     await fixture.sharedSpaceService.handleSharedSpacePersonDedup({ spaceId: fixture.space.id });
 
     const repaired = await fixture.ctx.database
       .selectFrom('shared_space_person')
       .select(['representativeFaceId'])
-      .where('id', '=', fixture.spacePerson.id)
+      .where('id', '=', survivor.id)
       .executeTakeFirstOrThrow();
+    const poolFaceIds = await fixture.ctx.database
+      .selectFrom('shared_space_person_face')
+      .select('assetFaceId')
+      .where('personId', '=', survivor.id)
+      .execute();
     const result = await fixture.personService.getAll(fixture.memberAuth, {
       withHidden: false,
       withSharedSpaces: true,
@@ -1917,7 +2019,7 @@ describe('People identity RBAC projection', () => {
       size: 50,
     } as any);
 
-    expect(repaired.representativeFaceId).toBe(fixture.spacePerson.representativeFaceId);
+    expect(poolFaceIds.map(({ assetFaceId }) => assetFaceId)).toContain(repaired.representativeFaceId);
     expect(result.people).toEqual([
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
