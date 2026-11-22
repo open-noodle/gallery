@@ -20,6 +20,9 @@
   },
   "response": {
     "body": {
+      "aspectClasses": [
+        "square"
+      ],
       "cameraMakes": [
         "Apple",
         "Canon",
