@@ -53,7 +53,7 @@
 <div class="mt-8 flex justify-between gap-2">
   <div class="left">
     {#if showResetToDefault}
-      <Button variant="ghost" shape="round" size="small" onclick={handleResetToDefault}>
+      <Button variant="ghost" shape="round" size="small" {disabled} onclick={handleResetToDefault}>
         {$t('reset_to_default')}
       </Button>
     {/if}
