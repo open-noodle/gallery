@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Grupo sin nombre",
     "face_cleanup_view_photo": "Ver la foto original",
     "face_cleanup_view_resolutions": "Ver decisiones",
+    "face_detection_description": "Detecta las caras en los recursos mediante aprendizaje automático. En el caso de los vídeos, solo se tiene en cuenta la miniatura, a menos que \"Detectar caras en todo el vídeo\" esté activado en los ajustes de reconocimiento facial. \"Actualizar\" (re)procesará todos los recursos. \"Restablecer\" borra además todos los datos de caras actuales. \"Faltante\" pone en cola los recursos que aún no se han procesado. Las caras detectadas se pondrán en cola para el reconocimiento facial una vez finalizada la detección, agrupándolos en personas existentes o nuevas.",
     "face_identity_backfill_job": "Relleno de identidades de caras",
     "face_suggestion_maintenance_job": "Mantenimiento de sugerencias de caras",
     "machine_learning_clip_max_distance": "Distancia máxima de búsqueda",
