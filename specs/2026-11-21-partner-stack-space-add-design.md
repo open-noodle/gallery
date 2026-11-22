@@ -8,6 +8,8 @@ Issue: [Gallery 1330](https://github.com/open-noodle/gallery/issues/1330).
 
 Keep explicit selections strict: every requested id must pass the existing owner-or-partner check, or the entire request fails before any write. Treat automatically expanded siblings as candidates, and include only those passing the identical check. An archived partner sibling is omitted; a shareable sibling still accompanies the selection. Deduplicate requested and expanded ids and preserve their order. Insertion, activity counts and face-match jobs all use the permitted result.
 
+When the omitted sibling is the stack's primary, the added member is counted in the Space but stays hidden in the stack-collapsed Space timeline, which keeps only primaries. This matches how the owner's own timeline and the partner view already render a stack whose primary is archived (upstream's collapse hides the other members there too), so it adds no new hiding; the member remains reachable through search, people and the uncollapsed views. Adding the primary instead would share an asset the partner grant excludes.
+
 The expansion query retains its existing live Timeline/Archive visibility restriction. Hidden and Locked siblings are never pulled in automatically, and trashed siblings remain excluded. Removing assets keeps its existing expansion behavior. This fixes a failed operation on assets the caller could already share; it does not introduce a new grant, so no opt-in setting is needed.
 
 ## Independent authorization truth table
