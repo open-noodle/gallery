@@ -66,6 +66,7 @@ export class VideoFaceRepository {
         'asset.type',
         'asset.visibility',
         'asset.originalPath',
+        'asset.checksum',
         'asset_video_trim.startTime as trimStart',
         'asset_video_trim.endTime as trimEnd',
       ])

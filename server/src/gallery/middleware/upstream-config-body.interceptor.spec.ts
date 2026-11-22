@@ -63,6 +63,15 @@ describe(withStoredGallerySettings.name, () => {
     });
   });
 
+  it('preserves customized cache settings when an older admin client omits them', () => {
+    const saved = cloneDeep(defaults);
+    saved.server.videoSampleCache = { maxSizeGiB: 8, retentionHours: 72 };
+    const body = cloneDeep(saved);
+    delete body.server.videoSampleCache;
+    withStoredGallerySettings(body, saved);
+    expect(body.server.videoSampleCache).toEqual({ maxSizeGiB: 8, retentionHours: 72 });
+  });
+
   it('should keep a Gallery setting the body sends', () => {
     const body = cloneDeep(stored);
     body.classification = { enabled: true, categories: [] };

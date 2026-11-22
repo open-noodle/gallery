@@ -470,7 +470,13 @@
     "transcoding_data_saver_resolution": "Auflösung",
     "transcoding_data_saver_resolution_description": "Größere Videos werden für die Kopie herunterskaliert. Videos, die schon innerhalb dieser Größe und der Bitrate-Obergrenze liegen, bekommen keine Kopie.",
     "transcoding_data_saver_video_codec": "Video-Codec",
-    "transcoding_data_saver_video_codec_description": "HEVC braucht für dasselbe Bild etwa die halbe Bitrate von H.264, und jedes aktuelle Smartphone kann es abspielen."
+    "transcoding_data_saver_video_codec_description": "HEVC braucht für dasselbe Bild etwa die halbe Bitrate von H.264, und jedes aktuelle Smartphone kann es abspielen.",
+    "video_sample_cache": "Gemeinsamer Cache für Videostichproben",
+    "video_sample_cache_description": "Videoframes werden über den temporären Serverspeicher für die Gesichts- und Haustiererkennung wiederverwendet.",
+    "video_sample_cache_retention": "Unbenutzte Stichproben aufbewahren (Stunden)",
+    "video_sample_cache_retention_description": "Stichproben verfallen nach dieser Anzahl von Stunden ohne erneute Verwendung. Änderungen gelten ohne Serverneustart.",
+    "video_sample_cache_size": "Maximale Cache-Größe (GiB)",
+    "video_sample_cache_size_description": "Setze den Wert auf 0, um den Cache zu deaktivieren. Wenn du das Limit verringerst, werden ältere Stichproben entfernt."
   },
   "album_linked_to_space": "Mit \"{space}\" verknüpft",
   "album_stack_count_in_album": "In Stapeln nur die Fotos dieses Albums zählen",

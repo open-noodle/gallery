@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Rozdzielczość",
     "transcoding_data_saver_resolution_description": "Większe filmy są zmniejszane na potrzeby kopii. Filmy, które już mieszczą się w tym rozmiarze i limicie szybkości transmisji, nie dostają kopii.",
     "transcoding_data_saver_video_codec": "Kodek wideo",
-    "transcoding_data_saver_video_codec_description": "HEVC potrzebuje około połowy szybkości transmisji H.264 dla tego samego obrazu, a każdy nowy telefon go odtwarza."
+    "transcoding_data_saver_video_codec_description": "HEVC potrzebuje około połowy szybkości transmisji H.264 dla tego samego obrazu, a każdy nowy telefon go odtwarza.",
+    "video_sample_cache": "Wspólna pamięć podręczna klatek wideo",
+    "video_sample_cache_description": "Wykorzystuj ponownie klatki wideo w zadaniach wykrywania twarzy i zwierząt, korzystając z tymczasowej pamięci serwera.",
+    "video_sample_cache_retention": "Przechowywanie nieużywanych próbek (godziny)",
+    "video_sample_cache_retention_description": "Próbki wygasają po tylu godzinach bez ponownego użycia. Zmiany są stosowane bez ponownego uruchamiania serwera.",
+    "video_sample_cache_size": "Maksymalny rozmiar pamięci podręcznej (GiB)",
+    "video_sample_cache_size_description": "Ustaw 0, aby wyłączyć pamięć podręczną. Zmniejszenie limitu usuwa starsze próbki."
   },
   "album_linked_to_space": "Połączono z \"{space}\"",
   "album_stack_count_in_album": "Licz w stosach tylko zdjęcia z tego albumu",

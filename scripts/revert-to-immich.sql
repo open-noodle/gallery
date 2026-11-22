@@ -864,6 +864,7 @@ UPDATE "system_metadata"
      #- '{machineLearning,facialRecognition,video}'
      #- '{machineLearning,spatialScene}'
      #- '{nightlyTasks,clusterNewPets}'
+     #- '{server,videoSampleCache}'
      #- '{server,mergePeopleAcrossOwners}'
      #- '{server,spaceEditorsCanAddMembers}'
      #- '{server,spaceEditorsCanChangeRoles}'

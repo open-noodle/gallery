@@ -468,7 +468,13 @@
     "transcoding_data_saver_resolution": "Resolutie",
     "transcoding_data_saver_resolution_description": "Grotere video's worden voor de kopie verkleind. Video's die al binnen deze grootte en de bitrategrens vallen, krijgen geen kopie.",
     "transcoding_data_saver_video_codec": "Videocodec",
-    "transcoding_data_saver_video_codec_description": "HEVC heeft voor hetzelfde beeld ongeveer de helft van de bitrate van H.264 nodig, en elke recente telefoon speelt het af."
+    "transcoding_data_saver_video_codec_description": "HEVC heeft voor hetzelfde beeld ongeveer de helft van de bitrate van H.264 nodig, en elke recente telefoon speelt het af.",
+    "video_sample_cache": "Gedeelde cache voor videoframes",
+    "video_sample_cache_description": "Gebruik videoframes opnieuw voor gezichts- en huisdierdetectietaken via tijdelijke serveropslag.",
+    "video_sample_cache_retention": "Ongebruikte frames bewaren (uren)",
+    "video_sample_cache_retention_description": "Frames verlopen na dit aantal uren zonder hergebruik. Wijzigingen worden toegepast zonder de server opnieuw te starten.",
+    "video_sample_cache_size": "Maximale cachegrootte (GiB)",
+    "video_sample_cache_size_description": "Stel dit in op 0 om caching uit te schakelen. Een lagere limiet verwijdert oudere frames."
   },
   "album_linked_to_space": "Gekoppeld aan \"{space}\"",
   "album_stack_count_in_album": "Alleen de foto's van dit album tellen in stacks",

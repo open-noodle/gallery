@@ -392,6 +392,21 @@ features:
       - web/src/app.html
     required_checks: [e2e-rebase-smoke, fork-patches-check]
 
+  shared-video-samples:
+    title: Shared Video Detection Sample Cache
+    risk: medium
+    domains: [server, web, config]
+    owned_paths:
+      - server/src/gallery/utils/video-sample-cache*.ts
+      - server/src/gallery/utils/cached-video-frames*.ts
+      - server/src/gallery/utils/video-detection-cache.spec.ts
+      - server/src/gallery/services/video-sample-cache.service*.ts
+      - web/src/lib/gallery/components/admin/video-sample-cache-settings.*
+    upstream_extension_paths:
+      - server/src/services/system-config.service.spec.ts
+      - web/src/routes/admin/system-settings/ServerSettings.svelte
+    required_checks: [ci-invariants-check]
+
   ml-classification-and-observability:
     title: ML, Classification, Duplicates, Config Caching, And Metrics
     aliases:

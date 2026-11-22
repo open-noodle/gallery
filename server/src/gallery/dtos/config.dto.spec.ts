@@ -8,6 +8,7 @@ import {
   GalleryMemoriesSchema,
   GalleryPetDetectionSchema,
   GalleryServerExtension,
+  GalleryVideoSampleCacheSchema,
   galleryConfigBool,
   galleryServerDefaults,
 } from 'src/gallery/dtos/config.dto.js';
@@ -174,6 +175,7 @@ describe('fork config is admin-only', () => {
     'petDetection',
     'suggestions',
     'mergePeopleAcrossOwners',
+    'videoSampleCache',
     'maxDistance',
     // the backup bucket and prefix are admin-only infrastructure detail, like the rest of `backup`
     's3',
@@ -191,5 +193,30 @@ describe('fork config is admin-only', () => {
     const userKeys = collectKeys(mapUserConfig(defaults));
     expect(userKeys).toContain('machineLearning.clip.enabled');
     expect(userKeys).toContain('map.lightStyle');
+  });
+});
+
+describe('shared video sample cache settings', () => {
+  it('defaults to 2 GiB and 24 hours', () => {
+    expect(defaults.server.videoSampleCache).toEqual({ maxSizeGiB: 2, retentionHours: 24 });
+  });
+
+  it.each([
+    { maxSizeGiB: 0, retentionHours: 1 },
+    { maxSizeGiB: 0.25, retentionHours: 72 },
+    { maxSizeGiB: 1024, retentionHours: 8760 },
+  ])('accepts valid limits: %j', (settings) => {
+    expect(GalleryVideoSampleCacheSchema.parse(settings)).toEqual(settings);
+  });
+
+  it.each([
+    { maxSizeGiB: -1, retentionHours: 24 },
+    { maxSizeGiB: 1025, retentionHours: 24 },
+    { maxSizeGiB: 2, retentionHours: 0 },
+    { maxSizeGiB: 2, retentionHours: 1.5 },
+    { maxSizeGiB: 2, retentionHours: 8761 },
+    { maxSizeGiB: Infinity, retentionHours: 24 },
+  ])('rejects invalid limits: %j', (settings) => {
+    expect(GalleryVideoSampleCacheSchema.safeParse(settings).success).toBe(false);
   });
 });
