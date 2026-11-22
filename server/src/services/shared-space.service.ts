@@ -984,14 +984,15 @@ export class SharedSpaceService extends BaseService {
     // stack-collapsed timeline (#751). Auto-expanded siblings are restricted to
     // space-eligible visibility so we never pull a Hidden/Locked frame in, and
     // access is checked on the full expanded set so we never contribute a
-    // sibling the actor cannot read.
-    const assetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
+    // sibling the actor cannot share. Inaccessible automatic siblings are omitted;
+    // every explicitly requested id must still pass (#1330).
+    const expandedAssetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
     // rbac-2: AssetRead's space arm (checkSpaceAccess) includes an un-role-gated shared_space_album branch,
     // so a space Viewer of a space linking album X could read X's assets and re-add them as DIRECT assets
     // into a space they own — gaining edit access over the owner's assets via checkSpaceEditAccess. AssetShare
     // (owner ∪ partner only, no album/space arm) closes the read→re-share→write escalation. Upstream's AssetShare now
     // also admits album members (immich-32609), so this checks the narrower pre-32609 rule explicitly.
-    await requireSpaceShareAccess(this.accessRepository, auth, assetIds);
+    const assetIds = await requireSpaceShareAccess(this.accessRepository, auth, dto.assetIds, expandedAssetIds);
     const inserted = await this.sharedSpaceRepository.addAssets(
       assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );

@@ -3381,24 +3381,37 @@ describe(SharedSpaceService.name, () => {
       ]);
     });
 
-    it('should reject the add when an expanded stack sibling is not accessible', async () => {
+    it('omits an inaccessible automatic sibling while adding the requested partner asset', async () => {
       const auth = factory.auth();
       const spaceId = newUuid();
       const childId = newUuid();
       const inaccessiblePrimaryId = newUuid();
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       // Selecting the child expands to a primary the user cannot read.
       mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([childId, inaccessiblePrimaryId]);
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([childId]));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([childId]));
       mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set());
+      mocks.sharedSpace.addAssets.mockResolvedValue([{ spaceId, assetId: childId, addedById: auth.user.id }] as any);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue();
 
-      await expect(sut.addAssets(auth, spaceId, { assetIds: [childId] })).rejects.toThrow();
+      await sut.addAssets(auth, spaceId, { assetIds: [childId] });
 
-      expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addAssets).toHaveBeenCalledExactlyOnceWith([
+        { spaceId, assetId: childId, addedById: auth.user.id },
+      ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledExactlyOnceWith([
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: childId } },
+      ]);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { count: 1, assetIds: [childId] } }),
+      );
     });
 
     it('should queue SharedSpaceFaceMatch jobs for every expanded stack member', async () => {
