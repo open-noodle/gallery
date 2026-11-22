@@ -15,11 +15,11 @@ import { utils } from 'src/utils';
 // list". Both now render through `PersonPickerPanel.svelte`.
 //
 // Why the ordering assertion needs a favourite. The picker asks `getAllPeople` WITHOUT
-// `closestAssetId`, so `getAllForUser` serves its alphabetical branch and already sorts named
-// people ahead of clusters. `isFavorite DESC` outranks that key, though, so favouriting the UNNAMED
-// cluster is the one lever left that makes the server hand the picker its candidates
-// cluster-first -- without it the render assertion would pass whether or not the client re-orders
-// anything, which is no test at all.
+// `closestAssetId` and WITH `withSharedSpaces` (so a name set inside a space shows, #1287), and
+// that identity list already sorts named people alphabetically ahead of clusters. Favourites
+// outrank that key, though, so favouriting the UNNAMED cluster is the one lever left that makes the
+// server hand the picker its candidates cluster-first -- without it the render assertion would pass
+// whether or not the client re-orders anything, which is no test at all.
 
 async function openInfoPanel(page: Page) {
   const navbar = page.getByTestId('asset-viewer-navbar-actions');
@@ -57,8 +57,8 @@ test.describe("Owner's face picker — named people first, search in plain sight
     owner = await utils.userSetup(admin.accessToken, createUserDto.create('ofp-owner'));
 
     // The face the picker is opened on. Its own person is excluded from the candidate list, and an
-    // unnamed person with a single face is below `getAllForUser`'s minimum-faces floor anyway, so
-    // this anchor never competes with the two candidates below.
+    // unnamed person on a single photo is below the minimum-faces floor anyway, so this anchor
+    // never competes with the candidates below.
     const anchorAsset = await utils.createAsset(owner.accessToken);
     const anchor = await utils.createPerson(owner.accessToken, {});
     await utils.createFace({ assetId: anchorAsset.id, personGroupId: anchor.id });
@@ -71,11 +71,12 @@ test.describe("Owner's face picker — named people first, search in plain sight
       await utils.createFace({ assetId: namedAsset.id, personGroupId: named.id });
     }
 
-    // Unnamed, so it needs three faces to clear the minimum-faces floor, and favourited so the
-    // server returns it FIRST — see the header note.
+    // Unnamed, so it has to clear the minimum-faces floor, and favourited so the server returns it
+    // FIRST — see the header note. The identity list counts that floor in distinct PHOTOS (as the
+    // People page does), so the three faces go on three photos rather than one.
     const cluster = await utils.createPerson(owner.accessToken, { isFavorite: true });
-    const clusterAsset = await utils.createAsset(owner.accessToken);
     for (let index = 0; index < 3; index++) {
+      const clusterAsset = await utils.createAsset(owner.accessToken);
       await utils.createFace({ assetId: clusterAsset.id, personGroupId: cluster.id });
     }
   });
