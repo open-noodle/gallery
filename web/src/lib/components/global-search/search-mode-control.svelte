@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fullPathSearchOption } from '#lib/gallery/search/full-path-search.ts';
   import type { SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiCreation, mdiFormatTitle, mdiOcr, mdiTextBoxOutline } from '@mdi/js';
@@ -26,6 +27,7 @@
     { value: 'metadata', labelKey: 'cmdk_mode_filename' as Translations, icon: mdiFormatTitle },
     { value: 'description', labelKey: 'cmdk_mode_description' as Translations, icon: mdiTextBoxOutline },
     { value: 'ocr', labelKey: 'cmdk_mode_ocr' as Translations, icon: mdiOcr },
+    fullPathSearchOption,
   ];
 
   let open = $state(false);
