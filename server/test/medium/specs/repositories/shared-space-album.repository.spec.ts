@@ -430,8 +430,8 @@ describe('AccessRepository.galleryPerson.checkSharedSpaceEditAccess — album le
   });
 });
 
-describe('getRecentAssets and getNewAssetCount — album leg (C2 consistency)', () => {
-  it('album-only space: getRecentAssets returns album image assets, getNewAssetCount counts them, both equal getAssetCount', async () => {
+describe('getAssetSummary and getNewAssetCount — album leg (C2 consistency)', () => {
+  it('album-only space: getAssetSummary returns album image assets, getNewAssetCount counts them, both equal getAssetCount', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
@@ -449,7 +449,7 @@ describe('getRecentAssets and getNewAssetCount — album leg (C2 consistency)', 
 
     await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
 
-    const recentAssets = await sut.getRecentAssets(space.id);
+    const { recentAssets } = await sut.getAssetSummary(space.id);
     expect(recentAssets).toHaveLength(3);
     const recentIds = recentAssets.map((a) => a.id);
     expect(recentIds).toContain(a1.id);

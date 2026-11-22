@@ -281,10 +281,9 @@ export class SharedSpaceService extends BaseService {
     // Spaces stay one at a time so a user in many spaces does not take over the connection pool; the reads for
     // one space are independent, so they run side by side, as in get() (#817).
     for (const space of spaces) {
-      const [members, assetCount, recentAssets, albumCount, membership, links] = await Promise.all([
+      const [members, { count: assetCount, recentAssets }, albumCount, membership, links] = await Promise.all([
         this.sharedSpaceRepository.getMembers(space.id),
-        this.sharedSpaceRepository.getAssetCount(space.id),
-        this.sharedSpaceRepository.getRecentAssets(space.id),
+        this.sharedSpaceRepository.getAssetSummary(space.id),
         this.sharedSpaceRepository.getLinkedAlbumCount(space.id),
         // Recency badge data
         this.sharedSpaceRepository.getMember(space.id, auth.user.id),
@@ -355,12 +354,11 @@ export class SharedSpaceService extends BaseService {
   async get(auth: AuthDto, id: string): Promise<SharedSpaceResponseDto> {
     const membership = await this.requireMembership(auth, id);
 
-    // Independent reads; the two asset scans dominate, so run them side by side.
-    const [space, members, assetCount, recentAssets, newAssetCount] = await Promise.all([
+    // Independent reads; the asset summary dominates, so run them side by side.
+    const [space, members, { count: assetCount, recentAssets }, newAssetCount] = await Promise.all([
       this.sharedSpaceRepository.getById(id),
       this.sharedSpaceRepository.getMembers(id),
-      this.sharedSpaceRepository.getAssetCount(id),
-      this.sharedSpaceRepository.getRecentAssets(id),
+      this.sharedSpaceRepository.getAssetSummary(id),
       membership.lastViewedAt ? this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt) : 0,
     ]);
     if (!space) {

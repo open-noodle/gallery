@@ -449,6 +449,36 @@ export function spaceAssetPathBranches(
   ];
 }
 
+/**
+The ids of the assets one space reaches, as a row source `(assetId)`: the same four paths
+{@link spaceAssetPathBranches} tests (direct pool, linked library, linked album, cross-owner
+contribution) read from the space's own rows. UNION removes an asset reached by several paths.
+
+Use it for a whole-space count or top-N. The EXISTS arms tested on an outer `asset` scan cost one
+probe per asset on the server, so a 7-asset space cost as much as one holding every photo (#1298).
+The caller joins `asset` and applies the asset gates (trash, offline, visibility).
+*/
+export function spaceAssetIdSource(
+  eb: ExpressionBuilder<DB, keyof DB>,
+  options: { spaceId: string } & Pick<SpacePathBranchOptions, 'albumTimelineGate' | 'viewerId'>,
+) {
+  const { spaceId, ...gate } = options;
+  const scope = { spaceId };
+  return eb
+    .selectFrom('shared_space_asset')
+    .select('shared_space_asset.assetId as assetId')
+    .where('shared_space_asset.spaceId', '=', asUuid(spaceId))
+    .union(
+      eb
+        .selectFrom('shared_space_library')
+        .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+        .select('asset.id as assetId')
+        .where('shared_space_library.spaceId', '=', asUuid(spaceId)),
+    )
+    .union(spaceAlbumArm(eb, 'album_asset', { scope, ...gate }).select('album_asset.assetId as assetId'))
+    .union(spaceAlbumArm(eb, 'album_space_asset', { scope, ...gate }).select('album_space_asset.assetId as assetId'));
+}
+
 /** How a viewer's shared spaces enter a query: which spaces, and the album arm's gate. */
 export type ViewerSpaces = Pick<SpacePathBranchOptions, 'scope' | 'albumTimelineGate' | 'viewerId'>;
 

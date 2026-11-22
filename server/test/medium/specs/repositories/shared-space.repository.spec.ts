@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceActivityType, SharedSpaceRole, SourceType } from 'src/enum.js';
+import { AssetType, AssetVisibility, SharedSpaceActivityType, SharedSpaceRole, SourceType } from 'src/enum.js';
 import { personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
@@ -1182,7 +1182,77 @@ describe(SharedSpaceRepository.name, () => {
     });
   });
 
-  describe('getRecentAssets', () => {
+  describe('getAssetSummary', () => {
+    it('counts every path once and takes the covers from the newest images', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'SummaryAlbum' });
+      await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id, showInTimeline: true });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const image = (day: number, extra: object = {}) =>
+        ctx.newAsset({
+          ownerId: user.id,
+          thumbhash: Buffer.from(`t${day}`),
+          fileCreatedAt: new Date(Date.UTC(2026, 0, day)),
+          ...extra,
+        });
+
+      // Direct and in the linked album: one asset, counted once.
+      const { asset: both } = await image(1);
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: both.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: both.id });
+      const { asset: fromLibrary } = await image(2, { libraryId: library.id });
+      const { asset: fromAlbum } = await image(3);
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: fromAlbum.id });
+      const { asset: contributed } = await ctx.newAsset({
+        ownerId: partner.id,
+        thumbhash: Buffer.from('t4'),
+        fileCreatedAt: new Date(Date.UTC(2026, 0, 4)),
+      });
+      await defaultDatabase
+        .insertInto('album_space_asset')
+        .values({ albumId: album.id, assetId: contributed.id, spaceId: space.id, addedById: partner.id })
+        .execute();
+      // The newest asset is a video: counted, never a cover.
+      const { asset: video } = await image(5, { type: AssetType.Video });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: video.id });
+      // Another space's asset and a trashed one stay out.
+      const { asset: elsewhere } = await image(6);
+      await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: elsewhere.id });
+      const { asset: trashed } = await image(7);
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: trashed.id });
+      await ctx.softDeleteAsset(trashed.id);
+
+      const summary = await sut.getAssetSummary(space.id, 3);
+
+      expect(summary.count).toBe(5);
+      expect(summary.count).toBe(await sut.getAssetCount(space.id));
+      expect(summary.recentAssets.map((asset) => asset.id)).toEqual([contributed.id, fromAlbum.id, fromLibrary.id]);
+      expect(summary.recentAssets[0].thumbhash).toEqual(Buffer.from('t4'));
+    });
+
+    it('returns the count when no asset can be a cover', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, thumbhash: null });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      await expect(sut.getAssetSummary(space.id)).resolves.toEqual({ count: 1, recentAssets: [] });
+    });
+
+    it('returns nothing for an empty space', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      await expect(sut.getAssetSummary(space.id)).resolves.toEqual({ count: 0, recentAssets: [] });
+    });
+
     it('should return recent assets ordered by addedAt desc', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -1207,7 +1277,7 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset2.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset3.id });
 
-      const result = await sut.getRecentAssets(space.id, 2);
+      const { recentAssets: result } = await sut.getAssetSummary(space.id, 2);
 
       expect(result).toHaveLength(2);
       // Most recent first (asset3 added last)
@@ -1226,7 +1296,7 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: withoutThumb.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: withThumb.id });
 
-      const result = await sut.getRecentAssets(space.id, 4);
+      const { recentAssets: result } = await sut.getAssetSummary(space.id, 4);
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(withThumb.id);
@@ -1241,7 +1311,7 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
       await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id, showInTimeline: false });
 
-      const result = await sut.getRecentAssets(space.id, 4);
+      const { recentAssets: result } = await sut.getAssetSummary(space.id, 4);
 
       expect(result).toEqual([]);
     });
@@ -5388,7 +5458,7 @@ describe(SharedSpaceRepository.name, () => {
   // query. Pin it so a future album-arm rewrite can't silently start over/under-surfacing trashed
   // album assets.
   describe('C5 album-arm trash parity', () => {
-    it('a soft-deleted album asset drops out of getAssetCount / getRecentAssets / isAssetInSpace', async () => {
+    it('a soft-deleted album asset drops out of getAssetCount / getAssetSummary / isAssetInSpace', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
@@ -5404,7 +5474,7 @@ describe(SharedSpaceRepository.name, () => {
 
       await expect(sut.getAssetCount(space.id)).resolves.toBe(0);
       await expect(sut.isAssetInSpace(space.id, asset.id)).resolves.toBe(false);
-      await expect(sut.getRecentAssets(space.id, 4)).resolves.toEqual([]);
+      await expect(sut.getAssetSummary(space.id, 4)).resolves.toEqual({ count: 0, recentAssets: [] });
     });
   });
 

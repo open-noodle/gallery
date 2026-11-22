@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, NotNull, Transaction, sql, type Updateable } from 'kysely';
+import { Insertable, Kysely, NotNull, Transaction, expressionBuilder, sql, type Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -33,6 +33,7 @@ import {
   albumMembership,
   sharedWithViewer,
   spaceAlbumAssetExists,
+  spaceAssetIdSource,
   spaceAssetPathBranches,
   spaceContributedAssetExists,
   spaceVisibilityGate,
@@ -693,26 +694,23 @@ export class SharedSpaceRepository {
   }
 
   /**
-  Assets visible in the space's timeline (direct pool, linked library, on-timeline linked album,
-  cross-owner contribution), as one `asset` scan with EXISTS arms. Unlike a UNION of the four
-  sources, nothing has to be deduplicated, so a count or a top-N stays a single pass.
+  The assets on the space's timeline (direct pool, linked library, on-timeline linked album,
+  cross-owner contribution), joined from the space's own rows so the cost follows the space's size,
+  not the server's (#1298). The id set is materialized: inlined, the planner turned it back into a
+  walk over every asset on the server, for the top 4 a backward `fileCreatedAt` index scan probing
+  the set per row (5.7 s on a 66k-asset space).
   */
   private selectSpaceTimelineAssets(spaceId: string) {
     return this.db
-      .selectFrom('asset')
+      .with(
+        (wb) => wb('space_asset_id').materialized(),
+        () => spaceAssetIdSource(expressionBuilder<DB, keyof DB>(), { spaceId, albumTimelineGate: 'space-tab' }),
+      )
+      .selectFrom('space_asset_id')
+      .innerJoin('asset', 'asset.id', 'space_asset_id.assetId')
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', '=', false)
-      .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
-      .where((eb) =>
-        eb.or(
-          spaceAssetPathBranches(eb, {
-            correlateAssetId: 'asset.id',
-            correlateLibraryId: 'asset.libraryId',
-            scope: { spaceId },
-            albumTimelineGate: 'space-tab',
-          }),
-        ),
-      );
+      .where('asset.visibility', 'in', visibleSpaceAssetVisibilities);
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -721,6 +719,34 @@ export class SharedSpaceRepository {
       .select((eb) => eb.fn.countAll().as('count'))
       .executeTakeFirstOrThrow();
     return Number(result.count);
+  }
+
+  /**
+  The space's asset count and its newest `limit` (at least 1) images with a thumbhash, the cover
+  mosaic, in one pass over the space's assets. The count is a window over every row, so the sort
+  cannot stop early and fall back into the index walk above; cover images sort first, so the rows
+  after them are dropped here.
+  */
+  @GenerateSql({ params: [DummyValue.UUID, 4] })
+  async getAssetSummary(
+    spaceId: string,
+    limit = 4,
+  ): Promise<{ count: number; recentAssets: { id: string; thumbhash: Buffer | null }[] }> {
+    const rows = await this.selectSpaceTimelineAssets(spaceId)
+      .select((eb) => [
+        'asset.id',
+        'asset.thumbhash',
+        eb.and([eb('asset.type', '=', AssetType.Image), eb('asset.thumbhash', 'is not', null)]).as('isCover'),
+        eb.fn.countAll().over().as('count'),
+      ])
+      .orderBy('isCover', 'desc')
+      .orderBy('asset.fileCreatedAt', 'desc')
+      .limit(Math.max(limit, 1))
+      .execute();
+    return {
+      count: Number(rows[0]?.count ?? 0),
+      recentAssets: rows.filter((row) => row.isCover).map(({ id, thumbhash }) => ({ id, thumbhash })),
+    };
   }
 
   async bulkAddUserAssets(spaceId: string, userId: string): Promise<number> {
@@ -1926,17 +1952,6 @@ export class SharedSpaceRepository {
       .where('asset.deletedAt', 'is', null)
       .executeTakeFirst();
     return Number(row?.count ?? 0);
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, 4] })
-  getRecentAssets(spaceId: string, limit = 4) {
-    return this.selectSpaceTimelineAssets(spaceId)
-      .where('asset.type', '=', AssetType.Image)
-      .where('asset.thumbhash', 'is not', null)
-      .select(['asset.id', 'asset.thumbhash'])
-      .orderBy('asset.fileCreatedAt', 'desc')
-      .limit(limit)
-      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
