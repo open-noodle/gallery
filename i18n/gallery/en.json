@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Unnamed cluster",
     "face_cleanup_view_photo": "View the original photo",
     "face_cleanup_view_resolutions": "View resolutions",
+    "face_detection_description": "Detect the faces in assets using machine learning. For videos, only the poster frame is considered, unless \"Detect faces across the whole video\" is turned on in the Facial Recognition settings. \"Refresh\" (re-)processes all assets. \"Reset\" additionally clears all current face data. \"Missing\" queues assets that haven't been processed yet. Detected faces will be queued for Facial Recognition after Face Detection is complete, grouping them into existing or new people.",
     "face_identity_backfill_job": "Face identity backfill",
     "face_suggestion_maintenance_job": "Face suggestion maintenance",
     "machine_learning_clip_max_distance": "Max search distance",

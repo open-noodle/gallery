@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Naamloos cluster",
     "face_cleanup_view_photo": "Bekijk de originele foto",
     "face_cleanup_view_resolutions": "Beslissingen bekijken",
+    "face_detection_description": "Detecteer gezichten in items met behulp van machine learning. Voor video's wordt alleen de thumbnail gebruikt, tenzij \"Gezichten in de hele video herkennen\" is ingeschakeld in de instellingen voor gezichtsherkenning. \"Vernieuwen\" verwerkt alle items (opnieuw). \"Reset\" verwijdert daarnaast alle huidige gezichtgegevens. \"Missend\" plaatst items in de wachtrij die nog niet zijn verwerkt. Gedetecteerde gezichten worden in de wachtrij geplaatst voor gezichtsherkenning nadat gezichtsdetectie is voltooid, waarbij ze worden gegroepeerd in bestaande of nieuwe mensen.",
     "face_identity_backfill_job": "Aanvullen van gezichtsidentiteiten",
     "face_suggestion_maintenance_job": "Onderhoud gezichtssuggesties",
     "machine_learning_clip_max_distance": "Maximale zoekafstand",

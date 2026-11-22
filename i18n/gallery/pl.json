@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Grupa bez nazwy",
     "face_cleanup_view_photo": "Zobacz oryginalne zdjęcie",
     "face_cleanup_view_resolutions": "Zobacz decyzje",
+    "face_detection_description": "Wykrywanie twarzy w zasobach używając uczenia maszynowego. Twarze w filmach wykryte zostaną tylko jeżeli są widoczne w miniaturze, chyba że w ustawieniach Rozpoznawania Twarzy włączona jest opcja \"Wykrywaj twarze w całym filmie\". \"Odśwież\" ponownie przetwarza wszystkie zasoby. \"Reset\" dodatkowo usuwa wszystkie bieżące dane twarzy. \"Brakujące\" dodaje do kolejki tylko zasoby, które nie zostały jeszcze przetworzone. Wykryte twarze zostaną dodane do kolejki Rozpoznawania Twarzy, aby związać je z istniejącą osobą albo stworzyć nową osobę.",
     "face_identity_backfill_job": "Uzupełnianie tożsamości twarzy",
     "face_suggestion_maintenance_job": "Konserwacja sugestii twarzy",
     "machine_learning_clip_max_distance": "Maksymalny dystans wyszukiwania",

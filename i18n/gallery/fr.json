@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Groupe sans nom",
     "face_cleanup_view_photo": "Voir la photo d'origine",
     "face_cleanup_view_resolutions": "Voir les décisions",
+    "face_detection_description": "Détecte les visages dans les médias à l'aide de l'apprentissage automatique. Pour les vidéos, seule la miniature est prise en compte, sauf si « Détecter les visages dans toute la vidéo » est activé dans les paramètres de reconnaissance faciale. « Actualiser » (re)traite tous les médias. « Réinitialiser » retraite tous les visages en repartant de zéro. « Manquant » met en file d'attente les médias qui n'ont pas encore été traités. Lorsque la détection est terminée, les visages détectés seront mis en file d'attente pour la reconnaissance faciale, les regroupant en personnes existantes ou nouvelles.",
     "face_identity_backfill_job": "Reconstitution des identités de visages",
     "face_suggestion_maintenance_job": "Maintenance des suggestions de visages",
     "machine_learning_clip_max_distance": "Distance de recherche maximale",

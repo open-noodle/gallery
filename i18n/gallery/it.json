@@ -308,6 +308,7 @@
     "face_cleanup_unnamed": "Gruppo senza nome",
     "face_cleanup_view_photo": "Visualizza la foto originale",
     "face_cleanup_view_resolutions": "Vedi le decisioni",
+    "face_detection_description": "Rileva i volti presenti nelle risorse utilizzando il machine-learning. Per i video, viene presa in considerazione solo la miniatura, a meno che \"Rileva i volti in tutto il video\" non sia attivato nelle impostazioni del riconoscimento facciale. Utilizza \"Ripristina\" per cancellare tutti i volti presenti, \"Ricarica\" per processare di nuovo tutti le risorse, \"Mancanti\" processa solo le risorse che non sono ancora stati processati. I volti rilevati verranno selezionati per il riconoscimento facciale dopo che il rilevamento dei volti sarà stato completato, raggruppandoli in persone esistenti e/o nuove.",
     "face_identity_backfill_job": "Ripopolamento delle identità dei volti",
     "face_suggestion_maintenance_job": "Manutenzione dei suggerimenti di volti",
     "machine_learning_clip_max_distance": "Distanza massima di ricerca",

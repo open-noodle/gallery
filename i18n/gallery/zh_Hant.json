@@ -309,6 +309,7 @@
     "face_cleanup_unnamed": "未命名叢集",
     "face_cleanup_view_photo": "檢視原始照片",
     "face_cleanup_view_resolutions": "檢視處理結果",
+    "face_detection_description": "使用機器學習偵測項目中的臉孔。對於影片，除非在「臉孔辨識」設定中開啟「在整部影片中偵測臉孔」，否則僅會分析縮圖。「重新整理」會重新處理所有項目；「重設」則會額外清除目前的臉孔資料；「加入排程」會將尚未處理的項目加入佇列。完成「臉孔偵測」後，偵測到的臉孔將加入「臉孔辨識」排程，並歸類至現有或新的人物群組。",
     "face_identity_backfill_job": "臉孔身分回填",
     "face_suggestion_maintenance_job": "臉孔建議維護",
     "library_watching_settings": "媒體庫監控[實驗性]",
