@@ -233,6 +233,9 @@ describe('Space add share-access boundaries', () => {
     const isPartner = boundary === 'revoked partner' || boundary === 'deleted partner';
     const w = await buildWorld(SharedSpaceRole.Editor, isPartner ? 'partner' : 'stranger', 'timeline');
     switch (boundary) {
+      case 'missing asset': {
+        break;
+      }
       case 'album reader': {
         const { result: album } = await w.ctx.newAlbum({ ownerId: w.assetOwner.id });
         await w.ctx.newAlbumAsset({ albumId: album.id, assetId: w.selected.id });
