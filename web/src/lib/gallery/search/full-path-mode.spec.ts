@@ -200,7 +200,9 @@ test('space previews and full results use the same narrowed request', async ({ m
   };
   expect(api.searchAssets).toHaveBeenCalledWith({ body: { ...expected, size: 5 } });
   await manager.activateSearch('/panorama');
-  expect(JSON.parse(router.url.searchParams.get('query')!)).toEqual(expected);
+  // The results page applies its Timeline default itself; the URL omits it (no "In archive" chip).
+  const { visibility: _, ...expectedUrlTerms } = expected;
+  expect(JSON.parse(router.url.searchParams.get('query')!)).toEqual(expectedUrlTerms);
 });
 
 test('path-only grammar leaves other search modes unchanged', () => {

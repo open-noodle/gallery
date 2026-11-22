@@ -29,7 +29,7 @@ Preview and complete results use the same terms. Existing panel filters are conv
 | Album opened through a Space | Album scope only, exactly like createAlbumTimeline.collectTerms |
 | Space photos | spaceId, withSharedSpaces: false; bare person ids move to spacePersonIds |
 
-All requests explicitly use Timeline visibility, matching the palette's existing policy even during an elevated session. The server's existing access checks remain authoritative. This change adds no authorization gate or grant. An album route overrides any stale album filter, and an explicit false prevents the results screen's global shared-spaces default from widening a scoped request.
+All requests explicitly use Timeline visibility, matching the palette's existing policy even during an elevated session. The results URL leaves `visibility` out because the results page applies the same Timeline default itself; written into the URL it would show as an "In archive: timeline" filter chip. The server's existing access checks remain authoritative. This change adds no authorization gate or grant. An album route overrides any stale album filter, and an explicit false prevents the results screen's global shared-spaces default from widening a scoped request.
 
 On a path results page the existing search header displays the searched path instead of the generic legacy-search notice. The existing palette button remains available. Other searches keep their current header.
 

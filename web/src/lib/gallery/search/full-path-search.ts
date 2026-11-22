@@ -73,6 +73,14 @@ export const buildFullPathSearchTerms = (
   return terms;
 };
 
-/** The one deliberate palette landing on the existing metadata results screen. */
-export const buildFullPathSearchUrl = (text: string, url: URL, filters?: FilterState): string =>
-  Route.search(buildFullPathSearchTerms(text, url, filters));
+/**
+The one deliberate palette landing on the existing metadata results screen. That page already searches Timeline
+visibility by default, so the URL leaves it out: written there, it would surface as a misleading "In archive" chip.
+*/
+export const buildFullPathSearchUrl = (text: string, url: URL, filters?: FilterState): string => {
+  const terms = buildFullPathSearchTerms(text, url, filters);
+  if (terms.visibility === AssetVisibility.Timeline) {
+    delete terms.visibility;
+  }
+  return Route.search(terms);
+};

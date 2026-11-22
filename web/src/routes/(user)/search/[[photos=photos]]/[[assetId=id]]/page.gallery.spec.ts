@@ -13,7 +13,7 @@ test('full path results query the existing metadata endpoint and display the sea
   settle,
 }) => {
   const originalPath = '/mnt/external/panorama 1/original pics';
-  await router.goto(Route.search({ originalPath, visibility: AssetVisibility.Timeline, withSharedSpaces: true }));
+  await router.goto(Route.search({ originalPath, withSharedSpaces: true }));
   await render(Page, load);
   await settle();
   expect(api.searchAssets).toHaveBeenCalledWith({
@@ -27,6 +27,8 @@ test('full path results query the existing metadata endpoint and display the sea
   });
   expect(api.searchSmart).not.toHaveBeenCalled();
   await expect.element(page.getByTestId('control-bar').getByText(originalPath, { exact: true })).toBeInTheDocument();
+  // The page's own Timeline default is not shown back as a visibility chip (tests render i18n keys).
+  await expect.element(page.getByText(/^in[ _]archive$/i)).not.toBeInTheDocument();
 });
 
 for (const scope of [
