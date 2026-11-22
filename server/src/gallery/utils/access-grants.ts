@@ -105,12 +105,24 @@ Upstream lets an album member re-share the album's assets (adding them to their 
 for albums, but not for adding assets to a space: a space Owner/Editor holds AssetUpdate over every space asset
 (checkSpaceEditAccess), so an album Viewer adding the owner's photos to their own space would turn read access into
 write access (rbac-2). SharedSpaceService.addAssets uses this instead of Permission.AssetShare.
+
+Every explicit id must pass. Automatic stack siblings are optional: retain only those covered by the same
+owner/partner grant, so an archived partner sibling cannot reject an otherwise valid selection (#1330).
 */
-export const requireSpaceShareAccess = async (access: AccessRepository, auth: AuthDto, assetIds: string[]) => {
-  const ids = new Set(assetIds);
+export const requireSpaceShareAccess = async (
+  access: AccessRepository,
+  auth: AuthDto,
+  assetIds: string[],
+  stackAssetIds: string[] = [],
+): Promise<string[]> => {
+  const ids = new Set([...assetIds, ...stackAssetIds]);
   const owned = await access.asset.checkOwnerAccess(auth.user.id, ids, false);
   const partner = await access.asset.checkPartnerAccess(auth.user.id, ids.difference(owned));
-  if (owned.union(partner).size !== ids.size) {
+  const allowed = owned.union(partner);
+  if (assetIds.some((id) => !allowed.has(id))) {
     throw new BadRequestException(`Not found or no ${Permission.AssetShare} access`);
   }
+  // Intersection iterates the smaller set, which can reorder the caller's selection.
+  // eslint-disable-next-line unicorn/prefer-set-methods
+  return [...ids].filter((id) => allowed.has(id));
 };
