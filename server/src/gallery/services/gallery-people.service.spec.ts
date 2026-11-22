@@ -318,6 +318,7 @@ describe(GalleryPeopleService.name, () => {
       expect(mocks.galleryPerson.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
         personId: person.personGroupId,
         assetFaceId: face.id,
+        viewerId: auth.user.id,
       });
       expect(mocks.person.update).toHaveBeenCalledWith({
         ownerId: person.ownerId,
@@ -415,6 +416,7 @@ describe(GalleryPeopleService.name, () => {
       expect(mocks.galleryPerson.getRepresentativeFaceForUpdate).toHaveBeenCalledWith({
         personId: 'person-1',
         assetFaceId: 'face-1',
+        viewerId: auth.user.id,
       });
       expect(mocks.media.generateThumbnail).toHaveBeenCalled();
       expect(cleanup).toHaveBeenCalled();
@@ -465,6 +467,7 @@ describe(GalleryPeopleService.name, () => {
         take: 10,
         skip: 0,
         scope: { memberUserId: auth.user.id },
+        viewerId: auth.user.id,
       });
     });
 
@@ -482,6 +485,7 @@ describe(GalleryPeopleService.name, () => {
         take: 10,
         skip: 0,
         scope: undefined,
+        viewerId: auth.user.id,
       });
     });
 

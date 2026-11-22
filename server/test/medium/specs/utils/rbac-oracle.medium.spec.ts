@@ -15,10 +15,12 @@ import { AlbumUserRole, AssetStatus, AssetVisibility, MemoryType, SharedLinkType
 import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
+import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -83,6 +85,7 @@ const seed = async () => {
       AssetFavoriteRepository,
       AssetRepository,
       GalleryAssetRepository,
+      GalleryPersonRepository,
       ConfigRepository,
       CryptoRepository,
       DatabaseRepository,
@@ -225,7 +228,52 @@ const seed = async () => {
   await ctx.newAssetFace({ assetId: petAsset, personGroupId: pet.personGroupId });
   const { person: human } = await ctx.newPerson({ ownerId: owner.id, name: 'Ann' });
   label('human', human.personGroupId);
-  await ctx.newAssetFace({ assetId: spaceAsset, personGroupId: human.personGroupId });
+  const { assetFace: humanSpaceFace } = await ctx.newAssetFace({
+    assetId: spaceAsset,
+    personGroupId: human.personGroupId,
+  });
+
+  // #1317: people of two other accounts joined to `human`'s identity, as an automatic join leaves them. The owner's
+  // person also has a face on the owner's private ownAsset; the editor's on editorAsset (in the space); the
+  // stranger's on the stranger's private strangerAsset.
+  const faceIdentity = ctx.get(FaceIdentityRepository);
+  const humanIdentity = await faceIdentity.ensurePersonIdentity(human.personGroupId);
+  // Surfaces return the joined identity either raw or as a `person:` filter token; label both so snapshots are stable.
+  label('humanIdentity', humanIdentity.id);
+  label('humanIdentity', `person:${humanIdentity.id}`);
+  label('humanToken', `person:${human.personGroupId}`);
+  const bindToHuman = (assetFaceId: string, source: 'owner-person' | 'shared-space-evidence') =>
+    faceIdentity.linkFace({ assetFaceId, identityId: humanIdentity.id, source });
+  await bindToHuman(humanSpaceFace.id, 'owner-person');
+  const { assetFace: humanPrivateFace } = await ctx.newAssetFace({
+    assetId: ownAsset,
+    personGroupId: human.personGroupId,
+  });
+  await bindToHuman(humanPrivateFace.id, 'owner-person');
+  const { person: editorHuman } = await ctx.newPerson({ ownerId: spaceEditor.id, name: 'Ann (editor)' });
+  label('editorHuman', editorHuman.personGroupId);
+  const { assetFace: editorFace } = await ctx.newAssetFace({
+    assetId: editorAsset,
+    personGroupId: editorHuman.personGroupId,
+  });
+  await bindToHuman(editorFace.id, 'shared-space-evidence');
+  const { person: strangerHuman } = await ctx.newPerson({ ownerId: stranger.id, name: 'Ann (stranger)' });
+  label('strangerHuman', strangerHuman.personGroupId);
+  const { assetFace: strangerFace } = await ctx.newAssetFace({
+    assetId: strangerAsset,
+    personGroupId: strangerHuman.personGroupId,
+  });
+  await bindToHuman(strangerFace.id, 'shared-space-evidence');
+  label('editorHumanToken', `person:${editorHuman.personGroupId}`);
+  label('strangerHumanToken', `person:${strangerHuman.personGroupId}`);
+  for (const joined of [editorHuman, strangerHuman]) {
+    await faceIdentity.ensurePersonIdentity(joined.personGroupId);
+  }
+  await ctx.database
+    .updateTable('person_identity')
+    .set({ identityId: humanIdentity.id })
+    .where('personGroupId', 'in', [editorHuman.personGroupId, strangerHuman.personGroupId])
+    .execute();
 
   const newTag = async (name: string, userId: string, assetIds: string[]) => {
     const { tag } = await ctx.newTag({ userId, value: name });
@@ -332,6 +380,11 @@ const seed = async () => {
       stack: stack.id,
       tagSpace,
       pet: pet.personGroupId,
+      people: {
+        human: human.personGroupId,
+        editorHuman: editorHuman.personGroupId,
+        strangerHuman: strangerHuman.personGroupId,
+      },
       memories: { memOwner, memViewer },
       links: { albumLink, individualLink, spaceLink, spaceAlbumLink },
     },
@@ -771,6 +824,21 @@ describe('viewer-scope RBAC oracle', () => {
         },
         ({ paths, assets }) => ({ paths: sorted(paths.map((path) => fromFixture(path)!)), assets: assetList(assets) }),
       ),
+    );
+    expect(result).toMatchSnapshot();
+  });
+
+  // #1317: the representative-face picker lists faces reached through a joined identity only when the actor can read
+  // the asset. Labels are the faces' assets.
+  it('representative face picker', async () => {
+    const sut = world.ctx.getService(GalleryPeopleService);
+    const result = await matrix(
+      Object.fromEntries(Object.entries(world.ids.people).map(([key, id]) => [key, () => id])),
+      (auth, personId) =>
+        attempt(
+          () => sut.getFacesForPicker(auth, personId, { page: 1, size: 100 }),
+          ({ faces }) => sorted(faces.map(({ assetId }) => name(assetId))),
+        ),
     );
     expect(result).toMatchSnapshot();
   });

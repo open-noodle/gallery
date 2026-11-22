@@ -6403,6 +6403,122 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
 }
 `;
 
+exports[`viewer-scope RBAC oracle > representative face picker 1`] = `
+{
+  "albumEditor": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "albumLink": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "albumViewer": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "individualLink": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "owner": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "ownAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "ownerElevated": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "ownAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "partner": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "spaceAlbumLink": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "spaceEditor": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "spaceLink": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": "error:BadRequestException",
+  },
+  "spaceViewer": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "spaceViewerOff": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "stockOwner": {
+    "editorHuman": [
+      "editorAsset",
+      "spaceAsset",
+    ],
+    "human": [
+      "editorAsset",
+      "ownAsset",
+      "spaceAsset",
+    ],
+    "strangerHuman": "error:BadRequestException",
+  },
+  "stranger": {
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
+    "strangerHuman": [
+      "strangerAsset",
+    ],
+  },
+}
+`;
+
 exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1`] = `
 {
   "albumEditor": {
@@ -8287,7 +8403,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": false,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8301,7 +8417,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownArchived:1",
         "ownAsset:1",
       ],
-      "people": [],
+      "people": [
+        "human:1",
+      ],
       "tags": [
         "tagOwn:1",
       ],
@@ -8431,7 +8549,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8445,7 +8563,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownArchived:1",
         "ownAsset:1",
       ],
-      "people": [],
+      "people": [
+        "human:1",
+      ],
       "tags": [
         "tagOwn:1",
       ],
@@ -8580,7 +8700,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
       ],
       "people": [
-        "human:1",
+        "human:2",
       ],
       "tags": [
         "tagOwn:1",
@@ -8596,7 +8716,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8610,7 +8730,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownArchived:1",
         "ownAsset:1",
       ],
-      "people": [],
+      "people": [
+        "human:1",
+      ],
       "tags": [
         "tagOwn:1",
       ],
@@ -8650,7 +8772,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8680,7 +8802,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
         "stackAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagSpace:2",
         "tagEditor:1",
@@ -8697,7 +8821,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8717,7 +8841,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownAsset:1",
         "spaceAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagEditor:1",
         "tagOwn:1",
@@ -8845,7 +8971,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
       ],
       "people": [
-        "human:1",
+        "human:2",
       ],
       "tags": [
         "tagOwn:1",
@@ -8861,7 +8987,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8875,7 +9001,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownArchived:1",
         "ownAsset:1",
       ],
-      "people": [],
+      "people": [
+        "human:1",
+      ],
       "tags": [
         "tagOwn:1",
       ],
@@ -8915,7 +9043,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8945,7 +9073,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
         "stackAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagSpace:2",
         "tagEditor:1",
@@ -8962,7 +9092,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -8982,7 +9112,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownAsset:1",
         "spaceAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagEditor:1",
         "tagOwn:1",
@@ -9153,7 +9285,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "stackAsset:1",
       ],
       "people": [
-        "human:1",
+        "human:2",
         "pet:1",
       ],
       "tags": [
@@ -9226,7 +9358,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9238,7 +9370,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
       "countries": [
         "editorAsset:1",
       ],
-      "people": [],
+      "people": [
+        "editorHuman:1",
+      ],
       "tags": [
         "tagEditor:1",
       ],
@@ -9273,7 +9407,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9291,7 +9425,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "petAsset:1",
         "spaceAsset:1",
       ],
-      "people": [],
+      "people": [
+        "editorHumanToken:2",
+      ],
       "tags": [
         "tagSpace:2",
         "tagEditor:1",
@@ -9307,7 +9443,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9321,7 +9457,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "editorAsset:1",
         "spaceAsset:1",
       ],
-      "people": [],
+      "people": [
+        "editorHumanToken:2",
+      ],
       "tags": [
         "tagEditor:1",
         "tagSpace:1",
@@ -9830,7 +9968,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
       ],
       "people": [
-        "human:1",
+        "human:2",
       ],
       "tags": [
         "tagOwn:1",
@@ -9846,7 +9984,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9860,7 +9998,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownArchived:1",
         "ownAsset:1",
       ],
-      "people": [],
+      "people": [
+        "human:1",
+      ],
       "tags": [
         "tagOwn:1",
       ],
@@ -9900,7 +10040,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9930,7 +10070,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "spaceAsset:1",
         "stackAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagSpace:2",
         "tagEditor:1",
@@ -9947,7 +10089,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": true,
@@ -9967,7 +10109,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "ownAsset:1",
         "spaceAsset:1",
       ],
-      "people": [],
+      "people": [
+        "humanToken:3",
+      ],
       "tags": [
         "tagEditor:1",
         "tagOwn:1",
@@ -10070,7 +10214,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": false,
@@ -10082,7 +10226,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
       "countries": [
         "strangerAsset:1",
       ],
-      "people": [],
+      "people": [
+        "strangerHuman:1",
+      ],
       "tags": [],
       "total": 1,
     },
@@ -10115,7 +10261,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": false,
@@ -10127,7 +10273,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
       "countries": [
         "strangerAsset:1",
       ],
-      "people": [],
+      "people": [
+        "strangerHuman:1",
+      ],
       "tags": [],
       "total": 1,
     },
@@ -10140,7 +10288,7 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
         "hasCameras": true,
         "hasFavorites": true,
         "hasImages": true,
-        "hasPeople": false,
+        "hasPeople": true,
         "hasPlaces": true,
         "hasRatings": false,
         "hasTags": false,
@@ -10152,7 +10300,9 @@ exports[`viewer-scope RBAC oracle > search options with counts 1`] = `
       "countries": [
         "strangerAsset:1",
       ],
-      "people": [],
+      "people": [
+        "strangerHuman:1",
+      ],
       "tags": [],
       "total": 1,
     },
@@ -10198,7 +10348,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "human",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10360,7 +10519,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10420,7 +10588,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10484,7 +10661,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10564,7 +10750,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "human",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10759,7 +10954,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10823,7 +11027,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -10973,7 +11186,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11033,7 +11255,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11097,7 +11328,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11324,7 +11564,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11388,7 +11637,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11454,7 +11712,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11772,7 +12039,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "human",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -11941,7 +12217,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12005,7 +12290,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12088,7 +12382,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "editorHuman",
+            "name": "Ann (editor)",
+            "primaryProfile": {
+              "id": "editorHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12138,7 +12441,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "editorHumanToken",
+            "name": "Ann (editor)",
+            "primaryProfile": {
+              "id": "editorHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12181,7 +12493,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "editorHumanToken",
+            "name": "Ann (editor)",
+            "primaryProfile": {
+              "id": "editorHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12422,7 +12743,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12486,7 +12816,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -12965,7 +13304,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -13025,7 +13373,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -13089,7 +13446,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "humanToken",
+            "name": "Ann",
+            "primaryProfile": {
+              "id": "human",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [
           {
@@ -13222,7 +13588,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "strangerHuman",
+            "name": "Ann (stranger)",
+            "primaryProfile": {
+              "id": "strangerHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [],
       },
@@ -13251,7 +13626,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "strangerHuman",
+            "name": "Ann (stranger)",
+            "primaryProfile": {
+              "id": "strangerHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [],
       },
@@ -13275,7 +13659,16 @@ exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
         "mediaTypes": [
           "IMAGE",
         ],
-        "people": [],
+        "people": [
+          {
+            "id": "strangerHuman",
+            "name": "Ann (stranger)",
+            "primaryProfile": {
+              "id": "strangerHuman",
+              "type": "user-person",
+            },
+          },
+        ],
         "ratings": [],
         "tags": [],
       },

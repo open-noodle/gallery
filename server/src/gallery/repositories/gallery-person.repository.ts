@@ -61,12 +61,39 @@ export interface RepresentativeFaceListOptions {
   `spaceVisibilityGate`, so their own elevation can never reach the owner's locked assets.
   */
   hasElevatedPermission?: boolean;
+  /** The caller. A face reached only through the person's identity is listed only if the caller can read its asset (#1317). */
+  viewerId: string;
 }
 
 export interface RepresentativeFaceUpdateOptions {
   personId: string;
   assetFaceId: string;
+  /** See RepresentativeFaceListOptions.viewerId. */
+  viewerId: string;
 }
+
+/**
+#1317: a face on the person's own cluster (`personGroupId` arm) always qualifies; a face reached only through
+the person's identity qualifies only when its asset is the viewer's own or reachable for the viewer through a
+shared space under the shareable-visibility gate. Keeps another account's private faces, joined into the same
+identity, out of the picker.
+*/
+const identityFaceReadableBy = (eb: ExpressionBuilder<DB, 'person' | 'asset_face' | 'asset'>, viewerId: string) =>
+  eb.or([
+    eb('asset_face.personGroupId', '=', eb.ref('person.personGroupId')),
+    eb('asset.ownerId', '=', viewerId),
+    eb.and([
+      spaceVisibilityGate(eb),
+      eb.or(
+        spaceAssetPathBranches(eb, {
+          correlateAssetId: 'asset.id',
+          correlateLibraryId: 'asset.libraryId',
+          scope: { memberUserId: viewerId },
+          albumTimelineGate: 'none',
+        }),
+      ),
+    ]),
+  ]);
 
 const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
 
@@ -439,6 +466,7 @@ export class GalleryPersonRepository {
           ),
         ),
       )
+      .where((eb) => identityFaceReadableBy(eb, options.viewerId))
       .$if(!options.hasElevatedPermission, (qb) => qb.where('asset.visibility', '!=', AssetVisibility.Locked))
       .$if(!!options.scope, (qb) =>
         qb.where((eb) =>
@@ -488,6 +516,7 @@ export class GalleryPersonRepository {
       .selectAll('asset_face')
       .where('person.personGroupId', '=', options.personId)
       .where('asset_face.id', '=', options.assetFaceId)
+      .where((eb) => identityFaceReadableBy(eb, options.viewerId))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)

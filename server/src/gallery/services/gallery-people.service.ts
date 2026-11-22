@@ -141,6 +141,7 @@ export class GalleryPeopleService extends BaseService {
       skip: (dto.page - 1) * dto.size,
       scope,
       hasElevatedPermission: auth.session?.hasElevatedPermission,
+      viewerId: auth.user.id,
     });
     const faces = rows.slice(0, take);
 
@@ -164,7 +165,11 @@ export class GalleryPeopleService extends BaseService {
 
   async getFaceThumbnail(auth: AuthDto, personId: string, faceId: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
-    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({ personId, assetFaceId: faceId });
+    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
+      personId,
+      assetFaceId: faceId,
+      viewerId: auth.user.id,
+    });
     if (!face) {
       throw new NotFoundException();
     }
@@ -204,6 +209,7 @@ export class GalleryPeopleService extends BaseService {
     const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
       personId: id,
       assetFaceId: dto.assetFaceId,
+      viewerId: auth.user.id,
     });
     if (!face) {
       throw new BadRequestException('Representative face must belong to the person');

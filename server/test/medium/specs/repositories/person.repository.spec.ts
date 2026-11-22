@@ -1351,20 +1351,41 @@ describe(PersonRepository.name, () => {
         deletedAt: new Date(),
       });
 
-      const faces = await gallerySut.getRepresentativeFaces({ personId: person.personGroupId, take: 20, skip: 0 });
+      const faces = await gallerySut.getRepresentativeFaces({
+        personId: person.personGroupId,
+        take: 20,
+        skip: 0,
+        viewerId: user.id,
+      });
 
       expect(faces.map((face) => face.id)).toEqual([validFaceId]);
       await expect(
-        gallerySut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: offlineFaceId }),
+        gallerySut.getRepresentativeFaceForUpdate({
+          personId: person.personGroupId,
+          assetFaceId: offlineFaceId,
+          viewerId: user.id,
+        }),
       ).resolves.toBeUndefined();
       await expect(
-        gallerySut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: deletedAssetFaceId }),
+        gallerySut.getRepresentativeFaceForUpdate({
+          personId: person.personGroupId,
+          assetFaceId: deletedAssetFaceId,
+          viewerId: user.id,
+        }),
       ).resolves.toBeUndefined();
       await expect(
-        gallerySut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: hiddenFaceId }),
+        gallerySut.getRepresentativeFaceForUpdate({
+          personId: person.personGroupId,
+          assetFaceId: hiddenFaceId,
+          viewerId: user.id,
+        }),
       ).resolves.toBeUndefined();
       await expect(
-        gallerySut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: deletedFaceId }),
+        gallerySut.getRepresentativeFaceForUpdate({
+          personId: person.personGroupId,
+          assetFaceId: deletedFaceId,
+          viewerId: user.id,
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -1390,11 +1411,16 @@ describe(PersonRepository.name, () => {
         personId: targetPerson.personGroupId,
         take: 20,
         skip: 0,
+        viewerId: user.id,
       });
 
       expect(faces.map((face) => face.id)).not.toContain(faceId);
       await expect(
-        gallerySut.getRepresentativeFaceForUpdate({ personId: targetPerson.personGroupId, assetFaceId: faceId }),
+        gallerySut.getRepresentativeFaceForUpdate({
+          personId: targetPerson.personGroupId,
+          assetFaceId: faceId,
+          viewerId: user.id,
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -1442,13 +1468,19 @@ describe(PersonRepository.name, () => {
         take: 50,
         skip: 0,
         scope: { memberUserId: viewer.id },
+        viewerId: viewer.id,
       });
       expect(scopedFaces.map((face) => face.id)).toEqual([spaceFaceId]);
       expect(scopedFaces.map((face) => face.id)).not.toContain(hiddenFaceId);
       expect(scopedFaces.map((face) => face.id)).not.toContain(neverSharedFaceId);
 
       // Regression: the unscoped (owner) path is unchanged and still returns all three.
-      const ownerFaces = await gallerySut.getRepresentativeFaces({ personId: person.personGroupId, take: 50, skip: 0 });
+      const ownerFaces = await gallerySut.getRepresentativeFaces({
+        personId: person.personGroupId,
+        take: 50,
+        skip: 0,
+        viewerId: owner.id,
+      });
       expect(new Set(ownerFaces.map((face) => face.id))).toEqual(
         new Set([spaceFaceId, hiddenFaceId, neverSharedFaceId]),
       );
@@ -1487,9 +1519,15 @@ describe(PersonRepository.name, () => {
       });
       await faceIdentityRepository.linkFace({ assetFaceId: otherFace.id, identityId: identity.id, source: 'manual' });
 
-      // Owner (unscoped) sees both -- the identity fan-out is intentional for the owner's own picker.
-      const ownerFaces = await gallerySut.getRepresentativeFaces({ personId: person.personGroupId, take: 50, skip: 0 });
-      expect(new Set(ownerFaces.map((face) => face.id))).toEqual(new Set([ownFace.id, otherFace.id]));
+      // #1317: the owner's picker lists faces reached through the identity only when the owner can read them; the
+      // other user's face is on a private asset of theirs, so the owner sees their own face only.
+      const ownerFaces = await gallerySut.getRepresentativeFaces({
+        personId: person.personGroupId,
+        take: 50,
+        skip: 0,
+        viewerId: owner.id,
+      });
+      expect(ownerFaces.map((face) => face.id)).toEqual([ownFace.id]);
 
       // The space viewer must NOT see the other user's face pulled in via the shared identity.
       const scopedFaces = await gallerySut.getRepresentativeFaces({
@@ -1497,6 +1535,7 @@ describe(PersonRepository.name, () => {
         take: 50,
         skip: 0,
         scope: { memberUserId: viewer.id },
+        viewerId: viewer.id,
       });
       expect(scopedFaces.map((face) => face.id)).toEqual([ownFace.id]);
       expect(scopedFaces.map((face) => face.id)).not.toContain(otherFace.id);
