@@ -1,5 +1,4 @@
-export type ReconciliationBridge =
-  'member-join' | 'space-evidence' | 'personal-upload' | 'explicit-space-add' | 'manual-compatible';
+export type ReconciliationBridge = 'member-join' | 'space-evidence' | 'explicit-space-add' | 'manual-compatible';
 
 export type ReconciliationClaim = {
   bridge: ReconciliationBridge;

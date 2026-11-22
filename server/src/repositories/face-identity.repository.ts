@@ -3,7 +3,7 @@ import { ExpressionBuilder, Insertable, Kysely, RawBuilder, Selectable, Transact
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { PeopleResponseDto, PersonResponseDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
-import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum.js';
+import { AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum.js';
 import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
 import {
   clearOrphanPersonIdentities,
@@ -13,7 +13,6 @@ import {
   personType,
   setPersonIdentity,
 } from 'src/gallery/utils/person-sidecar.js';
-import { probes } from 'src/repositories/database.repository.js';
 import type { PersonStatistics } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
@@ -130,12 +129,6 @@ const MERGE_IDENTITY_CENTROID_SAMPLE_SIZE = 200;
 // beyond this bound). This contains corruption regardless of how the identity link became wrong — even a
 // link already corrupt in the database. See specs/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
 const REPAIR_FACE_MAX_PERSON_DISTANCE = 0.5;
-
-export type AccessibleIdentityFaceMatch = {
-  identityId: string;
-  type: string;
-  distance: number;
-};
 
 type AccessiblePeopleOptions = {
   withHidden: boolean;
@@ -408,89 +401,6 @@ export class FaceIdentityRepository {
       legacySpacePersonIds: [...legacySpacePersonIds],
       hasInaccessibleToken,
     };
-  }
-
-  @GenerateSql({
-    params: [
-      {
-        userId: DummyValue.UUID,
-        embedding: DummyValue.VECTOR,
-        maxDistance: 0.6,
-        type: 'person',
-        excludeIdentityId: DummyValue.UUID,
-      },
-    ],
-  })
-  async findClosestAccessibleIdentityForFace(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    type: string;
-    excludeIdentityId?: string | null;
-  }): Promise<AccessibleIdentityFaceMatch | undefined> {
-    return this.db.transaction().execute(async (trx) => {
-      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
-
-      const result = await sql<AccessibleIdentityFaceMatch>`
-        WITH identity_matches AS (
-          SELECT
-            shared_space_person."identityId" AS "identityId",
-            shared_space_person.type,
-            MIN(face_search.embedding <=> ${input.embedding})::float8 AS distance
-          FROM shared_space_person
-          INNER JOIN shared_space_member
-            ON shared_space_member."spaceId" = shared_space_person."spaceId"
-            AND shared_space_member."userId" = ${input.userId}
-            AND shared_space_member."showInTimeline" = true
-          INNER JOIN shared_space_person_face
-            ON shared_space_person_face."personId" = shared_space_person.id
-          INNER JOIN asset_face
-            ON asset_face.id = shared_space_person_face."assetFaceId"
-          INNER JOIN asset
-            ON asset.id = asset_face."assetId"
-          INNER JOIN face_search
-            ON face_search."faceId" = asset_face.id
-          WHERE shared_space_person."identityId" IS NOT NULL
-            AND shared_space_person.type = ${input.type}
-            AND shared_space_person."isHidden" = false
-            ${input.excludeIdentityId ? sql`AND shared_space_person."identityId" <> ${input.excludeIdentityId}` : sql``}
-            AND asset_face."deletedAt" IS NULL
-            AND asset_face."isVisible" = true
-            AND asset."deletedAt" IS NULL
-            AND asset."isOffline" = false
-            AND asset.visibility = ${AssetVisibility.Timeline}
-            AND NOT EXISTS (
-              SELECT 1
-              FROM person existing_person
-              INNER JOIN person_identity ON person_identity."personGroupId" = existing_person."personGroupId"
-              WHERE existing_person."ownerId" = ${input.userId}
-                AND person_identity."identityId" = shared_space_person."identityId"
-            )
-            ${
-              input.excludeIdentityId
-                ? sql`
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM shared_space_person source_space_person
-                    INNER JOIN shared_space_person target_space_person
-                      ON target_space_person."spaceId" = source_space_person."spaceId"
-                      AND target_space_person."identityId" = shared_space_person."identityId"
-                    WHERE source_space_person."identityId" = ${input.excludeIdentityId}
-                  )
-                `
-                : sql``
-            }
-          GROUP BY shared_space_person."identityId", shared_space_person.type
-        )
-        SELECT "identityId", type, distance
-        FROM identity_matches
-        WHERE distance <= ${input.maxDistance}
-        ORDER BY distance
-        LIMIT 2
-      `.execute(trx);
-
-      return result.rows.length === 1 ? result.rows[0] : undefined;
-    });
   }
 
   async getBackfillWork(): Promise<FaceIdentityBackfillWork> {

@@ -3,14 +3,7 @@ import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
-import type {
-  AccessibleIdentityFaceMatch,
-  SharedSpaceFaceMatchBackfillTarget,
-} from 'src/repositories/face-identity.repository.js';
-import {
-  buildAutomaticReconciliationClaim,
-  chooseAutomaticTargetIdentity,
-} from 'src/services/accessible-identity-reconciliation.js';
+import type { SharedSpaceFaceMatchBackfillTarget } from 'src/repositories/face-identity.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
@@ -323,84 +316,6 @@ export class FaceIdentityMaintenanceService extends BaseService {
     const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId);
     await this.faceIdentityRepository.replaceFaceIdentity({ assetFaceId, identityId: identity.id, source });
     return identity.id;
-  }
-
-  async mergeWithAccessibleSharedIdentity(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    sourceIdentityId: string;
-    match?: AccessibleIdentityFaceMatch;
-  }): Promise<void> {
-    const match =
-      input.match ??
-      (await this.findClosestAccessibleSharedIdentity({
-        userId: input.userId,
-        embedding: input.embedding,
-        maxDistance: input.maxDistance,
-        excludeIdentityId: input.sourceIdentityId,
-      }));
-    if (!match || match.identityId === input.sourceIdentityId) {
-      return;
-    }
-
-    const target = chooseAutomaticTargetIdentity({
-      bridge: 'personal-upload',
-      localIdentityId: input.sourceIdentityId,
-      spaceIdentityId: match.identityId,
-    });
-    const claim = buildAutomaticReconciliationClaim({
-      bridge: 'personal-upload',
-      localIdentityId: input.sourceIdentityId,
-      spaceIdentityId: match.identityId,
-      sourceIdentityId: target.sourceIdentityId,
-      targetIdentityId: target.targetIdentityId,
-      distance: match.distance,
-      hasAccessBridge: true,
-      compatibleType: true,
-      hasEmbedding: true,
-      hiddenOrIgnored: false,
-      alreadySameIdentity: match.identityId === input.sourceIdentityId,
-      sameOwnerConflict: false,
-      sameSpaceConflict: false,
-    });
-    if (!claim) {
-      return;
-    }
-
-    const conflicts = await this.faceIdentityRepository.getMergeConflicts({
-      targetIdentityId: claim.targetIdentityId,
-      sourceIdentityIds: [claim.sourceIdentityId],
-    });
-    if (conflicts.personalProfileConflictCount > 0 || conflicts.spaceProfileConflictCount > 0) {
-      this.logger.warn(
-        `Skipping accessible identity merge due to conflicts: ${conflicts.personalProfileConflictCount} personal, ${conflicts.spaceProfileConflictCount} space`,
-      );
-      return;
-    }
-
-    await this.faceIdentityRepository.mergeIdentities({
-      targetIdentityId: claim.targetIdentityId,
-      sourceIdentityIds: [claim.sourceIdentityId],
-      source: 'shared-space-evidence',
-    });
-
-    await this.queueSpacePersonMetadataBackfill(claim.targetIdentityId);
-  }
-
-  findClosestAccessibleSharedIdentity(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    excludeIdentityId?: string | null;
-  }): Promise<AccessibleIdentityFaceMatch | undefined> {
-    return this.faceIdentityRepository.findClosestAccessibleIdentityForFace({
-      userId: input.userId,
-      embedding: input.embedding,
-      maxDistance: input.maxDistance,
-      type: 'person',
-      excludeIdentityId: input.excludeIdentityId ?? null,
-    });
   }
 
   async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {

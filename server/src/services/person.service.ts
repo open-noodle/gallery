@@ -845,24 +845,16 @@ export class PersonService extends BaseService {
       this.logger.debug(`Face ${id} has ${matches.length} matches`);
 
       let personGroupId = matches.find((match) => match.personGroupId)?.personGroupId;
-      const accessibleIdentityMatch = personGroupId
-        ? undefined
-        : await this.faceIdentity.findClosestAccessibleSharedIdentity({
-            userId: face.asset.ownerId,
-            embedding: face.faceSearch.embedding,
-            maxDistance: machineLearning.facialRecognition.maxDistance,
-          });
 
       // `matches` also includes the face itself
-      const matchedOnlySelf =
-        machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch;
+      const matchedOnlySelf = machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1;
       if (matchedOnlySelf && !skipSharedSpaceMatch) {
         this.logger.debug(`Face ${id} only matched the face itself, skipping`);
         return JobStatus.Skipped;
       }
 
       const isCore =
-        (matches.length >= machineLearning.facialRecognition.minFaces || !!accessibleIdentityMatch) &&
+        matches.length >= machineLearning.facialRecognition.minFaces &&
         face.asset.visibility === AssetVisibility.Timeline &&
         (await this.videoFaces.mayStartPerson(face.id, machineLearning));
       if (!isCore && !deferred) {
@@ -905,11 +897,9 @@ export class PersonService extends BaseService {
 
       if (personGroupId) {
         const person = await this.personRepository.getByGroupId({ ownerId, personGroupId });
-        let personCreated = false;
         if (person) {
           this.logger.debug(`Face ${id} matched person ${person.personGroupId}`);
         } else {
-          personCreated = true;
           await this.personRepository.create({ ownerId, faceAssetId: face.id, personGroupId });
           this.logger.log(`Created person for face ${id} in group ${personGroupId}`);
           await this.jobRepository.queue({
@@ -920,14 +910,9 @@ export class PersonService extends BaseService {
 
         this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
         await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
-        const sourceIdentityId = await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
-        await this.faceIdentity.mergeWithAccessibleSharedIdentity({
-          userId: face.asset.ownerId,
-          embedding: face.faceSearch.embedding,
-          maxDistance: machineLearning.facialRecognition.maxDistance,
-          sourceIdentityId,
-          match: personCreated ? accessibleIdentityMatch : undefined,
-        });
+        // #1317: a member's own face only joins its owner's identity here. Joining another account's people
+        // happens through shared-space reconciliation, on faces the space can see.
+        await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
       }
 
       if (!personGroupId) {

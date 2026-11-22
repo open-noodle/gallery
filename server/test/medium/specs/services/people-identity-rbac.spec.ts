@@ -29,6 +29,7 @@ import { DB } from 'src/schema/index.js';
 import { PersonService } from 'src/services/person.service.js';
 import { SearchService } from 'src/services/search.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { factory, newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -742,65 +743,66 @@ describe('People identity RBAC projection', () => {
     expect(JSON.stringify({ people, search, filters, cities })).not.toContain('Library Source');
   });
 
-  it('links a post-join private upload to a linked-library space identity and preserves owned access after leave', async () => {
+  // #1317: recognition no longer joins a member's private faces to a space identity they can access. With enough
+  // private photos the member gets their own person, on their own identity; sharing a photo is what joins them.
+  it('does not join private uploads of a member to a linked-library space identity', async () => {
     const fx = await createLinkedLibraryIdentityFixture({ personName: 'Library Source' });
-    const embeddingRow = await fx.ctx.database
-      .selectFrom('face_search')
-      .select('embedding')
-      .where('faceId', '=', fx.face.faceId)
-      .executeTakeFirstOrThrow();
+    const embedding = await spacePersonEmbedding(fx);
+    const uploadedFaceIds: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const { asset } = await fx.ctx.newAsset({ ownerId: fx.member.id, visibility: AssetVisibility.Timeline });
+      const { result: faceId } = await fx.ctx.newAssetFace({ assetId: asset.id });
+      await fx.ctx.database.insertInto('face_search').values({ faceId, embedding }).execute();
+      uploadedFaceIds.push(faceId);
+    }
 
-    const { asset } = await fx.ctx.newAsset({ ownerId: fx.member.id, visibility: AssetVisibility.Timeline });
-    const { result: uploadedFaceId } = await fx.ctx.newAssetFace({ assetId: asset.id });
-    await fx.ctx.database
-      .insertInto('face_search')
-      .values({ faceId: uploadedFaceId, embedding: embeddingRow.embedding })
-      .execute();
+    for (const id of uploadedFaceIds) {
+      await fx.personService.handleRecognizeFaces({ id });
+    }
 
-    await fx.personService.handleRecognizeFaces({ id: uploadedFaceId });
-
-    const uploadedPerson = await fx.ctx.database
+    const uploaded = await fx.ctx.database
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['person.personGroupId', personIdentityId().as('identityId')])
-      .where('asset_face.id', '=', uploadedFaceId)
-      .executeTakeFirstOrThrow();
+      .select(['person.personGroupId', 'person.ownerId', personIdentityId().as('identityId')])
+      .where('asset_face.id', 'in', uploadedFaceIds)
+      .execute();
     const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.personGroupId);
-    const withSpace = await fx.personService.getAll(authFor(fx.member), {
-      withHidden: false,
-      withSharedSpaces: true,
-      page: 1,
-      size: 50,
-    } as any);
-
-    expect(uploadedPerson.identityId).toBe(targetIdentity.id);
-    expect(withSpace.people).toEqual([
-      expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
-        numberOfAssets: 2,
-      }),
-    ]);
-
-    await fx.ctx.database
-      .deleteFrom('shared_space_member')
-      .where('spaceId', '=', fx.space.id)
-      .where('userId', '=', fx.member.id)
+    const markedFaces = await fx.ctx.database
+      .selectFrom('face_identity_face')
+      .select('assetFaceId')
+      .where('assetFaceId', 'in', uploadedFaceIds)
+      .where('source', '=', 'shared-space-evidence')
       .execute();
 
-    const afterLeave = await fx.personService.getAll(authFor(fx.member), {
-      withHidden: false,
-      withSharedSpaces: true,
-      page: 1,
-      size: 50,
-    } as any);
+    expect(uploaded).toHaveLength(3);
+    expect(new Set(uploaded.map(({ personGroupId }) => personGroupId)).size).toBe(1);
+    expect(uploaded[0].ownerId).toBe(fx.member.id);
+    expect(uploaded[0].identityId).not.toBe(targetIdentity.id);
+    expect(markedFaces).toEqual([]);
+  });
 
-    expect(afterLeave.people).toEqual([
-      expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
-        numberOfAssets: 1,
-      }),
-    ]);
-    expect(JSON.stringify(afterLeave)).not.toContain(fx.spacePerson.id);
+  it('does not start a person from a lone private face that only resembles a space person', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ personName: 'Library Source' });
+    // This file pins minFaces to 1; use the real default so a lone face is below the threshold. Config is cached
+    // across tests, so drop the cache before and after.
+    clearConfigCache();
+    fx.ctx
+      .getMock(SystemMetadataRepository)
+      .get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 3 } } } as any);
+    const embedding = await spacePersonEmbedding(fx);
+    const { asset } = await fx.ctx.newAsset({ ownerId: fx.member.id, visibility: AssetVisibility.Timeline });
+    const { result: faceId } = await fx.ctx.newAssetFace({ assetId: asset.id });
+    await fx.ctx.database.insertInto('face_search').values({ faceId, embedding }).execute();
+
+    await fx.personService.handleRecognizeFaces({ id: faceId, deferred: true });
+
+    const face = await fx.ctx.database
+      .selectFrom('asset_face')
+      .select('personGroupId')
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    clearConfigCache();
+    expect(face.personGroupId).toBeNull();
   });
 
   it('does not merge a post-join private upload when strict personal conflict guards fail', async () => {
@@ -1516,7 +1518,7 @@ describe('People identity RBAC projection', () => {
     ]);
   });
 
-  it('links a post-join private upload with no prior local profile without changing existing members', async () => {
+  it('does not join a post-join private upload to the space identity, and leaves existing members unchanged', async () => {
     const fixture = await setupJoinAfterDuplicatesFixture();
     const { ctx, personService, sharedSpaceService, faceIdentityRepository, space } = fixture;
     const { user: uploader } = await ctx.newUser();
@@ -1532,27 +1534,23 @@ describe('People identity RBAC projection', () => {
       role: SharedSpaceRole.Viewer,
     });
 
-    const { asset } = await ctx.newAsset({ ownerId: uploader.id, visibility: AssetVisibility.Timeline });
-    const { result: uploadedFaceId } = await ctx.newAssetFace({ assetId: asset.id });
-    await ctx.database
-      .insertInto('face_search')
-      .values({ faceId: uploadedFaceId, embedding: embeddingRow.embedding })
-      .execute();
-
-    await personService.handleRecognizeFaces({ id: uploadedFaceId });
+    const uploadedFaceIds: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const { asset } = await ctx.newAsset({ ownerId: uploader.id, visibility: AssetVisibility.Timeline });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id });
+      await ctx.database.insertInto('face_search').values({ faceId, embedding: embeddingRow.embedding }).execute();
+      uploadedFaceIds.push(faceId);
+    }
+    for (const id of uploadedFaceIds) {
+      await personService.handleRecognizeFaces({ id });
+    }
 
     const uploadedPerson = await ctx.database
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
       .select(['person.personGroupId', personIdentityId().as('identityId')])
-      .where('asset_face.id', '=', uploadedFaceId)
+      .where('asset_face.id', '=', uploadedFaceIds[0])
       .executeTakeFirstOrThrow();
-    const uploaderPeople = await personService.getAll(authFor(uploader), {
-      withHidden: false,
-      withSharedSpaces: true,
-      page: 1,
-      size: 50,
-    } as any);
     const ownerPeople = await personService.getAll(authFor(fixture.owner), {
       withHidden: false,
       withSharedSpaces: true,
@@ -1567,21 +1565,13 @@ describe('People identity RBAC projection', () => {
     } as any);
     const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(fixture.ownerPerson.personGroupId);
 
-    expect(uploaderPeople.people).toHaveLength(1);
-    expect(uploaderPeople.people[0]).toEqual(
-      expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
-        // The uploader's own photo, plus the owner's and the fixture member's photos in the space.
-        numberOfAssets: 3,
-      }),
-    );
+    expect(uploadedPerson.identityId).not.toBe(targetIdentity.id);
     expect(ownerPeople.people).toEqual([
       expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.ownerPerson.personGroupId } }),
     ]);
     expect(memberPeople.people).toEqual([
       expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId } }),
     ]);
-    expect(uploadedPerson.identityId).toBe(targetIdentity.id);
   });
 
   it('keeps one visible person when a post-join upload is added to the space', async () => {
