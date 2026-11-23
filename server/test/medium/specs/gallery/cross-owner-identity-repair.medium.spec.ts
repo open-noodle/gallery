@@ -258,6 +258,55 @@ describe('cross-owner identity repair (#1317)', () => {
     await expect(identityOf(fx, memberPerson.personGroupId)).resolves.not.toBe(fx.identityId);
   });
 
+  it.each([
+    ['trashed', { deletedAt: new Date() }],
+    ['moved to the Locked Folder', { visibility: AssetVisibility.Locked }],
+  ] as const)('stays detached after the backfill when the only shared photo is %s', async (_state, change) => {
+    const fx = await buildWorld();
+    const person = await joinMemberPerson(fx);
+    const { assetId, faceId } = await addFace(fx, {
+      ownerId: fx.member.id,
+      personGroupId: person.personGroupId,
+      inSpace: true,
+    });
+    await fx.ctx.database
+      .insertInto('shared_space_person_face')
+      .values({ personId: fx.spacePerson.id, assetFaceId: faceId })
+      .execute();
+    await fx.ctx.database.updateTable('asset').set(change).where('id', '=', assetId).execute();
+
+    await fx.sut.handleFaceIdentityCrossOwnerRepair({});
+    const detached = await identityOf(fx, person.personGroupId);
+    expect(detached).not.toBe(fx.identityId);
+
+    await fx.faceIdentity.backfillSpacePersonIdentities({ limit: 100 });
+    await fx.spaces.handleSharedSpaceIdentityReconciliation({ spaceId: fx.space.id });
+
+    await expect(identityOf(fx, person.personGroupId)).resolves.toBe(detached);
+    const onDetached = await fx.ctx.database
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('spaceId', '=', fx.space.id)
+      .where('identityId', '=', detached)
+      .execute();
+    expect(onDetached).toEqual([]);
+  });
+
+  it('keeps a member whose only shared photo is offline, so an unmounted library undoes no link', async () => {
+    const fx = await buildWorld();
+    const person = await joinMemberPerson(fx);
+    const { assetId } = await addFace(fx, {
+      ownerId: fx.member.id,
+      personGroupId: person.personGroupId,
+      inSpace: true,
+    });
+    await fx.ctx.database.updateTable('asset').set({ isOffline: true }).where('id', '=', assetId).execute();
+
+    await fx.sut.handleFaceIdentityCrossOwnerRepair({});
+
+    await expect(identityOf(fx, person.personGroupId)).resolves.toBe(fx.identityId);
+  });
+
   it('keeps a member who left the space while their directly added photo stays', async () => {
     const fx = await buildWorld();
     const memberPerson = await joinMemberPerson(fx);

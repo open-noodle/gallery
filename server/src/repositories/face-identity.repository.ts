@@ -449,11 +449,14 @@ export class FaceIdentityRepository {
               ON shared_space_person_face."personId" = shared_space_person.id
             INNER JOIN asset_face
               ON asset_face.id = shared_space_person_face."assetFaceId"
+            INNER JOIN asset ON asset.id = asset_face."assetId"
             INNER JOIN face_identity_face
               ON face_identity_face."assetFaceId" = asset_face.id
             WHERE shared_space."faceRecognitionEnabled" = true
               AND asset_face."deletedAt" IS NULL
               AND asset_face."isVisible" = true
+              AND asset."deletedAt" IS NULL
+              AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
               AND shared_space_person."identityId" IS DISTINCT FROM face_identity_face."identityId"
         ) AS "hasSpacePersonIdentityWork"
     `.execute(this.db);
@@ -3186,23 +3189,29 @@ export class FaceIdentityRepository {
   }
 
   private getSpacePersonBackfillIdentityGroups(personId: string): Promise<SpacePersonBackfillIdentityGroup[]> {
-    return this.db
-      .selectFrom('shared_space_person_face')
-      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-      .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
-      .innerJoin('face_identity', 'face_identity.id', 'face_identity_face.identityId')
-      .select(['face_identity_face.identityId', 'face_identity.type'])
-      .select(() => [
-        sql<number>`count(*)::int`.as('faceCount'),
-        sql<string>`min(asset_face.id::text)::uuid`.as('representativeFaceId'),
-      ])
-      .where('shared_space_person_face.personId', '=', personId)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', '=', true)
-      .groupBy(['face_identity_face.identityId', 'face_identity.type'])
-      .orderBy(sql`count(*)`, 'desc')
-      .$castTo<SpacePersonBackfillIdentityGroup>()
-      .execute();
+    return (
+      this.db
+        .selectFrom('shared_space_person_face')
+        .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+        .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+        .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+        .innerJoin('face_identity', 'face_identity.id', 'face_identity_face.identityId')
+        .select(['face_identity_face.identityId', 'face_identity.type'])
+        .select(() => [
+          sql<number>`count(*)::int`.as('faceCount'),
+          sql<string>`min(asset_face.id::text)::uuid`.as('representativeFaceId'),
+        ])
+        .where('shared_space_person_face.personId', '=', personId)
+        .where('asset_face.deletedAt', 'is', null)
+        .where('asset_face.isVisible', '=', true)
+        // #1317: a trashed or Locked photo is not in the space, so it must not rebuild a space person the repair undid.
+        .where('asset.deletedAt', 'is', null)
+        .where('asset.visibility', 'in', peopleAssetVisibilities)
+        .groupBy(['face_identity_face.identityId', 'face_identity.type'])
+        .orderBy(sql`count(*)`, 'desc')
+        .$castTo<SpacePersonBackfillIdentityGroup>()
+        .execute()
+    );
   }
 
   private async getSpacePersonBackfillAssetFaceIdsForIdentity(personId: string, identityId: string): Promise<string[]> {
@@ -3210,11 +3219,14 @@ export class FaceIdentityRepository {
       .selectFrom('shared_space_person_face')
       .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .select('asset_face.id')
       .where('shared_space_person_face.personId', '=', personId)
       .where('face_identity_face.identityId', '=', identityId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', 'in', peopleAssetVisibilities)
       .execute();
 
     return rows.map((row) => row.id);
