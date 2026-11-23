@@ -970,6 +970,10 @@ export type TestEmailResponseDto = {
     /** Email message ID */
     messageId: string;
 };
+export type SpatialSceneChoicesResponseDto = {
+    /** Number of photos with a per-photo choice (for DELETE, the number removed) */
+    count: number;
+};
 export type UserLicense = {
     /** Activation date */
     activatedAt: string;
@@ -1662,6 +1666,10 @@ export type AssetResponseDto = {
     resolvedSpaceId?: string;
     /** Whether the viewer offers Spatial Scene for this photo: it has a depth map and the admin offers it on every photo, or the photo counts as suitable. Present only on single-asset reads. */
     spatialScene?: boolean;
+    /** The per-photo choice behind spatialScene: true offered and false not offered whatever the automatic choice says, null for the automatic choice. Present only on single-asset reads while Spatial Scene is enabled. */
+    spatialSceneChoice?: boolean | null;
+    /** When the depth map was made. A client adds it to the depth map URL, so a map made again (another model, a refresh) is not served from its cache. Present only on single-asset reads of a photo with a depth map while Spatial Scene is enabled. */
+    spatialSceneDepthMapCreatedAt?: string;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */
@@ -2036,6 +2044,10 @@ export type AssetOcrResponseDto = {
     y3: number;
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
+};
+export type SpatialSceneOfferDto = {
+    /** true offers Spatial Scene on this photo and false stops offering it, whatever the automatic choice says; null returns the photo to the automatic choice */
+    offered: boolean | null;
 };
 export type AssetVideoTrimResponseDto = {
     /** End of the kept part, in seconds from the start of the original video */
@@ -6364,6 +6376,29 @@ export function sendTestEmailAdmin({ adminConfigSmtpDto }: {
     })));
 }
 /**
+ * Clear Spatial Scene per-photo choices
+ */
+export function clearSpatialSceneChoices(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SpatialSceneChoicesResponseDto;
+    }>("/admin/spatial-scene/choices", {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Count Spatial Scene per-photo choices
+ */
+export function getSpatialSceneChoices(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SpatialSceneChoicesResponseDto;
+    }>("/admin/spatial-scene/choices", {
+        ...opts
+    }));
+}
+/**
  * Search users
  */
 export function searchUsersAdmin({ id, withDeleted }: {
@@ -7217,6 +7252,17 @@ export function viewAssetDepth({ id, key, slug }: {
     }));
 }
 /**
+ * Refresh the depth map of a photo
+ */
+export function refreshAssetDepth({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/depth`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Remove edits from an existing asset
  */
 export function removeAssetEdits({ id }: {
@@ -7345,6 +7391,19 @@ export function downloadAsset({ download, edited, id, key, slug }: {
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Choose whether Spatial Scene is offered on a photo
+ */
+export function updateAssetSpatialScene({ id, spatialSceneOfferDto }: {
+    id: string;
+    spatialSceneOfferDto: SpatialSceneOfferDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/spatial-scene`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: spatialSceneOfferDto
+    })));
 }
 /**
  * View asset thumbnail

@@ -47,18 +47,35 @@ where
 
 -- SpatialSceneRepository.get
 select
-  "path",
-  "width",
-  "height",
-  "boundarySharpness",
-  "edgeDensity",
-  "foregroundRatio",
-  "focus",
-  "modelName"
+  "asset_spatial_scene"."path",
+  "asset_spatial_scene"."width",
+  "asset_spatial_scene"."height",
+  "asset_spatial_scene"."boundarySharpness",
+  "asset_spatial_scene"."edgeDensity",
+  "asset_spatial_scene"."foregroundRatio",
+  "asset_spatial_scene"."focus",
+  "asset_spatial_scene"."modelName",
+  "asset_spatial_scene"."createdAt",
+  "asset_spatial_scene_offer"."offered"
 from
   "asset_spatial_scene"
+  left join "asset_spatial_scene_offer" on "asset_spatial_scene_offer"."assetId" = "asset_spatial_scene"."assetId"
+where
+  "asset_spatial_scene"."assetId" = $1::uuid
+
+-- SpatialSceneRepository.getOffer
+select
+  "offered"
+from
+  "asset_spatial_scene_offer"
 where
   "assetId" = $1::uuid
+
+-- SpatialSceneRepository.countOffers
+select
+  count(*) as "count"
+from
+  "asset_spatial_scene_offer"
 
 -- SpatialSceneRepository.getPathsByPaths
 select

@@ -22,6 +22,7 @@ const SECTION_SOURCES: Record<string, string | string[]> = {
     '/src/routes/admin/system-settings/MachineLearningSettings.svelte',
     '/src/lib/gallery/components/admin/video-face-settings.svelte',
     '/src/lib/gallery/components/admin/video-pet-settings.svelte',
+    '/src/lib/gallery/admin/SpatialSceneSettings.svelte',
   ],
   classification: '/src/routes/admin/system-settings/ClassificationSettings.svelte',
   location: '/src/routes/admin/system-settings/MapSettings.svelte',

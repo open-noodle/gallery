@@ -41,7 +41,11 @@ class SpatialSceneOverlay extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final key = (id: id, thumbHash: asset is RemoteAsset ? asset.thumbHash : null);
+    final key = (
+      id: id,
+      thumbHash: asset is RemoteAsset ? asset.thumbHash : null,
+      depthMapVersion: ref.watch(spatialSceneDepthMapVersionProvider(id)),
+    );
     ref.listen(spatialSceneTexturesProvider(key), (_, next) {
       if (next.hasError) {
         ImmichToast.show(context: context, msg: context.t.spatial_scene_unavailable, toastType: ToastType.error);
