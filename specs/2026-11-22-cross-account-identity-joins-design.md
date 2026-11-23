@@ -105,7 +105,7 @@ A rule requiring a face in the space (`supportingFaceCount > 0`) was considered 
 `person` is the owner's private row. `src/gallery/utils/person-viewer-reads.ts` gives another member what their space publishes:
 
 - `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and refuses a hidden person.
-- `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796.
+- `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796. Owner decision (2026-11-23): keep this.
 - `GET /people/{id}/thumbnail` refuses a hidden person. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
 
 `person-reads-other-members-matrix.medium.spec.ts` covers every actor, setting and read (rule 7).
@@ -148,7 +148,7 @@ The rule does not look at `face_identity_face.source`. On real data the side tha
 - A member joined from private photos sees their person on its own again: it stops showing the other account's space photos, and with `withSharedSpaces` their People list shows their person and the space person separately. They can link them by hand, which now sticks.
 - The other account loses a name or birthday that came from that private person.
 - A member whose last photo of a person leaves every space holding that person (they remove it, or it was in an album they owned that leaving the space unlinks) is detached at the next nightly run. Leaving a space alone does not detach: photos the member added directly stay in the space (`removeMember` deletes only the membership row and unlinks the member's own albums), so the join stays backed.
-- Manual links made **before** this version carry no `manualLinkAt`, so the first run undoes them once if no shared photo backs them; the member re-links. On the real library tested, no identity spanned two accounts, so nothing is affected there.
+- Owner decision (2026-11-23): this is accepted. Manual links made **before** this version carry no `manualLinkAt`, so the first run undoes them once if no shared photo backs them; the member re-links. On the real library tested, no identity spanned two accounts, so nothing is affected there.
 
 ### 6. Tests
 
