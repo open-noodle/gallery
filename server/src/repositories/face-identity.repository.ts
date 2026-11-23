@@ -21,7 +21,12 @@ import { anyUuid, petFacePredicate, retryOnDeadlock } from 'src/utils/database.j
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
 import { targetTokens } from 'src/utils/face-repair.js';
 import { rekeyVerdictIdentity } from 'src/utils/face-verdict-merge.js';
-import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
+import {
+  accessibleTimelineAssetPredicate,
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+  spaceVisibleAssetVisibilities,
+} from 'src/utils/shared-space-album-scope.js';
 
 // A pet profile is listed only when it is an individual, not a species bucket (whose faces carry no embedding).
 // Pet recognition gives an individual pet_search rows (embedded_pet_identities); a human cluster the owner
@@ -1308,6 +1313,85 @@ export class FaceIdentityRepository {
       .set({ manualLinkAt: sql`now()` })
       .where('personGroupId', 'in', personGroupIds)
       .execute();
+  }
+
+  /**
+  Personal people the cross-owner repair detaches (#1317, spec 5b), ordered by personGroupId. A person is a
+  candidate when all three hold:
+    - its identity is shared: another owner's person or any space person sits on it;
+    - it is not backed: its owner has no live face bound to the identity on a live Timeline or Archive asset that
+      a space holding a space person on the identity can see (direct, linked library, linked album or album
+      contribution). Membership is not required, because linked libraries and albums reach assets of people who
+      never joined;
+    - no human linked it there by hand (`manualLinkAt` is null).
+  */
+  @GenerateSql({ params: [{ afterPersonGroupId: DummyValue.UUID, limit: 100 }] })
+  getCrossOwnerRepairCandidates({ afterPersonGroupId, limit }: { afterPersonGroupId?: string; limit: number }) {
+    return this.crossOwnerRepairCandidates()
+      .select(['person_identity.personGroupId', 'person_identity.ownerId', 'person_identity.identityId'])
+      .$if(!!afterPersonGroupId, (qb) => qb.where('person_identity.personGroupId', '>', afterPersonGroupId!))
+      .orderBy('person_identity.personGroupId')
+      .limit(limit)
+      .execute();
+  }
+
+  @GenerateSql()
+  async hasCrossOwnerRepairWork(): Promise<boolean> {
+    const row = await this.crossOwnerRepairCandidates()
+      .select('person_identity.personGroupId')
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  private crossOwnerRepairCandidates() {
+    return this.db
+      .selectFrom('person_identity')
+      .where('person_identity.manualLinkAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('person_identity as other')
+              .select(sql.lit(1).as('one'))
+              .whereRef('other.identityId', '=', 'person_identity.identityId')
+              .whereRef('other.ownerId', '!=', 'person_identity.ownerId'),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person')
+              .select(sql.lit(1).as('one'))
+              .whereRef('shared_space_person.identityId', '=', 'person_identity.identityId'),
+          ),
+        ]),
+      )
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('face_identity_face')
+              .innerJoin('asset_face', 'asset_face.id', 'face_identity_face.assetFaceId')
+              .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+              .innerJoin('shared_space_person', 'shared_space_person.identityId', 'face_identity_face.identityId')
+              .select(sql.lit(1).as('one'))
+              .whereRef('face_identity_face.identityId', '=', 'person_identity.identityId')
+              .whereRef('asset.ownerId', '=', 'person_identity.ownerId')
+              .where('asset_face.deletedAt', 'is', null)
+              .where('asset.deletedAt', 'is', null)
+              .where((eb) => spaceVisibilityGate(eb))
+              .where((eb) =>
+                eb.or(
+                  spaceAssetPathBranches(eb, {
+                    correlateAssetId: 'asset.id',
+                    correlateLibraryId: 'asset.libraryId',
+                    scope: { spaceIdRef: 'shared_space_person.spaceId' },
+                    albumTimelineGate: 'none',
+                  }),
+                ),
+              ),
+          ),
+        ),
+      );
   }
 
   async detachScopedProfile(profileRef: ScopedPersonProfileRefDto): Promise<string> {

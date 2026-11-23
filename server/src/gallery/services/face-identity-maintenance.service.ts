@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { ImmichWorker, JobName, JobStatus, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
+import {
+  DatabaseLock,
+  ImmichWorker,
+  JobName,
+  JobStatus,
+  QueueJobStatus,
+  QueueName,
+  SystemMetadataKey,
+} from 'src/enum.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { SharedSpaceFaceMatchBackfillTarget } from 'src/repositories/face-identity.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -19,6 +27,9 @@ maintenance, or a manual run) starts a fresh chain.
 */
 export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
+/** People the cross-owner repair checks per page (#1317). */
+export const FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE = 100;
+
 @Injectable()
 export class FaceIdentityMaintenanceService extends BaseService {
   /** An instance for `ctx` that logs under ctx's context, as these helpers did inside PersonService. */
@@ -31,6 +42,7 @@ export class FaceIdentityMaintenanceService extends BaseService {
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
     await this.queueInitialFaceSuggestionSweep();
+    await this.queueCrossOwnerRepairIfNeeded();
 
     if (!(await this.faceIdentityRepository.hasBackfillWork())) {
       return;
@@ -85,6 +97,64 @@ export class FaceIdentityMaintenanceService extends BaseService {
 
     this.logger.log('Face suggestions are enabled and have never been swept; queueing face suggestion maintenance');
     await this.jobRepository.queue({ name: JobName.FaceSuggestionMaintenance, data: {} });
+  }
+
+  /**
+  Queues the cross-owner repair at boot when some person needs it (#1317); the nightly identity reconciliation sweep
+  queues it too. The check is one indexed probe, and a library with nothing to repair queues nothing. While the
+  identity backfill still has work, per-face identity rows may not match their people yet and backing would read
+  short, so boot leaves the repair to the nightly sweep.
+  */
+  async queueCrossOwnerRepairIfNeeded(): Promise<void> {
+    if (await this.faceIdentityRepository.hasBackfillWork()) {
+      return;
+    }
+    if (!(await this.faceIdentityRepository.hasCrossOwnerRepairWork())) {
+      return;
+    }
+    await this.jobRepository.queue({ name: JobName.FaceIdentityCrossOwnerRepair, data: {} });
+  }
+
+  /**
+  Detaches each personal person that sits on a shared identity with no shared photo behind it and no manual link
+  (#1317, spec 5b; the rule is `FaceIdentityRepository.getCrossOwnerRepairCandidates`). Detaching gives the person
+  its own identity again and leaves everything else on the old identity in place. One page per job, under the
+  facial recognition lock so recognition and reconciliation do not interleave with it. A person that fails to
+  detach is logged and skipped. After the last page, one unscoped metadata backfill recomputes space person names
+  and birthdays inherited from a detached person.
+  */
+  @OnJob({ name: JobName.FaceIdentityCrossOwnerRepair, queue: QueueName.FacialRecognition })
+  async handleFaceIdentityCrossOwnerRepair({
+    cursor,
+  }: JobOf<JobName.FaceIdentityCrossOwnerRepair>): Promise<JobStatus> {
+    const candidates = await this.databaseRepository.withLock(DatabaseLock.FacialRecognition, async () => {
+      const page = await this.faceIdentityRepository.getCrossOwnerRepairCandidates({
+        afterPersonGroupId: cursor,
+        limit: FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE,
+      });
+      let detached = 0;
+      for (const { personGroupId } of page) {
+        try {
+          await this.faceIdentityRepository.detachScopedProfile({ type: 'person', id: personGroupId });
+          detached++;
+        } catch (error) {
+          this.logger.warn(`Cross-owner identity repair could not detach person ${personGroupId}: ${error}`);
+        }
+      }
+      this.logger.log(`Cross-owner identity repair checked ${page.length} people and detached ${detached}`);
+      return page;
+    });
+
+    if (candidates.length === FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE) {
+      await this.jobRepository.queue({
+        name: JobName.FaceIdentityCrossOwnerRepair,
+        data: { cursor: candidates.at(-1)!.personGroupId },
+      });
+      return JobStatus.Success;
+    }
+
+    await this.jobRepository.queue({ name: JobName.SharedSpacePersonMetadataBackfill, data: {} });
+    return JobStatus.Success;
   }
 
   @OnEvent({ name: 'ConfigValidate' })

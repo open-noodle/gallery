@@ -14281,6 +14281,30 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('handleSharedSpaceIdentityReconciliationSweep', () => {
+    it('queues each space reconciliation, then the cross-owner repair when some person needs it (#1317)', async () => {
+      mocks.sharedSpace.getFaceRecognitionEnabledSpaceIds.mockResolvedValue(['space-1']);
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(true);
+
+      await expect(sut.handleSharedSpaceIdentityReconciliationSweep()).resolves.toBe(JobStatus.Success);
+
+      const names = mocks.job.queue.mock.calls.map(([job]) => job.name);
+      expect(names.at(-1)).toBe(JobName.FaceIdentityCrossOwnerRepair);
+      expect(names).toContain(JobName.SharedSpaceIdentityReconciliation);
+    });
+
+    it('does not queue the cross-owner repair when no person needs it', async () => {
+      mocks.sharedSpace.getFaceRecognitionEnabledSpaceIds.mockResolvedValue(['space-1']);
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(false);
+
+      await sut.handleSharedSpaceIdentityReconciliationSweep();
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FaceIdentityCrossOwnerRepair }),
+      );
+    });
+  });
+
   describe('onAssetDelete', () => {
     it('recounts affected persons and deletes orphans for each impacted space', async () => {
       const spaceA = newUuid();

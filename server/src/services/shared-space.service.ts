@@ -3059,6 +3059,10 @@ export class SharedSpaceService extends BaseService {
     for (const spaceId of spaceIds) {
       await this.queueSpaceIdentityReconciliation({ spaceId });
     }
+    // #1317: queued after the reconciliations on the same FacialRecognition queue, so it sees their joins.
+    if (await this.faceIdentityRepository.hasCrossOwnerRepairWork()) {
+      await this.jobRepository.queue({ name: JobName.FaceIdentityCrossOwnerRepair, data: {} });
+    }
     return JobStatus.Success;
   }
 

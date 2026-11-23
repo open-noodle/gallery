@@ -1,9 +1,18 @@
 import { Reflector } from '@nestjs/core';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto.js';
-import { JobName, JobStatus, MetadataKey, QueueJobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
+import {
+  DatabaseLock,
+  JobName,
+  JobStatus,
+  MetadataKey,
+  QueueJobStatus,
+  QueueName,
+  SystemMetadataKey,
+} from 'src/enum.js';
 import {
   FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS,
+  FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE,
   FaceIdentityMaintenanceService,
 } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -47,6 +56,12 @@ const onConfigUpdateTestConfig = (
       },
     },
   }) as SystemConfig;
+
+const candidate = (index: number) => ({
+  personGroupId: `person-${String(index).padStart(3, '0')}`,
+  ownerId: 'owner',
+  identityId: 'identity',
+});
 
 describe(FaceIdentityMaintenanceService.name, () => {
   describe('createFor', () => {
@@ -387,6 +402,77 @@ describe(FaceIdentityMaintenanceService.name, () => {
         status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],
       });
       expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
+    });
+  });
+
+  describe('cross-owner identity repair (#1317)', () => {
+    it('queues the first page at boot when some person needs it', async () => {
+      useSuggestionSweepAlreadyRun();
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(true);
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityCrossOwnerRepair, data: {} });
+    });
+
+    it('waits for the identity backfill before queueing the repair at boot', async () => {
+      // Backfill realigns per-face identity rows; reading backing before it finishes could detach a backed person.
+      useSuggestionSweepAlreadyRun();
+      (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(true);
+      mocks.job.searchJobs.mockResolvedValue([]);
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FaceIdentityCrossOwnerRepair }),
+      );
+    });
+
+    it('queues nothing at boot when no person needs it', async () => {
+      useSuggestionSweepAlreadyRun();
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(false);
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FaceIdentityCrossOwnerRepair }),
+      );
+    });
+
+    it('detaches a page under the facial recognition lock and queues the next page from the last id', async () => {
+      const page = Array.from({ length: FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE }, (_, index) => candidate(index));
+      mocks.faceIdentity.getCrossOwnerRepairCandidates.mockResolvedValue(page);
+      mocks.faceIdentity.detachScopedProfile.mockResolvedValue('new-identity');
+
+      await expect(sut.handleFaceIdentityCrossOwnerRepair({ cursor: 'person-before' })).resolves.toBe(
+        JobStatus.Success,
+      );
+
+      expect(mocks.database.withLock).toHaveBeenCalledWith(DatabaseLock.FacialRecognition, expect.any(Function));
+      expect(mocks.faceIdentity.getCrossOwnerRepairCandidates).toHaveBeenCalledWith({
+        afterPersonGroupId: 'person-before',
+        limit: FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE,
+      });
+      expect(mocks.faceIdentity.detachScopedProfile).toHaveBeenCalledTimes(FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE);
+      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({
+        name: JobName.FaceIdentityCrossOwnerRepair,
+        data: { cursor: page.at(-1)!.personGroupId },
+      });
+    });
+
+    it('skips a person that fails to detach and queues one metadata backfill after the last page', async () => {
+      mocks.faceIdentity.getCrossOwnerRepairCandidates.mockResolvedValue([candidate(1), candidate(2)]);
+      mocks.faceIdentity.detachScopedProfile.mockRejectedValueOnce(new Error('boom')).mockResolvedValue('new-identity');
+
+      await expect(sut.handleFaceIdentityCrossOwnerRepair({})).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.faceIdentity.detachScopedProfile).toHaveBeenCalledWith({ type: 'person', id: 'person-002' });
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('person-001'));
+      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
+      });
     });
   });
 

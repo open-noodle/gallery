@@ -965,6 +965,8 @@ export enum JobName {
   FacialRecognition = 'FacialRecognition',
   FaceIdentityBackfill = 'FaceIdentityBackfill',
   FaceIdentityMaintenanceAfterRecognition = 'FaceIdentityMaintenanceAfterRecognition',
+  // #1317: detach a personal person joined to another account's or a space's identity on no shared photo.
+  FaceIdentityCrossOwnerRepair = 'FaceIdentityCrossOwnerRepair',
   FaceRepairScan = 'FaceRepairScan',
   FaceSuggestionMaintenance = 'FaceSuggestionMaintenance',
   PersonSuggestionScanQueueAll = 'PersonSuggestionScanQueueAll',
