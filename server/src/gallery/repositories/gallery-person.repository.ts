@@ -16,6 +16,7 @@ import {
 import { type PeopleFaceStatisticsOptions } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
+import { asDateString } from 'src/utils/date.js';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge.js';
@@ -492,6 +493,50 @@ export class GalleryPersonRepository {
       .offset(options.skip)
       .limit(options.take + 1)
       .execute();
+  }
+
+  /**
+  The name and birthday a viewer's spaces publish for people another account owns (#1317), with the viewer's own alias
+  first. A hidden space person publishes nothing. When several spaces hold the person, a named profile wins.
+  */
+  @GenerateSql({ params: [{ viewerId: DummyValue.UUID, personIds: [DummyValue.UUID], spaceId: DummyValue.UUID }] })
+  async getSpaceMetadataForViewer(input: { viewerId: string; personIds: string[]; spaceId?: string }) {
+    const metadata = new Map<string, { name: string; birthDate: string | null }>();
+    if (input.personIds.length === 0) {
+      return metadata;
+    }
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('shared_space_person_face', 'shared_space_person_face.assetFaceId', 'asset_face.id')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .innerJoin('shared_space_member', (join) =>
+        join
+          .onRef('shared_space_member.spaceId', '=', 'shared_space_person.spaceId')
+          .on('shared_space_member.userId', '=', input.viewerId),
+      )
+      .leftJoin('shared_space_person_alias', (join) =>
+        join
+          .onRef('shared_space_person_alias.personId', '=', 'shared_space_person.id')
+          .on('shared_space_person_alias.userId', '=', input.viewerId),
+      )
+      .distinctOn('asset_face.personGroupId')
+      .select('asset_face.personGroupId as personId')
+      .select('shared_space_person.birthDate')
+      .select(
+        sql<string>`COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '')`.as('name'),
+      )
+      .where('asset_face.personGroupId', 'in', input.personIds)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('shared_space_person.isHidden', '=', false)
+      .$if(!!input.spaceId, (qb) => qb.where('shared_space_person.spaceId', '=', input.spaceId!))
+      .orderBy('asset_face.personGroupId')
+      .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '') IS NULL`)
+      .orderBy('shared_space_person.id')
+      .execute();
+    for (const row of rows) {
+      metadata.set(row.personId!, { name: row.name, birthDate: asDateString(row.birthDate) });
+    }
+    return metadata;
   }
 
   @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID }] })

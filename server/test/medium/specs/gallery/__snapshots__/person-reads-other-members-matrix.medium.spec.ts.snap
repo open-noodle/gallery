@@ -1,0 +1,406 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`what each account can read about a person (#1317) > matches the recorded grid 1`] = `
+{
+  "admin-non-member names=false hidden=false privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=false hidden=false privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=false hidden=true privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=false hidden=true privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=true hidden=false privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=true hidden=false privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=true hidden=true privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "admin-non-member names=true hidden=true privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "editor names=false hidden=false privateCover=false": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "editor names=false hidden=false privateCover=true": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "editor names=false hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "editor names=false hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "editor names=true hidden=false privateCover=false": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "editor names=true hidden=false privateCover=true": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "editor names=true hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "editor names=true hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=false hidden=false privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=false hidden=false privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=false hidden=true privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=false hidden=true privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=true hidden=false privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=true hidden=false privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=true hidden=true privateCover=false": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "non-member names=true hidden=true privateCover=true": {
+    "face": "denied",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "owner names=false hidden=false privateCover=false": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "owner names=false hidden=false privateCover=true": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "owner names=false hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "owner names=false hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "owner names=true hidden=false privateCover=false": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "owner names=true hidden=false privateCover=true": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "owner names=true hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "owner names=true hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "person-owner names=false hidden=false privateCover=false": {
+    "face": {
+      "birthDate": "1980-02-03",
+      "name": "Owner private name",
+    },
+    "person": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=false hidden=false privateCover=true": {
+    "face": {
+      "birthDate": "1980-02-03",
+      "name": "Owner private name",
+    },
+    "person": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=false hidden=true privateCover=false": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": true,
+      "name": "",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=false hidden=true privateCover=true": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": true,
+      "name": "",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=true hidden=false privateCover=false": {
+    "face": {
+      "birthDate": "1980-02-03",
+      "name": "Owner private name",
+    },
+    "person": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=true hidden=false privateCover=true": {
+    "face": {
+      "birthDate": "1980-02-03",
+      "name": "Owner private name",
+    },
+    "person": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=true hidden=true privateCover=false": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": true,
+      "name": "Name the space shows",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "person-owner names=true hidden=true privateCover=true": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": true,
+      "name": "Name the space shows",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
+    "thumbnail": "stored",
+  },
+  "viewer names=false hidden=false privateCover=false": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "viewer names=false hidden=false privateCover=true": {
+    "face": {
+      "birthDate": null,
+      "name": "",
+    },
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "viewer names=false hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "viewer names=false hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "viewer names=true hidden=false privateCover=false": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "stored",
+  },
+  "viewer names=true hidden=false privateCover=true": {
+    "face": {
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
+    },
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
+    "thumbnail": "crop-of-shared-face",
+  },
+  "viewer names=true hidden=true privateCover=false": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+  "viewer names=true hidden=true privateCover=true": {
+    "face": "no-face",
+    "person": "denied",
+    "thumbnail": "denied",
+  },
+}
+`;

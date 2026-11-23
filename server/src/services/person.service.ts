@@ -45,6 +45,12 @@ import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { withOwnedPersonAssetCounts } from 'src/gallery/utils/owned-person-asset-counts.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
+import {
+  assetReadCheck,
+  cropForOtherMember,
+  projectFacesForViewer,
+  projectPersonForViewer,
+} from 'src/gallery/utils/person-viewer-reads.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -251,6 +257,14 @@ export class PersonService extends BaseService {
     // PersonService.getById does; otherwise the age silently disappears for every person whose
     // birthday only ever existed on a space profile. `mapFaces` already nulls people the caller
     // does not own, so only owned faces are resolved here.
+    await projectFacesForViewer(
+      { galleryPerson: this.galleryPersonRepository, sharedSpace: this.sharedSpaceRepository },
+      auth,
+      dto.id,
+      new Map(faces.flatMap((face) => (face.person ? [[face.person.personGroupId, face.person.ownerId]] : []))),
+      response,
+    );
+
     const identityByPersonId = new Map<string, string>();
     for (const face of faces) {
       if (face.person?.ownerId === auth.user.id && face.person.identityId) {
@@ -291,6 +305,9 @@ export class PersonService extends BaseService {
     if (allowedIds.has(id)) {
       const person = await this.findOrFail(auth, id);
       const response = mapPerson(person);
+      if (person.ownerId !== auth.user.id) {
+        return projectPersonForViewer(this.galleryPersonRepository, auth, person, response);
+      }
       // Name and birthday set in a shared space are resolved at read time (never written back to
       // `person`). The owner accessing their own person short-circuits the resolver, so overlay the
       // identity-wide resolution here — otherwise they see the raw, often-empty `person.birthDate`.
@@ -347,6 +364,19 @@ export class PersonService extends BaseService {
     const person = await this.personRepository.getByGroupIdOnly(personGroupId);
     if (!person || !person.thumbnailPath) {
       throw new NotFoundException();
+    }
+
+    const crop = await cropForOtherMember(
+      {
+        galleryPerson: this.galleryPersonRepository,
+        media: this.backendMedia,
+        canReadAsset: assetReadCheck((dto) => this.checkAccess(dto), auth),
+      },
+      auth,
+      person,
+    );
+    if (crop) {
+      return crop;
     }
 
     return this.backendMedia.serveFromBackend(

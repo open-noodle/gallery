@@ -233,6 +233,33 @@ limit
 offset
   $11
 
+-- GalleryPersonRepository.getSpaceMetadataForViewer
+select distinct
+  on ("asset_face"."personGroupId") "asset_face"."personGroupId" as "personId",
+  "shared_space_person"."birthDate",
+  COALESCE(
+    NULLIF(shared_space_person_alias.alias, ''),
+    shared_space_person.name,
+    ''
+  ) as "name"
+from
+  "asset_face"
+  inner join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+  inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_person"."spaceId"
+  and "shared_space_member"."userId" = $1
+  left join "shared_space_person_alias" on "shared_space_person_alias"."personId" = "shared_space_person"."id"
+  and "shared_space_person_alias"."userId" = $2
+where
+  "asset_face"."personGroupId" in ($3)
+  and "asset_face"."deletedAt" is null
+  and "shared_space_person"."isHidden" = $4
+  and "shared_space_person"."spaceId" = $5
+order by
+  "asset_face"."personGroupId",
+  NULLIF(BTRIM(shared_space_person.name), '') IS NULL,
+  "shared_space_person"."id"
+
 -- GalleryPersonRepository.getRepresentativeFaceForUpdate
 select
   "asset_face".*

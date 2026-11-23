@@ -523,7 +523,7 @@ describe(PersonService.name, () => {
 
     it('should get a person by id', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -1440,6 +1440,7 @@ describe(PersonService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
       mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0);
 
       const [result] = await sut.getFacesById(auth, { id: face.assetId });
 
