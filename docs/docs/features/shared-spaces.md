@@ -406,6 +406,14 @@ Space people are **separate** from the people in your personal library. When fac
 
 The separation keeps each member's personal library private while face management inside the space stays collaborative.
 
+### Linking your people to space people
+
+Gallery links one of your personal people to a space person automatically only when you have a photo of that person in the space: added directly, in a linked album, or in a connected library. Photos that stay in your own library are never used for this, so a space never learns who appears in them.
+
+If the same person appears only in your private photos, link them by hand: open your person, choose **Merge people**, and pick the space person. A link you make by hand stays.
+
+An automatic link lasts as long as a photo behind it is still in the space. When you remove the last such photo, or unlink the album that held it, Gallery undoes the link in the background and your person keeps their own name and photos. Leaving a space does not by itself undo a link: photos you added directly stay in the space after you leave.
+
 ### Merging People Across Owners
 
 Occasionally the same real person is split across more than one owner: a space person assembled from several members' photos, say, or a person tied to a [connected external library](#connected-libraries-admin). Merging those entries crosses an owner boundary, so it modifies people and faces owned by other users, and it may not be cleanly reversible.
