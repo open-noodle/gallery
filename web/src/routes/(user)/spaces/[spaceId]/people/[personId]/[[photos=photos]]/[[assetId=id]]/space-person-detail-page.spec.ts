@@ -434,6 +434,13 @@ describe('Spaces person detail page', () => {
     expect(invalidateAllMock).toHaveBeenCalled();
   });
 
+  it('does not invite a viewer to name a person they cannot edit', async () => {
+    await renderPage({ person: makePerson({ name: '' }), members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+
+    await expect.element(page.getByText('add_a_name')).not.toBeInTheDocument();
+    await expect.element(page.getByText('person', { exact: true })).toBeInTheDocument();
+  });
+
   it('does not expose person actions to viewers', async () => {
     await renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 

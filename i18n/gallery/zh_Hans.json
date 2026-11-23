@@ -1162,6 +1162,8 @@
     "other": "{count} 张照片"
   },
   "person_type_changed": "人物类型已更改。",
+  "person_unavailable_description": "该人物可能已被隐藏，或你已无权访问。",
+  "person_unavailable_title": "此人物不可用",
   "pet": "宠物",
   "pets": "宠物",
   "photos_only": "仅照片",

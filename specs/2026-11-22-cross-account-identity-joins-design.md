@@ -104,8 +104,9 @@ A rule requiring a face in the space (`supportingFaceCount > 0`) was considered 
 
 `person` is the owner's private row. `src/gallery/utils/person-viewer-reads.ts` gives another member what their space publishes:
 
-- `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and refuses a hidden person.
+- `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and the space profile (`primaryProfile`, `filterId`) that scopes their photos. It refuses a hidden person, and a person with no visible space person, because nothing is published about them.
 - `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796. Owner decision (2026-11-23): keep this.
+- The web person page sends another member to the space's page for that person, which works for a member who keeps the space off their timeline. A refused person shows a "not available" page. A member who cannot edit sees "Person" for an unnamed person, not "Add a name".
 - `GET /people/{id}/thumbnail` refuses a hidden person. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
 
 `person-reads-other-members-matrix.medium.spec.ts` covers every actor, setting and read (rule 7).

@@ -529,6 +529,20 @@ describe('Person detail page', () => {
     await expect.element(page.getByText('select_representative_face')).not.toBeInTheDocument();
   });
 
+  it('does not invite a space viewer to name a person they cannot edit', async () => {
+    mockSpaceRoles({ 'viewer-space-detail': SharedSpaceRole.Viewer });
+    await renderPage({
+      person: makePerson({
+        name: '',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'viewer-space-detail' },
+      }),
+    });
+
+    await vi.waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
+    await expect.element(page.getByText('add_a_name')).not.toBeInTheDocument();
+    await expect.element(page.getByText('person', { exact: true })).toBeInTheDocument();
+  });
+
   it('hides the merge option for a space-primary person the actor cannot edit', async () => {
     mockSpaceRoles({ 'viewer-space-detail-merge-gate': SharedSpaceRole.Viewer });
     await renderPage({

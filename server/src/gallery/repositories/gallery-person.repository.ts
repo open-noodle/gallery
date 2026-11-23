@@ -501,7 +501,10 @@ export class GalleryPersonRepository {
   */
   @GenerateSql({ params: [{ viewerId: DummyValue.UUID, personIds: [DummyValue.UUID], spaceId: DummyValue.UUID }] })
   async getSpaceMetadataForViewer(input: { viewerId: string; personIds: string[]; spaceId?: string }) {
-    const metadata = new Map<string, { name: string; birthDate: string | null }>();
+    const metadata = new Map<
+      string,
+      { name: string; birthDate: string | null; spacePersonId: string; spaceId: string }
+    >();
     if (input.personIds.length === 0) {
       return metadata;
     }
@@ -521,6 +524,7 @@ export class GalleryPersonRepository {
       )
       .distinctOn('asset_face.personGroupId')
       .select('asset_face.personGroupId as personId')
+      .select(['shared_space_person.id as spacePersonId', 'shared_space_person.spaceId'])
       .select('shared_space_person.birthDate')
       .select(
         sql<string>`COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '')`.as('name'),
@@ -534,7 +538,12 @@ export class GalleryPersonRepository {
       .orderBy('shared_space_person.id')
       .execute();
     for (const row of rows) {
-      metadata.set(row.personId!, { name: row.name, birthDate: asDateString(row.birthDate) });
+      metadata.set(row.personId!, {
+        name: row.name,
+        birthDate: asDateString(row.birthDate),
+        spacePersonId: row.spacePersonId,
+        spaceId: row.spaceId,
+      });
     }
     return metadata;
   }

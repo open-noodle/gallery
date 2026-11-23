@@ -1146,6 +1146,8 @@
     "other": "{count} фото"
   },
   "person_type_changed": "Тип человека изменён.",
+  "person_unavailable_description": "Возможно, он скрыт или у вас больше нет к нему доступа.",
+  "person_unavailable_title": "Этот человек недоступен",
   "pet": "Питомец",
   "pets": "Питомцы",
   "photos_only": "Только фото",

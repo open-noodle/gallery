@@ -43,7 +43,9 @@ const SETTINGS: Setting[] = [false, true].flatMap((sharesNames) =>
 
 const isSpaceMember = (actor: Actor) => (Object.values(SharedSpaceRole) as string[]).includes(actor);
 
-type PersonRead = 'denied' | { name: string; birthDate: string | null; isFavorite: boolean; thumbnailPath: string };
+type PersonRead =
+  | 'denied'
+  | { name: string; birthDate: string | null; isFavorite: boolean; thumbnailPath: string; opensSpaceProfile: boolean };
 type FaceRead = 'denied' | 'no-face' | { name: string; birthDate: string | null };
 type ThumbnailRead = 'denied' | 'stored' | 'crop-of-shared-face';
 
@@ -55,7 +57,7 @@ const expected = (actor: Actor, { sharesNames, hidden, privateCover }: Setting) 
     const published = sharesNames ? { name: SPACE_NAME, birthDate: SPACE_BIRTHDAY } : { name: '', birthDate: null };
     const own = hidden ? published : { name: OWNER_NAME, birthDate: OWNER_BIRTHDAY };
     return {
-      person: { ...own, isFavorite: true, thumbnailPath: STORED_THUMBNAIL } as PersonRead,
+      person: { ...own, isFavorite: true, thumbnailPath: STORED_THUMBNAIL, opensSpaceProfile: false } as PersonRead,
       face: own as FaceRead,
       thumbnail: 'stored' as ThumbnailRead,
     };
@@ -68,7 +70,7 @@ const expected = (actor: Actor, { sharesNames, hidden, privateCover }: Setting) 
   }
   const published = sharesNames ? { name: SPACE_NAME, birthDate: SPACE_BIRTHDAY } : { name: '', birthDate: null };
   return {
-    person: { ...published, isFavorite: false, thumbnailPath: '' } as PersonRead,
+    person: { ...published, isFavorite: false, thumbnailPath: '', opensSpaceProfile: true } as PersonRead,
     face: published as FaceRead,
     thumbnail: (privateCover ? 'crop-of-shared-face' : 'stored') as ThumbnailRead,
   };
@@ -184,6 +186,8 @@ const buildWorld = async (ctx: Ctx, actor: Actor, setting: Setting) => {
     personId: person.personGroupId,
     assetId: shared.assetId,
     sharedFaceId: shared.faceId,
+    spaceId: space.id,
+    spacePersonId: spacePerson.id,
   };
 };
 
@@ -222,6 +226,12 @@ describe('what each account can read about a person (#1317)', () => {
                 birthDate: person.birthDate ?? null,
                 isFavorite: person.isFavorite ?? false,
                 thumbnailPath: person.thumbnailPath,
+                // The person page filters its photos by this profile. Without it another member sees an empty page.
+                opensSpaceProfile:
+                  person.filterId === `space-person:${world.spacePersonId}` &&
+                  person.primaryProfile?.type === 'space-person' &&
+                  person.primaryProfile.id === world.spacePersonId &&
+                  person.primaryProfile.spaceId === world.spaceId,
               },
         face:
           faces === 'denied'
@@ -248,6 +258,18 @@ describe('what each account can read about a person (#1317)', () => {
         ctx.database.selectFrom('person').selectAll().where('personGroupId', '=', world.personId).executeTakeFirst(),
       ).resolves.toEqual(before);
     });
+  });
+
+  it.each(Object.values(SharedSpaceRole))('refuses a %s when the space publishes no profile', async (role) => {
+    const { sut, ctx } = setup();
+    const world = await buildWorld(ctx, role, { sharesNames: true, hidden: false, privateCover: false });
+    await ctx.database
+      .updateTable('shared_space_person')
+      .set({ isHidden: true })
+      .where('id', '=', world.spacePersonId)
+      .execute();
+
+    await expect(sut.getById(world.auth, world.personId)).rejects.toThrow('Not found or no person.read access');
   });
 
   it('matches the recorded grid', () => {

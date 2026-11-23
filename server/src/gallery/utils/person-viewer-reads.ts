@@ -39,7 +39,17 @@ export const projectPersonForViewer = async (
     viewerId: auth.user.id,
     personIds: [person.personGroupId],
   });
-  return forOtherMember(response, metadata.get(person.personGroupId));
+  const published = metadata.get(person.personGroupId);
+  // Every other member reaches a person through a space, so no visible space person means nothing is published.
+  if (!published) {
+    throw denied();
+  }
+  return {
+    ...forOtherMember(response, published),
+    // Clients open the person through this profile, which is what scopes their photos, thumbnail and edits.
+    primaryProfile: { type: 'space-person', id: published.spacePersonId, spaceId: published.spaceId },
+    filterId: `space-person:${published.spacePersonId}`,
+  };
 };
 
 export const projectFacesForViewer = async (

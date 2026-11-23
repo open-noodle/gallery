@@ -236,6 +236,8 @@ offset
 -- GalleryPersonRepository.getSpaceMetadataForViewer
 select distinct
   on ("asset_face"."personGroupId") "asset_face"."personGroupId" as "personId",
+  "shared_space_person"."id" as "spacePersonId",
+  "shared_space_person"."spaceId",
   "shared_space_person"."birthDate",
   COALESCE(
     NULLIF(shared_space_person_alias.alias, ''),

@@ -1147,6 +1147,8 @@
     "other": "{count} Fotos"
   },
   "person_type_changed": "Personentyp geändert.",
+  "person_unavailable_description": "Sie wurde möglicherweise ausgeblendet, oder du hast keinen Zugriff mehr auf sie.",
+  "person_unavailable_title": "Diese Person ist nicht verfügbar",
   "pet": "Haustier",
   "pets": "Haustiere",
   "photos_only": "Nur Fotos",
