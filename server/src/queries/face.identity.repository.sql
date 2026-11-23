@@ -1194,6 +1194,32 @@ WHERE
 LIMIT
   1
 
+-- FaceIdentityRepository.carryManualLinks
+update "person_identity"
+set
+  "manualLinkAt" = least(
+    "person_identity"."manualLinkAt",
+    (
+      (
+        select
+          min("source"."manualLinkAt") as "stamp"
+        from
+          "person_identity" as "source"
+        where
+          "source"."personGroupId" in ($1)
+      )
+    )
+  )
+where
+  "person_identity"."personGroupId" = $2
+
+-- FaceIdentityRepository.markManualLinks
+update "person_identity"
+set
+  "manualLinkAt" = now()
+where
+  "personGroupId" in ($1)
+
 -- FaceIdentityRepository.getAccessiblePeopleIdentityPage
 WITH
   timeline_spaces AS (

@@ -1,4 +1,4 @@
-import { ForeignKeyColumn, Index, Table } from '@immich/sql-tools';
+import { Column, ForeignKeyColumn, Index, Table, type Timestamp } from '@immich/sql-tools';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
@@ -18,4 +18,8 @@ export class PersonIdentityTable {
 
   @ForeignKeyColumn(() => FaceIdentityTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
   identityId!: string;
+
+  // Set when a member linked this person to another scope by hand (#1317); the cross-owner repair keeps those links.
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  manualLinkAt!: Timestamp | null;
 }

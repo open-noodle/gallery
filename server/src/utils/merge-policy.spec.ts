@@ -12,6 +12,7 @@ const makePlan = (overrides: Partial<IdentityMergePropagationPlan> = {}): Identi
   targetIdentityId: 'identity-t',
   sourceIdentityIds: ['identity-s'],
   personalProfileMerges: [],
+  manualLinkPersonIds: [],
   spaceProfileMerges: [],
   profileIdentityUpdates: [],
   affectedOwnerIds: [],

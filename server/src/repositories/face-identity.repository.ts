@@ -1272,6 +1272,44 @@ export class FaceIdentityRepository {
     };
   }
 
+  /** Stamps the personal people a human linked to another scope by hand (#1317); the cross-owner repair keeps them. */
+  /**
+  Gives the target the earliest manual-link stamp among the target and the people merged into it (#1317), so a
+  person linked by hand keeps that link after a personal merge deletes it. Run before the sources are removed.
+  */
+  @GenerateSql({ params: [{ targetPersonId: DummyValue.UUID, sourcePersonIds: [DummyValue.UUID] }] })
+  async carryManualLinks(
+    { targetPersonId, sourcePersonIds }: { targetPersonId: string; sourcePersonIds: string[] },
+    db: Kysely<DB> = this.db,
+  ): Promise<void> {
+    if (sourcePersonIds.length === 0) {
+      return;
+    }
+    await db
+      .updateTable('person_identity')
+      // least() skips nulls, so an unstamped target takes the earliest source stamp and a stamped one keeps its own.
+      .set({
+        manualLinkAt: sql`least(${sql.ref('person_identity.manualLinkAt')}, (${db
+          .selectFrom('person_identity as source')
+          .select((eb) => eb.fn.min('source.manualLinkAt').as('stamp'))
+          .where('source.personGroupId', 'in', sourcePersonIds)}))`,
+      })
+      .where('person_identity.personGroupId', '=', targetPersonId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async markManualLinks(personGroupIds: string[], db: Kysely<DB> = this.db): Promise<void> {
+    if (personGroupIds.length === 0) {
+      return;
+    }
+    await db
+      .updateTable('person_identity')
+      .set({ manualLinkAt: sql`now()` })
+      .where('personGroupId', 'in', personGroupIds)
+      .execute();
+  }
+
   async detachScopedProfile(profileRef: ScopedPersonProfileRefDto): Promise<string> {
     return this.db.transaction().execute(async (trx) => {
       const profile = await this.getProfileForDetach(profileRef, trx);
@@ -1292,6 +1330,14 @@ export class FaceIdentityRepository {
             .where('id', '=', profileRef.id)
             .where('spaceId', '=', profileRef.spaceId!)
             .execute());
+      if (profileRef.type === 'person') {
+        // A detached person is no longer linked by hand to anything (#1317).
+        await trx
+          .updateTable('person_identity')
+          .set({ manualLinkAt: null })
+          .where('personGroupId', '=', profileRef.id)
+          .execute();
+      }
 
       const faceIds = await this.getScopedProfileFaceIds(profileRef, trx);
       if (faceIds.length > 0) {
