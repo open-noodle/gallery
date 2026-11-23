@@ -86,9 +86,29 @@ In `GalleryPersonRepository.getRepresentativeFaces` and `getRepresentativeFaceFo
 
 `getRepresentativeFaceForUpdate` has no caller parameter today; it gains one, passed from both call sites (`getFaceThumbnail`, `updateRepresentativeFace`). A face the caller cannot read then gets the same answer as a face that does not belong to the person: 404 on the thumbnail route, 400 "Representative face must belong to the person" on `PUT .../representative-face`. Neither route tells it apart from an unrelated id any more.
 
-### 4. Names and birthdays: no change to inheritance
+### 4. Names and birthdays cross spaces only with their author
 
-`SharedSpaceRepository.getMetadataInheritanceCandidates` stays as it is. Once §1, §2 and §5 are in, a personal person sits on a space identity for one of two reasons: one of its photos is in the space, or its owner linked it by hand. Both are meant to lend the person's name and birthday to the space person. A rule requiring a face in the space (`supportingFaceCount > 0`) was considered and dropped: it would also stop names from people linked by hand, who have no photo in the space by definition. (My call; see "Calls made".) When the repair job detaches a profile, the existing metadata backfill recomputes the space person and resets a name or birthday whose source left.
+Owner decision (2026-11-23): a name crosses into a space only if the user who named the person is in that space. This replaces the space-to-space rule in `specs/2026-05-02-space-timeline-opt-in-identity-scope-design.md`, which checked only the member who added the photo.
+
+`SharedSpaceRepository.getMetadataInheritanceCandidates` now applies these rules:
+
+- A personal person lends its name and birthday while its owner is a member of the target space, shares person names there, and has not hidden the person.
+- A space person lends a value only if someone typed it there, and only while that author is a member of the target space and shares person names there. The earlier gates on the member who added the photo still apply.
+- `shared_space_person.nameSetById` and `birthDateSetById` record the author. Existing names take theirs from the first `person_update` activity that recorded the same name. A name with no such entry, and every existing birthday, has no author and stays in its own space.
+- A personal alias is never a source: it belongs to the member who wrote it.
+- An inherited copy is never a source. Otherwise two spaces can each keep the other's copy alive after the original is gone.
+
+A rule requiring a face in the space (`supportingFaceCount > 0`) was considered and dropped: it would also stop names from people linked by hand, who have no photo in the space by definition. When the repair job detaches a profile, the existing metadata backfill recomputes the space person and resets a name or birthday whose source left.
+
+### 4b. Reads of a person another account owns
+
+`person` is the owner's private row. `src/gallery/utils/person-viewer-reads.ts` gives another member what their space publishes:
+
+- `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and refuses a hidden person.
+- `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796.
+- `GET /people/{id}/thumbnail` refuses a hidden person. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
+
+`person-reads-other-members-matrix.medium.spec.ts` covers every actor, setting and read (rule 7).
 
 ### 5. Repair: record manual links, detach unbacked joins
 
@@ -142,13 +162,13 @@ The rule does not look at `face_identity_face.source`. On real data the side tha
 
 ## Version pairings (rule 6)
 
-Server-only change. No endpoint or response field is added, removed or retyped. One fork column is added (`person_identity.manualLinkAt`), read only by the repair job.
+Server-only change. No endpoint or response field is added, removed or retyped. Three fork columns are added: `person_identity.manualLinkAt`, read only by the repair job, and `shared_space_person.nameSetById` and `birthDateSetById`, read only by metadata inheritance. Existing response fields keep their types; for a person another account owns, some now carry empty values.
 
 - **Older Gallery app, new server**: the picker lists fewer faces; some person names and birthdays become empty where they came from another account's private person. No decoding change.
 - **New app, older server**: no app change in this work.
 - **Stock Immich apps**: unaffected; none of these reads are reachable through them.
 - **Stock Immich server on a Gallery database**: unaffected; only fork tables change.
-- **Older Gallery server on a database this version migrated**: it does not know `1800200000000-AddPersonIdentityManualLink`, so the documented downgrade applies (revert the fork migration with the newer image first). It would also start joining from private photos again; upgrading repairs at boot.
+- **Older Gallery server on a database this version migrated**: it does not know `1800200000000-AddPersonIdentityManualLink` or `1800300000000-AddSpacePersonMetadataAuthor`, so the documented downgrade applies (revert the fork migration with the newer image first). It would also start joining from private photos again; upgrading repairs at boot.
 
 ## Switching back and downgrading
 
@@ -182,14 +202,15 @@ A local copy of a real library (2 accounts, 13 spaces with face recognition, abo
 ## Calls made (check these while reading)
 
 - §3 uses "own or through a space", not everything `AssetRead` grants (reasons in §3).
-- §4: no inheritance rule; people linked by hand keep lending their names.
+- §4: people linked by hand keep lending their names. The owner set the author rule; applying it to birthdays too, and leaving names with no recorded author in their own space, are my calls.
+- §4b: shared albums and partner sharing keep #796's behaviour, because they have no space to publish a name.
 - §5b uses backing only, not the `shared-space-evidence` marker, because real data showed the marker can land on either side.
 - §5b's backing accepts every join path's evidence and does not require membership, so no job re-joins what the repair detaches. Checked on real data: same results as the earlier rule on all four copies, 0.2–0.3 s per run.
 - §5b holds `DatabaseLock.FacialRecognition` and relies on idempotent re-runs, rather than adding the merge engine's advisory lock to the automatic paths.
 
 ## Commits
 
-One PR, one commit per part, so each can be reviewed and sized on its own: this spec; §1; §2; §3; 5a; 5b; docs.
+One PR, one commit per part, so each can be reviewed and sized on its own: this spec; §1; §2; §3; 5a; 5b; docs; repair fix; §4b; §4; docs.
 
 ## Left to the builder
 
