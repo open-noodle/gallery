@@ -14,6 +14,7 @@ import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('shared_space_person')
 @UpdatedAtTrigger('shared_space_person_updatedAt')
@@ -83,6 +84,10 @@ export class SharedSpacePersonTable {
   @Column({ type: 'timestamp with time zone', nullable: true })
   nameSourceUpdatedAt!: Timestamp | null;
 
+  // Who typed a manual name. A value crosses to another space only while this user is a member there (#1317).
+  @ForeignKeyColumn(() => UserTable, { onDelete: 'SET NULL', nullable: true, index: false })
+  nameSetById!: string | null;
+
   @Column({ type: 'character varying', default: 'none' })
   birthDateSource!: Generated<string>;
 
@@ -94,6 +99,9 @@ export class SharedSpacePersonTable {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   birthDateSourceUpdatedAt!: Timestamp | null;
+
+  @ForeignKeyColumn(() => UserTable, { onDelete: 'SET NULL', nullable: true, index: false })
+  birthDateSetById!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

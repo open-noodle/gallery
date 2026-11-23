@@ -87,3 +87,4 @@
 1800000000000-AddAssetFaceVideoFrameTable
 1800100000000-AddVideoPetsSampledAt
 1800200000000-AddPersonIdentityManualLink
+1800300000000-AddSpacePersonMetadataAuthor

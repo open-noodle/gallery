@@ -73,10 +73,12 @@ export type SharedSpacePerson = {
   nameSourceProfileType: string | null;
   nameSourceProfileId: string | null;
   nameSourceUpdatedAt: Date | null;
+  nameSetById: string | null;
   birthDateSource: string;
   birthDateSourceProfileType: string | null;
   birthDateSourceProfileId: string | null;
   birthDateSourceUpdatedAt: Date | null;
+  birthDateSetById: string | null;
   personalPersonId?: string | null;
   personalName?: string | null;
   personalThumbnailPath?: string | null;

@@ -2825,6 +2825,7 @@ export class SharedSpaceService extends BaseService {
       sharedPersonUpdates.nameSourceProfileType = 'space-person';
       sharedPersonUpdates.nameSourceProfileId = personId;
       sharedPersonUpdates.nameSourceUpdatedAt = new Date();
+      sharedPersonUpdates.nameSetById = auth.user.id;
     }
 
     const hasSharedPersonUpdates = Object.values(sharedPersonUpdates).some((value) => value !== undefined);
@@ -2839,6 +2840,7 @@ export class SharedSpaceService extends BaseService {
         birthDateSourceProfileType: 'space-person',
         birthDateSourceProfileId: personId,
         birthDateSourceUpdatedAt: new Date(),
+        birthDateSetById: auth.user.id,
       });
     }
 

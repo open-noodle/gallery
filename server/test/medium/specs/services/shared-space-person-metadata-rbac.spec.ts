@@ -115,6 +115,15 @@ const getSpacePersonById = async (ctx: ReturnType<typeof setup>['ctx'], personId
     .executeTakeFirstOrThrow();
 };
 
+/** The member who bridges the two spaces typed the source space's name and birthday (#1317). */
+const markTypedBy = async (ctx: ReturnType<typeof setup>['ctx'], spacePersonId: string, userId: string) => {
+  await ctx.database
+    .updateTable('shared_space_person')
+    .set({ nameSource: 'manual', nameSetById: userId, birthDateSource: 'manual', birthDateSetById: userId })
+    .where('id', '=', spacePersonId)
+    .execute();
+};
+
 const createSpaceNameBridge = async (input?: {
   sourceName?: string;
   targetOwnedByOther?: boolean;
@@ -134,6 +143,7 @@ const createSpaceNameBridge = async (input?: {
   });
   await sut.handleSharedSpaceFaceMatch({ spaceId: sourceSpace.id, assetId: face.asset.id });
   const sourceSpacePerson = await getOnlySpacePerson(ctx, sourceSpace.id);
+  await markTypedBy(ctx, sourceSpacePerson.id, member.id);
 
   const { space: targetSpace } = await ctx.newSharedSpace({ createdById: otherOwner.id });
   await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: otherOwner.id, role: SharedSpaceRole.Owner });
@@ -186,6 +196,7 @@ const createLinkedLibrarySpaceNameBridge = async (input?: {
   await ctx.newSharedSpaceLibrary({ spaceId: sourceSpace.id, libraryId: library.id, addedById: source.id });
   await sut.handleSharedSpaceLibraryFaceSync({ spaceId: sourceSpace.id, libraryId: library.id });
   const sourceSpacePerson = await getOnlySpacePerson(ctx, sourceSpace.id);
+  await markTypedBy(ctx, sourceSpacePerson.id, member.id);
 
   const { space: targetSpace } = await ctx.newSharedSpace({ createdById: otherOwner.id });
   await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: otherOwner.id, role: SharedSpaceRole.Owner });
@@ -302,7 +313,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(person.birthDateSource).toBe('none');
   });
 
-  it('carries a member-visible inherited space name into a new space created by that member', async () => {
+  it('does not carry a name into a space its author is not a member of (#1317)', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { user: source } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
@@ -336,10 +347,8 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .selectAll()
       .where('spaceId', '=', targetSpace.id)
       .executeTakeFirstOrThrow();
-    expect(targetSpacePerson.name).toBe('John');
-    expect(targetSpacePerson.nameSource).toBe('inherited');
-    expect(targetSpacePerson.nameSourceProfileType).toBe('space-person');
-    expect(targetSpacePerson.nameSourceProfileId).toBe(sourceSpacePerson.id);
+    expect(targetSpacePerson.name).toBe('');
+    expect(targetSpacePerson.nameSource).toBe('none');
   });
 
   it('does not carry a space name from a source space hidden from the member timeline', async () => {
@@ -615,7 +624,11 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await sut.handleSharedSpaceLibraryFaceSync({ spaceId: targetSpace.id, libraryId: library.id });
     const targetSpacePerson = await getOnlySpacePerson(ctx, targetSpace.id);
 
-    await sut.updateSpacePerson(authFor(source), sourceSpace.id, sourceSpacePerson.id, { name: 'Johnny' });
+    await ctx.database
+      .updateTable('shared_space_person')
+      .set({ name: 'Johnny' })
+      .where('id', '=', sourceSpacePerson.id)
+      .execute();
     await sut.backfillSpacePersonMetadata({ identityId: face.identity.id, limit: 1000 });
 
     const renamed = await getSpacePersonById(ctx, targetSpacePerson.id);
@@ -817,7 +830,11 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
   it('updates from a renamed source space person and then clears after that source space is deleted', async () => {
     const { ctx, sut, face, source, sourceSpace, sourceSpacePerson, targetSpacePerson } = await createSpaceNameBridge();
 
-    await sut.updateSpacePerson(authFor(source), sourceSpace.id, sourceSpacePerson.id, { name: 'Johnny' });
+    await ctx.database
+      .updateTable('shared_space_person')
+      .set({ name: 'Johnny' })
+      .where('id', '=', sourceSpacePerson.id)
+      .execute();
     await sut.backfillSpacePersonMetadata({ identityId: face.identity.id, limit: 1000 });
 
     const renamed = await getSpacePersonById(ctx, targetSpacePerson.id);
