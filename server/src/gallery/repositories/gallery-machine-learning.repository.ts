@@ -9,6 +9,9 @@ import {
   PetDetectionResponse,
 } from 'src/repositories/machine-learning.repository.js';
 
+// A healthy call takes seconds; the budget also covers the first call, which loads (and may download) the model.
+export const DEPTH_ESTIMATION_TIMEOUT_MS = 5 * 60_000;
+
 // The fork's ML calls. Registered so it is the one instance behind the MachineLearningRepository token
 // (src/gallery/index.ts), which SystemConfigService.setup() configures and whose health checks run once.
 @Injectable()
@@ -52,7 +55,9 @@ export class GalleryMachineLearningRepository extends MachineLearningRepository 
 
   async estimateDepth(imagePath: string, { modelName }: { modelName: string }): Promise<DepthEstimation> {
     const request: DepthEstimationRequest = { [ModelTask.DEPTH_ESTIMATION]: { [ModelType.DEPTH]: { modelName } } };
-    const response = await this.predict<{ [ModelTask.DEPTH_ESTIMATION]?: DepthEstimation }>({ imagePath }, request);
+    const response = await this.predict<{ [ModelTask.DEPTH_ESTIMATION]?: DepthEstimation }>({ imagePath }, request, {
+      timeoutMs: DEPTH_ESTIMATION_TIMEOUT_MS,
+    });
     const depth = response[ModelTask.DEPTH_ESTIMATION];
     if (!depth) {
       throw new Error('Machine learning service returned no depth map; it may predate Spatial Scene');
