@@ -65,7 +65,9 @@ describe('BackupSettings', () => {
   it('shows the destination selector regardless of the media backend', async () => {
     await render(BackupSettings);
 
-    expect(page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }).element()).toHaveValue('local');
+    expect(page.getByRole('combobox', { name: 'admin.backup_destination', exact: true }).element()).toHaveValue(
+      'local',
+    );
   });
 
   it('shows the cloud configuration hint only for cloud destinations', async () => {
@@ -134,9 +136,7 @@ describe('BackupSettings', () => {
     await render(BackupSettings);
 
     expect(page.getByText('admin.backup_destination_legacy_hint', { exact: true }).element()).toBeInTheDocument();
-    await userEvent.click(
-      page.getByRole('button', { name: 'admin.backup_destination_use_independent', exact: true }),
-    );
+    await userEvent.click(page.getByRole('button', { name: 'admin.backup_destination_use_independent', exact: true }));
     await userEvent.click(page.getByRole('button', { name: 'save', exact: true }));
 
     expect(mocks.saveConfig).toHaveBeenCalledWith(
