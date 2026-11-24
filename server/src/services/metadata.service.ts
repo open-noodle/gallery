@@ -197,7 +197,8 @@ export class MetadataService extends BaseService {
       return;
     }
 
-    const flags: DeepPartial<SystemFlags> = (await this.systemMetadataRepository.get(SystemMetadataKey.SystemFlags)) ?? {};
+    const flags: DeepPartial<SystemFlags> =
+      (await this.systemMetadataRepository.get(SystemMetadataKey.SystemFlags)) ?? {};
     if (flags.faceSidecarExportBackfilled) {
       return;
     }
@@ -208,9 +209,7 @@ export class MetadataService extends BaseService {
   private async queueFaceSidecarBackfill(existingFlags?: DeepPartial<SystemFlags>) {
     const assetIds = await this.personRepository.getAssetIdsWithNamedFaces();
     if (assetIds.length > 0) {
-      await this.jobRepository.queueAll(
-        assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })),
-      );
+      await this.jobRepository.queueAll(assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
     }
 
     const flags = existingFlags ?? (await this.systemMetadataRepository.get(SystemMetadataKey.SystemFlags)) ?? {};
@@ -501,9 +500,7 @@ export class MetadataService extends BaseService {
       if (isFaceExportEnabled(metadata)) {
         const assetIds = await this.personRepository.getAssetIdsWithNamedFaces();
         if (assetIds.length > 0) {
-          await this.jobRepository.queueAll(
-            assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })),
-          );
+          await this.jobRepository.queueAll(assetIds.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
         }
       }
     }
