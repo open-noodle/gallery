@@ -93,7 +93,7 @@ Owner decision (2026-11-23): a name crosses into a space only if the user who na
 `SharedSpaceRepository.getMetadataInheritanceCandidates` now applies these rules:
 
 - A personal person lends its name and birthday while its owner is a member of the target space, shares person names there, and has not hidden the person.
-- A space person lends a value only if someone typed it there, and only while that author is a member of the target space and shares person names there. The earlier gates on the member who added the photo still apply.
+- A space person lends a value only if someone typed it there, and only while that author is a member of the target space and shares person names there. The earlier gates on the member who added the photo still apply. Every path that stores a typed name records its author: renaming a space person, creating one with a name (with or without a starting face), and the space person dedup, which copies the name's source and author onto the person it keeps.
 - `shared_space_person.nameSetById` and `birthDateSetById` record the author. Existing names take theirs from the first `person_update` activity that recorded the same name. A name with no such entry, and every existing birthday, has no author and stays in its own space.
 - A personal alias is never a source: it belongs to the member who wrote it.
 - An inherited copy is never a source. Otherwise two spaces can each keep the other's copy alive after the original is gone.
@@ -102,14 +102,16 @@ A rule requiring a face in the space (`supportingFaceCount > 0`) was considered 
 
 ### 4b. Reads of a person another account owns
 
-`person` is the owner's private row. `src/gallery/utils/person-viewer-reads.ts` gives another member what their space publishes:
+`person` is the owner's private row. `PersonViewerReads` (`src/gallery/utils/person-viewer-reads.ts`, built once per service by `GalleryBaseService.initGallery`) gives another member what their space shows. A member reads a person only through a profile one of their spaces shows: the space runs face recognition and keeps a visible space person for it, and the owner has not hidden it. Every person read applies that rule the same way (`requireShown`):
 
-- `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and the space profile (`primaryProfile`, `filterId`) that scopes their photos. It refuses a hidden person, and a person with no visible space person, because nothing is published about them.
+- `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and the space profile (`primaryProfile`, `filterId`) that scopes their photos.
+- `GET /people/{id}/faces` (the picker), `GET /people/{id}/faces/{faceId}/thumbnail` and `GET /people/{id}/statistics` refuse the same people `GET /people/{id}` refuses, so a member cannot learn which photos a hidden person is in.
 - `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796. Owner decision (2026-11-23): keep this.
 - The web person page sends another member to the space's page for that person, which works for a member who keeps the space off their timeline. A refused person shows a "not available" page. A member who cannot edit sees "Person" for an unnamed person, not "Add a name".
-- `GET /people/{id}/thumbnail` refuses a hidden person. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
+- `GET /people/{id}/thumbnail` refuses the same people. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
+- A space with face recognition off lists no people, so it shows none to its members either: `GET /faces` gives an empty name there.
 
-`person-reads-other-members-matrix.medium.spec.ts` covers every actor, setting and read (rule 7).
+`person-reads-other-members-matrix.medium.spec.ts` covers every actor (the owner, each space role, a non-member, a server admin who is not a member, a partner, a shared album member), every setting that changes the answer (the owner hid the person; the space shows a named, an unnamed or a hidden space person; recognition on or off; a cover photo the space cannot see) and all six reads (rule 7).
 
 ### 5. Repair: record manual links, detach unbacked joins
 
@@ -130,20 +132,22 @@ A new job, `FaceIdentityCrossOwnerRepair`.
 **Rule.** A personal profile (person P, owner U, identity I) is detached when all three hold:
 
 1. **I is shared:** it also holds another owner's personal profile, or any space person;
-2. **P is not backed:** U has no live face bound to I (`face_identity_face`) on an asset that a space holding a space person on I can see (`spaceAssetPathBranches` for that space: direct, linked library, linked album and album contributions, with `spaceVisibilityGate`). U does not have to be a member of that space;
+2. **P is not backed:** U has no live face of P, or bound to I (`face_identity_face`), on an asset that a space holding a space person on I can see (`spaceAssetPathBranches` for that space: direct, linked library, linked album and album contributions, with `spaceVisibilityGate`). U does not have to be a member of that space;
 3. **P was not linked by hand:** `person_identity.manualLinkAt` is null.
+
+Condition 2 counts P's own faces without their `face_identity_face` row, because the identity backfill writes those rows and the nightly sweep does not wait for it; a face with no row yet would otherwise read as unbacked.
 
 Condition 2 must accept everything any automatic or editor path joins on, or that path would re-join, every night, what the repair detaches. The paths are: the reconciliation claim (§1: a member's face on an asset the space can see), space face matching and dedup (faces projected into the space, which includes photos a non-member collaborator added to a linked album), and an editor linking a face to a space person (`getOrCreateOwnerPersonForIdentity` gives the face's owner a profile on I; the owner may not be a member). All of them rest on a face of U, bound to I, on an asset a space holding I can see; condition 2 is exactly that, without a membership requirement. Medium tests run reconciliation then the repair, and an editor face link then the repair, and assert the repair is a no-op.
 
 The rule does not look at `face_identity_face.source`. On real data the side that carries `shared-space-evidence` depends on whose face created the space person, not on who was joined: the owner's long-standing identity was merged into the newcomer's and the owner's 764 faces got the marker, while the newly joined account's faces kept `owner-person` (see "Verified on real data"). Backing does not depend on direction, and flagged exactly the right profile in every scenario tested.
 
-**Trigger.** `FaceIdentityMaintenanceService.onBootstrap` (microservices) runs the detection count and queues the job when it is non-zero, like `hasBackfillWork`, with a fixed job id so several microservices workers queue it once. Boot skips it while the identity backfill still has work: backing reads per-face identity rows, which the backfill may still be realigning, so the nightly run handles that case. `handleSharedSpaceIdentityReconciliationSweep` (nightly, fork file) queues it after queueing the per-space reconciliations. So a join that loses its shared photo (the member removes it from the space, or leaves) is undone at the next nightly run, and joins always follow shared photos or manual links.
+**Trigger.** `FaceIdentityMaintenanceService.onBootstrap` (microservices) runs the detection count and queues the job when it is non-zero, like `hasBackfillWork`, with a fixed job id so several microservices workers queue it once. Neither boot nor the nightly run waits for the identity backfill, because backing does not depend on the rows it writes (condition 2). `handleSharedSpaceIdentityReconciliationSweep` (nightly, fork file) queues it after queueing the per-space reconciliations. So a join that loses its shared photo (the member removes it from the space, or leaves) is undone at the next nightly run, and joins always follow shared photos or manual links.
 
-**Repair.** For each detected profile, `FaceIdentityRepository.detachScopedProfile({ type: 'person', id })`. A profile that fails (for example, its person was deleted since detection) is logged and skipped; the next run re-evaluates it. Detach gives a fresh identity and moves that person's `face_identity_face` rows moved to it with `source` unchanged. (Detach also always resets the remaining identity's `face_identity.representativeFaceId` to its most recently updated face; nothing reads that column today, so this has no visible effect.) After the last batch, queue one unscoped `SharedSpacePersonMetadataBackfill`, as `detachScopedPerson` does; it recomputes inherited names and birthdays and resets ones whose source left.
+**Repair.** For each detected profile, `FaceIdentityRepository.detachCrossOwnerCandidate(id)`: in one transaction it takes the merge engine's lock (`identity-merge-propagation`), checks the rule again for that person, and only then detaches it as `detachScopedProfile` does. A member who links their person by hand after the page was listed keeps the link and its stamp. A profile that fails (for example, its person was deleted since detection) is logged and skipped; the next run re-evaluates it. Detach gives a fresh identity and moves that person's `face_identity_face` rows moved to it with `source` unchanged. (Detach also always resets the remaining identity's `face_identity.representativeFaceId` to its most recently updated face; nothing reads that column today, so this has no visible effect.) After the last batch, queue one unscoped `SharedSpacePersonMetadataBackfill`, as `detachScopedPerson` does; it recomputes inherited names and birthdays and resets ones whose source left.
 
-**Locking.** The job holds `DatabaseLock.FacialRecognition` per batch, which serializes it with recognition (the only other holder); reconciliation and dedup do not take that lock. A join that lands mid-batch is caught by the next run, because the job is idempotent.
+**Locking.** The job holds `DatabaseLock.FacialRecognition` per batch, which serializes it with recognition (the only other holder); reconciliation and dedup do not take that lock. A join that lands mid-batch is caught by the next run, because the job is idempotent. Manual merges take a different lock, so each detach also takes the merge lock and checks the rule again (Repair).
 
-**Batching and logging.** Page candidate profiles by `personGroupId` with a cursor, a fixed chunk per job, re-queueing until none are left. One log line per run: profiles checked, detached, kept as linked by hand.
+**Batching and logging.** Page candidate profiles by `personGroupId` with a cursor, a fixed chunk per job, re-queueing until none are left. One log line per page: candidates found and detached. People linked by hand are not candidates, so they are not counted.
 
 **What members notice.**
 - A member joined from private photos sees their person on its own again: it stops showing the other account's space photos, and with `withSharedSpaces` their People list shows their person and the space person separately. They can link them by hand, which now sticks.
@@ -156,17 +160,17 @@ The rule does not look at `face_identity_face.source`. On real data the side tha
 - **Unit** (`shared-space.service.spec.ts`, fork-only service): the claim searches with `{ spaceId, spaceAssetOwnerId }` and never with `userIds`. Already updated. Extend the mock fixture `setupStrictReconciliationFixture` with a case where the search returns nothing for a member whose matching face is outside the space.
 - **Medium, reconciliation** (new database fixture; none exists today): a member's face on an asset outside the space produces no claim and no join; with one of the member's photos shared into the space, the join happens.
 - **Medium, recognition** (`test/medium/specs/gallery/**`, a fork test of upstream code): a member of a face-enabled space uploads a private photo that matches a space person; no `person_identity` row changes and no `shared-space-evidence` row is written.
-- **Medium, picker**: on a joined identity the owner sees their own private faces, a space member's shared face, a face they can read through an album or partner share, and not a space member's private face, on all three routes. The unreadable face gets the same response as a face that does not belong to the person.
+- **Medium, picker**: on a joined identity the owner sees their own private faces and a space member's shared face, and not a space member's private face or a face they could open only through an album or partner share (§3), on all three routes. The unreadable face gets the same response as a face that does not belong to the person.
 - **Medium, manual-link flag** (5a): each manual merge path (`POST /people/same-person`, `POST /people/{id}/merge`, `POST /people/merge`, space editor merge) sets `manualLinkAt` on every named personal profile, enumerated so a new merge path without it fails the test; detach clears it.
 - **Medium, repair job** (5b): a join built from private photos is detached; a join backed by a shared photo is kept; a person linked by hand with no shared photo is kept; a join whose member removes the shared photo is detached; a member who leaves the space while their directly added photo stays is kept; a join backed only by a photo in an album the member owned is detached after they leave (the album is unlinked); a face owner who is not a member, linked by an editor or reached through a linked album, is kept; the rule picks the joined member regardless of which side carries `shared-space-evidence`; reconciliation followed by the repair is a no-op; a second run changes nothing; a reconciliation run after the repair does not join again; the inherited name and birthday reset after the detach.
 - **RBAC oracle** (`test/medium/specs/utils/rbac-oracle.medium.spec.ts`): add a fixture where one member's private faces sit on another account's identity, and the person face picker as a surface. The snapshot must show none of those faces for the other account. Mutation-check once by removing the §3 predicate.
 
 ## Version pairings (rule 6)
 
-Server-only change. No endpoint or response field is added, removed or retyped. Three fork columns are added: `person_identity.manualLinkAt`, read only by the repair job, and `shared_space_person.nameSetById` and `birthDateSetById`, read only by metadata inheritance. Existing response fields keep their types; for a person another account owns, some now carry empty values.
+No endpoint or response field is added, removed or retyped. The web app ships inside the server image, so its change (§4b: the person page opens the space's page for another member's person, and a refused person shows a "not available" page) adds no pairing; it reads only fields older servers already send and falls back to the old page when `primaryProfile` is absent. Three fork columns are added: `person_identity.manualLinkAt`, read only by the repair job, and `shared_space_person.nameSetById` and `birthDateSetById`, read only by metadata inheritance. Existing response fields keep their types; for a person another account owns, some now carry empty values.
 
 - **Older Gallery app, new server**: the picker lists fewer faces; some person names and birthdays become empty where they came from another account's private person. No decoding change.
-- **New app, older server**: no app change in this work.
+- **New app, older server**: no mobile change in this work.
 - **Stock Immich apps**: unaffected; none of these reads are reachable through them.
 - **Stock Immich server on a Gallery database**: unaffected; only fork tables change.
 - **Older Gallery server on a database this version migrated**: it does not know `1800200000000-AddPersonIdentityManualLink` or `1800300000000-AddSpacePersonMetadataAuthor`, so the documented downgrade applies (revert the fork migration with the newer image first). It would also start joining from private photos again; upgrading repairs at boot.
@@ -193,7 +197,7 @@ A local copy of a real library (2 accounts, 13 spaces with face recognition, abo
 
 ## Upstream diff
 
-- `server/src/services/person.service.ts` (upstream file): the diff against `refs/upstream/v3.4.2` shrinks (§2 removes fork hunks).
+- `server/src/services/person.service.ts` (upstream file): against `refs/upstream/v3.4.2` the diff goes from 499 added and 308 removed lines to 492 and 307. §2 removes fork hunks; §4b adds one call per read into `PersonViewerReads`.
 - All other changes are in fork files: `server/src/gallery/**`, `server/src/services/shared-space.service.ts`, `server/src/repositories/face-identity.repository.ts` and fork test files. Report the before/after `git diff --stat refs/upstream/v3.4.2` for touched upstream files in the PR.
 
 ## Docs
@@ -207,11 +211,12 @@ A local copy of a real library (2 accounts, 13 spaces with face recognition, abo
 - §4b: shared albums and partner sharing keep #796's behaviour, because they have no space to publish a name.
 - §5b uses backing only, not the `shared-space-evidence` marker, because real data showed the marker can land on either side.
 - §5b's backing accepts every join path's evidence and does not require membership, so no job re-joins what the repair detaches. Checked on real data: same results as the earlier rule on all four copies, 0.2–0.3 s per run.
-- §5b holds `DatabaseLock.FacialRecognition` and relies on idempotent re-runs, rather than adding the merge engine's advisory lock to the automatic paths.
+- §5b holds `DatabaseLock.FacialRecognition` and relies on idempotent re-runs for the automatic paths, and takes the merge engine's lock only around each detach, for manual links.
+- §4b: a space with face recognition off shows no person to other members, matching its empty people list.
 
 ## Commits
 
-One PR, one commit per part, so each can be reviewed and sized on its own: this spec; §1; §2; §3; 5a; 5b; docs; repair fix; §4b; §4; docs.
+One PR, one commit per part, so each can be reviewed and sized on its own: this spec; §1; §2; §3; 5a; 5b; docs; repair fix; §4b; §4; docs; then one commit each for the review's findings on the repair, typed names, and person reads.
 
 ## Left to the builder
 
