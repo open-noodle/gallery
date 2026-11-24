@@ -116,8 +116,8 @@ export class FaceIdentityMaintenanceService extends BaseService {
   (#1317, spec 5b; the rule is `FaceIdentityRepository.getCrossOwnerRepairCandidates`, checked again for each person
   under the merge engine's lock, so a link made by hand while the page runs is kept). Detaching gives the person
   its own identity again and leaves everything else on the old identity in place. One page per job, under the
-  facial recognition lock so recognition and reconciliation do not interleave with it. A person that fails to
-  detach is logged and skipped. After the last page, one unscoped metadata backfill recomputes space person names
+  facial recognition lock so recognition does not interleave with it; reconciliation takes no lock, and a join it
+  makes mid-page is backed, so the per-person check keeps it. A person that fails to detach is logged and skipped. After the last page, one unscoped metadata backfill recomputes space person names
   and birthdays inherited from a detached person.
   */
   @OnJob({ name: JobName.FaceIdentityCrossOwnerRepair, queue: QueueName.FacialRecognition })

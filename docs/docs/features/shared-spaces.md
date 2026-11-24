@@ -410,7 +410,7 @@ The separation keeps each member's personal library private while face managemen
 
 Gallery links one of your personal people to a space person automatically only when you have a photo of that person in the space: added directly, in a linked album, or in a connected library. Photos that stay in your own library are never used for this, so a space never learns who appears in them.
 
-If the same person appears only in your private photos, link them by hand: open your person, choose **Merge people**, and pick the space person. A link you make by hand stays.
+If the same person appears only in your private photos, an owner or editor of the space can link them by hand: open your person, choose **Merge people**, and pick the space person. A link made by hand stays. A viewer cannot link by hand; the link is made automatically once one of their photos of that person is in the space.
 
 An automatic link lasts as long as a photo behind it is still in the space. When you remove the last such photo, or unlink the album that held it, Gallery undoes the link in the background and your person keeps their own name and photos. Leaving a space does not by itself undo a link: photos you added directly stay in the space after you leave.
 

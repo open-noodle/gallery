@@ -205,8 +205,10 @@ where
               inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
               inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
               and "linked_album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
             where
-              "album_asset"."assetId" = "asset"."id"
+              "shared_space_member"."userId" = $9::uuid
+              and "album_asset"."assetId" = "asset"."id"
           )
           or exists (
             select
@@ -217,21 +219,23 @@ where
               and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
               inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
               and "linked_album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
             where
-              "album_space_asset"."assetId" = "asset"."id"
+              "shared_space_member"."userId" = $10::uuid
+              and "album_space_asset"."assetId" = "asset"."id"
           )
         )
       )
     )
   )
-  and "asset"."visibility" != $9
+  and "asset"."visibility" != $11
 order by
   "asset"."fileCreatedAt" desc,
   "asset_face"."id"
 limit
-  $10
+  $12
 offset
-  $11
+  $13
 
 -- GalleryPersonRepository.getSpaceMetadataForViewer
 select distinct
@@ -325,8 +329,10 @@ where
               inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
               inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
               and "linked_album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
             where
-              "album_asset"."assetId" = "asset"."id"
+              "shared_space_member"."userId" = $8::uuid
+              and "album_asset"."assetId" = "asset"."id"
           )
           or exists (
             select
@@ -337,17 +343,19 @@ where
               and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
               inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
               and "linked_album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
             where
-              "album_space_asset"."assetId" = "asset"."id"
+              "shared_space_member"."userId" = $9::uuid
+              and "album_space_asset"."assetId" = "asset"."id"
           )
         )
       )
     )
   )
   and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $8
+  and "asset_face"."isVisible" = $10
   and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $9
+  and "asset"."isOffline" = $11
   and not exists (
     select
       "face_identity_face"."assetFaceId"

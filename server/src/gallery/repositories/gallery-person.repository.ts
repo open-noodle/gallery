@@ -430,7 +430,7 @@ export class GalleryPersonRepository {
       .executeTakeFirstOrThrow();
   }
 
-  @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0 }] })
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0, viewerId: DummyValue.UUID }] })
   getRepresentativeFaces(options: RepresentativeFaceListOptions) {
     return this.db
       .selectFrom('person')
@@ -548,7 +548,7 @@ export class GalleryPersonRepository {
     return metadata;
   }
 
-  @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID }] })
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID, viewerId: DummyValue.UUID }] })
   getRepresentativeFaceForUpdate(options: RepresentativeFaceUpdateOptions) {
     return this.db
       .selectFrom('person')
