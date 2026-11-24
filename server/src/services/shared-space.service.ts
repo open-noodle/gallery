@@ -109,6 +109,18 @@ const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
 const getSharedSpaceRoleScore = (role: string) => ROLE_HIERARCHY[role as SharedSpaceRole] ?? 0;
 const getMetadataSourceScore = (sourceProfileType?: string | null) => (sourceProfileType === 'user-person' ? 1 : 0);
 
+/**
+The provenance of a name someone typed into space person `personId` (#1317): the name crosses into another space
+only while `authorId` is a member there, so every path that stores a typed name records them.
+*/
+const typedNameFields = (personId: string, authorId: string) => ({
+  nameSource: 'manual' as const,
+  nameSourceProfileType: 'space-person' as const,
+  nameSourceProfileId: personId,
+  nameSourceUpdatedAt: new Date(),
+  nameSetById: authorId,
+});
+
 /** nameSource collapse precedence: a manually-set name wins over an inherited/auto/empty one. */
 const NAME_SOURCE_PRECEDENCE: Record<string, number> = {
   manual: 3,
@@ -2313,8 +2325,15 @@ export class SharedSpaceService extends BaseService {
   ): Promise<SharedSpacePersonResponseDto> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
+    const name = dto.name?.trim() ? dto.name : '';
     if (!dto.assetFaceId) {
-      const created = await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' });
+      let created = await this.sharedSpaceRepository.createPerson({ spaceId, name: '' });
+      if (name) {
+        created = await this.sharedSpaceRepository.updatePerson(created.id, {
+          name,
+          ...typedNameFields(created.id, auth.user.id),
+        });
+      }
       return this.mapSpacePerson(created, null);
     }
 
@@ -2339,16 +2358,21 @@ export class SharedSpaceService extends BaseService {
         const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
         let created = existingIdentityId
           ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
-              { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
+              { spaceId, identityId: existingIdentityId, name: '' },
               trx,
             )
-          : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
+          : await this.sharedSpaceRepository.createPerson({ spaceId, name: '' }, trx);
 
         // The identity's space person can already exist, unnamed: SharedSpaceFaceMatch creates one
         // whenever it reaches this face first. The caller asked for a person with this name, so name
-        // that row rather than hand back a blank one. A person someone already named keeps its name.
-        if (dto.name?.trim() && !created.name.trim()) {
-          created = await this.sharedSpaceRepository.updatePerson(created.id, { name: dto.name }, trx);
+        // that row rather than hand back a blank one. A person someone already named keeps its name
+        // and its author.
+        if (name && !created.name.trim()) {
+          created = await this.sharedSpaceRepository.updatePerson(
+            created.id,
+            { name, ...typedNameFields(created.id, auth.user.id) },
+            trx,
+          );
         }
 
         await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
@@ -2820,12 +2844,7 @@ export class SharedSpaceService extends BaseService {
       representativeFaceId: dto.representativeFaceId,
     };
     if (dto.name !== undefined) {
-      sharedPersonUpdates.name = dto.name;
-      sharedPersonUpdates.nameSource = 'manual';
-      sharedPersonUpdates.nameSourceProfileType = 'space-person';
-      sharedPersonUpdates.nameSourceProfileId = personId;
-      sharedPersonUpdates.nameSourceUpdatedAt = new Date();
-      sharedPersonUpdates.nameSetById = auth.user.id;
+      Object.assign(sharedPersonUpdates, { name: dto.name, ...typedNameFields(personId, auth.user.id) });
     }
 
     const hasSharedPersonUpdates = Object.values(sharedPersonUpdates).some((value) => value !== undefined);
@@ -3886,9 +3905,18 @@ export class SharedSpaceService extends BaseService {
       }
 
       // Determine merged properties
-      const updates: Partial<{ name: string; isHidden: boolean }> = {};
+      const updates: Parameters<typeof this.sharedSpaceRepository.updatePerson>[1] = {};
       if (!target.name && source.name) {
-        updates.name = source.name;
+        // The name keeps its provenance, so a typed name still crosses spaces only with its author (#1317).
+        const typedHere = source.nameSourceProfileType === 'space-person' && source.nameSourceProfileId === source.id;
+        Object.assign(updates, {
+          name: source.name,
+          nameSource: source.nameSource,
+          nameSourceProfileType: source.nameSourceProfileType,
+          nameSourceProfileId: typedHere ? target.id : source.nameSourceProfileId,
+          nameSourceUpdatedAt: source.nameSourceUpdatedAt,
+          nameSetById: source.nameSetById,
+        });
       }
 
       // Update and delete separately so deletePerson still runs if updatePerson fails

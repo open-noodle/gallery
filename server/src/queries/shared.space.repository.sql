@@ -3072,6 +3072,11 @@ select
   "shared_space_person"."faceCount",
   "shared_space_person"."representativeFaceId",
   "shared_space_person"."representativeFaceSource",
+  "shared_space_person"."nameSource",
+  "shared_space_person"."nameSourceProfileType",
+  "shared_space_person"."nameSourceProfileId",
+  "shared_space_person"."nameSourceUpdatedAt",
+  "shared_space_person"."nameSetById",
   "face_search"."embedding"
 from
   "shared_space_person"

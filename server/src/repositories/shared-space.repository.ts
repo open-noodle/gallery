@@ -165,6 +165,11 @@ type SpacePersonWithEmbedding = {
   faceCount: number;
   representativeFaceId: string | null;
   representativeFaceSource?: string | null;
+  nameSource?: string;
+  nameSourceProfileType?: string | null;
+  nameSourceProfileId?: string | null;
+  nameSourceUpdatedAt?: Date | null;
+  nameSetById?: string | null;
   embedding: string;
 };
 
@@ -4403,6 +4408,11 @@ export class SharedSpaceRepository {
         'shared_space_person.faceCount',
         'shared_space_person.representativeFaceId',
         'shared_space_person.representativeFaceSource',
+        'shared_space_person.nameSource',
+        'shared_space_person.nameSourceProfileType',
+        'shared_space_person.nameSourceProfileId',
+        'shared_space_person.nameSourceUpdatedAt',
+        'shared_space_person.nameSetById',
         'face_search.embedding',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)

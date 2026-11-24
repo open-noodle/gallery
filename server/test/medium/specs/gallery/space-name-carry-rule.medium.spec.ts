@@ -7,10 +7,13 @@ is never a source, so two spaces cannot keep a value alive after its original is
 */
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SourceType } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -19,7 +22,7 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { DB } from 'src/schema/index.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { newMediumService } from 'test/medium.factory.js';
-import { factory } from 'test/small.factory.js';
+import { factory, newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -40,14 +43,17 @@ const setup = () => {
       ConfigRepository,
       DatabaseRepository,
       FaceIdentityRepository,
+      FacePersonVerdictRepository,
+      FaceSearchRepository,
       PersonRepository,
       SharedSpaceRepository,
       SystemMetadataRepository,
     ],
-    mock: [JobRepository, LoggingRepository],
+    mock: [JobRepository, LoggingRepository, QueueMaintenanceRepository],
   });
   ctx.getMock(JobRepository).queue.mockResolvedValue();
   ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   return { sut, ctx };
 };
 
@@ -112,6 +118,7 @@ const buildWorld = async (input: { namerInTarget: boolean }) => {
     source,
     target,
     person,
+    faceId: assetFace.id,
     sourcePersonId,
     targetPersonId,
     authOf,
@@ -119,6 +126,13 @@ const buildWorld = async (input: { namerInTarget: boolean }) => {
     targetRow,
   };
 };
+
+const sourceRow = (w: Awaited<ReturnType<typeof buildWorld>>, id: string) =>
+  w.ctx.database
+    .selectFrom('shared_space_person')
+    .select(['name', 'nameSource', 'nameSetById'])
+    .where('id', '=', id)
+    .executeTakeFirstOrThrow();
 
 describe('names crossing between spaces (#1317)', () => {
   it('carries a name when the person who typed it is in the other space', async () => {
@@ -237,5 +251,125 @@ describe('names crossing between spaces (#1317)', () => {
     await w.backfill();
 
     await expect(w.targetRow()).resolves.toMatchObject({ name: 'Typed here', nameSource: 'manual' });
+  });
+
+  describe('a name typed when creating a space person', () => {
+    it('records who typed it and carries it into another space they are in', async () => {
+      const w = await buildWorld({ namerInTarget: true });
+      const created = await w.sut.createSpacePerson(w.authOf(w.namer), w.source.id, {
+        name: 'Sam',
+        assetFaceId: w.faceId,
+      });
+
+      await w.backfill();
+
+      await expect(sourceRow(w, created.id)).resolves.toEqual({
+        name: 'Sam',
+        nameSource: 'manual',
+        nameSetById: w.namer.id,
+      });
+      await expect(w.targetRow()).resolves.toMatchObject({ name: 'Sam', nameSource: 'inherited' });
+    });
+
+    it("is not replaced by the photo owner's own name", async () => {
+      const w = await buildWorld({ namerInTarget: true });
+      const created = await w.sut.createSpacePerson(w.authOf(w.namer), w.source.id, {
+        name: 'Sam',
+        assetFaceId: w.faceId,
+      });
+      await w.ctx.database
+        .updateTable('person')
+        .set({ name: 'Owner name' })
+        .where('personGroupId', '=', w.person.personGroupId)
+        .execute();
+
+      await w.backfill();
+
+      await expect(sourceRow(w, created.id)).resolves.toMatchObject({ name: 'Sam', nameSource: 'manual' });
+    });
+
+    it('records who typed it for a person created without a face', async () => {
+      const w = await buildWorld({ namerInTarget: true });
+      const created = await w.sut.createSpacePerson(w.authOf(w.namer), w.source.id, { name: 'Sam' });
+
+      await expect(sourceRow(w, created.id)).resolves.toEqual({
+        name: 'Sam',
+        nameSource: 'manual',
+        nameSetById: w.namer.id,
+      });
+    });
+
+    it('keeps the name and author of a person someone already named', async () => {
+      const w = await buildWorld({ namerInTarget: true });
+      await w.sut.updateSpacePerson(w.authOf(w.adder), w.source.id, w.sourcePersonId, { name: 'First' });
+
+      const created = await w.sut.createSpacePerson(w.authOf(w.namer), w.source.id, {
+        name: 'Second',
+        assetFaceId: w.faceId,
+      });
+
+      expect(created.id).toBe(w.sourcePersonId);
+      await expect(sourceRow(w, created.id)).resolves.toEqual({
+        name: 'First',
+        nameSource: 'manual',
+        nameSetById: w.adder.id,
+      });
+    });
+  });
+
+  it('keeps who typed a name when duplicate space people are folded together', async () => {
+    const w = await buildWorld({ namerInTarget: true });
+    const embedding = newEmbedding();
+    // Two space people in the source space for one face shape: the unnamed one has more faces and survives.
+    const addFace = async (spacePersonId: string) => {
+      const { asset } = await w.ctx.newAsset({ ownerId: w.adder.id });
+      const { person } = await w.ctx.newPerson({ ownerId: w.adder.id, name: '' });
+      const { assetFace } = await w.ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+        sourceType: SourceType.MachineLearning,
+      });
+      await w.ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
+      await w.ctx.newSharedSpaceAsset({ spaceId: w.source.id, assetId: asset.id, addedById: w.adder.id });
+      await w.ctx.database
+        .insertInto('shared_space_person_face')
+        .values({ personId: spacePersonId, assetFaceId: assetFace.id })
+        .execute();
+      return assetFace.id;
+    };
+    const named = await w.ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: w.source.id, type: 'person' })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const namedFace = await addFace(named.id);
+    await w.ctx.database
+      .updateTable('shared_space_person')
+      .set({ representativeFaceId: namedFace })
+      .where('id', '=', named.id)
+      .execute();
+    await w.sut.updateSpacePerson(w.authOf(w.namer), w.source.id, named.id, { name: 'Sam' });
+    const unnamed = await w.ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: w.source.id, type: 'person' })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const unnamedFace = await addFace(unnamed.id);
+    await addFace(unnamed.id);
+    await addFace(unnamed.id);
+    await w.ctx.database
+      .updateTable('shared_space_person')
+      .set({ representativeFaceId: unnamedFace })
+      .where('id', '=', unnamed.id)
+      .execute();
+
+    await w.sut.handleSharedSpacePersonDedup({ spaceId: w.source.id });
+
+    const rows = await w.ctx.database
+      .selectFrom('shared_space_person')
+      .select(['id', 'name', 'nameSource', 'nameSetById'])
+      .where('id', 'in', [named.id, unnamed.id])
+      .execute();
+    expect(rows).toEqual([{ id: unnamed.id, name: 'Sam', nameSource: 'manual', nameSetById: w.namer.id }]);
   });
 });
