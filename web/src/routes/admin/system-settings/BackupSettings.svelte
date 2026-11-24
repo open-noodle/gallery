@@ -18,6 +18,9 @@
 
   const disabled = $derived(featureFlagsManager.value.configFile);
   let configToEdit = $state(cloneDeep(config));
+  // Read from the server's copy: `bind:value` on a <select> writes its first option into an undefined binding,
+  // so `configToEdit` can no longer tell us whether the server knows about the destination field.
+  const destinationSupported = $derived(config.backup.database.destination !== undefined);
 
   let cronExpressionOptions = $derived([
     { text: $t('interval.night_at_midnight'), value: '0 0 * * *' },
@@ -86,9 +89,7 @@
 
         <SettingSelect
           options={backupDestinationOptions}
-          disabled={disabled ||
-            !configToEdit.backup.database.enabled ||
-            configToEdit.backup.database.destination === undefined}
+          disabled={disabled || !configToEdit.backup.database.enabled || !destinationSupported}
           name="backup-destination"
           label={$t('admin.backup_destination')}
           desc={$t('admin.backup_destination_description')}
@@ -99,7 +100,7 @@
 
         {#if configToEdit.backup.database.destination === 'cloud' && configToEdit.backup.database.s3.enabled}
           <Text size="small" color="muted">{$t('admin.backup_destination_legacy_hint')}</Text>
-        {:else if configToEdit.backup.database.destination !== undefined && configToEdit.backup.database.destination !== 'local'}
+        {:else if destinationSupported && configToEdit.backup.database.destination !== 'local'}
           <Text size="small" color="muted">{$t('admin.backup_destination_cloud_hint')}</Text>
         {/if}
 
