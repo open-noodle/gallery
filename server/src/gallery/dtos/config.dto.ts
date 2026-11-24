@@ -270,6 +270,10 @@ export const GalleryFacialRecognitionExtension = {
   video: GalleryVideoFacesSchema,
 };
 
+export const GalleryMetadataFacesExtension = {
+  export: galleryConfigBool.default(false).describe('Export face regions to MWG-rs compliant XMP sidecars'),
+};
+
 export const GalleryClipExtension = {
   maxDistance: z
     .number()
@@ -349,6 +353,10 @@ export const galleryMachineLearningDefaults = {
 export const galleryFacialRecognitionDefaults = {
   suggestions: galleryMachineLearningDefaults.faceSuggestions,
   video: galleryMachineLearningDefaults.videoFaces,
+};
+
+export const galleryMetadataFacesDefaults = {
+  export: false,
 };
 
 export const galleryBackupDatabaseDefaults = {
