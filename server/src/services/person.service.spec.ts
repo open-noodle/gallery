@@ -688,7 +688,7 @@ describe(PersonService.name, () => {
 
     it('should serve the thumbnail', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -711,6 +711,11 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.galleryPerson.getSpaceMetadataForViewer.mockResolvedValue(
+        new Map([
+          [person.personGroupId, { name: '', birthDate: null, spacePersonId: 'space-person-1', spaceId: 'space-1' }],
+        ]),
+      );
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -749,7 +754,7 @@ describe(PersonService.name, () => {
 
     it('should serve the thumbnail of a locked-folder face to an elevated owner', async () => {
       const auth = AuthFactory.from().session({ hasElevatedPermission: true }).build();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -4410,7 +4415,7 @@ describe(PersonService.name, () => {
 
     it('returns accessible identity statistics for an owned identity-backed person', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create({ identityId: 'identity-1' });
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: 'identity-1' });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -4474,6 +4479,11 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ identityId: null }); // ownerId is random, != auth.user.id
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.galleryPerson.getSpaceMetadataForViewer.mockResolvedValue(
+        new Map([
+          [person.personGroupId, { name: '', birthDate: null, spacePersonId: 'space-person-1', spaceId: 'space-1' }],
+        ]),
+      );
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getStatistics.mockResolvedValue({ assets: 2, faces: 2 });

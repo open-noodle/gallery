@@ -45,12 +45,6 @@ import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { withOwnedPersonAssetCounts } from 'src/gallery/utils/owned-person-asset-counts.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
-import {
-  assetReadCheck,
-  cropForOtherMember,
-  projectFacesForViewer,
-  projectPersonForViewer,
-} from 'src/gallery/utils/person-viewer-reads.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -251,20 +245,13 @@ export class PersonService extends BaseService {
       .filter((face) => !face.person?.isHidden || face.person?.ownerId === auth.user.id)
       .map((face) => mapFaces(face, asset.edits, assetDimensions));
 
+    await this.personViewerReads.faces(auth, dto.id, faces, response);
     // #808: a name or birthday set inside a shared space lives on `shared_space_person` and is
     // resolved at read time — it is never written back to `person`. The asset viewer Info panel
     // reads this endpoint for the owner, so it has to apply the same identity-wide resolution
     // PersonService.getById does; otherwise the age silently disappears for every person whose
-    // birthday only ever existed on a space profile. `mapFaces` already nulls people the caller
-    // does not own, so only owned faces are resolved here.
-    await projectFacesForViewer(
-      { galleryPerson: this.galleryPersonRepository, sharedSpace: this.sharedSpaceRepository },
-      auth,
-      dto.id,
-      new Map(faces.flatMap((face) => (face.person ? [[face.person.personGroupId, face.person.ownerId]] : []))),
-      response,
-    );
-
+    // birthday only ever existed on a space profile. Other people's faces were projected above,
+    // so only owned faces are resolved here.
     const identityByPersonId = new Map<string, string>();
     for (const face of faces) {
       if (face.person?.ownerId === auth.user.id && face.person.identityId) {
@@ -306,7 +293,7 @@ export class PersonService extends BaseService {
       const person = await this.findOrFail(auth, id);
       const response = mapPerson(person);
       if (person.ownerId !== auth.user.id) {
-        return projectPersonForViewer(this.galleryPersonRepository, auth, person, response);
+        return this.personViewerReads.person(auth, person, response);
       }
       // Name and birthday set in a shared space are resolved at read time (never written back to
       // `person`). The owner accessing their own person short-circuits the resolver, so overlay the
@@ -336,6 +323,7 @@ export class PersonService extends BaseService {
     const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     if (allowedIds.has(id)) {
       const person = await this.findOrFail(auth, id);
+      await this.personViewerReads.requireShown(auth, person);
       if (person.identityId) {
         return this.faceIdentityRepository.getAccessiblePersonStatistics(auth.user.id, person.identityId);
       }
@@ -366,15 +354,7 @@ export class PersonService extends BaseService {
       throw new NotFoundException();
     }
 
-    const crop = await cropForOtherMember(
-      {
-        galleryPerson: this.galleryPersonRepository,
-        media: this.backendMedia,
-        canReadAsset: assetReadCheck((dto) => this.checkAccess(dto), auth),
-      },
-      auth,
-      person,
-    );
+    const crop = await this.personViewerReads.thumbnail(auth, person);
     if (crop) {
       return crop;
     }
@@ -940,8 +920,7 @@ export class PersonService extends BaseService {
 
         this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
         await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
-        // #1317: a member's own face only joins its owner's identity here. Joining another account's people
-        // happens through shared-space reconciliation, on faces the space can see.
+        // #1317: only the owner's identity here; other accounts join through shared-space reconciliation.
         await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
       }
 

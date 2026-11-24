@@ -102,6 +102,17 @@ const buildWorld = async () => {
     source: 'shared-space-evidence',
   });
 
+  // The space person face matching makes for the identity: another member reads the person only through it.
+  const spacePerson = await ctx.database
+    .insertInto('shared_space_person')
+    .values({ spaceId: space.id, identityId: identity.id, representativeFaceId: ownerShared, type: 'person' })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await ctx.database
+    .insertInto('shared_space_person_face')
+    .values([ownerShared, memberShared].map((assetFaceId) => ({ personId: spacePerson.id, assetFaceId })))
+    .execute();
+
   return { sut, owner, member, person, faces: { ownerShared, ownerPrivate, ownerLocked, memberShared, memberPrivate } };
 };
 

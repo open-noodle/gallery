@@ -829,7 +829,9 @@ describe('viewer-scope RBAC oracle', () => {
   });
 
   // #1317: the representative-face picker lists faces reached through a joined identity only when the actor can read
-  // the asset. Labels are the faces' assets.
+  // the asset. Labels are the faces' assets. This world's space runs no face recognition, so it shows no person and
+  // every other account is refused; the faces a member sees through a space person are pinned in
+  // test/medium/specs/gallery/representative-face-identity-access.medium.spec.ts.
   it('representative face picker', async () => {
     const sut = world.ctx.getService(GalleryPeopleService);
     const result = await matrix(

@@ -6426,10 +6426,7 @@ exports[`viewer-scope RBAC oracle > representative face picker 1`] = `
     "strangerHuman": "error:BadRequestException",
   },
   "owner": {
-    "editorHuman": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "editorHuman": "error:BadRequestException",
     "human": [
       "editorAsset",
       "ownAsset",
@@ -6438,10 +6435,7 @@ exports[`viewer-scope RBAC oracle > representative face picker 1`] = `
     "strangerHuman": "error:BadRequestException",
   },
   "ownerElevated": {
-    "editorHuman": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "editorHuman": "error:BadRequestException",
     "human": [
       "editorAsset",
       "ownAsset",
@@ -6464,10 +6458,7 @@ exports[`viewer-scope RBAC oracle > representative face picker 1`] = `
       "editorAsset",
       "spaceAsset",
     ],
-    "human": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "human": "error:BadRequestException",
     "strangerHuman": "error:BadRequestException",
   },
   "spaceLink": {
@@ -6476,32 +6467,17 @@ exports[`viewer-scope RBAC oracle > representative face picker 1`] = `
     "strangerHuman": "error:BadRequestException",
   },
   "spaceViewer": {
-    "editorHuman": [
-      "editorAsset",
-      "spaceAsset",
-    ],
-    "human": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
     "strangerHuman": "error:BadRequestException",
   },
   "spaceViewerOff": {
-    "editorHuman": [
-      "editorAsset",
-      "spaceAsset",
-    ],
-    "human": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "editorHuman": "error:BadRequestException",
+    "human": "error:BadRequestException",
     "strangerHuman": "error:BadRequestException",
   },
   "stockOwner": {
-    "editorHuman": [
-      "editorAsset",
-      "spaceAsset",
-    ],
+    "editorHuman": "error:BadRequestException",
     "human": [
       "editorAsset",
       "ownAsset",

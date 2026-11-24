@@ -248,15 +248,17 @@ from
   "asset_face"
   inner join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
   inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+  inner join "shared_space" on "shared_space"."id" = "shared_space_person"."spaceId"
+  and "shared_space"."faceRecognitionEnabled" = $1
   inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_person"."spaceId"
-  and "shared_space_member"."userId" = $1
+  and "shared_space_member"."userId" = $2
   left join "shared_space_person_alias" on "shared_space_person_alias"."personId" = "shared_space_person"."id"
-  and "shared_space_person_alias"."userId" = $2
+  and "shared_space_person_alias"."userId" = $3
 where
-  "asset_face"."personGroupId" in ($3)
+  "asset_face"."personGroupId" in ($4)
   and "asset_face"."deletedAt" is null
-  and "shared_space_person"."isHidden" = $4
-  and "shared_space_person"."spaceId" = $5
+  and "shared_space_person"."isHidden" = $5
+  and "shared_space_person"."spaceId" = $6
 order by
   "asset_face"."personGroupId",
   NULLIF(BTRIM(shared_space_person.name), '') IS NULL,

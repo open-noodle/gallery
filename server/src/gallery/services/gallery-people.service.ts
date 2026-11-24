@@ -128,6 +128,7 @@ export class GalleryPeopleService extends BaseService {
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const person = await findOrFail(() => this.personRepository.getByGroupIdOnly(id), 'Person');
+    await this.personViewerReads.requireShown(auth, person);
     const take = dto.size;
     // Fork RBAC (Slice 2 / M1): PersonRead also admits non-owner space-granted callers. Scope those
     // callers to space-reachable, shareable-visibility faces only — never the owner's Hidden/
@@ -165,6 +166,8 @@ export class GalleryPeopleService extends BaseService {
 
   async getFaceThumbnail(auth: AuthDto, personId: string, faceId: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
+    const person = await findOrFail(() => this.personRepository.getByGroupIdOnly(personId), 'Person');
+    await this.personViewerReads.requireShown(auth, person);
     const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
       personId,
       assetFaceId: faceId,
