@@ -1252,12 +1252,22 @@ where
     select
       1 as "one"
     from
-      "face_identity_face"
-      inner join "asset_face" on "asset_face"."id" = "face_identity_face"."assetFaceId"
+      "asset_face"
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
-      inner join "shared_space_person" on "shared_space_person"."identityId" = "face_identity_face"."identityId"
+      inner join "shared_space_person" on "shared_space_person"."identityId" = "person_identity"."identityId"
     where
-      "face_identity_face"."identityId" = "person_identity"."identityId"
+      (
+        "asset_face"."personGroupId" = "person_identity"."personGroupId"
+        or exists (
+          select
+            1 as "one"
+          from
+            "face_identity_face"
+          where
+            "face_identity_face"."assetFaceId" = "asset_face"."id"
+            and "face_identity_face"."identityId" = "person_identity"."identityId"
+        )
+      )
       and "asset"."ownerId" = "person_identity"."ownerId"
       and "asset_face"."deletedAt" is null
       and "asset"."deletedAt" is null
@@ -1316,6 +1326,110 @@ order by
 limit
   $4
 
+-- FaceIdentityRepository.detachCrossOwnerCandidate
+begin
+select
+  pg_advisory_xact_lock(hashtext ('identity-merge-propagation'))
+select
+  "person_identity"."personGroupId"
+from
+  "person_identity"
+where
+  "person_identity"."manualLinkAt" is null
+  and (
+    exists (
+      select
+        1 as "one"
+      from
+        "person_identity" as "other"
+      where
+        "other"."identityId" = "person_identity"."identityId"
+        and "other"."ownerId" != "person_identity"."ownerId"
+    )
+    or exists (
+      select
+        1 as "one"
+      from
+        "shared_space_person"
+      where
+        "shared_space_person"."identityId" = "person_identity"."identityId"
+    )
+  )
+  and not exists (
+    select
+      1 as "one"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "shared_space_person" on "shared_space_person"."identityId" = "person_identity"."identityId"
+    where
+      (
+        "asset_face"."personGroupId" = "person_identity"."personGroupId"
+        or exists (
+          select
+            1 as "one"
+          from
+            "face_identity_face"
+          where
+            "face_identity_face"."assetFaceId" = "asset_face"."id"
+            and "face_identity_face"."identityId" = "person_identity"."identityId"
+        )
+      )
+      and "asset"."ownerId" = "person_identity"."ownerId"
+      and "asset_face"."deletedAt" is null
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" in ($1, $2)
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = "shared_space_person"."spaceId"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
+          )
+        )
+      )
+  )
+  and "person_identity"."personGroupId" = $3
+commit
+
 -- FaceIdentityRepository.hasCrossOwnerRepairWork
 select
   "person_identity"."personGroupId"
@@ -1346,12 +1460,22 @@ where
     select
       1 as "one"
     from
-      "face_identity_face"
-      inner join "asset_face" on "asset_face"."id" = "face_identity_face"."assetFaceId"
+      "asset_face"
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
-      inner join "shared_space_person" on "shared_space_person"."identityId" = "face_identity_face"."identityId"
+      inner join "shared_space_person" on "shared_space_person"."identityId" = "person_identity"."identityId"
     where
-      "face_identity_face"."identityId" = "person_identity"."identityId"
+      (
+        "asset_face"."personGroupId" = "person_identity"."personGroupId"
+        or exists (
+          select
+            1 as "one"
+          from
+            "face_identity_face"
+          where
+            "face_identity_face"."assetFaceId" = "asset_face"."id"
+            and "face_identity_face"."identityId" = "person_identity"."identityId"
+        )
+      )
       and "asset"."ownerId" = "person_identity"."ownerId"
       and "asset_face"."deletedAt" is null
       and "asset"."deletedAt" is null

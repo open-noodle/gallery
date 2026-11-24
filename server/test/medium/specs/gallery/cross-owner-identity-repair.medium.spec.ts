@@ -19,7 +19,10 @@ import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.r
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
-import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import {
+  FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE,
+  FaceIdentityMaintenanceService,
+} from 'src/gallery/services/face-identity-maintenance.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -466,5 +469,94 @@ describe('cross-owner identity repair (#1317)', () => {
       .where('id', '=', fx.spacePerson.id)
       .executeTakeFirstOrThrow();
     expect(spacePerson).toEqual({ name: '', birthDate: null });
+  });
+
+  // The identity backfill writes the per-face identity rows; until it does, a face can lack one. The nightly sweep
+  // queues the repair without waiting for the backfill, so backing must not depend on those rows.
+  it('keeps a member backed by a shared photo whose face has no per-face identity row yet', async () => {
+    const fx = await buildWorld();
+    const memberPerson = await joinMemberPerson(fx);
+    const { faceId } = await addFace(fx, {
+      ownerId: fx.member.id,
+      personGroupId: memberPerson.personGroupId,
+      inSpace: true,
+    });
+    await fx.ctx.database.deleteFrom('face_identity_face').where('assetFaceId', '=', faceId).execute();
+    await expect(fx.faceIdentity.hasBackfillWork()).resolves.toBe(true);
+
+    await expect(fx.faceIdentity.hasCrossOwnerRepairWork()).resolves.toBe(false);
+    await runRepair(fx);
+
+    await expect(identityOf(fx, memberPerson.personGroupId)).resolves.toBe(fx.identityId);
+  });
+
+  it('keeps a person the member links by hand after the page was listed', async () => {
+    const fx = await buildWorld();
+    // The member's person sits on its own identity, which a third account's person was joined to from private photos.
+    const { person: memberPerson } = await fx.ctx.newPerson({ ownerId: fx.member.id, name: 'Uncle Sam' });
+    const memberIdentity = await fx.faceIdentity.ensurePersonIdentity(memberPerson.personGroupId);
+    await addFace(fx, {
+      ownerId: fx.member.id,
+      personGroupId: memberPerson.personGroupId,
+      identityId: memberIdentity.id,
+    });
+    const { user: third } = await fx.ctx.newUser();
+    const thirdPerson = await joinMemberPerson(fx, {
+      ownerId: third.id,
+      name: 'Stranger',
+      identityId: memberIdentity.id,
+    });
+    await addFace(fx, { ownerId: third.id, personGroupId: thirdPerson.personGroupId, identityId: memberIdentity.id });
+    const merge = new IdentityMergePropagationService({
+      databaseRepository: fx.ctx.get(DatabaseRepository),
+      faceIdentityRepository: fx.faceIdentity,
+      jobRepository: fx.jobs,
+      logger: fx.ctx.getMock(LoggingRepository),
+      personRepository: fx.ctx.get(PersonRepository),
+      galleryPersonRepository: fx.ctx.get(GalleryPersonRepository),
+      sharedSpaceRepository: fx.ctx.get(SharedSpaceRepository),
+    });
+    const listCandidates = fx.faceIdentity.getCrossOwnerRepairCandidates.bind(fx.faceIdentity);
+    vi.spyOn(fx.faceIdentity, 'getCrossOwnerRepairCandidates').mockImplementationOnce(async (input) => {
+      const page = await listCandidates(input);
+      expect(page.map(({ personGroupId }) => personGroupId)).toContain(memberPerson.personGroupId);
+      // The member links their person to the space person by hand while the page is being processed.
+      await merge.mergeScopedProfiles(factory.auth({ user: fx.member }), {
+        target: { type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id },
+        sources: [{ type: 'person', id: memberPerson.personGroupId }],
+      });
+      return page;
+    });
+
+    await runRepair(fx);
+
+    const row = await fx.ctx.database
+      .selectFrom('person_identity')
+      .select(['identityId', 'manualLinkAt'])
+      .where('personGroupId', '=', memberPerson.personGroupId)
+      .executeTakeFirstOrThrow();
+    expect(row.identityId).toBe(fx.identityId);
+    expect(row.manualLinkAt).not.toBeNull();
+  });
+
+  it('detaches every candidate across more than one page', async () => {
+    const fx = await buildWorld();
+    const people = [];
+    for (let index = 0; index <= FACE_IDENTITY_CROSS_OWNER_REPAIR_PAGE_SIZE; index++) {
+      // An owner has at most one person per identity, so each candidate belongs to its own account.
+      const { user } = await fx.ctx.newUser();
+      const person = await joinMemberPerson(fx, { ownerId: user.id, name: `Member ${index}` });
+      await addFace(fx, { ownerId: user.id, personGroupId: person.personGroupId });
+      people.push(person);
+    }
+
+    const queued = await runRepair(fx);
+
+    expect(queued.filter((job) => job.name === JobName.FaceIdentityCrossOwnerRepair)).toHaveLength(1);
+    expect(queued.filter((job) => job.name === JobName.SharedSpacePersonMetadataBackfill)).toHaveLength(1);
+    for (const person of people) {
+      await expect(identityOf(fx, person.personGroupId)).resolves.not.toBe(fx.identityId);
+    }
+    await expect(fx.faceIdentity.hasCrossOwnerRepairWork()).resolves.toBe(false);
   });
 });

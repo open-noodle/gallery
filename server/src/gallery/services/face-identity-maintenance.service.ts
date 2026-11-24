@@ -101,14 +101,10 @@ export class FaceIdentityMaintenanceService extends BaseService {
 
   /**
   Queues the cross-owner repair at boot when some person needs it (#1317); the nightly identity reconciliation sweep
-  queues it too. The check is one indexed probe, and a library with nothing to repair queues nothing. While the
-  identity backfill still has work, per-face identity rows may not match their people yet and backing would read
-  short, so boot leaves the repair to the nightly sweep.
+  queues it too. A library with nothing to repair queues nothing. It does not wait for the identity backfill:
+  backing counts a person's own faces, which do not depend on the per-face identity rows the backfill writes.
   */
   async queueCrossOwnerRepairIfNeeded(): Promise<void> {
-    if (await this.faceIdentityRepository.hasBackfillWork()) {
-      return;
-    }
     if (!(await this.faceIdentityRepository.hasCrossOwnerRepairWork())) {
       return;
     }
@@ -117,7 +113,8 @@ export class FaceIdentityMaintenanceService extends BaseService {
 
   /**
   Detaches each personal person that sits on a shared identity with no shared photo behind it and no manual link
-  (#1317, spec 5b; the rule is `FaceIdentityRepository.getCrossOwnerRepairCandidates`). Detaching gives the person
+  (#1317, spec 5b; the rule is `FaceIdentityRepository.getCrossOwnerRepairCandidates`, checked again for each person
+  under the merge engine's lock, so a link made by hand while the page runs is kept). Detaching gives the person
   its own identity again and leaves everything else on the old identity in place. One page per job, under the
   facial recognition lock so recognition and reconciliation do not interleave with it. A person that fails to
   detach is logged and skipped. After the last page, one unscoped metadata backfill recomputes space person names
@@ -135,13 +132,14 @@ export class FaceIdentityMaintenanceService extends BaseService {
       let detached = 0;
       for (const { personGroupId } of page) {
         try {
-          await this.faceIdentityRepository.detachScopedProfile({ type: 'person', id: personGroupId });
-          detached++;
+          if (await this.faceIdentityRepository.detachCrossOwnerCandidate(personGroupId)) {
+            detached++;
+          }
         } catch (error) {
           this.logger.warn(`Cross-owner identity repair could not detach person ${personGroupId}: ${error}`);
         }
       }
-      this.logger.log(`Cross-owner identity repair checked ${page.length} people and detached ${detached}`);
+      this.logger.log(`Cross-owner identity repair found ${page.length} candidates and detached ${detached}`);
       return page;
     });
 
