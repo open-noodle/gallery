@@ -6,8 +6,9 @@ non-member, a server admin who is not a member, a partner the owner shares with,
 the photo), each setting that changes the answer, and each read: `GET /people/:id`, `GET /faces`,
 `GET /people/:id/thumbnail`, `GET /people/:id/faces` (the picker), `GET /people/:id/faces/:faceId/thumbnail` and
 `GET /people/:id/statistics`. The settings are: the owner hid the person, what the space shows for the person (a named
-profile, an unnamed one, or none because an editor hid it there), whether the space runs face recognition, and whether
-the person's cover photo is one the space cannot see. The expected grid comes from the truth table below, never from the
+profile, an unnamed one, or none because an editor hid it there), whether the space runs face recognition (it changes
+nothing: a space keeps its people when it is turned off), and whether the person's cover photo is one the space cannot
+see. The expected grid comes from the truth table below, never from the
 production helper. Mutation-checked once by removing the viewer checks.
 */
 import { Kysely } from 'kysely';
@@ -63,7 +64,7 @@ const isSpaceMember = (actor: Actor) => (Object.values(SharedSpaceRole) as strin
 type PersonRead =
   | 'denied'
   | { name: string; birthDate: string | null; isFavorite: boolean; thumbnailPath: string; opensSpaceProfile: boolean };
-type FaceRead = 'denied' | 'no-face' | { name: string; birthDate: string | null };
+type FaceRead = 'denied' | 'no-face' | 'no-person' | { name: string; birthDate: string | null };
 type ThumbnailRead = 'denied' | 'stored' | 'crop-of-shared-face';
 type PickerRead = 'denied' | 'shared-face-only' | 'every-face';
 type FaceThumbnailRead = 'denied' | 'served';
@@ -91,8 +92,10 @@ The truth table. A member reads a person only through a profile the space shows,
 shows, never the owner's private row. Partners and shared album members keep #796's behaviour: the photo's faces carry
 the owner's name, and the person itself stays closed to them.
 */
-const expected = (actor: Actor, { hidden, spaceProfile, recognition, privateCover }: Setting): Reads => {
-  const shown = recognition && spaceProfile !== 'hidden-in-space';
+const expected = (actor: Actor, { hidden, spaceProfile, privateCover }: Setting): Reads => {
+  // Turning face recognition off keeps a space's people, and the asset viewer still shows them (AssetService.get), so
+  // every read here does too.
+  const shown = spaceProfile !== 'hidden-in-space';
   const published =
     shown && spaceProfile === 'named' ? { name: SPACE_NAME, birthDate: SPACE_BIRTHDAY } : { name: '', birthDate: null };
   if (actor === 'person-owner') {
@@ -122,7 +125,8 @@ const expected = (actor: Actor, { hidden, spaceProfile, recognition, privateCove
     return { ...DENIED, face: 'no-face' };
   }
   if (!shown) {
-    return { ...DENIED, face: { name: '', birthDate: null } };
+    // The face stays, as a face nobody is recognised on: the person's id would lead only to refused reads.
+    return { ...DENIED, face: 'no-person' };
   }
   return {
     person: { ...published, isFavorite: false, thumbnailPath: '', opensSpaceProfile: true },
@@ -310,7 +314,9 @@ describe('what each account can read about a person (#1317)', () => {
               ? faces
               : faces.length === 0
                 ? 'no-face'
-                : { name: faces[0].person?.name ?? '', birthDate: faces[0].person?.birthDate ?? null },
+                : faces[0].person
+                  ? { name: faces[0].person.name, birthDate: faces[0].person.birthDate ?? null }
+                  : 'no-person',
           thumbnail:
             thumbnail === 'denied'
               ? thumbnail

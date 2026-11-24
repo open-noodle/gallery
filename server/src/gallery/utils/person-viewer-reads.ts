@@ -11,8 +11,8 @@ import type { ImmichMediaResponse } from 'src/utils/file.js';
 
 /*
 What a member reads about a person another account owns (#1317). `person` is the owner's private row. A member reads
-the person only through a profile one of their spaces shows: the space runs face recognition and keeps a visible space
-person for it, and the owner has not hidden it. They then get the name and birthday that profile shows, and never the
+the person only through a profile one of their spaces shows: a visible space person for it, which the owner has not
+hidden. They then get the name and birthday that profile shows, and never the
 owner's favorite, color or file path. Shared albums and partner sharing have no space to show a name, so `GET /faces`
 keeps #796's behaviour for them, and the person itself stays closed to them.
 */
@@ -87,7 +87,10 @@ export class PersonViewerReads {
     };
   }
 
-  /** `GET /faces`: replaces another member's person on each face with what the asset's space shows them. */
+  /**
+  `GET /faces`: replaces another member's person on each face with what the asset's space shows them, and leaves a
+  face whose person the space does not show without a person.
+  */
   async faces(auth: AuthDto, assetId: string, rows: FaceRow[], faces: AssetFaceResponseDto[]): Promise<void> {
     const ownerByPersonId = new Map(
       rows.flatMap(({ person }) => (person ? [[person.personGroupId, person.ownerId]] : [])),
@@ -106,7 +109,9 @@ export class PersonViewerReads {
       personIds: others.map((face) => face.person!.id),
     });
     for (const face of others) {
-      face.person = forOtherMember(face.person!, metadata.get(face.person!.id));
+      const shown = metadata.get(face.person!.id);
+      // A person the space does not show stays off the face: its id leads only to reads that refuse the member.
+      face.person = shown ? forOtherMember(face.person!, shown) : null;
     }
   }
 

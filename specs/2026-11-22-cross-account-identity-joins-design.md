@@ -102,16 +102,17 @@ A rule requiring a face in the space (`supportingFaceCount > 0`) was considered 
 
 ### 4b. Reads of a person another account owns
 
-`person` is the owner's private row. `PersonViewerReads` (`src/gallery/utils/person-viewer-reads.ts`, built once per service by `GalleryBaseService.initGallery`) gives another member what their space shows. A member reads a person only through a profile one of their spaces shows: the space runs face recognition and keeps a visible space person for it, and the owner has not hidden it. Every person read applies that rule the same way (`requireShown`):
+`person` is the owner's private row. `PersonViewerReads` (`src/gallery/utils/person-viewer-reads.ts`, built once per service by `GalleryBaseService.initGallery`) gives another member what their space shows. A member reads a person only through a profile one of their spaces shows: a visible space person for it, which the owner has not hidden. Every person read applies that rule the same way (`requireShown`):
 
 - `GET /people/{id}` returns the space's name and birthday, no favorite, color or file path, and the space profile (`primaryProfile`, `filterId`) that scopes their photos.
 - `GET /people/{id}/faces` (the picker), `GET /people/{id}/faces/{faceId}/thumbnail` and `GET /people/{id}/statistics` refuse the same people `GET /people/{id}` refuses, so a member cannot learn which photos a hidden person is in.
 - `GET /faces` does the same for a viewer who reaches the photo through a space. Shared albums and partner sharing have no space to publish a name, so they keep the behaviour chosen in #796. Owner decision (2026-11-23): keep this.
 - The web person page sends another member to the space's page for that person, which works for a member who keeps the space off their timeline. A refused person shows a "not available" page. A member who cannot edit sees "Person" for an unnamed person, not "Add a name".
 - `GET /people/{id}/thumbnail` refuses the same people. When the viewer cannot open the cover photo, it serves a crop of a face they can open.
-- A space with face recognition off lists no people, so it shows none to its members either: `GET /faces` gives an empty name there.
+- `GET /faces` leaves a face without a person when the space does not show that person, as the asset viewer already does (`AssetService.get`): the person's id would lead only to reads that refuse the member.
+- Turning face recognition off keeps a space's people, and the asset viewer keeps showing them, so these reads do too.
 
-`person-reads-other-members-matrix.medium.spec.ts` covers every actor (the owner, each space role, a non-member, a server admin who is not a member, a partner, a shared album member), every setting that changes the answer (the owner hid the person; the space shows a named, an unnamed or a hidden space person; recognition on or off; a cover photo the space cannot see) and all six reads (rule 7).
+`person-reads-other-members-matrix.medium.spec.ts` covers every actor (the owner, each space role, a non-member, a server admin who is not a member, a partner, a shared album member), every setting that could change the answer (the owner hid the person; the space shows a named, an unnamed or a hidden space person; recognition on or off, which changes nothing; a cover photo the space cannot see) and all six reads (rule 7).
 
 ### 5. Repair: record manual links, detach unbacked joins
 
@@ -212,7 +213,7 @@ A local copy of a real library (2 accounts, 13 spaces with face recognition, abo
 - §5b uses backing only, not the `shared-space-evidence` marker, because real data showed the marker can land on either side.
 - §5b's backing accepts every join path's evidence and does not require membership, so no job re-joins what the repair detaches. Checked on real data: same results as the earlier rule on all four copies, 0.2–0.3 s per run.
 - §5b holds `DatabaseLock.FacialRecognition` and relies on idempotent re-runs for the automatic paths, and takes the merge engine's lock only around each detach, for manual links.
-- §4b: a space with face recognition off shows no person to other members, matching its empty people list.
+- §4b: a space with face recognition off still shows its people to other members, matching the asset viewer. Checked on the Android app (2026-11-24): the people strip, the person page and the People list show the space's name and only shared photos; a person the space hides shows no People section.
 
 ## Commits
 

@@ -512,12 +512,6 @@ export class GalleryPersonRepository {
       .selectFrom('asset_face')
       .innerJoin('shared_space_person_face', 'shared_space_person_face.assetFaceId', 'asset_face.id')
       .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
-      // A space with face recognition off lists no people, so it shows none to its members either.
-      .innerJoin('shared_space', (join) =>
-        join
-          .onRef('shared_space.id', '=', 'shared_space_person.spaceId')
-          .on('shared_space.faceRecognitionEnabled', '=', true),
-      )
       .innerJoin('shared_space_member', (join) =>
         join
           .onRef('shared_space_member.spaceId', '=', 'shared_space_person.spaceId')

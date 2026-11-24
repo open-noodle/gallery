@@ -423,10 +423,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=false privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -434,10 +431,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=false privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -445,10 +439,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=true privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -456,10 +447,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=true privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -468,25 +456,41 @@ exports[`what each account can read about a person (#1317) > matches the recorde
   },
   "editor hidden=false space=named recognition=false privateCover=false": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "editor hidden=false space=named recognition=false privateCover=true": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=false space=named recognition=true privateCover=false": {
     "face": {
@@ -531,22 +535,38 @@ exports[`what each account can read about a person (#1317) > matches the recorde
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "editor hidden=false space=unnamed recognition=false privateCover=true": {
     "face": {
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=false space=unnamed recognition=true privateCover=false": {
     "face": {
@@ -875,10 +895,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=false privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -886,10 +903,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=false privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -897,10 +911,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=true privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -908,10 +919,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=true privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -920,25 +928,41 @@ exports[`what each account can read about a person (#1317) > matches the recorde
   },
   "owner hidden=false space=named recognition=false privateCover=false": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "owner hidden=false space=named recognition=false privateCover=true": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=false space=named recognition=true privateCover=false": {
     "face": {
@@ -983,22 +1007,38 @@ exports[`what each account can read about a person (#1317) > matches the recorde
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "owner hidden=false space=unnamed recognition=false privateCover=true": {
     "face": {
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=false space=unnamed recognition=true privateCover=false": {
     "face": {
@@ -1819,10 +1859,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=hidden-in-space recognition=false privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -1830,10 +1867,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=false privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -1841,10 +1875,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=true privateCover=false": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -1852,10 +1883,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=true privateCover=true": {
-    "face": {
-      "birthDate": null,
-      "name": "",
-    },
+    "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
     "picker": "denied",
@@ -1864,25 +1892,41 @@ exports[`what each account can read about a person (#1317) > matches the recorde
   },
   "viewer hidden=false space=named recognition=false privateCover=false": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "viewer hidden=false space=named recognition=false privateCover=true": {
     "face": {
-      "birthDate": null,
-      "name": "",
+      "birthDate": "1991-04-05",
+      "name": "Name the space shows",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=false space=named recognition=true privateCover=false": {
     "face": {
@@ -1927,22 +1971,38 @@ exports[`what each account can read about a person (#1317) > matches the recorde
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "stored",
   },
   "viewer hidden=false space=unnamed recognition=false privateCover=true": {
     "face": {
       "birthDate": null,
       "name": "",
     },
-    "faceThumbnail": "denied",
-    "person": "denied",
-    "picker": "denied",
-    "statistics": "denied",
-    "thumbnail": "denied",
+    "faceThumbnail": "served",
+    "person": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "opensSpaceProfile": true,
+      "thumbnailPath": "",
+    },
+    "picker": "shared-face-only",
+    "statistics": {
+      "assets": 1,
+    },
+    "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=false space=unnamed recognition=true privateCover=false": {
     "face": {
