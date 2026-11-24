@@ -5,7 +5,7 @@ Runs the real PersonService and GalleryPeopleService over every actor (the perso
 non-member, a server admin who is not a member, a partner the owner shares with, and a member of a shared album holding
 the photo), each setting that changes the answer, and each read: `GET /people/:id`, `GET /faces`,
 `GET /people/:id/thumbnail`, `GET /people/:id/faces` (the picker), `GET /people/:id/faces/:faceId/thumbnail` and
-`GET /people/:id/statistics`. The settings are: the owner hid the person, what the space shows for the person (a named
+`GET /people/:id/statistics`, and one write, `PUT /people/:id/representative-face`. The settings are: the owner hid the person, what the space shows for the person (a named
 profile, an unnamed one, or none because an editor hid it there), whether the space runs face recognition (it changes
 nothing: a space keeps its people when it is turned off), and whether the person's cover photo is one the space cannot
 see. The expected grid comes from the truth table below, never from the
@@ -69,6 +69,7 @@ type ThumbnailRead = 'denied' | 'stored' | 'crop-of-shared-face';
 type PickerRead = 'denied' | 'shared-face-only' | 'every-face';
 type FaceThumbnailRead = 'denied' | 'served';
 type StatisticsRead = 'denied' | { assets: number };
+type CoverWrite = 'denied' | { name: string; birthDate: string | null; isFavorite: boolean; thumbnailPath: string };
 type Reads = {
   person: PersonRead;
   face: FaceRead;
@@ -76,6 +77,8 @@ type Reads = {
   picker: PickerRead;
   faceThumbnail: FaceThumbnailRead;
   statistics: StatisticsRead;
+  /** `PUT /people/:id/representative-face` with the shared face: what it answers, after checking the write itself. */
+  coverWrite: CoverWrite;
 };
 
 const DENIED: Reads = {
@@ -85,6 +88,7 @@ const DENIED: Reads = {
   picker: 'denied',
   faceThumbnail: 'denied',
   statistics: 'denied',
+  coverWrite: 'denied',
 };
 
 /**
@@ -113,6 +117,8 @@ const expected = (actor: Actor, { hidden, spaceProfile, privateCover }: Setting)
       picker: 'every-face',
       faceThumbnail: 'served',
       statistics: { assets: 2 },
+      // The write answers with the owner's own row as stored.
+      coverWrite: { ...ownRow, isFavorite: true, thumbnailPath: STORED_THUMBNAIL },
     };
   }
   if (actor === 'partner' || actor === 'album-member') {
@@ -135,6 +141,8 @@ const expected = (actor: Actor, { hidden, spaceProfile, privateCover }: Setting)
     picker: 'shared-face-only',
     faceThumbnail: 'served',
     statistics: { assets: 1 },
+    // Only a space owner or editor may change the cover, and then gets back what the space shows, as from a read.
+    coverWrite: actor === SharedSpaceRole.Viewer ? 'denied' : { ...published, isFavorite: false, thumbnailPath: '' },
   };
 };
 
@@ -171,7 +179,13 @@ const setup = () => {
   ];
   const mock = [JobRepository, LoggingRepository, StorageRepository];
   const { sut, ctx } = newMediumService(PersonService, { database: defaultDatabase, real, mock });
-  const { sut: people } = newMediumService(GalleryPeopleService, { database: defaultDatabase, real, mock });
+  const { sut: people, ctx: peopleCtx } = newMediumService(GalleryPeopleService, {
+    database: defaultDatabase,
+    real,
+    mock,
+  });
+  // A cover change queues a thumbnail job.
+  peopleCtx.getMock(JobRepository).queue.mockResolvedValue();
   stubMedia(sut);
   stubMedia(people);
   return { sut, people, ctx };
@@ -335,17 +349,39 @@ describe('what each account can read about a person (#1317)', () => {
                   : 'denied',
           faceThumbnail: faceThumbnail === 'denied' ? faceThumbnail : 'served',
           statistics: statistics === 'denied' ? statistics : { assets: statistics.assets },
+          coverWrite: 'denied',
         };
-
-        expect(actual).toEqual(expected(actor, setting));
-        grid[
-          `${actor} hidden=${setting.hidden} space=${setting.spaceProfile} recognition=${setting.recognition} privateCover=${setting.privateCover}`
-        ] = actual;
 
         // A read changes nothing.
         await expect(
           ctx.database.selectFrom('person').selectAll().where('personGroupId', '=', world.personId).executeTakeFirst(),
         ).resolves.toEqual(before);
+
+        const written = await read(() =>
+          people.updateRepresentativeFace(world.auth, world.personId, { assetFaceId: world.sharedFaceId }),
+        );
+        const cover = await ctx.database
+          .selectFrom('person')
+          .select('faceAssetId')
+          .where('personGroupId', '=', world.personId)
+          .executeTakeFirstOrThrow();
+        if (written === 'denied') {
+          // A refused write leaves the cover as it was.
+          expect(cover.faceAssetId).toBe(before.faceAssetId);
+        } else {
+          expect(cover.faceAssetId).toBe(world.sharedFaceId);
+          actual.coverWrite = {
+            name: written.name,
+            birthDate: written.birthDate ?? null,
+            isFavorite: written.isFavorite ?? false,
+            thumbnailPath: written.thumbnailPath,
+          };
+        }
+
+        expect(actual).toEqual(expected(actor, setting));
+        grid[
+          `${actor} hidden=${setting.hidden} space=${setting.spaceProfile} recognition=${setting.recognition} privateCover=${setting.privateCover}`
+        ] = actual;
       },
     );
   });

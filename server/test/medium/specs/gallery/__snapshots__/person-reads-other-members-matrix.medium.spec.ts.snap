@@ -3,6 +3,7 @@
 exports[`what each account can read about a person (#1317) > matches the recorded grid 1`] = `
 {
   "admin-non-member hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -11,6 +12,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -19,6 +21,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -27,6 +30,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -35,6 +39,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -43,6 +48,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -51,6 +57,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -59,6 +66,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -67,6 +75,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -75,6 +84,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -83,6 +93,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -91,6 +102,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -99,6 +111,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -107,6 +120,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -115,6 +129,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -123,6 +138,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -131,6 +147,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -139,6 +156,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -147,6 +165,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -155,6 +174,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -163,6 +183,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -171,6 +192,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -179,6 +201,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -187,6 +210,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "admin-non-member hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -195,6 +219,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -206,6 +231,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -217,6 +243,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -228,6 +255,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -239,6 +267,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -250,6 +279,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -261,6 +291,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -272,6 +303,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -283,6 +315,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -294,6 +327,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -305,6 +339,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -316,6 +351,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -327,6 +363,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -335,6 +372,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -343,6 +381,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -351,6 +390,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -359,6 +399,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -367,6 +408,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -375,6 +417,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -383,6 +426,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -391,6 +435,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -399,6 +444,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -407,6 +453,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -415,6 +462,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "album-member hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -423,6 +471,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -431,6 +480,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -439,6 +489,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -447,6 +498,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -455,6 +507,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -474,6 +532,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "editor hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -493,6 +557,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -512,6 +582,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "editor hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -531,6 +607,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -550,6 +632,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "editor hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -569,6 +657,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -588,6 +682,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "editor hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -607,6 +707,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "editor hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -615,6 +716,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -623,6 +725,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -631,6 +734,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -639,6 +743,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -647,6 +752,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -655,6 +761,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -663,6 +770,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -671,6 +779,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -679,6 +788,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -687,6 +797,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -695,6 +806,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "editor hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -703,6 +815,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -711,6 +824,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -719,6 +833,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -727,6 +842,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -735,6 +851,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -743,6 +860,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -751,6 +869,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -759,6 +878,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -767,6 +887,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -775,6 +896,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -783,6 +905,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -791,6 +914,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -799,6 +923,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -807,6 +932,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -815,6 +941,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -823,6 +950,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -831,6 +959,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -839,6 +968,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -847,6 +977,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -855,6 +986,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -863,6 +995,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -871,6 +1004,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -879,6 +1013,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -887,6 +1022,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "non-member hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "denied",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -895,6 +1031,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -903,6 +1040,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -911,6 +1049,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -919,6 +1058,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -927,6 +1067,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -946,6 +1092,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "owner hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -965,6 +1117,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -984,6 +1142,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "owner hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1991-04-05",
+      "isFavorite": false,
+      "name": "Name the space shows",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1003,6 +1167,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1022,6 +1192,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "owner hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1041,6 +1217,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1060,6 +1242,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "owner hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": null,
+      "isFavorite": false,
+      "name": "",
+      "thumbnailPath": "",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1079,6 +1267,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "owner hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1087,6 +1276,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1095,6 +1285,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1103,6 +1294,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1111,6 +1303,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1119,6 +1312,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1127,6 +1321,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1135,6 +1330,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1143,6 +1339,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1151,6 +1348,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1159,6 +1357,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1167,6 +1366,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "owner hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1175,6 +1375,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1186,6 +1387,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1197,6 +1399,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1208,6 +1411,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1219,6 +1423,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1230,6 +1435,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1241,6 +1447,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1252,6 +1459,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1263,6 +1471,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1274,6 +1483,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1285,6 +1495,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1296,6 +1507,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1307,6 +1519,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1315,6 +1528,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1323,6 +1537,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1331,6 +1546,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1339,6 +1555,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1347,6 +1564,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1355,6 +1573,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1363,6 +1582,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1371,6 +1591,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1379,6 +1600,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1387,6 +1609,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1395,6 +1618,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "partner hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1403,6 +1627,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "person-owner hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1422,6 +1652,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1441,6 +1677,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1460,6 +1702,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1479,6 +1727,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1498,6 +1752,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1517,6 +1777,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1536,6 +1802,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1555,6 +1827,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1574,6 +1852,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1593,6 +1877,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1612,6 +1902,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1631,6 +1927,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1650,6 +1952,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1669,6 +1977,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1688,6 +2002,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1980-02-03",
       "name": "Owner private name",
@@ -1707,6 +2027,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1726,6 +2052,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1745,6 +2077,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1764,6 +2102,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1783,6 +2127,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1802,6 +2152,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1821,6 +2177,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1840,6 +2202,12 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "person-owner hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": {
+      "birthDate": "1980-02-03",
+      "isFavorite": true,
+      "name": "Owner private name",
+      "thumbnailPath": "upload/thumbs/stored.jpeg",
+    },
     "face": {
       "birthDate": null,
       "name": "",
@@ -1859,6 +2227,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1867,6 +2236,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1875,6 +2245,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1883,6 +2254,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-person",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -1891,6 +2263,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=false space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1910,6 +2283,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1929,6 +2303,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=false space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1948,6 +2323,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": "1991-04-05",
       "name": "Name the space shows",
@@ -1967,6 +2343,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=false space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": null,
       "name": "",
@@ -1986,6 +2363,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": null,
       "name": "",
@@ -2005,6 +2383,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=false space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": null,
       "name": "",
@@ -2024,6 +2403,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "stored",
   },
   "viewer hidden=false space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": {
       "birthDate": null,
       "name": "",
@@ -2043,6 +2423,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "crop-of-shared-face",
   },
   "viewer hidden=true space=hidden-in-space recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2051,6 +2432,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=hidden-in-space recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2059,6 +2441,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=hidden-in-space recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2067,6 +2450,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=hidden-in-space recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2075,6 +2459,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=named recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2083,6 +2468,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=named recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2091,6 +2477,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=named recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2099,6 +2486,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=named recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2107,6 +2495,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=unnamed recognition=false privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2115,6 +2504,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=unnamed recognition=false privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2123,6 +2513,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=unnamed recognition=true privateCover=false": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",
@@ -2131,6 +2522,7 @@ exports[`what each account can read about a person (#1317) > matches the recorde
     "thumbnail": "denied",
   },
   "viewer hidden=true space=unnamed recognition=true privateCover=true": {
+    "coverWrite": "denied",
     "face": "no-face",
     "faceThumbnail": "denied",
     "person": "denied",

@@ -110,6 +110,17 @@ const buildWorld = async (ctx: Ctx, actorLabel: Actor, membership: OwnerMembersh
     .set({ faceAssetId: coverFaceId })
     .where('personGroupId', '=', person.personGroupId)
     .execute();
+  // The space person face matching makes for the person: another member reaches the person only through it (#1317).
+  const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.personGroupId);
+  const spacePerson = await ctx.database
+    .insertInto('shared_space_person')
+    .values({ spaceId: space.id, identityId: identity.id, representativeFaceId: coverFaceId, type: 'person' })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await ctx.database
+    .insertInto('shared_space_person_face')
+    .values([coverFaceId, otherFaceId].map((assetFaceId) => ({ personId: spacePerson.id, assetFaceId })))
+    .execute();
 
   let actor: { id: string; isAdmin: boolean };
   switch (actorLabel) {

@@ -303,7 +303,7 @@ describe(GalleryPeopleService.name, () => {
   describe('representative face', () => {
     it('updates a personal representative face by exact assetFaceId', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create({ identityId: 'identity-1' });
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: 'identity-1' });
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([face.assetId]));
@@ -337,7 +337,7 @@ describe(GalleryPeopleService.name, () => {
 
     it('rejects a face that does not belong to the requested person or identity', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.galleryPerson.getRepresentativeFaceForUpdate.mockResolvedValue(
@@ -354,7 +354,7 @@ describe(GalleryPeopleService.name, () => {
 
     it('rejects a selected face when the actor cannot read the face asset', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id });
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -508,6 +508,11 @@ describe(GalleryPeopleService.name, () => {
     it('updates the representative face for a shared-space Editor who does not own the person', async () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ identityId: 'identity-1' });
+      mocks.galleryPerson.getSpaceMetadataForViewer.mockResolvedValue(
+        new Map([
+          [person.personGroupId, { name: '', birthDate: null, spacePersonId: 'space-person-1', spaceId: 'space-1' }],
+        ]),
+      );
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
@@ -535,6 +540,11 @@ describe(GalleryPeopleService.name, () => {
     it('rejects a representative face update when the actor cannot read the chosen face asset', async () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
+      mocks.galleryPerson.getSpaceMetadataForViewer.mockResolvedValue(
+        new Map([
+          [person.personGroupId, { name: '', birthDate: null, spacePersonId: 'space-person-1', spaceId: 'space-1' }],
+        ]),
+      );
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personGroupId: person.personGroupId });
       mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));

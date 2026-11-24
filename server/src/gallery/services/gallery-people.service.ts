@@ -208,6 +208,8 @@ export class GalleryPeopleService extends BaseService {
         throw new ForbiddenException('Not authorized to change this person');
       }
     }
+    // #1317: a space editor changes the cover only of a person their space shows, and before writing anything.
+    await this.personViewerReads.requireShown(auth, current);
 
     const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
       personId: id,
@@ -235,6 +237,7 @@ export class GalleryPeopleService extends BaseService {
       name: JobName.PersonGenerateThumbnail,
       data: { ownerId: current.ownerId, personGroupId: id },
     });
-    return mapPerson(person);
+    // Another member gets back what their space shows, never the owner's private row.
+    return this.personViewerReads.person(auth, person, mapPerson(person));
   }
 }
