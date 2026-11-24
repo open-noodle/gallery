@@ -3,6 +3,7 @@ import { defaults } from 'src/dtos/config.dto.js';
 import {
   deriveSuggestionBand,
   foldLegacyFaceSuggestionConfig,
+  migrateLegacyDatabaseBackupDestination,
   migrateLegacyPetDetectionModel,
 } from 'src/gallery/utils/config-migrations.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -107,6 +108,34 @@ describe('foldLegacyFaceSuggestionConfig', () => {
     foldLegacyFaceSuggestionConfig(partial);
     expect(partial.machineLearning.facialRecognition.suggestionMaxDistance).toBe(0.7);
     expect((partial.machineLearning.facialRecognition as any).suggestions).toBeUndefined();
+  });
+});
+
+describe('migrateLegacyDatabaseBackupDestination', () => {
+  it('migrates the legacy remote-only setting to cloud destination', () => {
+    const partial = { backup: { database: { s3: { enabled: true } } } };
+
+    expect(migrateLegacyDatabaseBackupDestination(partial)).toEqual({
+      backup: { database: { s3: { enabled: true }, destination: 'cloud' } },
+    });
+  });
+
+  it('migrates a quoted legacy boolean from config files', () => {
+    expect(migrateLegacyDatabaseBackupDestination({ backup: { database: { s3: { enabled: 'true' } } } })).toEqual({
+      backup: { database: { s3: { enabled: 'true' }, destination: 'cloud' } },
+    });
+  });
+
+  it('keeps an explicitly configured destination', () => {
+    const partial = { backup: { database: { s3: { enabled: true }, destination: 'both' } } };
+
+    expect(migrateLegacyDatabaseBackupDestination(partial)).toEqual(partial);
+  });
+
+  it('passes through settings that did not enable the legacy remote destination', () => {
+    const partial = { backup: { database: { s3: { enabled: false } } } };
+
+    expect(migrateLegacyDatabaseBackupDestination(partial)).toEqual(partial);
   });
 });
 
