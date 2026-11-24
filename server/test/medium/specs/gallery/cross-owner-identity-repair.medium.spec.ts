@@ -559,4 +559,23 @@ describe('cross-owner identity repair (#1317)', () => {
     }
     await expect(fx.faceIdentity.hasCrossOwnerRepairWork()).resolves.toBe(false);
   });
+
+  // §1: reconciliation reads only the member's faces the space can see.
+  it('reconciliation leaves a member whose matching face is private, and joins them once that photo is shared', async () => {
+    const fx = await buildWorld();
+    const { person: memberPerson } = await fx.ctx.newPerson({ ownerId: fx.member.id, name: 'Uncle Sam' });
+    const memberIdentity = await fx.faceIdentity.ensurePersonIdentity(memberPerson.personGroupId);
+    const { assetId } = await addFace(fx, {
+      ownerId: fx.member.id,
+      personGroupId: memberPerson.personGroupId,
+      identityId: memberIdentity.id,
+    });
+
+    await fx.spaces.handleSharedSpaceIdentityReconciliation({ spaceId: fx.space.id, userId: fx.member.id });
+    await expect(identityOf(fx, memberPerson.personGroupId)).resolves.toBe(memberIdentity.id);
+
+    await fx.ctx.newSharedSpaceAsset({ spaceId: fx.space.id, assetId, addedById: fx.member.id });
+    await fx.spaces.handleSharedSpaceIdentityReconciliation({ spaceId: fx.space.id, userId: fx.member.id });
+    await expect(identityOf(fx, memberPerson.personGroupId)).resolves.toBe(fx.identityId);
+  });
 });
