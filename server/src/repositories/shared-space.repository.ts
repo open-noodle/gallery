@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, NotNull, Transaction, expressionBuilder, sql, type Updateable } from 'kysely';
+import { Insertable, Kysely, NotNull, RawBuilder, Transaction, expressionBuilder, sql, type Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -165,6 +165,11 @@ type SpacePersonWithEmbedding = {
   faceCount: number;
   representativeFaceId: string | null;
   representativeFaceSource?: string | null;
+  nameSource?: string;
+  nameSourceProfileType?: string | null;
+  nameSourceProfileId?: string | null;
+  nameSourceUpdatedAt?: Date | null;
+  nameSetById?: string | null;
   embedding: string;
 };
 
@@ -207,6 +212,14 @@ export type SpaceAssetFace = {
   spacePersonName: string | null;
   isEditorDrawn: boolean;
 };
+
+/** True while the author of a space person's value is a member of the space and shares person names there. */
+const authorSharesHere = (spaceId: string, authorId: RawBuilder<unknown>) => sql<boolean>`EXISTS (
+  SELECT 1 FROM shared_space_member AS author
+  WHERE author."spaceId" = ${spaceId}
+    AND author."userId" = ${authorId}
+    AND author."sharePersonMetadata" = true
+)`;
 
 @Injectable()
 export class SharedSpaceRepository {
@@ -3219,23 +3232,26 @@ export class SharedSpaceRepository {
           .on('target_member.userId', '=', anyUuid(assetAdderIds))
           .on('target_member.sharePersonMetadata', '=', true),
       )
-      .leftJoin('shared_space_person_alias as source_alias', (join) =>
-        join
-          .onRef('source_alias.personId', '=', 'source_person.id')
-          .onRef('source_alias.userId', '=', 'source_member.userId'),
-      )
       .select([
         'source_person.id as personId',
         sql<'space-person'>`'space-person'`.as('sourceProfileType'),
         'source_person.id as sourceProfileId',
         'target_member.userId as userId',
         'target_member.role',
-        'source_person.birthDate',
         'source_person.type',
         'source_person.updatedAt',
       ])
       .select((eb) => [
-        sql<string>`COALESCE(NULLIF("source_alias"."alias", ''), "source_person"."name", '')`.as('name'),
+        // Only a value someone typed, while its author is a member here who shares person names (#1317). A personal
+        // alias never crosses, and an inherited copy is no source, so two spaces cannot keep a stale value alive.
+        sql<string>`CASE WHEN "source_person"."nameSource" = 'manual' AND ${authorSharesHere(input.spaceId, sql.ref('source_person.nameSetById'))} THEN COALESCE("source_person"."name", '') ELSE '' END`.as(
+          'name',
+        ),
+        sql<
+          string | null
+        >`CASE WHEN "source_person"."birthDateSource" = 'manual' AND ${authorSharesHere(input.spaceId, sql.ref('source_person.birthDateSetById'))} THEN "source_person"."birthDate" END`.as(
+          'birthDate',
+        ),
         sql<string | null>`NULL`.as('species'),
         eb.ref('source_person.faceCount').$castTo<number>().as('supportingFaceCount'),
         sql<boolean>`true`.as('isAssetAdder'),
@@ -4390,6 +4406,11 @@ export class SharedSpaceRepository {
         'shared_space_person.faceCount',
         'shared_space_person.representativeFaceId',
         'shared_space_person.representativeFaceSource',
+        'shared_space_person.nameSource',
+        'shared_space_person.nameSourceProfileType',
+        'shared_space_person.nameSourceProfileId',
+        'shared_space_person.nameSourceUpdatedAt',
+        'shared_space_person.nameSetById',
         'face_search.embedding',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)

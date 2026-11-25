@@ -38,6 +38,8 @@ describe('PUT /people/:id/representative-face — write scope (Slice 3 / M2)', (
     const originalFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: person.id });
     // The second face is the target the disputed actor tries to switch the cover to.
     const targetFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: person.id });
+    // Other members read the person only while the space shows it (#1317).
+    await utils.showFacesInSpace(ctx.spaceId, [originalFaceId, targetFaceId], 'M2 RepFace Person');
     return { personId: person.id, originalFaceId, targetFaceId };
   };
 

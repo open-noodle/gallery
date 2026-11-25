@@ -6,6 +6,7 @@ import type { IAssetEditJob } from 'src/gallery/types.js';
 import { assetEditJobData, sendAssetEditReady } from 'src/gallery/utils/asset-edit-ready.js';
 import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hooks.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
+import { PersonViewerReads } from 'src/gallery/utils/person-viewer-reads.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
 import { VideoFaceDetector } from 'src/gallery/utils/video-face-detector.js';
 import type { AccessRepository } from 'src/repositories/access.repository.js';
@@ -100,6 +101,7 @@ export abstract class GalleryBaseService {
   declare protected faceAssignmentService: FaceAssignmentService;
   declare protected backendMedia: BackendMediaServer;
   declare protected videoFaces: VideoFaceDetector;
+  declare protected personViewerReads: PersonViewerReads;
 
   // Called once at the end of BaseService's constructor, when the upstream repositories are set.
   protected initGallery() {
@@ -141,6 +143,12 @@ export abstract class GalleryBaseService {
       backendMedia: this.backendMedia,
       logger: this.logger,
       getConfig: (options) => this.getConfig(options),
+    });
+    this.personViewerReads = new PersonViewerReads({
+      accessRepository: this.accessRepository,
+      galleryPersonRepository: this.galleryPersonRepository,
+      backendMedia: this.backendMedia,
+      sharedSpaceRepository: this.sharedSpaceRepository,
     });
   }
 

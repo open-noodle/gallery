@@ -1144,6 +1144,8 @@
     "other": "{count} foto's"
   },
   "person_type_changed": "Persoonstype gewijzigd.",
+  "person_unavailable_description": "Deze persoon is mogelijk verborgen, of je hebt geen toegang meer.",
+  "person_unavailable_title": "Deze persoon is niet beschikbaar",
   "pet": "Huisdier",
   "pets": "Huisdieren",
   "photos_only": "Alleen foto's",

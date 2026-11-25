@@ -128,6 +128,7 @@ export class GalleryPeopleService extends BaseService {
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const person = await findOrFail(() => this.personRepository.getByGroupIdOnly(id), 'Person');
+    await this.personViewerReads.requireShown(auth, person);
     const take = dto.size;
     // Fork RBAC (Slice 2 / M1): PersonRead also admits non-owner space-granted callers. Scope those
     // callers to space-reachable, shareable-visibility faces only — never the owner's Hidden/
@@ -141,6 +142,7 @@ export class GalleryPeopleService extends BaseService {
       skip: (dto.page - 1) * dto.size,
       scope,
       hasElevatedPermission: auth.session?.hasElevatedPermission,
+      viewerId: auth.user.id,
     });
     const faces = rows.slice(0, take);
 
@@ -164,7 +166,13 @@ export class GalleryPeopleService extends BaseService {
 
   async getFaceThumbnail(auth: AuthDto, personId: string, faceId: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
-    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({ personId, assetFaceId: faceId });
+    const person = await findOrFail(() => this.personRepository.getByGroupIdOnly(personId), 'Person');
+    await this.personViewerReads.requireShown(auth, person);
+    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
+      personId,
+      assetFaceId: faceId,
+      viewerId: auth.user.id,
+    });
     if (!face) {
       throw new NotFoundException();
     }
@@ -200,10 +208,13 @@ export class GalleryPeopleService extends BaseService {
         throw new ForbiddenException('Not authorized to change this person');
       }
     }
+    // #1317: a space editor changes the cover only of a person their space shows, and before writing anything.
+    await this.personViewerReads.requireShown(auth, current);
 
     const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
       personId: id,
       assetFaceId: dto.assetFaceId,
+      viewerId: auth.user.id,
     });
     if (!face) {
       throw new BadRequestException('Representative face must belong to the person');
@@ -226,6 +237,7 @@ export class GalleryPeopleService extends BaseService {
       name: JobName.PersonGenerateThumbnail,
       data: { ownerId: current.ownerId, personGroupId: id },
     });
-    return mapPerson(person);
+    // Another member gets back what their space shows, never the owner's private row.
+    return this.personViewerReads.person(auth, person, mapPerson(person));
   }
 }

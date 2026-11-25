@@ -110,7 +110,7 @@ describe('accessible identity reconciliation policy', () => {
   it('counts multiple profiles on the same identity as one candidate outside claim filtering', () => {
     const claims: ReconciliationClaim[] = [
       {
-        bridge: 'personal-upload',
+        bridge: 'member-join',
         sourceIdentityId: 'local-identity',
         targetIdentityId: 'shared-identity',
         sourceProfileKey: 'user:u1:p1',
@@ -145,7 +145,6 @@ describe('accessible identity reconciliation policy', () => {
   it.each([
     ['member-join', 'local-identity', 'space-identity'],
     ['space-evidence', 'local-identity', 'space-identity'],
-    ['personal-upload', 'local-identity', 'space-identity'],
     ['explicit-space-add', 'local-identity', 'space-identity'],
   ] as const)('chooses deterministic target for %s', (bridge, expectedSource, expectedTarget) => {
     expect(

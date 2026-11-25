@@ -16,6 +16,7 @@ import {
 import { type PeopleFaceStatisticsOptions } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
+import { asDateString } from 'src/utils/date.js';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge.js';
@@ -61,12 +62,39 @@ export interface RepresentativeFaceListOptions {
   `spaceVisibilityGate`, so their own elevation can never reach the owner's locked assets.
   */
   hasElevatedPermission?: boolean;
+  /** The caller. A face reached only through the person's identity is listed only if the caller can read its asset (#1317). */
+  viewerId: string;
 }
 
 export interface RepresentativeFaceUpdateOptions {
   personId: string;
   assetFaceId: string;
+  /** See RepresentativeFaceListOptions.viewerId. */
+  viewerId: string;
 }
+
+/**
+#1317: a face on the person's own cluster (`personGroupId` arm) always qualifies; a face reached only through
+the person's identity qualifies only when its asset is the viewer's own or reachable for the viewer through a
+shared space under the shareable-visibility gate. Keeps another account's private faces, joined into the same
+identity, out of the picker.
+*/
+const identityFaceReadableBy = (eb: ExpressionBuilder<DB, 'person' | 'asset_face' | 'asset'>, viewerId: string) =>
+  eb.or([
+    eb('asset_face.personGroupId', '=', eb.ref('person.personGroupId')),
+    eb('asset.ownerId', '=', viewerId),
+    eb.and([
+      spaceVisibilityGate(eb),
+      eb.or(
+        spaceAssetPathBranches(eb, {
+          correlateAssetId: 'asset.id',
+          correlateLibraryId: 'asset.libraryId',
+          scope: { memberUserId: viewerId },
+          albumTimelineGate: 'none',
+        }),
+      ),
+    ]),
+  ]);
 
 const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
 
@@ -402,7 +430,7 @@ export class GalleryPersonRepository {
       .executeTakeFirstOrThrow();
   }
 
-  @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0 }] })
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0, viewerId: DummyValue.UUID }] })
   getRepresentativeFaces(options: RepresentativeFaceListOptions) {
     return this.db
       .selectFrom('person')
@@ -439,6 +467,7 @@ export class GalleryPersonRepository {
           ),
         ),
       )
+      .where((eb) => identityFaceReadableBy(eb, options.viewerId))
       .$if(!options.hasElevatedPermission, (qb) => qb.where('asset.visibility', '!=', AssetVisibility.Locked))
       .$if(!!options.scope, (qb) =>
         qb.where((eb) =>
@@ -466,7 +495,60 @@ export class GalleryPersonRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID }] })
+  /**
+  The name and birthday a viewer's spaces publish for people another account owns (#1317), with the viewer's own alias
+  first. A hidden space person publishes nothing. When several spaces hold the person, a named profile wins.
+  */
+  @GenerateSql({ params: [{ viewerId: DummyValue.UUID, personIds: [DummyValue.UUID], spaceId: DummyValue.UUID }] })
+  async getSpaceMetadataForViewer(input: { viewerId: string; personIds: string[]; spaceId?: string }) {
+    const metadata = new Map<
+      string,
+      { name: string; birthDate: string | null; spacePersonId: string; spaceId: string }
+    >();
+    if (input.personIds.length === 0) {
+      return metadata;
+    }
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('shared_space_person_face', 'shared_space_person_face.assetFaceId', 'asset_face.id')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .innerJoin('shared_space_member', (join) =>
+        join
+          .onRef('shared_space_member.spaceId', '=', 'shared_space_person.spaceId')
+          .on('shared_space_member.userId', '=', input.viewerId),
+      )
+      .leftJoin('shared_space_person_alias', (join) =>
+        join
+          .onRef('shared_space_person_alias.personId', '=', 'shared_space_person.id')
+          .on('shared_space_person_alias.userId', '=', input.viewerId),
+      )
+      .distinctOn('asset_face.personGroupId')
+      .select('asset_face.personGroupId as personId')
+      .select(['shared_space_person.id as spacePersonId', 'shared_space_person.spaceId'])
+      .select('shared_space_person.birthDate')
+      .select(
+        sql<string>`COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '')`.as('name'),
+      )
+      .where('asset_face.personGroupId', 'in', input.personIds)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('shared_space_person.isHidden', '=', false)
+      .$if(!!input.spaceId, (qb) => qb.where('shared_space_person.spaceId', '=', input.spaceId!))
+      .orderBy('asset_face.personGroupId')
+      .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '') IS NULL`)
+      .orderBy('shared_space_person.id')
+      .execute();
+    for (const row of rows) {
+      metadata.set(row.personId!, {
+        name: row.name,
+        birthDate: asDateString(row.birthDate),
+        spacePersonId: row.spacePersonId,
+        spaceId: row.spaceId,
+      });
+    }
+    return metadata;
+  }
+
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID, viewerId: DummyValue.UUID }] })
   getRepresentativeFaceForUpdate(options: RepresentativeFaceUpdateOptions) {
     return this.db
       .selectFrom('person')
@@ -488,6 +570,7 @@ export class GalleryPersonRepository {
       .selectAll('asset_face')
       .where('person.personGroupId', '=', options.personId)
       .where('asset_face.id', '=', options.assetFaceId)
+      .where((eb) => identityFaceReadableBy(eb, options.viewerId))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)

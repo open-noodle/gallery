@@ -25,6 +25,11 @@ export interface ScopedFaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 
   SQL to before this option existed. Only the suggestion scans and the cleanup scan's KNN pass pass this.
   */
   visibility?: AssetVisibility[];
+  /**
+  Space scope only: further restricts the candidates to assets owned by this user. Used by identity
+  reconciliation to find a member's faces the space can actually see — never their private library (#1317).
+  */
+  spaceAssetOwnerId?: string;
 }
 
 @Injectable()
@@ -56,6 +61,19 @@ export class FaceSearchRepository {
       ],
     },
     {
+      name: 'space-member',
+      params: [
+        {
+          spaceId: DummyValue.UUID,
+          spaceAssetOwnerId: DummyValue.UUID,
+          embedding: DummyValue.VECTOR,
+          numResults: 2,
+          maxDistance: 0.6,
+          hasPerson: true,
+        },
+      ],
+    },
+    {
       name: 'owner-visibility',
       params: [
         {
@@ -77,6 +95,7 @@ export class FaceSearchRepository {
     hasPerson,
     minBirthDate,
     visibility,
+    spaceAssetOwnerId,
   }: ScopedFaceEmbeddingSearch) {
     if (!z.int().min(1).max(1000).safeParse(numResults).success) {
       throw new Error(`Invalid value for 'numResults': ${numResults}`);
@@ -84,6 +103,10 @@ export class FaceSearchRepository {
 
     if (spaceId && userIds?.length) {
       throw new Error('Cannot mix spaceId and userIds');
+    }
+
+    if (spaceAssetOwnerId && !spaceId) {
+      throw new Error('spaceAssetOwnerId requires spaceId');
     }
 
     if (!spaceId && !userIds?.length) {
@@ -120,7 +143,8 @@ export class FaceSearchRepository {
                     }),
                   ),
                 )
-                .where((eb) => spaceVisibilityGate(eb)),
+                .where((eb) => spaceVisibilityGate(eb))
+                .$if(!!spaceAssetOwnerId, (qb) => qb.where('asset.ownerId', '=', spaceAssetOwnerId!)),
             )
             .where('asset.deletedAt', 'is', null)
             // Slice 1 (F2): opt-in visibility gate for the owner-scoped branch. Defaults to undefined (no

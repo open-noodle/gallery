@@ -1146,6 +1146,8 @@
     "other": "{count} photos"
   },
   "person_type_changed": "Type de personne modifié.",
+  "person_unavailable_description": "Elle a peut-être été masquée, ou vous n'y avez plus accès.",
+  "person_unavailable_title": "Cette personne n'est pas disponible",
   "pet": "Animal",
   "pets": "Animaux",
   "photos_only": "Photos uniquement",

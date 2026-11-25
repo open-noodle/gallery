@@ -675,7 +675,7 @@
                     {person.name || $t('add_a_name')}
                   </button>
                 {:else}
-                  <p class="w-40 truncate font-medium">{person.name || $t('add_a_name')}</p>
+                  <p class="w-40 truncate font-medium">{person.name || $t('person')}</p>
                 {/if}
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   {$t('assets_count', { values: { count: statistics.assets } })}

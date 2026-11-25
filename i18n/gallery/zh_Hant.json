@@ -1159,6 +1159,8 @@
     "other": "{count} 張相片"
   },
   "person_type_changed": "人物類型已變更。",
+  "person_unavailable_description": "此人物可能已被隱藏，或你已無權存取。",
+  "person_unavailable_title": "此人物無法使用",
   "pet": "寵物",
   "pets": "寵物",
   "photos_only": "僅相片",

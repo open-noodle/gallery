@@ -117,6 +117,8 @@
         "shared_space_library_addedById_fkey",
         "shared_space_member_userId_fkey",
         "shared_space_person_alias_userId_fkey",
+        "shared_space_person_birthDateSetById_fkey",
+        "shared_space_person_nameSetById_fkey",
         "user_group_createdById_fkey",
         "user_group_member_userId_fkey"
       ]

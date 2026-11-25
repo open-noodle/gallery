@@ -1148,6 +1148,8 @@
     "other": "{count} photos"
   },
   "person_type_changed": "Person type changed.",
+  "person_unavailable_description": "They may be hidden, or you may no longer have access to them.",
+  "person_unavailable_title": "This person isn't available",
   "pet": "Pet",
   "pets": "Pets",
   "photos_only": "Photos only",

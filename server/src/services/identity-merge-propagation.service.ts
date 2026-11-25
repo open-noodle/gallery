@@ -89,6 +89,12 @@ export type IdentityMergePropagationPlan = {
   sourceIdentityIds: string[];
   personalProfileMerges: PersonalProfileMergeStep[];
   spaceProfileMerges: SpaceProfileMergeStep[];
+  /**
+  Personal people the request names, stamped `person_identity.manualLinkAt` once the merge commits (#1317). A named
+  person merged into another of its owner's people is replaced by that survivor. Empty unless the request also names
+  a space person: a merge of the actor's own people says nothing about another account.
+  */
+  manualLinkPersonIds: string[];
   profileIdentityUpdates: Array<{ kind: MergeProfileKind; profileId: string; identityId: string }>;
   affectedOwnerIds: string[];
   /**
@@ -312,6 +318,8 @@ export class IdentityMergePropagationService {
     const featureFaceRepairJobs: MergePropagationFollowUpJob[] = [];
 
     for (const step of plan.personalProfileMerges) {
+      // A person linked by hand stays linked when it is merged into another of its owner's people (#1317).
+      await this.deps.faceIdentityRepository.carryManualLinks(step, db);
       let targetNeedsFeatureFaceRepair = false;
       for (const sourcePersonId of step.sourcePersonIds) {
         const { deletedThumbnailPath, targetNeedsFeatureFaceRepair: sourceMergeNeedsFeatureFaceRepair } =
@@ -381,6 +389,7 @@ export class IdentityMergePropagationService {
       },
       db,
     );
+    await this.deps.faceIdentityRepository.markManualLinks(plan.manualLinkPersonIds, db);
 
     for (const event of plan.activityEvents) {
       await this.deps.sharedSpaceRepository.logActivity(event, db);
@@ -700,6 +709,8 @@ export class IdentityMergePropagationService {
 
     const sortedAffectedOwnerIds = [...affectedOwnerIds].toSorted();
     const sortedAffectedSpaceIds = [...affectedSpaceIds].toSorted();
+    const namedProfiles = [ensuredTarget, ...ensuredSources];
+    const crossesScope = namedProfiles.some(({ kind }) => kind === 'space-person');
     const plan: IdentityMergePropagationPlan = {
       actorUserId,
       origin:
@@ -720,6 +731,12 @@ export class IdentityMergePropagationService {
       sourceIdentityIds,
       personalProfileMerges,
       spaceProfileMerges,
+      manualLinkPersonIds: crossesScope
+        ? this.survivingPersonIds(
+            namedProfiles.filter(({ kind }) => kind === 'person').map(({ id }) => id),
+            personalProfileMerges,
+          )
+        : [],
       profileIdentityUpdates,
       affectedOwnerIds: sortedAffectedOwnerIds,
       repointedOwnerIds: [...repointedOwnerIds].toSorted(),
@@ -874,6 +891,14 @@ export class IdentityMergePropagationService {
     }
 
     return groups;
+  }
+
+  /** Each named person, or the person it is merged into, so the stamp lands on a row that survives the merge. */
+  private survivingPersonIds(personIds: string[], merges: PersonalProfileMergeStep[]): string[] {
+    const survivorOf = new Map(
+      merges.flatMap((step) => step.sourcePersonIds.map((sourceId) => [sourceId, step.targetPersonId] as const)),
+    );
+    return [...new Set(personIds.map((id) => survivorOf.get(id) ?? id))];
   }
 
   private chooseSurvivor(

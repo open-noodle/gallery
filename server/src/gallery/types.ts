@@ -30,6 +30,11 @@ export interface IPetRecognitionJob extends IDeferrableJob {
   label?: string;
 }
 
+export interface IFaceIdentityCrossOwnerRepairJob extends IBaseJob {
+  /** The last personGroupId the previous page handled; absent on the first page. */
+  cursor?: string;
+}
+
 export interface IFaceIdentityBackfillJob extends IBaseJob {
   stage?: 'person' | 'space-person';
   cursor?: string;
@@ -142,6 +147,7 @@ export type GalleryJobItem =
   // Facial Recognition
   | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }
   | { name: JobName.FaceIdentityMaintenanceAfterRecognition; data: IDelayedJob }
+  | { name: JobName.FaceIdentityCrossOwnerRepair; data: IFaceIdentityCrossOwnerRepairJob }
   | { name: JobName.FaceSuggestionMaintenance; data: IBaseJob }
   | { name: JobName.PersonSuggestionScanQueueAll; data: IBaseJob }
   | { name: JobName.PersonSuggestionScan; data: IPersonSuggestionScanJob }

@@ -189,21 +189,24 @@ const setupStrictReconciliationFixture = (
 ) => {
   mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', faceRecognitionEnabled: true }));
   mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: 'space-1', userId: 'member-1' }));
-  mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue(
-    (overrides.spacePeople ?? [
-      {
-        id: 'space-person-1',
-        name: '',
-        type: 'person',
-        identityId: 'space-identity',
-        isHidden: false,
-        faceCount: 1,
-        representativeFaceId: 'space-face-1',
-        representativeFaceSource: 'auto',
-        embedding: '[1,2,3]',
-        ...overrides.spacePerson,
-      },
-    ]) as any,
+  const spacePeople = overrides.spacePeople ?? [
+    {
+      id: 'space-person-1',
+      name: '',
+      type: 'person',
+      identityId: 'space-identity',
+      isHidden: false,
+      faceCount: 1,
+      representativeFaceId: 'space-face-1',
+      representativeFaceSource: 'auto',
+      embedding: '[1,2,3]',
+      ...overrides.spacePerson,
+    },
+  ];
+  mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue(spacePeople as any);
+  // The claim re-reads its space person before applying (stale-claim guard).
+  mocks.sharedSpace.getPersonById.mockImplementation(
+    (id: string) => Promise.resolve(spacePeople.find((person) => person.id === id)) as any,
   );
   mocks.faceSearch.searchFaces.mockResolvedValue([
     { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
@@ -4053,6 +4056,18 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('handleSharedSpaceIdentityReconciliation', () => {
+    it('should skip a claim whose space person moved to another identity during the run (#1317)', async () => {
+      setupStrictReconciliationFixture(mocks);
+      // An earlier claim in the same run merged the space person's identity away.
+      mocks.sharedSpace.getPersonById.mockResolvedValue({ id: 'space-person-1', identityId: 'other-identity' } as any);
+
+      await expect(
+        sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+    });
+
     it('should merge one strict local member match into an accessible space identity', async () => {
       const space = factory.sharedSpace({ id: 'space-1', faceRecognitionEnabled: true });
 
@@ -4071,6 +4086,7 @@ describe(SharedSpaceService.name, () => {
           embedding: '[1,2,3]',
         },
       ]);
+      mocks.sharedSpace.getPersonById.mockResolvedValue({ id: 'space-person-1', identityId: 'space-identity' } as any);
       mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
       ]);
@@ -4087,13 +4103,18 @@ describe(SharedSpaceService.name, () => {
         sut.handleSharedSpaceIdentityReconciliation({ spaceId: space.id, userId: 'member-1' }),
       ).resolves.toBe(JobStatus.Success);
 
+      // #1317: the claim must only see the member's faces the space can see, never their private library.
       expect(mocks.faceSearch.searchFaces).toHaveBeenCalledWith(
         expect.objectContaining({
-          userIds: ['member-1'],
+          spaceId: space.id,
+          spaceAssetOwnerId: 'member-1',
           embedding: '[1,2,3]',
           hasPerson: true,
           numResults: 2,
         }),
+      );
+      expect(mocks.faceSearch.searchFaces).not.toHaveBeenCalledWith(
+        expect.objectContaining({ userIds: expect.anything() }),
       );
       expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
         targetIdentityId: 'space-identity',
@@ -14257,6 +14278,30 @@ describe(SharedSpaceService.name, () => {
     it('does nothing for an empty asset list', async () => {
       await sut.onAlbumAssetsRemove({ albumId: newUuid(), assetIds: [] });
       expect(mocks.sharedSpace.getSpacesLinkedToAlbum).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleSharedSpaceIdentityReconciliationSweep', () => {
+    it('queues each space reconciliation, then the cross-owner repair when some person needs it (#1317)', async () => {
+      mocks.sharedSpace.getFaceRecognitionEnabledSpaceIds.mockResolvedValue(['space-1']);
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(true);
+
+      await expect(sut.handleSharedSpaceIdentityReconciliationSweep()).resolves.toBe(JobStatus.Success);
+
+      const names = mocks.job.queue.mock.calls.map(([job]) => job.name);
+      expect(names.at(-1)).toBe(JobName.FaceIdentityCrossOwnerRepair);
+      expect(names).toContain(JobName.SharedSpaceIdentityReconciliation);
+    });
+
+    it('does not queue the cross-owner repair when no person needs it', async () => {
+      mocks.sharedSpace.getFaceRecognitionEnabledSpaceIds.mockResolvedValue(['space-1']);
+      mocks.faceIdentity.hasCrossOwnerRepairWork.mockResolvedValue(false);
+
+      await sut.handleSharedSpaceIdentityReconciliationSweep();
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FaceIdentityCrossOwnerRepair }),
+      );
     });
   });
 

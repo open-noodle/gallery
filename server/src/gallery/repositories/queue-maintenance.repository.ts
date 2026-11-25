@@ -344,6 +344,17 @@ export class QueueMaintenanceRepository {
         }
         return { jobId: 'face-identity-backfill/root', removeOnFail: true, removeOnComplete: true };
       }
+      case JobName.FaceIdentityCrossOwnerRepair: {
+        // The first page has one stable jobId so several microservices workers booting together queue it once.
+        const data = item.data as { cursor?: string };
+        return {
+          jobId: data.cursor
+            ? `face-identity-cross-owner-repair/after/${data.cursor}`
+            : 'face-identity-cross-owner-repair',
+          removeOnComplete: true,
+          removeOnFail: true,
+        };
+      }
       case JobName.FaceIdentityMaintenanceAfterRecognition: {
         const data = item.data as { delay?: number };
         if (data.delay !== undefined) {

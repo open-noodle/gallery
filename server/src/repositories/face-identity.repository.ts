@@ -3,7 +3,7 @@ import { ExpressionBuilder, Insertable, Kysely, RawBuilder, Selectable, Transact
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { PeopleResponseDto, PersonResponseDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
-import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum.js';
+import { AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum.js';
 import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
 import {
   clearOrphanPersonIdentities,
@@ -13,7 +13,6 @@ import {
   personType,
   setPersonIdentity,
 } from 'src/gallery/utils/person-sidecar.js';
-import { probes } from 'src/repositories/database.repository.js';
 import type { PersonStatistics } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
@@ -22,7 +21,12 @@ import { anyUuid, petFacePredicate, retryOnDeadlock } from 'src/utils/database.j
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
 import { targetTokens } from 'src/utils/face-repair.js';
 import { rekeyVerdictIdentity } from 'src/utils/face-verdict-merge.js';
-import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
+import {
+  accessibleTimelineAssetPredicate,
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+  spaceVisibleAssetVisibilities,
+} from 'src/utils/shared-space-album-scope.js';
 
 // A pet profile is listed only when it is an individual, not a species bucket (whose faces carry no embedding).
 // Pet recognition gives an individual pet_search rows (embedded_pet_identities); a human cluster the owner
@@ -130,12 +134,6 @@ const MERGE_IDENTITY_CENTROID_SAMPLE_SIZE = 200;
 // beyond this bound). This contains corruption regardless of how the identity link became wrong — even a
 // link already corrupt in the database. See specs/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
 const REPAIR_FACE_MAX_PERSON_DISTANCE = 0.5;
-
-export type AccessibleIdentityFaceMatch = {
-  identityId: string;
-  type: string;
-  distance: number;
-};
 
 type AccessiblePeopleOptions = {
   withHidden: boolean;
@@ -410,89 +408,6 @@ export class FaceIdentityRepository {
     };
   }
 
-  @GenerateSql({
-    params: [
-      {
-        userId: DummyValue.UUID,
-        embedding: DummyValue.VECTOR,
-        maxDistance: 0.6,
-        type: 'person',
-        excludeIdentityId: DummyValue.UUID,
-      },
-    ],
-  })
-  async findClosestAccessibleIdentityForFace(input: {
-    userId: string;
-    embedding: string;
-    maxDistance: number;
-    type: string;
-    excludeIdentityId?: string | null;
-  }): Promise<AccessibleIdentityFaceMatch | undefined> {
-    return this.db.transaction().execute(async (trx) => {
-      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
-
-      const result = await sql<AccessibleIdentityFaceMatch>`
-        WITH identity_matches AS (
-          SELECT
-            shared_space_person."identityId" AS "identityId",
-            shared_space_person.type,
-            MIN(face_search.embedding <=> ${input.embedding})::float8 AS distance
-          FROM shared_space_person
-          INNER JOIN shared_space_member
-            ON shared_space_member."spaceId" = shared_space_person."spaceId"
-            AND shared_space_member."userId" = ${input.userId}
-            AND shared_space_member."showInTimeline" = true
-          INNER JOIN shared_space_person_face
-            ON shared_space_person_face."personId" = shared_space_person.id
-          INNER JOIN asset_face
-            ON asset_face.id = shared_space_person_face."assetFaceId"
-          INNER JOIN asset
-            ON asset.id = asset_face."assetId"
-          INNER JOIN face_search
-            ON face_search."faceId" = asset_face.id
-          WHERE shared_space_person."identityId" IS NOT NULL
-            AND shared_space_person.type = ${input.type}
-            AND shared_space_person."isHidden" = false
-            ${input.excludeIdentityId ? sql`AND shared_space_person."identityId" <> ${input.excludeIdentityId}` : sql``}
-            AND asset_face."deletedAt" IS NULL
-            AND asset_face."isVisible" = true
-            AND asset."deletedAt" IS NULL
-            AND asset."isOffline" = false
-            AND asset.visibility = ${AssetVisibility.Timeline}
-            AND NOT EXISTS (
-              SELECT 1
-              FROM person existing_person
-              INNER JOIN person_identity ON person_identity."personGroupId" = existing_person."personGroupId"
-              WHERE existing_person."ownerId" = ${input.userId}
-                AND person_identity."identityId" = shared_space_person."identityId"
-            )
-            ${
-              input.excludeIdentityId
-                ? sql`
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM shared_space_person source_space_person
-                    INNER JOIN shared_space_person target_space_person
-                      ON target_space_person."spaceId" = source_space_person."spaceId"
-                      AND target_space_person."identityId" = shared_space_person."identityId"
-                    WHERE source_space_person."identityId" = ${input.excludeIdentityId}
-                  )
-                `
-                : sql``
-            }
-          GROUP BY shared_space_person."identityId", shared_space_person.type
-        )
-        SELECT "identityId", type, distance
-        FROM identity_matches
-        WHERE distance <= ${input.maxDistance}
-        ORDER BY distance
-        LIMIT 2
-      `.execute(trx);
-
-      return result.rows.length === 1 ? result.rows[0] : undefined;
-    });
-  }
-
   async getBackfillWork(): Promise<FaceIdentityBackfillWork> {
     const result = await sql<Pick<FaceIdentityBackfillWork, 'hasPersonalIdentityWork' | 'hasSpacePersonIdentityWork'>>`
       SELECT
@@ -534,11 +449,14 @@ export class FaceIdentityRepository {
               ON shared_space_person_face."personId" = shared_space_person.id
             INNER JOIN asset_face
               ON asset_face.id = shared_space_person_face."assetFaceId"
+            INNER JOIN asset ON asset.id = asset_face."assetId"
             INNER JOIN face_identity_face
               ON face_identity_face."assetFaceId" = asset_face.id
             WHERE shared_space."faceRecognitionEnabled" = true
               AND asset_face."deletedAt" IS NULL
               AND asset_face."isVisible" = true
+              AND asset."deletedAt" IS NULL
+              AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
               AND shared_space_person."identityId" IS DISTINCT FROM face_identity_face."identityId"
         ) AS "hasSpacePersonIdentityWork"
     `.execute(this.db);
@@ -1362,62 +1280,222 @@ export class FaceIdentityRepository {
     };
   }
 
-  async detachScopedProfile(profileRef: ScopedPersonProfileRefDto): Promise<string> {
+  /**
+  Gives the target the earliest manual-link stamp among the target and the people merged into it (#1317), so a
+  person linked by hand keeps that link after a personal merge deletes it. Run before the sources are removed.
+  */
+  @GenerateSql({ params: [{ targetPersonId: DummyValue.UUID, sourcePersonIds: [DummyValue.UUID] }] })
+  async carryManualLinks(
+    { targetPersonId, sourcePersonIds }: { targetPersonId: string; sourcePersonIds: string[] },
+    db: Kysely<DB> = this.db,
+  ): Promise<void> {
+    if (sourcePersonIds.length === 0) {
+      return;
+    }
+    await db
+      .updateTable('person_identity')
+      // least() skips nulls, so an unstamped target takes the earliest source stamp and a stamped one keeps its own.
+      .set({
+        manualLinkAt: sql`least(${sql.ref('person_identity.manualLinkAt')}, (${db
+          .selectFrom('person_identity as source')
+          .select((eb) => eb.fn.min('source.manualLinkAt').as('stamp'))
+          .where('source.personGroupId', 'in', sourcePersonIds)}))`,
+      })
+      .where('person_identity.personGroupId', '=', targetPersonId)
+      .execute();
+  }
+
+  /** Stamps the personal people a human linked to another scope by hand (#1317); the cross-owner repair keeps them. */
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async markManualLinks(personGroupIds: string[], db: Kysely<DB> = this.db): Promise<void> {
+    if (personGroupIds.length === 0) {
+      return;
+    }
+    await db
+      .updateTable('person_identity')
+      .set({ manualLinkAt: sql`now()` })
+      .where('personGroupId', 'in', personGroupIds)
+      .execute();
+  }
+
+  /**
+  Personal people the cross-owner repair detaches (#1317, spec 5b), ordered by personGroupId. A person is a
+  candidate when all three hold:
+    - its identity is shared: another owner's person or any space person sits on it;
+    - it is not backed: its owner has no live face of the person, or bound to the identity, on a live Timeline or
+      Archive asset that a space holding a space person on the identity can see (direct, linked library, linked
+      album or album contribution). Membership is not required, because linked libraries and albums reach assets of
+      people who never joined. The person's own faces count without their per-face identity row, which the identity
+      backfill may not have written yet: the nightly sweep queues the repair without waiting for it;
+    - no human linked it there by hand (`manualLinkAt` is null).
+  */
+  @GenerateSql({ params: [{ afterPersonGroupId: DummyValue.UUID, limit: 100 }] })
+  getCrossOwnerRepairCandidates({ afterPersonGroupId, limit }: { afterPersonGroupId?: string; limit: number }) {
+    return this.crossOwnerRepairCandidates()
+      .select(['person_identity.personGroupId', 'person_identity.ownerId', 'person_identity.identityId'])
+      .$if(!!afterPersonGroupId, (qb) => qb.where('person_identity.personGroupId', '>', afterPersonGroupId!))
+      .orderBy('person_identity.personGroupId')
+      .limit(limit)
+      .execute();
+  }
+
+  /**
+  Detaches one candidate of `getCrossOwnerRepairCandidates`, unless it stopped being one since the page was listed
+  (#1317). It takes the merge engine's lock and re-checks the rule in the same transaction, so a manual link
+  committed after the listing is kept. Returns whether the person was detached.
+  */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async detachCrossOwnerCandidate(personGroupId: string): Promise<boolean> {
     return this.db.transaction().execute(async (trx) => {
-      const profile = await this.getProfileForDetach(profileRef, trx);
-      const identity = await trx
-        .insertInto('face_identity')
-        .values({
-          type: profile.identityType,
-          representativeFaceId: profile.representativeFaceId,
-        } satisfies Insertable<FaceIdentityTable>)
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
-      await (profileRef.type === 'person'
-        ? setPersonIdentity(trx, profileRef.id, identity.id)
-        : trx
-            .updateTable('shared_space_person')
-            .set({ identityId: identity.id })
-            .where('id', '=', profileRef.id)
-            .where('spaceId', '=', profileRef.spaceId!)
-            .execute());
-
-      const faceIds = await this.getScopedProfileFaceIds(profileRef, trx);
-      if (faceIds.length > 0) {
-        // Re-key the faces onto the fresh identity and touch NOTHING else. `source` is deliberately absent:
-        // separating a profile is a statement about grouping ("this profile is not the same human as the ones
-        // it was grouped with"), not a per-face attestation, and `source='manual'` means precisely the latter
-        // — both engines read it, owner-agnostically, as "a human confirmed this face" and exclude it from the
-        // cleanup console and from suggestions forever (see isSettledForOwner in utils/face-repair.ts and the
-        // manual-link anti-join in face-person-verdict.repository.ts). Stamping it here buried every ML
-        // mistake in exactly the contaminated cluster a user separates BECAUSE it is contaminated, with no UI
-        // to undo it — the same over-claim the R1 people-merge decision reversed. The identityId rewrite is
-        // what makes the separation stick; the source label plays no part in it.
-        await trx
-          .updateTable('face_identity_face')
-          .set({ identityId: identity.id })
-          .where('assetFaceId', 'in', faceIds)
-          .execute();
-
-        if (profile.representativeFaceId && faceIds.includes(profile.representativeFaceId)) {
-          const replacement = await trx
-            .selectFrom('face_identity_face')
-            .select('assetFaceId')
-            .where('identityId', '=', profile.identityId)
-            .orderBy('updatedAt', 'desc')
-            .executeTakeFirst();
-
-          await trx
-            .updateTable('face_identity')
-            .set({ representativeFaceId: replacement?.assetFaceId ?? null })
-            .where('id', '=', profile.identityId)
-            .execute();
-        }
+      // The lock IdentityMergePropagationService.lockMergePropagation takes before any merge writes.
+      await sql`select pg_advisory_xact_lock(hashtext('identity-merge-propagation'))`.execute(trx);
+      const candidate = await this.crossOwnerRepairCandidates(trx)
+        .select('person_identity.personGroupId')
+        .where('person_identity.personGroupId', '=', personGroupId)
+        .executeTakeFirst();
+      if (!candidate) {
+        return false;
       }
-
-      return identity.id;
+      await this.detachScopedProfileIn(trx, { type: 'person', id: personGroupId });
+      return true;
     });
+  }
+
+  @GenerateSql()
+  async hasCrossOwnerRepairWork(): Promise<boolean> {
+    const row = await this.crossOwnerRepairCandidates()
+      .select('person_identity.personGroupId')
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  private crossOwnerRepairCandidates(db: Kysely<DB> = this.db) {
+    return db
+      .selectFrom('person_identity')
+      .where('person_identity.manualLinkAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('person_identity as other')
+              .select(sql.lit(1).as('one'))
+              .whereRef('other.identityId', '=', 'person_identity.identityId')
+              .whereRef('other.ownerId', '!=', 'person_identity.ownerId'),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person')
+              .select(sql.lit(1).as('one'))
+              .whereRef('shared_space_person.identityId', '=', 'person_identity.identityId'),
+          ),
+        ]),
+      )
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('asset_face')
+              .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+              .innerJoin('shared_space_person', 'shared_space_person.identityId', 'person_identity.identityId')
+              .select(sql.lit(1).as('one'))
+              .where((eb) =>
+                eb.or([
+                  eb('asset_face.personGroupId', '=', eb.ref('person_identity.personGroupId')),
+                  eb.exists(
+                    eb
+                      .selectFrom('face_identity_face')
+                      .select(sql.lit(1).as('one'))
+                      .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+                      .whereRef('face_identity_face.identityId', '=', 'person_identity.identityId'),
+                  ),
+                ]),
+              )
+              .whereRef('asset.ownerId', '=', 'person_identity.ownerId')
+              .where('asset_face.deletedAt', 'is', null)
+              .where('asset.deletedAt', 'is', null)
+              .where((eb) => spaceVisibilityGate(eb))
+              .where((eb) =>
+                eb.or(
+                  spaceAssetPathBranches(eb, {
+                    correlateAssetId: 'asset.id',
+                    correlateLibraryId: 'asset.libraryId',
+                    scope: { spaceIdRef: 'shared_space_person.spaceId' },
+                    albumTimelineGate: 'none',
+                  }),
+                ),
+              ),
+          ),
+        ),
+      );
+  }
+
+  async detachScopedProfile(profileRef: ScopedPersonProfileRefDto): Promise<string> {
+    return this.db.transaction().execute((trx) => this.detachScopedProfileIn(trx, profileRef));
+  }
+
+  private async detachScopedProfileIn(trx: Kysely<DB>, profileRef: ScopedPersonProfileRefDto): Promise<string> {
+    const profile = await this.getProfileForDetach(profileRef, trx);
+    const identity = await trx
+      .insertInto('face_identity')
+      .values({
+        type: profile.identityType,
+        representativeFaceId: profile.representativeFaceId,
+      } satisfies Insertable<FaceIdentityTable>)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    await (profileRef.type === 'person'
+      ? setPersonIdentity(trx, profileRef.id, identity.id)
+      : trx
+          .updateTable('shared_space_person')
+          .set({ identityId: identity.id })
+          .where('id', '=', profileRef.id)
+          .where('spaceId', '=', profileRef.spaceId!)
+          .execute());
+    if (profileRef.type === 'person') {
+      // A detached person is no longer linked by hand to anything (#1317).
+      await trx
+        .updateTable('person_identity')
+        .set({ manualLinkAt: null })
+        .where('personGroupId', '=', profileRef.id)
+        .execute();
+    }
+
+    const faceIds = await this.getScopedProfileFaceIds(profileRef, trx);
+    if (faceIds.length > 0) {
+      // Re-key the faces onto the fresh identity and touch NOTHING else. `source` is deliberately absent:
+      // separating a profile is a statement about grouping ("this profile is not the same human as the ones
+      // it was grouped with"), not a per-face attestation, and `source='manual'` means precisely the latter
+      // — both engines read it, owner-agnostically, as "a human confirmed this face" and exclude it from the
+      // cleanup console and from suggestions forever (see isSettledForOwner in utils/face-repair.ts and the
+      // manual-link anti-join in face-person-verdict.repository.ts). Stamping it here buried every ML
+      // mistake in exactly the contaminated cluster a user separates BECAUSE it is contaminated, with no UI
+      // to undo it — the same over-claim the R1 people-merge decision reversed. The identityId rewrite is
+      // what makes the separation stick; the source label plays no part in it.
+      await trx
+        .updateTable('face_identity_face')
+        .set({ identityId: identity.id })
+        .where('assetFaceId', 'in', faceIds)
+        .execute();
+
+      if (profile.representativeFaceId && faceIds.includes(profile.representativeFaceId)) {
+        const replacement = await trx
+          .selectFrom('face_identity_face')
+          .select('assetFaceId')
+          .where('identityId', '=', profile.identityId)
+          .orderBy('updatedAt', 'desc')
+          .executeTakeFirst();
+
+        await trx
+          .updateTable('face_identity')
+          .set({ representativeFaceId: replacement?.assetFaceId ?? null })
+          .where('id', '=', profile.identityId)
+          .execute();
+      }
+    }
+
+    return identity.id;
   }
 
   private isRepairRole(role: string | null | undefined): boolean {
@@ -3146,23 +3224,29 @@ export class FaceIdentityRepository {
   }
 
   private getSpacePersonBackfillIdentityGroups(personId: string): Promise<SpacePersonBackfillIdentityGroup[]> {
-    return this.db
-      .selectFrom('shared_space_person_face')
-      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-      .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
-      .innerJoin('face_identity', 'face_identity.id', 'face_identity_face.identityId')
-      .select(['face_identity_face.identityId', 'face_identity.type'])
-      .select(() => [
-        sql<number>`count(*)::int`.as('faceCount'),
-        sql<string>`min(asset_face.id::text)::uuid`.as('representativeFaceId'),
-      ])
-      .where('shared_space_person_face.personId', '=', personId)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', '=', true)
-      .groupBy(['face_identity_face.identityId', 'face_identity.type'])
-      .orderBy(sql`count(*)`, 'desc')
-      .$castTo<SpacePersonBackfillIdentityGroup>()
-      .execute();
+    return (
+      this.db
+        .selectFrom('shared_space_person_face')
+        .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+        .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+        .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+        .innerJoin('face_identity', 'face_identity.id', 'face_identity_face.identityId')
+        .select(['face_identity_face.identityId', 'face_identity.type'])
+        .select(() => [
+          sql<number>`count(*)::int`.as('faceCount'),
+          sql<string>`min(asset_face.id::text)::uuid`.as('representativeFaceId'),
+        ])
+        .where('shared_space_person_face.personId', '=', personId)
+        .where('asset_face.deletedAt', 'is', null)
+        .where('asset_face.isVisible', '=', true)
+        // #1317: a trashed or Locked photo is not in the space, so it must not rebuild a space person the repair undid.
+        .where('asset.deletedAt', 'is', null)
+        .where('asset.visibility', 'in', peopleAssetVisibilities)
+        .groupBy(['face_identity_face.identityId', 'face_identity.type'])
+        .orderBy(sql`count(*)`, 'desc')
+        .$castTo<SpacePersonBackfillIdentityGroup>()
+        .execute()
+    );
   }
 
   private async getSpacePersonBackfillAssetFaceIdsForIdentity(personId: string, identityId: string): Promise<string[]> {
@@ -3170,11 +3254,14 @@ export class FaceIdentityRepository {
       .selectFrom('shared_space_person_face')
       .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .select('asset_face.id')
       .where('shared_space_person_face.personId', '=', personId)
       .where('face_identity_face.identityId', '=', identityId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', 'in', peopleAssetVisibilities)
       .execute();
 
     return rows.map((row) => row.id);

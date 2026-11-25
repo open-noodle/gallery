@@ -36,6 +36,8 @@ describe('GET /people/:id/faces — space-scope (Slice 2 / M1)', () => {
     // A1: Timeline, added to the space the viewer belongs to -> space-reachable + shareable.
     // This is the ONLY face that grants the viewer PersonRead at all (checkSharedSpaceAccess).
     spaceFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: personId });
+    // Other members read the person only while the space shows it (#1317).
+    await utils.showFacesInSpace(ctx.spaceId, [spaceFaceId], 'M1 Scoped Person');
 
     // A2: also added to the space (space-reachable) but Hidden -> fails spaceVisibilityGate.
     const hiddenAsset = await utils.createAsset(ctx.spaceOwner.token!, { visibility: AssetVisibility.Hidden });

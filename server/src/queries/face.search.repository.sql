@@ -112,6 +112,87 @@ where
   "cte"."distance" <= $9
 commit
 
+-- FaceSearchRepository.searchFaces (space-member)
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personGroupId",
+      face_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+      left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
+    where
+      (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = $2::uuid
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = $3::uuid
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = $4::uuid
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = $5::uuid
+          )
+        )
+      )
+      and "asset"."visibility" in ($6, $7)
+      and "asset"."ownerId" = $8
+      and "asset"."deletedAt" is null
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."personGroupId" is not null
+    order by
+      "distance"
+    limit
+      $9
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $10
+commit
+
 -- FaceSearchRepository.searchFaces (owner-visibility)
 begin
 set

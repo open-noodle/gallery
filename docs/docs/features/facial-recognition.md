@@ -77,6 +77,9 @@ It is on by default, and the toggle lives under **Enable face suggestions** in t
 See [Face Suggestions](face-suggestions.md) for how review works, what each action means, how
 Shared Spaces are handled, and the upgrade and on/off behaviour.
 
+In a Shared Space, your people are linked to the space's people only through photos you have in
+that space. See [Linking your people to space people](shared-spaces.md#linking-your-people-to-space-people).
+
 ## How Face Detection Works
 
 Face detection sends the generated preview image to the machine learning service for processing. The service checks if it has the relevant model downloaded and downloads it if not. The image is decoded, pre-processed and passed to the face detection model (with hardware acceleration if configured). The bounding boxes and scores outputted from this model are used to crop and preprocess the image once again to be passed to a facial recognition model (also accelerated if configured). The embeddings from the recognition model, together with the bounding boxes and scores from the face detection model, are then sent back to the server to be added to the database. The embeddings in particular are indexed so they can be searched quickly during facial recognition clustering.

@@ -245,12 +245,13 @@ export class PersonService extends BaseService {
       .filter((face) => !face.person?.isHidden || face.person?.ownerId === auth.user.id)
       .map((face) => mapFaces(face, asset.edits, assetDimensions));
 
+    await this.personViewerReads.faces(auth, dto.id, faces, response);
     // #808: a name or birthday set inside a shared space lives on `shared_space_person` and is
     // resolved at read time — it is never written back to `person`. The asset viewer Info panel
     // reads this endpoint for the owner, so it has to apply the same identity-wide resolution
     // PersonService.getById does; otherwise the age silently disappears for every person whose
-    // birthday only ever existed on a space profile. `mapFaces` already nulls people the caller
-    // does not own, so only owned faces are resolved here.
+    // birthday only ever existed on a space profile. Other people's faces were projected above,
+    // so only owned faces are resolved here.
     const identityByPersonId = new Map<string, string>();
     for (const face of faces) {
       if (face.person?.ownerId === auth.user.id && face.person.identityId) {
@@ -291,6 +292,9 @@ export class PersonService extends BaseService {
     if (allowedIds.has(id)) {
       const person = await this.findOrFail(auth, id);
       const response = mapPerson(person);
+      if (person.ownerId !== auth.user.id) {
+        return this.personViewerReads.person(auth, person, response);
+      }
       // Name and birthday set in a shared space are resolved at read time (never written back to
       // `person`). The owner accessing their own person short-circuits the resolver, so overlay the
       // identity-wide resolution here — otherwise they see the raw, often-empty `person.birthDate`.
@@ -319,6 +323,7 @@ export class PersonService extends BaseService {
     const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     if (allowedIds.has(id)) {
       const person = await this.findOrFail(auth, id);
+      await this.personViewerReads.requireShown(auth, person);
       if (person.identityId) {
         return this.faceIdentityRepository.getAccessiblePersonStatistics(auth.user.id, person.identityId);
       }
@@ -347,6 +352,11 @@ export class PersonService extends BaseService {
     const person = await this.personRepository.getByGroupIdOnly(personGroupId);
     if (!person || !person.thumbnailPath) {
       throw new NotFoundException();
+    }
+
+    const crop = await this.personViewerReads.thumbnail(auth, person);
+    if (crop) {
+      return crop;
     }
 
     return this.backendMedia.serveFromBackend(
@@ -845,24 +855,16 @@ export class PersonService extends BaseService {
       this.logger.debug(`Face ${id} has ${matches.length} matches`);
 
       let personGroupId = matches.find((match) => match.personGroupId)?.personGroupId;
-      const accessibleIdentityMatch = personGroupId
-        ? undefined
-        : await this.faceIdentity.findClosestAccessibleSharedIdentity({
-            userId: face.asset.ownerId,
-            embedding: face.faceSearch.embedding,
-            maxDistance: machineLearning.facialRecognition.maxDistance,
-          });
 
       // `matches` also includes the face itself
-      const matchedOnlySelf =
-        machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch;
+      const matchedOnlySelf = machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1;
       if (matchedOnlySelf && !skipSharedSpaceMatch) {
         this.logger.debug(`Face ${id} only matched the face itself, skipping`);
         return JobStatus.Skipped;
       }
 
       const isCore =
-        (matches.length >= machineLearning.facialRecognition.minFaces || !!accessibleIdentityMatch) &&
+        matches.length >= machineLearning.facialRecognition.minFaces &&
         face.asset.visibility === AssetVisibility.Timeline &&
         (await this.videoFaces.mayStartPerson(face.id, machineLearning));
       if (!isCore && !deferred) {
@@ -905,11 +907,9 @@ export class PersonService extends BaseService {
 
       if (personGroupId) {
         const person = await this.personRepository.getByGroupId({ ownerId, personGroupId });
-        let personCreated = false;
         if (person) {
           this.logger.debug(`Face ${id} matched person ${person.personGroupId}`);
         } else {
-          personCreated = true;
           await this.personRepository.create({ ownerId, faceAssetId: face.id, personGroupId });
           this.logger.log(`Created person for face ${id} in group ${personGroupId}`);
           await this.jobRepository.queue({
@@ -920,14 +920,8 @@ export class PersonService extends BaseService {
 
         this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
         await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
-        const sourceIdentityId = await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
-        await this.faceIdentity.mergeWithAccessibleSharedIdentity({
-          userId: face.asset.ownerId,
-          embedding: face.faceSearch.embedding,
-          maxDistance: machineLearning.facialRecognition.maxDistance,
-          sourceIdentityId,
-          match: personCreated ? accessibleIdentityMatch : undefined,
-        });
+        // #1317: only the owner's identity here; other accounts join through shared-space reconciliation.
+        await this.faceIdentity.replaceFaceIdentity(personGroupId, id, 'owner-person');
       }
 
       if (!personGroupId) {

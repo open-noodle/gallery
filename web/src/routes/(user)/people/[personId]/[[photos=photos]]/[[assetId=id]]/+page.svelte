@@ -455,7 +455,9 @@
                         <PersonIndicator {person} />
                       </div>
                       <div class="flex flex-col justify-center px-4 text-start text-primary">
-                        <p class="w-40 truncate font-medium">{person.name || $t('add_a_name')}</p>
+                        <p class="w-40 truncate font-medium">
+                          {person.name || (canEditSpacePerson ? $t('add_a_name') : $t('person'))}
+                        </p>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           {$t('assets_count', { values: { count: numberOfAssets } })}
                         </p>

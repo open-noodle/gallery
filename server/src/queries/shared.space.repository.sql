@@ -2146,31 +2146,50 @@ select
   "source_person"."id" as "sourceProfileId",
   "target_member"."userId" as "userId",
   "target_member"."role",
-  "source_person"."birthDate",
   "source_person"."type",
   "source_person"."updatedAt",
-  COALESCE(
-    NULLIF("source_alias"."alias", ''),
-    "source_person"."name",
-    ''
-  ) as "name",
+  CASE
+    WHEN "source_person"."nameSource" = 'manual'
+    AND EXISTS (
+      SELECT
+        1
+      FROM
+        shared_space_member AS author
+      WHERE
+        author."spaceId" = $1
+        AND author."userId" = "source_person"."nameSetById"
+        AND author."sharePersonMetadata" = true
+    ) THEN COALESCE("source_person"."name", '')
+    ELSE ''
+  END as "name",
+  CASE
+    WHEN "source_person"."birthDateSource" = 'manual'
+    AND EXISTS (
+      SELECT
+        1
+      FROM
+        shared_space_member AS author
+      WHERE
+        author."spaceId" = $2
+        AND author."userId" = "source_person"."birthDateSetById"
+        AND author."sharePersonMetadata" = true
+    ) THEN "source_person"."birthDate"
+  END as "birthDate",
   NULL as "species",
   "source_person"."faceCount" as "supportingFaceCount",
   true as "isAssetAdder"
 from
   "shared_space_person" as "source_person"
   inner join "shared_space_member" as "source_member" on "source_member"."spaceId" = "source_person"."spaceId"
-  and "source_member"."userId" = any ($1::uuid[])
-  and "source_member"."showInTimeline" = $2
-  inner join "shared_space_member" as "target_member" on "target_member"."spaceId" = $3
-  and "target_member"."userId" = any ($4::uuid[])
-  and "target_member"."sharePersonMetadata" = $5
-  left join "shared_space_person_alias" as "source_alias" on "source_alias"."personId" = "source_person"."id"
-  and "source_alias"."userId" = "source_member"."userId"
+  and "source_member"."userId" = any ($3::uuid[])
+  and "source_member"."showInTimeline" = $4
+  inner join "shared_space_member" as "target_member" on "target_member"."spaceId" = $5
+  and "target_member"."userId" = any ($6::uuid[])
+  and "target_member"."sharePersonMetadata" = $7
 where
-  "source_person"."identityId" = $6
-  and "source_person"."spaceId" != $7
-  and "source_person"."isHidden" = $8
+  "source_person"."identityId" = $8
+  and "source_person"."spaceId" != $9
+  and "source_person"."isHidden" = $10
 
 -- SharedSpaceRepository.getSpacePersonAssetAdderIds
 select distinct
@@ -3052,6 +3071,11 @@ select
   "shared_space_person"."faceCount",
   "shared_space_person"."representativeFaceId",
   "shared_space_person"."representativeFaceSource",
+  "shared_space_person"."nameSource",
+  "shared_space_person"."nameSourceProfileType",
+  "shared_space_person"."nameSourceProfileId",
+  "shared_space_person"."nameSourceUpdatedAt",
+  "shared_space_person"."nameSetById",
   "face_search"."embedding"
 from
   "shared_space_person"

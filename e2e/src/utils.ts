@@ -758,6 +758,47 @@ export const utils = {
     return { personGroupId, faceId };
   },
 
+  /**
+  Publishes existing faces in a space as one space person, the way recognition would. Another member can read a
+  person only while a space they belong to shows a space person for one of its faces (#1317), so a spec that seeds
+  faces with `createFace` and reads the person as a member calls this. The space person is linked to the faces'
+  identity and created in one transaction, for the same dedup race `createSpacePerson` describes.
+  */
+  showFacesInSpace: async (spaceId: string, faceIds: string[], name: string): Promise<string> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+    try {
+      await client.query('BEGIN');
+      const spacePerson = await client.query(
+        `INSERT INTO shared_space_person
+           ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId", "identityId", "type")
+         SELECT $1, $2, false, $3, 1, af.id, pi."identityId", 'person'
+         FROM asset_face af
+         LEFT JOIN person_identity pi ON pi."personGroupId" = af."personGroupId"
+         WHERE af.id = $4
+         RETURNING id`,
+        [spaceId, name, faceIds.length, faceIds[0]],
+      );
+      const spacePersonId = spacePerson.rows[0].id as string;
+      for (const faceId of faceIds) {
+        await client.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+          spacePersonId,
+          faceId,
+        ]);
+      }
+      await client.query('COMMIT');
+      return spacePersonId;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // best-effort rollback; surface the original error
+      }
+      throw error;
+    }
+  },
+
   createSpacePerson: async (
     spaceId: string,
     name: string,

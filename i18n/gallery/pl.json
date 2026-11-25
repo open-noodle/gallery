@@ -1148,6 +1148,8 @@
     "other": "{count} zdjęć"
   },
   "person_type_changed": "Zmieniono typ osoby.",
+  "person_unavailable_description": "Mogła zostać ukryta lub nie masz już do niej dostępu.",
+  "person_unavailable_title": "Ta osoba jest niedostępna",
   "pet": "Zwierzę",
   "pets": "Zwierzęta",
   "photos_only": "Tylko zdjęcia",
