@@ -36347,6 +36347,7 @@
           "FacialRecognition",
           "FaceIdentityBackfill",
           "FaceIdentityMaintenanceAfterRecognition",
+          "FaceIdentityCrossOwnerRepair",
           "FaceRepairScan",
           "FaceSuggestionMaintenance",
           "PersonSuggestionScanQueueAll",

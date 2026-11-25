@@ -12952,6 +12952,7 @@ export enum JobName {
     FacialRecognition = "FacialRecognition",
     FaceIdentityBackfill = "FaceIdentityBackfill",
     FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
+    FaceIdentityCrossOwnerRepair = "FaceIdentityCrossOwnerRepair",
     FaceRepairScan = "FaceRepairScan",
     FaceSuggestionMaintenance = "FaceSuggestionMaintenance",
     PersonSuggestionScanQueueAll = "PersonSuggestionScanQueueAll",
