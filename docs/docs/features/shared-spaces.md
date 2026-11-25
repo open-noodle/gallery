@@ -414,7 +414,7 @@ If the same person appears only in your private photos, an owner or editor of th
 
 An automatic link lasts as long as a photo behind it is still in the space. When you remove the last such photo, or unlink the album that held it, Gallery undoes the link in the background and your person keeps their own name and photos. Leaving a space does not by itself undo a link: photos you added directly stay in the space after you leave.
 
-A name or birthday typed into one space carries into another only while the person who typed it is a member of that other space and has **Share person names** on there. Your personal alias for someone is never shared, and a person you hide stops lending their name and birthday.
+A name or birthday typed into one space carries into another only while the person who typed it is a member of that other space and has **Share person names** on there. Your personal alias for someone is never shared. Hiding a person only tidies your own People page: a name or birthday it already lends to a space stays there.
 
 ### Merging People Across Owners
 

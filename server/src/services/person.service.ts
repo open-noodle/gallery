@@ -416,7 +416,7 @@ export class PersonService extends BaseService {
       await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
     }
 
-    if (person.identityId && (name !== undefined || birthDate !== undefined || isHidden !== undefined)) {
+    if (person.identityId && (name !== undefined || birthDate !== undefined)) {
       await this.jobRepository.queue({
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: { identityId: person.identityId },

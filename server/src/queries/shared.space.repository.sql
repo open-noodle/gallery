@@ -2132,7 +2132,6 @@ from
   and "shared_space_person"."spaceId" = $4
 where
   "person_identity"."identityId" = $5
-  and "person"."isHidden" = $6
 group by
   "person"."personGroupId",
   "person"."ownerId",

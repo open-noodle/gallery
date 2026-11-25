@@ -92,7 +92,7 @@ Owner decision (2026-11-23): a name crosses into a space only if the user who na
 
 `SharedSpaceRepository.getMetadataInheritanceCandidates` now applies these rules:
 
-- A personal person lends its name and birthday while its owner is a member of the target space, shares person names there, and has not hidden the person.
+- A personal person lends its name and birthday while its owner is a member of the target space and shares person names there. Hiding the person does not change that: owner decision (2026-11-25), hiding only tidies the owner's own People page. Reads of the owner's person itself still refuse a hidden person (§4b).
 - A space person lends a value only if someone typed it there, and only while that author is a member of the target space and shares person names there. The earlier gates on the member who added the photo still apply. Every path that stores a typed name records its author: renaming a space person, creating one with a name (with or without a starting face), and the space person dedup, which copies the name's source and author onto the person it keeps.
 - `shared_space_person.nameSetById` and `birthDateSetById` record the author. Existing names take theirs from the first `person_update` activity that recorded the same name. A name with no such entry, and every existing birthday, has no author and stays in its own space.
 - A personal alias is never a source: it belongs to the member who wrote it.

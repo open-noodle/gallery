@@ -3203,8 +3203,6 @@ export class SharedSpaceRepository {
         isAssetAdderSql.as('isAssetAdder'),
       ])
       .where('person_identity.identityId', '=', input.identityId)
-      // A person their owner hid lends nothing (#1317).
-      .where('person.isHidden', '=', false)
       .groupBy([
         'person.personGroupId',
         'person.ownerId',

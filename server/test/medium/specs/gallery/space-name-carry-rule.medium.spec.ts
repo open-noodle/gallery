@@ -2,7 +2,7 @@
 When a name or birthday crosses between spaces (#1317, specs/2026-11-22-cross-account-identity-joins-design.md).
 
 A value typed into one space reaches another only while the person who typed it is a member of that other space and
-shares person names there. A personal alias never crosses, a person their owner hid lends nothing, and an inherited copy
+shares person names there. A personal alias never crosses, a person their owner hid still lends, and an inherited copy
 is never a source, so two spaces cannot keep a value alive after its original is gone.
 */
 import { Kysely } from 'kysely';
@@ -224,7 +224,8 @@ describe('names crossing between spaces (#1317)', () => {
     await expect(w.targetRow()).resolves.toMatchObject({ name: '', nameSource: 'none' });
   });
 
-  it('stops lending a name from a person their owner hid, in every space', async () => {
+  // Owner decision (2026-11-25): hiding a person only tidies its owner's own People page; the name it lent stays.
+  it('keeps lending a name after its owner hides the person', async () => {
     const w = await buildWorld({ namerInTarget: true });
     await w.ctx.database
       .updateTable('person')
@@ -241,7 +242,11 @@ describe('names crossing between spaces (#1317)', () => {
       .execute();
     await w.backfill();
 
-    await expect(w.targetRow()).resolves.toMatchObject({ name: '', nameSource: 'none', birthDate: null });
+    await expect(w.targetRow()).resolves.toMatchObject({
+      name: 'Owner name',
+      nameSource: 'inherited',
+      birthDate: new Date('1980-03-04'),
+    });
   });
 
   it('keeps a name someone typed directly into the space', async () => {
