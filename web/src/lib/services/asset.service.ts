@@ -7,6 +7,7 @@ import {
 } from '#lib/gallery/asset-actions.ts';
 import { resetLibraryView } from '#lib/gallery/library-view/library-view.svelte.ts';
 import { animateRemoval, celebrate } from '#lib/gallery/motion/index.ts';
+import { notifyTagAssets } from '#lib/gallery/utils/tag-assets-result.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -571,7 +572,7 @@ export const handleTagAssets = async (assetIds: string[], tagIds: string[]) => {
 
   try {
     const response = await bulkTagAssets({ tagBulkAssetsDto: { assetIds, tagIds } });
-    toastManager.primary($t('tagged_assets', { values: { count: response.count } }));
+    notifyTagAssets($t, assetIds, response);
     eventManager.emit('AssetsTag', assetIds);
     return true;
   } catch (error) {

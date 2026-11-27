@@ -187,7 +187,7 @@ describe('/tags', () => {
         .send({ tagIds: [tagA.id, tagB.id, tagC.id], assetIds: [assetA.id, assetB.id] })
         .set('Authorization', `Bearer ${user.accessToken}`);
       expect(status).toBe(200);
-      expect(body).toEqual({ count: 3 });
+      expect(body).toMatchObject({ count: 3 });
     });
 
     it('should skip tags that are not owned by the user', async () => {
@@ -203,7 +203,7 @@ describe('/tags', () => {
         .send({ tagIds: [tagA.id, tagB.id, tagC.id], assetIds: [assetA.id, assetB.id] })
         .set('Authorization', `Bearer ${user.accessToken}`);
       expect(status).toBe(200);
-      expect(body).toEqual({ count: 4 });
+      expect(body).toMatchObject({ count: 4 });
     });
 
     it('should bulk tag assets', async () => {
@@ -219,7 +219,7 @@ describe('/tags', () => {
         .send({ tagIds: [tagA.id, tagB.id, tagC.id], assetIds: [assetA.id, assetB.id] })
         .set('Authorization', `Bearer ${user.accessToken}`);
       expect(status).toBe(200);
-      expect(body).toEqual({ count: 6 });
+      expect(body).toMatchObject({ count: 6 });
     });
   });
 
