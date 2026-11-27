@@ -4831,6 +4831,12 @@ export type TagBulkAssetsDto = {
 export type TagBulkAssetsResponseDto = {
     /** Number of assets tagged */
     count: number;
+    /** Requested assets the caller may not tag; nothing was written for them. Absent on older servers. */
+    skippedAssetIds?: string[];
+    /** Requested tag IDs the caller may not use; nothing was written for them. Absent on older servers. */
+    skippedTagIds?: string[];
+    /** Requested assets the caller may tag that carry every permitted requested tag after the call, whether the link is new or already existed. Empty when no requested tag is permitted. Absent on older servers. */
+    taggedAssetIds?: string[];
 };
 export type TagUpdateDto = {
     /** Tag color (hex) */

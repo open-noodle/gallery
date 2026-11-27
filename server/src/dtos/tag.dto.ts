@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { Tag } from 'src/database.js';
+import { GalleryTagBulkAssetsResponseExtension } from 'src/gallery/dtos/tag.dto.js';
 import type { MaybeDehydrated } from 'src/types.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { hexColor } from 'src/validation.js';
@@ -43,6 +44,7 @@ const TagBulkAssetsSchema = z
 const TagBulkAssetsResponseSchema = z
   .object({
     count: z.int().describe('Number of assets tagged'),
+    ...GalleryTagBulkAssetsResponseExtension,
   })
   .meta({ id: 'TagBulkAssetsResponseDto' });
 

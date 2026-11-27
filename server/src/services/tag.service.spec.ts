@@ -221,7 +221,9 @@ describe(TagService.name, () => {
     it('should handle invalid requests', async () => {
       mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.tag.upsertAssetIds.mockResolvedValue([]);
-      await expect(sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1'], assetIds: ['asset-1'] })).resolves.toEqual({
+      await expect(
+        sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1'], assetIds: ['asset-1'] }),
+      ).resolves.toMatchObject({
         count: 0,
       });
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([]);
@@ -235,7 +237,9 @@ describe(TagService.name, () => {
       mocks.asset.getForUpdateTags.mockResolvedValue({ tags: [{ value: 'tag-1' }] });
       mocks.tag.upsertAssetIds.mockResolvedValue([{ tagId: 'tag-1', assetId: 'asset-1' }]);
 
-      await expect(sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1'], assetIds: ['asset-1'] })).resolves.toEqual({
+      await expect(
+        sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1'], assetIds: ['asset-1'] }),
+      ).resolves.toMatchObject({
         count: 1,
       });
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-1', assetId: 'asset-1' }]);
@@ -255,7 +259,7 @@ describe(TagService.name, () => {
       ]);
       await expect(
         sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1', 'tag-2'], assetIds: ['asset-1', 'asset-2', 'asset-3'] }),
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         count: 6,
       });
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(

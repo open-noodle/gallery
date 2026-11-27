@@ -117,7 +117,7 @@ describe('space editor on a member asset', () => {
 
     const { tag } = await ctx.newTag({ userId: editor.id, value: 'editor-tag' });
     await expect(ctx.getService(TagService).bulkTagAssets(auth, { tagIds: [tag.id], assetIds: [id] })).resolves.toEqual(
-      { count: 1 },
+      { count: 1, taggedAssetIds: [id], skippedAssetIds: [], skippedTagIds: [] },
     );
 
     const { person } = await ctx.newPerson({ ownerId: editor.id });

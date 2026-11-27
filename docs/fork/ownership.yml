@@ -121,6 +121,11 @@ features:
       - mobile/lib/gallery/utils/person_thumbnail_url.dart
       - mobile/test/gallery/utils/person_thumbnail_url_test.dart
       - mobile/lib/gallery/providers/gallery_action.notifier.dart
+      # Bulk-tag feedback (specs/2026-11-27-bulk-tag-feedback-design.md).
+      - server/src/gallery/utils/tag-bulk-feedback*.ts
+      - server/src/gallery/dtos/tag.dto.ts
+      - server/test/medium/specs/gallery/tag-*.medium.spec.ts
+      - web/src/lib/gallery/utils/tag-assets-result*.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts

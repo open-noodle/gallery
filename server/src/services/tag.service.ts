@@ -14,6 +14,7 @@ import {
 } from 'src/dtos/tag.dto.js';
 import { JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
 import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
+import { galleryTagBulkFeedback } from 'src/gallery/utils/tag-bulk-feedback.js';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { addAssets, removeAssets } from 'src/utils/asset.util.js';
@@ -110,7 +111,7 @@ export class TagService extends BaseService {
       await this.eventRepository.emit('AssetTag', { assetId, userId: auth.user.id });
     }
 
-    return { count: results.length };
+    return { count: results.length, ...galleryTagBulkFeedback(dto, tagIds, assetIds) };
   }
 
   async addAssets(auth: AuthDto, id: string, dto: BulkIdsDto): Promise<BulkIdResponseDto[]> {
