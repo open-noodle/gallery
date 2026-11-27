@@ -728,3 +728,58 @@ jobs:
           curl -fsS -X POST "https://api.bunny.net/pullzone/$PULLZONE_ID/purgeCache" \
             -H "AccessKey: $BUNNY_API_KEY" \
             -H "Content-Length: 0" -w 'purge %{http_code}\n'
+
+  # Offers this release to Noodle Cloud hubs: the hub's app release workflow
+  # opens a pull request bumping its Gallery package to these images (pinned
+  # there by digest) with these release notes; merged, its catalog job
+  # publishes the version. The hub's PUBLISHING.md has the rules a release
+  # keeps: a new tag per build, no tag a published version names ever moved
+  # or deleted. Re-run this job alone if it fails: the release is done.
+  hub-package:
+    name: Offer to Noodle Cloud
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Dispatch the hub's app release
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.NOODLE_HUB_TOKEN }}
+          RELEASE_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::NOODLE_HUB_TOKEN is not set: the hub can't be offered $VERSION"
+            exit 1
+          fi
+
+          notes=$(GH_TOKEN="$RELEASE_TOKEN" gh release view "$VERSION" --repo "$REPO" --json body --jq .body |
+            .github/scripts/hub-release-notes.sh)
+          if [[ -z "$notes" ]]; then
+            notes="Gallery ${VERSION#v}."
+          fi
+          printf 'Notes:\n%s\n' "$notes"
+
+          images=$(printf '%s\n' \
+            "ghcr.io/open-noodle/gallery-server=${VERSION}" \
+            "ghcr.io/open-noodle/gallery-ml=${VERSION}")
+
+          gh workflow run app-release.yml --repo Deeds67/noodlecloud --ref main \
+            -f package=gallery \
+            -f version="${VERSION#v}" \
+            -f images="$images" \
+            -f notes="$notes"
+
+          {
+            echo "### Offered to Noodle Cloud"
+            echo
+            echo "The hub's app release opens the bump pull request for Gallery ${VERSION#v}."
+          } >> "$GITHUB_STEP_SUMMARY"
