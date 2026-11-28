@@ -55,6 +55,7 @@ export class FileOperationRepository {
       SELECT EXISTS (
         SELECT 1 FROM pg_locks
         WHERE locktype = 'advisory' AND classid = 0 AND objsubid = 1 AND granted
+          AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
           AND objid = ${DatabaseLock.FileOperation}::oid
       ) AS held`.execute(this.db);
     return rows[0].held;
