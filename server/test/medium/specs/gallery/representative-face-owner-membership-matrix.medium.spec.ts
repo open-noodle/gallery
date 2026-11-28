@@ -19,6 +19,7 @@ fail.
 import { Kysely } from 'kysely';
 import { AlbumUserRole } from 'src/enum.js';
 import { SharedSpaceRole } from 'src/gallery/enum.js';
+import { PersonCoverRepository } from 'src/gallery/repositories/person-cover.repository.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -65,6 +66,7 @@ const setup = () => {
       AlbumUserRepository,
       AssetRepository,
       FaceIdentityRepository,
+      PersonCoverRepository,
       PersonRepository,
       SharedSpaceRepository,
       UserRepository,
