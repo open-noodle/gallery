@@ -805,14 +805,18 @@ describe('Spaces people page', () => {
     expect(menuButton).toBeInTheDocument();
   });
 
-  it('does NOT show context menu for viewers', async () => {
+  it('offers viewers only the favorite option in the context menu', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
     const { baseElement } = await renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
     await dispatchAndFlush(card, new MouseEvent('mouseenter'));
 
-    expect(page.getByLabelText('show_person_options', { exact: true }).query()).toBeNull();
+    await userEvent.click(page.getByLabelText('show_person_options', { exact: true }).element());
+
+    expect(page.getByText('to_favorite', { exact: true }).element()).toBeInTheDocument();
+    expect(page.getByText('merge_people', { exact: true }).query()).not.toBeInTheDocument();
+    expect(page.getByText('hide_person', { exact: true }).query()).not.toBeInTheDocument();
   });
 
   it('context menu has "Merge" option', async () => {
