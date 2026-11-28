@@ -49,6 +49,16 @@ class PersonalMergeDb {
   insertInto(table: string) {
     return new PersonalMergeInsertBuilder(this, table);
   }
+
+  // The identity-favorite helpers (reconcileIdentityFavorites, moveIdentityFavorites) run raw SQL, which Kysely
+  // executes through this. No fixture here seeds face_identity_favorite, so it answers with no rows.
+  getExecutor() {
+    return {
+      transformQuery: (node: unknown) => node,
+      compileQuery: (node: unknown) => ({ query: node, sql: '', parameters: [] }),
+      executeQuery: () => Promise.resolve({ rows: [] }),
+    };
+  }
 }
 
 class PersonalMergeInsertBuilder {
