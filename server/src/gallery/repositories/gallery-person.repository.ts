@@ -745,7 +745,7 @@ export class GalleryPersonRepository {
           .updateTable('person')
           .set({ isFavorite })
           .where('personGroupId', '=', owned.personGroupId)
-          .where('isFavorite', '!=', isFavorite)
+          .where('person.isFavorite', '!=', isFavorite)
           .execute();
       }
 
