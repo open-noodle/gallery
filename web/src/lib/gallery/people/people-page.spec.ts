@@ -823,8 +823,32 @@ describe('Global people page', () => {
     await expect.element(page.getByText('Shared Alice')).toBeInTheDocument();
   });
 
-  it('keeps personal actions off shared-space-only rows', async () => {
-    mockSpaceRole('space-1', SharedSpaceRole.Editor);
+  it.each([SharedSpaceRole.Editor, SharedSpaceRole.Viewer])(
+    'offers only favorite on shared-space-only rows, whatever the space role (%s)',
+    async (role) => {
+      mockSpaceRole('space-1', role);
+      await renderPage([
+        makePerson({
+          id: 'space-person-1',
+          name: 'Shared Alice',
+          isFavorite: undefined,
+          primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+        }),
+      ]);
+
+      await userEvent.hover(page.getByRole('group'));
+      await userEvent.click(page.getByLabelText('show_person_options'));
+
+      await expect.element(page.getByText('to_favorite')).toBeInTheDocument();
+      await expect.element(page.getByText('hide_person')).not.toBeInTheDocument();
+      await expect.element(page.getByText('set_date_of_birth')).not.toBeInTheDocument();
+      await expect.element(page.getByText('merge_people')).not.toBeInTheDocument();
+    },
+  );
+
+  it('favorites a shared-space-only row through the space endpoint', async () => {
+    mockSpaceRole('space-1', SharedSpaceRole.Viewer);
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined as never);
     await renderPage([
       makePerson({
         id: 'space-person-1',
@@ -835,11 +859,16 @@ describe('Global people page', () => {
     ]);
 
     await userEvent.hover(page.getByRole('group'));
+    await userEvent.click(page.getByLabelText('show_person_options'));
+    await userEvent.click(page.getByText('to_favorite'));
 
-    await expect.element(await getInputByValue('Shared Alice')).toHaveAttribute('placeholder', 'add_a_name');
-    await expect.element(page.getByLabelText('show_person_options')).not.toBeInTheDocument();
-    await expect.element(page.getByText('to_favorite')).not.toBeInTheDocument();
-    await expect.element(page.getByText('hide_person')).not.toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(sdkMock.favoriteSpacePerson).toHaveBeenCalledExactlyOnceWith({
+        id: 'space-1',
+        personId: 'space-person-1',
+      }),
+    );
+    expect(sdkMock.updatePerson).not.toHaveBeenCalled();
   });
 
   it('requests the next page at the shared size and merges the rows across the boundary', async () => {

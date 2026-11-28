@@ -14,6 +14,7 @@ import { GalleryFaceController } from 'src/gallery/controllers/gallery-face.cont
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
 import { GalleryServerController } from 'src/gallery/controllers/gallery-server.controller.js';
+import { GallerySpacePersonController } from 'src/gallery/controllers/gallery-space-person.controller.js';
 import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
 import { DataSaverVideoRepository } from 'src/gallery/repositories/data-saver-video.repository.js';
@@ -90,6 +91,7 @@ export const galleryControllers = [
   GalleryMapController,
   GalleryPeopleController,
   GallerySearchController,
+  GallerySpacePersonController,
   LibraryManifestController,
   SharedSpaceController,
   StorageMigrationController,

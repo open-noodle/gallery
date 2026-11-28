@@ -4672,6 +4672,8 @@ export type SharedSpacePersonResponseDto = {
     faceCount: number;
     /** Person ID */
     id: string;
+    /** Whether the current user favorited this person */
+    isFavorite?: boolean;
     /** Is hidden */
     isHidden: boolean;
     /** Person name */
@@ -11080,6 +11082,30 @@ export function getSpacePersonFaceThumbnail({ faceId, id, personId }: {
         data: Blob;
     }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces/${encodeURIComponent(faceId)}/thumbnail`, {
         ...opts
+    }));
+}
+/**
+ * Unfavorite a person in a shared space
+ */
+export function unfavoriteSpacePerson({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/favorite`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Favorite a person in a shared space
+ */
+export function favoriteSpacePerson({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/favorite`, {
+        ...opts,
+        method: "PUT"
     }));
 }
 /**

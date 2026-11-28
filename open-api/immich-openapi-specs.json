@@ -23434,6 +23434,124 @@
         "x-immich-state": "Stable"
       }
     },
+    "/shared-spaces/{id}/people/{personId}/favorite": {
+      "delete": {
+        "description": "Remove a person from the current user's favorites.",
+        "operationId": "unfavoriteSpacePerson",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Unfavorite a person in a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Stable"
+      },
+      "put": {
+        "description": "Favorite a person for the current user. Favorites are personal and pin the person to the top of lists.",
+        "operationId": "favoriteSpacePerson",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Favorite a person in a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Stable"
+      }
+    },
     "/shared-spaces/{id}/people/{personId}/merge": {
       "post": {
         "description": "Merge one or more people into the target person in a shared space.",
@@ -44409,6 +44527,10 @@
           "id": {
             "description": "Person ID",
             "type": "string"
+          },
+          "isFavorite": {
+            "description": "Whether the current user favorited this person",
+            "type": "boolean"
           },
           "isHidden": {
             "description": "Is hidden",

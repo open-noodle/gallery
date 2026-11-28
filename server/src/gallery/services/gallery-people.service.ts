@@ -228,4 +228,19 @@ export class GalleryPeopleService extends BaseService {
     });
     return mapPerson(person);
   }
+
+  /** Any member may favorite: the favorite is theirs alone. A person with no identity has nowhere to be stored. */
+  async setSpacePersonFavorite(auth: AuthDto, spaceId: string, personId: string, isFavorite: boolean): Promise<void> {
+    const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
+    if (!member) {
+      throw new ForbiddenException('Not a member of this space');
+    }
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId || !person.identityId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    await this.galleryPersonRepository.setIdentityFavorite(auth.user.id, person.identityId, isFavorite);
+  }
 }

@@ -1810,13 +1810,24 @@ export class SharedSpaceService extends BaseService {
       takenBefore: query?.takenBefore,
       minimumFaceCount: machineLearning.facialRecognition.minFaces,
       type: query?.type,
+      viewerUserId: auth.user.id,
     });
 
     const aliases =
       persons.length > 0 ? await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id) : [];
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
+    const favorites = await this.galleryPersonRepository.getFavoriteIdentityIds(
+      auth.user.id,
+      persons.flatMap(({ identityId }) => identityId ?? []),
+    );
 
-    return persons.map((person) => this.mapSpacePerson(person, aliasMap.get(person.id) ?? null));
+    return persons.map((person) =>
+      this.mapSpacePerson(
+        person,
+        aliasMap.get(person.id) ?? null,
+        !!person.identityId && favorites.has(person.identityId),
+      ),
+    );
   }
 
   async getSpacePeopleStatistics(
@@ -2357,7 +2368,7 @@ export class SharedSpaceService extends BaseService {
     );
 
     const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
-    return this.mapSpacePerson(person, alias?.alias ?? null);
+    return this.mapSpacePerson(person, alias?.alias ?? null, await this.isSpacePersonFavorite(auth, person));
   }
 
   /**
@@ -2634,7 +2645,7 @@ export class SharedSpaceService extends BaseService {
         representativeFaceId,
       });
       const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
-      return this.mapSpacePerson(updated, alias?.alias ?? null);
+      return this.mapSpacePerson(updated, alias?.alias ?? null, await this.isSpacePersonFavorite(auth, updated));
     }
 
     const face = await this.sharedSpaceRepository.getSpaceRepresentativeFaceForUpdate({
@@ -2657,7 +2668,7 @@ export class SharedSpaceService extends BaseService {
       });
     }
     const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
-    return this.mapSpacePerson(updated, alias?.alias ?? null);
+    return this.mapSpacePerson(updated, alias?.alias ?? null, await this.isSpacePersonFavorite(auth, updated));
   }
 
   async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
@@ -2675,7 +2686,7 @@ export class SharedSpaceService extends BaseService {
 
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
-    return this.mapSpacePerson(person, alias?.alias ?? null);
+    return this.mapSpacePerson(person, alias?.alias ?? null, await this.isSpacePersonFavorite(auth, person));
   }
 
   async getSpacePersonStatistics(
@@ -2876,7 +2887,7 @@ export class SharedSpaceService extends BaseService {
       data: { personId, personName: enriched.name ?? '' },
     });
 
-    return this.mapSpacePerson(enriched, alias?.alias ?? null);
+    return this.mapSpacePerson(enriched, alias?.alias ?? null, await this.isSpacePersonFavorite(auth, enriched));
   }
 
   async deleteSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
@@ -4693,7 +4704,19 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
-  private mapSpacePerson(person: SharedSpacePerson, alias: string | null): SharedSpacePersonResponseDto {
+  private async isSpacePersonFavorite(auth: AuthDto, person: { identityId?: string | null }): Promise<boolean> {
+    if (!person.identityId) {
+      return false;
+    }
+    const favorites = await this.galleryPersonRepository.getFavoriteIdentityIds(auth.user.id, [person.identityId]);
+    return favorites.has(person.identityId);
+  }
+
+  private mapSpacePerson(
+    person: SharedSpacePerson,
+    alias: string | null,
+    isFavorite = false,
+  ): SharedSpacePersonResponseDto {
     return {
       id: person.id,
       spaceId: person.spaceId,
@@ -4706,6 +4729,7 @@ export class SharedSpaceService extends BaseService {
       faceCount: person.faceCount,
       assetCount: person.assetCount,
       alias,
+      isFavorite,
       createdAt: (person.createdAt as unknown as Date).toISOString(),
       updatedAt: (person.updatedAt as unknown as Date).toISOString(),
       type: person.type,
