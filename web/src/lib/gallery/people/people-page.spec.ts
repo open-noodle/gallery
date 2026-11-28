@@ -848,7 +848,7 @@ describe('Global people page', () => {
 
   it('favorites a shared-space-only row through the space endpoint', async () => {
     mockSpaceRole('space-1', SharedSpaceRole.Viewer);
-    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined);
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined as never);
     await renderPage([
       makePerson({
         id: 'space-person-1',

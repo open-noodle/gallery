@@ -445,7 +445,7 @@ describe('Spaces person detail page', () => {
   });
 
   it.each([SharedSpaceRole.Viewer, SharedSpaceRole.Editor])('favorites the person as a %s', async (role) => {
-    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined);
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined as never);
     await renderPage({ members: [makeMember({ role })], person: makePerson({ isFavorite: false }) });
 
     await userEvent.click(page.getByText('to_favorite'));
@@ -455,7 +455,7 @@ describe('Spaces person detail page', () => {
   });
 
   it('unfavorites a favorited person', async () => {
-    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined);
+    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined as never);
     await renderPage({ person: makePerson({ isFavorite: true }) });
 
     await userEvent.click(page.getByText('unfavorite'));

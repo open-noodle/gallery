@@ -416,7 +416,7 @@ describe('Space people page', () => {
   });
 
   it('offers a viewer only favorite, and favorites through the space endpoint', async () => {
-    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined);
+    sdkMock.favoriteSpacePerson.mockResolvedValue(undefined as never);
     const alice = makeSpacePerson({ id: 'space-person-alice', name: 'Alice' });
     await renderPage([alice], { total: 1, hidden: 0, detectedFaceCount: 0 }, SharedSpaceRole.Viewer);
 
@@ -438,7 +438,7 @@ describe('Space people page', () => {
   });
 
   it('unfavorites a favorited person and pins favorites first', async () => {
-    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined);
+    sdkMock.unfavoriteSpacePerson.mockResolvedValue(undefined as never);
     const zed = makeSpacePerson({ id: 'space-person-zed', name: 'Zed', assetCount: 1, isFavorite: true });
     const amy = makeSpacePerson({ id: 'space-person-amy', name: 'Amy', assetCount: 50 });
     await renderPage([amy, zed]);
