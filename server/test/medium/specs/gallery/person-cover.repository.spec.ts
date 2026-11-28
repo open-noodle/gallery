@@ -5,7 +5,7 @@ import { PERSON_COVER_VERSION } from 'src/gallery/utils/person-cover.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
-import { up } from 'src/schema/migrations-gallery/1800200000000-AddPersonCoverTables.js';
+import { up } from 'src/schema/migrations-gallery/1800400000000-AddPersonCoverTables.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { newEmbedding } from 'test/small.factory.js';
@@ -426,7 +426,7 @@ describe(PersonCoverRepository.name, () => {
     });
   });
 
-  describe('migration 1800200000000-AddPersonCoverTables', () => {
+  describe('migration 1800400000000-AddPersonCoverTables', () => {
     it('marks every existing cover unknown and leaves people without a cover rowless', async () => {
       const { ctx } = setup();
       const { user } = await ctx.newUser();
